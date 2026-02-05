@@ -1,0 +1,31 @@
+[package]
+name = "memory_mcp"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+rmcp = { version = "0.14.0", features = ["macros", "transport-io"] }
+tokio = { version = "1.49.0", features = [
+    "rt-multi-thread",
+    "macros",
+    "io-std"
+] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+schemars = "1.2.1"
+chrono = { version = "0.4.43", features = ["serde", "clock"] }
+thiserror = "2.0.18"
+async-trait = "0.1.89"
+regex = "1.12.3"
+sha2 = "0.10.9"
+hex = "0.4.3"
+serde_cbor = "0.11.2"
+lru = "0.16.3"
+surrealdb-migrations = "2.4"
+include_dir = "0.7.4"
+surrealdb = { version = "2.6.0", features = ["kv-rocksdb"] }
+
+[dev-dependencies]
+serde_json = "1.0.149"
+tempfile = "3.24.0"

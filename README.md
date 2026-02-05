@@ -1,0 +1,240 @@
+# Memory MCP (Rust) — QuickStart и примеры использования 🧠🔧
+
+Краткое описание
+- Этот репозиторий содержит Rust‑версию Memory MCP сервера (`memory_mcp`) с stdio-only RMCP транспортом и встроенной/удалённой поддержкой SurrealDB (включая RocksDB для локальной персистенции).
+
+## Быстрый старт ✅
+1. Установить (рекомендуется) — через `cargo install`:
+
+```bash
+cargo install --locked memory_mcp
+```
+
+Или собрать бинарник из исходников:
+
+```bash
+cargo build --release
+```
+
+2. Задать необходимые переменные окружения (пример):
+
+```bash
+# Example environment variables (can be stored in .env)
+export SURREALDB_DB_NAME=memory              # e.g., memory, testdb, production_db
+export SURREALDB_URL=ws://127.0.0.1:8000/rpc # ws://host:port/rpc (omit for embedded)
+export SURREALDB_EMBEDDED=false             # true | false (recommended: leave unset to infer from SURREALDB_URL)
+export SURREALDB_DATA_DIR=./data/surrealdb  # path used when embedded (default ./data/surrealdb)
+export SURREALDB_NAMESPACES=org,personal,private  # comma-separated namespaces (at least one)
+export SURREALDB_USERNAME=root
+export SURREALDB_PASSWORD=root
+export LOG_LEVEL=info                        # trace | debug | info | warn | error
+```
+
+### Описание переменных окружения
+
+| Переменная | Описание | Формат / Примеры |
+|---|---|---|
+| `SURREALDB_DB_NAME` | Имя базы в SurrealDB | `memory`, `testdb`, `production_db` |
+| `SURREALDB_URL` | URL SurrealDB (WebSocket RPC). Если пустой — используется embedded RocksDB | `ws://127.0.0.1:8000/rpc` |
+| `SURREALDB_EMBEDDED` | Принудительно включить embedded режим. Рекомендуется оставить unset и полагаться на `SURREALDB_URL` | `true` / `false` |
+| `SURREALDB_DATA_DIR` | Путь к RocksDB data dir, используется в embedded режиме | `./data/surrealdb` |
+| `SURREALDB_NAMESPACES` | Спискок namespaces, разделённых запятой | `org,personal,private` |
+| `SURREALDB_USERNAME` | Имя пользователя SurrealDB | `root` |
+| `SURREALDB_PASSWORD` | Пароль SurrealDB | `root` |
+| `LOG_LEVEL` | Уровень логирования | `trace`, `debug`, `info`, `warn`, `error` |
+
+> Советы: храните секреты в CI/секретном хранилище, а не в репозитории. Для локальной разработки используйте `.env` и `set -a; source .env; set +a`.
+
+3. Запустить сервер (stdio transport):
+
+Если установлен через `cargo install`:
+
+```bash
+LOG_LEVEL=info memory_mcp
+```
+
+Если собран из исходников:
+
+```bash
+LOG_LEVEL=info ./target/release/memory_mcp
+```
+
+> Сервер ожидает входных сообщений по stdin и отвечает в stdout в формате RMCP/MCP envelope (см. примеры ниже).
+
+---
+
+## Пример `mcp.json` (интерфейс инструментов) 🗂️
+Ниже — минимальный пример манифеста `mcp.json`, который описывает доступные инструменты и их контракт.
+
+```json
+{
+  "name": "memory_mcp",
+  "version": "0.1.0",
+  "description": "Memory MCP — ingest/extract/assemble/explain tools",
+  "tools": [
+    {
+      "name": "ingest",
+      "description": "Ingest a document or message into memory (creates an episode)",
+      "input_example": {
+        "source_type": "email",
+        "source_id": "MSG-123",
+        "content": "The email body or raw document"
+      }
+    },
+    {
+      "name": "extract",
+      "description": "Extract entities/facts from an episode",
+      "input_example": { "episode_id": "episode:..." }
+    },
+    {
+      "name": "assemble_context",
+      "description": "Assemble context for an entity or a prompt",
+      "input_example": { "entity_id": "entity:...", "limit": 50 }
+    },
+    {
+      "name": "explain",
+      "description": "Return provenance and citations for an entity or fact",
+      "input_example": { "entity_id": "entity:..." }
+    }
+  ]
+}
+```
+
+> Поместите `mcp.json` рядом с бинарником или используйте его в CI для документирования интерфейса инструментов.
+
+---
+
+### Пример развернутого `mcp.json` (stdio servers) — пример для локальной разработки
+
+Ниже — пример более полного `mcp.json` с несколькими stdio‑серверами. Внимание: секции `env` содержат placeholders вместо реальных секретов — **не** храните секреты в репозитории.
+
+```json
+{
+  "servers": {
+    "memory-mcp": {
+      "type": "stdio",
+      "command": "./target/release/memory_mcp",
+      "env": {
+        "SURREALDB_DB_NAME": "memory",
+        "SURREALDB_URL": "ws://127.0.0.1:8000/rpc",
+        "SURREALDB_NAMESPACES": "org,personal,private",
+        "SURREALDB_USERNAME": "root",
+        "SURREALDB_PASSWORD": "root",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "memory-mcp-embedded": {
+      "type": "stdio",
+      "command": "./target/release/memory_mcp",
+      "env": {
+        "SURREALDB_DB_NAME": "memory",
+        "SURREALDB_EMBEDDED": "true",
+        "SURREALDB_DATA_DIR": "./data/surrealdb",
+        "SURREALDB_NAMESPACES": "org,personal,private",
+        "SURREALDB_USERNAME": "root",
+        "SURREALDB_PASSWORD": "root",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+> Примечание: значения env в примере совпадают с файлом `.env` в корне репозитория. Для запуска локально можно выполнить:
+
+```bash
+# загрузить переменные из .env (bash/zsh)
+set -a; source .env; set +a
+# затем запустить бинарник
+./target/release/memory_mcp
+```
+
+> Миграции схемы должны лежать в единственной ожидаемой относительной папке `./migrations` (от корня репозитория). При первом старте MCP файлы `*.surql` из `./migrations` будут автоматически применены к базе. Убедитесь, что `./migrations/__Initial.surql` присутствует.
+
+> В CI используйте защищённые переменные/секреты вместо хранения токенов в файлах.
+
+> Подсказка: для CI используйте безопасные переменные/секреты в самом CI и не вставляйте токены в публичные файлы.
+
+
+---
+
+## Примеры реальных сценариев использования (stdin/stdout) 📡
+Ниже — упрощённые примеры последовательного взаимодействия с сервером через stdio (RMCP envelope). Формат сообщения — JSON; конкретная envelope-форма может варьироваться по реализации клиента, но идея следующая:
+
+1) Ингестируем документ:
+
+```bash
+printf '%s\n' '{"type":"call","id":"1","tool":"ingest","args": {"source_type":"email","source_id":"MSG-202","content":"Hello from Alice"}}' | ./target/debug/memory_mcp
+```
+
+Ожидаемый ответ (пример):
+
+```json
+{"type":"response","id":"1","ok":{"episode_id":"episode:abc123"}}
+```
+
+2) Извлекаем сущности/факты из эпизода:
+
+```bash
+printf '%s\n' '{"type":"call","id":"2","tool":"extract","args": {"episode_id":"episode:abc123"}}' | ./target/release/memory_mcp
+```
+
+Ответ (пример):
+
+```json
+{"type":"response","id":"2","ok":{"entities":[{"id":"entity:john","type":"person","name":"John Doe"}]}}
+```
+
+3) Собираем контекст для сущности (assemble_context):
+
+```bash
+printf '%s\n' '{"type":"call","id":"3","tool":"assemble_context","args": {"entity_id":"entity:john","limit":25}}' | ./target/debug/memory_mcp
+```
+
+Ответ (пример):
+
+```json
+{"type":"response","id":"3","ok":{"context":[{"episode_id":"episode:abc123","text":"..."}]}}
+```
+
+4) Поясняем происхождение (explain):
+
+```bash
+printf '%s\n' '{"type":"call","id":"4","tool":"explain","args":{"entity_id":"entity:john"}}' | ./target/debug/memory_mcp
+```
+
+Ответ (пример):
+
+```json
+{"type":"response","id":"4","ok":{"explanations":[{"fact_id":"fact:1","source":"MSG-202","confidence":0.95}]}}
+```
+
+---
+
+## Пример последовательности в CI (тестовое встраивание) 🧪
+В CI можно запускать бинарник в фоновом процессе и взаимодействовать через stdio (или через тестовый клиент). Пример псевдо‑скрипта:
+
+```bash
+# запустить сервер (в background) и перенаправить stdin/stdout во временные FIFO
+mkfifo /tmp/mcp_in /tmp/mcp_out
+./target/debug/memory_mcp < /tmp/mcp_in > /tmp/mcp_out &
+PID=$!
+# отправить вызов
+echo '{"type":"call","id":"1","tool":"ingest","args":{"source_type":"email","source_id":"MSG-1","content":"CI test"}}' > /tmp/mcp_in
+# прочитать ответ
+head -n 1 /tmp/mcp_out
+# kill $PID после завершения
+kill $PID
+```
+
+---
+
+## Полезные переменные окружения и конфиг
+- SURREALDB_DATA_DIR — путь к директории данных при embedded RocksDB (по умолчанию `./data/surrealdb`).
+- SURREALDB_DB_NAME — имя базы (пример: `testdb`).
+- SURREALDB_USERNAME / SURREALDB_PASSWORD — учётные данные для SurrealDB.
+- `LOG_LEVEL` — уровень логирования (рекомендуемый).
+
+---
+
+Если нужно, могу добавить конкретные примеры клиента (Python/Node) для работы с stdio RMCP, или подготовить `mcp.json` с полными JSON‑schema для каждого инструмента. Хотите, чтобы я добавил пример клиентской библиотеки (Python) для интеграции по stdin/stdout? 💬
