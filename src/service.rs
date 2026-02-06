@@ -479,10 +479,11 @@ impl MemoryService {
 
         let namespace = self.namespace_for_scope(&request.scope);
         let cutoff_iso = normalize_iso(cutoff);
-        let query_opt = if request.query.trim().is_empty() {
+        let cleaned_query = preprocess_search_query(&request.query);
+        let query_opt = if cleaned_query.is_empty() {
             None
         } else {
-            Some(request.query.as_str())
+            Some(cleaned_query.as_str())
         };
 
         // Use DB-side filtering for scope, cutoff, query, and limit (query pushdown)
@@ -1562,6 +1563,29 @@ fn normalize_iso(dt: DateTime<Utc>) -> String {
     dt.to_rfc3339()
 }
 
+/// Preprocess a search query: strip episode references (episode:xxx),
+/// boolean operators (OR/AND/NOT), quoted phrases, and collapse whitespace.
+/// Returns cleaned words joined by spaces, suitable for full-text search.
+pub fn preprocess_search_query(raw: &str) -> String {
+    static EPISODE_REF: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static QUOTED: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+    let episode_re = EPISODE_REF.get_or_init(|| Regex::new(r"(?i)episode:[a-z0-9_-]+").unwrap());
+    let quoted_re = QUOTED.get_or_init(|| Regex::new(r#""([^"]*)""#).unwrap());
+
+    let s = episode_re.replace_all(raw, " ");
+    let s = quoted_re.replace_all(&s, " $1 ");
+
+    s.split_whitespace()
+        .filter(|w| {
+            let upper = w.to_uppercase();
+            // Drop boolean operators and very short noise tokens
+            upper != "OR" && upper != "AND" && upper != "NOT" && w.len() >= 2
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Bucket cutoff to the start of the hour for better cache hit rate
 fn bucket_to_hour(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:00:00Z").to_string()
@@ -2003,14 +2027,23 @@ mod tests {
                             return false;
                         }
                     }
+                    // Per-word OR matching (mirrors SurrealDB full-text search semantics)
                     if let Some(ref q) = query_lower {
                         let content = f
                             .get("content")
                             .and_then(Value::as_str)
                             .unwrap_or_default()
                             .to_lowercase();
-                        if !content.contains(q) {
-                            return false;
+                        let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
+                        if words.is_empty() {
+                            if !content.contains(q) {
+                                return false;
+                            }
+                        } else {
+                            let any_match = words.iter().any(|w| content.contains(w));
+                            if !any_match {
+                                return false;
+                            }
                         }
                     }
                     true
@@ -2514,5 +2547,123 @@ mod tests {
         }));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_preprocess_search_query_strips_episode_refs() {
+        let result = preprocess_search_query("PoC iOS MDM episode:035d8d47 OR episode:8de581d5");
+        assert_eq!(result, "PoC iOS MDM");
+    }
+
+    #[test]
+    fn test_preprocess_search_query_strips_boolean_ops() {
+        let result = preprocess_search_query("mobile checklist APNs OR FCM AND ports NOT pending");
+        assert_eq!(result, "mobile checklist APNs FCM ports pending");
+    }
+
+    #[test]
+    fn test_preprocess_search_query_strips_quotes() {
+        let result = preprocess_search_query(r#"changelog "KSMM v2.2" KSMM_6.0_Linux"#);
+        assert_eq!(result, "changelog KSMM v2.2 KSMM_6.0_Linux");
+    }
+
+    #[test]
+    fn test_preprocess_search_query_short_tokens_dropped() {
+        let result = preprocess_search_query("a PoC b c iOS MDM");
+        assert_eq!(result, "PoC iOS MDM");
+    }
+
+    #[test]
+    fn test_preprocess_search_query_empty_input() {
+        assert_eq!(preprocess_search_query(""), "");
+        assert_eq!(preprocess_search_query("   "), "");
+    }
+
+    #[test]
+    fn test_preprocess_search_query_complex_real_world() {
+        let result = preprocess_search_query(
+            r#"product summary "Kaspersky для Бизнеса Профессиональный" NEXT XDR Optimum RU adaptation PoC Guide"#,
+        );
+        assert_eq!(
+            result,
+            "product summary Kaspersky для Бизнеса Профессиональный NEXT XDR Optimum RU adaptation PoC Guide"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_assemble_context_multiword_query_finds_facts() {
+        let service = make_service();
+        let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
+
+        service
+            .add_fact(
+                "note",
+                "PoC plan for iOS and MDM enrollment via Connection Gateway on port 13000",
+                "PoC for iOS MDM",
+                "episode:test123",
+                t,
+                "org",
+                0.9,
+                vec![],
+                vec![],
+                json!({"source_episode": "episode:test123"}),
+            )
+            .await
+            .expect("add_fact");
+
+        // Multi-word query — no single contiguous "PoC iOS MDM" substring exists in content
+        let context = service
+            .assemble_context(AssembleContextRequest {
+                query: "PoC iOS MDM".to_string(),
+                scope: "org".to_string(),
+                as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+                budget: 10,
+                access: None,
+            })
+            .await
+            .expect("assemble");
+        assert!(
+            !context.is_empty(),
+            "Multi-word query should find facts via per-word matching"
+        );
+        assert!(context[0].get("content").unwrap().as_str().unwrap().contains("PoC"));
+    }
+
+    #[tokio::test]
+    async fn test_assemble_context_with_episode_refs_in_query() {
+        let service = make_service();
+        let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
+
+        service
+            .add_fact(
+                "metric",
+                "KSMM v2.2 changelog with Linux support",
+                "KSMM v2.2",
+                "episode:8de581d5",
+                t,
+                "org",
+                0.9,
+                vec![],
+                vec![],
+                json!({"source_episode": "episode:8de581d5"}),
+            )
+            .await
+            .expect("add_fact");
+
+        // Query with episode references that should be stripped
+        let context = service
+            .assemble_context(AssembleContextRequest {
+                query: "changelog KSMM v2.2 episode:8de581d5".to_string(),
+                scope: "org".to_string(),
+                as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+                budget: 10,
+                access: None,
+            })
+            .await
+            .expect("assemble");
+        assert!(
+            !context.is_empty(),
+            "Query with episode references should still find matching facts"
+        );
     }
 }

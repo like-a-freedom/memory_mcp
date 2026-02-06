@@ -303,3 +303,106 @@ async fn test_rate_limit_determinism() {
 
     assert_eq!(first, second);
 }
+
+#[tokio::test]
+async fn test_multiword_query_retrieval_quality() {
+    let service = common::make_service();
+    let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
+
+    // Add facts with various content that should match multi-word queries
+    service
+        .add_fact(
+            "note",
+            "PoC plan includes iOS enrollment via MDM Server placed on KSC host, using Connection Gateway port 13000",
+            "PoC for iOS MDM",
+            "episode:035d8d47",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:035d8d47"}),
+        )
+        .await
+        .expect("add fact 1");
+
+    service
+        .add_fact(
+            "note",
+            "Mobile checklist: APNs certificates required, FCM for Android, ports 5223 and 443 must be open",
+            "mobile checklist APNs FCM",
+            "episode:035d8d47",
+            t,
+            "org",
+            0.85,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:035d8d47"}),
+        )
+        .await
+        .expect("add fact 2");
+
+    service
+        .add_fact(
+            "note",
+            "KSMM v2.2 changelog: Linux support added, ПМИ v2.1 updated",
+            "KSMM v2.2 Linux",
+            "episode:8de581d5",
+            t,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:8de581d5"}),
+        )
+        .await
+        .expect("add fact 3");
+
+    // Test 1: Multi-word query where words are non-adjacent in content
+    let ctx = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "PoC iOS MDM".to_string(),
+            scope: "org".to_string(),
+            as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+            budget: 10,
+            access: None,
+        })
+        .await
+        .expect("assemble PoC iOS MDM");
+    assert!(
+        !ctx.is_empty(),
+        "PoC iOS MDM: expected matches for non-adjacent multi-word query"
+    );
+
+    // Test 2: Query with episode refs and OR — should be preprocessed and still find results
+    let ctx2 = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "mobile checklist APNs FCM ports pending checklist episode:035d8d47".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            access: None,
+        })
+        .await
+        .expect("assemble mobile checklist");
+    assert!(
+        !ctx2.is_empty(),
+        "mobile checklist query with episode ref: expected matches"
+    );
+
+    // Test 3: Query with quotes
+    let ctx3 = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: r#"changelog v2.2 KSMM "KSMM_6.0_Linux - ПМИ v2.1.md" episode:8de581d5"#.to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            access: None,
+        })
+        .await
+        .expect("assemble KSMM changelog");
+    assert!(
+        !ctx3.is_empty(),
+        "KSMM changelog query with quotes and episode ref: expected matches"
+    );
+}

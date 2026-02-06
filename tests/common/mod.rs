@@ -179,15 +179,23 @@ impl DbClient for FakeDbClient {
                         return false;
                     }
                 }
-                // Query contains
+                // Query matching: per-word OR (mirrors SurrealDB full-text search semantics)
                 if let Some(ref q) = query_lower {
                     let content = f
                         .get("content")
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_lowercase();
-                    if !content.contains(q) {
-                        return false;
+                    let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
+                    if words.is_empty() {
+                        if !content.contains(q) {
+                            return false;
+                        }
+                    } else {
+                        let any_match = words.iter().any(|w| content.contains(w));
+                        if !any_match {
+                            return false;
+                        }
                     }
                 }
                 true

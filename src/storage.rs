@@ -839,44 +839,70 @@ impl DbClient for SurrealDbClient {
         self.logger.log(event.clone(), LogLevel::Debug);
 
         // Build SURQL query with parameterized WHERE clause
-            // Filter: scope = $scope AND t_valid <= $cutoff AND t_ingested <= $cutoff
-            // and (t_invalid IS NULL OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)
-        // Compare dates as strings (ISO8601 format allows lexicographic comparison)
-        // Optional: content CONTAINS $query (case-insensitive via string::lowercase)
-            let mut sql = String::from(
-                "SELECT * FROM fact WHERE scope = $scope AND string::is::datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is::datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)",
+        // Filter: scope, bi-temporal cutoff, optional full-text search
+        // Strategy: use SurrealDB full-text search (@@) via fact_content_search index,
+        // then fall back to per-word CONTAINS OR if FTS returns no results.
+        let base_where = "scope = $scope AND string::is::datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is::datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
+
+        // Primary query: full-text search with @@ operator (uses SEARCH index)
+        let (sql_fts, sql_fallback) = if let Some(q) = query_contains {
+            // Build per-word fallback: each word matched via case-insensitive CONTAINS (OR)
+            let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
+            let fallback_clause = if words.is_empty() {
+                String::new()
+            } else {
+                let word_conditions: Vec<String> = words
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| format!("string::lowercase(content) CONTAINS string::lowercase($word{})", i))
+                    .collect();
+                format!(" AND ({})", word_conditions.join(" OR "))
+            };
+
+            let primary = format!(
+                "SELECT * FROM fact WHERE {} AND content @@ $query ORDER BY t_valid DESC LIMIT $limit",
+                base_where
             );
-
-        if query_contains.is_some() {
-            sql.push_str(" AND string::lowercase(content) CONTAINS string::lowercase($query)");
-        }
-
-        sql.push_str(" ORDER BY t_valid DESC LIMIT $limit");
-
-        let vars = if let Some(q) = query_contains {
-            serde_json::json!({
-                "scope": scope,
-                "cutoff": cutoff,
-                "query": q,
-                "limit": limit
-            })
+            let fallback = format!(
+                "SELECT * FROM fact WHERE {}{} ORDER BY t_valid DESC LIMIT $limit",
+                base_where, fallback_clause
+            );
+            (Some(primary), Some(fallback))
         } else {
-            serde_json::json!({
-                "scope": scope,
-                "cutoff": cutoff,
-                "limit": limit
-            })
+            (None, None)
         };
 
-        if self.db_local.is_some() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-                let mut e = event.clone();
-                e.insert("error".to_string(), Value::String(err.to_string()));
-                self.logger.log(e, LogLevel::Warn);
+        let sql_no_query = format!(
+            "SELECT * FROM fact WHERE {} ORDER BY t_valid DESC LIMIT $limit",
+            base_where
+        );
+
+        let mut vars_base = serde_json::json!({
+            "scope": scope,
+            "cutoff": cutoff,
+            "limit": limit
+        });
+
+        // Add query + per-word params
+        if let Some(q) = query_contains {
+            vars_base["query"] = serde_json::Value::String(q.to_string());
+            let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
+            for (i, word) in words.iter().enumerate() {
+                vars_base[format!("word{}", i)] = serde_json::Value::String(word.to_string());
+            }
+        }
+
+        let vars = vars_base;
+
+        // Helper: execute a SURQL query and return normalized Vec<Value>
+        async fn execute_query(
+            db: &surrealdb::Surreal<surrealdb::engine::local::Db>,
+            sql: &str,
+            vars: serde_json::Value,
+        ) -> Result<Vec<Value>, MemoryError> {
+            let mut response = db.query(sql).bind(vars).await.map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB select_facts_filtered failed: {err}"))
             })?;
-
             let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
             })?;
@@ -884,42 +910,82 @@ impl DbClient for SurrealDbClient {
                 MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
             })?;
             let normalized = normalize_surreal_json(&json);
-
-            let results: Vec<Value> = match normalized {
+            Ok(match normalized {
                 Value::Array(arr) => arr,
                 Value::Null => Vec::new(),
                 other => vec![other],
-            };
-
-            let mut done = event.clone();
-            done.insert(
-                "count".to_string(),
-                Value::Number(serde_json::Number::from(results.len())),
-            );
-            self.logger.log(done, LogLevel::Info);
-            return Ok(results);
+            })
         }
 
-        let db = self.with_namespace_remote(namespace).await?;
-        let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-            let mut e = event.clone();
-            e.insert("error".to_string(), Value::String(err.to_string()));
-            self.logger.log(e, LogLevel::Warn);
-            MemoryError::Storage(format!("SurrealDB select_facts_filtered failed: {err}"))
-        })?;
+        async fn execute_query_remote(
+            db: &surrealdb::Surreal<Client>,
+            sql: &str,
+            vars: serde_json::Value,
+        ) -> Result<Vec<Value>, MemoryError> {
+            let mut response = db.query(sql).bind(vars).await.map_err(|err| {
+                MemoryError::Storage(format!("SurrealDB select_facts_filtered failed: {err}"))
+            })?;
+            let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
+                MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
+            })?;
+            let json = serde_json::to_value(&surreal_val).map_err(|err| {
+                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
+            })?;
+            let normalized = normalize_surreal_json(&json);
+            Ok(match normalized {
+                Value::Array(arr) => arr,
+                Value::Null => Vec::new(),
+                other => vec![other],
+            })
+        }
 
-        let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
-            MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
-        })?;
-        let json = serde_json::to_value(&surreal_val).map_err(|err| {
-            MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-        })?;
-        let normalized = normalize_surreal_json(&json);
-
-        let results: Vec<Value> = match normalized {
-            Value::Array(arr) => arr,
-            Value::Null => Vec::new(),
-            other => vec![other],
+        // Determine which SQL to run: FTS primary → fallback → no-query
+        let results = if self.db_local.is_some() {
+            let db = self.with_namespace_local(namespace).await?;
+            if let Some(ref fts_sql) = sql_fts {
+                // Try full-text search first
+                let fts_results = execute_query(&db, fts_sql, vars.clone()).await;
+                match fts_results {
+                    Ok(r) if !r.is_empty() => r,
+                    _ => {
+                        // Fallback to per-word CONTAINS OR
+                        if let Some(ref fb_sql) = sql_fallback {
+                            self.logger.log({
+                                let mut e = event.clone();
+                                e.insert("fallback".to_string(), Value::String("per_word_contains".to_string()));
+                                e
+                            }, LogLevel::Debug);
+                            execute_query(&db, fb_sql, vars.clone()).await.unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                }
+            } else {
+                execute_query(&db, &sql_no_query, vars.clone()).await.unwrap_or_default()
+            }
+        } else {
+            let db = self.with_namespace_remote(namespace).await?;
+            if let Some(ref fts_sql) = sql_fts {
+                let fts_results = execute_query_remote(&db, fts_sql, vars.clone()).await;
+                match fts_results {
+                    Ok(r) if !r.is_empty() => r,
+                    _ => {
+                        if let Some(ref fb_sql) = sql_fallback {
+                            self.logger.log({
+                                let mut e = event.clone();
+                                e.insert("fallback".to_string(), Value::String("per_word_contains".to_string()));
+                                e
+                            }, LogLevel::Debug);
+                            execute_query_remote(&db, fb_sql, vars.clone()).await.unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                }
+            } else {
+                execute_query_remote(&db, &sql_no_query, vars.clone()).await.unwrap_or_default()
+            }
         };
 
         let mut done = event.clone();
