@@ -220,3 +220,72 @@ async fn test_mcp_extract_no_input_returns_soft_result() {
     assert!(extraction["entities"].as_array().unwrap().is_empty());
     assert!(extraction["facts"].as_array().unwrap().is_empty());
 }
+
+/// Regression: explain must accept loose objects with `id` instead of `source_episode`
+/// and missing `quote` — the exact payload shape that caused the production crash.
+#[tokio::test]
+async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
+    let service = common::make_service();
+    let mcp = MemoryMcp::new(service);
+
+    // Shape: [{content, id, source_type}] — no quote, no source_episode
+    let context_items = serde_json::to_string(&vec![
+        serde_json::json!({"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"}),
+        serde_json::json!({"content":"ASSIGNEE: Anton Solovey — Split requirements","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}),
+    ]).unwrap();
+    let explain_params = serde_json::json!({"context_items": context_items});
+    let explanation = mcp
+        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .await
+        .expect("explain with loose objects should not fail")
+        .0
+        .result;
+    assert_eq!(explanation.len(), 2);
+    assert_eq!(explanation[0]["source_episode"], "task:e8gsmlprfchnktf6js0p");
+    assert_eq!(explanation[0]["content"], "Follow up on ARR deal");
+    assert_eq!(explanation[0]["quote"], "");
+    assert_eq!(explanation[1]["source_episode"], "task:ha8caz3sb2fxr9ju2sbc");
+}
+
+/// Regression: explain must accept objects with `id` + `quote` but no `source_episode`.
+#[tokio::test]
+async fn test_mcp_explain_objects_with_quote_and_id() {
+    let service = common::make_service();
+    let mcp = MemoryMcp::new(service);
+
+    let context_items = serde_json::to_string(&vec![
+        serde_json::json!({"content":"data","quote":"q","id":"task:abc","source_type":"task"}),
+    ]).unwrap();
+    let explain_params = serde_json::json!({"context_items": context_items});
+    let explanation = mcp
+        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .await
+        .expect("explain with quote + id should not fail")
+        .0
+        .result;
+    assert_eq!(explanation[0]["source_episode"], "task:abc");
+    assert_eq!(explanation[0]["quote"], "q");
+}
+
+/// Explain accepts a mixed array of strings and objects.
+#[tokio::test]
+async fn test_mcp_explain_mixed_array() {
+    let service = common::make_service();
+    let mcp = MemoryMcp::new(service);
+
+    let context_items = serde_json::to_string(&vec![
+        serde_json::json!("episode:plain-id"),
+        serde_json::json!({"content":"info","id":"task:obj"}),
+    ]).unwrap();
+    let explain_params = serde_json::json!({"context_items": context_items});
+    let explanation = mcp
+        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .await
+        .expect("explain with mixed array should not fail")
+        .0
+        .result;
+    assert_eq!(explanation.len(), 2);
+    assert_eq!(explanation[0]["source_episode"], "episode:plain-id");
+    assert_eq!(explanation[1]["source_episode"], "task:obj");
+    assert_eq!(explanation[1]["content"], "info");
+}

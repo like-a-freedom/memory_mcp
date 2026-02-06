@@ -123,27 +123,9 @@ impl MemoryMcp {
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
         let access = AccessContext::default();
-        // Parse context_items from JSON string
-        // Allow two forms: 1) an array of ExplainItem objects, or 2) an array of episode id strings
-        let context_pack: Vec<crate::models::ExplainItem> = match serde_json::from_str(&params.0.context_items) {
-            Ok(pack) => pack,
-            Err(err_obj) => {
-                // Try parsing as array of strings (episode ids)
-                match serde_json::from_str::<Vec<String>>(&params.0.context_items) {
-                    Ok(ids) => ids
-                        .into_iter()
-                        .map(|s| crate::models::ExplainItem { content: "".to_string(), quote: "".to_string(), source_episode: s })
-                        .collect(),
-                    Err(err_ids) => {
-                        return Err(ErrorData::new(
-                            ErrorCode::INVALID_PARAMS,
-                            format!("Invalid context_items JSON: {} OR {}", err_obj, err_ids),
-                            None,
-                        ))
-                    }
-                }
-            }
-        };
+        let context_pack = parse_context_items(&params.0.context_items).map_err(|msg| {
+            ErrorData::new(ErrorCode::INVALID_PARAMS, msg, None)
+        })?;
         let request = ExplainRequest { context_pack };
 
         self.service.log_tool_event(
@@ -904,6 +886,61 @@ pub struct UiParams {
     marker: Option<Value>,
 }
 
+/// Parse `context_items` JSON string into `Vec<ExplainItem>`.
+///
+/// Accepted input formats (all must be a JSON array):
+///   1. Strict: `[{"content":"…","quote":"…","source_episode":"episode:xxx"}]`
+///   2. Array of id strings: `["episode:xxx","task:yyy"]`
+///   3. Loose objects: `[{"content":"…","id":"task:xxx","source_type":"task"}]`
+///      — `id` is used as `source_episode` when `source_episode` is absent;
+///        `quote` and `content` default to `""` when absent.
+///   4. Mixed: any combination of strings and objects in one array.
+pub(crate) fn parse_context_items(raw: &str) -> Result<Vec<crate::models::ExplainItem>, String> {
+    let values: Vec<Value> = serde_json::from_str(raw)
+        .map_err(|e| format!("Invalid context_items JSON: {e}"))?;
+
+    let items = values
+        .into_iter()
+        .map(|v| match v {
+            Value::String(s) => crate::models::ExplainItem {
+                content: String::new(),
+                quote: String::new(),
+                source_episode: s,
+            },
+            Value::Object(ref map) => {
+                let content = map
+                    .get("content")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let quote = map
+                    .get("quote")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let source_episode = map
+                    .get("source_episode")
+                    .or_else(|| map.get("id"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                crate::models::ExplainItem {
+                    content,
+                    quote,
+                    source_episode,
+                }
+            }
+            _ => crate::models::ExplainItem {
+                content: String::new(),
+                quote: String::new(),
+                source_episode: String::new(),
+            },
+        })
+        .collect();
+
+    Ok(items)
+}
+
 fn parse_datetime(value: &str) -> Option<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
@@ -948,4 +985,132 @@ fn mcp_error(err: MemoryError) -> ErrorData {
         MemoryError::Storage(_) => ErrorCode::INTERNAL_ERROR,
     };
     ErrorData::new(code, err.to_string(), None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_context_items;
+
+    // ── Shape 1: strict ExplainItem objects ──────────────────────────
+
+    #[test]
+    fn parse_strict_explain_items() {
+        let raw = r#"[{"content":"alpha","quote":"beta","source_episode":"episode:abc"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].content, "alpha");
+        assert_eq!(items[0].quote, "beta");
+        assert_eq!(items[0].source_episode, "episode:abc");
+    }
+
+    // ── Shape 2: array of id strings ─────────────────────────────────
+
+    #[test]
+    fn parse_array_of_id_strings() {
+        let raw = r#"["episode:111","task:222"]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].source_episode, "episode:111");
+        assert_eq!(items[0].content, "");
+        assert_eq!(items[1].source_episode, "task:222");
+    }
+
+    // ── Shape 3: loose objects with `id` and no `quote` ──────────────
+
+    #[test]
+    fn parse_loose_objects_id_no_quote() {
+        let raw = r#"[{"content":"Follow up on ARR deal","id":"task:e8g","source_type":"task"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].content, "Follow up on ARR deal");
+        assert_eq!(items[0].quote, "");
+        assert_eq!(items[0].source_episode, "task:e8g");
+    }
+
+    #[test]
+    fn parse_loose_objects_with_quote_and_id() {
+        let raw = r#"[{"content":"data","quote":"q","id":"task:abc","source_type":"task"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].content, "data");
+        assert_eq!(items[0].quote, "q");
+        assert_eq!(items[0].source_episode, "task:abc");
+    }
+
+    // ── Shape 4: source_episode takes priority over id ───────────────
+
+    #[test]
+    fn parse_source_episode_preferred_over_id() {
+        let raw = r#"[{"content":"x","quote":"y","source_episode":"episode:real","id":"task:alt"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].source_episode, "episode:real");
+    }
+
+    // ── Shape 5: mixed array (strings + objects) ─────────────────────
+
+    #[test]
+    fn parse_mixed_array() {
+        let raw = r#"["episode:aaa",{"content":"c","id":"task:bbb"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].source_episode, "episode:aaa");
+        assert_eq!(items[0].content, "");
+        assert_eq!(items[1].source_episode, "task:bbb");
+        assert_eq!(items[1].content, "c");
+    }
+
+    // ── Shape 6: empty array ─────────────────────────────────────────
+
+    #[test]
+    fn parse_empty_array() {
+        let items = parse_context_items("[]").unwrap();
+        assert!(items.is_empty());
+    }
+
+    // ── Shape 7: object with no id at all ────────────────────────────
+
+    #[test]
+    fn parse_object_no_id_fields() {
+        let raw = r#"[{"content":"only content","source_type":"email"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].content, "only content");
+        assert_eq!(items[0].source_episode, "");
+    }
+
+    // ── Error: not valid JSON ────────────────────────────────────────
+
+    #[test]
+    fn parse_invalid_json_errors() {
+        assert!(parse_context_items("not json").is_err());
+    }
+
+    // ── Error: not an array ──────────────────────────────────────────
+
+    #[test]
+    fn parse_non_array_errors() {
+        assert!(parse_context_items(r#"{"content":"x"}"#).is_err());
+    }
+
+    // ── Real-world payload (exact reproduction of reported bug) ──────
+
+    #[test]
+    fn parse_real_world_payload_without_quote_and_source_episode() {
+        let raw = r#"[{"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"},{"content":"ASSIGNEE: Anton Solovey — Split listed requirements","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].content, "Follow up on ARR deal");
+        assert_eq!(items[0].source_episode, "task:e8gsmlprfchnktf6js0p");
+        assert_eq!(items[0].quote, "");
+        assert_eq!(items[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
+    }
+
+    #[test]
+    fn parse_real_world_payload_with_quote_without_source_episode() {
+        let raw = r#"[{"content":"Follow up on ARR deal","quote":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"},{"content":"ASSIGNEE: Anton Solovey","quote":"ASSIGNEE: Anton Solovey","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].quote, "Follow up on ARR deal");
+        assert_eq!(items[0].source_episode, "task:e8gsmlprfchnktf6js0p");
+        assert_eq!(items[1].quote, "ASSIGNEE: Anton Solovey");
+        assert_eq!(items[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
+    }
 }
