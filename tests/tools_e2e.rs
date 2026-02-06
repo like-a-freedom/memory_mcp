@@ -63,6 +63,32 @@ async fn test_mcp_tools_flow() {
         .0
         .result;
     assert_eq!(explanation[0]["source_episode"], episode_id);
+
+    // Backwards-compatible: allow passing an array of episode id strings
+    let ingest_params2 = serde_json::json!({
+        "source_type": "email",
+        "source_id": "MSG-204",
+        "content": "Follow-up: ARR $500k",
+        "t_ref": "2026-01-11T00:00:00Z",
+        "scope": "org"
+    });
+    let episode_id2 = mcp
+        .ingest(Parameters(serde_json::from_value(ingest_params2).unwrap()))
+        .await
+        .expect("ingest2")
+        .0
+        .result;
+
+    let context_items_ids = serde_json::to_string(&vec![episode_id.clone(), episode_id2.clone()]).unwrap();
+    let explain_params_ids = serde_json::json!({"context_items": context_items_ids});
+    let explanation_ids = mcp
+        .explain(Parameters(serde_json::from_value(explain_params_ids).unwrap()))
+        .await
+        .expect("explain ids")
+        .0
+        .result;
+    assert_eq!(explanation_ids[0]["source_episode"], episode_id);
+    assert_eq!(explanation_ids[1]["source_episode"], episode_id2);
 }
 
 #[tokio::test]
@@ -131,9 +157,11 @@ async fn test_mcp_full_flow_end_to_end() {
         .expect("invalidate");
 
     // Assemble again, ensure invalidated fact is not returned
+    // Recompute as_of to be current time so invalidation is visible at this cutoff
+    let assemble_params_after = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
     let context_after = mcp
         .assemble_context(Parameters(
-            serde_json::from_value(assemble_params.clone()).unwrap(),
+            serde_json::from_value(assemble_params_after).unwrap(),
         ))
         .await
         .expect("assemble")

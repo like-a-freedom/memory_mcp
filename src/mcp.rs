@@ -124,14 +124,26 @@ impl MemoryMcp {
     ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
         let access = AccessContext::default();
         // Parse context_items from JSON string
-        let context_pack: Vec<crate::models::ExplainItem> =
-            serde_json::from_str(&params.0.context_items).map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INVALID_PARAMS,
-                    format!("Invalid context_items JSON: {}", e),
-                    None,
-                )
-            })?;
+        // Allow two forms: 1) an array of ExplainItem objects, or 2) an array of episode id strings
+        let context_pack: Vec<crate::models::ExplainItem> = match serde_json::from_str(&params.0.context_items) {
+            Ok(pack) => pack,
+            Err(err_obj) => {
+                // Try parsing as array of strings (episode ids)
+                match serde_json::from_str::<Vec<String>>(&params.0.context_items) {
+                    Ok(ids) => ids
+                        .into_iter()
+                        .map(|s| crate::models::ExplainItem { content: "".to_string(), quote: "".to_string(), source_episode: s })
+                        .collect(),
+                    Err(err_ids) => {
+                        return Err(ErrorData::new(
+                            ErrorCode::INVALID_PARAMS,
+                            format!("Invalid context_items JSON: {} OR {}", err_obj, err_ids),
+                            None,
+                        ))
+                    }
+                }
+            }
+        };
         let request = ExplainRequest { context_pack };
 
         self.service.log_tool_event(
