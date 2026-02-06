@@ -2268,15 +2268,15 @@ mod tests {
         let client = DummyClient;
         let svc = MemoryService::new(
             std::sync::Arc::new(client),
-            vec!["kaspersky".to_string()],
+            vec!["example".to_string()],
             "info".to_string(),
             50,
             100,
         )
         .expect("service init");
-        assert_eq!(svc.namespace_for_scope("org"), "kaspersky");
-        assert_eq!(svc.namespace_for_scope("org-foo"), "kaspersky");
-        assert_eq!(svc.namespace_for_scope("personal-joe"), "kaspersky");
+        assert_eq!(svc.namespace_for_scope("org"), "example");
+        assert_eq!(svc.namespace_for_scope("org-foo"), "example");
+        assert_eq!(svc.namespace_for_scope("personal-joe"), "example");
     }
 
     #[tokio::test]
@@ -2551,26 +2551,26 @@ mod tests {
 
     #[test]
     fn test_preprocess_search_query_strips_episode_refs() {
-        let result = preprocess_search_query("PoC iOS MDM episode:035d8d47 OR episode:8de581d5");
-        assert_eq!(result, "PoC iOS MDM");
+        let result = preprocess_search_query("Project Delta Briefing episode:035d8d47 OR episode:8de581d5");
+        assert_eq!(result, "Project Delta Briefing");
     }
 
     #[test]
     fn test_preprocess_search_query_strips_boolean_ops() {
-        let result = preprocess_search_query("mobile checklist APNs OR FCM AND ports NOT pending");
-        assert_eq!(result, "mobile checklist APNs FCM ports pending");
+        let result = preprocess_search_query("fleet manifest certs OR tokens AND ports NOT pending");
+        assert_eq!(result, "fleet manifest certs tokens ports pending");
     }
 
     #[test]
     fn test_preprocess_search_query_strips_quotes() {
-        let result = preprocess_search_query(r#"changelog "KSMM v2.2" KSMM_6.0_Linux"#);
-        assert_eq!(result, "changelog KSMM v2.2 KSMM_6.0_Linux");
+        let result = preprocess_search_query(r#"changelog "Module v2.2" Module_6.0_Linux"#);
+        assert_eq!(result, "changelog Module v2.2 Module_6.0_Linux");
     }
 
     #[test]
     fn test_preprocess_search_query_short_tokens_dropped() {
-        let result = preprocess_search_query("a PoC b c iOS MDM");
-        assert_eq!(result, "PoC iOS MDM");
+        let result = preprocess_search_query("a Xy b c DeviceAgent Portal");
+        assert_eq!(result, "Xy DeviceAgent Portal");
     }
 
     #[test]
@@ -2582,11 +2582,11 @@ mod tests {
     #[test]
     fn test_preprocess_search_query_complex_real_world() {
         let result = preprocess_search_query(
-            r#"product summary "Kaspersky для Бизнеса Профессиональный" NEXT XDR Optimum RU adaptation PoC Guide"#,
+            r#"product summary "VendorProduct Professional" NEXT MODULE Optimum RU adaptation Example Guide"#,
         );
         assert_eq!(
             result,
-            "product summary Kaspersky для Бизнеса Профессиональный NEXT XDR Optimum RU adaptation PoC Guide"
+            "product summary VendorProduct Professional NEXT MODULE Optimum RU adaptation Example Guide"
         );
     }
 
@@ -2598,8 +2598,8 @@ mod tests {
         service
             .add_fact(
                 "note",
-                "PoC plan for iOS and MDM enrollment via Connection Gateway on port 13000",
-                "PoC for iOS MDM",
+                "Project Delta includes enrollment workflow and gateway component on port 13000",
+                "Delta Enrollment",
                 "episode:test123",
                 t,
                 "org",
@@ -2611,10 +2611,10 @@ mod tests {
             .await
             .expect("add_fact");
 
-        // Multi-word query — no single contiguous "PoC iOS MDM" substring exists in content
+        // Multi-word query — no single contiguous "Delta Enrollment" substring exists in content
         let context = service
             .assemble_context(AssembleContextRequest {
-                query: "PoC iOS MDM".to_string(),
+                query: "Delta Enrollment".to_string(),
                 scope: "org".to_string(),
                 as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
                 budget: 10,
@@ -2626,7 +2626,7 @@ mod tests {
             !context.is_empty(),
             "Multi-word query should find facts via per-word matching"
         );
-        assert!(context[0].get("content").unwrap().as_str().unwrap().contains("PoC"));
+        assert!(context[0].get("content").unwrap().as_str().unwrap().contains("enrollment"));
     }
 
     #[tokio::test]
@@ -2637,8 +2637,8 @@ mod tests {
         service
             .add_fact(
                 "metric",
-                "KSMM v2.2 changelog with Linux support",
-                "KSMM v2.2",
+                "Module v2.2 release notes: feature set updated, Component v2.1 improved",
+                "Module v2.2",
                 "episode:8de581d5",
                 t,
                 "org",
@@ -2653,7 +2653,7 @@ mod tests {
         // Query with episode references that should be stripped
         let context = service
             .assemble_context(AssembleContextRequest {
-                query: "changelog KSMM v2.2 episode:8de581d5".to_string(),
+                query: "release notes Module v2.2 episode:8de581d5".to_string(),
                 scope: "org".to_string(),
                 as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
                 budget: 10,

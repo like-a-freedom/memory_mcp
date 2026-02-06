@@ -14,8 +14,8 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
     service
         .add_fact(
             "note",
-            "PoC plan includes iOS enrollment via MDM Server placed on KSC host",
-            "PoC for iOS MDM",
+            "Survey: Delta site includes enrollment workflow and gateway component on host alpha",
+            "Delta Survey",
             "episode:fts_test_1",
             t,
             "org",
@@ -29,8 +29,8 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
     service
         .add_fact(
             "note",
-            "Mobile device checklist: APNs certificates, FCM tokens, open ports 5223 and 443",
-            "mobile checklist APNs FCM ports",
+            "Checklist entry: cert rotation scheduled, token refresh in progress, ports 5223 and 443 open",
+            "cert checklist",
             "episode:fts_test_2",
             t,
             "org",
@@ -41,10 +41,10 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         )
         .await?;
 
-    // Multi-word query: "PoC iOS MDM" — no contiguous substring in content
+    // Multi-word query: "Delta Enrollment" — no contiguous substring in content
     let ctx = service
         .assemble_context(AssembleContextRequest {
-            query: "PoC iOS MDM".to_string(),
+            query: "Delta Enrollment".to_string(),
             scope: "org".to_string(),
             as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
             budget: 10,
@@ -54,21 +54,21 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
 
     assert!(
         !ctx.is_empty(),
-        "Multi-word FTS query 'PoC iOS MDM' should find facts (got empty)"
+        "Multi-word FTS query 'Delta Enrollment' should find facts (got empty)"
     );
     let content = ctx[0]
         .get("content")
         .and_then(|v| v.as_str())
         .unwrap_or_default();
     assert!(
-        content.contains("PoC"),
-        "Result content should contain 'PoC', got: {content}"
+        content.contains("enrollment"),
+        "Result content should contain 'enrollment', got: {content}"
     );
 
     // Query with episode reference that should be stripped by preprocessing
     let ctx2 = service
         .assemble_context(AssembleContextRequest {
-            query: "mobile APNs FCM ports episode:fts_test_2".to_string(),
+            query: "mobile certs tokens ports episode:fts_test_2".to_string(),
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
@@ -84,7 +84,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
     // Single word query still works (regression check)
     let ctx3 = service
         .assemble_context(AssembleContextRequest {
-            query: "APNs".to_string(),
+            query: "cert".to_string(),
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
@@ -94,7 +94,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
 
     assert!(
         !ctx3.is_empty(),
-        "Single-word query 'APNs' should still find facts (regression)"
+        "Single-word query 'cert' should still find facts (regression)"
     );
 
     Ok(())

@@ -313,8 +313,8 @@ async fn test_multiword_query_retrieval_quality() {
     service
         .add_fact(
             "note",
-            "PoC plan includes iOS enrollment via MDM Server placed on KSC host, using Connection Gateway port 13000",
-            "PoC for iOS MDM",
+            "Project Delta deployment includes a gateway service on port 13000",
+            "Delta Gateway",
             "episode:035d8d47",
             t,
             "org",
@@ -329,8 +329,8 @@ async fn test_multiword_query_retrieval_quality() {
     service
         .add_fact(
             "note",
-            "Mobile checklist: APNs certificates required, FCM for Android, ports 5223 and 443 must be open",
-            "mobile checklist APNs FCM",
+            "Fleet checklist: certs required, tokens rotated, ports 5223 and 443 must be open",
+            "fleet checklist certs tokens",
             "episode:035d8d47",
             t,
             "org",
@@ -345,8 +345,8 @@ async fn test_multiword_query_retrieval_quality() {
     service
         .add_fact(
             "note",
-            "KSMM v2.2 changelog: Linux support added, ПМИ v2.1 updated",
-            "KSMM v2.2 Linux",
+            "Module v2.2 release notes: feature set updated and component v2.1 improved",
+            "Module v2.2 release",
             "episode:8de581d5",
             t,
             "org",
@@ -361,23 +361,23 @@ async fn test_multiword_query_retrieval_quality() {
     // Test 1: Multi-word query where words are non-adjacent in content
     let ctx = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: "PoC iOS MDM".to_string(),
-            scope: "org".to_string(),
-            as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
-            budget: 10,
-            access: None,
-        })
-        .await
-        .expect("assemble PoC iOS MDM");
+query: "Delta Enrollment".to_string(),
+                scope: "org".to_string(),
+                as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+                budget: 10,
+                access: None,
+            })
+            .await
+            .expect("assemble Delta Enrollment");
     assert!(
         !ctx.is_empty(),
-        "PoC iOS MDM: expected matches for non-adjacent multi-word query"
+        "Delta Enrollment: expected matches for non-adjacent multi-word query"
     );
 
     // Test 2: Query with episode refs and OR — should be preprocessed and still find results
     let ctx2 = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: "mobile checklist APNs FCM ports pending checklist episode:035d8d47".to_string(),
+            query: "fleet checklist certs tokens ports pending checklist episode:035d8d47".to_string(),
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
@@ -393,16 +393,16 @@ async fn test_multiword_query_retrieval_quality() {
     // Test 3: Query with quotes
     let ctx3 = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: r#"changelog v2.2 KSMM "KSMM_6.0_Linux - ПМИ v2.1.md" episode:8de581d5"#.to_string(),
+            query: r#"release notes v2.2 Module "Module_6.0_Archive - Component v2.1.md" episode:8de581d5"#.to_string(),
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
             access: None,
         })
         .await
-        .expect("assemble KSMM changelog");
+        .expect("assemble Module changelog");
     assert!(
         !ctx3.is_empty(),
-        "KSMM changelog query with quotes and episode ref: expected matches"
+        "Module changelog query with quotes and episode ref: expected matches"
     );
 }

@@ -9,9 +9,9 @@ pub async fn setup_embedded_service() -> Result<(TempDir, MemoryService), Memory
     let tmp = tempfile::tempdir().expect("failed to create tempdir");
     let data_dir = tmp.path().to_str().unwrap().to_string();
     let config = SurrealConfig {
-        db_name: "kaspersky".to_string(),
+        db_name: "example".to_string(),
         url: None,
-        namespaces: vec!["kaspersky".to_string()],
+        namespaces: vec!["example".to_string()],
         username: "root".to_string(),
         password: "root".to_string(),
         log_level: "trace".to_string(),
