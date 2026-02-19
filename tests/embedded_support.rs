@@ -3,7 +3,7 @@ use tempfile::TempDir;
 
 use memory_mcp::config::SurrealConfig;
 use memory_mcp::service::{MemoryError, MemoryService};
-use memory_mcp::storage::SurrealDbClient;
+use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 pub async fn setup_embedded_service() -> Result<(TempDir, MemoryService), MemoryError> {
     let tmp = tempfile::tempdir().expect("failed to create tempdir");
