@@ -79,10 +79,13 @@ async fn test_mcp_tools_flow() {
         .0
         .result;
 
-    let context_items_ids = serde_json::to_string(&vec![episode_id.clone(), episode_id2.clone()]).unwrap();
+    let context_items_ids =
+        serde_json::to_string(&vec![episode_id.clone(), episode_id2.clone()]).unwrap();
     let explain_params_ids = serde_json::json!({"context_items": context_items_ids});
     let explanation_ids = mcp
-        .explain(Parameters(serde_json::from_value(explain_params_ids).unwrap()))
+        .explain(Parameters(
+            serde_json::from_value(explain_params_ids).unwrap(),
+        ))
         .await
         .expect("explain ids")
         .0
@@ -241,10 +244,16 @@ async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
         .0
         .result;
     assert_eq!(explanation.len(), 2);
-    assert_eq!(explanation[0]["source_episode"], "task:e8gsmlprfchnktf6js0p");
+    assert_eq!(
+        explanation[0]["source_episode"],
+        "task:e8gsmlprfchnktf6js0p"
+    );
     assert_eq!(explanation[0]["content"], "Follow up on ARR deal");
     assert_eq!(explanation[0]["quote"], "");
-    assert_eq!(explanation[1]["source_episode"], "task:ha8caz3sb2fxr9ju2sbc");
+    assert_eq!(
+        explanation[1]["source_episode"],
+        "task:ha8caz3sb2fxr9ju2sbc"
+    );
 }
 
 /// Regression: explain must accept objects with `id` + `quote` but no `source_episode`.
@@ -255,7 +264,8 @@ async fn test_mcp_explain_objects_with_quote_and_id() {
 
     let context_items = serde_json::to_string(&vec![
         serde_json::json!({"content":"data","quote":"q","id":"task:abc","source_type":"task"}),
-    ]).unwrap();
+    ])
+    .unwrap();
     let explain_params = serde_json::json!({"context_items": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
@@ -276,7 +286,8 @@ async fn test_mcp_explain_mixed_array() {
     let context_items = serde_json::to_string(&vec![
         serde_json::json!("episode:plain-id"),
         serde_json::json!({"content":"info","id":"task:obj"}),
-    ]).unwrap();
+    ])
+    .unwrap();
     let explain_params = serde_json::json!({"context_items": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))

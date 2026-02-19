@@ -1,8 +1,20 @@
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
+
+/// Trait for safe mutex locking that handles poisoned locks gracefully.
+/// For cache operations, a poisoned mutex is not fatal - we can continue operating.
+pub trait SafeMutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T> SafeMutex<T> for Mutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
 
 use chrono::{DateTime, Utc};
 use lru::LruCache;
@@ -34,6 +46,23 @@ pub enum MemoryError {
 
 const CONTEXT_CACHE_SIZE: usize = 512;
 
+/// Core service for memory operations.
+///
+/// `MemoryService` provides the main business logic for the Memory MCP system,
+/// including episode ingestion, entity extraction, fact management, and context assembly.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use memory_mcp::MemoryService;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let service = MemoryService::new_from_env().await?;
+///     // Use the service for memory operations
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone)]
 pub struct MemoryService {
     db_client: Arc<dyn DbClient>,
@@ -48,6 +77,23 @@ pub struct MemoryService {
 }
 
 impl MemoryService {
+    /// Creates a new `MemoryService` from environment variables.
+    ///
+    /// # Environment Variables
+    ///
+    /// - `SURREALDB_DB_NAME`: Database name (required)
+    /// - `SURREALDB_URL`: WebSocket URL for remote connection (required for remote)
+    /// - `SURREALDB_EMBEDDED`: Set to "true" for embedded RocksDB mode
+    /// - `SURREALDB_DATA_DIR`: Path to RocksDB data directory (embedded mode)
+    /// - `SURREALDB_NAMESPACES`: Comma-separated list of namespaces
+    /// - `SURREALDB_USERNAME`: Database username
+    /// - `SURREALDB_PASSWORD`: Database password
+    /// - `LOG_LEVEL`: Logging level (trace, debug, info, warn, error)
+    ///
+    /// # Errors
+    ///
+    /// Returns `MemoryError::ConfigMissing` if required environment variables are missing.
+    /// Returns `MemoryError::Storage` if database connection fails.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
         let default_namespace = config
@@ -386,7 +432,7 @@ impl MemoryService {
                 "provenance": provenance,
             });
             self.db_client.create(&fact_id, payload, &namespace).await?;
-            self.context_cache.lock().unwrap().clear();
+            self.context_cache.safe_lock().clear();
         }
         Ok(fact_id)
     }
@@ -406,14 +452,11 @@ impl MemoryService {
             "t_invalid".to_string(),
             json!(normalize_dt(request.t_invalid)),
         );
-        updated.insert(
-            "t_invalid_ingested".to_string(),
-            json!(normalize_dt(now())),
-        );
+        updated.insert("t_invalid_ingested".to_string(), json!(normalize_dt(now())));
         self.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
-        self.context_cache.lock().unwrap().clear();
+        self.context_cache.safe_lock().clear();
         Ok("ok".to_string())
     }
 
@@ -460,7 +503,7 @@ impl MemoryService {
             access.allowed_tags.clone(),
         );
         let cached = {
-            let mut cache = self.context_cache.lock().unwrap();
+            let mut cache = self.context_cache.safe_lock();
             cache.get(&cache_key).cloned()
         };
         if let Some(cached) = cached {
@@ -535,8 +578,7 @@ impl MemoryService {
         }
 
         self.context_cache
-            .lock()
-            .unwrap()
+            .safe_lock()
             .put(cache_key, results.clone());
 
         // Log cache set and returned results count
@@ -687,17 +729,11 @@ impl MemoryService {
     }
 
     pub fn register_analyzer(&self, name: &str, config: Value) {
-        self.analyzers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
+        self.analyzers.safe_lock().insert(name.to_string(), config);
     }
 
     pub fn register_index(&self, name: &str, config: Value) {
-        self.indexes
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
+        self.indexes.safe_lock().insert(name.to_string(), config);
     }
 
     pub async fn create_task(
@@ -1233,7 +1269,11 @@ impl MemoryService {
         }
         // Enhanced promise detection: support Russian and various English patterns ("will do", "I will", "I'll", "going to ...")
         // Narrow English matches to promise-like verbs to avoid false positives (e.g., "will happen")
-        let promise_re = Regex::new(r"\b(i will|i'll|will\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule)|going to\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule))\b").unwrap();
+        static PROMISE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+        let promise_re = PROMISE_RE.get_or_init(|| {
+            Regex::new(r"\b(i will|i'll|will\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule)|going to\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule))\b")
+                .expect("promise regex is valid")
+        });
         if normalized.contains("сделаю") || promise_re.is_match(&normalized) {
             let fact_id = self
                 .add_fact(
@@ -1481,8 +1521,8 @@ impl RateLimiter {
     }
 
     fn allow(&self, key: &str) -> bool {
-        let mut tokens = self.tokens.lock().unwrap();
-        let mut last = self.last.lock().unwrap();
+        let mut tokens = self.tokens.safe_lock();
+        let mut last = self.last.safe_lock();
         let now = Instant::now();
         let last_time = last.entry(key.to_string()).or_insert(now);
         let elapsed = now.duration_since(*last_time).as_secs_f64();
@@ -1570,8 +1610,11 @@ pub fn preprocess_search_query(raw: &str) -> String {
     static EPISODE_REF: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static QUOTED: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 
-    let episode_re = EPISODE_REF.get_or_init(|| Regex::new(r"(?i)episode:[a-z0-9_-]+").unwrap());
-    let quoted_re = QUOTED.get_or_init(|| Regex::new(r#""([^"]*)""#).unwrap());
+    let episode_re = EPISODE_REF.get_or_init(|| {
+        Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid")
+    });
+    let quoted_re =
+        QUOTED.get_or_init(|| Regex::new(r#""([^"]*)""#).expect("quoted regex is valid"));
 
     let s = episode_re.replace_all(raw, " ");
     let s = quoted_re.replace_all(&s, " $1 ");
@@ -2034,7 +2077,8 @@ mod tests {
                             .and_then(Value::as_str)
                             .unwrap_or_default()
                             .to_lowercase();
-                        let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
+                        let words: Vec<&str> =
+                            q.split_whitespace().filter(|w| w.len() >= 2).collect();
                         if words.is_empty() {
                             if !content.contains(q) {
                                 return false;
@@ -2109,9 +2153,7 @@ mod tests {
                 let from_b = b.get("from_id").and_then(Value::as_str).unwrap_or_default();
                 let to_a = a.get("to_id").and_then(Value::as_str).unwrap_or_default();
                 let to_b = b.get("to_id").and_then(Value::as_str).unwrap_or_default();
-                from_a
-                    .cmp(from_b)
-                    .then_with(|| to_a.cmp(to_b))
+                from_a.cmp(from_b).then_with(|| to_a.cmp(to_b))
             });
 
             Ok(filtered)
@@ -2551,13 +2593,15 @@ mod tests {
 
     #[test]
     fn test_preprocess_search_query_strips_episode_refs() {
-        let result = preprocess_search_query("Project Delta Briefing episode:035d8d47 OR episode:8de581d5");
+        let result =
+            preprocess_search_query("Project Delta Briefing episode:035d8d47 OR episode:8de581d5");
         assert_eq!(result, "Project Delta Briefing");
     }
 
     #[test]
     fn test_preprocess_search_query_strips_boolean_ops() {
-        let result = preprocess_search_query("fleet manifest certs OR tokens AND ports NOT pending");
+        let result =
+            preprocess_search_query("fleet manifest certs OR tokens AND ports NOT pending");
         assert_eq!(result, "fleet manifest certs tokens ports pending");
     }
 
@@ -2626,7 +2670,14 @@ mod tests {
             !context.is_empty(),
             "Multi-word query should find facts via per-word matching"
         );
-        assert!(context[0].get("content").unwrap().as_str().unwrap().contains("enrollment"));
+        assert!(
+            context[0]
+                .get("content")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("enrollment")
+        );
     }
 
     #[tokio::test]

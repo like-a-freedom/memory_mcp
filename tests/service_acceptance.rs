@@ -361,14 +361,14 @@ async fn test_multiword_query_retrieval_quality() {
     // Test 1: Multi-word query where words are non-adjacent in content
     let ctx = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-query: "Delta Enrollment".to_string(),
-                scope: "org".to_string(),
-                as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
-                budget: 10,
-                access: None,
-            })
-            .await
-            .expect("assemble Delta Enrollment");
+            query: "Delta Enrollment".to_string(),
+            scope: "org".to_string(),
+            as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+            budget: 10,
+            access: None,
+        })
+        .await
+        .expect("assemble Delta Enrollment");
     assert!(
         !ctx.is_empty(),
         "Delta Enrollment: expected matches for non-adjacent multi-word query"
@@ -377,7 +377,8 @@ query: "Delta Enrollment".to_string(),
     // Test 2: Query with episode refs and OR — should be preprocessed and still find results
     let ctx2 = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: "fleet checklist certs tokens ports pending checklist episode:035d8d47".to_string(),
+            query: "fleet checklist certs tokens ports pending checklist episode:035d8d47"
+                .to_string(),
             scope: "org".to_string(),
             as_of: None,
             budget: 10,

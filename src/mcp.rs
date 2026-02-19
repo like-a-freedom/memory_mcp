@@ -17,6 +17,71 @@ use crate::models::{
 };
 use crate::service::{MemoryError, MemoryService};
 
+/// Macro for instrumenting tool operations with logging.
+///
+/// This macro wraps an async block with start/done/error logging.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let result = instrument_tool!(self, "ingest", args, {
+///     self.service.ingest(request, access).await
+/// });
+/// ```
+#[macro_export]
+macro_rules! instrument_tool {
+    ($self:expr, $op:expr, $args:expr, $body:expr) => {{
+        $self.service.log_tool_event(
+            concat!($op, ".start"),
+            $args,
+            json!({}),
+            LogLevel::Info,
+        );
+        match $body {
+            Ok(result) => {
+                $self.service.log_tool_event(
+                    concat!($op, ".done"),
+                    json!({}),
+                    json!({"result": &result}),
+                    LogLevel::Info,
+                );
+                Ok(result)
+            }
+            Err(err) => {
+                $self.service.log_tool_event(
+                    concat!($op, ".error"),
+                    json!({}),
+                    json!({"error": err.to_string()}),
+                    LogLevel::Warn,
+                );
+                Err(err)
+            }
+        }
+    }};
+}
+
+/// MCP (Model Context Protocol) server handler for memory operations.
+///
+/// `MemoryMcp` implements the MCP protocol and provides tools for:
+/// - Ingesting episodes (conversations, emails, documents)
+/// - Extracting entities and facts
+/// - Resolving entity aliases
+/// - Assembling context for queries
+/// - Managing invalidations
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use memory_mcp::{MemoryMcp, MemoryService};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let service = MemoryService::new_from_env().await?;
+///     let server = MemoryMcp::new(service);
+///     // Start the MCP server...
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone)]
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
@@ -24,12 +89,19 @@ pub struct MemoryMcp {
     tool_router: ToolRouter<Self>,
 }
 
+/// Response wrapper for tool results.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ToolResponse<T> {
+    /// The actual result data.
     pub result: T,
 }
 
 impl MemoryMcp {
+    /// Creates a new `MemoryMcp` instance with the given service.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The `MemoryService` to use for memory operations.
     pub fn new(service: MemoryService) -> Self {
         Self {
             service: Arc::new(service),
@@ -37,6 +109,9 @@ impl MemoryMcp {
         }
     }
 
+    /// Returns a reference to the underlying `MemoryService`.
+    ///
+    /// This can be used to access service methods directly if needed.
     pub fn service(&self) -> Arc<MemoryService> {
         self.service.clone()
     }
@@ -123,9 +198,8 @@ impl MemoryMcp {
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
         let access = AccessContext::default();
-        let context_pack = parse_context_items(&params.0.context_items).map_err(|msg| {
-            ErrorData::new(ErrorCode::INVALID_PARAMS, msg, None)
-        })?;
+        let context_pack = parse_context_items(&params.0.context_items)
+            .map_err(|msg| ErrorData::new(ErrorCode::INVALID_PARAMS, msg, None))?;
         let request = ExplainRequest { context_pack };
 
         self.service.log_tool_event(
@@ -159,65 +233,84 @@ impl MemoryMcp {
         }
     }
 
-    #[tool(description = "Analyze an episode to identify entities, facts, and relationships.")]
-    pub async fn extract(
+    /// Shared implementation for extract operations (used by extract and extract_entities).
+    /// Handles the common logic of extracting from episode_id or ingesting content first.
+    async fn extract_impl(
         &self,
-        params: Parameters<ExtractParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
+        episode_id: Option<String>,
+        content: Option<String>,
+        text: Option<String>,
+        source_type: Option<String>,
+        source_id: Option<String>,
+        t_ref: Option<String>,
+        scope: Option<String>,
+        enable_logging: bool,
+    ) -> Result<Value, ErrorData> {
         let access = AccessContext::default();
-        let episode_id = normalize_optional_string(p.episode_id);
-        let content = normalize_optional_string(p.content);
-        let text = normalize_optional_string(p.text);
+        let episode_id = normalize_optional_string(episode_id);
+        let content = normalize_optional_string(content);
+        let text = normalize_optional_string(text);
 
-        self.service.log_tool_event(
-            "extract.start",
-            json!({"episode_id": episode_id, "has_content": content.is_some() || text.is_some()}),
-            json!({}),
-            LogLevel::Info,
-        );
+        if enable_logging {
+            self.service.log_tool_event(
+                "extract.start",
+                json!({"episode_id": episode_id, "has_content": content.is_some() || text.is_some()}),
+                json!({}),
+                LogLevel::Info,
+            );
+        }
 
+        // If episode_id provided, extract directly
         if let Some(ref episode_id) = episode_id {
             match self.service.extract(episode_id, Some(access)).await {
                 Ok(result) => {
-                    self.service.log_tool_event(
-                        "extract.done",
-                        json!({"episode_id": episode_id}),
-                        json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
-                        LogLevel::Info,
-                    );
-                    return Ok(Json(ToolResponse { result }));
+                    if enable_logging {
+                        self.service.log_tool_event(
+                            "extract.done",
+                            json!({"episode_id": episode_id}),
+                            json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
+                            LogLevel::Info,
+                        );
+                    }
+                    return Ok(result);
                 }
                 Err(err) => {
-                    self.service.log_tool_event(
-                        "extract.error",
-                        json!({"episode_id": episode_id}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                    );
+                    if enable_logging {
+                        self.service.log_tool_event(
+                            "extract.error",
+                            json!({"episode_id": episode_id}),
+                            json!({"error": err.to_string()}),
+                            LogLevel::Warn,
+                        );
+                    }
                     return Err(mcp_error(err));
                 }
             }
         }
+
+        // Otherwise, ingest content first then extract
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
             let result = empty_extract_result("no_input", "episode_id or content/text is required");
-            self.service.log_tool_event(
-                "extract.no_input",
-                json!({"episode_id": episode_id, "has_content": false}),
-                json!({"status": "no_input"}),
-                LogLevel::Warn,
-            );
-            return Ok(Json(ToolResponse { result }));
+            if enable_logging {
+                self.service.log_tool_event(
+                    "extract.no_input",
+                    json!({"episode_id": episode_id, "has_content": false}),
+                    json!({"status": "no_input"}),
+                    LogLevel::Warn,
+                );
+            }
+            return Ok(result);
         }
-        let source_type = p.source_type.unwrap_or_else(|| "ad-hoc".to_string());
-        let source_id = p.source_id.unwrap_or_else(|| content_hash(&content));
-        let t_ref = p
-            .t_ref
+
+        let source_type = source_type.unwrap_or_else(|| "ad-hoc".to_string());
+        let source_id = source_id.unwrap_or_else(|| content_hash(&content));
+        let t_ref = t_ref
             .as_ref()
             .and_then(|s| parse_datetime(s))
             .unwrap_or_else(Utc::now);
-        let scope = p.scope.unwrap_or_else(|| "org".to_string());
+        let scope = scope.unwrap_or_else(|| "org".to_string());
+
         match self
             .service
             .ingest(
@@ -237,34 +330,61 @@ impl MemoryMcp {
         {
             Ok(episode_id) => match self.service.extract(&episode_id, Some(access)).await {
                 Ok(result) => {
-                    self.service.log_tool_event(
-                        "extract.done",
-                        json!({"episode_id": episode_id}),
-                        json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
-                        LogLevel::Info,
-                    );
-                    Ok(Json(ToolResponse { result }))
+                    if enable_logging {
+                        self.service.log_tool_event(
+                            "extract.done",
+                            json!({"episode_id": episode_id}),
+                            json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
+                            LogLevel::Info,
+                        );
+                    }
+                    Ok(result)
                 }
                 Err(err) => {
+                    if enable_logging {
+                        self.service.log_tool_event(
+                            "extract.error",
+                            json!({}),
+                            json!({"error": err.to_string()}),
+                            LogLevel::Warn,
+                        );
+                    }
+                    Err(mcp_error(err))
+                }
+            },
+            Err(err) => {
+                if enable_logging {
                     self.service.log_tool_event(
                         "extract.error",
                         json!({}),
                         json!({"error": err.to_string()}),
                         LogLevel::Warn,
                     );
-                    Err(mcp_error(err))
                 }
-            },
-            Err(err) => {
-                self.service.log_tool_event(
-                    "extract.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                );
                 Err(mcp_error(err))
             }
         }
+    }
+
+    #[tool(description = "Analyze an episode to identify entities, facts, and relationships.")]
+    pub async fn extract(
+        &self,
+        params: Parameters<ExtractParams>,
+    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
+        let p = params.0;
+        let result = self
+            .extract_impl(
+                p.episode_id,
+                p.content,
+                p.text,
+                p.source_type,
+                p.source_id,
+                p.t_ref,
+                p.scope,
+                true, // enable logging
+            )
+            .await?;
+        Ok(Json(ToolResponse { result }))
     }
 
     #[tool(description = "Find or create a canonical entity, handling deduplication and aliases.")]
@@ -457,59 +577,18 @@ impl MemoryMcp {
         params: Parameters<AliasExtractParams>,
     ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
         let p = params.0;
-        let access = AccessContext::default();
-        let episode_id = normalize_optional_string(p.episode_id);
-        let content = normalize_optional_string(p.content);
-        let text = normalize_optional_string(p.text);
-        if let Some(ref episode_id) = episode_id {
-            let result = self
-                .service
-                .extract(episode_id, Some(access))
-                .await
-                .map_err(mcp_error)?;
-            return Ok(Json(ToolResponse { result }));
-        }
-        let content = content.or(text).unwrap_or_default();
-        if content.trim().is_empty() {
-            let result = empty_extract_result("no_input", "episode_id or content/text is required");
-            self.service.log_tool_event(
-                "extract.no_input",
-                json!({"episode_id": episode_id, "has_content": false}),
-                json!({"status": "no_input"}),
-                LogLevel::Warn,
-            );
-            return Ok(Json(ToolResponse { result }));
-        }
-        let source_type = p.source_type.unwrap_or_else(|| "ad-hoc".to_string());
-        let source_id = p.source_id.unwrap_or_else(|| content_hash(&content));
-        let t_ref = p
-            .t_ref
-            .as_ref()
-            .and_then(|s| parse_datetime(s))
-            .unwrap_or_else(Utc::now);
-        let scope = p.scope.unwrap_or_else(|| "org".to_string());
-        let episode_id = self
-            .service
-            .ingest(
-                IngestRequest {
-                    source_type,
-                    source_id,
-                    content,
-                    t_ref,
-                    scope,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: Vec::new(),
-                },
-                Some(access.clone()),
-            )
-            .await
-            .map_err(mcp_error)?;
         let result = self
-            .service
-            .extract(&episode_id, Some(access))
-            .await
-            .map_err(mcp_error)?;
+            .extract_impl(
+                p.episode_id,
+                p.content,
+                p.text,
+                p.source_type,
+                p.source_id,
+                p.t_ref,
+                p.scope,
+                false, // disable detailed logging for alias
+            )
+            .await?;
         Ok(Json(ToolResponse { result }))
     }
 
@@ -896,8 +975,8 @@ pub struct UiParams {
 ///        `quote` and `content` default to `""` when absent.
 ///   4. Mixed: any combination of strings and objects in one array.
 pub(crate) fn parse_context_items(raw: &str) -> Result<Vec<crate::models::ExplainItem>, String> {
-    let values: Vec<Value> = serde_json::from_str(raw)
-        .map_err(|e| format!("Invalid context_items JSON: {e}"))?;
+    let values: Vec<Value> =
+        serde_json::from_str(raw).map_err(|e| format!("Invalid context_items JSON: {e}"))?;
 
     let items = values
         .into_iter()
@@ -1040,7 +1119,8 @@ mod tests {
 
     #[test]
     fn parse_source_episode_preferred_over_id() {
-        let raw = r#"[{"content":"x","quote":"y","source_episode":"episode:real","id":"task:alt"}]"#;
+        let raw =
+            r#"[{"content":"x","quote":"y","source_episode":"episode:real","id":"task:alt"}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items[0].source_episode, "episode:real");
     }

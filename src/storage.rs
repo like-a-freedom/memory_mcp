@@ -10,6 +10,189 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 use crate::service::migrations_dir;
 
+/// Unified database engine enum that abstracts over local (RocksDB) and remote (WebSocket) connections.
+/// This eliminates code duplication from if/else branches throughout the codebase.
+pub enum DbEngine {
+    Local(Mutex<Surreal<surrealdb::engine::local::Db>>),
+    Remote(Mutex<Surreal<Client>>),
+}
+
+impl DbEngine {
+    /// Execute a query and return the raw SurrealDB response.
+    async fn query(
+        &self,
+        sql: &str,
+        namespace: &str,
+        database: &str,
+    ) -> Result<surrealdb::Response, MemoryError> {
+        match self {
+            DbEngine::Local(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                guard
+                    .query(sql)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
+            }
+            DbEngine::Remote(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                guard
+                    .query(sql)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
+            }
+        }
+    }
+
+    /// Execute a query with bound variables.
+    async fn query_with_vars(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+        database: &str,
+    ) -> Result<surrealdb::Response, MemoryError> {
+        match self {
+            DbEngine::Local(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                let mut query = guard.query(sql);
+                if let Some(vars) = vars {
+                    query = query.bind(vars);
+                }
+                query
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
+            }
+            DbEngine::Remote(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                let mut query = guard.query(sql);
+                if let Some(vars) = vars {
+                    query = query.bind(vars);
+                }
+                query
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
+            }
+        }
+    }
+
+    /// Select all records from a table.
+    async fn select_table(
+        &self,
+        table: &str,
+        namespace: &str,
+        database: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        match self {
+            DbEngine::Local(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                let sql = format!("SELECT * FROM {}", table);
+                let mut response = guard.query(sql.as_str()).await.map_err(|e| {
+                    MemoryError::Storage(format!("SurrealDB select table failed: {e}"))
+                })?;
+                let s_val: surrealdb::Value = response.take(0).map_err(|e| {
+                    MemoryError::Storage(format!("SurrealDB response deserialize failed: {e}"))
+                })?;
+                let json = serde_json::to_value(&s_val).map_err(|e| {
+                    MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
+                })?;
+                let normalized = normalize_surreal_json(&json);
+                if normalized.is_array() {
+                    serde_json::from_value(normalized).map_err(|e| {
+                        MemoryError::Storage(format!("Deserializing query array failed: {e}"))
+                    })
+                } else {
+                    Ok(vec![normalized])
+                }
+            }
+            DbEngine::Remote(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                guard.select(table).await.map_err(|e| {
+                    MemoryError::Storage(format!("SurrealDB select table failed: {e}"))
+                })
+            }
+        }
+    }
+
+    /// Execute a query and deserialize the first result set into type `T`.
+    async fn query_get<T: serde::de::DeserializeOwned>(
+        &self,
+        sql: &str,
+        namespace: &str,
+        database: &str,
+    ) -> Result<T, MemoryError> {
+        let mut response = self.query(sql, namespace, database).await?;
+        let surreal_val: surrealdb::Value = response.take(0).map_err(|e| {
+            MemoryError::Storage(format!("SurrealDB response deserialize failed: {e}"))
+        })?;
+        let json = serde_json::to_value(&surreal_val).map_err(|e| {
+            MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
+        })?;
+
+        let normalized = normalize_surreal_json(&json);
+        // First try to deserialize directly
+        if let Ok(res) = serde_json::from_value(normalized.clone()) {
+            return Ok(res);
+        }
+        // If direct deserialization fails and we have an array of single-field objects,
+        // try to extract inner values (e.g., SELECT name FROM ... -> [{"name":"Alice"}])
+        if let serde_json::Value::Array(arr) = normalized {
+            let inner: Vec<serde_json::Value> = arr
+                .into_iter()
+                .map(|el| {
+                    if let serde_json::Value::Object(map) = el {
+                        if map.len() == 1 {
+                            map.into_iter()
+                                .next()
+                                .expect("map with len 1 has one entry")
+                                .1
+                        } else {
+                            serde_json::Value::Object(map)
+                        }
+                    } else {
+                        el
+                    }
+                })
+                .collect();
+            if let Ok(res) = serde_json::from_value(serde_json::Value::Array(inner)) {
+                return Ok(res);
+            }
+        }
+        Err(MemoryError::Storage(
+            "Deserializing query result failed".to_string(),
+        ))
+    }
+}
+
 #[async_trait]
 pub trait DbClient: Send + Sync {
     async fn select_one(
@@ -77,10 +260,10 @@ pub trait DbClient: Send + Sync {
 }
 
 pub struct SurrealDbClient {
-    db_remote: Option<Mutex<Surreal<Client>>>,
-    db_local: Option<Mutex<surrealdb::Surreal<surrealdb::engine::local::Db>>>,
+    engine: DbEngine,
     database: String,
     logger: StdoutLogger,
+    is_local: bool,
 }
 
 impl SurrealDbClient {
@@ -88,7 +271,7 @@ impl SurrealDbClient {
         config: &SurrealConfig,
         default_namespace: &str,
     ) -> Result<Self, MemoryError> {
-        if config.embedded {
+        let (engine, is_local) = if config.embedded {
             // Use RocksDB embedded engine with configurable data dir (persistent)
             use std::path::PathBuf;
             use surrealdb::engine::local::RocksDb;
@@ -127,69 +310,94 @@ impl SurrealDbClient {
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
 
-            return Ok(Self {
-                db_remote: None,
-                db_local: Some(Mutex::new(db)),
-                database: config.db_name.clone(),
-                logger: StdoutLogger::new(&config.log_level),
-            });
-        }
+            (DbEngine::Local(Mutex::new(db)), true)
+        } else {
+            // Fallback to remote WS connection
+            let url = normalize_url(config.url.as_ref().unwrap_or(&"".to_string()));
+            let db = Surreal::new::<Ws>(url.as_str())
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
+            db.signin(Root {
+                username: config.username.as_str(),
+                password: config.password.as_str(),
+            })
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
+            db.use_ns(default_namespace)
+                .use_db(config.db_name.as_str())
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
 
-        // Fallback to remote WS connection
-        let url = normalize_url(config.url.as_ref().unwrap_or(&"".to_string()));
-        let db = Surreal::new::<Ws>(url.as_str())
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
-        db.signin(Root {
-            username: config.username.as_str(),
-            password: config.password.as_str(),
-        })
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
-        db.use_ns(default_namespace)
-            .use_db(config.db_name.as_str())
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+            (DbEngine::Remote(Mutex::new(db)), false)
+        };
 
         Ok(Self {
-            db_remote: Some(Mutex::new(db)),
-            db_local: None,
+            engine,
+            is_local,
             database: config.db_name.clone(),
             logger: StdoutLogger::new(&config.log_level),
         })
     }
 
-    async fn with_namespace_remote(
-        &self,
-        namespace: &str,
-    ) -> Result<surrealdb::Surreal<Client>, MemoryError> {
-        let guard = match &self.db_remote {
-            Some(m) => m.lock().await,
-            None => return Err(MemoryError::Storage("remote db not configured".to_string())),
-        };
-        guard
-            .use_ns(namespace)
-            .use_db(&self.database)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-        Ok(guard.clone())
+    /// Check if using local (embedded) database.
+    fn is_local(&self) -> bool {
+        self.is_local
     }
 
+    /// Get local database reference (for backward compatibility during migration).
+    fn db_local(&self) -> Option<&Mutex<Surreal<surrealdb::engine::local::Db>>> {
+        match &self.engine {
+            DbEngine::Local(db) => Some(db),
+            DbEngine::Remote(_) => None,
+        }
+    }
+
+    /// Get remote database reference (for backward compatibility during migration).
+    fn db_remote(&self) -> Option<&Mutex<Surreal<Client>>> {
+        match &self.engine {
+            DbEngine::Local(_) => None,
+            DbEngine::Remote(db) => Some(db),
+        }
+    }
+
+    /// Get local database with namespace set (for backward compatibility).
     async fn with_namespace_local(
         &self,
         namespace: &str,
     ) -> Result<surrealdb::Surreal<surrealdb::engine::local::Db>, MemoryError> {
-        let guard = match &self.db_local {
-            Some(m) => m.lock().await,
-            None => return Err(MemoryError::Storage("local db not configured".to_string())),
-        };
-        guard
-            .use_ns(namespace)
-            .use_db(&self.database)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-        Ok(guard.clone())
+        match &self.engine {
+            DbEngine::Local(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(&self.database)
+                    .await
+                    .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+                Ok(guard.clone())
+            }
+            DbEngine::Remote(_) => Err(MemoryError::Storage("local db not configured".to_string())),
+        }
     }
+
+    /// Get remote database with namespace set (for backward compatibility).
+    async fn with_namespace_remote(
+        &self,
+        namespace: &str,
+    ) -> Result<surrealdb::Surreal<Client>, MemoryError> {
+        match &self.engine {
+            DbEngine::Local(_) => Err(MemoryError::Storage("remote db not configured".to_string())),
+            DbEngine::Remote(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(&self.database)
+                    .await
+                    .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+                Ok(guard.clone())
+            }
+        }
+    }
+
     /// Apply migrations for the given namespace.
     ///
     /// Behavior:
@@ -244,18 +452,35 @@ impl SurrealDbClient {
                     MemoryError::Storage(format!("writing temp migration config failed: {err}"))
                 })?;
 
-                let res = if self.db_local.is_some() {
-                    let db = self.with_namespace_local(namespace).await?;
-                    MigrationRunner::new(&db)
-                        .use_config_file(&config_path)
-                        .up()
-                        .await
-                } else {
-                    let db = self.with_namespace_remote(namespace).await?;
-                    MigrationRunner::new(&db)
-                        .use_config_file(&config_path)
-                        .up()
-                        .await
+                let res = match &self.engine {
+                    DbEngine::Local(db) => {
+                        let guard = db.lock().await;
+                        guard
+                            .use_ns(namespace)
+                            .use_db(&self.database)
+                            .await
+                            .map_err(|e| {
+                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
+                            })?;
+                        MigrationRunner::new(&*guard)
+                            .use_config_file(&config_path)
+                            .up()
+                            .await
+                    }
+                    DbEngine::Remote(db) => {
+                        let guard = db.lock().await;
+                        guard
+                            .use_ns(namespace)
+                            .use_db(&self.database)
+                            .await
+                            .map_err(|e| {
+                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
+                            })?;
+                        MigrationRunner::new(&*guard)
+                            .use_config_file(&config_path)
+                            .up()
+                            .await
+                    }
                 };
 
                 let _ = std::fs::remove_file(&config_path);
@@ -279,18 +504,35 @@ impl SurrealDbClient {
             }
             MigrationSource::Embedded => {
                 log_event(LogLevel::Info, "start", "embedded", None);
-                let res = if self.db_local.is_some() {
-                    let db = self.with_namespace_local(namespace).await?;
-                    MigrationRunner::new(&db)
-                        .load_files(&EMBEDDED_MIGRATIONS)
-                        .up()
-                        .await
-                } else {
-                    let db = self.with_namespace_remote(namespace).await?;
-                    MigrationRunner::new(&db)
-                        .load_files(&EMBEDDED_MIGRATIONS)
-                        .up()
-                        .await
+                let res = match &self.engine {
+                    DbEngine::Local(db) => {
+                        let guard = db.lock().await;
+                        guard
+                            .use_ns(namespace)
+                            .use_db(&self.database)
+                            .await
+                            .map_err(|e| {
+                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
+                            })?;
+                        MigrationRunner::new(&*guard)
+                            .load_files(&EMBEDDED_MIGRATIONS)
+                            .up()
+                            .await
+                    }
+                    DbEngine::Remote(db) => {
+                        let guard = db.lock().await;
+                        guard
+                            .use_ns(namespace)
+                            .use_db(&self.database)
+                            .await
+                            .map_err(|e| {
+                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
+                            })?;
+                        MigrationRunner::new(&*guard)
+                            .load_files(&EMBEDDED_MIGRATIONS)
+                            .up()
+                            .await
+                    }
                 };
 
                 match res {
@@ -365,7 +607,7 @@ impl DbClient for SurrealDbClient {
         );
         self.logger.log(sql_event, LogLevel::Trace);
 
-        let item: Option<Value> = if self.db_local.is_some() {
+        let item: Option<Value> = if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut q = db.query(sql.as_str());
             if let Some(b) = bind.clone() {
@@ -483,7 +725,7 @@ impl DbClient for SurrealDbClient {
         );
         self.logger.log(event.clone(), LogLevel::Debug);
 
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             // Use an explicit SELECT query to ensure consistent serialization across engines
             let sql = format!("SELECT * FROM {}", table);
@@ -602,7 +844,7 @@ impl DbClient for SurrealDbClient {
 
         let content_for_create = content;
 
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut response = db
                 .query(&sql)
@@ -708,7 +950,7 @@ impl DbClient for SurrealDbClient {
             content
         };
 
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut response = db
                 .query(&sql)
@@ -778,7 +1020,7 @@ impl DbClient for SurrealDbClient {
         }
         self.logger.log(event.clone(), LogLevel::Debug);
 
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut query = db.query(sql);
             if let Some(vars) = vars.clone() {
@@ -854,7 +1096,12 @@ impl DbClient for SurrealDbClient {
                 let word_conditions: Vec<String> = words
                     .iter()
                     .enumerate()
-                    .map(|(i, _)| format!("string::lowercase(content) CONTAINS string::lowercase($word{})", i))
+                    .map(|(i, _)| {
+                        format!(
+                            "string::lowercase(content) CONTAINS string::lowercase($word{})",
+                            i
+                        )
+                    })
                     .collect();
                 format!(" AND ({})", word_conditions.join(" OR "))
             };
@@ -940,7 +1187,7 @@ impl DbClient for SurrealDbClient {
         }
 
         // Determine which SQL to run: FTS primary → fallback → no-query
-        let results = if self.db_local.is_some() {
+        let results = if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             if let Some(ref fts_sql) = sql_fts {
                 // Try full-text search first
@@ -950,19 +1197,29 @@ impl DbClient for SurrealDbClient {
                     _ => {
                         // Fallback to per-word CONTAINS OR
                         if let Some(ref fb_sql) = sql_fallback {
-                            self.logger.log({
-                                let mut e = event.clone();
-                                e.insert("fallback".to_string(), Value::String("per_word_contains".to_string()));
-                                e
-                            }, LogLevel::Debug);
-                            execute_query(&db, fb_sql, vars.clone()).await.unwrap_or_default()
+                            self.logger.log(
+                                {
+                                    let mut e = event.clone();
+                                    e.insert(
+                                        "fallback".to_string(),
+                                        Value::String("per_word_contains".to_string()),
+                                    );
+                                    e
+                                },
+                                LogLevel::Debug,
+                            );
+                            execute_query(&db, fb_sql, vars.clone())
+                                .await
+                                .unwrap_or_default()
                         } else {
                             Vec::new()
                         }
                     }
                 }
             } else {
-                execute_query(&db, &sql_no_query, vars.clone()).await.unwrap_or_default()
+                execute_query(&db, &sql_no_query, vars.clone())
+                    .await
+                    .unwrap_or_default()
             }
         } else {
             let db = self.with_namespace_remote(namespace).await?;
@@ -972,19 +1229,29 @@ impl DbClient for SurrealDbClient {
                     Ok(r) if !r.is_empty() => r,
                     _ => {
                         if let Some(ref fb_sql) = sql_fallback {
-                            self.logger.log({
-                                let mut e = event.clone();
-                                e.insert("fallback".to_string(), Value::String("per_word_contains".to_string()));
-                                e
-                            }, LogLevel::Debug);
-                            execute_query_remote(&db, fb_sql, vars.clone()).await.unwrap_or_default()
+                            self.logger.log(
+                                {
+                                    let mut e = event.clone();
+                                    e.insert(
+                                        "fallback".to_string(),
+                                        Value::String("per_word_contains".to_string()),
+                                    );
+                                    e
+                                },
+                                LogLevel::Debug,
+                            );
+                            execute_query_remote(&db, fb_sql, vars.clone())
+                                .await
+                                .unwrap_or_default()
                         } else {
                             Vec::new()
                         }
                     }
                 }
             } else {
-                execute_query_remote(&db, &sql_no_query, vars.clone()).await.unwrap_or_default()
+                execute_query_remote(&db, &sql_no_query, vars.clone())
+                    .await
+                    .unwrap_or_default()
             }
         };
 
@@ -1024,7 +1291,7 @@ impl DbClient for SurrealDbClient {
             "cutoff": cutoff,
         });
 
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
                 let mut e = event.clone();
@@ -1126,7 +1393,7 @@ impl SurrealDbClient {
         // embedded (RocksDB) and remote engines we first take the raw
         // `surrealdb::sql::Value` and then deserialize it into `T` via
         // serde_json conversions.
-        if self.db_local.is_some() {
+        if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
             let mut response = db
                 .query(sql)
@@ -1152,7 +1419,10 @@ impl SurrealDbClient {
                     .map(|el| {
                         if let serde_json::Value::Object(map) = el {
                             if map.len() == 1 {
-                                map.into_iter().next().unwrap().1
+                                map.into_iter()
+                                    .next()
+                                    .expect("map with len 1 has one entry")
+                                    .1
                             } else {
                                 serde_json::Value::Object(map)
                             }
@@ -1241,7 +1511,7 @@ fn normalize_surreal_json(v: &serde_json::Value) -> serde_json::Value {
     use serde_json::Value as J;
     match v {
         J::Object(map) if map.len() == 1 => {
-            let (k, val) = map.iter().next().unwrap();
+            let (k, val) = map.iter().next().expect("map with len 1 has one entry");
             match k.as_str() {
                 "Array" => {
                     if let J::Array(items) = val {
@@ -1595,9 +1865,7 @@ mod tests {
                 let from_b = b.get("from_id").and_then(Value::as_str).unwrap_or_default();
                 let to_a = a.get("to_id").and_then(Value::as_str).unwrap_or_default();
                 let to_b = b.get("to_id").and_then(Value::as_str).unwrap_or_default();
-                from_a
-                    .cmp(from_b)
-                    .then_with(|| to_a.cmp(to_b))
+                from_a.cmp(from_b).then_with(|| to_a.cmp(to_b))
             });
 
             Ok(filtered)

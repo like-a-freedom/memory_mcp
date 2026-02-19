@@ -264,9 +264,7 @@ impl DbClient for FakeDbClient {
             let from_b = b.get("from_id").and_then(Value::as_str).unwrap_or_default();
             let to_a = a.get("to_id").and_then(Value::as_str).unwrap_or_default();
             let to_b = b.get("to_id").and_then(Value::as_str).unwrap_or_default();
-            from_a
-                .cmp(from_b)
-                .then_with(|| to_a.cmp(to_b))
+            from_a.cmp(from_b).then_with(|| to_a.cmp(to_b))
         });
 
         Ok(filtered)
