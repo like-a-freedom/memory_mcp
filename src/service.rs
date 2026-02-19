@@ -46,6 +46,15 @@ pub enum MemoryError {
 
 const CONTEXT_CACHE_SIZE: usize = 512;
 
+/// Half-life in days for metric and promise fact confidence decay.
+const METRIC_HALF_LIFE_DAYS: f64 = 365.0;
+
+/// Half-life in days for general fact confidence decay.
+const DEFAULT_HALF_LIFE_DAYS: f64 = 180.0;
+
+/// Scaling factor for confidence rounding.
+const CONFIDENCE_SCALE: f64 = 10000.0;
+
 /// Core service for memory operations.
 ///
 /// `MemoryService` provides the main business logic for the Memory MCP system,
@@ -460,7 +469,8 @@ impl MemoryService {
             }
             let payload = serde_json::Value::Object(payload_map);
             self.db_client.create(&fact_id, payload, &namespace).await?;
-            self.context_cache.safe_lock().clear();
+            // Selective cache invalidation for the affected scope
+            invalidate_cache_by_scope(&self.context_cache, scope);
         }
         Ok(fact_id)
     }
@@ -476,6 +486,14 @@ impl MemoryService {
             namespace.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
         let mut updated =
             record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+        
+        // Get scope from record for cache invalidation
+        let scope = updated
+            .get("scope")
+            .and_then(Value::as_str)
+            .unwrap_or(&namespace)
+            .to_string();
+        
         updated.insert(
             "t_invalid".to_string(),
             json!(normalize_dt(request.t_invalid)),
@@ -484,7 +502,8 @@ impl MemoryService {
         self.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
-        self.context_cache.safe_lock().clear();
+        // Selective cache invalidation for the affected scope
+        invalidate_cache_by_scope(&self.context_cache, &scope);
         Ok("ok".to_string())
     }
 
@@ -1561,6 +1580,29 @@ impl CacheKey {
             tags,
         }
     }
+
+    /// Check if this cache key matches the given scope.
+    fn matches_scope(&self, scope: &str) -> bool {
+        self.scope == scope
+    }
+}
+
+/// Invalidate cache entries for a specific scope.
+fn invalidate_cache_by_scope(
+    cache: &Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>,
+    scope: &str,
+) {
+    let mut guard = cache.safe_lock();
+    // Collect keys to remove (can't modify while iterating)
+    let keys_to_remove: Vec<CacheKey> = guard
+        .iter()
+        .filter(|(key, _)| key.matches_scope(scope))
+        .map(|(key, _)| key.clone())
+        .collect();
+    // Remove matching entries
+    for key in keys_to_remove {
+        guard.pop(&key);
+    }
 }
 
 #[derive(Debug)]
@@ -1948,13 +1990,13 @@ fn fact_from_record(record: &Value) -> Option<Fact> {
 
 fn decayed_confidence(fact: &Fact, now: DateTime<Utc>) -> f64 {
     let half_life_days = if fact.fact_type == "metric" || fact.fact_type == "promise" {
-        365.0
+        METRIC_HALF_LIFE_DAYS
     } else {
-        180.0
+        DEFAULT_HALF_LIFE_DAYS
     };
     let delta_days = (now - fact.t_valid).num_days().max(0) as f64;
     let decay = 0.5_f64.powf(delta_days / half_life_days);
-    (fact.confidence * decay * 10000.0).round() / 10000.0
+    (fact.confidence * decay * CONFIDENCE_SCALE).round() / CONFIDENCE_SCALE
 }
 
 fn bfs_path(
