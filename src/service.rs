@@ -389,6 +389,61 @@ impl MemoryService {
         Ok(entity_id)
     }
 
+    /// Adds a new fact to the knowledge base.
+    ///
+    /// Facts are bi-temporal: they have a validity time (`t_valid`) and an ingestion time.
+    /// Facts can be invalidated later while preserving history.
+    ///
+    /// # Arguments
+    ///
+    /// * `fact_type` - Type of fact (e.g., "metric", "promise", "note")
+    /// * `content` - The fact content
+    /// * `quote` - Original quote from source
+    /// * `source_episode` - Episode ID this fact was extracted from
+    /// * `t_valid` - When the fact became valid
+    /// * `scope` - Scope for access control
+    /// * `confidence` - Confidence score (0.0-1.0)
+    /// * `entity_links` - Related entity IDs
+    /// * `policy_tags` - Policy tags for filtering
+    /// * `provenance` - Provenance metadata
+    ///
+    /// # Returns
+    ///
+    /// The deterministic fact ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MemoryError::Validation` if required fields are empty.
+    /// Returns `MemoryError::Storage` if database operation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use memory_mcp::MemoryService;
+    /// use chrono::Utc;
+    /// use serde_json::json;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let service = MemoryService::new_from_env().await?;
+    ///     
+    ///     let fact_id = service.add_fact(
+    ///         "metric",
+    ///         "ARR reached $5M",
+    ///         "ARR reached $5M in Q4",
+    ///         "episode:abc123",
+    ///         Utc::now(),
+    ///         "org",
+    ///         0.9,
+    ///         vec![],
+    ///         vec!["finance".to_string()],
+    ///         json!({"source": "quarterly_review"}),
+    ///     ).await?;
+    ///     
+    ///     println!("Created fact: {}", fact_id);
+    ///     Ok(())
+    /// }
+    /// ```
     #[allow(clippy::too_many_arguments)]
     pub async fn add_fact(
         &self,
@@ -507,6 +562,61 @@ impl MemoryService {
         Ok("ok".to_string())
     }
 
+    /// Assembles context for answering a query.
+    ///
+    /// Retrieves relevant facts based on:
+    /// - Scope and access control
+    /// - Query terms (full-text search)
+    /// - Temporal validity (facts active as-of the cutoff time)
+    /// - Policy tag filtering
+    ///
+    /// Results are cached by (query, scope, cutoff hour, budget, tags) for performance.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The context assembly request containing:
+    ///   - `query`: Search query terms
+    ///   - `scope`: Scope to search within
+    ///   - `as_of`: Timestamp for temporal validity (default: now)
+    ///   - `budget`: Maximum facts to return (default: 5)
+    ///   - `access`: Optional access control payload
+    ///
+    /// # Returns
+    ///
+    /// A vector of context items with fact_id, content, quote, confidence, and rationale.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MemoryError::Validation` if scope is empty.
+    /// Returns `MemoryError::Storage` if database query fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use memory_mcp::MemoryService;
+    /// use memory_mcp::models::AssembleContextRequest;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let service = MemoryService::new_from_env().await?;
+    ///     
+    ///     let request = AssembleContextRequest {
+    ///         query: "ARR growth Q4".to_string(),
+    ///         scope: "org".to_string(),
+    ///         as_of: None,  // Use current time
+    ///         budget: 10,
+    ///         access: None,
+    ///     };
+    ///     
+    ///     let context = service.assemble_context(request).await?;
+    ///     
+    ///     for item in context {
+    ///         println!("Fact: {}", item["content"]);
+    ///         println!("Confidence: {}", item["confidence"]);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn assemble_context(
         &self,
         request: AssembleContextRequest,
@@ -1698,10 +1808,12 @@ fn string_from_value(value: &Value) -> Option<String> {
     }
 }
 
+#[must_use]
 fn normalize_dt(dt: DateTime<Utc>) -> String {
     dt.to_rfc3339()
 }
 
+#[must_use]
 fn normalize_iso(dt: DateTime<Utc>) -> String {
     dt.to_rfc3339()
 }
@@ -1709,6 +1821,7 @@ fn normalize_iso(dt: DateTime<Utc>) -> String {
 /// Preprocess a search query: strip episode references (episode:xxx),
 /// boolean operators (OR/AND/NOT), quoted phrases, and collapse whitespace.
 /// Returns cleaned words joined by spaces, suitable for full-text search.
+#[must_use]
 pub fn preprocess_search_query(raw: &str) -> String {
     static EPISODE_REF: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static QUOTED: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -1732,21 +1845,25 @@ pub fn preprocess_search_query(raw: &str) -> String {
         .join(" ")
 }
 
-/// Bucket cutoff to the start of the hour for better cache hit rate
+/// Bucket cutoff to the start of the hour for better cache hit rate.
+#[must_use]
 fn bucket_to_hour(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:00:00Z").to_string()
 }
 
+#[must_use]
 fn now() -> DateTime<Utc> {
     Utc::now()
 }
 
+#[must_use]
 fn parse_iso(value: &str) -> Option<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
         .ok()
 }
 
+#[must_use]
 fn deterministic_episode_id(
     source_type: &str,
     source_id: &str,
@@ -1763,6 +1880,7 @@ fn deterministic_episode_id(
     format!("episode:{}", hash_prefix(&payload))
 }
 
+#[must_use]
 fn deterministic_entity_id(entity_type: &str, canonical_name: &str) -> String {
     let payload = format!(
         "{}|{}",
@@ -1772,6 +1890,7 @@ fn deterministic_entity_id(entity_type: &str, canonical_name: &str) -> String {
     format!("entity:{}", hash_prefix(&payload))
 }
 
+#[must_use]
 fn deterministic_fact_id(
     fact_type: &str,
     content: &str,
@@ -1788,12 +1907,14 @@ fn deterministic_fact_id(
     format!("fact:{}", hash_prefix(&payload))
 }
 
+#[must_use]
 fn deterministic_community_id(member_entities: &[String]) -> String {
     let mut members = member_entities.to_vec();
     members.sort();
     format!("community:{}", hash_prefix(&members.join("|")))
 }
 
+#[must_use]
 fn deterministic_edge_id(
     from_id: &str,
     relation: &str,
@@ -1810,6 +1931,7 @@ fn deterministic_edge_id(
     format!("edge:{}", hash_prefix(&payload))
 }
 
+#[must_use]
 fn hash_prefix(payload: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(payload.as_bytes());
