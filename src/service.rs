@@ -415,22 +415,50 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = now();
-            let payload = json!({
-                "fact_id": fact_id,
-                "fact_type": fact_type,
-                "content": content,
-                "quote": quote,
-                "source_episode": source_episode,
-                "t_valid": normalize_dt(t_valid),
-                "t_ingested": normalize_dt(t_ingested),
-                "t_invalid": Value::Null,
-                "t_invalid_ingested": Value::Null,
-                "confidence": confidence,
-                "entity_links": entity_links,
-                "scope": scope,
-                "policy_tags": policy_tags,
-                "provenance": provenance,
-            });
+            let mut payload_map = serde_json::Map::new();
+            payload_map.insert(
+                "fact_id".to_string(),
+                serde_json::Value::String(fact_id.clone()),
+            );
+            payload_map.insert(
+                "fact_type".to_string(),
+                serde_json::Value::String(fact_type.to_string()),
+            );
+            payload_map.insert(
+                "content".to_string(),
+                serde_json::Value::String(content.to_string()),
+            );
+            payload_map.insert(
+                "quote".to_string(),
+                serde_json::Value::String(quote.to_string()),
+            );
+            payload_map.insert(
+                "source_episode".to_string(),
+                serde_json::Value::String(source_episode.to_string()),
+            );
+            payload_map.insert(
+                "t_valid".to_string(),
+                serde_json::Value::String(normalize_dt(t_valid)),
+            );
+            payload_map.insert(
+                "t_ingested".to_string(),
+                serde_json::Value::String(normalize_dt(t_ingested)),
+            );
+            payload_map.insert("confidence".to_string(), serde_json::json!(confidence));
+            payload_map.insert("entity_links".to_string(), serde_json::json!(entity_links));
+            payload_map.insert(
+                "scope".to_string(),
+                serde_json::Value::String(scope.to_string()),
+            );
+            payload_map.insert("policy_tags".to_string(), serde_json::json!(policy_tags));
+            if !provenance.is_null() {
+                let provenance_str = serde_json::to_string(&provenance).unwrap_or_default();
+                payload_map.insert(
+                    "provenance".to_string(),
+                    serde_json::Value::String(provenance_str),
+                );
+            }
+            let payload = serde_json::Value::Object(payload_map);
             self.db_client.create(&fact_id, payload, &namespace).await?;
             self.context_cache.safe_lock().clear();
         }
@@ -544,18 +572,34 @@ impl MemoryService {
 
         // Only filter by policy_tags in memory (complex set intersection)
         let mut active = Vec::new();
+
         for record in fact_records {
-            if let Some(fact) = fact_from_record(&record) {
-                // Tag filtering only - scope/cutoff/query done in DB
-                if !fact.policy_tags.is_empty()
-                    && let Some(allowed_tags) = &access.allowed_tags
-                {
-                    let allowed: std::collections::HashSet<_> = allowed_tags.iter().collect();
-                    if !fact.policy_tags.iter().any(|tag| allowed.contains(tag)) {
-                        continue;
+            let items: Vec<&Value> =
+                if let Some(arr) = record.get("Array").and_then(|v| v.as_array()) {
+                    arr.iter().collect()
+                } else {
+                    vec![&record]
+                };
+
+            for item in items {
+                let fact_item = if let Some(obj) = item.get("Object") {
+                    obj
+                } else {
+                    item
+                };
+
+                if let Some(fact) = fact_from_record(fact_item) {
+                    // Tag filtering only - scope/cutoff/query done in DB
+                    if !fact.policy_tags.is_empty()
+                        && let Some(allowed_tags) = &access.allowed_tags
+                    {
+                        let allowed: std::collections::HashSet<_> = allowed_tags.iter().collect();
+                        if !fact.policy_tags.iter().any(|tag| allowed.contains(tag)) {
+                            continue;
+                        }
                     }
+                    active.push(fact);
                 }
-                active.push(fact);
             }
         }
         active.sort_by(|a, b| {
@@ -1156,20 +1200,37 @@ impl MemoryService {
             );
             return Ok(());
         }
-        let payload = json!({
-            "edge_id": edge_id,
-            "from_id": edge.from_id,
-            "relation": edge.relation,
-            "to_id": edge.to_id,
-            "strength": edge.strength,
-            "confidence": edge.confidence,
-            "provenance": edge.provenance,
-            "t_valid": normalize_dt(edge.t_valid),
-            "t_ingested": normalize_dt(edge.t_ingested),
-            "t_invalid": edge.t_invalid.map(normalize_dt),
-            "t_invalid_ingested": edge.t_invalid_ingested.map(normalize_dt),
-        });
-        self.db_client.create(&edge_id, payload, namespace).await?;
+        let mut payload = serde_json::Map::new();
+        payload.insert("edge_id".to_string(), Value::String(edge_id.clone()));
+        payload.insert("from_id".to_string(), Value::String(edge.from_id.clone()));
+        payload.insert("relation".to_string(), Value::String(edge.relation.clone()));
+        payload.insert("to_id".to_string(), Value::String(edge.to_id.clone()));
+        payload.insert("strength".to_string(), json!(edge.strength));
+        payload.insert("confidence".to_string(), json!(edge.confidence));
+        payload.insert("provenance".to_string(), edge.provenance.clone());
+        payload.insert(
+            "t_valid".to_string(),
+            Value::String(normalize_dt(edge.t_valid)),
+        );
+        payload.insert(
+            "t_ingested".to_string(),
+            Value::String(normalize_dt(edge.t_ingested)),
+        );
+        if let Some(t_invalid) = edge.t_invalid {
+            payload.insert(
+                "t_invalid".to_string(),
+                Value::String(normalize_dt(t_invalid)),
+            );
+        }
+        if let Some(t_invalid_ingested) = edge.t_invalid_ingested {
+            payload.insert(
+                "t_invalid_ingested".to_string(),
+                Value::String(normalize_dt(t_invalid_ingested)),
+            );
+        }
+        self.db_client
+            .create(&edge_id, Value::Object(payload), namespace)
+            .await?;
         self.logger.log(
             log_event(
                 "store_edge.created",
@@ -1790,53 +1851,93 @@ fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episod
 
 fn fact_from_record(record: &Value) -> Option<Fact> {
     let map = record.as_object()?;
-    let t_valid_str = map.get("t_valid")?.as_str()?;
+
+    fn unwrap_string(v: &Value) -> Option<&str> {
+        if let Some(s) = v.as_str() {
+            Some(s)
+        } else if let Some(obj) = v.as_object() {
+            obj.get("String").and_then(|s| s.as_str())
+        } else {
+            None
+        }
+    }
+
+    fn unwrap_array(v: &Value) -> Option<&Vec<Value>> {
+        if let Some(arr) = v.as_array() {
+            Some(arr)
+        } else if let Some(obj) = v.as_object() {
+            obj.get("Array").and_then(|a| a.as_array())
+        } else {
+            None
+        }
+    }
+
+    let t_valid_str = unwrap_string(map.get("t_valid")?)?;
     let t_valid = parse_iso(t_valid_str)?;
     let t_ingested = map
         .get("t_ingested")
-        .and_then(Value::as_str)
+        .and_then(unwrap_string)
         .and_then(parse_iso)
         .unwrap_or(t_valid);
+
+    let fact_id = unwrap_string(map.get("fact_id")?)?.to_string();
+    let fact_type = unwrap_string(map.get("fact_type")?)?.to_string();
+    let content = unwrap_string(map.get("content")?)?.to_string();
+    let quote = unwrap_string(map.get("quote")?)?.to_string();
+    let source_episode = unwrap_string(map.get("source_episode")?)?.to_string();
+    let scope = unwrap_string(map.get("scope")?)
+        .unwrap_or_default()
+        .to_string();
+
     Some(Fact {
-        fact_id: map.get("fact_id")?.as_str()?.to_string(),
-        fact_type: map.get("fact_type")?.as_str()?.to_string(),
-        content: map.get("content")?.as_str()?.to_string(),
-        quote: map.get("quote")?.as_str()?.to_string(),
-        source_episode: map.get("source_episode")?.as_str()?.to_string(),
+        fact_id,
+        fact_type,
+        content,
+        quote,
+        source_episode,
         t_valid,
         t_ingested,
         t_invalid: map
             .get("t_invalid")
-            .and_then(Value::as_str)
+            .and_then(unwrap_string)
             .and_then(parse_iso),
         t_invalid_ingested: map
             .get("t_invalid_ingested")
-            .and_then(Value::as_str)
+            .and_then(unwrap_string)
             .and_then(parse_iso),
-        confidence: map.get("confidence").and_then(Value::as_f64).unwrap_or(0.0),
+        confidence: map
+            .get("confidence")
+            .and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(obj) = v.as_object() {
+                    obj.get("Number")
+                        .and_then(|n| n.as_f64())
+                        .or_else(|| obj.get("Float").and_then(|n| n.as_f64()))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0.0),
         entity_links: map
             .get("entity_links")
-            .and_then(Value::as_array)
+            .and_then(unwrap_array)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(Value::as_str)
+                    .filter_map(unwrap_string)
                     .map(String::from)
                     .collect()
             })
             .unwrap_or_default(),
-        scope: map
-            .get("scope")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
+        scope,
         policy_tags: map
             .get("policy_tags")
-            .and_then(Value::as_array)
+            .and_then(unwrap_array)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(Value::as_str)
+                    .filter_map(unwrap_string)
                     .map(String::from)
                     .collect()
             })

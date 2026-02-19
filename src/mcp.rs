@@ -235,6 +235,7 @@ impl MemoryMcp {
 
     /// Shared implementation for extract operations (used by extract and extract_entities).
     /// Handles the common logic of extracting from episode_id or ingesting content first.
+    #[allow(clippy::too_many_arguments)]
     async fn extract_impl(
         &self,
         episode_id: Option<String>,
@@ -971,8 +972,8 @@ pub struct UiParams {
 ///   1. Strict: `[{"content":"…","quote":"…","source_episode":"episode:xxx"}]`
 ///   2. Array of id strings: `["episode:xxx","task:yyy"]`
 ///   3. Loose objects: `[{"content":"…","id":"task:xxx","source_type":"task"}]`
-///      — `id` is used as `source_episode` when `source_episode` is absent;
-///        `quote` and `content` default to `""` when absent.
+///      — `id` is used as `source_episode` when absent.
+///      `quote` and `content` default to `""` when absent.
 ///   4. Mixed: any combination of strings and objects in one array.
 pub(crate) fn parse_context_items(raw: &str) -> Result<Vec<crate::models::ExplainItem>, String> {
     let values: Vec<Value> =

@@ -32,6 +32,7 @@ DEFINE FIELD policy_tags ON fact TYPE array;
 DEFINE FIELD provenance ON fact TYPE object;
 
 DEFINE TABLE edge TYPE RELATION;
+DEFINE FIELD edge_id ON edge TYPE string;
 DEFINE FIELD from_id ON edge TYPE string;
 DEFINE FIELD relation ON edge TYPE string;
 DEFINE FIELD to_id ON edge TYPE string;
@@ -73,6 +74,6 @@ DEFINE ANALYZER simple TOKENIZERS blank FILTERS lowercase;
 
 DEFINE INDEX episode_source_id ON TABLE episode COLUMNS source_type, source_id;
 DEFINE INDEX entity_canonical_name ON TABLE entity COLUMNS canonical_name;
-DEFINE INDEX fact_content_search ON TABLE fact COLUMNS content SEARCH ANALYZER simple;
+DEFINE INDEX fact_content_search ON TABLE fact COLUMNS content FULLTEXT ANALYZER simple;
 DEFINE INDEX edge_relation ON TABLE edge COLUMNS relation;
 DEFINE INDEX community_members ON TABLE community COLUMNS member_entities;

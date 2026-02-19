@@ -3,194 +3,17 @@ use serde_json::Value;
 use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
+use surrealdb::types::Value as SurrealValue;
 use tokio::sync::Mutex;
 
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
-use crate::service::migrations_dir;
 
 /// Unified database engine enum that abstracts over local (RocksDB) and remote (WebSocket) connections.
-/// This eliminates code duplication from if/else branches throughout the codebase.
 pub enum DbEngine {
     Local(Mutex<Surreal<surrealdb::engine::local::Db>>),
     Remote(Mutex<Surreal<Client>>),
-}
-
-impl DbEngine {
-    /// Execute a query and return the raw SurrealDB response.
-    async fn query(
-        &self,
-        sql: &str,
-        namespace: &str,
-        database: &str,
-    ) -> Result<surrealdb::Response, MemoryError> {
-        match self {
-            DbEngine::Local(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                guard
-                    .query(sql)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
-            }
-            DbEngine::Remote(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                guard
-                    .query(sql)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
-            }
-        }
-    }
-
-    /// Execute a query with bound variables.
-    async fn query_with_vars(
-        &self,
-        sql: &str,
-        vars: Option<Value>,
-        namespace: &str,
-        database: &str,
-    ) -> Result<surrealdb::Response, MemoryError> {
-        match self {
-            DbEngine::Local(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                let mut query = guard.query(sql);
-                if let Some(vars) = vars {
-                    query = query.bind(vars);
-                }
-                query
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
-            }
-            DbEngine::Remote(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                let mut query = guard.query(sql);
-                if let Some(vars) = vars {
-                    query = query.bind(vars);
-                }
-                query
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB query failed: {e}")))
-            }
-        }
-    }
-
-    /// Select all records from a table.
-    async fn select_table(
-        &self,
-        table: &str,
-        namespace: &str,
-        database: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        match self {
-            DbEngine::Local(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                let sql = format!("SELECT * FROM {}", table);
-                let mut response = guard.query(sql.as_str()).await.map_err(|e| {
-                    MemoryError::Storage(format!("SurrealDB select table failed: {e}"))
-                })?;
-                let s_val: surrealdb::Value = response.take(0).map_err(|e| {
-                    MemoryError::Storage(format!("SurrealDB response deserialize failed: {e}"))
-                })?;
-                let json = serde_json::to_value(&s_val).map_err(|e| {
-                    MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
-                })?;
-                let normalized = normalize_surreal_json(&json);
-                if normalized.is_array() {
-                    serde_json::from_value(normalized).map_err(|e| {
-                        MemoryError::Storage(format!("Deserializing query array failed: {e}"))
-                    })
-                } else {
-                    Ok(vec![normalized])
-                }
-            }
-            DbEngine::Remote(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                guard.select(table).await.map_err(|e| {
-                    MemoryError::Storage(format!("SurrealDB select table failed: {e}"))
-                })
-            }
-        }
-    }
-
-    /// Execute a query and deserialize the first result set into type `T`.
-    async fn query_get<T: serde::de::DeserializeOwned>(
-        &self,
-        sql: &str,
-        namespace: &str,
-        database: &str,
-    ) -> Result<T, MemoryError> {
-        let mut response = self.query(sql, namespace, database).await?;
-        let surreal_val: surrealdb::Value = response.take(0).map_err(|e| {
-            MemoryError::Storage(format!("SurrealDB response deserialize failed: {e}"))
-        })?;
-        let json = serde_json::to_value(&surreal_val).map_err(|e| {
-            MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
-        })?;
-
-        let normalized = normalize_surreal_json(&json);
-        // First try to deserialize directly
-        if let Ok(res) = serde_json::from_value(normalized.clone()) {
-            return Ok(res);
-        }
-        // If direct deserialization fails and we have an array of single-field objects,
-        // try to extract inner values (e.g., SELECT name FROM ... -> [{"name":"Alice"}])
-        if let serde_json::Value::Array(arr) = normalized {
-            let inner: Vec<serde_json::Value> = arr
-                .into_iter()
-                .map(|el| {
-                    if let serde_json::Value::Object(map) = el {
-                        if map.len() == 1 {
-                            map.into_iter()
-                                .next()
-                                .expect("map with len 1 has one entry")
-                                .1
-                        } else {
-                            serde_json::Value::Object(map)
-                        }
-                    } else {
-                        el
-                    }
-                })
-                .collect();
-            if let Ok(res) = serde_json::from_value(serde_json::Value::Array(inner)) {
-                return Ok(res);
-            }
-        }
-        Err(MemoryError::Storage(
-            "Deserializing query result failed".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -263,7 +86,6 @@ pub struct SurrealDbClient {
     engine: DbEngine,
     database: String,
     logger: StdoutLogger,
-    is_local: bool,
 }
 
 impl SurrealDbClient {
@@ -271,7 +93,7 @@ impl SurrealDbClient {
         config: &SurrealConfig,
         default_namespace: &str,
     ) -> Result<Self, MemoryError> {
-        let (engine, is_local) = if config.embedded {
+        let engine = if config.embedded {
             // Use RocksDB embedded engine with configurable data dir (persistent)
             use std::path::PathBuf;
             use surrealdb::engine::local::RocksDb;
@@ -291,11 +113,11 @@ impl SurrealDbClient {
             }
 
             let root = Root {
-                username: config.username.as_str(),
-                password: config.password.as_str(),
+                username: config.username.clone(),
+                password: config.password.clone(),
             };
             let cfg = SurrealOptConfig::new()
-                .user(root)
+                .user(root.clone())
                 .capabilities(Capabilities::all());
             let db = Surreal::new::<RocksDb>((path.clone(), cfg))
                 .await
@@ -310,7 +132,7 @@ impl SurrealDbClient {
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
 
-            (DbEngine::Local(Mutex::new(db)), true)
+            DbEngine::Local(Mutex::new(db))
         } else {
             // Fallback to remote WS connection
             let url = normalize_url(config.url.as_ref().unwrap_or(&"".to_string()));
@@ -318,8 +140,8 @@ impl SurrealDbClient {
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
             db.signin(Root {
-                username: config.username.as_str(),
-                password: config.password.as_str(),
+                username: config.username.clone(),
+                password: config.password.clone(),
             })
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
@@ -328,20 +150,20 @@ impl SurrealDbClient {
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
 
-            (DbEngine::Remote(Mutex::new(db)), false)
+            DbEngine::Remote(Mutex::new(db))
         };
 
         Ok(Self {
             engine,
-            is_local,
             database: config.db_name.clone(),
             logger: StdoutLogger::new(&config.log_level),
         })
     }
 
     /// Check if using local (embedded) database.
+    #[allow(dead_code)]
     fn is_local(&self) -> bool {
-        self.is_local
+        matches!(self.engine, DbEngine::Local(_))
     }
 
     /// Get local database reference (for backward compatibility during migration).
@@ -353,6 +175,7 @@ impl SurrealDbClient {
     }
 
     /// Get remote database reference (for backward compatibility during migration).
+    #[allow(dead_code)]
     fn db_remote(&self) -> Option<&Mutex<Surreal<Client>>> {
         match &self.engine {
             DbEngine::Local(_) => None,
@@ -398,161 +221,144 @@ impl SurrealDbClient {
         }
     }
 
-    /// Apply migrations for the given namespace.
-    ///
-    /// Behavior:
-    /// - If a filesystem `./migrations` directory exists in the repo root it will be used.
-    /// - Otherwise, fallback to migrations embedded into the binary at compile time.
+    /// Initialize database schema.
+    /// Creates tables and indexes if they don't exist.
     pub async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
-        use std::collections::HashMap;
-        use surrealdb_migrations::MigrationRunner;
+        let schema_sql = r#"
+            -- Define tables
+            DEFINE TABLE IF NOT EXISTS episode SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS entity SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS fact SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS edge SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS community SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS event_log SCHEMAFULL;
+            DEFINE TABLE IF NOT EXISTS task SCHEMAFULL;
+            
+            -- Episode fields
+            DEFINE FIELD IF NOT EXISTS episode_id ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS source_type ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS source_id ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS content ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_ref ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_ingested ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS scope ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS visibility_scope ON episode TYPE string;
+            DEFINE FIELD IF NOT EXISTS policy_tags ON episode TYPE option<array>;
+            
+            -- Entity fields
+            DEFINE FIELD IF NOT EXISTS entity_id ON entity TYPE string;
+            DEFINE FIELD IF NOT EXISTS entity_type ON entity TYPE string;
+            DEFINE FIELD IF NOT EXISTS canonical_name ON entity TYPE string;
+            DEFINE FIELD IF NOT EXISTS aliases ON entity TYPE option<array>;
+            
+            -- Fact fields
+            DEFINE FIELD IF NOT EXISTS fact_id ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS fact_type ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS content ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS quote ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS source_episode ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_valid ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_ingested ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_invalid ON fact TYPE option<string>;
+            DEFINE FIELD IF NOT EXISTS t_invalid_ingested ON fact TYPE option<string>;
+            DEFINE FIELD IF NOT EXISTS confidence ON fact TYPE float;
+            DEFINE FIELD IF NOT EXISTS entity_links ON fact TYPE option<array>;
+            DEFINE FIELD IF NOT EXISTS scope ON fact TYPE string;
+            DEFINE FIELD IF NOT EXISTS policy_tags ON fact TYPE option<array>;
+            DEFINE FIELD IF NOT EXISTS provenance ON fact;
+            
+            -- Edge fields
+            DEFINE FIELD IF NOT EXISTS edge_id ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS from_id ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS relation ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS to_id ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS strength ON edge TYPE option<float>;
+            DEFINE FIELD IF NOT EXISTS confidence ON edge TYPE option<float>;
+            DEFINE FIELD IF NOT EXISTS provenance ON edge;
+            DEFINE FIELD IF NOT EXISTS t_valid ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_ingested ON edge TYPE string;
+            DEFINE FIELD IF NOT EXISTS t_invalid ON edge TYPE option<string>;
+            DEFINE FIELD IF NOT EXISTS t_invalid_ingested ON edge TYPE option<string>;
 
-        let log_event = |level: LogLevel, stage: &str, source: &str, detail: Option<String>| {
-            let mut event = HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::Value::String("migrations".to_string()),
-            );
-            event.insert(
-                "stage".to_string(),
-                serde_json::Value::String(stage.to_string()),
-            );
-            event.insert(
-                "source".to_string(),
-                serde_json::Value::String(source.to_string()),
-            );
-            event.insert(
-                "namespace".to_string(),
-                serde_json::Value::String(namespace.to_string()),
-            );
-            if let Some(detail) = detail {
-                event.insert("detail".to_string(), serde_json::Value::String(detail));
-            }
-            self.logger.log(event, level);
-        };
+            -- Community fields
+            DEFINE FIELD IF NOT EXISTS community_id ON community TYPE string;
+            DEFINE FIELD IF NOT EXISTS member_entities ON community TYPE option<array>;
+            DEFINE FIELD IF NOT EXISTS summary ON community TYPE string;
+            DEFINE FIELD IF NOT EXISTS updated_at ON community TYPE string;
 
-        // Filesystem migrations path (repo_root/migrations)
-        let fs_dir = migrations_dir()?;
-        match migration_source(&fs_dir) {
-            MigrationSource::Filesystem(path) => {
-                log_event(LogLevel::Info, "start", "filesystem", None);
-                // Create a small temp config pointing to the repo root to pass into the runner
-                let root = path.parent().unwrap_or(path.as_path());
-                let mut cfg = String::new();
-                cfg.push_str("[core]\n");
-                cfg.push_str(&format!("path = \"{}\"\n", root.to_str().unwrap_or(".")));
+            -- Event log fields
+            DEFINE FIELD IF NOT EXISTS ts ON event_log TYPE string;
+            DEFINE FIELD IF NOT EXISTS op ON event_log TYPE string;
+            DEFINE FIELD IF NOT EXISTS args ON event_log;
+            DEFINE FIELD IF NOT EXISTS result ON event_log;
+            DEFINE FIELD IF NOT EXISTS access ON event_log;
+            DEFINE FIELD IF NOT EXISTS transport ON event_log TYPE option<string>;
+            DEFINE FIELD IF NOT EXISTS content_type ON event_log TYPE option<string>;
+            DEFINE FIELD IF NOT EXISTS session_vars ON event_log;
 
-                let tmp_dir = std::env::temp_dir();
-                let config_path = tmp_dir.join(format!(
-                    "surreal_mig_{}.toml",
-                    chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-                ));
+            -- Task fields
+            DEFINE FIELD IF NOT EXISTS status ON task TYPE string;
+            DEFINE FIELD IF NOT EXISTS title ON task TYPE string;
+            DEFINE FIELD IF NOT EXISTS due_date ON task TYPE option<string>;
+            
+            -- Analyzers
+            DEFINE ANALYZER IF NOT EXISTS simple TOKENIZERS blank FILTERS lowercase;
+            
+            -- Indexes
+            DEFINE INDEX IF NOT EXISTS idx_episode_source ON episode COLUMNS source_type, source_id;
+            DEFINE INDEX IF NOT EXISTS idx_episode_scope ON episode COLUMNS scope;
+            DEFINE INDEX IF NOT EXISTS idx_episode_t_ref ON episode COLUMNS t_ref;
+            DEFINE INDEX IF NOT EXISTS fact_content_search ON fact COLUMNS content FULLTEXT ANALYZER simple;
+            DEFINE INDEX IF NOT EXISTS idx_fact_episode ON fact COLUMNS source_episode;
+            DEFINE INDEX IF NOT EXISTS idx_fact_scope ON fact COLUMNS scope;
+            DEFINE INDEX IF NOT EXISTS idx_fact_t_valid ON fact COLUMNS t_valid;
+            DEFINE INDEX IF NOT EXISTS idx_fact_type ON fact COLUMNS fact_type;
+            DEFINE INDEX IF NOT EXISTS idx_entity_name ON entity COLUMNS canonical_name;
+            DEFINE INDEX IF NOT EXISTS idx_edge_from ON edge COLUMNS from_id;
+            DEFINE INDEX IF NOT EXISTS idx_edge_to ON edge COLUMNS to_id;
+            DEFINE INDEX IF NOT EXISTS idx_edge_relation ON edge COLUMNS relation;
+            DEFINE INDEX IF NOT EXISTS idx_community_members ON community COLUMNS member_entities;
+        "#;
 
-                std::fs::write(&config_path, cfg).map_err(|err| {
-                    MemoryError::Storage(format!("writing temp migration config failed: {err}"))
+        match &self.engine {
+            DbEngine::Local(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(&self.database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                guard.query(schema_sql).await.map_err(|e| {
+                    MemoryError::Storage(format!("Schema initialization failed: {e}"))
                 })?;
-
-                let res = match &self.engine {
-                    DbEngine::Local(db) => {
-                        let guard = db.lock().await;
-                        guard
-                            .use_ns(namespace)
-                            .use_db(&self.database)
-                            .await
-                            .map_err(|e| {
-                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
-                            })?;
-                        MigrationRunner::new(&*guard)
-                            .use_config_file(&config_path)
-                            .up()
-                            .await
-                    }
-                    DbEngine::Remote(db) => {
-                        let guard = db.lock().await;
-                        guard
-                            .use_ns(namespace)
-                            .use_db(&self.database)
-                            .await
-                            .map_err(|e| {
-                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
-                            })?;
-                        MigrationRunner::new(&*guard)
-                            .use_config_file(&config_path)
-                            .up()
-                            .await
-                    }
-                };
-
-                let _ = std::fs::remove_file(&config_path);
-                match res {
-                    Ok(()) => {
-                        log_event(LogLevel::Info, "done", "filesystem", None);
-                        Ok(())
-                    }
-                    Err(err) => {
-                        log_event(
-                            LogLevel::Error,
-                            "error",
-                            "filesystem",
-                            Some(err.to_string()),
-                        );
-                        Err(MemoryError::Storage(format!(
-                            "surrealdb-migrations failed: {err}"
-                        )))
-                    }
-                }
             }
-            MigrationSource::Embedded => {
-                log_event(LogLevel::Info, "start", "embedded", None);
-                let res = match &self.engine {
-                    DbEngine::Local(db) => {
-                        let guard = db.lock().await;
-                        guard
-                            .use_ns(namespace)
-                            .use_db(&self.database)
-                            .await
-                            .map_err(|e| {
-                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
-                            })?;
-                        MigrationRunner::new(&*guard)
-                            .load_files(&EMBEDDED_MIGRATIONS)
-                            .up()
-                            .await
-                    }
-                    DbEngine::Remote(db) => {
-                        let guard = db.lock().await;
-                        guard
-                            .use_ns(namespace)
-                            .use_db(&self.database)
-                            .await
-                            .map_err(|e| {
-                                MemoryError::Storage(format!("SurrealDB use failed: {e}"))
-                            })?;
-                        MigrationRunner::new(&*guard)
-                            .load_files(&EMBEDDED_MIGRATIONS)
-                            .up()
-                            .await
-                    }
-                };
-
-                match res {
-                    Ok(()) => {
-                        log_event(LogLevel::Info, "done", "embedded", None);
-                        Ok(())
-                    }
-                    Err(err) => {
-                        log_event(LogLevel::Error, "error", "embedded", Some(err.to_string()));
-                        Err(MemoryError::Storage(format!(
-                            "surrealdb-migrations failed: {err}"
-                        )))
-                    }
-                }
-            }
-            MigrationSource::None => {
-                log_event(LogLevel::Info, "skip", "none", None);
-                Ok(())
+            DbEngine::Remote(db) => {
+                let guard = db.lock().await;
+                guard
+                    .use_ns(namespace)
+                    .use_db(&self.database)
+                    .await
+                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
+                guard.query(schema_sql).await.map_err(|e| {
+                    MemoryError::Storage(format!("Schema initialization failed: {e}"))
+                })?;
             }
         }
+
+        self.logger.log(
+            {
+                let mut event = std::collections::HashMap::new();
+                event.insert("op".to_string(), Value::String("schema.init".to_string()));
+                event.insert(
+                    "namespace".to_string(),
+                    Value::String(namespace.to_string()),
+                );
+                event
+            },
+            LogLevel::Info,
+        );
+
+        Ok(())
     }
 }
 
@@ -619,14 +425,11 @@ impl DbClient for SurrealDbClient {
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB select failed: {err}"))
             })?;
-            // Get raw surrealdb::Value and normalize into plain JSON
-            let surreal_val: surrealdb::Value = response
-                .take(0)
+            // Get response as SurrealValue and convert to JSON
+            let surreal_val: SurrealValue = response
+                .take::<SurrealValue>(0)
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB select failed: {err}")))?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
+            let normalized: Value = surreal_val.into_json_value();
 
             // Debug: log the raw JSON response
             let mut json_event = std::collections::HashMap::new();
@@ -662,13 +465,10 @@ impl DbClient for SurrealDbClient {
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB select failed: {err}"))
             })?;
-            let surreal_val: surrealdb::Value = response
-                .take(0)
+            let surreal_val: SurrealValue = response
+                .take::<SurrealValue>(0)
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB select failed: {err}")))?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
+            let normalized: Value = surreal_val.into_json_value();
             if let Value::Array(arr) = normalized {
                 arr.into_iter().next()
             } else if normalized != Value::Null {
@@ -735,19 +535,13 @@ impl DbClient for SurrealDbClient {
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB select table failed: {err}"))
             })?;
-            let s_val: surrealdb::Value = response.take(0).map_err(|err| {
+            let surreal_val: SurrealValue = response.take::<SurrealValue>(0).map_err(|err| {
                 let mut e = event.clone();
                 e.insert("error".to_string(), Value::String(err.to_string()));
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
             })?;
-            let json = serde_json::to_value(&s_val).map_err(|err| {
-                let mut e = event.clone();
-                e.insert("error".to_string(), Value::String(err.to_string()));
-                self.logger.log(e, LogLevel::Warn);
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
+            let normalized: Value = surreal_val.into_json_value();
             // If the response is an array return its contents, otherwise return a single-element vec
             if normalized.is_array() {
                 let arr: Vec<Value> = serde_json::from_value(normalized).map_err(|err| {
@@ -823,26 +617,13 @@ impl DbClient for SurrealDbClient {
         // Use CREATE with explicit record id when provided so SurrealDB will persist
         // deterministic ids; otherwise allow auto-id creation for table-only requests.
         // Use RETURN * to get the created row back from SurrealDB
-        let sql = if table == "edge" {
-            let from_id = content.get("from_id").and_then(Value::as_str);
-            let to_id = content.get("to_id").and_then(Value::as_str);
-            if let (Some(from), Some(to), Some(edge_id)) = (from_id, to_id, id) {
-                format!(
-                    "RELATE {}->{}:{}->{} CONTENT $content RETURN *",
-                    from, table, edge_id, to
-                )
-            } else if let Some(edge_id) = id {
-                format!("CREATE {}:{} CONTENT $content RETURN *", table, edge_id)
-            } else {
-                format!("CREATE {} CONTENT $content RETURN *", table)
-            }
-        } else if let Some(record_id) = id {
+        let sql = if let Some(record_id) = id {
             format!("CREATE {}:{} CONTENT $content RETURN *", table, record_id)
         } else {
             format!("CREATE {} CONTENT $content RETURN *", table)
         };
 
-        let content_for_create = content;
+        let content_for_create = normalize_surreal_json(&content);
 
         if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
@@ -857,13 +638,10 @@ impl DbClient for SurrealDbClient {
                     MemoryError::Storage(format!("SurrealDB create failed: {err}"))
                 })?;
             // Debug: log raw response
-            let surreal_val: surrealdb::Value = response
-                .take(0)
+            let surreal_val: SurrealValue = response
+                .take::<SurrealValue>(0)
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB create failed: {err}")))?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
+            let normalized: Value = surreal_val.into_json_value();
             let mut json_event = std::collections::HashMap::new();
             json_event.insert(
                 "op".to_string(),
@@ -903,7 +681,13 @@ impl DbClient for SurrealDbClient {
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB create failed: {err}"))
             })?;
-        let result: Vec<Value> = response.take(0).unwrap_or_default();
+        let surreal_val: SurrealValue = response.take::<SurrealValue>(0).unwrap_or_default();
+        let normalized: Value = surreal_val.into_json_value();
+        let result: Vec<Value> = match normalized {
+            Value::Array(arr) => arr,
+            Value::Null => Vec::new(),
+            other => vec![other],
+        };
         let mut done = event.clone();
         done.insert("result".to_string(), Value::String("ok".to_string()));
         self.logger.log(done, LogLevel::Info);
@@ -949,6 +733,8 @@ impl DbClient for SurrealDbClient {
         } else {
             content
         };
+        // Normalize content: convert JSON null to SurrealDB none for optional fields
+        let content_for_update = normalize_surreal_json(&content_for_update);
 
         if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
@@ -962,13 +748,10 @@ impl DbClient for SurrealDbClient {
                     self.logger.log(e, LogLevel::Warn);
                     MemoryError::Storage(format!("SurrealDB update failed: {err}"))
                 })?;
-            let surreal_val: surrealdb::Value = response
-                .take(0)
+            let surreal_val: SurrealValue = response
+                .take::<SurrealValue>(0)
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB update failed: {err}")))?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
+            let normalized: Value = surreal_val.into_json_value();
             let result: Vec<Value> = match normalized {
                 Value::Array(arr) => arr,
                 Value::Null => Vec::new(),
@@ -991,7 +774,13 @@ impl DbClient for SurrealDbClient {
                 self.logger.log(e, LogLevel::Warn);
                 MemoryError::Storage(format!("SurrealDB update failed: {err}"))
             })?;
-        let result: Vec<Value> = response.take(0).unwrap_or_default();
+        let surreal_val: SurrealValue = response.take::<SurrealValue>(0).unwrap_or_default();
+        let normalized: Value = surreal_val.into_json_value();
+        let result: Vec<Value> = match normalized {
+            Value::Array(arr) => arr,
+            Value::Null => Vec::new(),
+            other => vec![other],
+        };
         let mut done = event.clone();
         done.insert("result".to_string(), Value::String("ok".to_string()));
         self.logger.log(done, LogLevel::Info);
@@ -1084,13 +873,14 @@ impl DbClient for SurrealDbClient {
         // Filter: scope, bi-temporal cutoff, optional full-text search
         // Strategy: use SurrealDB full-text search (@@) via fact_content_search index,
         // then fall back to per-word CONTAINS OR if FTS returns no results.
-        let base_where = "scope = $scope AND string::is::datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is::datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
+        let base_where = "scope = $scope AND t_valid <= $cutoff AND (t_ingested IS NONE OR t_ingested <= $cutoff) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
 
-        // Primary query: full-text search with @@ operator (uses SEARCH index)
-        let (sql_fts, sql_fallback) = if let Some(q) = query_contains {
+        // Query with per-word CONTAINS (OR) - more reliable across SurrealDB versions
+        // than the @@ FTS operator which has version-specific behavior
+        let sql_with_query = if let Some(q) = query_contains {
             // Build per-word fallback: each word matched via case-insensitive CONTAINS (OR)
             let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
-            let fallback_clause = if words.is_empty() {
+            let word_clause = if words.is_empty() {
                 String::new()
             } else {
                 let word_conditions: Vec<String> = words
@@ -1106,17 +896,12 @@ impl DbClient for SurrealDbClient {
                 format!(" AND ({})", word_conditions.join(" OR "))
             };
 
-            let primary = format!(
-                "SELECT * FROM fact WHERE {} AND content @@ $query ORDER BY t_valid DESC LIMIT $limit",
-                base_where
-            );
-            let fallback = format!(
+            Some(format!(
                 "SELECT * FROM fact WHERE {}{} ORDER BY t_valid DESC LIMIT $limit",
-                base_where, fallback_clause
-            );
-            (Some(primary), Some(fallback))
+                base_where, word_clause
+            ))
         } else {
-            (None, None)
+            None
         };
 
         let sql_no_query = format!(
@@ -1150,13 +935,12 @@ impl DbClient for SurrealDbClient {
             let mut response = db.query(sql).bind(vars).await.map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB select_facts_filtered failed: {err}"))
             })?;
-            let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
+            let raw: SurrealValue = response.take::<SurrealValue>(0).map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
             })?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
+            let normalized = serde_json::to_value(&raw).map_err(|e| {
+                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
             })?;
-            let normalized = normalize_surreal_json(&json);
             Ok(match normalized {
                 Value::Array(arr) => arr,
                 Value::Null => Vec::new(),
@@ -1172,13 +956,12 @@ impl DbClient for SurrealDbClient {
             let mut response = db.query(sql).bind(vars).await.map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB select_facts_filtered failed: {err}"))
             })?;
-            let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
+            let raw: SurrealValue = response.take::<SurrealValue>(0).map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
             })?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
+            let normalized = serde_json::to_value(&raw).map_err(|e| {
+                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {e}"))
             })?;
-            let normalized = normalize_surreal_json(&json);
             Ok(match normalized {
                 Value::Array(arr) => arr,
                 Value::Null => Vec::new(),
@@ -1186,36 +969,13 @@ impl DbClient for SurrealDbClient {
             })
         }
 
-        // Determine which SQL to run: FTS primary → fallback → no-query
+        // Determine which SQL to run: with query or no query
         let results = if self.db_local().is_some() {
             let db = self.with_namespace_local(namespace).await?;
-            if let Some(ref fts_sql) = sql_fts {
-                // Try full-text search first
-                let fts_results = execute_query(&db, fts_sql, vars.clone()).await;
-                match fts_results {
-                    Ok(r) if !r.is_empty() => r,
-                    _ => {
-                        // Fallback to per-word CONTAINS OR
-                        if let Some(ref fb_sql) = sql_fallback {
-                            self.logger.log(
-                                {
-                                    let mut e = event.clone();
-                                    e.insert(
-                                        "fallback".to_string(),
-                                        Value::String("per_word_contains".to_string()),
-                                    );
-                                    e
-                                },
-                                LogLevel::Debug,
-                            );
-                            execute_query(&db, fb_sql, vars.clone())
-                                .await
-                                .unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        }
-                    }
-                }
+            if let Some(ref query_sql) = sql_with_query {
+                execute_query(&db, query_sql, vars.clone())
+                    .await
+                    .unwrap_or_default()
             } else {
                 execute_query(&db, &sql_no_query, vars.clone())
                     .await
@@ -1223,31 +983,10 @@ impl DbClient for SurrealDbClient {
             }
         } else {
             let db = self.with_namespace_remote(namespace).await?;
-            if let Some(ref fts_sql) = sql_fts {
-                let fts_results = execute_query_remote(&db, fts_sql, vars.clone()).await;
-                match fts_results {
-                    Ok(r) if !r.is_empty() => r,
-                    _ => {
-                        if let Some(ref fb_sql) = sql_fallback {
-                            self.logger.log(
-                                {
-                                    let mut e = event.clone();
-                                    e.insert(
-                                        "fallback".to_string(),
-                                        Value::String("per_word_contains".to_string()),
-                                    );
-                                    e
-                                },
-                                LogLevel::Debug,
-                            );
-                            execute_query_remote(&db, fb_sql, vars.clone())
-                                .await
-                                .unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        }
-                    }
-                }
+            if let Some(ref query_sql) = sql_with_query {
+                execute_query_remote(&db, query_sql, vars.clone())
+                    .await
+                    .unwrap_or_default()
             } else {
                 execute_query_remote(&db, &sql_no_query, vars.clone())
                     .await
@@ -1284,7 +1023,7 @@ impl DbClient for SurrealDbClient {
         // Filter: t_valid <= cutoff AND t_ingested <= cutoff
         // and (t_invalid IS NULL OR t_invalid > cutoff OR t_invalid_ingested > cutoff)
         let sql = String::from(
-            "SELECT * FROM edge WHERE string::is::datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is::datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
+            "SELECT * FROM edge WHERE string::is_datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is_datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
         );
 
         let vars = serde_json::json!({
@@ -1300,14 +1039,10 @@ impl DbClient for SurrealDbClient {
                 MemoryError::Storage(format!("SurrealDB select_edges_filtered failed: {err}"))
             })?;
 
-            let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
+            let surreal_val: SurrealValue = response.take::<SurrealValue>(0).map_err(|err| {
                 MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
             })?;
-            let json = serde_json::to_value(&surreal_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-            let normalized = normalize_surreal_json(&json);
-
+            let normalized: Value = surreal_val.into_json_value();
             let results: Vec<Value> = match normalized {
                 Value::Array(arr) => arr,
                 Value::Null => Vec::new(),
@@ -1331,14 +1066,10 @@ impl DbClient for SurrealDbClient {
             MemoryError::Storage(format!("SurrealDB select_edges_filtered failed: {err}"))
         })?;
 
-        let surreal_val: surrealdb::Value = response.take(0).map_err(|err| {
+        let surreal_val: SurrealValue = response.take::<SurrealValue>(0).map_err(|err| {
             MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
         })?;
-        let json = serde_json::to_value(&surreal_val).map_err(|err| {
-            MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-        })?;
-        let normalized = normalize_surreal_json(&json);
-
+        let normalized: Value = surreal_val.into_json_value();
         let results: Vec<Value> = match normalized {
             Value::Array(arr) => arr,
             Value::Null => Vec::new(),
@@ -1357,130 +1088,6 @@ impl DbClient for SurrealDbClient {
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
         // Delegate to the inherent method implemented on SurrealDbClient
         SurrealDbClient::apply_migrations(self, namespace).await
-    }
-}
-
-enum MigrationSource {
-    Filesystem(std::path::PathBuf),
-    Embedded,
-    None,
-}
-
-fn migration_source(fs_dir: &std::path::Path) -> MigrationSource {
-    if fs_dir.exists() {
-        return MigrationSource::Filesystem(fs_dir.to_path_buf());
-    }
-    if EMBEDDED_MIGRATIONS.files().next().is_some() {
-        return MigrationSource::Embedded;
-    }
-    MigrationSource::None
-}
-
-use include_dir::{Dir, include_dir};
-
-static EMBEDDED_MIGRATIONS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/migrations");
-
-impl SurrealDbClient {
-    /// Execute query and deserialize the first result set into type `T`.
-    pub async fn query_get<T: serde::de::DeserializeOwned>(
-        &self,
-        sql: &str,
-        namespace: &str,
-    ) -> Result<T, MemoryError> {
-        // The SurrealDB `Response::take` API requires a type that implements
-        // `opt::QueryResult<T>` for the index type (usize). That does not hold
-        // for arbitrary `T`. To keep things simple and consistent across both
-        // embedded (RocksDB) and remote engines we first take the raw
-        // `surrealdb::sql::Value` and then deserialize it into `T` via
-        // serde_json conversions.
-        if self.db_local().is_some() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db
-                .query(sql)
-                .await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
-            let s_val: surrealdb::Value = response.take(0).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
-            })?;
-            let json = serde_json::to_value(&s_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-
-            let normalized = normalize_surreal_json(&json);
-            // First try to deserialize directly
-            if let Ok(res) = serde_json::from_value(normalized.clone()) {
-                return Ok(res);
-            }
-            // If direct deserialization fails and we have an array of single-field objects,
-            // try to extract inner values (e.g., SELECT name FROM ... -> [{"name":"Alice"}])
-            if let serde_json::Value::Array(arr) = normalized {
-                let inner: Vec<serde_json::Value> = arr
-                    .into_iter()
-                    .map(|el| {
-                        if let serde_json::Value::Object(map) = el {
-                            if map.len() == 1 {
-                                map.into_iter()
-                                    .next()
-                                    .expect("map with len 1 has one entry")
-                                    .1
-                            } else {
-                                serde_json::Value::Object(map)
-                            }
-                        } else {
-                            el
-                        }
-                    })
-                    .collect();
-                if let Ok(res) = serde_json::from_value(serde_json::Value::Array(inner)) {
-                    return Ok(res);
-                }
-            }
-            Err(MemoryError::Storage(
-                "Deserializing query result failed".to_string(),
-            ))
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db
-                .query(sql)
-                .await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
-            let s_val: surrealdb::Value = response.take(0).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB response deserialize failed: {err}"))
-            })?;
-            let json = serde_json::to_value(&s_val).map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB -> JSON conversion failed: {err}"))
-            })?;
-
-            let normalized = normalize_surreal_json(&json);
-            // First try to deserialize directly
-            if let Ok(res) = serde_json::from_value(normalized.clone()) {
-                return Ok(res);
-            }
-            // If direct deserialization fails and we have an array of single-field objects,
-            // try to extract inner values (e.g., SELECT name FROM ... -> [{"name":"Alice"}])
-            if let serde_json::Value::Array(arr) = normalized {
-                let inner: Vec<serde_json::Value> = arr
-                    .into_iter()
-                    .map(|el| {
-                        if let serde_json::Value::Object(map) = el {
-                            if map.len() == 1 {
-                                map.into_iter().next().unwrap().1
-                            } else {
-                                serde_json::Value::Object(map)
-                            }
-                        } else {
-                            el
-                        }
-                    })
-                    .collect();
-                if let Ok(res) = serde_json::from_value(serde_json::Value::Array(inner)) {
-                    return Ok(res);
-                }
-            }
-            Err(MemoryError::Storage(
-                "Deserializing query result failed".to_string(),
-            ))
-        }
     }
 }
 
@@ -1507,12 +1114,18 @@ fn normalize_url(url: &str) -> String {
 /// SurrealDB serializes SQL values using tagged enums, e.g.:
 /// {"Array":[{"Object":{"name":{"Strand":"Alice"}}}]}
 /// This helper converts that into: [{"name":"Alice"}]
+/// It also converts JSON null to SurrealDB none for optional fields.
+#[allow(dead_code)]
 fn normalize_surreal_json(v: &serde_json::Value) -> serde_json::Value {
     use serde_json::Value as J;
     match v {
         J::Object(map) if map.len() == 1 => {
             let (k, val) = map.iter().next().expect("map with len 1 has one entry");
             match k.as_str() {
+                "None" => {
+                    // SurrealDB none value - return as-is for optional fields
+                    v.clone()
+                }
                 "Array" => {
                     if let J::Array(items) = val {
                         let arr: Vec<J> = items.iter().map(normalize_surreal_json).collect();
@@ -1548,32 +1161,20 @@ fn normalize_surreal_json(v: &serde_json::Value) -> serde_json::Value {
                 _ => normalize_surreal_json(val),
             }
         }
+        J::Object(map) => {
+            // Regular object - recursively normalize all values to handle null -> none
+            let mut out = serde_json::Map::new();
+            for (k, v) in map.iter() {
+                out.insert(k.clone(), normalize_surreal_json(v));
+            }
+            J::Object(out)
+        }
+        J::Null => {
+            // Convert JSON null to SurrealDB none for optional fields
+            serde_json::json!({"None": {}})
+        }
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
-    }
-}
-
-#[cfg(test)]
-mod migration_tests {
-    use super::*;
-
-    #[test]
-    fn migration_source_prefers_filesystem() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let migrations_dir = dir.path().join("migrations");
-        std::fs::create_dir_all(&migrations_dir).expect("create migrations dir");
-
-        let source = migration_source(&migrations_dir);
-        assert!(matches!(source, MigrationSource::Filesystem(path) if path == migrations_dir));
-    }
-
-    #[test]
-    fn migration_source_falls_back_to_embedded_when_fs_missing() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let migrations_dir = dir.path().join("missing");
-
-        let source = migration_source(&migrations_dir);
-        assert!(matches!(source, MigrationSource::Embedded));
     }
 }
 
@@ -1644,7 +1245,11 @@ mod tests {
 
     #[test]
     fn normalize_surreal_json_preserves_primitives() {
-        assert_eq!(normalize_surreal_json(&json!(null)), json!(null));
+        // null is converted to SurrealDB none for optional fields (an Object)
+        assert_eq!(
+            normalize_surreal_json(&json!(null)),
+            serde_json::json!({"None": {}})
+        );
         assert_eq!(normalize_surreal_json(&json!(42)), json!(42));
         assert_eq!(normalize_surreal_json(&json!(true)), json!(true));
         assert_eq!(normalize_surreal_json(&json!("plain")), json!("plain"));
