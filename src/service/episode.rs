@@ -11,26 +11,53 @@ use super::query::parse_iso;
 /// Parse an episode from a database record.
 #[must_use]
 pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
+    fn unwrap_string(v: &Value) -> Option<&str> {
+        if let Some(s) = v.as_str() {
+            Some(s)
+        } else if let Some(obj) = v.as_object() {
+            obj.get("String")
+                .and_then(Value::as_str)
+                .or_else(|| obj.get("Strand").and_then(Value::as_str))
+                .or_else(|| {
+                    obj.get("Strand")
+                        .and_then(|inner| inner.get("String"))
+                        .and_then(Value::as_str)
+                })
+        } else {
+            None
+        }
+    }
+
+    fn unwrap_array(v: &Value) -> Option<&Vec<Value>> {
+        if let Some(arr) = v.as_array() {
+            Some(arr)
+        } else if let Some(obj) = v.as_object() {
+            obj.get("Array").and_then(Value::as_array)
+        } else {
+            None
+        }
+    }
+
     Some(Episode {
-        episode_id: record.get("episode_id")?.as_str()?.to_string(),
-        source_type: record.get("source_type")?.as_str()?.to_string(),
-        source_id: record.get("source_id")?.as_str()?.to_string(),
-        content: record.get("content")?.as_str()?.to_string(),
-        t_ref: parse_iso(record.get("t_ref")?.as_str()?)?,
-        t_ingested: parse_iso(record.get("t_ingested")?.as_str()?)?,
-        scope: record.get("scope")?.as_str()?.to_string(),
+        episode_id: unwrap_string(record.get("episode_id")?)?.to_string(),
+        source_type: unwrap_string(record.get("source_type")?)?.to_string(),
+        source_id: unwrap_string(record.get("source_id")?)?.to_string(),
+        content: unwrap_string(record.get("content")?)?.to_string(),
+        t_ref: parse_iso(unwrap_string(record.get("t_ref")?)?)?,
+        t_ingested: parse_iso(unwrap_string(record.get("t_ingested")?)?)?,
+        scope: unwrap_string(record.get("scope")?)?.to_string(),
         visibility_scope: record
             .get("visibility_scope")
-            .and_then(Value::as_str)
+            .and_then(unwrap_string)
             .unwrap_or_default()
             .to_string(),
         policy_tags: record
             .get("policy_tags")
-            .and_then(Value::as_array)
+            .and_then(unwrap_array)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(Value::as_str)
+                    .filter_map(unwrap_string)
                     .map(String::from)
                     .collect()
             })
@@ -47,7 +74,14 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         if let Some(s) = v.as_str() {
             Some(s)
         } else if let Some(obj) = v.as_object() {
-            obj.get("String").and_then(|s| s.as_str())
+            obj.get("String")
+                .and_then(Value::as_str)
+                .or_else(|| obj.get("Strand").and_then(Value::as_str))
+                .or_else(|| {
+                    obj.get("Strand")
+                        .and_then(|inner| inner.get("String"))
+                        .and_then(Value::as_str)
+                })
         } else {
             None
         }
@@ -365,7 +399,7 @@ pub(crate) async fn store_edge(
     payload_map.insert("to_id".to_string(), Value::String(edge.to_id.clone()));
     payload_map.insert("strength".to_string(), json!(edge.strength));
     payload_map.insert("confidence".to_string(), json!(edge.confidence));
-    payload_map.insert("provenance".to_string(), edge.provenance.clone());
+    payload_map.insert("provenance".to_string(), json!({}));
     payload_map.insert("t_valid".to_string(), Value::String(super::normalize_dt(edge.t_valid)));
     payload_map.insert("t_ingested".to_string(), Value::String(super::normalize_dt(edge.t_ingested)));
     if let Some(t_invalid) = edge.t_invalid {

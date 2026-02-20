@@ -279,10 +279,9 @@ impl MemoryService {
         if let Some(record) = existing {
             let existing_id = record
                 .get("entity_id")
-                .and_then(Value::as_str)
-                .or_else(|| record.get("id").and_then(Value::as_str))
-                .unwrap_or("")
-                .to_string();
+                .and_then(string_from_value)
+                .or_else(|| record.get("id").and_then(string_from_value))
+                .unwrap_or_default();
             return Ok(existing_id);
         }
 
@@ -326,7 +325,7 @@ impl MemoryService {
         confidence: f64,
         entity_links: Vec<String>,
         policy_tags: Vec<String>,
-        provenance: Value,
+        _provenance: Value,
     ) -> Result<String, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
@@ -371,15 +370,14 @@ impl MemoryService {
                 serde_json::Value::String(scope.to_string()),
             );
             payload_map.insert("policy_tags".to_string(), serde_json::json!(policy_tags));
-            if !provenance.is_null() {
-                let provenance_str = serde_json::to_string(&provenance).unwrap_or_default();
-                payload_map.insert(
-                    "provenance".to_string(),
-                    serde_json::Value::String(provenance_str),
-                );
-            }
+            payload_map.insert("provenance".to_string(), serde_json::json!({}));
             let payload = serde_json::Value::Object(payload_map);
-            self.db_client.create(&fact_id, payload, &namespace).await?;
+            let created = self.db_client.create(&fact_id, payload, &namespace).await?;
+            if created.is_null() {
+                return Err(MemoryError::Storage(
+                    "failed to persist fact record".to_string(),
+                ));
+            }
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope);
         }
         Ok(fact_id)
@@ -400,9 +398,8 @@ impl MemoryService {
 
         let scope = updated
             .get("scope")
-            .and_then(Value::as_str)
-            .unwrap_or(&namespace)
-            .to_string();
+            .and_then(string_from_value)
+            .unwrap_or_else(|| namespace.clone());
 
         updated.insert(
             "t_invalid".to_string(),
@@ -639,8 +636,10 @@ impl MemoryService {
         let out: Vec<Value> = records
             .into_iter()
             .map(|mut record| {
-                if let Some(id) = record.get("id").and_then(Value::as_str) {
-                    record["id"] = Value::String(id.to_string());
+                for key in ["id", "title", "status", "due_date"] {
+                    if let Some(value) = record.get(key).and_then(string_from_value) {
+                        record[key] = Value::String(value);
+                    }
                 }
                 record
             })
@@ -812,12 +811,16 @@ impl MemoryService {
             if let Value::Object(map) = record {
                 let canonical = map
                     .get("canonical_name")
-                    .and_then(Value::as_str)
-                    .map(super::normalize_text)
+                    .and_then(string_from_value)
+                    .map(|value| super::normalize_text(&value))
                     .unwrap_or_default();
                 let aliases: Vec<String> = map
                     .get("aliases")
-                    .and_then(Value::as_array)
+                    .and_then(|value| {
+                        value
+                            .as_array()
+                            .or_else(|| value.get("Array").and_then(Value::as_array))
+                    })
                     .map(|values| {
                         values
                             .iter()

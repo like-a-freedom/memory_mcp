@@ -276,11 +276,22 @@ impl DbClient for SurrealDbClient {
 
         let (sql, bind) = if let Some(idx) = record_id.find(':') {
             let table = &record_id[..idx];
-            if table == "episode" {
+            let id = &record_id[idx + 1..];
+            let id_field = match table {
+                "fact" => Some("fact_id"),
+                "entity" => Some("entity_id"),
+                "edge" => Some("edge_id"),
+                "community" => Some("community_id"),
+                _ => None,
+            };
+
+            if let Some(field) = id_field {
                 (
-                    format!("SELECT * FROM {table} WHERE episode_id = $id"),
+                    format!("SELECT * FROM {table} WHERE {field} = $id"),
                     Some(Value::String(record_id.to_string())),
                 )
+            } else if !id.is_empty() {
+                (format!("SELECT * FROM {table}:⟨{id}⟩"), None)
             } else {
                 (format!("SELECT * FROM {record_id}"), None)
             }
@@ -377,37 +388,35 @@ impl DbClient for SurrealDbClient {
 
         let base_where = "scope = $scope AND t_valid <= $cutoff AND (t_ingested IS NONE OR t_ingested <= $cutoff) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
 
-        let (sql, vars) = if let Some(q) = query_contains {
-            let words: Vec<&str> = q.split_whitespace().filter(|w| w.len() >= 2).collect();
-            let word_clause = if words.is_empty() {
-                String::new()
-            } else {
-                let conditions: Vec<String> = words
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| format!("string::lowercase(content) CONTAINS string::lowercase($word{i})"))
-                    .collect();
-                format!(" AND ({})", conditions.join(" OR "))
-            };
+        let (sql, vars, query_words) = if let Some(q) = query_contains {
+            let words: Vec<String> = q
+                .split_whitespace()
+                .filter(|w| w.len() >= 2)
+                .map(|w| w.to_lowercase())
+                .collect();
 
-            let mut v = serde_json::json!({
+            let v = serde_json::json!({
                 "scope": scope,
                 "cutoff": cutoff,
                 "limit": limit,
             });
 
-            for (i, word) in words.iter().enumerate() {
-                v[format!("word{i}")] = serde_json::Value::String(word.to_string());
-            }
-
-            (format!("SELECT * FROM fact WHERE {base_where}{word_clause} ORDER BY t_valid DESC LIMIT $limit"), v)
+            (
+                "SELECT * FROM fact ORDER BY t_valid DESC".to_string(),
+                v,
+                words,
+            )
         } else {
             let v = serde_json::json!({
                 "scope": scope,
                 "cutoff": cutoff,
                 "limit": limit,
             });
-            (format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit"), v)
+            (
+                format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit"),
+                v,
+                Vec::new(),
+            )
         };
 
         let surreal_val = if self.is_local() {
@@ -429,7 +438,17 @@ impl DbClient for SurrealDbClient {
         };
 
         let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
+        let mut results = extract_records(normalized);
+
+        if query_contains.is_some() {
+            let flattened = flatten_surreal_records(results);
+            results = flattened
+                .into_iter()
+                .filter(|record| record_is_visible_for_scope(record, scope, cutoff))
+                .filter(|record| record_matches_any_query_word(record, &query_words))
+                .take(limit.max(1) as usize)
+                .collect();
+        }
 
         self.log_op("db.select_facts_filtered.result", vec![
             ("count", Value::Number(serde_json::Number::from(results.len()))),
@@ -500,7 +519,7 @@ impl DbClient for SurrealDbClient {
         };
 
         let sql = if let Some(record_id) = id {
-            format!("CREATE {table}:{record_id} CONTENT $content RETURN *")
+            format!("CREATE {table}:⟨{record_id}⟩ CONTENT $content RETURN *")
         } else {
             format!("CREATE {table} CONTENT $content RETURN *")
         };
@@ -554,7 +573,7 @@ impl DbClient for SurrealDbClient {
             )));
         };
 
-        let sql = format!("UPDATE {table}:{id} MERGE $content RETURN *");
+        let sql = format!("UPDATE {table}:⟨{id}⟩ MERGE $content RETURN *");
 
         let content_for_update = if let Value::Object(mut map) = content {
             map.remove("id");
@@ -680,19 +699,149 @@ fn surreal_to_json(value: SurrealValue) -> Value {
 }
 
 fn extract_first_record(value: Value) -> Option<Value> {
+    extract_records(value).into_iter().next()
+}
+
+fn unwrap_object_wrapper(value: Value) -> Value {
     match value {
-        Value::Array(arr) => arr.into_iter().next(),
-        Value::Null => None,
-        other => Some(other),
+        Value::Object(mut map) => {
+            if let Some(object) = map.remove("Object") {
+                object
+            } else {
+                Value::Object(map)
+            }
+        }
+        other => other,
     }
 }
 
 fn extract_records(value: Value) -> Vec<Value> {
     match value {
-        Value::Array(arr) => arr,
+        Value::Array(arr) => arr.into_iter().map(unwrap_object_wrapper).collect(),
+        Value::Object(mut map) => {
+            if let Some(array) = map.remove("Array") {
+                return array
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(unwrap_object_wrapper)
+                    .collect();
+            }
+            if let Some(object) = map.remove("Object") {
+                return vec![object];
+            }
+            vec![Value::Object(map)]
+        }
         Value::Null => Vec::new(),
         other => vec![other],
     }
+}
+
+fn value_to_matchable_string(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Object(map) => {
+            if map.contains_key("None") {
+                return String::new();
+            }
+            if let Some(inner) = map.get("String") {
+                return value_to_matchable_string(inner);
+            }
+            if let Some(inner) = map.get("Strand") {
+                return value_to_matchable_string(inner);
+            }
+            if let Some(inner) = map.get("content") {
+                return value_to_matchable_string(inner);
+            }
+            if map.len() == 1
+                && let Some((_, inner)) = map.iter().next()
+            {
+                return value_to_matchable_string(inner);
+            }
+            String::new()
+        }
+        Value::Array(values) => values
+            .first()
+            .map(value_to_matchable_string)
+            .unwrap_or_default(),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn record_matches_any_query_word(record: &Value, words: &[String]) -> bool {
+    if words.is_empty() {
+        return true;
+    }
+    let content = record
+        .get("content")
+        .map(value_to_matchable_string)
+        .unwrap_or_default()
+        .to_lowercase();
+    words.iter().any(|word| content.contains(word))
+}
+
+fn record_string_field(record: &Value, key: &str) -> String {
+    record
+        .get(key)
+        .map(value_to_matchable_string)
+        .unwrap_or_default()
+}
+
+fn record_is_visible_for_scope(record: &Value, scope: &str, cutoff: &str) -> bool {
+    let record_scope = record_string_field(record, "scope");
+    if record_scope != scope {
+        return false;
+    }
+
+    let t_valid = record_string_field(record, "t_valid");
+    if t_valid.is_empty() || t_valid.as_str() > cutoff {
+        return false;
+    }
+
+    let t_ingested = record_string_field(record, "t_ingested");
+    if !t_ingested.is_empty() && t_ingested.as_str() > cutoff {
+        return false;
+    }
+
+    let t_invalid = record_string_field(record, "t_invalid");
+    if !t_invalid.is_empty() && t_invalid.as_str() <= cutoff {
+        let t_invalid_ingested = record_string_field(record, "t_invalid_ingested");
+        let invalid_known = if t_invalid_ingested.is_empty() {
+            true
+        } else {
+            t_invalid_ingested.as_str() <= cutoff
+        };
+        if invalid_known {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn flatten_surreal_records(records: Vec<Value>) -> Vec<Value> {
+    let mut flat = Vec::new();
+    for record in records {
+        if let Some(items) = record.get("Array").and_then(Value::as_array) {
+            for item in items {
+                if let Some(obj) = item.get("Object") {
+                    flat.push(obj.clone());
+                } else {
+                    flat.push(item.clone());
+                }
+            }
+            continue;
+        }
+        if let Some(obj) = record.get("Object") {
+            flat.push(obj.clone());
+            continue;
+        }
+        flat.push(record);
+    }
+    flat
 }
 
 fn normalize_surreal_json(v: &Value) -> Value {
@@ -716,7 +865,12 @@ fn normalize_surreal_json(v: &Value) -> Value {
                         .and_then(|inner| inner.get("String").cloned())
                         .unwrap_or_else(|| val.clone())
                 }
-                _ => normalize_surreal_json(val),
+                "Number" | "Float" | "Int" | "Decimal" => normalize_surreal_json(val),
+                _ => J::Object(
+                    map.iter()
+                        .map(|(ik, iv)| (ik.clone(), normalize_surreal_json(iv)))
+                        .collect(),
+                ),
             }
         }
         J::Object(map) => {

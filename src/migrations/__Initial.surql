@@ -31,7 +31,7 @@ DEFINE FIELD scope ON fact TYPE string;
 DEFINE FIELD policy_tags ON fact TYPE array;
 DEFINE FIELD provenance ON fact TYPE object;
 
-DEFINE TABLE edge TYPE RELATION;
+DEFINE TABLE edge SCHEMAFULL;
 DEFINE FIELD edge_id ON edge TYPE string;
 DEFINE FIELD from_id ON edge TYPE string;
 DEFINE FIELD relation ON edge TYPE string;
