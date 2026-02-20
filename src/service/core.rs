@@ -37,6 +37,21 @@ pub struct MemoryService {
 
 use lru::LruCache;
 
+/// Build a startup versions event payload used for diagnostic logging.
+/// Extracted to a helper so it can be unit-tested independently of logger I/O.
+fn build_startup_versions_event(
+    client_version: &str,
+    server_version: Option<&str>,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let mut m = std::collections::HashMap::new();
+    m.insert("op".to_string(), json!("startup.versions"));
+    m.insert("client_version".to_string(), json!(client_version));
+    if let Some(sv) = server_version {
+        m.insert("surrealdb_server_version".to_string(), json!(sv));
+    }
+    m
+}
+
 impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
@@ -70,6 +85,25 @@ impl MemoryService {
             .cloned()
             .unwrap_or_else(|| "default".to_string());
         let db_client = SurrealDbClient::connect(&config, &default_namespace).await?;
+
+        // Query server + client versions and emit a compact startup event so
+        // operators can quickly confirm compatibility (non-fatal on failure).
+        let server_version = match db_client.server_version(&default_namespace).await {
+            Ok(Some(v)) => Some(v),
+            Ok(None) => None,
+            Err(err) => {
+                let mut evt = std::collections::HashMap::new();
+                evt.insert("op".to_string(), json!("startup.version_check"));
+                evt.insert("error".to_string(), json!(format!("{err}")));
+                startup_logger.log(evt, crate::logging::LogLevel::Warn);
+                None
+            }
+        };
+
+        let client_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
+        let versions_event = build_startup_versions_event(client_version, server_version.as_deref());
+        startup_logger.log(versions_event, crate::logging::LogLevel::Info);
+
         let service = Self::new(
             Arc::new(db_client),
             config.namespaces,
@@ -1163,6 +1197,22 @@ mod tests {
 
         let path = bfs_path(&graph, "A", "C", 5);
         assert_eq!(path, None);
+    }
+
+    #[test]
+    fn build_startup_versions_event_includes_both_versions() {
+        let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert_eq!(evt.get("surrealdb_server_version").unwrap().as_str(), Some("SurrealDB 3.0.0"));
+    }
+
+    #[test]
+    fn build_startup_versions_event_omits_server_when_none() {
+        let evt = build_startup_versions_event("0.1.0", None);
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert!(evt.get("surrealdb_server_version").is_none());
     }
 
     #[test]

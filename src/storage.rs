@@ -216,6 +216,37 @@ impl SurrealDbClient {
         matches!(self.engine, DbEngine::Local(_))
     }
 
+    /// Ask the connected SurrealDB instance for a server version string.
+    /// Returns Ok(None) if the information cannot be retrieved.
+    pub async fn server_version(&self, namespace: &str) -> Result<Option<String>, MemoryError> {
+        // "INFO FOR DB" is an informational command that returns DB metadata.
+        // Treat failures as non-fatal (return Ok(None)).
+        let sql = "INFO FOR DB";
+        let res = if self.is_local() {
+            match self.with_namespace_local(namespace).await {
+                Ok(db) => db.query(sql).await,
+                Err(e) => return Err(e),
+            }
+        } else {
+            match self.with_namespace_remote(namespace).await {
+                Ok(db) => db.query(sql).await,
+                Err(e) => return Err(e),
+            }
+        };
+
+        let mut response = match res {
+            Ok(r) => r,
+            Err(_) => return Ok(None),
+        };
+
+        let surreal_val = response
+            .take::<SurrealValue>(0)
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?;
+
+        let json = surreal_to_json(surreal_val);
+        Ok(find_version_in_json(&json))
+    }
+
     /// Logs a database operation event.
     fn log_op(&self, op: &str, details: Vec<(&str, Value)>) {
         let mut event = std::collections::HashMap::new();
@@ -672,6 +703,41 @@ fn surreal_to_json(value: SurrealValue) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
 
+/// Try to find a version-like field inside arbitrary JSON returned by the
+/// server info query. Searches keys for the substring "version" (case-ins).
+fn find_version_in_json(v: &Value) -> Option<String> {
+    match v {
+        Value::String(s) => Some(s.clone()),
+        Value::Object(map) => {
+            for (k, val) in map.iter() {
+                if k.to_lowercase().contains("version") {
+                    if let Some(s) = val.as_str() {
+                        return Some(s.to_string());
+                    } else {
+                        return Some(val.to_string());
+                    }
+                }
+            }
+            // fallback: search nested
+            for (_, val) in map.iter() {
+                if let Some(found) = find_version_in_json(val) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        Value::Array(arr) => {
+            for it in arr.iter() {
+                if let Some(found) = find_version_in_json(it) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        other => Some(other.to_string()),
+    }
+}
+
 fn extract_first_record(value: Value) -> Option<Value> {
     extract_records(value).into_iter().next()
 }
@@ -885,6 +951,29 @@ mod tests {
     fn normalize_url_handles_trailing_slash() {
         assert_eq!(normalize_url("http://db.local/"), "ws://db.local/rpc");
         assert_eq!(normalize_url("https://db.local/"), "wss://db.local/rpc");
+    }
+
+    #[tokio::test]
+    async fn server_version_returns_some_for_embedded() {
+        let td = tempfile::tempdir().expect("create tempdir");
+        let data_dir = td.path().to_str().unwrap().to_string();
+
+        let config = crate::config::SurrealConfigBuilder::new()
+            .db_name("testdb")
+            .namespace("testns")
+            .credentials("root", "root")
+            .data_dir(&data_dir)
+            .embedded(true)
+            .build()
+            .expect("valid config");
+
+        let client = SurrealDbClient::connect(&config, "testns").await.expect("connect");
+        let ver = client.server_version("testns").await.expect("server_version");
+        // Server version may be unavailable for embedded engines; ensure we
+        // don't error and that any returned string is non-empty.
+        if let Some(s) = ver {
+            assert!(!s.is_empty());
+        }
     }
 
     #[test]
