@@ -122,11 +122,11 @@ impl MemoryService {
             50,
             100,
         )?;
-        service.check_surrealdb_connection().await?;
         service
             .db_client
             .apply_migrations(&service.default_namespace)
             .await?;
+        service.check_surrealdb_connection().await?;
         Ok(service)
     }
 
