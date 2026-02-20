@@ -84,15 +84,20 @@ impl StdoutLogger {
         }
     }
 
+    /// Returns true if the provided `level` should be emitted given the
+    /// currently configured minimum level.
+    #[must_use]
+    pub fn is_enabled(&self, level: LogLevel) -> bool {
+        !(level < self.level)
+    }
+
     /// Logs an event if the level is enabled.
     ///
-    /// Debug and trace levels are suppressed in production.
+    /// The logger respects the configured minimum `level`. Messages with a
+    /// severity lower than the configured level are dropped. `debug` and
+    /// `trace` messages are emitted only when the logger is configured to
+    /// `debug`/`trace` respectively (no global unconditional suppression).
     pub fn log(&self, event: HashMap<String, Value>, level: LogLevel) {
-        // Suppress debug/trace in production
-        if matches!(level, LogLevel::Debug | LogLevel::Trace) {
-            return;
-        }
-
         if level < self.level {
             return;
         }
@@ -283,5 +288,23 @@ mod tests {
         let event = HashMap::new();
         let line = StdoutLogger::format_event_line(&event, LogLevel::Info);
         assert!(line.contains("] INFO"));
+    }
+
+    #[test]
+    fn is_enabled_respects_configured_level() {
+        let info_logger = StdoutLogger::new("info");
+        assert!(info_logger.is_enabled(LogLevel::Info));
+        assert!(!info_logger.is_enabled(LogLevel::Debug));
+        assert!(!info_logger.is_enabled(LogLevel::Trace));
+
+        let debug_logger = StdoutLogger::new("debug");
+        assert!(debug_logger.is_enabled(LogLevel::Debug));
+        assert!(!debug_logger.is_enabled(LogLevel::Trace));
+        assert!(debug_logger.is_enabled(LogLevel::Info));
+
+        let trace_logger = StdoutLogger::new("trace");
+        assert!(trace_logger.is_enabled(LogLevel::Trace));
+        assert!(trace_logger.is_enabled(LogLevel::Debug));
+        assert!(trace_logger.is_enabled(LogLevel::Info));
     }
 }
