@@ -80,6 +80,7 @@ pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64
 mod tests {
     use super::*;
     use crate::models::Fact;
+    use chrono::TimeZone;
     use serde_json::json;
 
     #[test]

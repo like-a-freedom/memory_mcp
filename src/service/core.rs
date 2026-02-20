@@ -997,7 +997,7 @@ fn bfs_path(
 mod tests {
     use super::*;
     use crate::models::{AccessContext, AccessPayload, AccessScopeAllow};
-    use chrono::Utc;
+    use chrono::TimeZone;
 
     // ==================== Rate Limiter Tests ====================
 

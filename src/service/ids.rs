@@ -87,7 +87,7 @@ pub fn deterministic_edge_id(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
 
     #[test]
     fn hash_prefix_produces_24_char_hex() {
