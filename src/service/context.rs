@@ -152,12 +152,12 @@ fn filter_facts_by_policy(
 
             if let Some(fact) = super::episode::fact_from_record(fact_item) {
                 // Tag filtering
-                if !fact.policy_tags.is_empty() {
-                    if let Some(allowed_tags) = &access.allowed_tags {
-                        let allowed: std::collections::HashSet<_> = allowed_tags.iter().collect();
-                        if !fact.policy_tags.iter().any(|tag| allowed.contains(tag)) {
-                            continue;
-                        }
+                if !fact.policy_tags.is_empty()
+                    && let Some(allowed_tags) = &access.allowed_tags
+                {
+                    let allowed: std::collections::HashSet<_> = allowed_tags.iter().collect();
+                    if !fact.policy_tags.iter().any(|tag| allowed.contains(tag)) {
+                        continue;
                     }
                 }
                 facts.push(fact);
@@ -169,7 +169,7 @@ fn filter_facts_by_policy(
 }
 
 /// Sort facts by recency.
-fn sort_facts_by_recency(facts: &mut Vec<crate::models::Fact>) {
+fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     facts.sort_by(|a, b| {
         b.t_valid
             .cmp(&a.t_valid)

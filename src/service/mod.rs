@@ -7,15 +7,15 @@
 //! - Context assembly for queries
 
 pub use error::MemoryError;
-pub use service::MemoryService;
+pub use core::MemoryService;
 
 mod cache;
 mod context;
+mod core;
 mod episode;
 mod error;
 mod ids;
 mod query;
-mod service;
 mod validation;
 
 // Constants
@@ -48,4 +48,4 @@ pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
 // Internal helpers
-pub(crate) use service::log_event;
+pub(crate) use core::log_event;

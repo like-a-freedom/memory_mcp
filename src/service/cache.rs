@@ -1,13 +1,10 @@
 //! Context cache management.
 
-use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
 use lru::LruCache;
 use serde_json::Value;
-
-use super::error::MemoryError;
 
 /// Cache key for context assembly results.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -73,12 +70,4 @@ pub fn invalidate_cache_by_scope(
     for key in keys_to_remove {
         guard.pop(&key);
     }
-}
-
-/// Create cache with given size.
-pub fn create_cache(cache_size: usize) -> Result<Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>, MemoryError> {
-    let cache_size = NonZeroUsize::new(cache_size).ok_or_else(|| {
-        MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
-    })?;
-    Ok(Arc::new(Mutex::new(LruCache::new(cache_size))))
 }

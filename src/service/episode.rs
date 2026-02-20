@@ -344,7 +344,7 @@ pub async fn extract_from_episode(
 }
 
 /// Store an edge in the database.
-async fn store_edge(
+pub(crate) async fn store_edge(
     service: &crate::service::MemoryService,
     edge: &Edge,
     namespace: &str,

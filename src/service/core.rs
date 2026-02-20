@@ -81,6 +81,7 @@ impl MemoryService {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn new_with_cache_size(
         db_client: Arc<dyn DbClient>,
         namespaces: Vec<String>,
@@ -447,6 +448,24 @@ impl MemoryService {
             None,
         )
         .await
+    }
+
+    /// Creates a relationship edge between two entities.
+    pub async fn relate(&self, from_id: &str, relation: &str, to_id: &str) -> Result<(), MemoryError> {
+        use crate::models::Edge;
+        let edge = Edge {
+            from_id: from_id.to_string(),
+            relation: relation.to_string(),
+            to_id: to_id.to_string(),
+            strength: 1.0,
+            confidence: 0.8,
+            provenance: json!({"source": "manual"}),
+            t_valid: super::query::now(),
+            t_ingested: super::query::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+        };
+        super::episode::store_edge(self, &edge, &self.default_namespace).await
     }
 
     /// Registers an analyzer.
@@ -852,7 +871,7 @@ impl MemoryService {
 
 // ==================== Rate Limiter ====================
 
-struct RateLimiter {
+pub(crate) struct RateLimiter {
     rps: i32,
     burst: i32,
     tokens: Mutex<HashMap<String, f64>>,
@@ -860,7 +879,7 @@ struct RateLimiter {
 }
 
 impl RateLimiter {
-    fn new(rps: i32, burst: i32) -> Self {
+    pub(crate) fn new(rps: i32, burst: i32) -> Self {
         Self {
             rps: rps.max(1),
             burst: burst.max(1),
@@ -915,15 +934,6 @@ fn serialize_access(access: &AccessContext) -> Value {
         "content_type": access.content_type,
         "cross_scope_allow": access.cross_scope_allow,
     })
-}
-
-#[must_use]
-pub fn normalize_text(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
 }
 
 #[must_use]
