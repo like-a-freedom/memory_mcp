@@ -8,6 +8,7 @@
 
 ## Document Change History
 
+- **2026-02-20**: Fixed `create_task` optional `due_date` coercion regression under SurrealDB 3 by preserving JSON `null` in DB write payload normalization (instead of converting to `{"None": {}}`, which SurrealDB interpreted as an object and rejected for `option<string>`). Added regression coverage for `create_task` with `due_date: null` parameter parsing, payload normalization, and integration flow without due date. Revalidated with full `cargo fmt`, strict `cargo clippy --all-targets --all-features -- -D warnings`, and full test suite.
 - **2026-02-19**: Completed SurrealDB 2.x → 3.x migration validation. Fixed edge persistence regression by omitting optional invalidation fields when absent, added missing `edge_id` field and missing runtime tables (`community`, `event_log`, `task`) in schema initialization, updated deprecated SurrealQL syntax (`SEARCH ANALYZER` → `FULLTEXT ANALYZER`, `string::is::datetime` → `string::is_datetime`), and revalidated with `cargo fmt`, `cargo clippy --all-targets --all-features -- -D warnings`, and full test suite.
 - **2026-02-06**: Replaced `CONTAINS` substring matching with SurrealDB full-text search (`@@` operator) + per-word fallback for `assemble_context`; added query preprocessing (`preprocess_search_query`); comprehensive test coverage (unit, acceptance, embedded FTS integration).
 - **2026-02-05**: Consolidated three specifications into single source of truth

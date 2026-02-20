@@ -7,6 +7,8 @@
 
 **Migration update (2026-02-19):** SurrealDB 2.x → 3.x migration validation was completed in `agent/rusty_memory_mcp` (schema/runtime fixes, deprecated SurrealQL replacements, full `fmt`/`clippy`/tests green). Current detailed status and changelog are maintained only in `MEMORY_SYSTEM_SPEC.md`.
 
+**Task API regression fix (2026-02-20):** Resolved `create_task` failure when `due_date` is omitted or explicitly `null` by preserving JSON `null` in DB write normalization (instead of converting it to `{"None": {}}`, which SurrealDB v3 rejects for `option<string>`). Added parser, storage, and integration regression tests; `fmt`/strict `clippy`/full tests are green.
+
 **Embedded DB path fix (2026-02-20):**
 - If `SURREALDB_DATA_DIR` is **not** set, embedded SurrealDB path defaults to `data/surrealdb` **relative to the running executable directory** (not process working directory).
 - If `SURREALDB_DATA_DIR` **is** set, that path is used **as-is** (strict override, no implicit rewriting).

@@ -926,7 +926,10 @@ fn normalize_surreal_json(v: &Value) -> Value {
                 .map(|(k, v)| (k.clone(), normalize_surreal_json(v)))
                 .collect(),
         ),
-        J::Null => json!({"None": {}}),
+        // Keep JSON null as-is for write payloads.
+        // Converting null into {"None": {}} causes SurrealDB v3 type coercion
+        // failures for optional scalar fields (e.g., option<string>).
+        J::Null => J::Null,
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
     }
@@ -1044,10 +1047,22 @@ mod tests {
 
     #[test]
     fn normalize_surreal_json_preserves_primitives() {
-        assert_eq!(normalize_surreal_json(&json!(null)), json!({"None": {}}));
+        assert_eq!(normalize_surreal_json(&json!(null)), json!(null));
         assert_eq!(normalize_surreal_json(&json!(42)), json!(42));
         assert_eq!(normalize_surreal_json(&json!(true)), json!(true));
         assert_eq!(normalize_surreal_json(&json!("plain")), json!("plain"));
+    }
+
+    #[test]
+    fn build_create_query_preserves_null_option_fields() {
+        let content = json!({
+            "title": "Follow up",
+            "status": "pending_confirmation",
+            "due_date": null
+        });
+
+        let (_sql, vars) = build_create_query("task", content);
+        assert!(vars["content"]["due_date"].is_null());
     }
 
     // Tests for query builder helper functions

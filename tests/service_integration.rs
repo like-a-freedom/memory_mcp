@@ -187,6 +187,27 @@ async fn test_service_ui_operations() {
 }
 
 #[tokio::test]
+async fn test_service_create_task_without_due_date() {
+    let service = common::make_service();
+
+    let task = service
+        .create_task("Follow up with legal", None)
+        .await
+        .unwrap();
+
+    assert_eq!(task["status"], "pending_confirmation");
+    assert_eq!(task["title"], "Follow up with legal");
+    assert!(task.get("due_date").is_none());
+
+    let tasks = service.ui_tasks().await.unwrap();
+    assert!(
+        tasks
+            .iter()
+            .any(|t| { t.get("title").and_then(|v| v.as_str()) == Some("Follow up with legal") })
+    );
+}
+
+#[tokio::test]
 async fn test_service_cache_behavior() {
     let service = common::make_service();
 

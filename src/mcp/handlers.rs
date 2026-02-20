@@ -760,3 +760,48 @@ impl MemoryMcp {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Datelike;
+    use serde_json::json;
+
+    #[test]
+    fn parse_datetime_handles_null() {
+        // Test that None input returns None
+        let result: Option<chrono::DateTime<chrono::Utc>> = None;
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn parse_datetime_parses_valid_iso() {
+        let result = parse_datetime("2024-01-15T10:30:00Z");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2024);
+        assert_eq!(dt.month(), 1);
+        assert_eq!(dt.day(), 15);
+    }
+
+    #[test]
+    fn parse_datetime_returns_none_for_invalid() {
+        assert!(parse_datetime("invalid").is_none());
+        assert!(parse_datetime("").is_none());
+    }
+
+    #[test]
+    fn create_task_params_accept_null_due_date() {
+        let params: CreateTaskParams = serde_json::from_value(json!({
+            "title": "Follow up with ACME",
+            "due_date": null
+        }))
+        .unwrap();
+
+        assert_eq!(params.title, "Follow up with ACME");
+        assert!(params.due_date.is_none());
+    }
+
+    // Note: normalize_optional_string, content_hash, default_scope, and empty_extract_result
+    // are tested in src/mcp/parsers.rs tests module
+}

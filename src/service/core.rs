@@ -543,17 +543,23 @@ impl MemoryService {
             LogLevel::Info,
         );
 
+        // Build payload conditionally to avoid sending null for due_date
+        let payload = if let Some(date) = due_date {
+            json!({
+                "status": "pending_confirmation",
+                "title": title,
+                "due_date": super::normalize_dt(date),
+            })
+        } else {
+            json!({
+                "status": "pending_confirmation",
+                "title": title,
+            })
+        };
+
         let record = self
             .db_client
-            .create(
-                "task",
-                json!({
-                    "status": "pending_confirmation",
-                    "title": title,
-                    "due_date": due_date.map(super::normalize_dt),
-                }),
-                &self.default_namespace,
-            )
+            .create("task", payload, &self.default_namespace)
             .await?;
 
         let id = record
@@ -572,12 +578,23 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        Ok(json!({
-            "id": id,
-            "status": "pending_confirmation",
-            "title": title,
-            "due_date": due_date.map(super::normalize_dt),
-        }))
+        // Build response conditionally
+        let response = if let Some(date) = due_date {
+            json!({
+                "id": id,
+                "status": "pending_confirmation",
+                "title": title,
+                "due_date": super::normalize_dt(date),
+            })
+        } else {
+            json!({
+                "id": id,
+                "status": "pending_confirmation",
+                "title": title,
+            })
+        };
+
+        Ok(response)
     }
 
     /// Creates a message draft.
@@ -1226,7 +1243,7 @@ mod tests {
         let evt = build_startup_versions_event("0.1.0", None);
         assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
-        assert!(evt.get("surrealdb_server_version").is_none());
+        assert!(!evt.contains_key("surrealdb_server_version"));
     }
 
     #[test]
@@ -1488,5 +1505,236 @@ mod tests {
         let original = json!([1, 2, 3, "test", {"key": "value"}]);
         let round_tripped = service.cbor_round_trip(&original).unwrap();
         assert_eq!(original, round_tripped);
+    }
+
+    // ==================== create_task Tests ====================
+
+    #[tokio::test]
+    async fn create_task_without_due_date_omits_field() {
+        use std::sync::Mutex;
+
+        struct CreateTaskMockDbClient {
+            created_records: Mutex<Vec<(String, Value, String)>>,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for CreateTaskMockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn create(
+                &self,
+                record_id: &str,
+                content: Value,
+                namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                let mut records = self.created_records.lock().unwrap();
+                records.push((
+                    record_id.to_string(),
+                    content.clone(),
+                    namespace.to_string(),
+                ));
+
+                // Add id to content
+                let mut content_with_id = if let Value::Object(map) = content {
+                    map
+                } else {
+                    serde_json::Map::new()
+                };
+                content_with_id.insert("id".to_string(), Value::String("task:test123".to_string()));
+                Ok(Value::Object(content_with_id))
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let mock_db = CreateTaskMockDbClient {
+            created_records: Mutex::new(vec![]),
+        };
+
+        let service = MemoryService::new(
+            Arc::new(mock_db),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let result = service.create_task("Test task", None).await.unwrap();
+
+        // Verify response doesn't have due_date field when not provided
+        assert_eq!(result["title"], "Test task");
+        assert_eq!(result["status"], "pending_confirmation");
+        assert!(result.get("due_date").is_none());
+    }
+
+    #[tokio::test]
+    async fn create_task_with_due_date_includes_field() {
+        use chrono::Utc;
+        use std::sync::Mutex;
+
+        struct CreateTaskMockDbClient {
+            created_records: Mutex<Vec<(String, Value, String)>>,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for CreateTaskMockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn create(
+                &self,
+                record_id: &str,
+                content: Value,
+                namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                let mut records = self.created_records.lock().unwrap();
+                records.push((
+                    record_id.to_string(),
+                    content.clone(),
+                    namespace.to_string(),
+                ));
+
+                let mut content_with_id = if let Value::Object(map) = content {
+                    map
+                } else {
+                    serde_json::Map::new()
+                };
+                content_with_id.insert("id".to_string(), Value::String("task:test456".to_string()));
+                Ok(Value::Object(content_with_id))
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let mock_db = CreateTaskMockDbClient {
+            created_records: Mutex::new(vec![]),
+        };
+
+        let service = MemoryService::new(
+            Arc::new(mock_db),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let due_date = Utc::now();
+        let result = service
+            .create_task("Task with deadline", Some(due_date))
+            .await
+            .unwrap();
+
+        // Verify response has due_date field when provided
+        assert_eq!(result["title"], "Task with deadline");
+        assert_eq!(result["status"], "pending_confirmation");
+        assert!(result.get("due_date").is_some());
+        assert!(result["due_date"].as_str().is_some());
     }
 }
