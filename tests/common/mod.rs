@@ -288,7 +288,6 @@ pub fn make_service() -> MemoryService {
     .expect("service init")
 }
 
-#[cfg(feature = "embedded-tests")]
 pub async fn setup_embedded_service() -> Result<(tempfile::TempDir, MemoryService), MemoryError> {
     use memory_mcp::config::SurrealConfig;
     use memory_mcp::storage::SurrealDbClient;

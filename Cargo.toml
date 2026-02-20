@@ -2,6 +2,7 @@
 name = "memory_mcp"
 version = "0.1.0"
 edition = "2024"
+resolver = "3"
 license = "MIT"
 
 [dependencies]
@@ -27,3 +28,22 @@ surrealdb = { version = "3.0.0", features = ["kv-rocksdb"] }
 [dev-dependencies]
 serde_json = "1.0.149"
 tempfile = "3.25.0"
+
+[profile.dev]
+# keep incremental compilation enabled for fastest local edit/test cycles
+incremental = true
+codegen-units = 16
+debug = true
+
+[profile.test]
+# make `cargo test` incremental as well
+incremental = true
+codegen-units = 16
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

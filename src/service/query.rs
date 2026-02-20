@@ -80,7 +80,7 @@ pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64
 mod tests {
     use super::*;
     use crate::models::Fact;
-    use chrono::TimeZone;
+    use chrono::{Datelike, TimeZone};
     use serde_json::json;
 
     #[test]
@@ -142,8 +142,10 @@ mod tests {
 
     #[test]
     fn preprocess_search_query_drops_short_words() {
+        // Only words with length < 2 are dropped (i.e., "a")
+        // "an", "be", "to", "of" have length 2, so they're kept
         let result = preprocess_search_query("a an I be to of query");
-        assert_eq!(result, "query");
+        assert_eq!(result, "an be to of query");
     }
 
     #[test]

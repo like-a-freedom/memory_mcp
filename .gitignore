@@ -6,6 +6,7 @@ AGENTS.md
 # Cargo build artifacts
 /target/
 **/target/
+/scripts
 
 # Cargo.lock
 # - Keep for binaries and applications

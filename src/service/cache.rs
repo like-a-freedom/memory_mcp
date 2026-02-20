@@ -126,7 +126,7 @@ mod tests {
 
         // Poison the mutex
         let _ = std::panic::catch_unwind(|| {
-            let guard = mutex.lock().unwrap();
+            let _guard = mutex.lock().unwrap();
             panic!("poison");
         });
 
@@ -158,7 +158,7 @@ mod tests {
         invalidate_cache_by_scope(&cache, "org");
         
         // Check that org entries are removed but personal remains
-        let guard = cache.safe_lock();
+        let mut guard = cache.safe_lock();
         assert!(guard.get(&key1).is_none());
         assert!(guard.get(&key2).is_none());
         assert!(guard.get(&key3).is_some());
