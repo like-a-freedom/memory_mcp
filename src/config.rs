@@ -130,7 +130,7 @@ impl SurrealConfig {
 ///     .embedded(true)
 ///     .build();
 /// ```
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct SurrealConfigBuilder {
     db_name: Option<String>,
     url: Option<String>,
