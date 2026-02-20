@@ -100,7 +100,10 @@ enum DbEngine {
 
 impl SurrealDbClient {
     /// Connects to SurrealDB using the provided configuration.
-    pub async fn connect(config: &SurrealConfig, default_namespace: &str) -> Result<Self, MemoryError> {
+    pub async fn connect(
+        config: &SurrealConfig,
+        default_namespace: &str,
+    ) -> Result<Self, MemoryError> {
         let engine = if config.embedded {
             Self::connect_embedded(config, default_namespace).await?
         } else {
@@ -135,7 +138,9 @@ impl SurrealDbClient {
 
         let db = Surreal::new::<RocksDb>((data_dir, cfg))
             .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB embedded init failed: {err}")))?;
+            .map_err(|err| {
+                MemoryError::Storage(format!("SurrealDB embedded init failed: {err}"))
+            })?;
 
         db.signin(root)
             .await
@@ -225,39 +230,80 @@ impl SurrealDbClient {
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
         let schema_sql = include_str!("migrations/__Initial.surql");
 
-        match &self.engine {
-            DbEngine::Local(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(&self.database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                guard.query(schema_sql).await.map_err(|e| {
-                    MemoryError::Storage(format!("Schema initialization failed: {e}"))
-                })?;
-            }
-            DbEngine::Remote(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(&self.database)
-                    .await
-                    .map_err(|e| MemoryError::Storage(format!("SurrealDB use failed: {e}")))?;
-                guard.query(schema_sql).await.map_err(|e| {
-                    MemoryError::Storage(format!("Schema initialization failed: {e}"))
-                })?;
-            }
-        }
+        self.execute_raw_query(schema_sql, None, namespace).await?;
 
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), Value::String("schema.init".to_string())),
-                ("namespace".to_string(), Value::String(namespace.to_string())),
+                (
+                    "namespace".to_string(),
+                    Value::String(namespace.to_string()),
+                ),
             ]),
             LogLevel::Info,
         );
 
+        Ok(())
+    }
+
+    /// Execute a query that returns a SurrealValue (internal helper).
+    async fn execute_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<SurrealValue, MemoryError> {
+        if self.is_local() {
+            let db = self.with_namespace_local(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars.clone() {
+                q = q.bind(v);
+            }
+            let mut response = q
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+            response
+                .take::<SurrealValue>(0)
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
+        } else {
+            let db = self.with_namespace_remote(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars {
+                q = q.bind(v);
+            }
+            let mut response = q
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+            response
+                .take::<SurrealValue>(0)
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
+        }
+    }
+
+    /// Execute a query that doesn't return a value (internal helper).
+    async fn execute_raw_query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<(), MemoryError> {
+        if self.is_local() {
+            let db = self.with_namespace_local(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars.clone() {
+                q = q.bind(v);
+            }
+            q.await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+        } else {
+            let db = self.with_namespace_remote(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars {
+                q = q.bind(v);
+            }
+            q.await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+        }
         Ok(())
     }
 }
@@ -269,104 +315,55 @@ impl DbClient for SurrealDbClient {
         record_id: &str,
         namespace: &str,
     ) -> Result<Option<Value>, MemoryError> {
-        self.log_op("db.select_one", vec![
-            ("record_id", Value::String(record_id.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.select_one",
+            vec![
+                ("record_id", Value::String(record_id.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
-        let (sql, bind) = if let Some(idx) = record_id.find(':') {
-            let table = &record_id[..idx];
-            let id = &record_id[idx + 1..];
-            let id_field = match table {
-                "fact" => Some("fact_id"),
-                "entity" => Some("entity_id"),
-                "edge" => Some("edge_id"),
-                "community" => Some("community_id"),
-                _ => None,
-            };
+        let (sql, bind) = build_select_one_query(record_id);
 
-            if let Some(field) = id_field {
-                (
-                    format!("SELECT * FROM {table} WHERE {field} = $id"),
-                    Some(Value::String(record_id.to_string())),
-                )
-            } else if !id.is_empty() {
-                (format!("SELECT * FROM {table}:⟨{id}⟩"), None)
-            } else {
-                (format!("SELECT * FROM {record_id}"), None)
-            }
-        } else {
-            (format!("SELECT * FROM {record_id}"), None)
-        };
-
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut q = db.query(&sql);
-            if let Some(b) = bind.clone() {
-                q = q.bind(("id", b));
-            }
-            let mut response = q.await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut q = db.query(&sql);
-            if let Some(b) = bind {
-                q = q.bind(("id", b));
-            }
-            let mut response = q.await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
+        let surreal_val = self
+            .execute_query(&sql, bind.map(|b| json!({"id": b})), namespace)
+            .await?;
 
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized);
 
-        self.log_op("db.select_one.result", vec![
-            ("record_id", Value::String(record_id.to_string())),
-            ("found", Value::Bool(result.is_some())),
-        ]);
+        self.log_op(
+            "db.select_one.result",
+            vec![
+                ("record_id", Value::String(record_id.to_string())),
+                ("found", Value::Bool(result.is_some())),
+            ],
+        );
 
         Ok(result)
     }
 
     async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError> {
-        self.log_op("db.select_table", vec![
-            ("table", Value::String(table.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.select_table",
+            vec![
+                ("table", Value::String(table.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
         let sql = format!("SELECT * FROM {table}");
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db.query(&sql).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
-
+        let surreal_val = self.execute_query(&sql, None, namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let results = extract_records(normalized);
 
-        self.log_op("db.select_table.result", vec![
-            ("count", Value::Number(serde_json::Number::from(results.len()))),
-        ]);
+        self.log_op(
+            "db.select_table.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
 
         Ok(results)
     }
@@ -379,12 +376,15 @@ impl DbClient for SurrealDbClient {
         query_contains: Option<&str>,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op("db.select_facts_filtered", vec![
-            ("scope", Value::String(scope.to_string())),
-            ("cutoff", Value::String(cutoff.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-            ("limit", Value::Number(serde_json::Number::from(limit))),
-        ]);
+        self.log_op(
+            "db.select_facts_filtered",
+            vec![
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
 
         let base_where = "scope = $scope AND t_valid <= $cutoff AND (t_ingested IS NONE OR t_ingested <= $cutoff) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
 
@@ -419,24 +419,7 @@ impl DbClient for SurrealDbClient {
             )
         };
 
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
-
+        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let mut results = extract_records(normalized);
 
@@ -450,9 +433,13 @@ impl DbClient for SurrealDbClient {
                 .collect();
         }
 
-        self.log_op("db.select_facts_filtered.result", vec![
-            ("count", Value::Number(serde_json::Number::from(results.len()))),
-        ]);
+        self.log_op(
+            "db.select_facts_filtered.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
 
         Ok(results)
     }
@@ -462,41 +449,30 @@ impl DbClient for SurrealDbClient {
         namespace: &str,
         cutoff: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op("db.select_edges_filtered", vec![
-            ("cutoff", Value::String(cutoff.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.select_edges_filtered",
+            vec![
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
         let sql = String::from(
             "SELECT * FROM edge WHERE string::is_datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is_datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
         );
 
         let vars = serde_json::json!({ "cutoff": cutoff });
-
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db.query(&sql).bind(vars).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
-
+        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let results = extract_records(normalized);
 
-        self.log_op("db.select_edges_filtered.result", vec![
-            ("count", Value::Number(serde_json::Number::from(results.len()))),
-        ]);
+        self.log_op(
+            "db.select_edges_filtered.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
 
         Ok(results)
     }
@@ -507,49 +483,23 @@ impl DbClient for SurrealDbClient {
         content: Value,
         namespace: &str,
     ) -> Result<Value, MemoryError> {
-        self.log_op("db.create", vec![
-            ("record_id", Value::String(record_id.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.create",
+            vec![
+                ("record_id", Value::String(record_id.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
-        let (table, id) = if let Some(idx) = record_id.find(':') {
-            (&record_id[..idx], Some(&record_id[idx + 1..]))
-        } else {
-            (record_id, None)
-        };
-
-        let sql = if let Some(record_id) = id {
-            format!("CREATE {table}:⟨{record_id}⟩ CONTENT $content RETURN *")
-        } else {
-            format!("CREATE {table} CONTENT $content RETURN *")
-        };
-
-        let content_for_create = normalize_surreal_json(&content);
-
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).bind(("content", content_for_create.clone())).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db.query(&sql).bind(("content", content_for_create)).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
-
+        let (sql, vars) = build_create_query(record_id, content);
+        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized).unwrap_or(Value::Null);
 
-        self.log_op("db.create.result", vec![
-            ("result", Value::String("ok".to_string())),
-        ]);
+        self.log_op(
+            "db.create.result",
+            vec![("result", Value::String("ok".to_string()))],
+        );
 
         Ok(result)
     }
@@ -560,54 +510,23 @@ impl DbClient for SurrealDbClient {
         content: Value,
         namespace: &str,
     ) -> Result<Value, MemoryError> {
-        self.log_op("db.update", vec![
-            ("record_id", Value::String(record_id.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.update",
+            vec![
+                ("record_id", Value::String(record_id.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
-        let (table, id) = if let Some(idx) = record_id.find(':') {
-            (&record_id[..idx], &record_id[idx + 1..])
-        } else {
-            return Err(MemoryError::Storage(format!(
-                "Invalid record_id format: expected 'table:id', got '{record_id}'"
-            )));
-        };
-
-        let sql = format!("UPDATE {table}:⟨{id}⟩ MERGE $content RETURN *");
-
-        let content_for_update = if let Value::Object(mut map) = content {
-            map.remove("id");
-            Value::Object(map)
-        } else {
-            content
-        };
-
-        let content_for_update = normalize_surreal_json(&content_for_update);
-
-        let surreal_val = if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut response = db.query(&sql).bind(("content", content_for_update.clone())).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut response = db.query(&sql).bind(("content", content_for_update)).await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))?
-        };
-
+        let (sql, vars) = build_update_query(record_id, content)?;
+        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized).unwrap_or(Value::Null);
 
-        self.log_op("db.update.result", vec![
-            ("result", Value::String("ok".to_string())),
-        ]);
+        self.log_op(
+            "db.update.result",
+            vec![("result", Value::String("ok".to_string()))],
+        );
 
         Ok(result)
     }
@@ -618,40 +537,27 @@ impl DbClient for SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<Value, MemoryError> {
-        self.log_op("db.query", vec![
-            ("sql", Value::String(sql.to_string())),
-            ("namespace", Value::String(namespace.to_string())),
-        ]);
+        self.log_op(
+            "db.query",
+            vec![
+                ("sql", Value::String(sql.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+            ],
+        );
 
         if let Some(Value::Object(map)) = &vars {
-            self.log_op("db.query.vars", vec![
-                ("count", Value::Number(serde_json::Number::from(map.len()))),
-            ]);
+            self.log_op(
+                "db.query.vars",
+                vec![("count", Value::Number(serde_json::Number::from(map.len())))],
+            );
         }
 
-        if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars.clone() {
-                q = q.bind(v);
-            }
-            q.await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars {
-                q = q.bind(v);
-            }
-            q.await.map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-            })?;
-        }
+        self.execute_raw_query(sql, vars, namespace).await?;
 
-        self.log_op("db.query.result", vec![
-            ("result", Value::String("ok".to_string())),
-        ]);
+        self.log_op(
+            "db.query.result",
+            vec![("result", Value::String("ok".to_string()))],
+        );
 
         Ok(Value::Null)
     }
@@ -665,13 +571,81 @@ impl DbClient for SurrealDbClient {
 // Helper functions
 // ============================================================================
 
+/// Build SQL query for selecting a single record.
+fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
+    if let Some(idx) = record_id.find(':') {
+        let table = &record_id[..idx];
+        let id = &record_id[idx + 1..];
+        let id_field = match table {
+            "fact" => Some("fact_id"),
+            "entity" => Some("entity_id"),
+            "edge" => Some("edge_id"),
+            "community" => Some("community_id"),
+            _ => None,
+        };
+
+        if let Some(field) = id_field {
+            (
+                format!("SELECT * FROM {table} WHERE {field} = $id"),
+                Some(Value::String(record_id.to_string())),
+            )
+        } else if !id.is_empty() {
+            (format!("SELECT * FROM {table}:⟨{id}⟩"), None)
+        } else {
+            (format!("SELECT * FROM {record_id}"), None)
+        }
+    } else {
+        (format!("SELECT * FROM {record_id}"), None)
+    }
+}
+
+/// Build SQL query for creating a record.
+fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
+    let (table, id) = if let Some(idx) = record_id.find(':') {
+        (&record_id[..idx], Some(&record_id[idx + 1..]))
+    } else {
+        (record_id, None)
+    };
+
+    let sql = if let Some(record_id) = id {
+        format!("CREATE {table}:⟨{record_id}⟩ CONTENT $content RETURN *")
+    } else {
+        format!("CREATE {table} CONTENT $content RETURN *")
+    };
+
+    let content_for_create = normalize_surreal_json(&content);
+    (sql, json!({"content": content_for_create}))
+}
+
+/// Build SQL query for updating a record.
+fn build_update_query(record_id: &str, content: Value) -> Result<(String, Value), MemoryError> {
+    let (table, id) = if let Some(idx) = record_id.find(':') {
+        (&record_id[..idx], &record_id[idx + 1..])
+    } else {
+        return Err(MemoryError::Storage(format!(
+            "Invalid record_id format: expected 'table:id', got '{record_id}'"
+        )));
+    };
+
+    let sql = format!("UPDATE {table}:⟨{id}⟩ MERGE $content RETURN *");
+
+    let content_for_update = if let Value::Object(mut map) = content {
+        map.remove("id");
+        Value::Object(map)
+    } else {
+        content
+    };
+
+    let content_for_update = normalize_surreal_json(&content_for_update);
+    Ok((sql, json!({"content": content_for_update})))
+}
+
 fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
     if let Some(parent) = path.parent()
         && !parent.exists()
     {
-        std::fs::create_dir_all(parent).map_err(|err| {
-            MemoryError::Storage(format!("failed to create data dir: {err}"))
-        })?;
+        std::fs::create_dir_all(parent)
+            .map_err(|err| MemoryError::Storage(format!("failed to create data dir: {err}")))?;
     }
     Ok(())
 }
@@ -854,19 +828,25 @@ fn normalize_surreal_json(v: &Value) -> Value {
             };
             match k.as_str() {
                 "None" => v.clone(),
-                "Array" => val.as_array()
+                "Array" => val
+                    .as_array()
                     .map(|items| J::Array(items.iter().map(normalize_surreal_json).collect()))
                     .unwrap_or_else(|| val.clone()),
-                "Object" => val.as_object()
+                "Object" => val
+                    .as_object()
                     .map(|inner| {
-                        J::Object(inner.iter().map(|(ik, iv)| (ik.clone(), normalize_surreal_json(iv))).collect())
+                        J::Object(
+                            inner
+                                .iter()
+                                .map(|(ik, iv)| (ik.clone(), normalize_surreal_json(iv)))
+                                .collect(),
+                        )
                     })
                     .unwrap_or_else(|| val.clone()),
-                "Strand" | "String" => {
-                    val.as_object()
-                        .and_then(|inner| inner.get("String").cloned())
-                        .unwrap_or_else(|| val.clone())
-                }
+                "Strand" | "String" => val
+                    .as_object()
+                    .and_then(|inner| inner.get("String").cloned())
+                    .unwrap_or_else(|| val.clone()),
                 "Number" | "Float" | "Int" | "Decimal" => normalize_surreal_json(val),
                 _ => J::Object(
                     map.iter()
@@ -875,9 +855,11 @@ fn normalize_surreal_json(v: &Value) -> Value {
                 ),
             }
         }
-        J::Object(map) => {
-            J::Object(map.iter().map(|(k, v)| (k.clone(), normalize_surreal_json(v))).collect())
-        }
+        J::Object(map) => J::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), normalize_surreal_json(v)))
+                .collect(),
+        ),
         J::Null => json!({"None": {}}),
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
@@ -890,7 +872,10 @@ mod tests {
 
     #[test]
     fn normalize_url_upgrades_http_and_appends_rpc() {
-        assert_eq!(normalize_url("http://localhost:8000"), "ws://localhost:8000/rpc");
+        assert_eq!(
+            normalize_url("http://localhost:8000"),
+            "ws://localhost:8000/rpc"
+        );
         assert_eq!(normalize_url("https://db.local"), "wss://db.local/rpc");
         assert_eq!(normalize_url("https://db.local/rpc"), "wss://db.local/rpc");
         assert_eq!(normalize_url("ws://custom"), "ws://custom");
@@ -969,5 +954,69 @@ mod tests {
         assert_eq!(normalize_surreal_json(&json!(42)), json!(42));
         assert_eq!(normalize_surreal_json(&json!(true)), json!(true));
         assert_eq!(normalize_surreal_json(&json!("plain")), json!("plain"));
+    }
+
+    // Tests for query builder helper functions
+
+    #[test]
+    fn build_select_one_query_with_fact_id() {
+        let (sql, bind) = build_select_one_query("fact:abc123");
+        assert_eq!(sql, "SELECT * FROM fact WHERE fact_id = $id");
+        assert_eq!(bind, Some(json!("fact:abc123")));
+    }
+
+    #[test]
+    fn build_select_one_query_with_entity_id() {
+        let (sql, bind) = build_select_one_query("entity:xyz789");
+        assert_eq!(sql, "SELECT * FROM entity WHERE entity_id = $id");
+        assert_eq!(bind, Some(json!("entity:xyz789")));
+    }
+
+    #[test]
+    fn build_select_one_query_with_standard_id() {
+        let (sql, bind) = build_select_one_query("episode:def456");
+        assert_eq!(sql, "SELECT * FROM episode:⟨def456⟩");
+        assert_eq!(bind, None);
+    }
+
+    #[test]
+    fn build_select_one_query_without_colon() {
+        let (sql, bind) = build_select_one_query("some_table");
+        assert_eq!(sql, "SELECT * FROM some_table");
+        assert_eq!(bind, None);
+    }
+
+    #[test]
+    fn build_create_query_with_id() {
+        let content = json!({"name": "test"});
+        let (sql, vars) = build_create_query("entity:abc123", content);
+        assert_eq!(sql, "CREATE entity:⟨abc123⟩ CONTENT $content RETURN *");
+        assert!(vars.get("content").is_some());
+    }
+
+    #[test]
+    fn build_create_query_without_id() {
+        let content = json!({"name": "test"});
+        let (sql, vars) = build_create_query("entity", content);
+        assert_eq!(sql, "CREATE entity CONTENT $content RETURN *");
+        assert!(vars.get("content").is_some());
+    }
+
+    #[test]
+    fn build_update_query_success() {
+        let content = json!({"id": "fact:abc123", "name": "updated"});
+        let (sql, vars) = build_update_query("fact:abc123", content).unwrap();
+        assert_eq!(sql, "UPDATE fact:⟨abc123⟩ MERGE $content RETURN *");
+        // The 'id' field should be removed from content
+        let content_val = vars.get("content").unwrap();
+        assert!(content_val.get("id").is_none());
+        assert_eq!(content_val.get("name").unwrap(), "updated");
+    }
+
+    #[test]
+    fn build_update_query_invalid_format() {
+        let content = json!({"name": "test"});
+        let result = build_update_query("invalid_format", content);
+        assert!(matches!(result, Err(MemoryError::Storage(_))));
     }
 }

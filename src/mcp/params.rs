@@ -3,8 +3,8 @@
 //! All parameter structs use flat, primitive types only (no nested structs)
 //! for OpenAI schema compatibility.
 
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// Parameters for the `ingest` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

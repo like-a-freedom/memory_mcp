@@ -287,4 +287,3 @@ pub fn make_service() -> MemoryService {
     )
     .expect("service init")
 }
-

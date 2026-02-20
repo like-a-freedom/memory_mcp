@@ -1,7 +1,7 @@
 //! Error conversion utilities for MCP protocol.
 
-use rmcp::model::ErrorCode;
 use rmcp::ErrorData;
+use rmcp::model::ErrorCode;
 
 use crate::service::MemoryError;
 

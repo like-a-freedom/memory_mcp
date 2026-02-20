@@ -235,10 +235,7 @@ mod tests {
         let mut event = HashMap::new();
         event.insert("name".to_string(), json!("Dmitry Ivanov"));
         event.insert("list".to_string(), json!(["a", "b", "c"]));
-        event.insert(
-            "args".to_string(),
-            json!({"scope": "org", "query": "ARR"}),
-        );
+        event.insert("args".to_string(), json!({"scope": "org", "query": "ARR"}));
 
         let line = StdoutLogger::format_event_line_with_ts(
             &event,

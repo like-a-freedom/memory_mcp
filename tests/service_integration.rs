@@ -28,7 +28,7 @@ async fn test_service_ingest_and_extract_flow() {
 
     // Extract entities and facts
     let result = service.extract(&episode_id, None).await.unwrap();
-    
+
     assert!(result.get("episode_id").is_some());
     assert!(result.get("entities").is_some());
     assert!(result.get("facts").is_some());
@@ -58,20 +58,23 @@ async fn test_service_add_fact_and_assemble_context() {
     let service = common::make_service();
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-    
+
     // Add facts
-    let _fact_id = service.add_fact(
-        "metric",
-        "ARR reached $5M in Q4 2023",
-        "ARR reached $5M",
-        "episode:test",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec!["finance".to_string()],
-        json!({"quarter": "Q4", "year": 2023}),
-    ).await.unwrap();
+    let _fact_id = service
+        .add_fact(
+            "metric",
+            "ARR reached $5M in Q4 2023",
+            "ARR reached $5M",
+            "episode:test",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec!["finance".to_string()],
+            json!({"quarter": "Q4", "year": 2023}),
+        )
+        .await
+        .unwrap();
 
     // Assemble context
     let request = memory_mcp::models::AssembleContextRequest {
@@ -94,20 +97,23 @@ async fn test_service_fact_invalidation() {
     let service = common::make_service();
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-    
+
     // Add a fact
-    let fact_id = service.add_fact(
-        "metric",
-        "ARR $3M",
-        "ARR $3M",
-        "episode:test",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    ).await.unwrap();
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR $3M",
+            "ARR $3M",
+            "episode:test",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     // Verify fact is visible before invalidation
     let request_before = memory_mcp::models::AssembleContextRequest {
@@ -118,20 +124,25 @@ async fn test_service_fact_invalidation() {
         access: None,
     };
     let context_before = service.assemble_context(request_before).await.unwrap();
-    assert!(context_before.iter().any(|f| {
-        f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id)
-    }));
+    assert!(
+        context_before
+            .iter()
+            .any(|f| { f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id) })
+    );
 
     // Invalidate the fact
     let t_invalid = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
-    service.invalidate(
-        memory_mcp::models::InvalidateRequest {
-            fact_id: fact_id.clone(),
-            reason: "Superseded by new value".to_string(),
-            t_invalid,
-        },
-        None,
-    ).await.unwrap();
+    service
+        .invalidate(
+            memory_mcp::models::InvalidateRequest {
+                fact_id: fact_id.clone(),
+                reason: "Superseded by new value".to_string(),
+                t_invalid,
+            },
+            None,
+        )
+        .await
+        .unwrap();
 
     // Verify fact is not visible after invalidation (for queries after t_invalid)
     let request_after = memory_mcp::models::AssembleContextRequest {
@@ -142,9 +153,11 @@ async fn test_service_fact_invalidation() {
         access: None,
     };
     let context_after = service.assemble_context(request_after).await.unwrap();
-    assert!(!context_after.iter().any(|f| {
-        f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id)
-    }));
+    assert!(
+        !context_after
+            .iter()
+            .any(|f| { f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id) })
+    );
 }
 
 #[tokio::test]
@@ -152,10 +165,13 @@ async fn test_service_ui_operations() {
     let service = common::make_service();
 
     // Create a task
-    let task = service.create_task(
-        "Review Q4 metrics",
-        Some(Utc.with_ymd_and_hms(2024, 12, 31, 0, 0, 0).unwrap()),
-    ).await.unwrap();
+    let task = service
+        .create_task(
+            "Review Q4 metrics",
+            Some(Utc.with_ymd_and_hms(2024, 12, 31, 0, 0, 0).unwrap()),
+        )
+        .await
+        .unwrap();
     assert_eq!(task["status"], "pending_confirmation");
     assert_eq!(task["title"], "Review Q4 metrics");
 
@@ -175,20 +191,23 @@ async fn test_service_cache_behavior() {
     let service = common::make_service();
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-    
+
     // Add a fact
-    service.add_fact(
-        "note",
-        "Test content for caching",
-        "Test quote",
-        "episode:cache-test",
-        t_valid,
-        "org",
-        0.8,
-        vec![],
-        vec![],
-        json!({}),
-    ).await.unwrap();
+    service
+        .add_fact(
+            "note",
+            "Test content for caching",
+            "Test quote",
+            "episode:cache-test",
+            t_valid,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     // First query
     let request = memory_mcp::models::AssembleContextRequest {
@@ -211,33 +230,39 @@ async fn test_service_scope_isolation() {
     let service = common::make_service();
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-    
-    // Add facts to different scopes
-    service.add_fact(
-        "note",
-        "Org scope fact",
-        "Org quote",
-        "episode:org",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    ).await.unwrap();
 
-    service.add_fact(
-        "note",
-        "Personal scope fact",
-        "Personal quote",
-        "episode:personal",
-        t_valid,
-        "personal",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    ).await.unwrap();
+    // Add facts to different scopes
+    service
+        .add_fact(
+            "note",
+            "Org scope fact",
+            "Org quote",
+            "episode:org",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "Personal scope fact",
+            "Personal quote",
+            "episode:personal",
+            t_valid,
+            "personal",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     // Query org scope - should only see org facts
     let request_org = memory_mcp::models::AssembleContextRequest {
@@ -249,6 +274,9 @@ async fn test_service_scope_isolation() {
     };
     let org_results = service.assemble_context(request_org).await.unwrap();
     assert!(org_results.iter().all(|r| {
-        r.get("content").and_then(|v| v.as_str()).unwrap_or("").contains("Org")
+        r.get("content")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .contains("Org")
     }));
 }

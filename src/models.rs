@@ -226,10 +226,11 @@ impl AccessContext {
         if let Some(scopes) = &self.allowed_scopes
             && !scopes.contains(&scope.to_string())
         {
-            return self
-                .cross_scope_allow
-                .as_ref()
-                .is_some_and(|cross| cross.iter().any(|pair| pair.from == "*" && pair.to == scope));
+            return self.cross_scope_allow.as_ref().is_some_and(|cross| {
+                cross
+                    .iter()
+                    .any(|pair| pair.from == "*" && pair.to == scope)
+            });
         }
         true
     }

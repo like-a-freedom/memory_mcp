@@ -6,8 +6,8 @@
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
 
-pub use error::MemoryError;
 pub use core::MemoryService;
+pub use error::MemoryError;
 
 mod cache;
 mod context;
@@ -36,15 +36,15 @@ mod constants {
 
 // Re-export commonly used items
 pub use cache::{CacheKey, SafeMutex, invalidate_cache_by_scope};
-pub use query::{
-    bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now, parse_iso,
-    preprocess_search_query,
-};
+pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
 pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
     deterministic_episode_id, deterministic_fact_id, hash_prefix,
 };
-pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
+pub use query::{
+    bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now, parse_iso,
+    preprocess_search_query,
+};
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
 // Internal helpers

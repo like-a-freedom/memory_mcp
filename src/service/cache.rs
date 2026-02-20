@@ -57,10 +57,7 @@ impl<T> SafeMutex<T> for Mutex<T> {
 }
 
 /// Invalidate cache entries for a specific scope.
-pub fn invalidate_cache_by_scope(
-    cache: &Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>,
-    scope: &str,
-) {
+pub fn invalidate_cache_by_scope(cache: &Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>, scope: &str) {
     let mut guard = cache.safe_lock();
     let keys_to_remove: Vec<CacheKey> = guard
         .iter()
@@ -100,7 +97,10 @@ mod tests {
         let cutoff = Utc::now();
         let tags = Some(vec!["zebra".to_string(), "apple".to_string()]);
         let key = CacheKey::new("query", "org", cutoff, 5, tags);
-        assert_eq!(key.tags, Some(vec!["apple".to_string(), "zebra".to_string()]));
+        assert_eq!(
+            key.tags,
+            Some(vec!["apple".to_string(), "zebra".to_string()])
+        );
     }
 
     #[test]
@@ -137,26 +137,26 @@ mod tests {
 
     #[test]
     fn invalidate_cache_by_scope_removes_matching_entries() {
-        let cache: Arc<Mutex<LruCache<CacheKey, Vec<Value>>>> = 
+        let cache: Arc<Mutex<LruCache<CacheKey, Vec<Value>>>> =
             Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
-        
+
         let cutoff = Utc::now();
-        
+
         // Add entries for different scopes
         let key1 = CacheKey::new("query1", "org", cutoff, 5, None);
         let key2 = CacheKey::new("query2", "org", cutoff, 5, None);
         let key3 = CacheKey::new("query3", "personal", cutoff, 5, None);
-        
+
         {
             let mut guard = cache.safe_lock();
             guard.put(key1.clone(), vec![json!("value1")]);
             guard.put(key2.clone(), vec![json!("value2")]);
             guard.put(key3.clone(), vec![json!("value3")]);
         }
-        
+
         // Invalidate org scope
         invalidate_cache_by_scope(&cache, "org");
-        
+
         // Check that org entries are removed but personal remains
         let mut guard = cache.safe_lock();
         assert!(guard.get(&key1).is_none());

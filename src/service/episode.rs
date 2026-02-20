@@ -3,10 +3,10 @@
 use regex::Regex;
 use serde_json::Value;
 
-use crate::models::Edge;
-use crate::models::Episode;
 use super::error::MemoryError;
 use super::query::parse_iso;
+use crate::models::Edge;
+use crate::models::Episode;
 
 /// Parse an episode from a database record.
 #[must_use]
@@ -385,7 +385,8 @@ pub(crate) async fn store_edge(
 ) -> Result<(), MemoryError> {
     use serde_json::json;
 
-    let edge_id = super::ids::deterministic_edge_id(&edge.from_id, &edge.relation, &edge.to_id, edge.t_valid);
+    let edge_id =
+        super::ids::deterministic_edge_id(&edge.from_id, &edge.relation, &edge.to_id, edge.t_valid);
 
     let existing = service.db_client.select_one(&edge_id, namespace).await?;
     if existing.is_some() {
@@ -400,10 +401,19 @@ pub(crate) async fn store_edge(
     payload_map.insert("strength".to_string(), json!(edge.strength));
     payload_map.insert("confidence".to_string(), json!(edge.confidence));
     payload_map.insert("provenance".to_string(), json!({}));
-    payload_map.insert("t_valid".to_string(), Value::String(super::normalize_dt(edge.t_valid)));
-    payload_map.insert("t_ingested".to_string(), Value::String(super::normalize_dt(edge.t_ingested)));
+    payload_map.insert(
+        "t_valid".to_string(),
+        Value::String(super::normalize_dt(edge.t_valid)),
+    );
+    payload_map.insert(
+        "t_ingested".to_string(),
+        Value::String(super::normalize_dt(edge.t_ingested)),
+    );
     if let Some(t_invalid) = edge.t_invalid {
-        payload_map.insert("t_invalid".to_string(), Value::String(super::normalize_dt(t_invalid)));
+        payload_map.insert(
+            "t_invalid".to_string(),
+            Value::String(super::normalize_dt(t_invalid)),
+        );
     }
     if let Some(t_invalid_ingested) = edge.t_invalid_ingested {
         payload_map.insert(
@@ -412,7 +422,8 @@ pub(crate) async fn store_edge(
         );
     }
 
-    service.db_client
+    service
+        .db_client
         .create(&edge_id, Value::Object(payload_map), namespace)
         .await?;
 
@@ -462,7 +473,12 @@ async fn update_communities(
     let summary = if !names.is_empty() {
         names.iter().take(3).cloned().collect::<Vec<_>>().join(", ")
     } else {
-        entity_ids.iter().take(3).cloned().collect::<Vec<_>>().join(", ")
+        entity_ids
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
     };
 
     let payload = json!({
@@ -472,13 +488,18 @@ async fn update_communities(
         "updated_at": super::normalize_dt(super::query::now()),
     });
 
-    let existing = service.db_client.select_one(&community_id, &namespace).await?;
+    let existing = service
+        .db_client
+        .select_one(&community_id, &namespace)
+        .await?;
     if existing.is_some() {
-        service.db_client
+        service
+            .db_client
             .update(&community_id, payload, &namespace)
             .await?;
     } else {
-        service.db_client
+        service
+            .db_client
             .create(&community_id, payload, &namespace)
             .await?;
     }

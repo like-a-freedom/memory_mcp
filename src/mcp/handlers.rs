@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use rmcp::handler::server::wrapper::{Json, Parameters};
-use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
 use rmcp::handler::server::tool::ToolRouter;
+use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{ServerCapabilities, ServerInfo};
+use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
@@ -139,7 +139,10 @@ impl MemoryMcp {
         // Otherwise, ingest content first then extract
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
-            let result = super::parsers::empty_extract_result("no_input", "episode_id or content/text is required");
+            let result = super::parsers::empty_extract_result(
+                "no_input",
+                "episode_id or content/text is required",
+            );
             if enable_logging {
                 self.service.log_tool_event(
                     "extract.no_input",

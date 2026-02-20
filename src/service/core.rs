@@ -11,15 +11,15 @@ use serde_json::{Value, json};
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{
-    AccessContext, AssembleContextRequest, EntityCandidate, ExplainRequest,
-    IngestRequest, InvalidateRequest,
+    AccessContext, AssembleContextRequest, EntityCandidate, ExplainRequest, IngestRequest,
+    InvalidateRequest,
 };
 use crate::storage::{DbClient, SurrealDbClient};
 
 use super::cache::{CacheKey, SafeMutex};
 use super::error::MemoryError;
+use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
-use super::ids::{deterministic_episode_id, deterministic_entity_id, deterministic_fact_id};
 
 /// Core service for memory operations.
 #[derive(Clone)]
@@ -334,44 +334,20 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
-            let mut payload_map = serde_json::Map::new();
-            payload_map.insert(
-                "fact_id".to_string(),
-                serde_json::Value::String(fact_id.clone()),
-            );
-            payload_map.insert(
-                "fact_type".to_string(),
-                serde_json::Value::String(fact_type.to_string()),
-            );
-            payload_map.insert(
-                "content".to_string(),
-                serde_json::Value::String(content.to_string()),
-            );
-            payload_map.insert(
-                "quote".to_string(),
-                serde_json::Value::String(quote.to_string()),
-            );
-            payload_map.insert(
-                "source_episode".to_string(),
-                serde_json::Value::String(source_episode.to_string()),
-            );
-            payload_map.insert(
-                "t_valid".to_string(),
-                serde_json::Value::String(super::normalize_dt(t_valid)),
-            );
-            payload_map.insert(
-                "t_ingested".to_string(),
-                serde_json::Value::String(super::normalize_dt(t_ingested)),
-            );
-            payload_map.insert("confidence".to_string(), serde_json::json!(confidence));
-            payload_map.insert("entity_links".to_string(), serde_json::json!(entity_links));
-            payload_map.insert(
-                "scope".to_string(),
-                serde_json::Value::String(scope.to_string()),
-            );
-            payload_map.insert("policy_tags".to_string(), serde_json::json!(policy_tags));
-            payload_map.insert("provenance".to_string(), serde_json::json!({}));
-            let payload = serde_json::Value::Object(payload_map);
+            let payload = json!({
+                "fact_id": fact_id.clone(),
+                "fact_type": fact_type,
+                "content": content,
+                "quote": quote,
+                "source_episode": source_episode,
+                "t_valid": super::normalize_dt(t_valid),
+                "t_ingested": super::normalize_dt(t_ingested),
+                "confidence": confidence,
+                "entity_links": entity_links,
+                "scope": scope,
+                "policy_tags": policy_tags,
+                "provenance": json!({}),
+            });
             let created = self.db_client.create(&fact_id, payload, &namespace).await?;
             if created.is_null() {
                 return Err(MemoryError::Storage(
@@ -405,7 +381,10 @@ impl MemoryService {
             "t_invalid".to_string(),
             json!(super::normalize_dt(request.t_invalid)),
         );
-        updated.insert("t_invalid_ingested".to_string(), json!(super::normalize_dt(super::query::now())));
+        updated.insert(
+            "t_invalid_ingested".to_string(),
+            json!(super::normalize_dt(super::query::now())),
+        );
         self.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
@@ -448,7 +427,12 @@ impl MemoryService {
     }
 
     /// Creates a relationship edge between two entities.
-    pub async fn relate(&self, from_id: &str, relation: &str, to_id: &str) -> Result<(), MemoryError> {
+    pub async fn relate(
+        &self,
+        from_id: &str,
+        relation: &str,
+        to_id: &str,
+    ) -> Result<(), MemoryError> {
         use crate::models::Edge;
         let edge = Edge {
             from_id: from_id.to_string(),
@@ -559,41 +543,19 @@ impl MemoryService {
 
     /// Retrieves promise facts.
     pub async fn ui_promises(&self) -> Result<Vec<Value>, MemoryError> {
-        self.logger.log(
-            log_event("ui_promises.start", json!({}), json!({}), None),
-            LogLevel::Debug,
-        );
-        let mut records = Vec::new();
-        for namespace in &self.namespaces {
-            records.extend(self.db_client.select_table("fact", namespace).await?);
-        }
-        let filtered: Vec<Value> = records
-            .into_iter()
-            .filter(|record| record.get("fact_type").and_then(Value::as_str) == Some("promise"))
-            .map(|record| {
-                json!({
-                    "content": record.get("content"),
-                    "quote": record.get("quote"),
-                    "source_episode": record.get("source_episode"),
-                })
-            })
-            .collect();
-        self.logger.log(
-            log_event(
-                "ui_promises.done",
-                json!({}),
-                json!({"count": filtered.len()}),
-                None,
-            ),
-            LogLevel::Info,
-        );
-        Ok(filtered)
+        self.fetch_facts_by_type("promise").await
     }
 
     /// Retrieves metric facts.
     pub async fn ui_metrics(&self) -> Result<Vec<Value>, MemoryError> {
+        self.fetch_facts_by_type("metric").await
+    }
+
+    /// Fetches facts filtered by type.
+    async fn fetch_facts_by_type(&self, fact_type: &str) -> Result<Vec<Value>, MemoryError> {
+        let op_name = format!("ui_{fact_type}s");
         self.logger.log(
-            log_event("ui_metrics.start", json!({}), json!({}), None),
+            log_event(&format!("{op_name}.start"), json!({}), json!({}), None),
             LogLevel::Debug,
         );
         let mut records = Vec::new();
@@ -602,7 +564,7 @@ impl MemoryService {
         }
         let filtered: Vec<Value> = records
             .into_iter()
-            .filter(|record| record.get("fact_type").and_then(Value::as_str) == Some("metric"))
+            .filter(|record| record.get("fact_type").and_then(Value::as_str) == Some(fact_type))
             .map(|record| {
                 json!({
                     "content": record.get("content"),
@@ -613,7 +575,7 @@ impl MemoryService {
             .collect();
         self.logger.log(
             log_event(
-                "ui_metrics.done",
+                &format!("{op_name}.done"),
                 json!({}),
                 json!({"count": filtered.len()}),
                 None,
@@ -841,15 +803,19 @@ impl MemoryService {
         if let Some(scopes) = &access.allowed_scopes
             && !scopes.contains(&scope.to_string())
         {
-            return access
-                .cross_scope_allow
-                .as_ref()
-                .is_some_and(|cross| cross.iter().any(|pair| pair.from == "*" && pair.to == scope));
+            return access.cross_scope_allow.as_ref().is_some_and(|cross| {
+                cross
+                    .iter()
+                    .any(|pair| pair.from == "*" && pair.to == scope)
+            });
         }
         true
     }
 
-    pub(crate) fn enforce_rate_limit(&self, access: Option<&AccessContext>) -> Result<(), MemoryError> {
+    pub(crate) fn enforce_rate_limit(
+        &self,
+        access: Option<&AccessContext>,
+    ) -> Result<(), MemoryError> {
         if let Some(access) = access
             && let Some(caller) = &access.caller_id
             && !self.rate_limiter.allow(caller)
@@ -875,8 +841,8 @@ impl MemoryService {
 // ==================== Rate Limiter ====================
 
 pub(crate) struct RateLimiter {
-    rps: i32,
-    burst: i32,
+    rps: f64,
+    burst: f64,
     tokens: Mutex<HashMap<String, f64>>,
     last: Mutex<HashMap<String, Instant>>,
 }
@@ -884,8 +850,8 @@ pub(crate) struct RateLimiter {
 impl RateLimiter {
     pub(crate) fn new(rps: i32, burst: i32) -> Self {
         Self {
-            rps: rps.max(1),
-            burst: burst.max(1),
+            rps: (rps.max(1)) as f64,
+            burst: (burst.max(1)) as f64,
             tokens: Mutex::new(HashMap::new()),
             last: Mutex::new(HashMap::new()),
         }
@@ -898,9 +864,9 @@ impl RateLimiter {
         let last_time = last.entry(key.to_string()).or_insert(now);
         let elapsed = now.duration_since(*last_time).as_secs_f64();
         *last_time = now;
-        let entry = tokens.entry(key.to_string()).or_insert(self.burst as f64);
-        let refill = elapsed * self.rps as f64;
-        *entry = (*entry + refill).min(self.burst as f64);
+        let entry = tokens.entry(key.to_string()).or_insert(self.burst);
+        let refill = elapsed * self.rps;
+        *entry = (*entry + refill).min(self.burst);
         if *entry < 1.0 {
             return false;
         }
@@ -967,10 +933,13 @@ fn bfs_path(
     target: &str,
     max_hops: i32,
 ) -> Option<Vec<String>> {
-    let mut queue: std::collections::VecDeque<(String, Vec<String>)> = std::collections::VecDeque::new();
-    let mut visited = HashMap::new();
+    use std::collections::HashSet;
+
+    let mut queue: std::collections::VecDeque<(String, Vec<String>)> =
+        std::collections::VecDeque::new();
+    let mut visited = HashSet::new();
     queue.push_back((start.to_string(), vec![start.to_string()]));
-    visited.insert(start.to_string(), true);
+    visited.insert(start.to_string());
 
     while let Some((node, path)) = queue.pop_front() {
         if (path.len() as i32) - 1 > max_hops {
@@ -978,7 +947,7 @@ fn bfs_path(
         }
         if let Some(neighbors) = graph.get(&node) {
             for neighbor in neighbors {
-                if visited.contains_key(neighbor) {
+                if visited.contains(neighbor) {
                     continue;
                 }
                 if neighbor == target {
@@ -986,7 +955,7 @@ fn bfs_path(
                     new_path.push(neighbor.clone());
                     return Some(new_path);
                 }
-                visited.insert(neighbor.clone(), true);
+                visited.insert(neighbor.clone());
                 let mut new_path = path.clone();
                 new_path.push(neighbor.clone());
                 queue.push_back((neighbor.clone(), new_path));
@@ -1042,8 +1011,14 @@ mod tests {
             None,
         );
         assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
-        assert_eq!(event.get("args").unwrap().get("key").unwrap().as_str(), Some("value"));
-        assert_eq!(event.get("result").unwrap().get("result").unwrap().as_str(), Some("ok"));
+        assert_eq!(
+            event.get("args").unwrap().get("key").unwrap().as_str(),
+            Some("value")
+        );
+        assert_eq!(
+            event.get("result").unwrap().get("result").unwrap().as_str(),
+            Some("ok")
+        );
     }
 
     #[test]
@@ -1059,7 +1034,10 @@ mod tests {
         };
         let event = log_event("test_op", json!({}), json!({}), Some(&access));
         let access_event = event.get("access").unwrap();
-        assert_eq!(access_event.get("caller_id").unwrap().as_str(), Some("test-caller"));
+        assert_eq!(
+            access_event.get("caller_id").unwrap().as_str(),
+            Some("test-caller")
+        );
     }
 
     #[test]
@@ -1130,7 +1108,10 @@ mod tests {
         graph.insert("C".to_string(), vec![]);
 
         let path = bfs_path(&graph, "A", "C", 5);
-        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]));
+        assert_eq!(
+            path,
+            Some(vec!["A".to_string(), "B".to_string(), "C".to_string()])
+        );
     }
 
     #[test]

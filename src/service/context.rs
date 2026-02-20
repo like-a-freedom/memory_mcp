@@ -2,10 +2,10 @@
 
 use serde_json::{Value, json};
 
-use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembleContextRequest};
 use super::cache::{CacheKey, SafeMutex};
 use super::error::MemoryError;
+use crate::logging::LogLevel;
+use crate::models::{AccessContext, AssembleContextRequest};
 
 /// Assemble context for a query.
 pub async fn assemble_context(
@@ -76,7 +76,11 @@ pub async fn assemble_context(
     let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
-    let query_opt = if cleaned_query.is_empty() { None } else { Some(cleaned_query.as_str()) };
+    let query_opt = if cleaned_query.is_empty() {
+        None
+    } else {
+        Some(cleaned_query.as_str())
+    };
 
     let fact_records = service
         .db_client
@@ -130,10 +134,7 @@ pub async fn assemble_context(
 }
 
 /// Filter facts by policy tags.
-fn filter_facts_by_policy(
-    records: Vec<Value>,
-    access: &AccessContext,
-) -> Vec<crate::models::Fact> {
+fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<crate::models::Fact> {
     let mut facts = Vec::new();
 
     for record in records {
