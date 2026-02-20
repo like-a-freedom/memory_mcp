@@ -41,6 +41,29 @@ impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
+
+        // Startup log: emit effective DB storage location so misconfigured
+        // working directories are easy to diagnose. Use Info level so the
+        // message appears by default in normal runs.
+        let effective_data_dir = config.data_dir_or_default();
+        let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
+        let mut startup_event = std::collections::HashMap::new();
+        startup_event.insert("op".to_string(), serde_json::json!("startup"));
+        startup_event.insert(
+            "db_mode".to_string(),
+            serde_json::json!(if config.embedded { "embedded" } else { "remote" }),
+        );
+        // Only include the effective data dir for embedded mode to avoid
+        // exposing unnecessary fields for remote mode.
+        if config.embedded {
+            startup_event.insert("effective_data_dir".to_string(), serde_json::json!(effective_data_dir.clone()));
+        } else if let Some(url) = &config.url {
+            startup_event.insert("url".to_string(), serde_json::json!(url));
+        }
+        startup_event.insert("namespaces".to_string(), serde_json::json!(config.namespaces));
+        startup_event.insert("db_name".to_string(), serde_json::json!(config.db_name));
+        startup_logger.log(startup_event, crate::logging::LogLevel::Info);
+
         let default_namespace = config
             .namespaces
             .first()
