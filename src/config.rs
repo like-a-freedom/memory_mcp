@@ -4,6 +4,7 @@
 //! with support for both embedded and remote SurrealDB deployments.
 
 use std::env;
+use std::path::PathBuf;
 
 use crate::service::MemoryError;
 
@@ -68,9 +69,10 @@ impl SurrealConfig {
         let url = if embedded {
             env::var("SURREALDB_URL").ok()
         } else {
-            Some(env::var("SURREALDB_URL").map_err(|_| {
-                MemoryError::ConfigMissing("SURREALDB_URL".to_string())
-            })?)
+            Some(
+                env::var("SURREALDB_URL")
+                    .map_err(|_| MemoryError::ConfigMissing("SURREALDB_URL".to_string()))?,
+            )
         };
 
         let namespaces = parse_comma_list("SURREALDB_NAMESPACES")?;
@@ -110,8 +112,27 @@ impl SurrealConfig {
     pub fn data_dir_or_default(&self) -> String {
         self.data_dir
             .clone()
-            .unwrap_or_else(|| "./data/surrealdb".to_string())
+            .unwrap_or_else(default_embedded_data_dir)
     }
+}
+
+/// Returns the default embedded SurrealDB path.
+///
+/// If no explicit path is configured, we store DB files next to the running
+/// executable to make runtime behavior independent from process working
+/// directory.
+fn default_embedded_data_dir() -> String {
+    let base_dir = env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+        .or_else(|| env::current_dir().ok())
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    base_dir
+        .join("data")
+        .join("surrealdb")
+        .to_string_lossy()
+        .to_string()
 }
 
 /// Builder for constructing SurrealConfig programmatically.
@@ -199,15 +220,15 @@ impl SurrealConfigBuilder {
     /// Returns `MemoryError::ConfigMissing` if required fields are not set.
     /// Returns `MemoryError::ConfigInvalid` if namespaces is empty.
     pub fn build(self) -> Result<SurrealConfig, MemoryError> {
-        let db_name = self.db_name.ok_or_else(|| {
-            MemoryError::ConfigMissing("db_name".to_string())
-        })?;
-        let username = self.username.ok_or_else(|| {
-            MemoryError::ConfigMissing("username".to_string())
-        })?;
-        let password = self.password.ok_or_else(|| {
-            MemoryError::ConfigMissing("password".to_string())
-        })?;
+        let db_name = self
+            .db_name
+            .ok_or_else(|| MemoryError::ConfigMissing("db_name".to_string()))?;
+        let username = self
+            .username
+            .ok_or_else(|| MemoryError::ConfigMissing("username".to_string()))?;
+        let password = self
+            .password
+            .ok_or_else(|| MemoryError::ConfigMissing("password".to_string()))?;
 
         if self.namespaces.is_empty() {
             return Err(MemoryError::ConfigInvalid(
@@ -243,8 +264,7 @@ fn parse_bool_env(var_name: &str) -> Option<bool> {
 ///
 /// Returns `MemoryError::ConfigMissing` if the variable is not set.
 fn parse_comma_list(var_name: &str) -> Result<Vec<String>, MemoryError> {
-    let raw = env::var(var_name)
-        .map_err(|_| MemoryError::ConfigMissing(var_name.to_string()))?;
+    let raw = env::var(var_name).map_err(|_| MemoryError::ConfigMissing(var_name.to_string()))?;
 
     Ok(raw
         .split(',')
@@ -320,7 +340,16 @@ mod tests {
             .credentials("u", "p")
             .build()
             .expect("valid config");
-        assert_eq!(config.data_dir_or_default(), "./data/surrealdb");
+        let default_path = config.data_dir_or_default();
+        let expected_prefix = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+            .or_else(|| std::env::current_dir().ok())
+            .expect("current_exe or current_dir should be available");
+
+        let default_path_buf = PathBuf::from(default_path);
+        assert!(default_path_buf.starts_with(expected_prefix));
+        assert!(default_path_buf.ends_with(PathBuf::from("data").join("surrealdb")));
     }
 
     #[test]
@@ -333,5 +362,17 @@ mod tests {
             .build()
             .expect("valid config");
         assert_eq!(config.data_dir_or_default(), "/custom/path");
+    }
+
+    #[test]
+    fn data_dir_or_default_preserves_custom_relative_path() {
+        let config = SurrealConfigBuilder::new()
+            .db_name("test")
+            .namespace("test")
+            .credentials("u", "p")
+            .data_dir("relative/custom/path")
+            .build()
+            .expect("valid config");
+        assert_eq!(config.data_dir_or_default(), "relative/custom/path");
     }
 }
