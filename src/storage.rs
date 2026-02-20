@@ -849,7 +849,9 @@ fn normalize_surreal_json(v: &Value) -> Value {
 
     match v {
         J::Object(map) if map.len() == 1 => {
-            let (k, val) = map.iter().next().expect("map with len 1 has one entry");
+            let Some((k, val)) = map.iter().next() else {
+                return J::Object(map.clone());
+            };
             match k.as_str() {
                 "None" => v.clone(),
                 "Array" => val.as_array()
