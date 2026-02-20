@@ -75,6 +75,7 @@ pub fn invalidate_cache_by_scope(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::num::NonZeroUsize;
 
     #[test]
