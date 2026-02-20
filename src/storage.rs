@@ -706,19 +706,34 @@ fn surreal_to_json(value: SurrealValue) -> Value {
 /// Try to find a version-like field inside arbitrary JSON returned by the
 /// server info query. Searches keys for the substring "version" (case-ins).
 fn find_version_in_json(v: &Value) -> Option<String> {
+    use regex::Regex;
+
+    // Simple semver-ish matcher (e.g. 3.0.0)
+    let ver_re = Regex::new(r"\d+\.\d+(?:\.\d+)?").unwrap();
+
     match v {
-        Value::String(s) => Some(s.clone()),
+        // Only accept plain strings that look like a version or mention SurrealDB.
+        Value::String(s) => {
+            if ver_re.is_match(s) || s.to_lowercase().contains("surreal") {
+                Some(s.clone())
+            } else {
+                None
+            }
+        }
         Value::Object(map) => {
+            // Prefer explicit keys containing "version" and return their string value
             for (k, val) in map.iter() {
                 if k.to_lowercase().contains("version") {
                     if let Some(s) = val.as_str() {
                         return Some(s.to_string());
+                    } else if let Some(found) = find_version_in_json(val) {
+                        return Some(found);
                     } else {
                         return Some(val.to_string());
                     }
                 }
             }
-            // fallback: search nested
+            // Otherwise search nested values for a version-like string
             for (_, val) in map.iter() {
                 if let Some(found) = find_version_in_json(val) {
                     return Some(found);
@@ -734,7 +749,8 @@ fn find_version_in_json(v: &Value) -> Option<String> {
             }
             None
         }
-        other => Some(other.to_string()),
+        // Don't coerce arbitrary JSON to a version string
+        _ => None,
     }
 }
 
@@ -1063,6 +1079,31 @@ mod tests {
 
         let (_sql, vars) = build_create_query("task", content);
         assert!(vars["content"]["due_date"].is_null());
+    }
+
+    // ----------------- find_version_in_json tests -----------------
+    #[test]
+    fn find_version_in_json_prefers_version_key() {
+        let j = json!({"meta": {"server": {"version": "3.0.0"}}});
+        assert_eq!(find_version_in_json(&j), Some("3.0.0".to_string()));
+    }
+
+    #[test]
+    fn find_version_in_json_extracts_from_string_with_semver() {
+        let j = json!("SurrealDB 3.0.0 (embedded)");
+        assert_eq!(find_version_in_json(&j), Some("SurrealDB 3.0.0 (embedded)".to_string()));
+    }
+
+    #[test]
+    fn find_version_in_json_ignores_ddl_string() {
+        let j = json!( ["DEFINE ANALYZER simple TOKENIZERS BLANK FILTERS LOWERCASE"] );
+        assert_eq!(find_version_in_json(&j), None);
+    }
+
+    #[test]
+    fn find_version_in_json_finds_version_in_array() {
+        let j = json!([{"info": "x"}, {"version": "3.1.0"}]);
+        assert_eq!(find_version_in_json(&j), Some("3.1.0".to_string()));
     }
 
     // Tests for query builder helper functions
