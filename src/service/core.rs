@@ -66,16 +66,26 @@ impl MemoryService {
         startup_event.insert("op".to_string(), serde_json::json!("startup"));
         startup_event.insert(
             "db_mode".to_string(),
-            serde_json::json!(if config.embedded { "embedded" } else { "remote" }),
+            serde_json::json!(if config.embedded {
+                "embedded"
+            } else {
+                "remote"
+            }),
         );
         // Only include the effective data dir for embedded mode to avoid
         // exposing unnecessary fields for remote mode.
         if config.embedded {
-            startup_event.insert("effective_data_dir".to_string(), serde_json::json!(effective_data_dir.clone()));
+            startup_event.insert(
+                "effective_data_dir".to_string(),
+                serde_json::json!(effective_data_dir.clone()),
+            );
         } else if let Some(url) = &config.url {
             startup_event.insert("url".to_string(), serde_json::json!(url));
         }
-        startup_event.insert("namespaces".to_string(), serde_json::json!(config.namespaces));
+        startup_event.insert(
+            "namespaces".to_string(),
+            serde_json::json!(config.namespaces),
+        );
         startup_event.insert("db_name".to_string(), serde_json::json!(config.db_name));
         startup_logger.log(startup_event, crate::logging::LogLevel::Info);
 
@@ -101,7 +111,8 @@ impl MemoryService {
         };
 
         let client_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
-        let versions_event = build_startup_versions_event(client_version, server_version.as_deref());
+        let versions_event =
+            build_startup_versions_event(client_version, server_version.as_deref());
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
         let service = Self::new(
@@ -1204,7 +1215,10 @@ mod tests {
         let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
         assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
-        assert_eq!(evt.get("surrealdb_server_version").unwrap().as_str(), Some("SurrealDB 3.0.0"));
+        assert_eq!(
+            evt.get("surrealdb_server_version").unwrap().as_str(),
+            Some("SurrealDB 3.0.0")
+        );
     }
 
     #[test]
@@ -1225,5 +1239,254 @@ mod tests {
         let path = bfs_path(&graph, "A", "A", 5);
         // Current behavior: returns None for same node
         assert_eq!(path, None);
+    }
+
+    // ==================== Namespace Tests ====================
+
+    #[test]
+    fn namespace_for_scope_returns_exact_match() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("org"), "org");
+        assert_eq!(service.namespace_for_scope("personal"), "personal");
+    }
+
+    #[test]
+    fn namespace_for_scope_returns_default_for_unknown() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("unknown"), "org");
+    }
+
+    #[test]
+    fn namespace_for_scope_handles_personal_prefix() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("personal-work"), "personal");
+    }
+
+    #[test]
+    fn namespace_for_scope_handles_org_prefix() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("org-team"), "org");
+    }
+
+    #[test]
+    fn namespace_for_scope_handles_private_prefix() {
+        let service = create_test_service(vec!["org", "private"]);
+        assert_eq!(service.namespace_for_scope("private-notes"), "private");
+    }
+
+    fn create_test_service(namespaces: Vec<&str>) -> MemoryService {
+        use crate::storage::DbClient;
+        use std::sync::Arc;
+
+        struct MockDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for MockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        MemoryService::new(
+            Arc::new(MockDbClient),
+            namespaces.iter().map(|s| s.to_string()).collect(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap()
+    }
+
+    // ==================== Access Control Tests ====================
+
+    #[test]
+    fn is_scope_allowed_returns_true_when_no_restrictions() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext::default();
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_true_for_allowed_scope() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_false_for_disallowed_scope() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        assert!(!service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_allows_with_cross_scope_wildcard() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    // ==================== Rate Limiter Enforcement Tests ====================
+
+    #[test]
+    fn enforce_rate_limit_allows_without_caller_id() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext::default();
+        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn enforce_rate_limit_allows_within_limit() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        // First request should pass
+        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn enforce_rate_limit_accepts_none() {
+        let service = create_test_service(vec!["org"]);
+        assert!(service.enforce_rate_limit(None).is_ok());
+    }
+
+    // ==================== Pure Function Tests ====================
+
+    #[test]
+    fn send_message_draft_creates_pending_status() {
+        let service = create_test_service(vec!["org"]);
+        let draft = service.send_message_draft("test@example.com", "Subject", "Body");
+        assert_eq!(draft["status"], "pending_confirmation");
+        assert_eq!(draft["to"], "test@example.com");
+        assert_eq!(draft["subject"], "Subject");
+        assert_eq!(draft["body"], "Body");
+    }
+
+    #[test]
+    fn schedule_meeting_creates_pending_status() {
+        let service = create_test_service(vec!["org"]);
+        use chrono::Utc;
+        let start = Utc::now();
+        let end = Utc::now();
+        let meeting = service.schedule_meeting("Team Sync", start, end);
+        assert_eq!(meeting["status"], "pending_confirmation");
+        assert_eq!(meeting["title"], "Team Sync");
+    }
+
+    #[test]
+    fn update_metric_returns_ok_status() {
+        let service = create_test_service(vec!["org"]);
+        let result = service.update_metric("revenue", 1000000.0);
+        assert_eq!(result["status"], "ok");
+        assert_eq!(result["metric"], "revenue");
+        assert_eq!(result["value"], 1000000.0);
+    }
+
+    #[test]
+    fn cbor_round_trip_preserves_value() {
+        let service = create_test_service(vec!["org"]);
+        let original = json!({"key": "value", "nested": {"num": 42}});
+        let round_tripped = service.cbor_round_trip(&original).unwrap();
+        assert_eq!(original, round_tripped);
+    }
+
+    #[test]
+    fn cbor_round_trip_handles_arrays() {
+        let service = create_test_service(vec!["org"]);
+        let original = json!([1, 2, 3, "test", {"key": "value"}]);
+        let round_tripped = service.cbor_round_trip(&original).unwrap();
+        assert_eq!(original, round_tripped);
     }
 }

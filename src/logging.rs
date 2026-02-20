@@ -88,7 +88,7 @@ impl StdoutLogger {
     /// currently configured minimum level.
     #[must_use]
     pub fn is_enabled(&self, level: LogLevel) -> bool {
-        !(level < self.level)
+        level >= self.level
     }
 
     /// Logs an event if the level is enabled.

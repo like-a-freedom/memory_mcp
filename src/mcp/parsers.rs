@@ -205,4 +205,146 @@ mod tests {
         assert_eq!(items[0].source_episode, "task:e8gsmlprfchnktf6js0p");
         assert_eq!(items[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
     }
+
+    // ==================== Additional Parser Tests ====================
+
+    #[test]
+    fn parse_datetime_parses_rfc3339() {
+        use chrono::Datelike;
+        let result = parse_datetime("2024-01-15T10:30:00Z");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2024);
+        assert_eq!(dt.month(), 1);
+        assert_eq!(dt.day(), 15);
+    }
+
+    #[test]
+    fn parse_datetime_parses_with_timezone() {
+        let result = parse_datetime("2024-01-15T10:30:00+05:00");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_datetime_returns_none_for_invalid() {
+        assert!(parse_datetime("invalid").is_none());
+        assert!(parse_datetime("").is_none());
+        assert!(parse_datetime("2024-13-45").is_none());
+    }
+
+    #[test]
+    fn parse_datetime_returns_none_for_empty() {
+        assert!(parse_datetime("").is_none());
+    }
+
+    #[test]
+    fn default_scope_returns_org() {
+        assert_eq!(default_scope(), "org");
+    }
+
+    #[test]
+    fn content_hash_is_deterministic() {
+        let hash1 = content_hash("test content");
+        let hash2 = content_hash("test content");
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn content_hash_differs_for_different_content() {
+        let hash1 = content_hash("content A");
+        let hash2 = content_hash("content B");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn content_hash_produces_hex_string() {
+        let hash = content_hash("test");
+        // First 16 chars of SHA-256 hex
+        assert_eq!(hash.len(), 16);
+        // All characters should be hex
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn normalize_optional_string_returns_content_for_some() {
+        assert_eq!(
+            normalize_optional_string(Some("test".to_string())),
+            Some("test".to_string())
+        );
+    }
+
+    #[test]
+    fn normalize_optional_string_returns_none_for_none() {
+        assert_eq!(normalize_optional_string(None), None);
+    }
+
+    #[test]
+    fn normalize_optional_string_returns_none_for_empty() {
+        assert_eq!(normalize_optional_string(Some("".to_string())), None);
+    }
+
+    #[test]
+    fn normalize_optional_string_returns_none_for_null() {
+        assert_eq!(normalize_optional_string(Some("null".to_string())), None);
+    }
+
+    #[test]
+    fn normalize_optional_string_trims_whitespace() {
+        assert_eq!(
+            normalize_optional_string(Some("  test  ".to_string())),
+            Some("test".to_string())
+        );
+    }
+
+    #[test]
+    fn normalize_optional_string_returns_none_for_none_input() {
+        assert_eq!(normalize_optional_string(None), None::<String>);
+    }
+
+    #[test]
+    fn empty_extract_result_creates_error_structure() {
+        let result = empty_extract_result("no_content", "Content is required");
+        assert_eq!(result["status"], "no_content");
+        assert_eq!(result["hint"], "Content is required");
+        assert_eq!(result["entities"], serde_json::json!([]));
+        assert_eq!(result["facts"], serde_json::json!([]));
+        assert_eq!(result["links"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn parse_context_items_prefers_source_episode_over_id() {
+        let raw = r#"[{"content":"Test","id":"episode:123","source_episode":"episode:456"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].source_episode, "episode:456");
+    }
+
+    #[test]
+    fn parse_context_items_uses_id_when_source_episode_missing() {
+        let raw = r#"[{"content":"Test","id":"episode:123"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].source_episode, "episode:123");
+    }
+
+    #[test]
+    fn parse_context_items_handles_empty_quote() {
+        let raw = r#"[{"content":"Test","id":"episode:123","quote":""}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].quote, "");
+    }
+
+    #[test]
+    fn parse_context_items_handles_missing_fields() {
+        let raw = r#"[{"content":"Test"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].content, "Test");
+        assert_eq!(items[0].source_episode, "");
+        assert_eq!(items[0].quote, "");
+    }
+
+    #[test]
+    fn parse_context_items_preserves_unicode() {
+        let raw = r#"[{"content":"Привет мир","id":"episode:123"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items[0].content, "Привет мир");
+    }
 }

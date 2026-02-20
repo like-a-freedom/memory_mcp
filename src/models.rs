@@ -415,4 +415,104 @@ mod tests {
         let access = AccessContext::default();
         assert!(access.is_scope_allowed("any_scope"));
     }
+
+    // ==================== Additional ID Type Tests ====================
+
+    #[test]
+    fn episode_id_clone() {
+        let id1 = EpisodeId::from("episode:test123");
+        let id2 = id1.clone();
+        assert_eq!(id1.0, id2.0);
+    }
+
+    #[test]
+    fn entity_id_clone() {
+        let id1 = EntityId::from("entity:alice");
+        let id2 = id1.clone();
+        assert_eq!(id1.0, id2.0);
+    }
+
+    #[test]
+    fn fact_id_clone() {
+        let id1 = FactId::from("fact:abc123");
+        let id2 = id1.clone();
+        assert_eq!(id1.0, id2.0);
+    }
+
+    // ==================== Additional AccessContext Tests ====================
+
+    #[test]
+    fn access_context_from_payload_with_none() {
+        let result = AccessContext::from_payload(None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn access_context_from_payload_maps_all_fields() {
+        use serde_json::json;
+        let payload = AccessPayload {
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: Some(vec!["tag1".to_string()]),
+            caller_id: Some("user123".to_string()),
+            session_vars: Some(json!({"key": "value"})),
+            transport: Some("http".to_string()),
+            content_type: Some("application/json".to_string()),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+
+        let context = AccessContext::from_payload(Some(payload)).unwrap();
+        assert_eq!(context.allowed_scopes, Some(vec!["org".to_string()]));
+        assert_eq!(context.allowed_tags, Some(vec!["tag1".to_string()]));
+        assert_eq!(context.caller_id, Some("user123".to_string()));
+        assert_eq!(context.transport, Some("http".to_string()));
+        assert_eq!(context.content_type, Some("application/json".to_string()));
+    }
+
+    #[test]
+    fn access_context_is_scope_allowed_with_allowed_list() {
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        assert!(access.is_scope_allowed("org"));
+        assert!(access.is_scope_allowed("personal"));
+        assert!(!access.is_scope_allowed("private"));
+    }
+
+    #[test]
+    fn access_context_is_scope_allowed_with_wildcard_cross_scope() {
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        assert!(access.is_scope_allowed("personal"));
+        assert!(access.is_scope_allowed("org")); // Allowed via cross_scope
+        assert!(!access.is_scope_allowed("private"));
+    }
+
+    #[test]
+    fn default_scope_returns_personal() {
+        assert_eq!(default_scope(), "personal");
+    }
+
+    #[test]
+    fn default_budget_returns_5() {
+        assert_eq!(default_budget(), 5);
+    }
 }

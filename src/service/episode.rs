@@ -506,3 +506,167 @@ async fn update_communities(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn episode_from_record_parses_full_record() {
+        let mut record = serde_json::Map::new();
+        record.insert("episode_id".to_string(), json!("episode:test123"));
+        record.insert("source_type".to_string(), json!("email"));
+        record.insert("source_id".to_string(), json!("msg-123"));
+        record.insert("content".to_string(), json!("Test content"));
+        record.insert("t_ref".to_string(), json!("2024-01-15T10:30:00Z"));
+        record.insert("t_ingested".to_string(), json!("2024-01-15T10:31:00Z"));
+        record.insert("scope".to_string(), json!("org"));
+        record.insert("visibility_scope".to_string(), json!("org"));
+        record.insert("policy_tags".to_string(), json!(["tag1", "tag2"]));
+
+        let episode = episode_from_record(&record).unwrap();
+        assert_eq!(episode.episode_id, "episode:test123");
+        assert_eq!(episode.source_type, "email");
+        assert_eq!(episode.source_id, "msg-123");
+        assert_eq!(episode.content, "Test content");
+        assert_eq!(episode.scope, "org");
+        assert_eq!(episode.visibility_scope, "org");
+        assert_eq!(episode.policy_tags, vec!["tag1", "tag2"]);
+    }
+
+    #[test]
+    fn episode_from_record_returns_none_for_missing_required_field() {
+        let mut record = serde_json::Map::new();
+        record.insert("episode_id".to_string(), json!("episode:test123"));
+        // Missing source_type
+
+        assert!(episode_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn episode_from_record_handles_wrapped_string_values() {
+        let mut record = serde_json::Map::new();
+        record.insert(
+            "episode_id".to_string(),
+            json!({"String": "episode:test123"}),
+        );
+        record.insert("source_type".to_string(), json!({"String": "email"}));
+        record.insert("source_id".to_string(), json!({"String": "msg-123"}));
+        record.insert("content".to_string(), json!({"String": "Test"}));
+        record.insert(
+            "t_ref".to_string(),
+            json!({"String": "2024-01-15T10:30:00Z"}),
+        );
+        record.insert(
+            "t_ingested".to_string(),
+            json!({"String": "2024-01-15T10:31:00Z"}),
+        );
+        record.insert("scope".to_string(), json!({"String": "org"}));
+        record.insert(
+            "policy_tags".to_string(),
+            json!({"Array": [{"String": "tag1"}]}),
+        );
+
+        let episode = episode_from_record(&record).unwrap();
+        assert_eq!(episode.episode_id, "episode:test123");
+        assert_eq!(episode.policy_tags, vec!["tag1"]);
+    }
+
+    #[test]
+    fn episode_from_record_uses_defaults_for_optional_fields() {
+        let mut record = serde_json::Map::new();
+        record.insert("episode_id".to_string(), json!("episode:test123"));
+        record.insert("source_type".to_string(), json!("email"));
+        record.insert("source_id".to_string(), json!("msg-123"));
+        record.insert("content".to_string(), json!("Test"));
+        record.insert("t_ref".to_string(), json!("2024-01-15T10:30:00Z"));
+        record.insert("t_ingested".to_string(), json!("2024-01-15T10:31:00Z"));
+        record.insert("scope".to_string(), json!("org"));
+        // No visibility_scope or policy_tags
+
+        let episode = episode_from_record(&record).unwrap();
+        assert_eq!(episode.visibility_scope, "");
+        assert!(episode.policy_tags.is_empty());
+    }
+
+    #[test]
+    fn fact_from_record_parses_full_record() {
+        let record = json!({
+            "fact_id": "fact:test123",
+            "fact_type": "note",
+            "content": "Test fact",
+            "quote": "Test quote",
+            "source_episode": "episode:abc",
+            "t_valid": "2024-01-15T10:30:00Z",
+            "t_ingested": "2024-01-15T10:31:00Z",
+            "t_invalid": "2024-01-16T10:30:00Z",
+            "confidence": 0.95,
+            "entity_links": ["entity:1", "entity:2"],
+            "scope": "org",
+            "policy_tags": ["tag1"],
+            "provenance": {"source": "test"}
+        });
+
+        let fact = fact_from_record(&record).unwrap();
+        assert_eq!(fact.fact_id, "fact:test123");
+        assert_eq!(fact.fact_type, "note");
+        assert_eq!(fact.content, "Test fact");
+        assert_eq!(fact.quote, "Test quote");
+        assert_eq!(fact.source_episode, "episode:abc");
+        assert!((fact.confidence - 0.95).abs() < f64::EPSILON);
+        assert_eq!(fact.entity_links, vec!["entity:1", "entity:2"]);
+        assert_eq!(fact.scope, "org");
+        assert_eq!(fact.policy_tags, vec!["tag1"]);
+    }
+
+    #[test]
+    fn fact_from_record_handles_optional_fields() {
+        let record = json!({
+            "fact_id": "fact:test123",
+            "fact_type": "note",
+            "content": "Test",
+            "quote": "Quote",
+            "source_episode": "episode:abc",
+            "t_valid": "2024-01-15T10:30:00Z",
+            "scope": "org"
+        });
+
+        let fact = fact_from_record(&record).unwrap();
+        assert!(fact.t_invalid.is_none());
+        assert!(fact.t_invalid_ingested.is_none());
+        assert!(fact.entity_links.is_empty());
+        assert!(fact.policy_tags.is_empty());
+        assert!((fact.confidence).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn fact_from_record_returns_none_for_invalid_record() {
+        let record = json!({"invalid": "data"});
+        assert!(fact_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn is_promise_statement_detects_promise_patterns() {
+        assert!(is_promise_statement("i will finish this task"));
+        assert!(is_promise_statement("i'll deliver the report tomorrow"));
+        assert!(is_promise_statement("will complete the project"));
+        assert!(is_promise_statement("going to implement the feature"));
+        assert!(is_promise_statement("I сделаю это завтра"));
+    }
+
+    #[test]
+    fn is_promise_statement_rejects_non_promise_patterns() {
+        assert!(!is_promise_statement("this is just a note"));
+        assert!(!is_promise_statement("meeting scheduled for tomorrow"));
+        assert!(!is_promise_statement("review the document"));
+        assert!(!is_promise_statement("the task is complete"));
+    }
+
+    #[test]
+    fn is_promise_statement_detects_lowercase_variations() {
+        assert!(is_promise_statement("i will finish this"));
+        assert!(is_promise_statement("i'll deliver"));
+        assert!(is_promise_statement("will complete the task"));
+    }
+}

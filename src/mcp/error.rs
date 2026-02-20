@@ -13,7 +13,6 @@ use crate::service::MemoryError;
 /// - `ConfigMissing` → `INVALID_REQUEST`
 /// - `ConfigInvalid` → `INVALID_REQUEST`
 /// - `Storage` → `INTERNAL_ERROR`
-#[must_use]
 pub fn mcp_error(err: MemoryError) -> ErrorData {
     let code = match err {
         MemoryError::Validation(_) => ErrorCode::INVALID_PARAMS,
@@ -23,4 +22,63 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
         MemoryError::Storage(_) => ErrorCode::INTERNAL_ERROR,
     };
     ErrorData::new(code, err.to_string(), None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_error_maps_validation_to_invalid_params() {
+        let err = MemoryError::Validation("test error".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INVALID_PARAMS);
+        assert!(mcp_err.message.contains("test error"));
+    }
+
+    #[test]
+    fn mcp_error_maps_not_found_to_invalid_params() {
+        let err = MemoryError::NotFound("resource not found".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INVALID_PARAMS);
+        assert!(mcp_err.message.contains("resource not found"));
+    }
+
+    #[test]
+    fn mcp_error_maps_config_missing_to_invalid_request() {
+        let err = MemoryError::ConfigMissing("SURREALDB_URL".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INVALID_REQUEST);
+        assert!(mcp_err.message.contains("SURREALDB_URL"));
+    }
+
+    #[test]
+    fn mcp_error_maps_config_invalid_to_invalid_request() {
+        let err = MemoryError::ConfigInvalid("invalid value".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INVALID_REQUEST);
+        assert!(mcp_err.message.contains("invalid value"));
+    }
+
+    #[test]
+    fn mcp_error_maps_storage_to_internal_error() {
+        let err = MemoryError::Storage("database error".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INTERNAL_ERROR);
+        assert!(mcp_err.message.contains("database error"));
+    }
+
+    #[test]
+    fn mcp_error_includes_error_message() {
+        let err = MemoryError::Validation("field is required".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.message, "validation error: field is required");
+    }
+
+    #[test]
+    fn mcp_error_has_none_data() {
+        let err = MemoryError::NotFound("test".to_string());
+        let mcp_err = mcp_error(err);
+        assert!(mcp_err.data.is_none());
+    }
 }

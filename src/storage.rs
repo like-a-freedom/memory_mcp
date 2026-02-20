@@ -967,8 +967,13 @@ mod tests {
             .build()
             .expect("valid config");
 
-        let client = SurrealDbClient::connect(&config, "testns").await.expect("connect");
-        let ver = client.server_version("testns").await.expect("server_version");
+        let client = SurrealDbClient::connect(&config, "testns")
+            .await
+            .expect("connect");
+        let ver = client
+            .server_version("testns")
+            .await
+            .expect("server_version");
         // Server version may be unavailable for embedded engines; ensure we
         // don't error and that any returned string is non-empty.
         if let Some(s) = ver {
@@ -1107,5 +1112,244 @@ mod tests {
         let content = json!({"name": "test"});
         let result = build_update_query("invalid_format", content);
         assert!(matches!(result, Err(MemoryError::Storage(_))));
+    }
+
+    // ==================== Additional Helper Function Tests ====================
+
+    #[test]
+    fn extract_first_record_from_nested_object() {
+        let nested = json!({
+            "Object": {
+                "id": "test:1",
+                "name": "Test"
+            }
+        });
+        let result = extract_first_record(nested);
+        assert_eq!(result, Some(json!({"id": "test:1", "name": "Test"})));
+    }
+
+    #[test]
+    fn extract_first_record_from_nested_array() {
+        let nested = json!({
+            "Array": [
+                {"Object": {"id": "test:1"}},
+                {"Object": {"id": "test:2"}}
+            ]
+        });
+        let result = extract_first_record(nested);
+        assert_eq!(result, Some(json!({"id": "test:1"})));
+    }
+
+    #[test]
+    fn unwrap_object_wrapper_unwraps_object_key() {
+        let wrapped = json!({"Object": {"id": "test:1"}});
+        let result = unwrap_object_wrapper(wrapped);
+        assert_eq!(result, json!({"id": "test:1"}));
+    }
+
+    #[test]
+    fn unwrap_object_wrapper_preserves_unwrapped() {
+        let unwrapped = json!({"id": "test:1"});
+        let result = unwrap_object_wrapper(unwrapped);
+        assert_eq!(result, json!({"id": "test:1"}));
+    }
+
+    #[test]
+    fn value_to_matchable_string_extracts_simple_string() {
+        let value = json!("test string");
+        assert_eq!(value_to_matchable_string(&value), "test string");
+    }
+
+    #[test]
+    fn value_to_matchable_string_extracts_from_string_wrapper() {
+        let value = json!({"String": "wrapped"});
+        assert_eq!(value_to_matchable_string(&value), "wrapped");
+    }
+
+    #[test]
+    fn value_to_matchable_string_extracts_from_strand_wrapper() {
+        let value = json!({"Strand": "strand content"});
+        assert_eq!(value_to_matchable_string(&value), "strand content");
+    }
+
+    #[test]
+    fn value_to_matchable_string_handles_none() {
+        let value = json!({"None": {}});
+        assert_eq!(value_to_matchable_string(&value), "");
+    }
+
+    #[test]
+    fn record_matches_any_query_word_returns_true_for_empty_words() {
+        let record = json!({"content": "test content"});
+        assert!(record_matches_any_query_word(&record, &[]));
+    }
+
+    #[test]
+    fn record_matches_any_query_word_finds_match() {
+        let record = json!({"content": "test content here"});
+        let words = vec!["content".to_string(), "other".to_string()];
+        assert!(record_matches_any_query_word(&record, &words));
+    }
+
+    #[test]
+    fn record_matches_any_query_word_returns_false_when_no_match() {
+        let record = json!({"content": "test content here"});
+        let words = vec!["missing".to_string(), "absent".to_string()];
+        assert!(!record_matches_any_query_word(&record, &words));
+    }
+
+    #[test]
+    fn record_string_field_extracts_field() {
+        let record = json!({"scope": "org", "content": "test"});
+        assert_eq!(record_string_field(&record, "scope"), "org");
+        assert_eq!(record_string_field(&record, "content"), "test");
+    }
+
+    #[test]
+    fn record_string_field_returns_empty_for_missing() {
+        let record = json!({"scope": "org"});
+        assert_eq!(record_string_field(&record, "missing"), "");
+    }
+
+    #[test]
+    fn record_is_visible_for_scope_checks_scope() {
+        let record = json!({
+            "scope": "org",
+            "t_valid": "2024-01-15T10:00:00Z",
+            "t_ingested": "2024-01-15T10:00:00Z"
+        });
+        assert!(record_is_visible_for_scope(
+            &record,
+            "org",
+            "2024-01-16T00:00:00Z"
+        ));
+        assert!(!record_is_visible_for_scope(
+            &record,
+            "personal",
+            "2024-01-16T00:00:00Z"
+        ));
+    }
+
+    #[test]
+    fn record_is_visible_for_scope_checks_t_valid() {
+        let record = json!({
+            "scope": "org",
+            "t_valid": "2024-01-15T10:00:00Z",
+            "t_ingested": "2024-01-15T10:00:00Z"
+        });
+        // Record valid at 10:00, checking at 09:00 - should not be visible
+        assert!(!record_is_visible_for_scope(
+            &record,
+            "org",
+            "2024-01-15T09:00:00Z"
+        ));
+        // Record valid at 10:00, checking at 11:00 - should be visible
+        assert!(record_is_visible_for_scope(
+            &record,
+            "org",
+            "2024-01-15T11:00:00Z"
+        ));
+    }
+
+    #[test]
+    fn record_is_visible_for_scope_checks_t_invalid() {
+        let record = json!({
+            "scope": "org",
+            "t_valid": "2024-01-15T10:00:00Z",
+            "t_ingested": "2024-01-15T10:00:00Z",
+            "t_invalid": "2024-01-15T12:00:00Z",
+            "t_invalid_ingested": "2024-01-15T12:00:00Z"
+        });
+        // Record invalidated at 12:00, checking at 13:00 - should not be visible
+        assert!(!record_is_visible_for_scope(
+            &record,
+            "org",
+            "2024-01-15T13:00:00Z"
+        ));
+        // Record invalidated at 12:00, checking at 11:00 - should be visible
+        assert!(record_is_visible_for_scope(
+            &record,
+            "org",
+            "2024-01-15T11:00:00Z"
+        ));
+    }
+
+    #[test]
+    fn flatten_surreal_records_flattens_nested() {
+        let records = vec![
+            json!({"Array": [{"Object": {"id": "1"}}, {"Object": {"id": "2"}}]}),
+            json!({"Object": {"id": "3"}}),
+            json!({"id": "4"}),
+        ];
+        let flat = flatten_surreal_records(records);
+        assert_eq!(flat.len(), 4);
+        assert_eq!(flat[0]["id"], "1");
+        assert_eq!(flat[1]["id"], "2");
+        assert_eq!(flat[2]["id"], "3");
+        assert_eq!(flat[3]["id"], "4");
+    }
+
+    #[test]
+    fn normalize_surreal_json_handles_nested_objects() {
+        let nested = json!({
+            "Object": {
+                "name": {"Strand": "Alice"},
+                "age": {"Number": 30}
+            }
+        });
+        let normalized = normalize_surreal_json(&nested);
+        assert_eq!(normalized["name"], "Alice");
+        assert_eq!(normalized["age"], 30);
+    }
+
+    #[test]
+    fn normalize_surreal_json_handles_empty_object() {
+        let empty = json!({});
+        let normalized = normalize_surreal_json(&empty);
+        assert_eq!(normalized, json!({}));
+    }
+
+    #[test]
+    fn normalize_surreal_json_handles_array() {
+        let arr = json!({
+            "Array": [
+                {"String": "item1"},
+                {"String": "item2"}
+            ]
+        });
+        let normalized = normalize_surreal_json(&arr);
+        assert_eq!(normalized, json!(["item1", "item2"]));
+    }
+
+    #[test]
+    fn ensure_dir_exists_creates_parent_dirs() {
+        use tempfile::tempdir;
+
+        let temp = tempdir().unwrap();
+        let deep_path = temp.path().join("a/b/c/deep.db");
+
+        // Should not fail even if parent doesn't exist
+        assert!(ensure_dir_exists(&deep_path).is_ok());
+        assert!(deep_path.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn ensure_dir_exists_handles_existing_dir() {
+        use tempfile::tempdir;
+
+        let temp = tempdir().unwrap();
+        let existing_path = temp.path().join("existing.db");
+
+        // First call creates the directory
+        assert!(ensure_dir_exists(&existing_path).is_ok());
+        // Second call should also succeed
+        assert!(ensure_dir_exists(&existing_path).is_ok());
+    }
+
+    #[test]
+    fn ensure_dir_exists_handles_no_parent() {
+        let path = std::path::Path::new("test.db");
+        // Should succeed if there's no parent directory
+        assert!(ensure_dir_exists(path).is_ok());
     }
 }
