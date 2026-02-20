@@ -992,3 +992,177 @@ fn bfs_path(
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{AccessContext, AccessPayload, AccessScopeAllow};
+    use chrono::Utc;
+
+    // ==================== Rate Limiter Tests ====================
+
+    #[test]
+    fn rate_limiter_allows_burst() {
+        let limiter = RateLimiter::new(10, 5);
+        // Should allow burst of 5 requests
+        for _ in 0..5 {
+            assert!(limiter.allow("test-user"));
+        }
+    }
+
+    #[test]
+    fn rate_limiter_blocks_after_burst() {
+        let limiter = RateLimiter::new(10, 2);
+        assert!(limiter.allow("test-user"));
+        assert!(limiter.allow("test-user"));
+        // Third request should be blocked
+        assert!(!limiter.allow("test-user"));
+    }
+
+    #[test]
+    fn rate_limiter_different_users_independent() {
+        let limiter = RateLimiter::new(10, 1);
+        assert!(limiter.allow("user-1"));
+        assert!(!limiter.allow("user-1"));
+        // Different user should be allowed
+        assert!(limiter.allow("user-2"));
+    }
+
+    // ==================== Helper Function Tests ====================
+
+    #[test]
+    fn log_event_creates_expected_structure() {
+        let event = log_event(
+            "test_op",
+            json!({"key": "value"}),
+            json!({"result": "ok"}),
+            None,
+        );
+        assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
+        assert_eq!(event.get("args").unwrap().get("key").unwrap().as_str(), Some("value"));
+        assert_eq!(event.get("result").unwrap().get("result").unwrap().as_str(), Some("ok"));
+    }
+
+    #[test]
+    fn log_event_includes_access_when_provided() {
+        let access = AccessContext {
+            caller_id: Some("test-caller".to_string()),
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let access_event = event.get("access").unwrap();
+        assert_eq!(access_event.get("caller_id").unwrap().as_str(), Some("test-caller"));
+    }
+
+    #[test]
+    fn serialize_access_includes_all_fields() {
+        let access = AccessContext {
+            caller_id: Some("caller".to_string()),
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: Some(vec!["tag1".to_string()]),
+            session_vars: Some(json!({"key": "value"})),
+            transport: Some("http".to_string()),
+            content_type: Some("application/json".to_string()),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        let serialized = serialize_access(&access);
+        assert!(serialized.get("caller_id").is_some());
+        assert!(serialized.get("allowed_scopes").is_some());
+        assert!(serialized.get("allowed_tags").is_some());
+        assert!(serialized.get("session_vars").is_some());
+        assert!(serialized.get("transport").is_some());
+        assert!(serialized.get("content_type").is_some());
+        assert!(serialized.get("cross_scope_allow").is_some());
+    }
+
+    #[test]
+    fn string_from_value_handles_string() {
+        let value = json!("test");
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_strand() {
+        let value = json!({"Strand": "test"});
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_nested_strand() {
+        let value = json!({"Strand": {"String": "test"}});
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_returns_none_for_other_types() {
+        assert_eq!(string_from_value(&json!(123)), None);
+        assert_eq!(string_from_value(&json!(true)), None);
+        assert_eq!(string_from_value(&json!(null)), None);
+        assert_eq!(string_from_value(&json!([1, 2, 3])), None);
+    }
+
+    #[test]
+    fn bfs_path_finds_direct_connection() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "B", 5);
+        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
+    }
+
+    #[test]
+    fn bfs_path_finds_indirect_connection() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec!["C".to_string()]);
+        graph.insert("C".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "C", 5);
+        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]));
+    }
+
+    #[test]
+    fn bfs_path_respects_max_hops() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec!["C".to_string()]);
+        graph.insert("C".to_string(), vec!["D".to_string()]);
+
+        // Path A->B->C->D requires 3 hops, but we only allow 2
+        let path = bfs_path(&graph, "A", "D", 2);
+        assert_eq!(path, None);
+
+        // With 3 hops it should work
+        let path = bfs_path(&graph, "A", "D", 3);
+        assert!(path.is_some());
+    }
+
+    #[test]
+    fn bfs_path_returns_none_for_unreachable() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec![]);
+        graph.insert("C".to_string(), vec![]); // Unreachable from A
+
+        let path = bfs_path(&graph, "A", "C", 5);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn bfs_path_returns_single_element_for_same_node() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "A", 5);
+        assert_eq!(path, Some(vec!["A".to_string()]));
+    }
+}

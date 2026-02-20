@@ -83,3 +83,89 @@ pub fn deterministic_edge_id(
     );
     format!("edge:{}", hash_prefix(&payload))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn hash_prefix_produces_24_char_hex() {
+        let hash = hash_prefix("test payload");
+        assert_eq!(hash.len(), 24);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hash_prefix_is_deterministic() {
+        let hash1 = hash_prefix("test");
+        let hash2 = hash_prefix("test");
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn hash_prefix_differs_for_different_inputs() {
+        let hash1 = hash_prefix("test1");
+        let hash2 = hash_prefix("test2");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn deterministic_episode_id_starts_with_prefix() {
+        let t_ref = Utc::now();
+        let id = deterministic_episode_id("email", "msg-123", t_ref, "org");
+        assert!(id.starts_with("episode:"));
+    }
+
+    #[test]
+    fn deterministic_episode_id_is_deterministic() {
+        let t_ref = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let id1 = deterministic_episode_id("email", "msg-123", t_ref, "org");
+        let id2 = deterministic_episode_id("email", "msg-123", t_ref, "org");
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_episode_id_normalizes_input() {
+        let t_ref = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let id1 = deterministic_episode_id("Email", "MSG-123", t_ref, "ORG");
+        let id2 = deterministic_episode_id("email", "msg-123", t_ref, "org");
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_entity_id_starts_with_prefix() {
+        let id = deterministic_entity_id("person", "John Doe");
+        assert!(id.starts_with("entity:"));
+    }
+
+    #[test]
+    fn deterministic_entity_id_is_deterministic() {
+        let id1 = deterministic_entity_id("person", "John Doe");
+        let id2 = deterministic_entity_id("person", "John Doe");
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_fact_id_starts_with_prefix() {
+        let t_valid = Utc::now();
+        let id = deterministic_fact_id("metric", "ARR $5M", "episode:1", t_valid);
+        assert!(id.starts_with("fact:"));
+    }
+
+    #[test]
+    fn deterministic_community_id_sorts_members() {
+        let members = vec!["c".to_string(), "a".to_string(), "b".to_string()];
+        let id1 = deterministic_community_id(&members);
+        let members2 = vec!["b".to_string(), "c".to_string(), "a".to_string()];
+        let id2 = deterministic_community_id(&members2);
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_edge_id_starts_with_prefix() {
+        let t_valid = Utc::now();
+        let id = deterministic_edge_id("entity:1", "knows", "entity:2", t_valid);
+        assert!(id.starts_with("edge:"));
+    }
+}
