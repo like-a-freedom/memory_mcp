@@ -8,6 +8,8 @@
 
 ## Document Change History
 
+- **2026-03-11**: Completed memory-only MCP surface cleanup. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService`, kept the public contract focused on six canonical memory tools, updated service internals to return typed extraction/context/explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
+
 - **2026-02-20**: Fixed `create_task` optional `due_date` coercion regression under SurrealDB 3 by preserving JSON `null` in DB write payload normalization (instead of converting to `{"None": {}}`, which SurrealDB interpreted as an object and rejected for `option<string>`). Added regression coverage for `create_task` with `due_date: null` parameter parsing, payload normalization, and integration flow without due date. Revalidated with full `cargo fmt`, strict `cargo clippy --all-targets --all-features -- -D warnings`, and full test suite.
 - **2026-02-20 (hotfix)**: Fixed SurrealDB server-version detection — `INFO FOR DB` response parsing now prefers explicit `version` keys and version-like strings (semver/SurrealDB labels) and ignores non-version text (DDL/statements). This prevents logging migration DDL as the server version (e.g. `DEFINE ANALYZER ...`). Added unit tests for `find_version_in_json` and verified startup logging no longer reports DDL as the server version.
 - **2026-02-19**: Completed SurrealDB 2.x → 3.x migration validation. Fixed edge persistence regression by omitting optional invalidation fields when absent, added missing `edge_id` field and missing runtime tables (`community`, `event_log`, `task`) in schema initialization, updated deprecated SurrealQL syntax (`SEARCH ANALYZER` → `FULLTEXT ANALYZER`, `string::is::datetime` → `string::is_datetime`), and revalidated with `cargo fmt`, `cargo clippy --all-targets --all-features -- -D warnings`, and full test suite.
@@ -39,10 +41,10 @@
 
 ### 1.1 Product Vision
 
-Memory System provides **agents and humans** with a unified memory/context layer that:
-- Aggregates multi-channel sources (email, chat, calendar, tasks, calls, files)
-- Transforms into a **bi-temporal knowledge graph** (facts + relationships)
-- Delivers to LLMs on-demand with minimal token budget and low latency
+Memory System provides agents with a unified long-term memory/context layer that:
+- Aggregates source material into episodes
+- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships)
+- Delivers ranked context packs to LLMs on-demand with minimal token budget and low latency
 - Supports personal, team, and organizational scopes with strict access control
 
 ### 1.2 Key Design Principles
@@ -381,13 +383,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
-**FR-AG-01**: System MUST provide "skills" as memory operations: `ingest_document`, `extract_entities`, `resolve_entity`, `assemble_context`, `create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`.  
+**FR-AG-01**: System MUST provide six canonical memory operations: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`.  
 **Status**: ✅ Done
 
-**FR-AG-02**: Skills MUST be accessible via MCP interface (stdio/http/socket) so IDEs/assistants can call them uniformly.  
+**FR-AG-02**: Canonical memory operations MUST be accessible via MCP interface (stdio/http/socket) so IDEs/assistants can call them uniformly.  
 **Status**: ✅ Done
 
-**FR-AG-03**: System MUST support human-in-the-loop mode: confirmation for sending emails, changing promise/task status. For entity merging (`resolve_entity`), system MUST support `require_confirmation` option (if `true` — request confirmation); by default, automatic merging without dry-run is allowed unless explicitly specified otherwise; all actions logged in merge log.  
+**FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: merges and invalidations are logged, and callers can request citations/explanations via `explain`.  
 **Status**: ✅ Done
 
 **FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
@@ -455,37 +457,19 @@ All IDs MUST be deterministic to ensure idempotence:
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
-| `ingest` | Store raw episode | `source_type`, `source_id`, `content`, `t_ref`, `scope` | `episode_id`, `status` |
-| `extract` | Extract entities + facts from episode | `episode_id` (optional: `content`/`text` for soft-fallback) | `entities[]`, `facts[]` |
-| `resolve` | Deduplicate/merge entities | `entity_candidate`, `scope`, `require_confirmation?` | `canonical_entity_id`, `merge_actions[]` |
-| `invalidate` | Mark fact as superseded | `fact_id`, `reason`, `t_invalid` | `ok` |
-| `assemble_context` | Build context pack for query | `query`, `scope`, `as_of?`, `token_budget` | `facts[]`, `confidence`, `rationale`, `provenance` |
-| `explain` | Get citations for facts | `fact_ids[]` | `citations[]` (episode links, quotes) |
+| `ingest` | Store raw episode | `source_type`, `source_id`, `content`, `t_ref`, `scope` | `ToolResponse<String>` with `episode_id` in `result` |
+| `extract` | Extract entities, facts, and links from an episode or inline content | `episode_id` or non-empty `content`/`text` | `ToolResponse<ExtractResult>` |
+| `resolve` | Deduplicate/resolve canonical entities | `entity_type`, `canonical_name`, `aliases[]` | `ToolResponse<String>` with canonical `entity_id` |
+| `invalidate` | Mark fact as superseded | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
+| `assemble_context` | Build ranked context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
+| `explain` | Return citation-ready context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
 
-### 7.2 UI Helper Tools
+### 7.2 Contract Design Notes
 
-| Tool | Description |
-|------|-------------|
-| `ui_promises` | List all promise facts (filtered by scope/actor) |
-| `ui_metrics` | List all metric facts with history |
-| `ui_tasks` | List all task drafts |
-
-### 7.3 Draft Tools (Human-in-the-Loop)
-
-| Tool | Description |
-|------|-------------|
-| `create_task` | Draft new task (requires confirmation) |
-| `send_message_draft` | Draft email/message (requires confirmation) |
-| `schedule_meeting` | Draft calendar event (requires confirmation) |
-| `update_metric` | Record new metric value (triggers invalidation of old) |
-
-### 7.4 Semantic/Alias Tools (Intent-Based Routing)
-
-For backward compatibility and ease of use, these tools route to canonical tools:
-
-- `ingest_document` → `ingest`
-- `extract_entities` → `extract`
-- `resolve_entity` → `resolve`
+- Public MCP surface is intentionally limited to the six canonical memory tools above.
+- Legacy UI/draft/helper tools are not part of the current public contract.
+- `extract` returns a soft partial response with an empty typed result when neither `episode_id` nor content is supplied.
+- List-style responses use decision-ready envelope fields such as `status`, `guidance`, `has_more`, `total_count`, and `next_offset`.
 
 ### 7.5 Tool Call Logging and Observability
 
@@ -637,10 +621,8 @@ memory_mcp/
 #### 9.2.5 Tool Surface and Consolidation
 
 - [x] Canonical tools: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`
-- [x] UI tools: `ui_promises`, `ui_metrics`, `ui_tasks`
-- [x] Draft tools: `create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`
-- [x] Alias/semantic tools: `ingest_document`, `extract_entities`, `resolve_entity`
-- [x] Consolidation policy: intent-router or minimal set
+- [x] Minimal public tool surface enforced (memory-only)
+- [x] Consolidation policy: canonical six-tool surface
 - [x] Soft-fallbacks for intent-based calls (normalize empty strings, soft-fallbacks for `extract` with no input)
 - [x] Tool call logging (start/done/error) with Info/Warn levels
 
@@ -704,7 +686,7 @@ memory_mcp/
 - [x] E2E tests for MCP tools
 - [x] Acceptance scenarios
 - [x] Unit tests for service layer and infrastructure (including `StdoutLogger`)
-- [x] Test fixtures/embedded SurrealDB (RocksDB used in tests)
+- [x] Test fixtures/embedded in-memory SurrealDB (`kv-mem`)
 - [x] Code formatted (`cargo fmt`) and checked (`cargo clippy`)
 
 **Status**: ✅ Done
@@ -748,14 +730,15 @@ memory_mcp/
 
 **Completed:**
 - Rust MCP server with rmcp + SurrealDB backend
-- All canonical tools, UI tools, draft tools
+- Canonical memory-only MCP surface (`ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`)
 - Migrations with embedded/filesystem fallback
 - Logging with StdoutLogger (human-readable text format)
 - Tests (unit/integration/e2e)
 - Clippy/fmt clean
 - Persistence test (RocksDB)
-- Soft-fallbacks for `extract` (no hard errors on missing input)
+- Soft-fallbacks for `extract` (partial typed response, no hard error on missing input)
 - Tool call logging (observability)
+- Typed service outputs for extract/context/explain (`ExtractResult`, `AssembledContextItem`, `ExplainItem`)
 
 - Bi-temporal edge filtering (DB-side pushdown) implemented; storage API exposes filtered edge selection used by graph traversals.
 - Graph traversal updated: `find_intro_chain` accepts optional `as_of` and uses filtered edges; neighbor ordering made deterministic.
@@ -954,11 +937,13 @@ These documents are superseded by this specification:
 
 ## Document Status
 
-**Current Version**: 2.0  
+**Current Version**: 2.1  
 **Consolidated**: February 5, 2026  
 **Next Review**: When significant requirements change or implementation milestones reached
 
 **Changelog:**
+
+- **2026-03-11**: Removed legacy non-memory service APIs, aligned documentation to the six-tool memory-only MCP surface, and revalidated with `cargo fmt --all`, `cargo test`, and strict `cargo clippy --all-targets -- -D warnings`.
 
 - **2026-02-19**: Completed SurrealDB 2.x → 3.x migration validation; fixed `edge` persistence/schema regressions, updated deprecated SurrealQL syntax, and confirmed clean `fmt`/`clippy`/full test run.
 - **2026-02-06**: Added FR-CA-08 (multi-word FTS search), AT-08, updated implementation summary with FTS details

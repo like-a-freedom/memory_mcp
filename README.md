@@ -1,7 +1,9 @@
 # Memory MCP (Rust) — QuickStart и примеры использования 🧠🔧
 
 Краткое описание
-- Этот репозиторий содержит Rust‑версию Memory MCP сервера (`memory_mcp`) с stdio-only RMCP транспортом и встроенной/удалённой поддержкой SurrealDB (включая RocksDB для локальной персистенции).
+- Этот репозиторий содержит Rust‑версию Memory MCP сервера (`memory_mcp`) с stdio-only RMCP транспортом и встроенной/удалённой поддержкой SurrealDB.
+- Сервер намеренно **memory-only**: он хранит факты о сущностях и связях, извлекает структуру из эпизодов, резолвит сущности, инвалидирует устаревшие факты и собирает долгосрочный контекст для LLM.
+- Публичная MCP-поверхность сведена к шести intent-driven инструментам: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`.
 
 ## Быстрый старт ✅
 1. Установить (рекомендуется) — через `cargo install`:
@@ -35,9 +37,9 @@ export LOG_LEVEL=info                        # trace | debug | info | warn | err
 | Переменная | Описание | Формат / Примеры |
 |---|---|---|
 | `SURREALDB_DB_NAME` | Имя базы в SurrealDB | `memory`, `testdb`, `production_db` |
-| `SURREALDB_URL` | URL SurrealDB (WebSocket RPC). Если пустой — используется embedded RocksDB | `ws://127.0.0.1:8000/rpc` |
+| `SURREALDB_URL` | URL SurrealDB (WebSocket RPC). Если пустой — используется embedded SurrealDB | `ws://127.0.0.1:8000/rpc` |
 | `SURREALDB_EMBEDDED` | Принудительно включить embedded режим. Рекомендуется оставить unset и полагаться на `SURREALDB_URL` | `true` / `false` |
-| `SURREALDB_DATA_DIR` | Путь к RocksDB data dir, используется в embedded режиме | `./data/surrealdb` |
+| `SURREALDB_DATA_DIR` | Путь к data dir, используется в embedded режиме | `./data/surrealdb` |
 | `SURREALDB_NAMESPACES` | Спискок namespaces, разделённых запятой | `org,personal,private` |
 | `SURREALDB_USERNAME` | Имя пользователя SurrealDB | `root` |
 | `SURREALDB_PASSWORD` | Пароль SurrealDB | `root` |
@@ -85,7 +87,7 @@ LOG_LEVEL=info ./target/release/memory_mcp
     },
     {
       "name": "extract",
-      "description": "Extract entities/facts from an episode",
+      "description": "Extract entities, facts, and links from an episode or inline content",
       "input_example": { "episode_id": "episode:..." }
     },
     {
@@ -99,7 +101,7 @@ LOG_LEVEL=info ./target/release/memory_mcp
     },
     {
       "name": "assemble_context",
-      "description": "Assemble active context for a natural-language query",
+      "description": "Assemble active ranked context for a natural-language query",
       "input_example": {
         "query": "ARR commitments for Alice",
         "scope": "org",
@@ -128,6 +130,8 @@ LOG_LEVEL=info ./target/release/memory_mcp
 ```
 
 > Поместите `mcp.json` рядом с бинарником или используйте его в CI для документирования интерфейса инструментов.
+
+> Важно: legacy-инструменты вроде `create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`, а также alias-обёртки вроде `ingest_document` больше не являются частью публичной MCP-поверхности этого сервера.
 
 ---
 
@@ -209,7 +213,7 @@ printf '%s\n' '{"type":"call","id":"2","tool":"extract","args": {"episode_id":"e
 Ответ (пример):
 
 ```json
-{"type":"response","id":"2","ok":{"status":"success","result":{"episode_id":"episode:abc123","entities":[{"entity_id":"entity:john","type":"person","name":"John Doe"}],"facts":[{"fact_id":"fact:arr","type":"metric"}],"links":[]},"guidance":"Resolve canonical entities for any ambiguous names before creating manual links."}}
+{"type":"response","id":"2","ok":{"status":"success","result":{"episode_id":"episode:abc123","entities":[{"entity_id":"entity:john","type":"person","canonical_name":"John Doe"}],"facts":[{"fact_id":"fact:arr","type":"metric"}],"links":[{"entity_id":"entity:john","episode_id":"episode:abc123"}]},"guidance":"Resolve canonical entities for any ambiguous names before creating manual links."}}
 ```
 
 3) Собираем контекст по запросу (assemble_context):
@@ -221,7 +225,7 @@ printf '%s\n' '{"type":"call","id":"3","tool":"assemble_context","args": {"query
 Ответ (пример):
 
 ```json
-{"type":"response","id":"3","ok":{"status":"success","result":[{"fact_id":"fact:arr","content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123","confidence":0.93,"rationale":"matched scope=org and active at 2026-03-11T10:00:00Z"}],"guidance":"Call explain if you need provenance-ready citations for selected items.","has_more":false,"total_count":1}}
+{"type":"response","id":"3","ok":{"status":"success","result":[{"fact_id":"fact:arr","content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123","confidence":0.93,"provenance":{"source_episode":"episode:abc123"},"rationale":"matched scope=org and active at 2026-03-11"}],"guidance":"Call explain if you need provenance-ready citations for selected items.","has_more":false,"total_count":1}}
 ```
 
 4) Поясняем происхождение (explain):
@@ -257,7 +261,7 @@ kill $PID
 ---
 
 ## Полезные переменные окружения и конфиг
-- SURREALDB_DATA_DIR — путь к директории данных при embedded RocksDB (по умолчанию `./data/surrealdb`).
+- SURREALDB_DATA_DIR — путь к директории данных при embedded SurrealDB (по умолчанию `./data/surrealdb`).
 - SURREALDB_DB_NAME — имя базы (пример: `testdb`).
 - SURREALDB_USERNAME / SURREALDB_PASSWORD — учётные данные для SurrealDB.
 - `LOG_LEVEL` — уровень логирования (рекомендуемый).
