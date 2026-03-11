@@ -7,12 +7,12 @@ use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::logging::LogLevel;
 use crate::models::{
-    AccessContext, AssembleContextRequest, EntityCandidate, ExplainRequest, IngestRequest,
-    InvalidateRequest,
+    AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
+    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::service::MemoryService;
 
@@ -45,6 +45,17 @@ impl<T> ToolResponse<T> {
     fn success_with_guidance(result: T, guidance: impl Into<String>) -> Self {
         Self {
             status: "success".to_string(),
+            result,
+            guidance: Some(guidance.into()),
+            has_more: None,
+            total_count: None,
+            next_offset: None,
+        }
+    }
+
+    fn partial_with_guidance(result: T, guidance: impl Into<String>) -> Self {
+        Self {
+            status: "partial".to_string(),
             result,
             guidance: Some(guidance.into()),
             has_more: None,
@@ -136,7 +147,7 @@ impl MemoryMcp {
         t_ref: Option<String>,
         scope: Option<String>,
         enable_logging: bool,
-    ) -> Result<Value, ErrorData> {
+    ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
         use super::parsers::normalize_optional_string;
 
         let access = AccessContext::default();
@@ -165,7 +176,17 @@ impl MemoryMcp {
                             LogLevel::Info,
                         );
                     }
-                    return Ok(result);
+                    let parsed: ExtractResult = serde_json::from_value(result).map_err(|err| {
+                        ErrorData::new(
+                            rmcp::model::ErrorCode::INTERNAL_ERROR,
+                            format!("extract result schema mismatch: {err}"),
+                            None,
+                        )
+                    })?;
+                    return Ok(ToolResponse::success_with_guidance(
+                        parsed,
+                        "Resolve canonical entities for any ambiguous names before creating manual links.",
+                    ));
                 }
                 Err(err) => {
                     if enable_logging {
@@ -184,10 +205,6 @@ impl MemoryMcp {
         // Otherwise, ingest content first then extract
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
-            let result = super::parsers::empty_extract_result(
-                "no_input",
-                "episode_id or content/text is required",
-            );
             if enable_logging {
                 self.service.log_tool_event(
                     "extract.no_input",
@@ -196,7 +213,10 @@ impl MemoryMcp {
                     LogLevel::Warn,
                 );
             }
-            return Ok(result);
+            return Ok(ToolResponse::partial_with_guidance(
+                ExtractResult::empty(),
+                "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
+            ));
         }
 
         let source_type = source_type.unwrap_or_else(|| "ad-hoc".to_string());
@@ -234,7 +254,17 @@ impl MemoryMcp {
                             LogLevel::Info,
                         );
                     }
-                    Ok(result)
+                    let parsed: ExtractResult = serde_json::from_value(result).map_err(|err| {
+                        ErrorData::new(
+                            rmcp::model::ErrorCode::INTERNAL_ERROR,
+                            format!("extract result schema mismatch: {err}"),
+                            None,
+                        )
+                    })?;
+                    Ok(ToolResponse::success_with_guidance(
+                        parsed,
+                        "Resolve canonical entities for any ambiguous names before creating manual links.",
+                    ))
                 }
                 Err(err) => {
                     if enable_logging {
@@ -339,7 +369,7 @@ impl MemoryMcp {
     pub async fn explain(
         &self,
         params: Parameters<ExplainParams>,
-    ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
+    ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
         let access = AccessContext::default();
         let context_pack = parse_context_items(&params.0.context_items)
             .map_err(|msg| ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, None))?;
@@ -354,6 +384,18 @@ impl MemoryMcp {
 
         match self.service.explain(request, Some(access)).await {
             Ok(explanations) => {
+                let explanations: Vec<ExplainItem> = explanations
+                    .into_iter()
+                    .map(|value| {
+                        serde_json::from_value(value).map_err(|err| {
+                            ErrorData::new(
+                                rmcp::model::ErrorCode::INTERNAL_ERROR,
+                                format!("explain result schema mismatch: {err}"),
+                                None,
+                            )
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
                 self.service.log_tool_event(
                     "explain.done",
                     json!({}),
@@ -385,9 +427,9 @@ impl MemoryMcp {
     pub async fn extract(
         &self,
         params: Parameters<ExtractParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
+    ) -> Result<Json<ToolResponse<ExtractResult>>, ErrorData> {
         let p = params.0;
-        let result = self
+        let response = self
             .extract_impl(
                 p.episode_id,
                 p.content,
@@ -399,10 +441,7 @@ impl MemoryMcp {
                 true,
             )
             .await?;
-        Ok(Json(ToolResponse::success_with_guidance(
-            result,
-            "Resolve canonical entities for any ambiguous names before creating manual links.",
-        )))
+        Ok(Json(response))
     }
 
     #[tool(
@@ -512,7 +551,7 @@ impl MemoryMcp {
     pub async fn assemble_context(
         &self,
         params: Parameters<AssembleContextParams>,
-    ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
+    ) -> Result<Json<ToolResponse<Vec<AssembledContextItem>>>, ErrorData> {
         let p = params.0;
         let as_of = if p.as_of.trim().is_empty() {
             None
@@ -538,6 +577,18 @@ impl MemoryMcp {
 
         match self.service.assemble_context(request).await {
             Ok(results) => {
+                let results: Vec<AssembledContextItem> = results
+                    .into_iter()
+                    .map(|value| {
+                        serde_json::from_value(value).map_err(|err| {
+                            ErrorData::new(
+                                rmcp::model::ErrorCode::INTERNAL_ERROR,
+                                format!("assemble_context result schema mismatch: {err}"),
+                                None,
+                            )
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
                 self.service.log_tool_event(
                     "assemble_context.done",
                     json!({}),
@@ -569,6 +620,10 @@ mod tests {
     use super::*;
     use chrono::Datelike;
 
+    fn schema_json<T: schemars::JsonSchema>() -> serde_json::Value {
+        serde_json::to_value(schemars::schema_for!(T)).expect("schema json")
+    }
+
     #[test]
     fn build_server_info_enables_tools_and_sets_instructions() {
         let info = MemoryMcp::build_server_info();
@@ -599,6 +654,60 @@ mod tests {
         assert_eq!(
             response.guidance.as_deref(),
             Some("Call extract next to derive entities and facts."),
+        );
+    }
+
+    #[test]
+    fn extract_tool_response_schema_exposes_structured_result() {
+        let schema = schema_json::<ToolResponse<ExtractResult>>();
+        let properties = schema["properties"].as_object().expect("properties object");
+
+        assert!(properties.contains_key("status"));
+        assert!(properties.contains_key("result"));
+        assert!(properties.contains_key("guidance"));
+        assert_eq!(properties["status"]["type"], "string");
+        assert!(
+            properties["result"]["$ref"] == "#/$defs/ExtractResult"
+                || properties["result"]["$ref"] == "#/definitions/ExtractResult"
+        );
+    }
+
+    #[test]
+    fn assemble_context_tool_response_schema_exposes_item_array() {
+        let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
+        let result = &schema["properties"]["result"];
+
+        assert_eq!(result["type"], "array");
+        assert!(
+            result["items"]["$ref"] == "#/$defs/AssembledContextItem"
+                || result["items"]["$ref"] == "#/definitions/AssembledContextItem"
+        );
+    }
+
+    #[test]
+    fn explain_tool_response_schema_exposes_citation_items() {
+        let schema = schema_json::<ToolResponse<Vec<ExplainItem>>>();
+        let result = &schema["properties"]["result"];
+
+        assert_eq!(result["type"], "array");
+        assert!(
+            result["items"]["$ref"] == "#/$defs/ExplainItem"
+                || result["items"]["$ref"] == "#/definitions/ExplainItem"
+        );
+    }
+
+    #[test]
+    fn tool_response_partial_envelope_marks_retryable_state() {
+        let response = ToolResponse::partial_with_guidance(
+            ExtractResult::empty(),
+            "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
+        );
+
+        assert_eq!(response.status, "partial");
+        assert!(response.result.entities.is_empty());
+        assert_eq!(
+            response.guidance.as_deref(),
+            Some("Provide either `episode_id` or non-empty `content`/`text`, then retry."),
         );
     }
 

@@ -171,6 +171,63 @@ pub struct AssembleContextRequest {
 }
 
 // ============================================================================
+// MCP output types
+// ============================================================================
+
+/// A compact extracted entity returned by the MCP `extract` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ExtractedEntity {
+    pub entity_id: String,
+    #[serde(rename = "type")]
+    pub entity_type: String,
+    pub canonical_name: String,
+}
+
+/// A compact extracted fact returned by the MCP `extract` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ExtractedFact {
+    pub fact_id: String,
+    #[serde(rename = "type")]
+    pub fact_type: String,
+}
+
+/// A relationship link produced during extraction.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ExtractedLink {
+    pub entity_id: String,
+    pub episode_id: String,
+}
+
+/// Structured result returned by the MCP `extract` tool.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct ExtractResult {
+    pub episode_id: String,
+    pub entities: Vec<ExtractedEntity>,
+    pub facts: Vec<ExtractedFact>,
+    pub links: Vec<ExtractedLink>,
+}
+
+impl ExtractResult {
+    /// Returns an empty extraction result for partial or no-input responses.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+}
+
+/// A ranked context item returned by the MCP `assemble_context` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssembledContextItem {
+    pub fact_id: String,
+    pub content: String,
+    pub quote: String,
+    pub source_episode: String,
+    pub confidence: f64,
+    pub provenance: serde_json::Value,
+    pub rationale: String,
+}
+
+// ============================================================================
 // Access control types
 // ============================================================================
 

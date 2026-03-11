@@ -97,3 +97,57 @@ pub struct AssembleContextParams {
     #[serde(default = "super::default_budget")]
     pub budget: i32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn schema_json<T: JsonSchema>() -> serde_json::Value {
+        serde_json::to_value(schemars::schema_for!(T)).expect("schema json")
+    }
+
+    #[test]
+    fn ingest_params_schema_exposes_expected_fields() {
+        let schema = schema_json::<IngestParams>();
+        let properties = schema["properties"].as_object().expect("properties object");
+
+        for key in [
+            "source_type",
+            "source_id",
+            "content",
+            "t_ref",
+            "scope",
+            "t_ingested",
+            "visibility_scope",
+            "policy_tags",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
+    }
+
+    #[test]
+    fn resolve_params_schema_models_aliases_as_string_array() {
+        let schema = schema_json::<ResolveParams>();
+        let aliases = &schema["properties"]["aliases"];
+
+        assert_eq!(aliases["type"], "array");
+        assert_eq!(aliases["items"]["type"], "string");
+    }
+
+    #[test]
+    fn explain_params_schema_requires_json_array_string() {
+        let schema = schema_json::<ExplainParams>();
+        assert_eq!(schema["properties"]["context_items"]["type"], "string");
+    }
+
+    #[test]
+    fn assemble_context_params_schema_keeps_flat_primitives() {
+        let schema = schema_json::<AssembleContextParams>();
+        let properties = schema["properties"].as_object().expect("properties object");
+
+        assert_eq!(properties["query"]["type"], "string");
+        assert_eq!(properties["scope"]["type"], "string");
+        assert_eq!(properties["as_of"]["type"], "string");
+        assert_eq!(properties["budget"]["type"], "integer");
+    }
+}

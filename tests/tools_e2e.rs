@@ -39,7 +39,7 @@ async fn test_mcp_tools_flow() {
         .0;
     assert_eq!(extraction.status, "success");
     let extraction = extraction.result;
-    assert!(extraction["facts"].as_array().unwrap().len() >= 2);
+    assert!(extraction.facts.len() >= 2);
 
     let assemble_params = serde_json::json!({
         "query": "ARR",
@@ -70,7 +70,7 @@ async fn test_mcp_tools_flow() {
         .0;
     assert_eq!(explanation.status, "success");
     let explanation = explanation.result;
-    assert_eq!(explanation[0]["source_episode"], episode_id);
+    assert_eq!(explanation[0].source_episode, episode_id);
 
     // Backwards-compatible: allow passing an array of episode id strings
     let ingest_params2 = serde_json::json!({
@@ -98,8 +98,8 @@ async fn test_mcp_tools_flow() {
         .expect("explain ids")
         .0
         .result;
-    assert_eq!(explanation_ids[0]["source_episode"], episode_id);
-    assert_eq!(explanation_ids[1]["source_episode"], episode_id2);
+    assert_eq!(explanation_ids[0].source_episode, episode_id);
+    assert_eq!(explanation_ids[1].source_episode, episode_id2);
 }
 
 #[tokio::test]
@@ -130,9 +130,9 @@ async fn test_mcp_full_flow_end_to_end() {
         .expect("extract")
         .0
         .result;
-    let facts = extraction["facts"].as_array().unwrap();
-    assert!(facts.iter().any(|f| f["type"] == "metric"));
-    assert!(facts.iter().any(|f| f["type"] == "promise"));
+    let facts = extraction.facts;
+    assert!(facts.iter().any(|f| f.fact_type == "metric"));
+    assert!(facts.iter().any(|f| f.fact_type == "promise"));
 
     // Assemble
     let assemble_params = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
@@ -155,10 +155,10 @@ async fn test_mcp_full_flow_end_to_end() {
         .expect("explain")
         .0
         .result;
-    assert_eq!(explanation[0]["source_episode"], episode_id);
+    assert_eq!(explanation[0].source_episode, episode_id);
 
     // Invalidate the metric fact (use a past date so it's considered invalid)
-    let fact_id = context[0]["fact_id"].as_str().unwrap().to_string();
+    let fact_id = context[0].fact_id.clone();
     let invalidate_params = serde_json::json!({"fact_id": fact_id, "reason": "superseded", "t_invalid": "2026-02-04T00:00:00Z"});
     let _ = mcp
         .invalidate(Parameters(
@@ -181,7 +181,7 @@ async fn test_mcp_full_flow_end_to_end() {
     assert!(
         !context_after
             .iter()
-            .any(|c| c["fact_id"] == context[0]["fact_id"])
+            .any(|c| c.fact_id == context[0].fact_id)
     );
 }
 
@@ -224,12 +224,15 @@ async fn test_mcp_extract_no_input_returns_soft_result() {
         .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
         .await
         .expect("extract")
-        .0
-        .result;
+        .0;
 
-    assert_eq!(extraction["status"], "no_input");
-    assert!(extraction["entities"].as_array().unwrap().is_empty());
-    assert!(extraction["facts"].as_array().unwrap().is_empty());
+    assert_eq!(extraction.status, "partial");
+    assert!(extraction.result.entities.is_empty());
+    assert!(extraction.result.facts.is_empty());
+    assert_eq!(
+        extraction.guidance.as_deref(),
+        Some("Provide either `episode_id` or non-empty `content`/`text`, then retry."),
+    );
 }
 
 /// Regression: explain must accept loose objects with `id` instead of `source_episode`
@@ -252,16 +255,10 @@ async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
         .0
         .result;
     assert_eq!(explanation.len(), 2);
-    assert_eq!(
-        explanation[0]["source_episode"],
-        "task:e8gsmlprfchnktf6js0p"
-    );
-    assert_eq!(explanation[0]["content"], "Follow up on ARR deal");
-    assert_eq!(explanation[0]["quote"], "");
-    assert_eq!(
-        explanation[1]["source_episode"],
-        "task:ha8caz3sb2fxr9ju2sbc"
-    );
+    assert_eq!(explanation[0].source_episode, "task:e8gsmlprfchnktf6js0p");
+    assert_eq!(explanation[0].content, "Follow up on ARR deal");
+    assert_eq!(explanation[0].quote, "");
+    assert_eq!(explanation[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
 }
 
 /// Regression: explain must accept objects with `id` + `quote` but no `source_episode`.
@@ -281,8 +278,8 @@ async fn test_mcp_explain_objects_with_quote_and_id() {
         .expect("explain with quote + id should not fail")
         .0
         .result;
-    assert_eq!(explanation[0]["source_episode"], "task:abc");
-    assert_eq!(explanation[0]["quote"], "q");
+    assert_eq!(explanation[0].source_episode, "task:abc");
+    assert_eq!(explanation[0].quote, "q");
 }
 
 /// Explain accepts a mixed array of strings and objects.
@@ -304,7 +301,7 @@ async fn test_mcp_explain_mixed_array() {
         .0
         .result;
     assert_eq!(explanation.len(), 2);
-    assert_eq!(explanation[0]["source_episode"], "episode:plain-id");
-    assert_eq!(explanation[1]["source_episode"], "task:obj");
-    assert_eq!(explanation[1]["content"], "info");
+    assert_eq!(explanation[0].source_episode, "episode:plain-id");
+    assert_eq!(explanation[1].source_episode, "task:obj");
+    assert_eq!(explanation[1].content, "info");
 }
