@@ -1,6 +1,4 @@
 use chrono::{TimeZone, Utc};
-use serde_json::Value;
-
 use memory_mcp::models::{AccessContext, EntityCandidate, IngestRequest, InvalidateRequest};
 
 mod common;
@@ -27,9 +25,9 @@ async fn test_ingest_extract_and_assemble() {
         .expect("ingest");
 
     let extraction = service.extract(&episode_id, None).await.expect("extract");
-    let facts = extraction["facts"].as_array().unwrap();
-    assert!(facts.iter().any(|fact| fact["type"] == "metric"));
-    assert!(facts.iter().any(|fact| fact["type"] == "promise"));
+    let facts = extraction.facts;
+    assert!(facts.iter().any(|fact| fact.fact_type == "metric"));
+    assert!(facts.iter().any(|fact| fact.fact_type == "promise"));
 
     let context = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
@@ -92,7 +90,7 @@ async fn test_invalidate_and_explain() {
         .await
         .expect("ingest");
     let extraction = service.extract(&episode_id, None).await.expect("extract");
-    let fact_id = extraction["facts"][0]["fact_id"].as_str().unwrap();
+    let fact_id = extraction.facts[0].fact_id.clone();
 
     service
         .invalidate(
@@ -131,7 +129,7 @@ async fn test_invalidate_and_explain() {
         )
         .await
         .expect("explain");
-    assert_eq!(explanation[0]["source_episode"], Value::String(episode_id));
+    assert_eq!(explanation[0].source_episode, episode_id);
 }
 
 #[tokio::test]

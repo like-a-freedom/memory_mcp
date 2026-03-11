@@ -127,7 +127,7 @@ pub struct ExplainRequest {
 }
 
 /// A single item to explain.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExplainItem {
     pub content: String,
     pub quote: String,
@@ -175,7 +175,7 @@ pub struct AssembleContextRequest {
 // ============================================================================
 
 /// A compact extracted entity returned by the MCP `extract` tool.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedEntity {
     pub entity_id: String,
     #[serde(rename = "type")]
@@ -184,7 +184,7 @@ pub struct ExtractedEntity {
 }
 
 /// A compact extracted fact returned by the MCP `extract` tool.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedFact {
     pub fact_id: String,
     #[serde(rename = "type")]
@@ -192,14 +192,14 @@ pub struct ExtractedFact {
 }
 
 /// A relationship link produced during extraction.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedLink {
     pub entity_id: String,
     pub episode_id: String,
 }
 
 /// Structured result returned by the MCP `extract` tool.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractResult {
     pub episode_id: String,
     pub entities: Vec<ExtractedEntity>,
@@ -216,7 +216,7 @@ impl ExtractResult {
 }
 
 /// A ranked context item returned by the MCP `assemble_context` tool.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,

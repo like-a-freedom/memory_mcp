@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
 use lru::LruCache;
-use serde_json::Value;
+
+use crate::models::AssembledContextItem;
 
 /// Cache key for context assembly results.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -57,7 +58,10 @@ impl<T> SafeMutex<T> for Mutex<T> {
 }
 
 /// Invalidate cache entries for a specific scope.
-pub fn invalidate_cache_by_scope(cache: &Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>, scope: &str) {
+pub fn invalidate_cache_by_scope(
+    cache: &Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    scope: &str,
+) {
     let mut guard = cache.safe_lock();
     let keys_to_remove: Vec<CacheKey> = guard
         .iter()
@@ -137,7 +141,7 @@ mod tests {
 
     #[test]
     fn invalidate_cache_by_scope_removes_matching_entries() {
-        let cache: Arc<Mutex<LruCache<CacheKey, Vec<Value>>>> =
+        let cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>> =
             Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
 
         let cutoff = Utc::now();
@@ -149,9 +153,18 @@ mod tests {
 
         {
             let mut guard = cache.safe_lock();
-            guard.put(key1.clone(), vec![json!("value1")]);
-            guard.put(key2.clone(), vec![json!("value2")]);
-            guard.put(key3.clone(), vec![json!("value3")]);
+            let item = |fact_id: &str| AssembledContextItem {
+                fact_id: fact_id.to_string(),
+                content: "content".to_string(),
+                quote: "quote".to_string(),
+                source_episode: "episode:test".to_string(),
+                confidence: 0.9,
+                provenance: json!({}),
+                rationale: "rationale".to_string(),
+            };
+            guard.put(key1.clone(), vec![item("fact:1")]);
+            guard.put(key2.clone(), vec![item("fact:2")]);
+            guard.put(key3.clone(), vec![item("fact:3")]);
         }
 
         // Invalidate org scope

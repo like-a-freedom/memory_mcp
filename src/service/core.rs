@@ -11,8 +11,8 @@ use serde_json::{Value, json};
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{
-    AccessContext, AssembleContextRequest, EntityCandidate, ExplainRequest, IngestRequest,
-    InvalidateRequest,
+    AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
+    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::storage::{DbClient, SurrealDbClient};
 
@@ -29,7 +29,7 @@ pub struct MemoryService {
     pub(crate) default_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
-    pub(crate) context_cache: Arc<Mutex<LruCache<CacheKey, Vec<Value>>>>,
+    pub(crate) context_cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) analyzers: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) indexes: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) name_regex: Regex,
@@ -275,17 +275,15 @@ impl MemoryService {
         &self,
         request: ExplainRequest,
         access: Option<AccessContext>,
-    ) -> Result<Vec<Value>, MemoryError> {
+    ) -> Result<Vec<ExplainItem>, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let explanations = request
             .context_pack
             .into_iter()
-            .map(|item| {
-                json!({
-                    "content": item.content,
-                    "quote": item.quote,
-                    "source_episode": item.source_episode,
-                })
+            .map(|item| ExplainItem {
+                content: item.content,
+                quote: item.quote,
+                source_episode: item.source_episode,
             })
             .collect::<Vec<_>>();
 
@@ -307,7 +305,7 @@ impl MemoryService {
         &self,
         episode_id: &str,
         access: Option<AccessContext>,
-    ) -> Result<Value, MemoryError> {
+    ) -> Result<ExtractResult, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let (record, _) = self.find_episode_record(episode_id).await?;
         if record.is_none() {
@@ -321,9 +319,9 @@ impl MemoryService {
                 "extract",
                 json!({"episode_id": episode_id}),
                 json!({
-                    "entities": payload["entities"].as_array().map(|v| v.len()).unwrap_or(0),
-                    "facts": payload["facts"].as_array().map(|v| v.len()).unwrap_or(0),
-                    "links": payload["links"].as_array().map(|v| v.len()).unwrap_or(0),
+                    "entities": payload.entities.len(),
+                    "facts": payload.facts.len(),
+                    "links": payload.links.len(),
                 }),
                 access.as_ref(),
             ),
@@ -464,7 +462,7 @@ impl MemoryService {
     pub async fn assemble_context(
         &self,
         request: AssembleContextRequest,
-    ) -> Result<Vec<Value>, MemoryError> {
+    ) -> Result<Vec<AssembledContextItem>, MemoryError> {
         super::context::assemble_context(self, request).await
     }
 

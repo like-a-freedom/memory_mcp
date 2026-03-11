@@ -19,9 +19,9 @@ async fn test_promise_detection_extracts_promise_fact() {
 
     let episode_id = service.ingest(req, None).await.expect("ingest");
     let extraction = service.extract(&episode_id, None).await.expect("extract");
-    let facts = extraction["facts"].as_array().expect("facts array");
+    let facts = extraction.facts;
     assert!(
-        facts.iter().any(|f| f["type"] == "promise"),
+        facts.iter().any(|f| f.fact_type == "promise"),
         "expected a promise fact"
     );
 }

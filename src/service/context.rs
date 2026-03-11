@@ -5,13 +5,13 @@ use serde_json::{Value, json};
 use super::cache::{CacheKey, SafeMutex};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembleContextRequest};
+use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
 
 /// Assemble context for a query.
 pub async fn assemble_context(
     service: &crate::service::MemoryService,
     request: AssembleContextRequest,
-) -> Result<Vec<Value>, MemoryError> {
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let access = AccessContext::from_payload(request.access.clone());
 
     service.logger.log(
@@ -98,19 +98,24 @@ pub async fn assemble_context(
     let mut active = filter_facts_by_policy(fact_records, &access);
     sort_facts_by_recency(&mut active);
 
-    let results: Vec<Value> = active
+    let results: Vec<AssembledContextItem> = active
         .into_iter()
         .take(request.budget.max(1) as usize)
         .map(|fact| {
-            json!({
-                "fact_id": fact.fact_id,
-                "content": fact.content,
-                "quote": fact.quote,
-                "source_episode": fact.source_episode,
-                "confidence": super::decayed_confidence(&fact, cutoff),
-                "provenance": fact.provenance,
-                "rationale": format!("matched scope={} and active at {}", request.scope, cutoff.date_naive()),
-            })
+            let confidence = super::decayed_confidence(&fact, cutoff);
+            AssembledContextItem {
+                fact_id: fact.fact_id,
+                content: fact.content,
+                quote: fact.quote,
+                source_episode: fact.source_episode,
+                confidence,
+                provenance: fact.provenance,
+                rationale: format!(
+                    "matched scope={} and active at {}",
+                    request.scope,
+                    cutoff.date_naive()
+                ),
+            }
         })
         .collect();
 

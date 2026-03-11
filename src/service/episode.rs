@@ -7,6 +7,7 @@ use super::error::MemoryError;
 use super::query::parse_iso;
 use crate::models::Edge;
 use crate::models::Episode;
+use crate::models::{ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink};
 
 /// Parse an episode from a database record.
 #[must_use]
@@ -175,9 +176,8 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
 pub async fn extract_entities(
     service: &crate::service::MemoryService,
     content: &str,
-) -> Result<Vec<Value>, MemoryError> {
+) -> Result<Vec<ExtractedEntity>, MemoryError> {
     use crate::models::EntityCandidate;
-    use serde_json::json;
 
     let candidates: std::collections::HashSet<_> = service
         .name_regex
@@ -205,11 +205,11 @@ pub async fn extract_entities(
             )
             .await?;
 
-        entities.push(json!({
-            "entity_id": entity_id,
-            "type": entity_type,
-            "canonical_name": candidate,
-        }));
+        entities.push(ExtractedEntity {
+            entity_id,
+            entity_type: entity_type.to_string(),
+            canonical_name: candidate,
+        });
     }
 
     Ok(entities)
@@ -219,7 +219,7 @@ pub async fn extract_entities(
 pub async fn extract_facts(
     service: &crate::service::MemoryService,
     episode: &Episode,
-) -> Result<Vec<Value>, MemoryError> {
+) -> Result<Vec<ExtractedFact>, MemoryError> {
     use serde_json::json;
 
     let mut facts = Vec::new();
@@ -241,7 +241,10 @@ pub async fn extract_facts(
                 json!({"source_episode": episode.episode_id}),
             )
             .await?;
-        facts.push(json!({"fact_id": fact_id, "type": "metric"}));
+        facts.push(ExtractedFact {
+            fact_id,
+            fact_type: "metric".to_string(),
+        });
     }
 
     // Detect promise facts
@@ -260,7 +263,10 @@ pub async fn extract_facts(
                 json!({"source_episode": episode.episode_id}),
             )
             .await?;
-        facts.push(json!({"fact_id": fact_id, "type": "promise"}));
+        facts.push(ExtractedFact {
+            fact_id,
+            fact_type: "promise".to_string(),
+        });
     }
 
     Ok(facts)
@@ -281,7 +287,7 @@ pub fn is_promise_statement(content: &str) -> bool {
 pub async fn extract_from_episode(
     service: &crate::service::MemoryService,
     episode_id: &str,
-) -> Result<Value, MemoryError> {
+) -> Result<ExtractResult, MemoryError> {
     use crate::logging::LogLevel;
     use crate::models::Edge;
     use serde_json::json;
@@ -311,13 +317,13 @@ pub async fn extract_from_episode(
 
     // Create entity-episode edges
     for entity in &entities {
-        links.push(json!({
-            "entity_id": entity["entity_id"].clone(),
-            "episode_id": episode_id,
-        }));
+        links.push(ExtractedLink {
+            entity_id: entity.entity_id.clone(),
+            episode_id: episode_id.to_string(),
+        });
 
         let edge = Edge {
-            from_id: entity["entity_id"].as_str().unwrap_or("").to_string(),
+            from_id: entity.entity_id.clone(),
             relation: "mentioned_in".to_string(),
             to_id: episode_id.to_string(),
             strength: 1.0,
@@ -335,9 +341,9 @@ pub async fn extract_from_episode(
     for fact in &facts {
         for entity in &entities {
             let edge = Edge {
-                from_id: entity["entity_id"].as_str().unwrap_or("").to_string(),
+                from_id: entity.entity_id.clone(),
                 relation: "involved_in".to_string(),
-                to_id: fact["fact_id"].as_str().unwrap_or("").to_string(),
+                to_id: fact.fact_id.clone(),
                 strength: 0.8,
                 confidence: 0.85,
                 provenance: json!({"source_episode": episode_id}),
@@ -353,8 +359,7 @@ pub async fn extract_from_episode(
     // Update communities
     let entity_ids: Vec<String> = entities
         .iter()
-        .filter_map(|entity| entity.get("entity_id").and_then(Value::as_str))
-        .map(String::from)
+        .map(|entity| entity.entity_id.clone())
         .collect();
 
     update_communities(service, &entity_ids, &episode.scope).await?;
@@ -369,12 +374,12 @@ pub async fn extract_from_episode(
         LogLevel::Info,
     );
 
-    Ok(json!({
-        "episode_id": episode_id,
-        "entities": entities,
-        "facts": facts,
-        "links": links,
-    }))
+    Ok(ExtractResult {
+        episode_id: episode_id.to_string(),
+        entities,
+        facts,
+        links,
+    })
 }
 
 /// Store an edge in the database.

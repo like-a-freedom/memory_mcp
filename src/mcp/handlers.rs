@@ -172,19 +172,12 @@ impl MemoryMcp {
                         self.service.log_tool_event(
                             "extract.done",
                             json!({"episode_id": episode_id}),
-                            json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
+                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
                             LogLevel::Info,
                         );
                     }
-                    let parsed: ExtractResult = serde_json::from_value(result).map_err(|err| {
-                        ErrorData::new(
-                            rmcp::model::ErrorCode::INTERNAL_ERROR,
-                            format!("extract result schema mismatch: {err}"),
-                            None,
-                        )
-                    })?;
                     return Ok(ToolResponse::success_with_guidance(
-                        parsed,
+                        result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ));
                 }
@@ -250,19 +243,12 @@ impl MemoryMcp {
                         self.service.log_tool_event(
                             "extract.done",
                             json!({"episode_id": episode_id}),
-                            json!({"entities": result["entities"].as_array().map(|a| a.len()).unwrap_or(0), "facts": result["facts"].as_array().map(|a| a.len()).unwrap_or(0)}),
+                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
                             LogLevel::Info,
                         );
                     }
-                    let parsed: ExtractResult = serde_json::from_value(result).map_err(|err| {
-                        ErrorData::new(
-                            rmcp::model::ErrorCode::INTERNAL_ERROR,
-                            format!("extract result schema mismatch: {err}"),
-                            None,
-                        )
-                    })?;
                     Ok(ToolResponse::success_with_guidance(
-                        parsed,
+                        result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ))
                 }
@@ -384,18 +370,6 @@ impl MemoryMcp {
 
         match self.service.explain(request, Some(access)).await {
             Ok(explanations) => {
-                let explanations: Vec<ExplainItem> = explanations
-                    .into_iter()
-                    .map(|value| {
-                        serde_json::from_value(value).map_err(|err| {
-                            ErrorData::new(
-                                rmcp::model::ErrorCode::INTERNAL_ERROR,
-                                format!("explain result schema mismatch: {err}"),
-                                None,
-                            )
-                        })
-                    })
-                    .collect::<Result<_, _>>()?;
                 self.service.log_tool_event(
                     "explain.done",
                     json!({}),
@@ -577,18 +551,6 @@ impl MemoryMcp {
 
         match self.service.assemble_context(request).await {
             Ok(results) => {
-                let results: Vec<AssembledContextItem> = results
-                    .into_iter()
-                    .map(|value| {
-                        serde_json::from_value(value).map_err(|err| {
-                            ErrorData::new(
-                                rmcp::model::ErrorCode::INTERNAL_ERROR,
-                                format!("assemble_context result schema mismatch: {err}"),
-                                None,
-                            )
-                        })
-                    })
-                    .collect::<Result<_, _>>()?;
                 self.service.log_tool_event(
                     "assemble_context.done",
                     json!({}),

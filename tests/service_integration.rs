@@ -29,9 +29,9 @@ async fn test_service_ingest_and_extract_flow() {
     // Extract entities and facts
     let result = service.extract(&episode_id, None).await.unwrap();
 
-    assert!(result.get("episode_id").is_some());
-    assert!(result.get("entities").is_some());
-    assert!(result.get("facts").is_some());
+    assert_eq!(result.episode_id, episode_id);
+    assert!(!result.entities.is_empty());
+    assert!(!result.facts.is_empty());
 }
 
 #[tokio::test]
@@ -87,9 +87,9 @@ async fn test_service_add_fact_and_assemble_context() {
 
     let context = service.assemble_context(request).await.unwrap();
     assert!(!context.is_empty());
-    assert!(context[0].get("fact_id").is_some());
-    assert!(context[0].get("content").is_some());
-    assert!(context[0].get("confidence").is_some());
+    assert!(!context[0].fact_id.is_empty());
+    assert!(!context[0].content.is_empty());
+    assert!(context[0].confidence.is_finite());
 }
 
 #[tokio::test]
@@ -124,11 +124,7 @@ async fn test_service_fact_invalidation() {
         access: None,
     };
     let context_before = service.assemble_context(request_before).await.unwrap();
-    assert!(
-        context_before
-            .iter()
-            .any(|f| { f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id) })
-    );
+    assert!(context_before.iter().any(|f| f.fact_id == fact_id));
 
     // Invalidate the fact
     let t_invalid = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
@@ -153,11 +149,7 @@ async fn test_service_fact_invalidation() {
         access: None,
     };
     let context_after = service.assemble_context(request_after).await.unwrap();
-    assert!(
-        !context_after
-            .iter()
-            .any(|f| { f.get("fact_id").and_then(|v| v.as_str()) == Some(&fact_id) })
-    );
+    assert!(!context_after.iter().any(|f| f.fact_id == fact_id));
 }
 
 #[tokio::test]
@@ -247,10 +239,5 @@ async fn test_service_scope_isolation() {
         access: None,
     };
     let org_results = service.assemble_context(request_org).await.unwrap();
-    assert!(org_results.iter().all(|r| {
-        r.get("content")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .contains("Org")
-    }));
+    assert!(org_results.iter().all(|r| { r.content.contains("Org") }));
 }

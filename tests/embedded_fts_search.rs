@@ -56,10 +56,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         !ctx.is_empty(),
         "Multi-word FTS query 'Delta Enrollment' should find facts (got empty)"
     );
-    let content = ctx[0]
-        .get("content")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default();
+    let content = &ctx[0].content;
     assert!(
         content.contains("enrollment"),
         "Result content should contain 'enrollment', got: {content}"

@@ -24,9 +24,9 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
 
     // Basic extract should work after persistence
     let payload = svc.extract(&episode_id, None).await?;
-    assert_eq!(payload["episode_id"].as_str().unwrap(), episode_id.as_str());
-    assert!(payload.get("entities").is_some());
-    assert!(payload.get("facts").is_some());
+    assert_eq!(payload.episode_id, episode_id);
+    assert!(!payload.entities.is_empty());
+    assert!(!payload.facts.is_empty());
 
     // Count should reflect at least one episode
     let count = svc.episode_count().await?;
