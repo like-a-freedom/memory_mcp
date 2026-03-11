@@ -57,6 +57,9 @@ pub struct MemoryMcp {
 }
 
 impl MemoryMcp {
+    const SERVER_INSTRUCTIONS: &str =
+        "Memory MCP server: stores, extracts, resolves, and assembles long-term context.";
+
     /// Creates a new `MemoryMcp` instance with the given service.
     ///
     /// # Arguments
@@ -75,6 +78,11 @@ impl MemoryMcp {
     #[must_use]
     pub fn service(&self) -> Arc<MemoryService> {
         self.service.clone()
+    }
+
+    fn build_server_info() -> ServerInfo {
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
     /// Shared implementation for extract operations.
@@ -234,14 +242,7 @@ impl MemoryMcp {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for MemoryMcp {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some(
-                "Memory MCP server: stores, extracts, resolves, and assembles long-term context."
-                    .to_string(),
-            ),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
-        }
+        Self::build_server_info()
     }
 }
 
@@ -766,6 +767,18 @@ mod tests {
     use super::*;
     use chrono::Datelike;
     use serde_json::json;
+
+    #[test]
+    fn build_server_info_enables_tools_and_sets_instructions() {
+        let info = MemoryMcp::build_server_info();
+        let capabilities = serde_json::to_value(&info.capabilities).unwrap();
+
+        assert_eq!(
+            info.instructions.as_deref(),
+            Some(MemoryMcp::SERVER_INSTRUCTIONS),
+        );
+        assert!(capabilities.get("tools").is_some());
+    }
 
     #[test]
     fn parse_datetime_handles_null() {
