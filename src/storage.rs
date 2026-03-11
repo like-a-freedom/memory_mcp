@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::engine::local::Mem;
 use surrealdb::engine::local::RocksDb;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
@@ -99,6 +100,31 @@ enum DbEngine {
 }
 
 impl SurrealDbClient {
+    /// Connects to an embedded in-memory SurrealDB instance.
+    ///
+    /// This is primarily intended for tests that should exercise the real
+    /// SurrealDB query engine without touching the filesystem.
+    pub async fn connect_in_memory(
+        database: &str,
+        default_namespace: &str,
+        log_level: &str,
+    ) -> Result<Self, MemoryError> {
+        let db = Surreal::new::<Mem>(())
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB memory init failed: {err}")))?;
+
+        db.use_ns(default_namespace)
+            .use_db(database)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+
+        Ok(Self {
+            engine: DbEngine::Local(Mutex::new(db)),
+            database: database.to_string(),
+            logger: StdoutLogger::new(log_level),
+        })
+    }
+
     /// Connects to SurrealDB using the provided configuration.
     pub async fn connect(
         config: &SurrealConfig,
@@ -356,9 +382,16 @@ impl DbClient for SurrealDbClient {
 
         let (sql, bind) = build_select_one_query(record_id);
 
-        let surreal_val = self
+        let surreal_val = match self
             .execute_query(&sql, bind.map(|b| json!({"id": b})), namespace)
-            .await?;
+            .await
+        {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(None);
+            }
+            Err(err) => return Err(err),
+        };
 
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized);
@@ -384,7 +417,13 @@ impl DbClient for SurrealDbClient {
         );
 
         let sql = format!("SELECT * FROM {table}");
-        let surreal_val = self.execute_query(&sql, None, namespace).await?;
+        let surreal_val = match self.execute_query(&sql, None, namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
         let normalized = surreal_to_json(surreal_val);
         let results = extract_records(normalized);
 
@@ -450,7 +489,13 @@ impl DbClient for SurrealDbClient {
             )
         };
 
-        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
         let normalized = surreal_to_json(surreal_val);
         let mut results = extract_records(normalized);
 
@@ -493,7 +538,13 @@ impl DbClient for SurrealDbClient {
         );
 
         let vars = serde_json::json!({ "cutoff": cutoff });
-        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
         let normalized = surreal_to_json(surreal_val);
         let results = extract_records(normalized);
 
@@ -697,6 +748,11 @@ fn normalize_url(url: &str) -> String {
         return format!("{}/rpc", base.trim_end_matches('/'));
     }
     url.to_string()
+}
+
+fn is_missing_table_error(message: &str) -> bool {
+    let lowered = message.to_lowercase();
+    lowered.contains("does not exist") && lowered.contains("table")
 }
 
 fn surreal_to_json(value: SurrealValue) -> Value {
@@ -972,6 +1028,20 @@ mod tests {
         assert_eq!(normalize_url("https://db.local/"), "wss://db.local/rpc");
     }
 
+    #[test]
+    fn is_missing_table_error_detects_missing_table_message() {
+        assert!(is_missing_table_error(
+            "SurrealDB take failed: The table 'episode' does not exist"
+        ));
+    }
+
+    #[test]
+    fn is_missing_table_error_ignores_other_storage_errors() {
+        assert!(!is_missing_table_error(
+            "SurrealDB query failed: permission denied"
+        ));
+    }
+
     #[tokio::test]
     async fn server_version_returns_some_for_embedded() {
         let td = tempfile::tempdir().expect("create tempdir");
@@ -998,6 +1068,25 @@ mod tests {
         if let Some(s) = ver {
             assert!(!s.is_empty());
         }
+    }
+
+    #[tokio::test]
+    async fn connect_in_memory_initializes_real_embedded_engine() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let records = client
+            .select_table("event_log", "testns")
+            .await
+            .expect("select table");
+
+        assert!(records.is_empty());
     }
 
     #[test]
@@ -1091,12 +1180,15 @@ mod tests {
     #[test]
     fn find_version_in_json_extracts_from_string_with_semver() {
         let j = json!("SurrealDB 3.0.0 (embedded)");
-        assert_eq!(find_version_in_json(&j), Some("SurrealDB 3.0.0 (embedded)".to_string()));
+        assert_eq!(
+            find_version_in_json(&j),
+            Some("SurrealDB 3.0.0 (embedded)".to_string())
+        );
     }
 
     #[test]
     fn find_version_in_json_ignores_ddl_string() {
-        let j = json!( ["DEFINE ANALYZER simple TOKENIZERS BLANK FILTERS LOWERCASE"] );
+        let j = json!(["DEFINE ANALYZER simple TOKENIZERS BLANK FILTERS LOWERCASE"]);
         assert_eq!(find_version_in_json(&j), None);
     }
 

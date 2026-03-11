@@ -7,7 +7,7 @@ mod common;
 
 #[tokio::test]
 async fn test_mcp_tools_flow() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
@@ -21,8 +21,13 @@ async fn test_mcp_tools_flow() {
         .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
         .await
         .expect("ingest")
-        .0
-        .result;
+        .0;
+    assert_eq!(episode_id.status, "success");
+    assert_eq!(
+        episode_id.guidance.as_deref(),
+        Some("Call extract next to derive entities and facts."),
+    );
+    let episode_id = episode_id.result;
 
     let extract_params = serde_json::json!({
         "episode_id": episode_id
@@ -31,8 +36,9 @@ async fn test_mcp_tools_flow() {
         .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
         .await
         .expect("extract")
-        .0
-        .result;
+        .0;
+    assert_eq!(extraction.status, "success");
+    let extraction = extraction.result;
     assert!(extraction["facts"].as_array().unwrap().len() >= 2);
 
     let assemble_params = serde_json::json!({
@@ -45,8 +51,9 @@ async fn test_mcp_tools_flow() {
         .assemble_context(Parameters(serde_json::from_value(assemble_params).unwrap()))
         .await
         .expect("assemble")
-        .0
-        .result;
+        .0;
+    assert_eq!(context.status, "success");
+    let context = context.result;
     assert!(!context.is_empty());
 
     let context_items = serde_json::to_string(&vec![serde_json::json!({
@@ -60,8 +67,9 @@ async fn test_mcp_tools_flow() {
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
         .expect("explain")
-        .0
-        .result;
+        .0;
+    assert_eq!(explanation.status, "success");
+    let explanation = explanation.result;
     assert_eq!(explanation[0]["source_episode"], episode_id);
 
     // Backwards-compatible: allow passing an array of episode id strings
@@ -96,7 +104,7 @@ async fn test_mcp_tools_flow() {
 
 #[tokio::test]
 async fn test_mcp_full_flow_end_to_end() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     // Ingest content that contains ARR and a promise
@@ -179,7 +187,7 @@ async fn test_mcp_full_flow_end_to_end() {
 
 #[tokio::test]
 async fn test_mcp_ingest_validation_error() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
@@ -203,7 +211,7 @@ async fn test_mcp_ingest_validation_error() {
 
 #[tokio::test]
 async fn test_mcp_extract_no_input_returns_soft_result() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     let extract_params = serde_json::json!({
@@ -228,7 +236,7 @@ async fn test_mcp_extract_no_input_returns_soft_result() {
 /// and missing `quote` — the exact payload shape that caused the production crash.
 #[tokio::test]
 async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     // Shape: [{content, id, source_type}] — no quote, no source_episode
@@ -259,7 +267,7 @@ async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
 /// Regression: explain must accept objects with `id` + `quote` but no `source_episode`.
 #[tokio::test]
 async fn test_mcp_explain_objects_with_quote_and_id() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     let context_items = serde_json::to_string(&vec![
@@ -280,7 +288,7 @@ async fn test_mcp_explain_objects_with_quote_and_id() {
 /// Explain accepts a mixed array of strings and objects.
 #[tokio::test]
 async fn test_mcp_explain_mixed_array() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
     let context_items = serde_json::to_string(&vec![

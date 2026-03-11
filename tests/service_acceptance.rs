@@ -7,7 +7,7 @@ mod common;
 
 #[tokio::test]
 async fn test_ingest_extract_and_assemble() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let now = Utc::now();
     let episode_id = service
         .ingest(
@@ -46,7 +46,7 @@ async fn test_ingest_extract_and_assemble() {
 
 #[tokio::test]
 async fn test_resolve_aliases() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let first = service
         .resolve(
             EntityCandidate {
@@ -74,7 +74,7 @@ async fn test_resolve_aliases() {
 
 #[tokio::test]
 async fn test_invalidate_and_explain() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let episode_id = service
         .ingest(
             IngestRequest {
@@ -136,7 +136,7 @@ async fn test_invalidate_and_explain() {
 
 #[tokio::test]
 async fn test_policy_tag_filtering() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     service
         .add_fact(
             "metric",
@@ -176,7 +176,7 @@ async fn test_policy_tag_filtering() {
 
 #[tokio::test]
 async fn test_graph_intro_chain() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let alice = service.resolve_person("Alice").await.expect("alice");
     let bob = service.resolve_person("Bob").await.expect("bob");
     let openai = service.resolve_company("OpenAI").await.expect("openai");
@@ -196,7 +196,7 @@ async fn test_graph_intro_chain() {
 
 #[tokio::test]
 async fn test_graph_intro_chain_as_of_filters_edges() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let alice = service.resolve_person("Alice").await.expect("alice");
     let bob = service.resolve_person("Bob").await.expect("bob");
     let openai = service.resolve_company("OpenAI").await.expect("openai");
@@ -224,7 +224,7 @@ async fn test_graph_intro_chain_as_of_filters_edges() {
 
 #[tokio::test]
 async fn test_cbor_round_trip() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let payload = serde_json::json!({
         "datetime": "2026-01-01T00:00:00Z",
         "record_id": "episode:abc123",
@@ -237,7 +237,7 @@ async fn test_cbor_round_trip() {
 
 #[tokio::test]
 async fn test_rate_limit_determinism() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     service
         .add_fact(
             "metric",
@@ -306,7 +306,7 @@ async fn test_rate_limit_determinism() {
 
 #[tokio::test]
 async fn test_multiword_query_retrieval_quality() {
-    let service = common::make_service();
+    let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
 
     // Add facts with various content that should match multi-word queries

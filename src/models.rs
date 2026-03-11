@@ -312,7 +312,7 @@ pub struct Community {
 
 #[must_use]
 pub fn default_scope() -> String {
-    "personal".to_string()
+    "org".to_string()
 }
 
 #[must_use]
@@ -507,8 +507,8 @@ mod tests {
     }
 
     #[test]
-    fn default_scope_returns_personal() {
-        assert_eq!(default_scope(), "personal");
+    fn default_scope_returns_org() {
+        assert_eq!(default_scope(), "org");
     }
 
     #[test]

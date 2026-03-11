@@ -4,7 +4,7 @@ use memory_mcp::models::IngestRequest;
 
 #[tokio::test]
 async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let (_tmp, svc) = embedded_support::setup_embedded_service().await?;
+    let svc = embedded_support::setup_embedded_service().await?;
 
     let req = IngestRequest {
         source_type: "meeting".to_string(),

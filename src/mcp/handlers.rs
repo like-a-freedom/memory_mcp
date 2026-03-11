@@ -23,8 +23,46 @@ use super::parsers::{content_hash, parse_context_items, parse_datetime};
 /// Response wrapper for tool results.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 pub struct ToolResponse<T> {
+    /// Result status for the tool call.
+    pub status: String,
     /// The actual result data.
     pub result: T,
+    /// Optional next-step guidance for the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guidance: Option<String>,
+    /// Pagination flag for list responses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_more: Option<bool>,
+    /// Total count of records in the current response slice.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_count: Option<usize>,
+    /// Offset for the next page when pagination is supported.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_offset: Option<usize>,
+}
+
+impl<T> ToolResponse<T> {
+    fn success_with_guidance(result: T, guidance: impl Into<String>) -> Self {
+        Self {
+            status: "success".to_string(),
+            result,
+            guidance: Some(guidance.into()),
+            has_more: None,
+            total_count: None,
+            next_offset: None,
+        }
+    }
+
+    fn complete_list(result: T, total_count: usize, guidance: impl Into<String>) -> Self {
+        Self {
+            status: "success".to_string(),
+            result,
+            guidance: Some(guidance.into()),
+            has_more: Some(false),
+            total_count: Some(total_count),
+            next_offset: None,
+        }
+    }
 }
 
 /// MCP (Model Context Protocol) server handler for memory operations.
@@ -57,8 +95,7 @@ pub struct MemoryMcp {
 }
 
 impl MemoryMcp {
-    const SERVER_INSTRUCTIONS: &str =
-        "Memory MCP server: stores, extracts, resolves, and assembles long-term context.";
+    const SERVER_INSTRUCTIONS: &str = "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context.";
 
     /// Creates a new `MemoryMcp` instance with the given service.
     ///
@@ -224,19 +261,6 @@ impl MemoryMcp {
             }
         }
     }
-
-    /// Parse aliases from a string (comma-separated or JSON array).
-    fn parse_aliases(aliases_str: &str) -> Vec<String> {
-        if aliases_str.starts_with('[') {
-            serde_json::from_str(aliases_str).unwrap_or_default()
-        } else {
-            aliases_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
-        }
-    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -249,7 +273,7 @@ impl ServerHandler for MemoryMcp {
 #[tool_router]
 impl MemoryMcp {
     #[tool(
-        description = "Store a new episode (conversation, email, document, or event) into memory."
+        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must include ISO 8601 `t_ref` and a memory `scope`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
     )]
     pub async fn ingest(
         &self,
@@ -292,7 +316,10 @@ impl MemoryMcp {
                     json!({"episode_id": &episode_id}),
                     LogLevel::Info,
                 );
-                Ok(Json(ToolResponse { result: episode_id }))
+                Ok(Json(ToolResponse::success_with_guidance(
+                    episode_id,
+                    "Call extract next to derive entities and facts.",
+                )))
             }
             Err(err) => {
                 self.service.log_tool_event(
@@ -306,7 +333,9 @@ impl MemoryMcp {
         }
     }
 
-    #[tool(description = "Provide detailed explanations for context items with source citations.")]
+    #[tool(
+        description = "Explain context items with provenance-ready citations. Use this tool when you already have context items and need source snippets for an answer. Do not use this tool to search memory. Pass `context_items` as a JSON array string of objects or source IDs. Returns citation-ready items. On error, fix the JSON payload shape and retry."
+    )]
     pub async fn explain(
         &self,
         params: Parameters<ExplainParams>,
@@ -331,9 +360,12 @@ impl MemoryMcp {
                     json!({"count": explanations.len()}),
                     LogLevel::Info,
                 );
-                Ok(Json(ToolResponse {
-                    result: explanations,
-                }))
+                let count = explanations.len();
+                Ok(Json(ToolResponse::complete_list(
+                    explanations,
+                    count,
+                    "Use these citations directly in the final response.",
+                )))
             }
             Err(err) => {
                 self.service.log_tool_event(
@@ -347,7 +379,9 @@ impl MemoryMcp {
         }
     }
 
-    #[tool(description = "Analyze an episode to identify entities, facts, and relationships.")]
+    #[tool(
+        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Do not use this tool for retrieval. If you pass content instead of an `episode_id`, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links. On error, provide either `episode_id` or content/text."
+    )]
     pub async fn extract(
         &self,
         params: Parameters<ExtractParams>,
@@ -365,21 +399,25 @@ impl MemoryMcp {
                 true,
             )
             .await?;
-        Ok(Json(ToolResponse { result }))
+        Ok(Json(ToolResponse::success_with_guidance(
+            result,
+            "Resolve canonical entities for any ambiguous names before creating manual links.",
+        )))
     }
 
-    #[tool(description = "Find or create a canonical entity, handling deduplication and aliases.")]
+    #[tool(
+        description = "Resolve a canonical entity identifier for a name and its aliases. Use this tool when a person, company, or project may appear under multiple names. Do not use this tool for full-text retrieval. Arguments must include `entity_type`, `canonical_name`, and optional `aliases`. Returns the canonical `entity_id`. On error, fix the entity fields and retry."
+    )]
     pub async fn resolve(
         &self,
         params: Parameters<ResolveParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
         let p = params.0;
         let access = AccessContext::default();
-        let aliases = Self::parse_aliases(&p.aliases);
         let candidate = EntityCandidate {
             entity_type: p.entity_type.clone(),
             canonical_name: p.canonical_name.clone(),
-            aliases,
+            aliases: p.aliases.clone(),
         };
 
         self.service.log_tool_event(
@@ -397,7 +435,10 @@ impl MemoryMcp {
                     json!({"entity_id": &entity_id}),
                     LogLevel::Info,
                 );
-                Ok(Json(ToolResponse { result: entity_id }))
+                Ok(Json(ToolResponse::success_with_guidance(
+                    entity_id,
+                    "Use this entity_id when linking facts or relationships.",
+                )))
             }
             Err(err) => {
                 self.service.log_tool_event(
@@ -411,7 +452,9 @@ impl MemoryMcp {
         }
     }
 
-    #[tool(description = "Mark a fact as no longer valid while preserving its history.")]
+    #[tool(
+        description = "Invalidate a fact while preserving historical traceability. Use this tool when a fact becomes outdated or superseded. Do not use this tool to delete memory. Arguments require a `fact_id`, `reason`, and ISO 8601 `t_invalid`. Returns confirmation. On error, verify the fact identifier and retry."
+    )]
     pub async fn invalidate(
         &self,
         params: Parameters<InvalidateParams>,
@@ -446,7 +489,10 @@ impl MemoryMcp {
                     json!({"result": res}),
                     LogLevel::Info,
                 );
-                Ok(Json(ToolResponse { result: res }))
+                Ok(Json(ToolResponse::success_with_guidance(
+                    res,
+                    "Re-run assemble_context with a fresh `as_of` timestamp to confirm the fact is no longer active.",
+                )))
             }
             Err(err) => {
                 self.service.log_tool_event(
@@ -460,7 +506,9 @@ impl MemoryMcp {
         }
     }
 
-    #[tool(description = "Retrieve relevant facts and context for answering a specific query.")]
+    #[tool(
+        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments require a natural-language `query`, a `scope`, and optional `as_of` plus `budget`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
+    )]
     pub async fn assemble_context(
         &self,
         params: Parameters<AssembleContextParams>,
@@ -496,262 +544,16 @@ impl MemoryMcp {
                     json!({"count": results.len()}),
                     LogLevel::Info,
                 );
-                Ok(Json(ToolResponse { result: results }))
+                let count = results.len();
+                Ok(Json(ToolResponse::complete_list(
+                    results,
+                    count,
+                    "Call explain if you need provenance-ready citations for selected items.",
+                )))
             }
             Err(err) => {
                 self.service.log_tool_event(
                     "assemble_context.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                );
-                Err(mcp_error(err))
-            }
-        }
-    }
-
-    #[tool(description = "Store a document into memory (alias for ingest).")]
-    pub async fn ingest_document(
-        &self,
-        params: Parameters<AliasIngestParams>,
-    ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        let p = params.0;
-        let t_ref = parse_datetime(&p.t_ref).ok_or_else(|| {
-            ErrorData::new(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid t_ref format".to_string(),
-                None,
-            )
-        })?;
-        let t_ingested = p.t_ingested.as_ref().and_then(|s| parse_datetime(s));
-        let access = AccessContext::default();
-        let request = IngestRequest {
-            source_type: p.source_type,
-            source_id: p.source_id,
-            content: p.content,
-            t_ref,
-            scope: p.scope,
-            t_ingested,
-            visibility_scope: p.visibility_scope,
-            policy_tags: p.policy_tags,
-        };
-        let episode_id = self
-            .service
-            .ingest(request, Some(access))
-            .await
-            .map_err(mcp_error)?;
-        Ok(Json(ToolResponse { result: episode_id }))
-    }
-
-    #[tool(description = "Analyze content to identify entities (alias for extract).")]
-    pub async fn extract_entities(
-        &self,
-        params: Parameters<AliasExtractParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
-        let result = self
-            .extract_impl(
-                p.episode_id,
-                p.content,
-                p.text,
-                p.source_type,
-                p.source_id,
-                p.t_ref,
-                p.scope,
-                false,
-            )
-            .await?;
-        Ok(Json(ToolResponse { result }))
-    }
-
-    #[tool(description = "Find the canonical ID for an entity (alias for resolve).")]
-    pub async fn resolve_entity(
-        &self,
-        params: Parameters<ResolveEntityParams>,
-    ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        let p = params.0;
-        let access = AccessContext::default();
-        let aliases = Self::parse_aliases(&p.aliases);
-        let candidate = EntityCandidate {
-            entity_type: p.entity_type,
-            canonical_name: p.canonical_name,
-            aliases,
-        };
-        let entity_id = self
-            .service
-            .resolve(candidate, Some(access))
-            .await
-            .map_err(mcp_error)?;
-        Ok(Json(ToolResponse { result: entity_id }))
-    }
-
-    #[tool(description = "Create a task reminder draft for user confirmation.")]
-    pub async fn create_task(
-        &self,
-        params: Parameters<CreateTaskParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
-        let due_date = p.due_date.as_ref().and_then(|s| parse_datetime(s));
-
-        self.service.log_tool_event(
-            "create_task.start",
-            json!({"title": &p.title}),
-            json!({}),
-            LogLevel::Info,
-        );
-
-        match self.service.create_task(&p.title, due_date).await {
-            Ok(record) => {
-                self.service.log_tool_event(
-                    "create_task.done",
-                    json!({"title": &p.title}),
-                    json!({"id": record.get("id")}),
-                    LogLevel::Info,
-                );
-                Ok(Json(ToolResponse { result: record }))
-            }
-            Err(err) => {
-                self.service.log_tool_event(
-                    "create_task.error",
-                    json!({"title": &p.title}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                );
-                Err(mcp_error(err))
-            }
-        }
-    }
-
-    #[tool(description = "Draft an email or message for the user to review.")]
-    pub async fn send_message_draft(
-        &self,
-        params: Parameters<SendMessageParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
-        let result = self.service.send_message_draft(
-            p.to.as_deref().unwrap_or(""),
-            p.subject.as_deref().unwrap_or(""),
-            p.body.as_deref().unwrap_or(""),
-        );
-        Ok(Json(ToolResponse { result }))
-    }
-
-    #[tool(description = "Draft a calendar meeting for user confirmation.")]
-    pub async fn schedule_meeting(
-        &self,
-        params: Parameters<ScheduleMeetingParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
-        let start = parse_datetime(&p.start).ok_or_else(|| {
-            ErrorData::new(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "start is required".to_string(),
-                None,
-            )
-        })?;
-        let end = parse_datetime(&p.end).ok_or_else(|| {
-            ErrorData::new(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "end is required".to_string(),
-                None,
-            )
-        })?;
-        let result = self
-            .service
-            .schedule_meeting(p.title.as_deref().unwrap_or(""), start, end);
-        Ok(Json(ToolResponse { result }))
-    }
-
-    #[tool(description = "Record or update a tracked metric value.")]
-    pub async fn update_metric(
-        &self,
-        params: Parameters<UpdateMetricParams>,
-    ) -> Result<Json<ToolResponse<Value>>, ErrorData> {
-        let p = params.0;
-        let result = self
-            .service
-            .update_metric(p.name.as_deref().unwrap_or(""), p.value.unwrap_or(0.0));
-        Ok(Json(ToolResponse { result }))
-    }
-
-    #[tool(description = "Retrieve all commitments and promises.")]
-    pub async fn ui_promises(
-        &self,
-        _params: Parameters<UiParams>,
-    ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
-        self.service
-            .log_tool_event("ui_promises.start", json!({}), json!({}), LogLevel::Info);
-        match self.service.ui_promises().await {
-            Ok(result) => {
-                self.service.log_tool_event(
-                    "ui_promises.done",
-                    json!({}),
-                    json!({"count": result.len()}),
-                    LogLevel::Info,
-                );
-                Ok(Json(ToolResponse { result }))
-            }
-            Err(err) => {
-                self.service.log_tool_event(
-                    "ui_promises.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                );
-                Err(mcp_error(err))
-            }
-        }
-    }
-
-    #[tool(description = "Retrieve all tracked metrics.")]
-    pub async fn ui_metrics(
-        &self,
-        _params: Parameters<UiParams>,
-    ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
-        self.service
-            .log_tool_event("ui_metrics.start", json!({}), json!({}), LogLevel::Info);
-        match self.service.ui_metrics().await {
-            Ok(result) => {
-                self.service.log_tool_event(
-                    "ui_metrics.done",
-                    json!({}),
-                    json!({"count": result.len()}),
-                    LogLevel::Info,
-                );
-                Ok(Json(ToolResponse { result }))
-            }
-            Err(err) => {
-                self.service.log_tool_event(
-                    "ui_metrics.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                );
-                Err(mcp_error(err))
-            }
-        }
-    }
-
-    #[tool(description = "Retrieve all pending task drafts.")]
-    pub async fn ui_tasks(
-        &self,
-        _params: Parameters<UiParams>,
-    ) -> Result<Json<ToolResponse<Vec<Value>>>, ErrorData> {
-        self.service
-            .log_tool_event("ui_tasks.start", json!({}), json!({}), LogLevel::Info);
-        match self.service.ui_tasks().await {
-            Ok(result) => {
-                self.service.log_tool_event(
-                    "ui_tasks.done",
-                    json!({}),
-                    json!({"count": result.len()}),
-                    LogLevel::Info,
-                );
-                Ok(Json(ToolResponse { result }))
-            }
-            Err(err) => {
-                self.service.log_tool_event(
-                    "ui_tasks.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
@@ -766,7 +568,6 @@ impl MemoryMcp {
 mod tests {
     use super::*;
     use chrono::Datelike;
-    use serde_json::json;
 
     #[test]
     fn build_server_info_enables_tools_and_sets_instructions() {
@@ -775,9 +576,30 @@ mod tests {
 
         assert_eq!(
             info.instructions.as_deref(),
-            Some(MemoryMcp::SERVER_INSTRUCTIONS),
+            Some(
+                "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context.",
+            ),
         );
         assert!(capabilities.get("tools").is_some());
+    }
+
+    #[test]
+    fn tool_response_success_envelope_is_decision_ready() {
+        let response = ToolResponse {
+            status: "success".to_string(),
+            result: "episode:abc123".to_string(),
+            guidance: Some("Call extract next to derive entities and facts.".to_string()),
+            has_more: None,
+            total_count: None,
+            next_offset: None,
+        };
+
+        assert_eq!(response.status, "success");
+        assert_eq!(response.result, "episode:abc123");
+        assert_eq!(
+            response.guidance.as_deref(),
+            Some("Call extract next to derive entities and facts."),
+        );
     }
 
     #[test]
@@ -801,18 +623,6 @@ mod tests {
     fn parse_datetime_returns_none_for_invalid() {
         assert!(parse_datetime("invalid").is_none());
         assert!(parse_datetime("").is_none());
-    }
-
-    #[test]
-    fn create_task_params_accept_null_due_date() {
-        let params: CreateTaskParams = serde_json::from_value(json!({
-            "title": "Follow up with ACME",
-            "due_date": null
-        }))
-        .unwrap();
-
-        assert_eq!(params.title, "Follow up with ACME");
-        assert!(params.due_date.is_none());
     }
 
     // Note: normalize_optional_string, content_hash, default_scope, and empty_extract_result

@@ -7,7 +7,7 @@ use memory_mcp::models::AssembleContextRequest;
 /// SurrealDB stack (embedded) with the FTS index and per-word fallback.
 #[tokio::test]
 async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error>> {
-    let (_tmp, service) = embedded_support::setup_embedded_service().await?;
+    let service = embedded_support::setup_embedded_service().await?;
     let t = Utc::now() - Duration::days(1);
 
     // Add facts with content that has non-adjacent words matching the query

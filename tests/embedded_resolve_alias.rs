@@ -5,7 +5,7 @@ use memory_mcp::models::EntityCandidate;
 #[tokio::test]
 async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn std::error::Error>>
 {
-    let (_tmp, service) = embedded_support::setup_embedded_service().await?;
+    let service = embedded_support::setup_embedded_service().await?;
 
     let canonical_id = service
         .resolve(

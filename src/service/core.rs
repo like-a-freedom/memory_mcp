@@ -734,14 +734,11 @@ impl MemoryService {
             {
                 if let Value::Object(map) = record
                     && let (Some(from_id), Some(to_id)) = (
-                        map.get("from_id").and_then(Value::as_str),
-                        map.get("to_id").and_then(Value::as_str),
+                        map.get("from_id").and_then(string_from_value),
+                        map.get("to_id").and_then(string_from_value),
                     )
                 {
-                    graph
-                        .entry(from_id.to_string())
-                        .or_default()
-                        .push(to_id.to_string());
+                    graph.entry(from_id).or_default().push(to_id);
                 }
             }
         }
@@ -916,9 +913,8 @@ impl MemoryService {
             .await?;
         Ok(record.and_then(|map| {
             map.get("entity_id")
-                .and_then(Value::as_str)
-                .or_else(|| map.get("id").and_then(Value::as_str))
-                .map(str::to_string)
+                .and_then(string_from_value)
+                .or_else(|| map.get("id").and_then(string_from_value))
         }))
     }
 }

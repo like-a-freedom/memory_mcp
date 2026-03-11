@@ -14,14 +14,25 @@ use crate::service::MemoryError;
 /// - `ConfigInvalid` → `INVALID_REQUEST`
 /// - `Storage` → `INTERNAL_ERROR`
 pub fn mcp_error(err: MemoryError) -> ErrorData {
-    let code = match err {
-        MemoryError::Validation(_) => ErrorCode::INVALID_PARAMS,
-        MemoryError::NotFound(_) => ErrorCode::INVALID_PARAMS,
-        MemoryError::ConfigMissing(_) => ErrorCode::INVALID_REQUEST,
-        MemoryError::ConfigInvalid(_) => ErrorCode::INVALID_REQUEST,
-        MemoryError::Storage(_) => ErrorCode::INTERNAL_ERROR,
+    let (code, guidance) = match &err {
+        MemoryError::Validation(_) => (
+            ErrorCode::INVALID_PARAMS,
+            "Fix the input arguments and retry.",
+        ),
+        MemoryError::NotFound(_) => (
+            ErrorCode::INVALID_PARAMS,
+            "Verify the identifier or create the missing memory record first.",
+        ),
+        MemoryError::ConfigMissing(_) | MemoryError::ConfigInvalid(_) => (
+            ErrorCode::INVALID_REQUEST,
+            "Fix the server configuration before retrying this tool call.",
+        ),
+        MemoryError::Storage(_) => (
+            ErrorCode::INTERNAL_ERROR,
+            "Retry the request. If the problem persists, inspect server logs.",
+        ),
     };
-    ErrorData::new(code, err.to_string(), None)
+    ErrorData::new(code, format!("{} Guidance: {guidance}", err), None)
 }
 
 #[cfg(test)]
@@ -72,7 +83,10 @@ mod tests {
     fn mcp_error_includes_error_message() {
         let err = MemoryError::Validation("field is required".to_string());
         let mcp_err = mcp_error(err);
-        assert_eq!(mcp_err.message, "validation error: field is required");
+        assert_eq!(
+            mcp_err.message,
+            "validation error: field is required Guidance: Fix the input arguments and retry."
+        );
     }
 
     #[test]

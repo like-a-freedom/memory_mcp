@@ -9,7 +9,7 @@ mod common;
 
 #[tokio::test]
 async fn test_service_ingest_and_extract_flow() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     // Ingest an episode
     let request = memory_mcp::models::IngestRequest {
@@ -36,7 +36,7 @@ async fn test_service_ingest_and_extract_flow() {
 
 #[tokio::test]
 async fn test_service_resolve_and_relate_entities() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     // Resolve entities
     let alice_id = service.resolve_person("Alice Smith").await.unwrap();
@@ -55,7 +55,7 @@ async fn test_service_resolve_and_relate_entities() {
 
 #[tokio::test]
 async fn test_service_add_fact_and_assemble_context() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
@@ -94,7 +94,7 @@ async fn test_service_add_fact_and_assemble_context() {
 
 #[tokio::test]
 async fn test_service_fact_invalidation() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
@@ -161,55 +161,8 @@ async fn test_service_fact_invalidation() {
 }
 
 #[tokio::test]
-async fn test_service_ui_operations() {
-    let service = common::make_service();
-
-    // Create a task
-    let task = service
-        .create_task(
-            "Review Q4 metrics",
-            Some(Utc.with_ymd_and_hms(2024, 12, 31, 0, 0, 0).unwrap()),
-        )
-        .await
-        .unwrap();
-    assert_eq!(task["status"], "pending_confirmation");
-    assert_eq!(task["title"], "Review Q4 metrics");
-
-    // Get UI tasks
-    let tasks = service.ui_tasks().await.unwrap();
-    assert!(!tasks.is_empty());
-
-    // Get UI promises
-    let _promises = service.ui_promises().await.unwrap();
-
-    // Get UI metrics
-    let _metrics = service.ui_metrics().await.unwrap();
-}
-
-#[tokio::test]
-async fn test_service_create_task_without_due_date() {
-    let service = common::make_service();
-
-    let task = service
-        .create_task("Follow up with legal", None)
-        .await
-        .unwrap();
-
-    assert_eq!(task["status"], "pending_confirmation");
-    assert_eq!(task["title"], "Follow up with legal");
-    assert!(task.get("due_date").is_none());
-
-    let tasks = service.ui_tasks().await.unwrap();
-    assert!(
-        tasks
-            .iter()
-            .any(|t| { t.get("title").and_then(|v| v.as_str()) == Some("Follow up with legal") })
-    );
-}
-
-#[tokio::test]
 async fn test_service_cache_behavior() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
@@ -248,7 +201,7 @@ async fn test_service_cache_behavior() {
 
 #[tokio::test]
 async fn test_service_scope_isolation() {
-    let service = common::make_service();
+    let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 

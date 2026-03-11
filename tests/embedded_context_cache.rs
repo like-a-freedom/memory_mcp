@@ -5,7 +5,7 @@ use memory_mcp::models::{AccessPayload, AssembleContextRequest};
 
 #[tokio::test]
 async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std::error::Error>> {
-    let (_tmp, service) = embedded_support::setup_embedded_service().await?;
+    let service = embedded_support::setup_embedded_service().await?;
     let now = Utc::now();
 
     service

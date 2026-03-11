@@ -70,7 +70,7 @@ LOG_LEVEL=info ./target/release/memory_mcp
 {
   "name": "memory_mcp",
   "version": "0.1.0",
-  "description": "Memory MCP — ingest/extract/assemble/explain tools",
+  "description": "Memory MCP — long-term memory tools for ingest, extraction, entity resolution, invalidation, context assembly, and explanation",
   "tools": [
     {
       "name": "ingest",
@@ -78,7 +78,9 @@ LOG_LEVEL=info ./target/release/memory_mcp
       "input_example": {
         "source_type": "email",
         "source_id": "MSG-123",
-        "content": "The email body or raw document"
+        "content": "The email body or raw document",
+        "t_ref": "2026-03-11T10:00:00Z",
+        "scope": "org"
       }
     },
     {
@@ -87,14 +89,39 @@ LOG_LEVEL=info ./target/release/memory_mcp
       "input_example": { "episode_id": "episode:..." }
     },
     {
+      "name": "resolve",
+      "description": "Resolve a canonical entity id from a name and aliases",
+      "input_example": {
+        "entity_type": "person",
+        "canonical_name": "John Doe",
+        "aliases": ["Johnny Doe", "J. Doe"]
+      }
+    },
+    {
       "name": "assemble_context",
-      "description": "Assemble context for an entity or a prompt",
-      "input_example": { "entity_id": "entity:...", "limit": 50 }
+      "description": "Assemble active context for a natural-language query",
+      "input_example": {
+        "query": "ARR commitments for Alice",
+        "scope": "org",
+        "as_of": "2026-03-11T10:00:00Z",
+        "budget": 10
+      }
     },
     {
       "name": "explain",
-      "description": "Return provenance and citations for an entity or fact",
-      "input_example": { "entity_id": "entity:..." }
+      "description": "Return provenance-ready citations for context items",
+      "input_example": {
+        "context_items": "[{\"content\":\"ARR $2M\",\"quote\":\"ARR $2M\",\"source_episode\":\"episode:abc123\"}]"
+      }
+    },
+    {
+      "name": "invalidate",
+      "description": "Mark a fact as no longer valid while preserving history",
+      "input_example": {
+        "fact_id": "fact:...",
+        "reason": "Superseded by a newer update",
+        "t_invalid": "2026-03-11T10:00:00Z"
+      }
     }
   ]
 }
@@ -170,7 +197,7 @@ printf '%s\n' '{"type":"call","id":"1","tool":"ingest","args": {"source_type":"e
 Ожидаемый ответ (пример):
 
 ```json
-{"type":"response","id":"1","ok":{"episode_id":"episode:abc123"}}
+{"type":"response","id":"1","ok":{"status":"success","result":"episode:abc123","guidance":"Call extract next to derive entities and facts."}}
 ```
 
 2) Извлекаем сущности/факты из эпизода:
@@ -182,31 +209,31 @@ printf '%s\n' '{"type":"call","id":"2","tool":"extract","args": {"episode_id":"e
 Ответ (пример):
 
 ```json
-{"type":"response","id":"2","ok":{"entities":[{"id":"entity:john","type":"person","name":"John Doe"}]}}
+{"type":"response","id":"2","ok":{"status":"success","result":{"episode_id":"episode:abc123","entities":[{"entity_id":"entity:john","type":"person","name":"John Doe"}],"facts":[{"fact_id":"fact:arr","type":"metric"}],"links":[]},"guidance":"Resolve canonical entities for any ambiguous names before creating manual links."}}
 ```
 
-3) Собираем контекст для сущности (assemble_context):
+3) Собираем контекст по запросу (assemble_context):
 
 ```bash
-printf '%s\n' '{"type":"call","id":"3","tool":"assemble_context","args": {"entity_id":"entity:john","limit":25}}' | ./target/debug/memory_mcp
+printf '%s\n' '{"type":"call","id":"3","tool":"assemble_context","args": {"query":"ARR for John","scope":"org","as_of":"2026-03-11T10:00:00Z","budget":25}}' | ./target/debug/memory_mcp
 ```
 
 Ответ (пример):
 
 ```json
-{"type":"response","id":"3","ok":{"context":[{"episode_id":"episode:abc123","text":"..."}]}}
+{"type":"response","id":"3","ok":{"status":"success","result":[{"fact_id":"fact:arr","content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123","confidence":0.93,"rationale":"matched scope=org and active at 2026-03-11T10:00:00Z"}],"guidance":"Call explain if you need provenance-ready citations for selected items.","has_more":false,"total_count":1}}
 ```
 
 4) Поясняем происхождение (explain):
 
 ```bash
-printf '%s\n' '{"type":"call","id":"4","tool":"explain","args":{"entity_id":"entity:john"}}' | ./target/debug/memory_mcp
+printf '%s\n' '{"type":"call","id":"4","tool":"explain","args":{"context_items":"[{\"content\":\"ARR $2M\",\"quote\":\"ARR $2M\",\"source_episode\":\"episode:abc123\"}]"}}' | ./target/debug/memory_mcp
 ```
 
 Ответ (пример):
 
 ```json
-{"type":"response","id":"4","ok":{"explanations":[{"fact_id":"fact:1","source":"MSG-202","confidence":0.95}]}}
+{"type":"response","id":"4","ok":{"status":"success","result":[{"content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123"}],"guidance":"Use these citations directly in the final response.","has_more":false,"total_count":1}}
 ```
 
 ---

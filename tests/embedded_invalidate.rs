@@ -5,7 +5,7 @@ use memory_mcp::models::{AssembleContextRequest, InvalidateRequest};
 
 #[tokio::test]
 async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn std::error::Error>> {
-    let (_tmp, service) = embedded_support::setup_embedded_service().await?;
+    let service = embedded_support::setup_embedded_service().await?;
     let now = Utc::now();
 
     let fact_id = service
