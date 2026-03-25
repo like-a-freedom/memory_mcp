@@ -446,38 +446,12 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let base_where = "scope = $scope AND t_valid <= $cutoff AND (t_ingested IS NONE OR t_ingested <= $cutoff) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff)";
-
-        let (sql, vars, query_words) = if let Some(q) = query_contains {
-            let words: Vec<String> = q
-                .split_whitespace()
-                .filter(|w| w.len() >= 2)
-                .map(|w| w.to_lowercase())
-                .collect();
-
-            let v = serde_json::json!({
-                "scope": scope,
-                "cutoff": cutoff,
-                "limit": limit,
-            });
-
-            (
-                "SELECT * FROM fact ORDER BY t_valid DESC".to_string(),
-                v,
-                words,
-            )
-        } else {
-            let v = serde_json::json!({
-                "scope": scope,
-                "cutoff": cutoff,
-                "limit": limit,
-            });
-            (
-                format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit"),
-                v,
-                Vec::new(),
-            )
-        };
+        let (sql, vars) = build_select_facts_filtered_query(
+            scope,
+            cutoff,
+            query_contains,
+            limit,
+        );
 
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
@@ -487,17 +461,7 @@ impl DbClient for SurrealDbClient {
             Err(err) => return Err(err),
         };
         let normalized = surreal_to_json(surreal_val);
-        let mut results = extract_records(normalized);
-
-        if query_contains.is_some() {
-            let flattened = flatten_surreal_records(results);
-            results = flattened
-                .into_iter()
-                .filter(|record| record_is_visible_for_scope(record, scope, cutoff))
-                .filter(|record| record_matches_any_query_word(record, &query_words))
-                .take(limit.max(1) as usize)
-                .collect();
-        }
+        let results = extract_records(normalized);
 
         self.log_op(
             "db.select_facts_filtered.result",
@@ -524,7 +488,7 @@ impl DbClient for SurrealDbClient {
         );
 
         let sql = String::from(
-            "SELECT * FROM edge WHERE string::is_datetime(t_valid) AND t_valid <= $cutoff AND (t_ingested IS NONE OR (string::is_datetime(t_ingested) AND t_ingested <= $cutoff)) AND (t_invalid IS NONE OR t_invalid > $cutoff OR t_invalid_ingested > $cutoff) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
+            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
         );
 
         let vars = serde_json::json!({ "cutoff": cutoff });
@@ -675,14 +639,24 @@ fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
         (record_id, None)
     };
 
-    let sql = if let Some(record_id) = id {
-        format!("CREATE {table}:⟨{record_id}⟩ CONTENT $content RETURN *")
+    let target = if let Some(record_id) = id {
+        format!("{table}:⟨{record_id}⟩")
     } else {
-        format!("CREATE {table} CONTENT $content RETURN *")
+        table.to_string()
     };
 
-    let content_for_create = normalize_surreal_json(&content);
-    (sql, json!({"content": content_for_create}))
+    let normalized = normalize_surreal_json(&content);
+    if let Value::Object(map) = normalized {
+        let (assignments, vars) = build_set_assignments(table, map);
+        let sql = if assignments.is_empty() {
+            format!("CREATE {target} RETURN *")
+        } else {
+            format!("CREATE {target} SET {} RETURN *", assignments.join(", "))
+        };
+        (sql, Value::Object(vars))
+    } else {
+        (format!("CREATE {target} CONTENT $content RETURN *"), json!({"content": normalized}))
+    }
 }
 
 /// Build SQL query for updating a record.
@@ -695,8 +669,6 @@ fn build_update_query(record_id: &str, content: Value) -> Result<(String, Value)
         )));
     };
 
-    let sql = format!("UPDATE {table}:⟨{id}⟩ MERGE $content RETURN *");
-
     let content_for_update = if let Value::Object(mut map) = content {
         map.remove("id");
         Value::Object(map)
@@ -704,8 +676,71 @@ fn build_update_query(record_id: &str, content: Value) -> Result<(String, Value)
         content
     };
 
-    let content_for_update = normalize_surreal_json(&content_for_update);
-    Ok((sql, json!({"content": content_for_update})))
+    let normalized = normalize_surreal_json(&content_for_update);
+    if let Value::Object(map) = normalized {
+        let (assignments, vars) = build_set_assignments(table, map);
+        let sql = if assignments.is_empty() {
+            format!("UPDATE {table}:⟨{id}⟩ RETURN *")
+        } else {
+            format!("UPDATE {table}:⟨{id}⟩ SET {} RETURN *", assignments.join(", "))
+        };
+        Ok((sql, Value::Object(vars)))
+    } else {
+        let sql = format!("UPDATE {table}:⟨{id}⟩ MERGE $content RETURN *");
+        Ok((sql, json!({"content": normalized})))
+    }
+}
+
+fn build_select_facts_filtered_query(
+    scope: &str,
+    cutoff: &str,
+    query_contains: Option<&str>,
+    limit: i32,
+) -> (String, Value) {
+    let cutoff_expr = "type::datetime($cutoff)";
+    let base_where = format!(
+        "scope = $scope AND t_valid <= {cutoff_expr} AND (t_ingested IS NONE OR t_ingested <= {cutoff_expr}) AND (t_invalid IS NONE OR t_invalid > {cutoff_expr} OR t_invalid_ingested > {cutoff_expr})"
+    );
+
+    let mut vars = serde_json::Map::from_iter([
+        ("scope".to_string(), json!(scope)),
+        ("cutoff".to_string(), json!(cutoff)),
+        ("limit".to_string(), json!(limit)),
+    ]);
+
+    let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
+        let words: Vec<String> = query
+            .split_whitespace()
+            .filter(|word| word.len() >= 2)
+            .map(|word| word.to_lowercase())
+            .collect();
+
+        vars.insert("query".to_string(), json!(query));
+
+        let fallback = if words.is_empty() {
+            String::new()
+        } else {
+            let predicates = words
+                .iter()
+                .enumerate()
+                .map(|(index, word)| {
+                    let key = format!("word_{index}");
+                    vars.insert(key.clone(), json!(word));
+                    format!("string::lowercase(content) CONTAINS ${key}")
+                })
+                .collect::<Vec<_>>()
+                .join(" AND ");
+            format!(" OR ({predicates})")
+        };
+
+        format!(
+            "SELECT * FROM fact WHERE {base_where} AND (content @@ $query{fallback}) ORDER BY t_valid DESC LIMIT $limit"
+        )
+    } else {
+        format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit")
+    };
+
+    (sql, Value::Object(vars))
 }
 
 fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
@@ -716,6 +751,51 @@ fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
             .map_err(|err| MemoryError::Storage(format!("failed to create data dir: {err}")))?;
     }
     Ok(())
+}
+
+fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
+    match table {
+        "episode" => &["t_ref", "t_ingested"],
+        "fact" | "edge" => &["t_valid", "t_ingested", "t_invalid", "t_invalid_ingested"],
+        "community" => &["updated_at"],
+        "event_log" => &["ts"],
+        "task" => &["due_date"],
+        "script_migration" => &["executed_at"],
+        _ => &[],
+    }
+}
+
+fn build_set_assignments(
+    table: &str,
+    map: serde_json::Map<String, Value>,
+) -> (Vec<String>, serde_json::Map<String, Value>) {
+    let temporal_fields = temporal_field_names_for_table(table);
+    let mut entries: Vec<(String, Value)> = map.into_iter().collect();
+    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+    let mut assignments = Vec::with_capacity(entries.len());
+    let mut vars = serde_json::Map::new();
+
+    for (key, value) in entries {
+        if temporal_fields.contains(&key.as_str()) {
+            match value {
+                Value::Null => assignments.push(format!("{key} = NONE")),
+                Value::String(raw) => {
+                    vars.insert(key.clone(), Value::String(raw));
+                    assignments.push(format!("{key} = type::datetime(${key})"));
+                }
+                other => {
+                    vars.insert(key.clone(), other);
+                    assignments.push(format!("{key} = ${key}"));
+                }
+            }
+        } else {
+            vars.insert(key.clone(), value);
+            assignments.push(format!("{key} = ${key}"));
+        }
+    }
+
+    (assignments, vars)
 }
 
 fn normalize_url(url: &str) -> String {
@@ -799,12 +879,12 @@ fn unwrap_object_wrapper(value: Value) -> Value {
     match value {
         Value::Object(mut map) => {
             if let Some(object) = map.remove("Object") {
-                object
+                normalize_surreal_json(&object)
             } else {
-                Value::Object(map)
+                normalize_surreal_json(&Value::Object(map))
             }
         }
-        other => other,
+        other => normalize_surreal_json(&other),
     }
 }
 
@@ -822,119 +902,13 @@ fn extract_records(value: Value) -> Vec<Value> {
                     .collect();
             }
             if let Some(object) = map.remove("Object") {
-                return vec![object];
+                return vec![normalize_surreal_json(&object)];
             }
-            vec![Value::Object(map)]
+            vec![normalize_surreal_json(&Value::Object(map))]
         }
         Value::Null => Vec::new(),
-        other => vec![other],
+        other => vec![normalize_surreal_json(&other)],
     }
-}
-
-fn value_to_matchable_string(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.clone(),
-        Value::Object(map) => {
-            if map.contains_key("None") {
-                return String::new();
-            }
-            if let Some(inner) = map.get("String") {
-                return value_to_matchable_string(inner);
-            }
-            if let Some(inner) = map.get("Strand") {
-                return value_to_matchable_string(inner);
-            }
-            if let Some(inner) = map.get("content") {
-                return value_to_matchable_string(inner);
-            }
-            if map.len() == 1
-                && let Some((_, inner)) = map.iter().next()
-            {
-                return value_to_matchable_string(inner);
-            }
-            String::new()
-        }
-        Value::Array(values) => values
-            .first()
-            .map(value_to_matchable_string)
-            .unwrap_or_default(),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        _ => String::new(),
-    }
-}
-
-fn record_matches_any_query_word(record: &Value, words: &[String]) -> bool {
-    if words.is_empty() {
-        return true;
-    }
-    let content = record
-        .get("content")
-        .map(value_to_matchable_string)
-        .unwrap_or_default()
-        .to_lowercase();
-    words.iter().any(|word| content.contains(word))
-}
-
-fn record_string_field(record: &Value, key: &str) -> String {
-    record
-        .get(key)
-        .map(value_to_matchable_string)
-        .unwrap_or_default()
-}
-
-fn record_is_visible_for_scope(record: &Value, scope: &str, cutoff: &str) -> bool {
-    let record_scope = record_string_field(record, "scope");
-    if record_scope != scope {
-        return false;
-    }
-
-    let t_valid = record_string_field(record, "t_valid");
-    if t_valid.is_empty() || t_valid.as_str() > cutoff {
-        return false;
-    }
-
-    let t_ingested = record_string_field(record, "t_ingested");
-    if !t_ingested.is_empty() && t_ingested.as_str() > cutoff {
-        return false;
-    }
-
-    let t_invalid = record_string_field(record, "t_invalid");
-    if !t_invalid.is_empty() && t_invalid.as_str() <= cutoff {
-        let t_invalid_ingested = record_string_field(record, "t_invalid_ingested");
-        let invalid_known = if t_invalid_ingested.is_empty() {
-            true
-        } else {
-            t_invalid_ingested.as_str() <= cutoff
-        };
-        if invalid_known {
-            return false;
-        }
-    }
-
-    true
-}
-
-fn flatten_surreal_records(records: Vec<Value>) -> Vec<Value> {
-    let mut flat = Vec::new();
-    for record in records {
-        if let Some(items) = record.get("Array").and_then(Value::as_array) {
-            for item in items {
-                if let Some(obj) = item.get("Object") {
-                    flat.push(obj.clone());
-                } else {
-                    flat.push(item.clone());
-                }
-            }
-            continue;
-        }
-        if let Some(obj) = record.get("Object") {
-            flat.push(obj.clone());
-            continue;
-        }
-        flat.push(record);
-    }
-    flat
 }
 
 fn normalize_surreal_json(v: &Value) -> Value {
@@ -963,6 +937,10 @@ fn normalize_surreal_json(v: &Value) -> Value {
                     })
                     .unwrap_or_else(|| val.clone()),
                 "Strand" | "String" => val
+                    .as_object()
+                    .and_then(|inner| inner.get("String").cloned())
+                    .unwrap_or_else(|| val.clone()),
+                "Datetime" => val
                     .as_object()
                     .and_then(|inner| inner.get("String").cloned())
                     .unwrap_or_else(|| val.clone()),
@@ -1142,8 +1120,25 @@ mod tests {
             "due_date": null
         });
 
-        let (_sql, vars) = build_create_query("task", content);
-        assert!(vars["content"]["due_date"].is_null());
+        let (sql, vars) = build_create_query("task", content);
+        assert!(sql.contains("due_date = NONE"));
+        assert!(vars.get("due_date").is_none());
+    }
+
+    #[test]
+    fn build_create_query_casts_temporal_fields_with_type_datetime() {
+        let content = json!({
+            "content": "remember this",
+            "scope": "org",
+            "t_valid": "2026-03-25T17:07:08.958562Z",
+            "t_ingested": "2026-03-25T17:07:08.958562Z"
+        });
+
+        let (sql, vars) = build_create_query("fact", content);
+        assert!(sql.contains("t_valid = type::datetime($t_valid)"));
+        assert!(sql.contains("t_ingested = type::datetime($t_ingested)"));
+        assert_eq!(vars.get("t_valid"), Some(&json!("2026-03-25T17:07:08.958562Z")));
+        assert_eq!(vars.get("t_ingested"), Some(&json!("2026-03-25T17:07:08.958562Z")));
     }
 
     #[test]
@@ -1205,26 +1200,25 @@ mod tests {
     fn build_create_query_with_id() {
         let content = json!({"name": "test"});
         let (sql, vars) = build_create_query("entity:abc123", content);
-        assert_eq!(sql, "CREATE entity:⟨abc123⟩ CONTENT $content RETURN *");
-        assert!(vars.get("content").is_some());
+        assert_eq!(sql, "CREATE entity:⟨abc123⟩ SET name = $name RETURN *");
+        assert_eq!(vars.get("name"), Some(&json!("test")));
     }
 
     #[test]
     fn build_create_query_without_id() {
         let content = json!({"name": "test"});
         let (sql, vars) = build_create_query("entity", content);
-        assert_eq!(sql, "CREATE entity CONTENT $content RETURN *");
-        assert!(vars.get("content").is_some());
+        assert_eq!(sql, "CREATE entity SET name = $name RETURN *");
+        assert_eq!(vars.get("name"), Some(&json!("test")));
     }
 
     #[test]
     fn build_update_query_success() {
         let content = json!({"id": "fact:abc123", "name": "updated"});
         let (sql, vars) = build_update_query("fact:abc123", content).unwrap();
-        assert_eq!(sql, "UPDATE fact:⟨abc123⟩ MERGE $content RETURN *");
-        let content_val = vars.get("content").unwrap();
-        assert!(content_val.get("id").is_none());
-        assert_eq!(content_val.get("name").unwrap(), "updated");
+        assert_eq!(sql, "UPDATE fact:⟨abc123⟩ SET name = $name RETURN *");
+        assert!(vars.get("id").is_none());
+        assert_eq!(vars.get("name"), Some(&json!("updated")));
     }
 
     #[test]
@@ -1270,137 +1264,6 @@ mod tests {
         let unwrapped = json!({"id": "test:1"});
         let result = unwrap_object_wrapper(unwrapped);
         assert_eq!(result, json!({"id": "test:1"}));
-    }
-
-    #[test]
-    fn value_to_matchable_string_extracts_simple_string() {
-        let value = json!("test string");
-        assert_eq!(value_to_matchable_string(&value), "test string");
-    }
-
-    #[test]
-    fn value_to_matchable_string_extracts_from_string_wrapper() {
-        let value = json!({"String": "wrapped"});
-        assert_eq!(value_to_matchable_string(&value), "wrapped");
-    }
-
-    #[test]
-    fn value_to_matchable_string_extracts_from_strand_wrapper() {
-        let value = json!({"Strand": "strand content"});
-        assert_eq!(value_to_matchable_string(&value), "strand content");
-    }
-
-    #[test]
-    fn value_to_matchable_string_handles_none() {
-        let value = json!({"None": {}});
-        assert_eq!(value_to_matchable_string(&value), "");
-    }
-
-    #[test]
-    fn record_matches_any_query_word_returns_true_for_empty_words() {
-        let record = json!({"content": "test content"});
-        assert!(record_matches_any_query_word(&record, &[]));
-    }
-
-    #[test]
-    fn record_matches_any_query_word_finds_match() {
-        let record = json!({"content": "test content here"});
-        let words = vec!["content".to_string(), "other".to_string()];
-        assert!(record_matches_any_query_word(&record, &words));
-    }
-
-    #[test]
-    fn record_matches_any_query_word_returns_false_when_no_match() {
-        let record = json!({"content": "test content here"});
-        let words = vec!["missing".to_string(), "absent".to_string()];
-        assert!(!record_matches_any_query_word(&record, &words));
-    }
-
-    #[test]
-    fn record_string_field_extracts_field() {
-        let record = json!({"scope": "org", "content": "test"});
-        assert_eq!(record_string_field(&record, "scope"), "org");
-        assert_eq!(record_string_field(&record, "content"), "test");
-    }
-
-    #[test]
-    fn record_string_field_returns_empty_for_missing() {
-        let record = json!({"scope": "org"});
-        assert_eq!(record_string_field(&record, "missing"), "");
-    }
-
-    #[test]
-    fn record_is_visible_for_scope_checks_scope() {
-        let record = json!({
-            "scope": "org",
-            "t_valid": "2024-01-15T10:00:00Z",
-            "t_ingested": "2024-01-15T10:00:00Z"
-        });
-        assert!(record_is_visible_for_scope(
-            &record,
-            "org",
-            "2024-01-16T00:00:00Z"
-        ));
-        assert!(!record_is_visible_for_scope(
-            &record,
-            "personal",
-            "2024-01-16T00:00:00Z"
-        ));
-    }
-
-    #[test]
-    fn record_is_visible_for_scope_checks_t_valid() {
-        let record = json!({
-            "scope": "org",
-            "t_valid": "2024-01-15T10:00:00Z",
-            "t_ingested": "2024-01-15T10:00:00Z"
-        });
-        assert!(!record_is_visible_for_scope(
-            &record,
-            "org",
-            "2024-01-15T09:00:00Z"
-        ));
-        assert!(record_is_visible_for_scope(
-            &record,
-            "org",
-            "2024-01-15T11:00:00Z"
-        ));
-    }
-
-    #[test]
-    fn record_is_visible_for_scope_checks_t_invalid() {
-        let record = json!({
-            "scope": "org",
-            "t_valid": "2024-01-15T10:00:00Z",
-            "t_ingested": "2024-01-15T10:00:00Z",
-            "t_invalid": "2024-01-15T12:00:00Z",
-            "t_invalid_ingested": "2024-01-15T12:00:00Z"
-        });
-        assert!(!record_is_visible_for_scope(
-            &record,
-            "org",
-            "2024-01-15T13:00:00Z"
-        ));
-        assert!(record_is_visible_for_scope(
-            &record,
-            "org",
-            "2024-01-15T11:00:00Z"
-        ));
-    }
-
-    #[test]
-    fn flatten_surreal_records_flattens_nested() {
-        let records = vec![
-            json!({"Array": [{"Object": {"id": "1"}}, {"Object": {"id": "2"}}]}),
-            json!({"Object": {"id": "3"}}),
-            json!({"id": "4"}),
-        ];
-        let flat = flatten_surreal_records(records);
-        assert_eq!(flat.len(), 4);
-        assert_eq!(flat[0]["id"], "1");
-        assert_eq!(flat[1]["id"], "2");
-        assert_eq!(flat[2]["id"], "3");
-        assert_eq!(flat[3]["id"], "4");
     }
 
     #[test]
@@ -1461,5 +1324,42 @@ mod tests {
     fn ensure_dir_exists_handles_no_parent() {
         let path = std::path::Path::new("test.db");
         assert!(ensure_dir_exists(path).is_ok());
+    }
+
+    #[test]
+    fn build_select_facts_filtered_query_with_text_query_preserves_temporal_filters() {
+        let (sql, vars) = build_select_facts_filtered_query(
+            "org",
+            "2026-01-15T00:00:00Z",
+            Some("ARR growth"),
+            5,
+        );
+
+        assert!(
+            sql.contains("FROM fact WHERE"),
+            "expected DB-side WHERE filtering, got: {sql}"
+        );
+        assert!(
+            sql.contains("scope = $scope"),
+            "expected scope predicate, got: {sql}"
+        );
+        assert!(
+            sql.contains("t_valid <= type::datetime($cutoff)"),
+            "expected temporal predicate, got: {sql}"
+        );
+        assert!(
+            sql.contains("content @@ $query"),
+            "expected fulltext operator for text search, got: {sql}"
+        );
+        assert_eq!(vars["scope"], json!("org"));
+        assert_eq!(vars["cutoff"], json!("2026-01-15T00:00:00Z"));
+        assert_eq!(vars["query"], json!("ARR growth"));
+        assert_eq!(vars["limit"], json!(5));
+    }
+
+    #[test]
+    fn normalize_surreal_json_unwraps_datetime_variants() {
+        let datetime = json!({"Datetime": {"String": "2026-01-15T00:00:00Z"}});
+        assert_eq!(normalize_surreal_json(&datetime), json!("2026-01-15T00:00:00Z"));
     }
 }

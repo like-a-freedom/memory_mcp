@@ -4,6 +4,7 @@
 
 use chrono::{TimeZone, Utc};
 use serde_json::json;
+use memory_mcp::storage::DbClient;
 
 mod common;
 
@@ -83,6 +84,72 @@ async fn test_service_add_fact_and_assemble_context() {
     assert!(!context[0].fact_id.is_empty());
     assert!(!context[0].content.is_empty());
     assert!(context[0].confidence.is_finite());
+}
+
+#[tokio::test]
+async fn test_service_add_fact_persists_provenance() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let provenance = json!({
+        "source_episode": "episode:provenance",
+        "ingest": {"source_type": "email", "source_id": "prov-1"}
+    });
+
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR reached $7M",
+            "ARR reached $7M",
+            "episode:provenance",
+            Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
+            "org",
+            0.95,
+            vec![],
+            vec![],
+            provenance.clone(),
+        )
+        .await
+        .unwrap();
+
+    let stored = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .unwrap()
+        .expect("stored fact");
+    assert_eq!(stored.get("provenance"), Some(&provenance));
+}
+
+#[tokio::test]
+async fn test_service_extract_persists_edge_provenance() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "edge-prov-1".to_string(),
+                content: "Meeting with Alice Smith about ARR goals".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2024, 3, 2, 12, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let extraction = service.extract(&episode_id, None).await.unwrap();
+    assert!(!extraction.links.is_empty());
+
+    let edges = db_client.select_table("edge", "org").await.unwrap();
+    assert!(!edges.is_empty());
+    assert!(edges.iter().all(|edge| {
+        edge.get("provenance")
+            .and_then(|value| value.get("source_episode"))
+            == Some(&json!(episode_id))
+    }));
 }
 
 #[tokio::test]

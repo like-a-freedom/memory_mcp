@@ -92,3 +92,25 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
+
+#[test]
+fn schema_uses_datetime_for_fact_temporal_fields() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        schema.contains("DEFINE FIELD t_valid ON fact TYPE datetime;"),
+        "fact.t_valid should use datetime in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_ingested ON fact TYPE datetime;"),
+        "fact.t_ingested should use datetime in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_invalid ON fact TYPE option<datetime>;"),
+        "fact.t_invalid should use option<datetime> in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_invalid_ingested ON fact TYPE option<datetime>;"),
+        "fact.t_invalid_ingested should use option<datetime> in schema"
+    );
+}

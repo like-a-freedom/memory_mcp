@@ -1,0 +1,11 @@
+-- Versioned migration scaffold for upgrading temporal fields to native SurrealDB datetime types.
+--
+-- Fresh installs already receive datetime-typed fields from `__Initial.surql`.
+-- This file exists as the first numbered migration anchor for future checksum-
+-- enforced migration execution.
+--
+-- Intended upgrade operations for existing databases:
+--   - convert episode.t_ref / episode.t_ingested to datetime
+--   - convert fact.{t_valid,t_ingested,t_invalid,t_invalid_ingested} to datetime
+--   - convert edge.{t_valid,t_ingested,t_invalid,t_invalid_ingested} to datetime
+--   - convert community.updated_at, event_log.ts, task.due_date, script_migration.executed_at

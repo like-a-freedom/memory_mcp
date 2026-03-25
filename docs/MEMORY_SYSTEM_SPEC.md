@@ -1,12 +1,14 @@
 # Memory System — Unified Specification
 
-**Version:** 2.0  
+**Version:** 2.2  
 **Date:** February 5, 2026  
 **Status:** Consolidated (supersedes all previous SPEC.md versions)
 
 ---
 
 ## Document Change History
+
+- **2026-03-25**: Revalidated the implementation against the consolidated external review in `docs/Code Review v2  memory_mcp — объединённый план от двух ревьюеров.md`. Corrected overstated documentation claims: temporal fields are still stored as `string`, `assemble_context` still falls back to Rust-side filtering for text queries, provenance is still dropped in fact/edge persistence, `explain` remains a pass-through adapter, entity resolution still scans the full `entity` table, edge invalidation is not implemented, embeddings/native `RELATE` traversal are roadmap items, and migration checksums are defined in schema but not enforced.
 
 - **2026-03-11**: Completed the cleanup of the memory-only MCP surface. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService` and narrowed the public contract to six canonical memory tools. Updated service internals to return typed extraction, context, and explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
 
@@ -43,8 +45,8 @@
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
-- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships)
-- Delivers ranked context packs to LLMs on-demand with minimal token budget and low latency
+- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships), with native SurrealDB datetime typing and graph-native relations still pending
+- Delivers compact context packs to LLMs on-demand with minimal token budget; current implementation ranks primarily by recency, while hybrid semantic/graph ranking remains planned
 - Supports personal, team, and organizational scopes with strict access control
 
 ### 1.2 Key Design Principles
@@ -93,6 +95,16 @@ Memory System provides agents with a unified long-term memory and context layer 
 - Skills like `context-assembly`, `entity-tracking`, `stakeholder-analysis`, `decision-tracking`, and `ingest-episode` are embedded in the Memory Agent prompt rather than exposed as standalone skills
 - PDM delegates via `runSubagent(agentName: "memory", ...)` rather than calling MCP tools directly
 
+### 1.4 Implementation Reality Check (2026-03-25)
+
+The target architecture remains valid, but the current Rust implementation is still an intermediate milestone rather than the final production design. The following review findings are confirmed in code and should be treated as authoritative for planning:
+
+- Temporal fields are still declared as `TYPE string` in `src/migrations/__Initial.surql`; bi-temporal semantics therefore depend on ISO string discipline rather than native SurrealDB datetime types.
+- Full-text search is not yet fully pushed down to SurrealDB: the `fact_content_search` index exists, but `select_facts_filtered()` still loads all facts and filters in Rust when a query string is present.
+- Provenance is structurally modeled but not reliably persisted: `add_fact()` and `store_edge()` currently write `{}` instead of the supplied provenance payload.
+- Graph traversal uses a flat `edge` table plus in-memory BFS; native SurrealDB `RELATE` edges and server-side traversal are still roadmap items.
+- Embeddings, hybrid semantic retrieval, checksum-enforced migrations, robust community retrieval, and a non-pass-through `explain()` implementation are not finished yet.
+
 ---
 
 ## 2. System Architecture
@@ -104,7 +116,7 @@ Memory System provides agents with a unified long-term memory and context layer 
 | **PDM Agent** | Strategy, roadmapping, stakeholder management, requirements engineering. Delegates memory operations. |
 | **Memory Agent** | Episode ingestion, entity extraction, fact extraction, context assembly, stakeholder analysis, decision tracking. Encapsulates memory skills. |
 | **Memory MCP Server** | Exposes MCP tools (`ingest`, `extract`, `resolve`, `assemble_context`, etc.), manages SurrealDB lifecycle, migrations, rate limiting. |
-| **SurrealDB** | Stores all memory objects (Episode/Entity/Fact/Edge/Community), executes graph traversals, provides full-text/vector search. |
+| **SurrealDB** | Stores all memory objects (Episode/Entity/Fact/Edge/Community), provides schema/index primitives, and currently backs full-text search plus flat-table graph traversal. Native graph relations and vector retrieval are planned but not yet implemented. |
 
 ### 2.2 Design Rationale
 
@@ -279,13 +291,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-DB-03**: System MUST support SurrealDB schemas/migrations as code (DDL/versions) and reproducible deployment.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — DDL is stored in code and applied idempotently, but versioned multi-file migrations and checksum enforcement are not implemented.
 
 **FR-DB-04**: Namespace/database MUST be mandatory at service startup; values set via environment configuration.  
 **Status**: ✅ Done
 
 **FR-DB-05**: System MUST provide indexes in SurrealDB for retrieval: full-text, graph traversal, and (if available) vector indexes.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — full-text index exists, but `edge.from_id` / `edge.to_id` indexes are missing and vector indexes are not implemented.
 
 **FR-DB-06**: Execution/event log MUST be stored in SurrealDB (append-only) or synchronized there for audit.  
 **Status**: ✅ Done
@@ -293,30 +305,30 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 ### 5.4 Entity and Fact Extraction
 
 **FR-EX-01**: System MUST extract entities: `Person`, `Company`, `Project`, `Deal`, `Product`, `Asset`, `Location` (extensible).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — current extractor is regex-based and effectively recognizes only title-cased `person` / `company` candidates.
 
 **FR-EX-02**: System MUST extract facts/items: `Promise`, `Task`, `Metric`, `Decision`, `Opinion`/`Preference`, `Relationship` (extensible).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — current extraction covers only simple `promise` and `metric` heuristics.
 
 **FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — facts persist `content`, `quote`, `source_episode`, and `t_valid`, but `source_position` / actor linkage are not consistently populated.
 
 **FR-EX-04**: To improve extraction quality, the system SHOULD use a two-step flow—initial extraction followed by self-validation—to reduce hallucinations and omissions.  
-**Status**: ✅ Done
+**Status**: ❌ Not done — current extraction is single-pass and heuristic.
 
 ### 5.5 Entity Resolution (Deduplication)
 
 **FR-ER-01**: System MUST support aliases and entity merging (for example, "Mitya/Dima/Dmitry Ivanov").  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — aliases can be stored, but merge workflows are not implemented.
 
 **FR-ER-02**: System MUST provide hybrid deduplication: (a) embedding similarity + (b) text features + (c) LLM verification based on episode context.  
-**Status**: ✅ Done
+**Status**: ❌ Not done — no embedding field, no embedding provider, and no LLM verification pipeline exist in the current code.
 
 **FR-ER-03**: System MUST preserve merge history (merge log): who/what/when/why merged, with rollback capability (split).  
-**Status**: ✅ Done
+**Status**: ❌ Not done — merge history / split support are not implemented.
 
 **FR-ER-04**: After merge, all facts/links MUST reference canonical entity, preserving provenance.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — canonical IDs are used at creation time, but post-merge rewriting is not implemented because merge workflows are absent.
 
 **FR-ER-05**: Alias resolution MUST be deterministic (exact match → canonical entity, then stable tie-break rules).  
 **Status**: ✅ Done
@@ -327,16 +339,16 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-GR-02**: Each edge/fact MUST have temporal attributes and provenance (source) to ensure explainability ("why did the agent decide this").  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — temporal fields exist, but they are stored as strings and fact/edge provenance is currently overwritten with empty objects during persistence.
 
 **FR-GR-03**: System MUST support "communities/clusters" of entities and store their summaries for faster retrieval and organizational context overview.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — communities are written by simple per-episode grouping, but are not consumed by retrieval.
 
 **FR-GR-04**: Each edge MUST contain metadata: `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid`, and optional `weight`/`temporal_weight` for ranking.  
 **Status**: ✅ Done
 
 **FR-GR-05**: Edges MUST support bi-temporal attributes and invalidation: when adding a new conflicting edge, old edges should be marked `t_invalid` (see Edge Invalidation rules in FR-TM).  
-**Status**: ✅ Done
+**Status**: ❌ Not done — `store_edge()` short-circuits on existing edge IDs and does not invalidate conflicting edges.
 
 ### 5.7 Temporality: Decay and Invalidation
 
@@ -347,13 +359,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-TM-03**: System MUST implement bi-temporal model: store validity time of fact (T) and transaction/ingest time (T′) for audit, retroactive corrections, and correct "as-of" answers.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — the model exists, but temporal fields are string-typed and text-query retrieval currently bypasses DB-side temporal filtering.
 
 **FR-TM-04**: Retrieval MUST support "as-of" queries (snapshot at date): show context as it was at meeting/email time.  
 **Status**: ✅ Done
 
 **FR-TM-05**: When new fact/metric conflicts with existing ones, system MUST perform contradiction check (LLM-assisted or rule-based) and upon confirmation set `t_invalid` on old facts (explicit invalidation), preserving provenance.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — explicit fact invalidation exists as an operation, but contradiction detection and conflict-driven edge invalidation are not implemented.
 
 ### 5.8 Context Assembly
 
@@ -361,25 +373,25 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-CA-02**: System MUST support hybrid retrieval: vector (semantic), full-text, and graph traversal (BFS/limited hops) for "social" queries and connection chains.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — current retrieval supports full-text-ish matching and in-memory BFS traversal only; vector retrieval is absent.
 
 **FR-CA-03**: System MUST enforce token budgeting: limits on fact count, quote length, detail levels (brief/standard/deep).  
 **Status**: ✅ Done
 
 **FR-CA-04**: Assembly result MUST include: (a) facts, (b) confidence score, (c) rationale (why included), (d) provenance.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — response shape includes these fields, but provenance quality is degraded because persisted provenance is currently dropped in storage.
 
 **FR-CA-05**: Retrieval results MUST be deterministically ordered (stable sort + tie-break by time and ID).  
 **Status**: ✅ Done
 
 **FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search and vector indexes; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — analyzer support exists for FTS, but vector index support is still roadmap-only.
 
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
 
 **FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — query preprocessing and multi-word matching exist, but the current text-query path still loads all facts and filters in Rust, bypassing DB-side temporal pushdown.
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
@@ -390,7 +402,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — invalidations are logged, but merge history is missing and `explain` currently acts as a pass-through formatter rather than provenance tracing.
 
 **FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
 **Status**: ✅ Done
@@ -418,10 +430,10 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 | Object | Required Fields | Acceptance Criteria |
 |--------|----------------|---------------------|
 | **Episode** | `id`, `source_type`, `source_id`, `content`, `t_ref`, `t_ingested` | For any fact, can open source episode and see exact quote/fragment. |
-| **Entity** | `id`, `type`, `canonical_name`, `aliases[]`, `embedding`, `merge_history[]` | Search by any alias returns canonical entity; merge/split reflected in history. |
+| **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
 | **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. |
-| **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships tracked with provenance; invalidation supported. |
-| **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Adding new entities updates cluster/summary without full graph recompute. |
+| **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
+| **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Current implementation updates communities from a single episode cohort; retrieval integration is still pending. |
 
 ### 6.2 Deterministic ID Rules
 
@@ -461,8 +473,8 @@ All IDs MUST be deterministic to ensure idempotence:
 | `extract` | Extract entities, facts, and links from an episode or inline content | `episode_id` or non-empty `content`/`text` | `ToolResponse<ExtractResult>` |
 | `resolve` | Deduplicate/resolve canonical entities | `entity_type`, `canonical_name`, `aliases[]` | `ToolResponse<String>` with canonical `entity_id` |
 | `invalidate` | Mark fact as superseded | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
-| `assemble_context` | Build ranked context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
-| `explain` | Return citation-ready context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
+| `assemble_context` | Build recency-first context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
+| `explain` | Return citation-shaped context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
 
 ### 7.2 Contract Design Notes
 
@@ -520,7 +532,7 @@ Logging levels:
 ### 8.4 Auditability
 
 **NFR-A-01 (Auditability)**: MUST store complete provenance: "which episode generated which fact", plus invalidation/update history (bi-temporal).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — provenance is modeled, but not faithfully persisted for facts and edges in the current implementation.
 
 ### 8.5 Determinism
 
@@ -536,7 +548,7 @@ Logging levels:
 ### 8.6 Maintainability
 
 **NFR-M-01 (Maintainability)**: All schemas, policies, and pipelines MUST be managed as code (Git) with migrations and versioning.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — schema is in Git, but migration versioning / checksum enforcement are still missing.
 
 ### 8.7 Observability
 
@@ -643,8 +655,9 @@ memory_mcp/
 - [x] Idempotent error handling: ignore benign errors (already exists/defined/index exists)
 - [x] Expectations: `script_migration` schema or canonical initial migration (`__Initial.surql`)
 - [x] Integration test: apply migrations to embedded SurrealDB, verify indexes/tables
+- [ ] Versioned multi-file migrations with checksum verification
 
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — startup migration works, but versioned/checksummed migration execution is not implemented.
 
 #### 9.2.8 Configuration and Environment
 
@@ -745,10 +758,20 @@ memory_mcp/
 - In-memory/Mock DB clients and acceptance tests updated to mirror bi-temporal semantics; new acceptance test added for as-of traversal behavior.
 - Full test suite (unit + integration + acceptance) passes locally; `cargo clippy` completed with no warnings.
 
-- Full-text search (FTS) implemented for `assemble_context`: primary `@@` operator uses existing `fact_content_search` index; per-word `CONTAINS` OR fallback when FTS returns empty results. Query preprocessing via `preprocess_search_query()` strips episode refs, boolean operators, quoted phrases, and short tokens. FakeDbClient and MockDbClient updated to mirror per-word OR semantics. Comprehensive test coverage: 6 unit tests for preprocessing, 2 unit tests for multi-word assemble, 1 acceptance test (3 scenarios), 1 embedded FTS integration test (3 scenarios).
+- Query preprocessing for `assemble_context` exists (`preprocess_search_query()`), with test coverage for multi-word search behavior and query normalization.
 - SurrealDB 3 migration hardening completed: `store_edge` no longer writes null optional invalidation fields, runtime schema now defines `edge_id` and all required SCHEMAFULL tables (`community`, `event_log`, `task`), and legacy SurrealQL syntax updated (`SEARCH ANALYZER` → `FULLTEXT ANALYZER`, `string::is::datetime` → `string::is_datetime`).
 
 **Pending:**
+- Native datetime fields for temporal columns
+- DB-side FTS + bi-temporal pushdown in a single query path
+- Provenance persistence for facts and edges
+- Edge indexes on `from_id` / `to_id`
+- Indexed entity lookup instead of full-table scan
+- Real `explain()` provenance expansion
+- Native graph relations (`RELATE`) and server-side traversal
+- Embeddings and hybrid semantic retrieval
+- Community-aware retrieval and lifecycle jobs
+- Versioned/checksummed migrations
 - JSON log format option
 - Parameterized queries (security hardening)
 - RBAC setup (SurrealDB roles/permissions)
@@ -770,7 +793,7 @@ memory_mcp/
 | **API-03** | `resolve(entity_candidate) → canonical_entity_id (+ merge actions)` | ✅ Done |
 | **API-04** | `invalidate(fact_id, reason, t_invalid) → ok` | ✅ Done |
 | **API-05** | `assemble_context(query, scope, as_of, budget) → context_pack` | ✅ Done |
-| **API-06** | `explain(context_pack) → episode links/quotes` | ✅ Done |
+| **API-06** | `explain(context_pack) → episode links/quotes` | ⚠️ Partial — currently returns citation-shaped items without episode lookup or provenance tracing |
 
 **Note:** SurrealMCP and SurrealDB transports MUST support production settings, including authentication (JWT/auth server), rate limits (RPS/burst), and multiple transport modes (stdio, HTTP, socket, RPC). API-01 through API-06 MUST be accessible over RPC/HTTP and, where appropriate, accept and return CBOR-encoded payloads. All calls must be logged in the execution/event log together with transport and content-type information.
 
@@ -939,11 +962,13 @@ These documents are superseded by this specification:
 
 ## Document Status
 
-**Current Version**: 2.1  
+**Current Version**: 2.2  
 **Consolidated**: February 5, 2026  
 **Next Review**: When significant requirements change or implementation milestones reached
 
 **Changelog:**
+
+- **2026-03-25**: Reconciled the specification with the validated review findings. Downgraded overstated statuses around temporal typing, FTS pushdown, provenance persistence, explainability, edge invalidation, embeddings, migration versioning, and community retrieval; added an explicit implementation reality-check section.
 
 - **2026-03-11**: Removed legacy non-memory service APIs, aligned documentation to the six-tool memory-only MCP surface, and revalidated with `cargo fmt --all`, `cargo test`, and strict `cargo clippy --all-targets -- -D warnings`.
 

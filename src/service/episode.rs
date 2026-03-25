@@ -18,9 +18,15 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
         } else if let Some(obj) = v.as_object() {
             obj.get("String")
                 .and_then(Value::as_str)
+                .or_else(|| obj.get("Datetime").and_then(Value::as_str))
                 .or_else(|| obj.get("Strand").and_then(Value::as_str))
                 .or_else(|| {
                     obj.get("Strand")
+                        .and_then(|inner| inner.get("String"))
+                        .and_then(Value::as_str)
+                })
+                .or_else(|| {
+                    obj.get("Datetime")
                         .and_then(|inner| inner.get("String"))
                         .and_then(Value::as_str)
                 })
@@ -77,9 +83,15 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         } else if let Some(obj) = v.as_object() {
             obj.get("String")
                 .and_then(Value::as_str)
+                .or_else(|| obj.get("Datetime").and_then(Value::as_str))
                 .or_else(|| obj.get("Strand").and_then(Value::as_str))
                 .or_else(|| {
                     obj.get("Strand")
+                        .and_then(|inner| inner.get("String"))
+                        .and_then(Value::as_str)
+                })
+                .or_else(|| {
+                    obj.get("Datetime")
                         .and_then(|inner| inner.get("String"))
                         .and_then(Value::as_str)
                 })
@@ -400,7 +412,7 @@ pub(crate) async fn store_edge(
     payload_map.insert("to_id".to_string(), Value::String(edge.to_id.clone()));
     payload_map.insert("strength".to_string(), json!(edge.strength));
     payload_map.insert("confidence".to_string(), json!(edge.confidence));
-    payload_map.insert("provenance".to_string(), json!({}));
+    payload_map.insert("provenance".to_string(), edge.provenance.clone());
     payload_map.insert(
         "t_valid".to_string(),
         Value::String(super::normalize_dt(edge.t_valid)),

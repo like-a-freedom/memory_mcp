@@ -270,15 +270,10 @@ impl MemoryService {
         access: Option<AccessContext>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
-        let explanations = request
-            .context_pack
-            .into_iter()
-            .map(|item| ExplainItem {
-                content: item.content,
-                quote: item.quote,
-                source_episode: item.source_episode,
-            })
-            .collect::<Vec<_>>();
+        let mut explanations = Vec::with_capacity(request.context_pack.len());
+        for item in request.context_pack {
+            explanations.push(self.build_explain_item(item).await?);
+        }
 
         self.logger.log(
             log_event(
@@ -384,7 +379,7 @@ impl MemoryService {
         confidence: f64,
         entity_links: Vec<String>,
         policy_tags: Vec<String>,
-        _provenance: Value,
+        provenance: Value,
     ) -> Result<String, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
@@ -405,7 +400,7 @@ impl MemoryService {
                 "entity_links": entity_links,
                 "scope": scope,
                 "policy_tags": policy_tags,
-                "provenance": json!({}),
+                "provenance": provenance,
             });
             let created = self.db_client.create(&fact_id, payload, &namespace).await?;
             if created.is_null() {
@@ -729,6 +724,36 @@ impl MemoryService {
                 .and_then(string_from_value)
                 .or_else(|| map.get("id").and_then(string_from_value))
         }))
+    }
+
+    async fn build_explain_item(&self, item: ExplainItem) -> Result<ExplainItem, MemoryError> {
+        let (record, _) = self.find_episode_record(&item.source_episode).await?;
+        let Some(record) = record else {
+            return Ok(item);
+        };
+
+        let Some(episode) = super::episode::episode_from_record(&record) else {
+            return Ok(item);
+        };
+
+        Ok(ExplainItem {
+            content: if item.content.is_empty() {
+                episode.content.clone()
+            } else {
+                item.content
+            },
+            quote: item.quote,
+            source_episode: item.source_episode,
+            scope: Some(episode.scope.clone()),
+            t_ref: Some(episode.t_ref),
+            t_ingested: Some(episode.t_ingested),
+            provenance: json!({
+                "source_episode": episode.episode_id,
+                "source_type": episode.source_type,
+                "source_id": episode.source_id,
+            }),
+            citation_context: Some(episode.content),
+        })
     }
 }
 

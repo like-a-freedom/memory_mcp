@@ -292,3 +292,64 @@ async fn test_mcp_explain_mixed_array() {
     assert_eq!(explanation[1].source_episode, "task:obj");
     assert_eq!(explanation[1].content, "info");
 }
+
+#[tokio::test]
+async fn test_mcp_explain_loads_episode_context() {
+    let service = common::make_service().await;
+    let mcp = MemoryMcp::new(service);
+
+    let ingest_params = serde_json::json!({
+        "source_type": "email",
+        "source_id": "EXPLAIN-CTX-1",
+        "content": "Customer confirmed ARR is now $3M and expects renewal next quarter.",
+        "t_ref": "2026-02-15T08:30:00Z",
+        "scope": "org"
+    });
+    let episode_id = mcp
+        .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
+        .await
+        .expect("ingest explain context")
+        .0
+        .result;
+
+    let context_items = serde_json::to_string(&vec![serde_json::json!({
+        "content": "ARR is now $3M",
+        "quote": "ARR is now $3M",
+        "source_episode": episode_id.clone()
+    })])
+    .unwrap();
+
+    let explanation = mcp
+        .explain(Parameters(
+            serde_json::from_value(serde_json::json!({"context_items": context_items})).unwrap(),
+        ))
+        .await
+        .expect("explain with loaded episode context")
+        .0
+        .result;
+
+    assert_eq!(explanation.len(), 1);
+    assert_eq!(explanation[0].source_episode, episode_id);
+    assert_eq!(explanation[0].scope.as_deref(), Some("org"));
+    assert_eq!(
+        explanation[0].t_ref.map(|dt| dt.to_rfc3339()),
+        Some("2026-02-15T08:30:00+00:00".to_string())
+    );
+    assert!(explanation[0].t_ingested.is_some());
+    assert_eq!(
+        explanation[0].citation_context.as_deref(),
+        Some("Customer confirmed ARR is now $3M and expects renewal next quarter.")
+    );
+    assert_eq!(
+        explanation[0].provenance.get("source_episode"),
+        Some(&serde_json::json!(explanation[0].source_episode.clone()))
+    );
+    assert_eq!(
+        explanation[0].provenance.get("source_type"),
+        Some(&serde_json::json!("email"))
+    );
+    assert_eq!(
+        explanation[0].provenance.get("source_id"),
+        Some(&serde_json::json!("EXPLAIN-CTX-1"))
+    );
+}

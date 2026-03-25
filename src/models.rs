@@ -124,6 +124,16 @@ pub struct ExplainItem {
     pub content: String,
     pub quote: String,
     pub source_episode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub t_ref: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub t_ingested: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub provenance: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub citation_context: Option<String>,
 }
 
 /// Request to extract entities and facts from an episode.

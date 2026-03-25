@@ -25,3 +25,31 @@ pub async fn make_service() -> MemoryService {
     )
     .expect("service init")
 }
+
+#[allow(dead_code)]
+pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>) {
+    let db_client = Arc::new(
+        SurrealDbClient::connect_in_memory("memory_test", "org", "warn")
+            .await
+            .expect("connect in memory service"),
+    );
+    db_client
+        .apply_migrations("org")
+        .await
+        .expect("apply in-memory migrations");
+
+    let service = MemoryService::new(
+        db_client.clone(),
+        vec![
+            "org".to_string(),
+            "personal".to_string(),
+            "private".to_string(),
+        ],
+        "warn".to_string(),
+        50,
+        100,
+    )
+    .expect("service init");
+
+    (service, db_client)
+}

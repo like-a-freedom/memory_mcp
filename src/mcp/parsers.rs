@@ -39,6 +39,11 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 content: String::new(),
                 quote: String::new(),
                 source_episode: s,
+                scope: None,
+                t_ref: None,
+                t_ingested: None,
+                provenance: Value::Null,
+                citation_context: None,
             },
             Value::Object(ref map) => {
                 let content = map
@@ -61,12 +66,22 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     content,
                     quote,
                     source_episode,
+                    scope: None,
+                    t_ref: None,
+                    t_ingested: None,
+                    provenance: Value::Null,
+                    citation_context: None,
                 }
             }
             _ => ExplainItem {
                 content: String::new(),
                 quote: String::new(),
                 source_episode: String::new(),
+                scope: None,
+                t_ref: None,
+                t_ingested: None,
+                provenance: Value::Null,
+                citation_context: None,
             },
         })
         .collect();
