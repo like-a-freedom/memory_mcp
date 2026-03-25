@@ -45,7 +45,7 @@
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
-- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships), with native SurrealDB relation edges now in place and native datetime typing still pending
+- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships) backed by native SurrealDB relation edges and native `datetime` temporal fields
 - Delivers compact context packs to LLMs on-demand with minimal token budget; current implementation combines lexical retrieval, community summaries, and graph traversal, while full hybrid embedding ranking remains gated behind the default `NullEmbedder`
 - Supports personal, team, and organizational scopes with strict access control
 
@@ -97,12 +97,14 @@ Memory System provides agents with a unified long-term memory and context layer 
 
 ### 1.4 Implementation Reality Check (2026-03-25)
 
-The target architecture remains valid, but the current Rust implementation is still an intermediate milestone rather than the final production design. The following review findings are confirmed in code and should be treated as authoritative for planning:
+The target architecture remains valid, but several roadmap items are intentionally staged rather than fully “done forever.” The current implementation reality is:
 
-- Temporal fields are still declared as strings/ISO strings rather than native SurrealDB `datetime` fields, so the remaining correctness gap is schema fidelity rather than logical bitemporality.
-- Full-text search still relies on the current `select_facts_filtered()` query path, so semantic ranking remains primarily lexical unless community or graph signals are added later in the pipeline.
-- `explain()` is still a citation-shaped pass-through adapter; provenance is now persisted, but provenance expansion is not implemented yet.
-- Embedding fields, vector indexes, and pluggable provider/extractor abstractions now exist, but the default `NullEmbedder` intentionally keeps hybrid embedding retrieval disabled.
+- Temporal fields are persisted as native SurrealDB `datetime` / `option<datetime>` values, with write-time coercion handled in `build_set_assignments()`.
+- Retrieval is currently lexical-first, then augmented by community-summary and graph signals; embedding retrieval remains scaffolded but disabled by the default `NullEmbedder`.
+- `explain()` now expands provenance back to the source episode, including citation text and timestamp context.
+- Community maintenance is implemented as a deterministic connected-components baseline, while more advanced clustering/consolidation remains deferred.
+- Embedded/local deployments intentionally keep a shared `Mutex<Surreal<_>>` because namespace rebasing (`use_ns` / `use_db`) is session-scoped; a namespace-scoped client pool remains known throughput tech debt.
+- `RegexEntityExtractor` is the deterministic fallback extractor today; broader multilingual / NLP extraction remains a follow-up.
 
 ---
 
@@ -115,7 +117,7 @@ The target architecture remains valid, but the current Rust implementation is st
 | **PDM Agent** | Strategy, roadmapping, stakeholder management, requirements engineering. Delegates memory operations. |
 | **Memory Agent** | Episode ingestion, entity extraction, fact extraction, context assembly, stakeholder analysis, decision tracking. Encapsulates memory skills. |
 | **Memory MCP Server** | Exposes MCP tools (`ingest`, `extract`, `resolve`, `assemble_context`, etc.), manages SurrealDB lifecycle, migrations, rate limiting. |
-| **SurrealDB** | Stores all memory objects (Episode/Entity/Fact/Edge/Community), provides schema/index primitives, and currently backs full-text search plus flat-table graph traversal. Native graph relations and vector retrieval are planned but not yet implemented. |
+| **SurrealDB** | Stores all memory objects (Episode/Entity/Fact/Edge/Community), provides schema/index primitives, backs lexical retrieval, native relation edges, community maintenance, and embedding-index scaffolding. Full hybrid embedding retrieval remains intentionally disabled by default. |
 
 ### 2.2 Design Rationale
 
@@ -401,7 +403,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.  
-**Status**: ⚠️ Partial — invalidations are logged, but merge history is missing and `explain` currently acts as a pass-through formatter rather than provenance tracing.
+**Status**: ⚠️ Partial — invalidations are logged and `explain` performs provenance tracing back to source episodes, but explicit entity-merge history is still missing.
 
 **FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
 **Status**: ✅ Done

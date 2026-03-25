@@ -6,13 +6,13 @@ This document records the line-by-line validation of the external review against
 
 | Review item | Status | Current evidence | Documentation consequence |
 | --- | --- | --- | --- |
-| Temporal fields are `TYPE string` instead of `TYPE datetime` | Still confirmed | `src/migrations/__Initial.surql` still uses string-backed temporal fields | Keep native datetime migration as remaining work |
+| Temporal fields are `TYPE string` instead of `TYPE datetime` | Resolved | `src/migrations/__Initial.surql` uses `datetime` / `option<datetime>` and `src/storage.rs::build_set_assignments()` coerces write payloads through `type::datetime(...)` | Remove stale temporal-schema gap claims |
 | FTS index exists but is not used as the only retrieval path | Still confirmed | `src/storage.rs::select_facts_filtered()` remains the lexical retrieval entry point | Document retrieval as lexical/community/graph hybrid, not pure vector ranking |
 | Provenance is ignored in fact persistence | Resolved | `src/service/core.rs::add_fact()` persists the supplied `provenance` payload | Promote provenance persistence from roadmap to implemented |
 | Provenance is ignored in edge persistence | Resolved | `src/service/episode.rs::store_edge()` persists edge provenance through `relate_edge()` | Same as above |
 | Edge indexes on `from_id` / `to_id` are missing | Resolved | `src/migrations/__Initial.surql` now defines `edge_from_id` and `edge_to_id` | Remove stale index-gap claims |
 | `find_entity_record()` performs full table scan | Resolved | `src/service/core.rs::find_entity_record()` now calls `select_entity_lookup()` | Promote indexed entity lookup to implemented |
-| `explain()` is a pass-through adapter | Still confirmed | `src/service/core.rs::explain()` still reshapes citation items without provenance traversal | Keep `explain` marked partial |
+| `explain()` is a pass-through adapter | Resolved | `src/service/core.rs::explain()` expands items back to source episodes and includes provenance/citation context | Promote explainability from partial to implemented baseline |
 | `find_intro_chain()` loads all edges into memory before BFS | Resolved | `src/service/core.rs::find_intro_chain()` now uses DB-side neighbor lookups | Update graph traversal notes to reflect current pushdown |
 | Edges are stored as flat records, not native `RELATE` edges | Resolved | `src/migrations/__Initial.surql` defines `edge TYPE RELATION`; `src/storage.rs::relate_edge()` uses `RELATE` | Promote native relation storage to implemented |
 | Embeddings are absent | Partially resolved | `src/models.rs`, `src/migrations/__Initial.surql`, and `src/service/embedding.rs` now provide embedding fields, indexes, and a `NullEmbedder` scaffold | Document semantic retrieval as scaffolded but disabled by default |
@@ -26,7 +26,7 @@ This document records the line-by-line validation of the external review against
 
 The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
 
-- preserved the remaining partial gaps (native datetime schema, richer extraction, real `explain`, security hardening)
+- preserved the remaining partial gaps (richer extraction, lifecycle follow-up, security hardening, client-sharing throughput)
 - promoted implemented remediation work: provenance persistence, indexed entity lookup, native `RELATE` edges, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced migrations
 - updated local-operation and stdio host examples to match the current Rust workspace layout
 - recorded verification commands and exact pass counts from this remediation pass
@@ -39,4 +39,4 @@ The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
    - **implemented now**
    - **partially implemented / correctness gap**
    - **target architecture / roadmap**
-4. The next engineering pass should focus on documentation/security hardening, native datetime typing, richer extraction quality, and production deployment controls.
+4. The next engineering pass should focus on lifecycle automation, richer extraction quality, client-sharing throughput, and production deployment controls.

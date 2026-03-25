@@ -101,13 +101,15 @@ pub async fn assemble_context(
             active.iter().map(|fact| fact.fact_id.clone()).collect();
         let community_facts = collect_community_facts(
             service,
-            &namespace,
-            &request.scope,
-            &cutoff_iso,
-            query,
-            &access,
-            &direct_fact_ids,
-            request.budget,
+            CollectCommunityFactsRequest {
+                namespace: &namespace,
+                scope: &request.scope,
+                cutoff_iso: &cutoff_iso,
+                query,
+                access: &access,
+                direct_fact_ids: &direct_fact_ids,
+                budget: request.budget,
+            },
         )
         .await?;
 
@@ -215,17 +217,22 @@ fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     });
 }
 
+struct CollectCommunityFactsRequest<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff_iso: &'a str,
+    query: &'a str,
+    access: &'a AccessContext,
+    direct_fact_ids: &'a std::collections::HashSet<String>,
+    budget: i32,
+}
+
 async fn collect_community_facts(
     service: &crate::service::MemoryService,
-    namespace: &str,
-    scope: &str,
-    cutoff_iso: &str,
-    query: &str,
-    access: &AccessContext,
-    direct_fact_ids: &std::collections::HashSet<String>,
-    budget: i32,
+    request: CollectCommunityFactsRequest<'_>,
 ) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
-    let matched_communities = find_matching_communities(service, namespace, query).await?;
+    let matched_communities =
+        find_matching_communities(service, request.namespace, request.query).await?;
     if matched_communities.is_empty() {
         return Ok(Vec::new());
     }
@@ -237,13 +244,19 @@ async fn collect_community_facts(
 
     let fallback_records = service
         .db_client
-        .select_facts_filtered(namespace, scope, cutoff_iso, None, budget.max(1) * 10)
+        .select_facts_filtered(
+            request.namespace,
+            request.scope,
+            request.cutoff_iso,
+            None,
+            request.budget.max(1) * 10,
+        )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    let mut facts = filter_facts_by_policy(fallback_records, access)
+    let mut facts = filter_facts_by_policy(fallback_records, request.access)
         .into_iter()
-        .filter(|fact| !direct_fact_ids.contains(&fact.fact_id))
+        .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
         .filter(|fact| {
             fact.entity_links
                 .iter()
@@ -260,13 +273,13 @@ async fn collect_community_facts(
 
     Ok(facts
         .into_iter()
-        .take(budget.max(1) as usize)
+        .take(request.budget.max(1) as usize)
         .map(|fact| {
             (
                 fact,
                 format!(
                     "matched community summary for query=\"{}\" via {}",
-                    query, community_summary
+                    request.query, community_summary
                 ),
             )
         })

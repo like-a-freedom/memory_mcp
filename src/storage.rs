@@ -54,6 +54,9 @@ pub trait DbClient: Send + Sync {
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects edges with DB-side filtering for bi-temporal visibility.
+    ///
+    /// This remains part of the production API because community maintenance
+    /// currently rebuilds connected components from the active edge set.
     async fn select_edges_filtered(
         &self,
         namespace: &str,
@@ -118,6 +121,7 @@ pub trait DbClient: Send + Sync {
 pub struct SurrealDbClient {
     engine: DbEngine,
     database: String,
+    embedding_dimension: usize,
     logger: StdoutLogger,
 }
 
@@ -154,6 +158,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Local(Mutex::new(db)),
             database: database.to_string(),
+            embedding_dimension: 4,
             logger: StdoutLogger::new(log_level),
         })
     }
@@ -172,6 +177,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine,
             database: config.db_name.clone(),
+            embedding_dimension: config.embedding_dimension,
             logger: StdoutLogger::new(&config.log_level),
         })
     }
@@ -316,7 +322,12 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        self.execute_raw_query(include_str!("migrations/__Initial.surql"), None, namespace)
+        let initial_schema = render_initial_schema_sql(
+            include_str!("migrations/__Initial.surql"),
+            self.embedding_dimension,
+        );
+
+        self.execute_raw_query(&initial_schema, None, namespace)
             .await?;
 
         for migration in versioned_migrations() {
@@ -429,6 +440,10 @@ impl SurrealDbClient {
         }
         Ok(())
     }
+}
+
+fn render_initial_schema_sql(template: &str, embedding_dimension: usize) -> String {
+    template.replace("{{EMBEDDING_DIMENSION}}", &embedding_dimension.to_string())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1878,6 +1893,17 @@ mod tests {
         assert_eq!(vars.get("from_id"), Some(&json!("entity:alice")));
         assert_eq!(vars.get("to_id"), Some(&json!("entity:bob")));
         assert_eq!(vars.get("relation"), Some(&json!("knows")));
+    }
+
+    #[test]
+    fn render_initial_schema_sql_replaces_embedding_dimension_placeholder() {
+        let rendered = render_initial_schema_sql(
+            "DEFINE INDEX fact_embedding_hnsw ON fact FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST EUCLIDEAN TYPE F32 EFC 150 M 8;",
+            768,
+        );
+
+        assert!(rendered.contains("HNSW DIMENSION 768"));
+        assert!(!rendered.contains("{{EMBEDDING_DIMENSION}}"));
     }
 
     #[test]
