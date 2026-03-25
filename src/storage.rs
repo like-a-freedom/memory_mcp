@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::local::Mem;
@@ -19,6 +20,15 @@ use tokio::sync::Mutex;
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
+
+/// Traversal direction for graph neighbor queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphDirection {
+    /// Traverse incoming edges pointing to the supplied node.
+    Incoming,
+    /// Traverse outgoing edges leaving the supplied node.
+    Outgoing,
+}
 
 /// Trait for database operations, enabling dependency injection and testing.
 #[async_trait]
@@ -49,6 +59,32 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
         cutoff: &str,
     ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects active graph neighbors for one node without materializing the full edge table.
+    async fn select_edge_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects one entity by canonical name or alias using a parameterized lookup path.
+    async fn select_entity_lookup(
+        &self,
+        namespace: &str,
+        normalized_name: &str,
+    ) -> Result<Option<Value>, MemoryError>;
+
+    /// Creates a native graph relation edge while preserving compatibility fields.
+    async fn relate_edge(
+        &self,
+        namespace: &str,
+        edge_id: &str,
+        from_id: &str,
+        to_id: &str,
+        content: Value,
+    ) -> Result<Value, MemoryError>;
 
     /// Creates a new record.
     async fn create(
@@ -87,6 +123,11 @@ pub struct SurrealDbClient {
 
 /// Internal enum representing the database engine type.
 enum DbEngine {
+    // We intentionally retain the outer mutex because this service rebases one
+    // shared Surreal client onto different namespaces/databases per operation.
+    // `use_ns` / `use_db` are called through `&self`, so removing this guard
+    // without introducing namespace-scoped clients would let concurrent calls
+    // race on shared session context.
     Local(Mutex<Surreal<Db>>),
     Remote(Mutex<Surreal<Client>>),
 }
@@ -152,7 +193,7 @@ impl SurrealDbClient {
 
         let cfg = SurrealOptConfig::new()
             .user(root.clone())
-            .capabilities(Capabilities::all());
+            .capabilities(Capabilities::default());
 
         let db = Surreal::new::<RocksDb>((data_dir, cfg))
             .await
@@ -275,9 +316,12 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        let schema_sql = include_str!("migrations/__Initial.surql");
+        self.execute_raw_query(include_str!("migrations/__Initial.surql"), None, namespace)
+            .await?;
 
-        self.execute_raw_query(schema_sql, None, namespace).await?;
+        for migration in versioned_migrations() {
+            self.apply_versioned_migration(namespace, migration).await?;
+        }
 
         self.logger.log(
             std::collections::HashMap::from([
@@ -289,6 +333,38 @@ impl SurrealDbClient {
             ]),
             LogLevel::Info,
         );
+
+        Ok(())
+    }
+
+    async fn apply_versioned_migration(
+        &self,
+        namespace: &str,
+        migration: &MigrationScript,
+    ) -> Result<(), MemoryError> {
+        let record_id = migration_record_id(migration.file_name);
+        let checksum = migration_checksum(migration.sql);
+
+        if let Some(existing) = self.select_one(&record_id, namespace).await? {
+            validate_applied_migration(&existing, migration.file_name, &checksum)?;
+            return Ok(());
+        }
+
+        if migration_has_statements(migration.sql) {
+            self.execute_raw_query(migration.sql, None, namespace)
+                .await?;
+        }
+
+        self.create(
+            &record_id,
+            json!({
+                "script_name": migration.file_name,
+                "checksum": checksum,
+                "executed_at": chrono::Utc::now().to_rfc3339(),
+            }),
+            namespace,
+        )
+        .await?;
 
         Ok(())
     }
@@ -355,6 +431,130 @@ impl SurrealDbClient {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct MigrationScript {
+    file_name: &'static str,
+    sql: &'static str,
+}
+
+fn versioned_migrations() -> &'static [MigrationScript] {
+    &[
+        MigrationScript {
+            file_name: "001_init.surql",
+            sql: include_str!("migrations/001_init.surql"),
+        },
+        MigrationScript {
+            file_name: "002_datetime_types.surql",
+            sql: include_str!("migrations/002_datetime_types.surql"),
+        },
+        MigrationScript {
+            file_name: "003_edge_indexes.surql",
+            sql: include_str!("migrations/003_edge_indexes.surql"),
+        },
+        MigrationScript {
+            file_name: "004_migration_checksums.surql",
+            sql: include_str!("migrations/004_migration_checksums.surql"),
+        },
+    ]
+}
+
+fn migration_record_id(file_name: &str) -> String {
+    let slug = file_name
+        .chars()
+        .map(|character| match character {
+            'a'..='z' | 'A'..='Z' | '0'..='9' => character,
+            _ => '_',
+        })
+        .collect::<String>();
+    format!("script_migration:{slug}")
+}
+
+fn migration_checksum(sql: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(sql.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn migration_has_statements(sql: &str) -> bool {
+    sql.lines()
+        .map(str::trim)
+        .any(|line| !line.is_empty() && !line.starts_with("--"))
+}
+
+fn validate_applied_migration(
+    existing: &Value,
+    expected_file_name: &str,
+    expected_checksum: &str,
+) -> Result<(), MemoryError> {
+    let Some(map) = existing.as_object() else {
+        return Err(MemoryError::Storage(
+            "stored migration bookkeeping record must be an object".to_string(),
+        ));
+    };
+
+    let applied_name = map
+        .get("script_name")
+        .and_then(json_string)
+        .ok_or_else(|| {
+            MemoryError::Storage("applied migration record missing script_name".to_string())
+        })?;
+    let applied_checksum = map.get("checksum").and_then(json_string).ok_or_else(|| {
+        MemoryError::Storage("applied migration record missing checksum".to_string())
+    })?;
+    let executed_at = map
+        .get("executed_at")
+        .and_then(json_string)
+        .ok_or_else(|| {
+            MemoryError::Storage("applied migration record missing executed_at".to_string())
+        })?;
+
+    if applied_name != expected_file_name {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "applied migration name mismatch for {expected_file_name}: found {applied_name}"
+        )));
+    }
+
+    if applied_checksum != expected_checksum {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "applied migration {expected_file_name} was modified after execution"
+        )));
+    }
+
+    if chrono::DateTime::parse_from_rfc3339(executed_at).is_err() {
+        return Err(MemoryError::Storage(format!(
+            "applied migration {expected_file_name} has invalid executed_at"
+        )));
+    }
+
+    Ok(())
+}
+
+fn json_string(value: &Value) -> Option<&str> {
+    if let Some(value) = value.as_str() {
+        Some(value)
+    } else if let Some(object) = value.as_object() {
+        object
+            .get("String")
+            .and_then(Value::as_str)
+            .or_else(|| object.get("Strand").and_then(Value::as_str))
+            .or_else(|| {
+                object
+                    .get("Strand")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+            .or_else(|| object.get("Datetime").and_then(Value::as_str))
+            .or_else(|| {
+                object
+                    .get("Datetime")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+    } else {
+        None
+    }
+}
+
 #[async_trait]
 impl DbClient for SurrealDbClient {
     async fn select_one(
@@ -398,6 +598,7 @@ impl DbClient for SurrealDbClient {
     }
 
     async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        validate_table_name(table)?;
         self.log_op(
             "db.select_table",
             vec![
@@ -446,12 +647,7 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_select_facts_filtered_query(
-            scope,
-            cutoff,
-            query_contains,
-            limit,
-        );
+        let (sql, vars) = build_select_facts_filtered_query(scope, cutoff, query_contains, limit);
 
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
@@ -511,6 +707,114 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(results)
+    }
+
+    async fn select_edge_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_edge_neighbors",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("node_id", Value::String(node_id.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                (
+                    "direction",
+                    Value::String(match direction {
+                        GraphDirection::Incoming => "incoming".to_string(),
+                        GraphDirection::Outgoing => "outgoing".to_string(),
+                    }),
+                ),
+            ],
+        );
+
+        let (sql, vars) = build_select_edge_neighbors_query(node_id, cutoff, direction);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_edge_neighbors.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_entity_lookup(
+        &self,
+        namespace: &str,
+        normalized_name: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        self.log_op(
+            "db.select_entity_lookup",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("name", Value::String(normalized_name.to_string())),
+            ],
+        );
+
+        let (sql, vars) = build_select_entity_lookup_query(normalized_name);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(None);
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let result = extract_first_record(normalized);
+
+        self.log_op(
+            "db.select_entity_lookup.result",
+            vec![("found", Value::Bool(result.is_some()))],
+        );
+
+        Ok(result)
+    }
+
+    async fn relate_edge(
+        &self,
+        namespace: &str,
+        edge_id: &str,
+        from_id: &str,
+        to_id: &str,
+        content: Value,
+    ) -> Result<Value, MemoryError> {
+        self.log_op(
+            "db.relate_edge",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("edge_id", Value::String(edge_id.to_string())),
+                ("from_id", Value::String(from_id.to_string())),
+                ("to_id", Value::String(to_id.to_string())),
+            ],
+        );
+
+        let (sql, vars) = build_relate_edge_query(edge_id, from_id, to_id, content);
+        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
+        let normalized = surreal_to_json(surreal_val);
+        let result = extract_first_record(normalized).unwrap_or(Value::Null);
+
+        self.log_op(
+            "db.relate_edge.result",
+            vec![("result", Value::String("ok".to_string()))],
+        );
+
+        Ok(result)
     }
 
     async fn create(
@@ -603,6 +907,27 @@ impl DbClient for SurrealDbClient {
     }
 }
 
+fn validate_table_name(table: &str) -> Result<(), MemoryError> {
+    const ALLOWED_TABLES: &[&str] = &[
+        "community",
+        "edge",
+        "entity",
+        "episode",
+        "event_log",
+        "fact",
+        "script_migration",
+        "task",
+    ];
+
+    if ALLOWED_TABLES.contains(&table) {
+        Ok(())
+    } else {
+        Err(MemoryError::ConfigInvalid(format!(
+            "table `{table}` is not an allowed query target"
+        )))
+    }
+}
+
 /// Build SQL query for selecting a single record.
 fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     if let Some(idx) = record_id.find(':') {
@@ -655,7 +980,10 @@ fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
         };
         (sql, Value::Object(vars))
     } else {
-        (format!("CREATE {target} CONTENT $content RETURN *"), json!({"content": normalized}))
+        (
+            format!("CREATE {target} CONTENT $content RETURN *"),
+            json!({"content": normalized}),
+        )
     }
 }
 
@@ -682,7 +1010,10 @@ fn build_update_query(record_id: &str, content: Value) -> Result<(String, Value)
         let sql = if assignments.is_empty() {
             format!("UPDATE {table}:⟨{id}⟩ RETURN *")
         } else {
-            format!("UPDATE {table}:⟨{id}⟩ SET {} RETURN *", assignments.join(", "))
+            format!(
+                "UPDATE {table}:⟨{id}⟩ SET {} RETURN *",
+                assignments.join(", ")
+            )
         };
         Ok((sql, Value::Object(vars)))
     } else {
@@ -741,6 +1072,69 @@ fn build_select_facts_filtered_query(
     };
 
     (sql, Value::Object(vars))
+}
+
+fn build_select_entity_lookup_query(normalized_name: &str) -> (String, Value) {
+    (
+        "SELECT * FROM entity WHERE canonical_name_normalized = $name OR aliases CONTAINS $name LIMIT 1"
+            .to_string(),
+        json!({"name": normalized_name}),
+    )
+}
+
+fn build_select_edge_neighbors_query(
+    node_id: &str,
+    cutoff: &str,
+    direction: GraphDirection,
+) -> (String, Value) {
+    let node_field = match direction {
+        GraphDirection::Incoming => "to_id",
+        GraphDirection::Outgoing => "from_id",
+    };
+
+    (
+        format!(
+            "SELECT * FROM edge WHERE {node_field} = $node_id AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY from_id ASC, to_id ASC, t_valid DESC"
+        ),
+        json!({"node_id": node_id, "cutoff": cutoff}),
+    )
+}
+
+fn build_relate_edge_query(
+    edge_id: &str,
+    from_id: &str,
+    to_id: &str,
+    content: Value,
+) -> (String, Value) {
+    let normalized = normalize_surreal_json(&content);
+
+    if let Value::Object(map) = normalized {
+        let (assignments, mut vars) = build_set_assignments("edge", map);
+        let mut all_assignments = vec!["id = $edge".to_string()];
+        all_assignments.extend(assignments);
+        vars.insert("edge_id".to_string(), json!(edge_id));
+        vars.insert("from_id".to_string(), json!(from_id));
+        vars.insert("to_id".to_string(), json!(to_id));
+
+        (
+            format!(
+                "LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET {} RETURN *",
+                all_assignments.join(", ")
+            ),
+            Value::Object(vars),
+        )
+    } else {
+        (
+            "LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET id = $edge, content = $content RETURN *"
+                .to_string(),
+            json!({
+                "edge_id": edge_id,
+                "from_id": from_id,
+                "to_id": to_id,
+                "content": normalized,
+            }),
+        )
+    }
 }
 
 fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
@@ -1044,6 +1438,79 @@ mod tests {
     }
 
     #[test]
+    fn validate_table_name_rejects_unexpected_identifier() {
+        let error = validate_table_name("fact; DELETE user").expect_err("invalid table");
+        assert!(
+            matches!(error, MemoryError::ConfigInvalid(message) if message.contains("not an allowed query target"))
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_migrations_records_script_name_checksum_and_executed_at() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let record_id = migration_record_id("004_migration_checksums.surql");
+        let record = client
+            .select_one(&record_id, "testns")
+            .await
+            .expect("select migration record")
+            .expect("stored migration record");
+        let expected_checksum =
+            migration_checksum(include_str!("migrations/004_migration_checksums.surql"));
+
+        assert_eq!(
+            record.get("script_name").and_then(json_string),
+            Some("004_migration_checksums.surql")
+        );
+        assert_eq!(
+            record.get("checksum").and_then(json_string),
+            Some(expected_checksum.as_str())
+        );
+        assert!(record.get("executed_at").and_then(json_string).is_some());
+    }
+
+    #[tokio::test]
+    async fn apply_migrations_rejects_modified_applied_migration() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("initial apply migrations");
+
+        let record_id = migration_record_id("003_edge_indexes.surql");
+        client
+            .update(
+                &record_id,
+                json!({
+                    "script_name": "003_edge_indexes.surql",
+                    "checksum": "tampered",
+                    "executed_at": chrono::Utc::now().to_rfc3339(),
+                }),
+                "testns",
+            )
+            .await
+            .expect("tamper migration record");
+
+        let error = client
+            .apply_migrations("testns")
+            .await
+            .expect_err("modified applied migration should be rejected");
+        assert!(
+            matches!(error, MemoryError::ConfigInvalid(message) if message.contains("modified after execution"))
+        );
+    }
+
+    #[test]
     fn extract_first_record_from_array() {
         let arr = Value::Array(vec![json!({"id": 1}), json!({"id": 2})]);
         let result = extract_first_record(arr);
@@ -1137,8 +1604,14 @@ mod tests {
         let (sql, vars) = build_create_query("fact", content);
         assert!(sql.contains("t_valid = type::datetime($t_valid)"));
         assert!(sql.contains("t_ingested = type::datetime($t_ingested)"));
-        assert_eq!(vars.get("t_valid"), Some(&json!("2026-03-25T17:07:08.958562Z")));
-        assert_eq!(vars.get("t_ingested"), Some(&json!("2026-03-25T17:07:08.958562Z")));
+        assert_eq!(
+            vars.get("t_valid"),
+            Some(&json!("2026-03-25T17:07:08.958562Z"))
+        );
+        assert_eq!(
+            vars.get("t_ingested"),
+            Some(&json!("2026-03-25T17:07:08.958562Z"))
+        );
     }
 
     #[test]
@@ -1328,12 +1801,8 @@ mod tests {
 
     #[test]
     fn build_select_facts_filtered_query_with_text_query_preserves_temporal_filters() {
-        let (sql, vars) = build_select_facts_filtered_query(
-            "org",
-            "2026-01-15T00:00:00Z",
-            Some("ARR growth"),
-            5,
-        );
+        let (sql, vars) =
+            build_select_facts_filtered_query("org", "2026-01-15T00:00:00Z", Some("ARR growth"), 5);
 
         assert!(
             sql.contains("FROM fact WHERE"),
@@ -1358,8 +1827,65 @@ mod tests {
     }
 
     #[test]
+    fn build_select_entity_lookup_query_parameterizes_canonical_and_alias_match() {
+        let (sql, vars) = build_select_entity_lookup_query("dmitry ivanov");
+
+        assert_eq!(
+            sql,
+            "SELECT * FROM entity WHERE canonical_name_normalized = $name OR aliases CONTAINS $name LIMIT 1"
+        );
+        assert_eq!(vars, json!({"name": "dmitry ivanov"}));
+    }
+
+    #[test]
+    fn build_select_edge_neighbors_query_parameterizes_incoming_lookup() {
+        let (sql, vars) = build_select_edge_neighbors_query(
+            "entity:openai",
+            "2026-01-15T00:00:00Z",
+            GraphDirection::Incoming,
+        );
+
+        assert!(sql.contains("to_id = $node_id"));
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
+        assert_eq!(
+            vars,
+            json!({"node_id": "entity:openai", "cutoff": "2026-01-15T00:00:00Z"})
+        );
+    }
+
+    #[test]
+    fn build_relate_edge_query_uses_native_relate_syntax() {
+        let (sql, vars) = build_relate_edge_query(
+            "edge:abc123",
+            "entity:alice",
+            "entity:bob",
+            json!({
+                "edge_id": "edge:abc123",
+                "from_id": "entity:alice",
+                "relation": "knows",
+                "to_id": "entity:bob",
+                "strength": 1.0,
+                "confidence": 0.8,
+                "provenance": {"source": "manual"},
+                "t_valid": "2026-01-15T00:00:00Z",
+                "t_ingested": "2026-01-15T00:00:00Z"
+            }),
+        );
+
+        assert!(sql.starts_with("LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET"));
+        assert!(sql.contains("id = $edge"));
+        assert_eq!(vars.get("edge_id"), Some(&json!("edge:abc123")));
+        assert_eq!(vars.get("from_id"), Some(&json!("entity:alice")));
+        assert_eq!(vars.get("to_id"), Some(&json!("entity:bob")));
+        assert_eq!(vars.get("relation"), Some(&json!("knows")));
+    }
+
+    #[test]
     fn normalize_surreal_json_unwraps_datetime_variants() {
         let datetime = json!({"Datetime": {"String": "2026-01-15T00:00:00Z"}});
-        assert_eq!(normalize_surreal_json(&datetime), json!("2026-01-15T00:00:00Z"));
+        assert_eq!(
+            normalize_surreal_json(&datetime),
+            json!("2026-01-15T00:00:00Z")
+        );
     }
 }

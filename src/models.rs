@@ -299,6 +299,8 @@ pub struct Episode {
     pub scope: String,
     pub visibility_scope: String,
     pub policy_tags: Vec<String>,
+    #[serde(default)]
+    pub embedding: Option<Vec<f32>>,
 }
 
 /// An entity represents a canonical named thing.
@@ -308,6 +310,8 @@ pub struct Entity {
     pub entity_type: String,
     pub canonical_name: String,
     pub aliases: Vec<String>,
+    #[serde(default)]
+    pub embedding: Option<Vec<f32>>,
 }
 
 /// A fact represents a piece of knowledge extracted from an episode.
@@ -327,6 +331,8 @@ pub struct Fact {
     pub scope: String,
     pub policy_tags: Vec<String>,
     pub provenance: serde_json::Value,
+    #[serde(default)]
+    pub embedding: Option<Vec<f32>>,
 }
 
 /// An edge represents a relationship between entities or facts.

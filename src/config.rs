@@ -11,6 +11,8 @@ use crate::service::MemoryError;
 /// Configuration for SurrealDB connection.
 ///
 /// Supports both embedded (RocksDB) and remote (WebSocket) modes.
+/// For local development, prefer embedded mode. For remote deployments, use a
+/// dedicated least-privileged database user instead of root credentials.
 ///
 /// # Examples
 ///
@@ -54,6 +56,9 @@ impl SurrealConfig {
     /// | `SURREALDB_USERNAME` | Yes | Database username |
     /// | `SURREALDB_PASSWORD` | Yes | Database password |
     /// | `LOG_LEVEL` | No | Logging level (default: "warn") |
+    ///
+    /// Security note: embedded mode is the preferred local default. Remote mode
+    /// should be paired with scoped credentials and host-level authentication.
     ///
     /// # Errors
     ///

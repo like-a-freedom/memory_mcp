@@ -95,11 +95,52 @@ pub async fn assemble_context(
     let mut active = filter_facts_by_policy(fact_records, &access);
     sort_facts_by_recency(&mut active);
 
+    let mut rationale_by_fact_id = std::collections::HashMap::new();
+    if let Some(query) = query_opt {
+        let direct_fact_ids: std::collections::HashSet<_> =
+            active.iter().map(|fact| fact.fact_id.clone()).collect();
+        let community_facts = collect_community_facts(
+            service,
+            &namespace,
+            &request.scope,
+            &cutoff_iso,
+            query,
+            &access,
+            &direct_fact_ids,
+            request.budget,
+        )
+        .await?;
+
+        for (fact, rationale) in community_facts {
+            rationale_by_fact_id.insert(fact.fact_id.clone(), rationale);
+            active.push(fact);
+        }
+
+        sort_facts_by_recency(&mut active);
+        let mut deduped = Vec::with_capacity(active.len());
+        let mut seen = std::collections::HashSet::new();
+        for fact in active {
+            if seen.insert(fact.fact_id.clone()) {
+                deduped.push(fact);
+            }
+        }
+        active = deduped;
+    }
+
     let results: Vec<AssembledContextItem> = active
         .into_iter()
         .take(request.budget.max(1) as usize)
         .map(|fact| {
             let confidence = super::decayed_confidence(&fact, cutoff);
+            let rationale = rationale_by_fact_id
+                .remove(&fact.fact_id)
+                .unwrap_or_else(|| {
+                    format!(
+                        "matched scope={} and active at {}",
+                        request.scope,
+                        cutoff.date_naive()
+                    )
+                });
             AssembledContextItem {
                 fact_id: fact.fact_id,
                 content: fact.content,
@@ -107,11 +148,7 @@ pub async fn assemble_context(
                 source_episode: fact.source_episode,
                 confidence,
                 provenance: fact.provenance,
-                rationale: format!(
-                    "matched scope={} and active at {}",
-                    request.scope,
-                    cutoff.date_naive()
-                ),
+                rationale,
             }
         })
         .collect();
@@ -178,6 +215,146 @@ fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     });
 }
 
+async fn collect_community_facts(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    scope: &str,
+    cutoff_iso: &str,
+    query: &str,
+    access: &AccessContext,
+    direct_fact_ids: &std::collections::HashSet<String>,
+    budget: i32,
+) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
+    let matched_communities = find_matching_communities(service, namespace, query).await?;
+    if matched_communities.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let member_ids: std::collections::HashSet<_> = matched_communities
+        .iter()
+        .flat_map(|community| community.member_entities.iter().cloned())
+        .collect();
+
+    let fallback_records = service
+        .db_client
+        .select_facts_filtered(namespace, scope, cutoff_iso, None, budget.max(1) * 10)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    let mut facts = filter_facts_by_policy(fallback_records, access)
+        .into_iter()
+        .filter(|fact| !direct_fact_ids.contains(&fact.fact_id))
+        .filter(|fact| {
+            fact.entity_links
+                .iter()
+                .any(|entity_id| member_ids.contains(entity_id))
+        })
+        .collect::<Vec<_>>();
+    sort_facts_by_recency(&mut facts);
+
+    let community_summary = matched_communities
+        .iter()
+        .map(|community| community.summary.as_str())
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    Ok(facts
+        .into_iter()
+        .take(budget.max(1) as usize)
+        .map(|fact| {
+            (
+                fact,
+                format!(
+                    "matched community summary for query=\"{}\" via {}",
+                    query, community_summary
+                ),
+            )
+        })
+        .collect())
+}
+
+#[derive(Debug)]
+struct StoredCommunitySummary {
+    summary: String,
+    member_entities: Vec<String>,
+}
+
+async fn find_matching_communities(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    query: &str,
+) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
+    let normalized_query = query.to_lowercase();
+    let communities = service
+        .db_client
+        .select_table("community", namespace)
+        .await?;
+
+    Ok(communities
+        .iter()
+        .filter_map(stored_community_summary_from_value)
+        .filter(|community| community.summary.to_lowercase().contains(&normalized_query))
+        .collect())
+}
+
+fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunitySummary> {
+    let map = value.as_object()?;
+    let summary = map
+        .get("summary")
+        .and_then(unwrap_context_string)
+        .unwrap_or_default()
+        .to_string();
+    let member_entities = map
+        .get("member_entities")
+        .and_then(unwrap_context_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(unwrap_context_string)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if summary.is_empty() || member_entities.is_empty() {
+        return None;
+    }
+
+    Some(StoredCommunitySummary {
+        summary,
+        member_entities,
+    })
+}
+
+fn unwrap_context_string(value: &Value) -> Option<&str> {
+    if let Some(value) = value.as_str() {
+        Some(value)
+    } else if let Some(object) = value.as_object() {
+        object
+            .get("String")
+            .and_then(Value::as_str)
+            .or_else(|| object.get("Strand").and_then(Value::as_str))
+            .or_else(|| {
+                object
+                    .get("Strand")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+    } else {
+        None
+    }
+}
+
+fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
+    if let Some(array) = value.as_array() {
+        Some(array)
+    } else if let Some(object) = value.as_object() {
+        object.get("Array").and_then(Value::as_array)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +377,7 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
+            embedding: None,
         }
     }
 

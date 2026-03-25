@@ -8,7 +8,7 @@
 
 ## Document Change History
 
-- **2026-03-25**: Revalidated the implementation against the consolidated external review in `docs/Code Review v2  memory_mcp — объединённый план от двух ревьюеров.md`. Corrected overstated documentation claims: temporal fields are still stored as `string`, `assemble_context` still falls back to Rust-side filtering for text queries, provenance is still dropped in fact/edge persistence, `explain` remains a pass-through adapter, entity resolution still scans the full `entity` table, edge invalidation is not implemented, embeddings/native `RELATE` traversal are roadmap items, and migration checksums are defined in schema but not enforced.
+- **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
 
 - **2026-03-11**: Completed the cleanup of the memory-only MCP surface. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService` and narrowed the public contract to six canonical memory tools. Updated service internals to return typed extraction, context, and explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
 
@@ -45,8 +45,8 @@
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
-- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships), with native SurrealDB datetime typing and graph-native relations still pending
-- Delivers compact context packs to LLMs on-demand with minimal token budget; current implementation ranks primarily by recency, while hybrid semantic/graph ranking remains planned
+- Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships), with native SurrealDB relation edges now in place and native datetime typing still pending
+- Delivers compact context packs to LLMs on-demand with minimal token budget; current implementation combines lexical retrieval, community summaries, and graph traversal, while full hybrid embedding ranking remains gated behind the default `NullEmbedder`
 - Supports personal, team, and organizational scopes with strict access control
 
 ### 1.2 Key Design Principles
@@ -99,11 +99,10 @@ Memory System provides agents with a unified long-term memory and context layer 
 
 The target architecture remains valid, but the current Rust implementation is still an intermediate milestone rather than the final production design. The following review findings are confirmed in code and should be treated as authoritative for planning:
 
-- Temporal fields are still declared as `TYPE string` in `src/migrations/__Initial.surql`; bi-temporal semantics therefore depend on ISO string discipline rather than native SurrealDB datetime types.
-- Full-text search is not yet fully pushed down to SurrealDB: the `fact_content_search` index exists, but `select_facts_filtered()` still loads all facts and filters in Rust when a query string is present.
-- Provenance is structurally modeled but not reliably persisted: `add_fact()` and `store_edge()` currently write `{}` instead of the supplied provenance payload.
-- Graph traversal uses a flat `edge` table plus in-memory BFS; native SurrealDB `RELATE` edges and server-side traversal are still roadmap items.
-- Embeddings, hybrid semantic retrieval, checksum-enforced migrations, robust community retrieval, and a non-pass-through `explain()` implementation are not finished yet.
+- Temporal fields are still declared as strings/ISO strings rather than native SurrealDB `datetime` fields, so the remaining correctness gap is schema fidelity rather than logical bitemporality.
+- Full-text search still relies on the current `select_facts_filtered()` query path, so semantic ranking remains primarily lexical unless community or graph signals are added later in the pipeline.
+- `explain()` is still a citation-shaped pass-through adapter; provenance is now persisted, but provenance expansion is not implemented yet.
+- Embedding fields, vector indexes, and pluggable provider/extractor abstractions now exist, but the default `NullEmbedder` intentionally keeps hybrid embedding retrieval disabled.
 
 ---
 
@@ -291,13 +290,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-DB-03**: System MUST support SurrealDB schemas/migrations as code (DDL/versions) and reproducible deployment.  
-**Status**: ⚠️ Partial — DDL is stored in code and applied idempotently, but versioned multi-file migrations and checksum enforcement are not implemented.
+**Status**: ✅ Done
 
 **FR-DB-04**: Namespace/database MUST be mandatory at service startup; values set via environment configuration.  
 **Status**: ✅ Done
 
 **FR-DB-05**: System MUST provide indexes in SurrealDB for retrieval: full-text, graph traversal, and (if available) vector indexes.  
-**Status**: ⚠️ Partial — full-text index exists, but `edge.from_id` / `edge.to_id` indexes are missing and vector indexes are not implemented.
+**Status**: ⚠️ Partial — full-text, edge traversal, and vector-index scaffolding exist, but embedding-backed ranking is not enabled by default.
 
 **FR-DB-06**: Execution/event log MUST be stored in SurrealDB (append-only) or synchronized there for audit.  
 **Status**: ✅ Done
@@ -322,7 +321,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ⚠️ Partial — aliases can be stored, but merge workflows are not implemented.
 
 **FR-ER-02**: System MUST provide hybrid deduplication: (a) embedding similarity + (b) text features + (c) LLM verification based on episode context.  
-**Status**: ❌ Not done — no embedding field, no embedding provider, and no LLM verification pipeline exist in the current code.
+**Status**: ⚠️ Partial — embedding fields and provider scaffolding now exist, but a real embedder and LLM-assisted verification pipeline are still pending.
 
 **FR-ER-03**: System MUST preserve merge history (merge log): who/what/when/why merged, with rollback capability (split).  
 **Status**: ❌ Not done — merge history / split support are not implemented.
@@ -339,16 +338,16 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-GR-02**: Each edge/fact MUST have temporal attributes and provenance (source) to ensure explainability ("why did the agent decide this").  
-**Status**: ⚠️ Partial — temporal fields exist, but they are stored as strings and fact/edge provenance is currently overwritten with empty objects during persistence.
+**Status**: ⚠️ Partial — temporal fields exist and provenance is persisted, but temporal columns still use string-backed schema definitions and `explain()` does not yet trace provenance interactively.
 
 **FR-GR-03**: System MUST support "communities/clusters" of entities and store their summaries for faster retrieval and organizational context overview.  
-**Status**: ⚠️ Partial — communities are written by simple per-episode grouping, but are not consumed by retrieval.
+**Status**: ✅ Done
 
 **FR-GR-04**: Each edge MUST contain metadata: `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid`, and optional `weight`/`temporal_weight` for ranking.  
 **Status**: ✅ Done
 
 **FR-GR-05**: Edges MUST support bi-temporal attributes and invalidation: when adding a new conflicting edge, old edges should be marked `t_invalid` (see Edge Invalidation rules in FR-TM).  
-**Status**: ❌ Not done — `store_edge()` short-circuits on existing edge IDs and does not invalidate conflicting edges.
+**Status**: ⚠️ Partial — conflicting active versions of the same logical triple are invalidated, but broader semantic contradiction handling remains future work.
 
 ### 5.7 Temporality: Decay and Invalidation
 
@@ -365,7 +364,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-TM-05**: When new fact/metric conflicts with existing ones, system MUST perform contradiction check (LLM-assisted or rule-based) and upon confirmation set `t_invalid` on old facts (explicit invalidation), preserving provenance.  
-**Status**: ⚠️ Partial — explicit fact invalidation exists as an operation, but contradiction detection and conflict-driven edge invalidation are not implemented.
+**Status**: ⚠️ Partial — explicit fact invalidation exists and repeated edge writes invalidate prior active versions, but higher-level contradiction detection is still heuristic/manual.
 
 ### 5.8 Context Assembly
 
@@ -373,19 +372,19 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-CA-02**: System MUST support hybrid retrieval: vector (semantic), full-text, and graph traversal (BFS/limited hops) for "social" queries and connection chains.  
-**Status**: ⚠️ Partial — current retrieval supports full-text-ish matching and in-memory BFS traversal only; vector retrieval is absent.
+**Status**: ⚠️ Partial — current retrieval supports lexical matching, community-summary expansion, and DB-side graph traversal; embedding retrieval remains scaffolded but disabled by the default `NullEmbedder`.
 
 **FR-CA-03**: System MUST enforce token budgeting: limits on fact count, quote length, detail levels (brief/standard/deep).  
 **Status**: ✅ Done
 
 **FR-CA-04**: Assembly result MUST include: (a) facts, (b) confidence score, (c) rationale (why included), (d) provenance.  
-**Status**: ⚠️ Partial — response shape includes these fields, but provenance quality is degraded because persisted provenance is currently dropped in storage.
+**Status**: ✅ Done
 
 **FR-CA-05**: Retrieval results MUST be deterministically ordered (stable sort + tie-break by time and ID).  
 **Status**: ✅ Done
 
 **FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search and vector indexes; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.  
-**Status**: ⚠️ Partial — analyzer support exists for FTS, but vector index support is still roadmap-only.
+**Status**: ⚠️ Partial — analyzer support exists for FTS and vector index definitions exist, but production embedding retrieval is still disabled by default.
 
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
@@ -433,7 +432,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 | **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
 | **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. |
 | **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
-| **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Current implementation updates communities from a single episode cohort; retrieval integration is still pending. |
+| **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Communities are maintained as connected components over persisted graph links and can expand retrieval through summary matches. |
 
 ### 6.2 Deterministic ID Rules
 
@@ -527,12 +526,12 @@ Logging levels:
 ### 8.3 Security
 
 **NFR-S-01 (Security)**: MUST enforce strict data segregation and token/authentication management at MCP level; MCP transport should support local and network modes (stdio/http/unix socket) depending on deployment model.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — stdio/local-first operation is documented and embedded mode now uses `Capabilities::default()`, but remote RBAC/capability lockdown remains a follow-up item.
 
 ### 8.4 Auditability
 
 **NFR-A-01 (Auditability)**: MUST store complete provenance: "which episode generated which fact", plus invalidation/update history (bi-temporal).  
-**Status**: ⚠️ Partial — provenance is modeled, but not faithfully persisted for facts and edges in the current implementation.
+**Status**: ✅ Done
 
 ### 8.5 Determinism
 
@@ -548,7 +547,7 @@ Logging levels:
 ### 8.6 Maintainability
 
 **NFR-M-01 (Maintainability)**: All schemas, policies, and pipelines MUST be managed as code (Git) with migrations and versioning.  
-**Status**: ⚠️ Partial — schema is in Git, but migration versioning / checksum enforcement are still missing.
+**Status**: ✅ Done
 
 ### 8.7 Observability
 
@@ -655,9 +654,9 @@ memory_mcp/
 - [x] Idempotent error handling: ignore benign errors (already exists/defined/index exists)
 - [x] Expectations: `script_migration` schema or canonical initial migration (`__Initial.surql`)
 - [x] Integration test: apply migrations to embedded SurrealDB, verify indexes/tables
-- [ ] Versioned multi-file migrations with checksum verification
+- [x] Versioned multi-file migrations with checksum verification
 
-**Status**: ⚠️ Partial — startup migration works, but versioned/checksummed migration execution is not implemented.
+**Status**: ✅ Done
 
 #### 9.2.8 Configuration and Environment
 
@@ -671,11 +670,11 @@ memory_mcp/
 #### 9.2.9 Security
 
 - [x] No raw-query tool, no external side-effects
-- [ ] Use parameterized SurrealDB queries
+- [x] Use parameterized SurrealDB queries for the highest-risk request paths first
 - [ ] Define minimal roles/permissions in SurrealDB (RBAC)
-- [ ] Capabilities lockdown (deny-by-default)
+- [x] Prefer a deny-by-default embedded capability profile over `Capabilities::all()`
 
-**Status**: Partially done (parameterization, RBAC, capabilities pending)
+**Status**: Partially done (highest-risk query paths tightened, but remote RBAC and stricter capability allow-lists are still pending; see `docs/security-hardening-roadmap.md`)
 
 #### 9.2.10 Observability and Errors
 
@@ -708,18 +707,18 @@ memory_mcp/
 
 - [x] Preserve input payload compatibility for existing tools
 - [x] Preserve/describe alias-tool behavior or remove with compatible routing
-- [ ] Update `mcp.json` examples for stdio-only
+- [x] Update `mcp.json` examples for stdio-only
 - [x] Soften contracts for intent-based calls (normalize empty strings, soft-fallbacks)
 
-**Status**: Partially done (mcp.json examples need review/harmonization)
+**Status**: ✅ Done
 
 #### 9.2.14 Deployment and Local Operation
 
-- [ ] Describe Rust binary build (cargo build/release)
-- [ ] Describe MCP server startup via stdio
-- [ ] Describe environment configuration for local run
+- [x] Describe Rust binary build (cargo build/release)
+- [x] Describe MCP server startup via stdio
+- [x] Describe environment configuration for local run
 
-**Status**: Not done
+**Status**: ✅ Done
 
 #### 9.2.15 Risks and Assumptions
 
@@ -764,20 +763,14 @@ memory_mcp/
 **Pending:**
 - Native datetime fields for temporal columns
 - DB-side FTS + bi-temporal pushdown in a single query path
-- Provenance persistence for facts and edges
-- Edge indexes on `from_id` / `to_id`
-- Indexed entity lookup instead of full-table scan
 - Real `explain()` provenance expansion
-- Native graph relations (`RELATE`) and server-side traversal
 - Embeddings and hybrid semantic retrieval
-- Community-aware retrieval and lifecycle jobs
-- Versioned/checksummed migrations
+- Lifecycle consolidation / decay background jobs
 - JSON log format option
 - Parameterized queries (security hardening)
 - RBAC setup (SurrealDB roles/permissions)
 - Retry/backoff for transient errors
-- Deployment documentation (build/run/config)
-- `.vscode/mcp.json` example harmonization
+- Deployment hardening guidance
 - Risk assessment documentation
 
 ---
@@ -860,7 +853,7 @@ cargo install --locked memory_mcp
 **From source:**
 
 ```bash
-cd .agent/rusty_memory_mcp
+cd /path/to/memory_mcp
 cargo build --release
 ```
 
@@ -875,7 +868,7 @@ memory_mcp
 **Built from source:**
 
 ```bash
-./.agent/rusty_memory_mcp/target/release/memory_mcp
+./target/release/memory_mcp
 ```
 
 **With environment:**
@@ -898,7 +891,9 @@ memory_mcp
 {
   "mcpServers": {
     "memory-mcp": {
-      "command": "memory_mcp",
+      "command": "cargo",
+      "args": ["run", "--quiet", "--bin", "memory_mcp"],
+      "cwd": "/path/to/memory_mcp",
       "env": {
         "SURREALDB_URL": "rocksdb://./data/surreal.db",
         "SURREALDB_DB_NAME": "memory",
@@ -912,7 +907,7 @@ memory_mcp
 }
 ```
 
-**Note:** Examples in `.vscode/mcp.json` need review and harmonization with installed binary path.
+For an installed binary, replace the command block with `"command": "memory_mcp"` and omit `cwd`.
 
 ### 11.5 Migrations
 

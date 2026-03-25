@@ -163,6 +163,7 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
+            embedding: None,
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let confidence = decayed_confidence(&fact, now);
@@ -186,6 +187,7 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
+            embedding: None,
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let confidence = decayed_confidence(&fact, now);
@@ -209,6 +211,7 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
+            embedding: None,
         };
         let confidence = decayed_confidence(&fact, Utc::now());
         assert!(confidence > 0.99);

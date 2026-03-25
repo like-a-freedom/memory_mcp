@@ -1,11 +1,10 @@
 //! MemoryService implementation - core service orchestration.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use serde_json::{Value, json};
 
 use crate::config::SurrealConfig;
@@ -14,12 +13,15 @@ use crate::models::{
     AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
-use crate::storage::{DbClient, SurrealDbClient};
+use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
 use super::cache::{CacheKey, SafeMutex};
+use super::embedding::NullEmbedder;
+use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+use super::{EmbeddingProvider, EntityExtractor};
 
 /// Core service for memory operations.
 #[derive(Clone)]
@@ -32,7 +34,8 @@ pub struct MemoryService {
     pub(crate) context_cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) analyzers: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) indexes: Arc<Mutex<HashMap<String, Value>>>,
-    pub(crate) name_regex: Regex,
+    pub(crate) embedder: Arc<dyn EmbeddingProvider>,
+    pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
 }
 
 use lru::LruCache;
@@ -56,6 +59,9 @@ impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
+        let default_namespace = config
+            .default_namespace()
+            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?;
 
         let effective_data_dir = config.data_dir_or_default();
         let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
@@ -69,36 +75,31 @@ impl MemoryService {
                 "remote"
             }),
         );
+        startup_event.insert(
+            "namespaces".to_string(),
+            serde_json::json!(config.namespaces.clone()),
+        );
         if config.embedded {
             startup_event.insert(
-                "effective_data_dir".to_string(),
-                serde_json::json!(effective_data_dir.clone()),
+                "data_dir".to_string(),
+                serde_json::json!(effective_data_dir),
             );
         } else if let Some(url) = &config.url {
             startup_event.insert("url".to_string(), serde_json::json!(url));
         }
-        startup_event.insert(
-            "namespaces".to_string(),
-            serde_json::json!(config.namespaces),
-        );
-        startup_event.insert("db_name".to_string(), serde_json::json!(config.db_name));
         startup_logger.log(startup_event, crate::logging::LogLevel::Info);
 
-        let default_namespace = config
-            .namespaces
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "default".to_string());
-        let db_client = SurrealDbClient::connect(&config, &default_namespace).await?;
-
-        let server_version = match db_client.server_version(&default_namespace).await {
-            Ok(Some(v)) => Some(v),
-            Ok(None) => None,
+        let db_client = SurrealDbClient::connect(&config, default_namespace).await?;
+        let server_version = match db_client.server_version(default_namespace).await {
+            Ok(version) => version,
             Err(err) => {
-                let mut evt = std::collections::HashMap::new();
-                evt.insert("op".to_string(), json!("startup.version_check"));
-                evt.insert("error".to_string(), json!(format!("{err}")));
-                startup_logger.log(evt, crate::logging::LogLevel::Warn);
+                let mut event = std::collections::HashMap::new();
+                event.insert(
+                    "op".to_string(),
+                    serde_json::json!("startup.version_probe_failed"),
+                );
+                event.insert("error".to_string(), serde_json::json!(err.to_string()));
+                startup_logger.log(event, crate::logging::LogLevel::Warn);
                 None
             }
         };
@@ -187,8 +188,8 @@ impl MemoryService {
             context_cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
             analyzers: Arc::new(Mutex::new(HashMap::new())),
             indexes: Arc::new(Mutex::new(HashMap::new())),
-            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+")
-                .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
+            embedder: Arc::new(NullEmbedder),
+            entity_extractor: Arc::new(RegexEntityExtractor::new()?),
         })
     }
 
@@ -229,7 +230,8 @@ impl MemoryService {
         let existing = self.db_client.select_one(&episode_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = request.t_ingested.unwrap_or_else(super::query::now);
-            let payload = json!({
+            let embedding = self.embedder.embed_text(&request.content).await?;
+            let mut payload = json!({
                 "episode_id": episode_id,
                 "source_type": request.source_type,
                 "source_id": request.source_id,
@@ -240,6 +242,9 @@ impl MemoryService {
                 "visibility_scope": request.visibility_scope.unwrap_or_else(|| request.scope.clone()),
                 "policy_tags": request.policy_tags,
             });
+            if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
+                object.insert("embedding".to_string(), json!(embedding));
+            }
             self.db_client
                 .create(&episode_id, payload, &namespace)
                 .await?;
@@ -327,6 +332,7 @@ impl MemoryService {
         self.enforce_rate_limit(access.as_ref())?;
         validate_entity_candidate(&candidate)?;
         let namespace = self.default_namespace.clone();
+        let normalized = super::normalize_text(&candidate.canonical_name);
         let existing = self
             .find_entity_record(&candidate.canonical_name, &namespace)
             .await?;
@@ -340,6 +346,7 @@ impl MemoryService {
         }
 
         let entity_id = deterministic_entity_id(&candidate.entity_type, &candidate.canonical_name);
+        let embedding = self.embedder.embed_text(&candidate.canonical_name).await?;
         let aliases = candidate
             .aliases
             .into_iter()
@@ -347,21 +354,19 @@ impl MemoryService {
             .map(|alias| super::normalize_text(&alias))
             .collect::<Vec<_>>();
 
-        let payload = json!({
+        let mut payload = json!({
             "entity_id": entity_id,
             "entity_type": candidate.entity_type,
             "canonical_name": candidate.canonical_name,
+            "canonical_name_normalized": normalized,
             "aliases": aliases.clone(),
         });
+        if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
+            object.insert("embedding".to_string(), json!(embedding));
+        }
         self.db_client
             .create(&entity_id, payload, &namespace)
             .await?;
-        if !aliases.is_empty() {
-            let statement = format!("UPDATE {} SET aliases = $aliases RETURN *", entity_id);
-            self.db_client
-                .query(&statement, Some(json!({"aliases": aliases})), &namespace)
-                .await?;
-        }
 
         Ok(entity_id)
     }
@@ -388,7 +393,8 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
-            let payload = json!({
+            let embedding = self.embedder.embed_text(content).await?;
+            let mut payload = json!({
                 "fact_id": fact_id.clone(),
                 "fact_type": fact_type,
                 "content": content,
@@ -402,6 +408,9 @@ impl MemoryService {
                 "policy_tags": policy_tags,
                 "provenance": provenance,
             });
+            if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
+                object.insert("embedding".to_string(), json!(embedding));
+            }
             let created = self.db_client.create(&fact_id, payload, &namespace).await?;
             if created.is_null() {
                 return Err(MemoryError::Storage(
@@ -535,38 +544,65 @@ impl MemoryService {
         let cutoff = as_of.unwrap_or_else(super::query::now);
         let cutoff_iso = super::normalize_dt(cutoff);
 
-        let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-        for namespace in &self.namespaces {
-            for record in self
-                .db_client
-                .select_edges_filtered(namespace, &cutoff_iso)
-                .await?
-            {
-                if let Value::Object(map) = record
-                    && let (Some(from_id), Some(to_id)) = (
-                        map.get("from_id").and_then(string_from_value),
-                        map.get("to_id").and_then(string_from_value),
-                    )
-                {
-                    graph.entry(from_id).or_default().push(to_id);
+        let mut frontier = vec![target_id.clone()];
+        let mut visited = std::collections::HashSet::from([target_id.clone()]);
+        let mut next_hop: HashMap<String, String> = HashMap::new();
+        let mut candidate_starts = BTreeSet::new();
+
+        for _ in 0..max_hops {
+            let mut next_frontier = Vec::new();
+
+            for node_id in &frontier {
+                for namespace in &self.namespaces {
+                    for record in self
+                        .db_client
+                        .select_edge_neighbors(
+                            namespace,
+                            node_id,
+                            &cutoff_iso,
+                            GraphDirection::Incoming,
+                        )
+                        .await?
+                    {
+                        if let Value::Object(map) = record
+                            && let (Some(from_id), Some(to_id)) = (
+                                map.get("from_id").and_then(string_from_value),
+                                map.get("to_id").and_then(string_from_value),
+                            )
+                            && visited.insert(from_id.clone())
+                        {
+                            next_hop.insert(from_id.clone(), to_id);
+                            candidate_starts.insert(from_id.clone());
+                            next_frontier.push(from_id);
+                        }
+                    }
                 }
             }
-        }
 
-        for neighbors in graph.values_mut() {
-            neighbors.sort();
-        }
-
-        let mut start_ids = graph.keys().cloned().collect::<Vec<_>>();
-        start_ids.sort();
-        for start_id in start_ids {
-            if start_id == target_id {
-                return Ok(vec![start_id]);
+            if next_frontier.is_empty() {
+                break;
             }
-            if let Some(path) = bfs_path(&graph, &start_id, &target_id, max_hops) {
+
+            next_frontier.sort();
+            next_frontier.dedup();
+            frontier = next_frontier;
+        }
+
+        let Some(start_id) = candidate_starts.into_iter().next() else {
+            return Ok(vec![]);
+        };
+
+        let mut path = vec![start_id.clone()];
+        let mut current = start_id;
+
+        while let Some(next) = next_hop.get(&current).cloned() {
+            path.push(next.clone());
+            if next == target_id {
                 return Ok(path);
             }
+            current = next;
         }
+
         Ok(vec![])
     }
 
@@ -658,35 +694,11 @@ impl MemoryService {
         namespace: &str,
     ) -> Result<Option<serde_json::Map<String, Value>>, MemoryError> {
         let normalized = super::normalize_text(name);
-        let records = self.db_client.select_table("entity", namespace).await?;
-        for record in records {
-            if let Value::Object(map) = record {
-                let canonical = map
-                    .get("canonical_name")
-                    .and_then(string_from_value)
-                    .map(|value| super::normalize_text(&value))
-                    .unwrap_or_default();
-                let aliases: Vec<String> = map
-                    .get("aliases")
-                    .and_then(|value| {
-                        value
-                            .as_array()
-                            .or_else(|| value.get("Array").and_then(Value::as_array))
-                    })
-                    .map(|values| {
-                        values
-                            .iter()
-                            .filter_map(string_from_value)
-                            .map(|value| super::normalize_text(&value))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                if normalized == canonical || aliases.contains(&normalized) {
-                    return Ok(Some(map));
-                }
-            }
-        }
-        Ok(None)
+        Ok(self
+            .db_client
+            .select_entity_lookup(namespace, &normalized)
+            .await?
+            .and_then(|record| record.as_object().cloned()))
     }
 
     pub(crate) fn is_scope_allowed(&self, scope: &str, access: &AccessContext) -> bool {
@@ -842,6 +854,7 @@ fn string_from_value(value: &Value) -> Option<String> {
     }
 }
 
+#[cfg(test)]
 fn bfs_path(
     graph: &HashMap<String, Vec<String>>,
     start: &str,
@@ -883,6 +896,7 @@ fn bfs_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::EntityCandidate;
     use crate::models::{AccessContext, AccessScopeAllow};
     use serde_json::json;
 
@@ -1149,6 +1163,35 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1283,5 +1326,279 @@ mod tests {
         let original = json!([1, 2, 3, "test", {"key": "value"}]);
         let round_tripped = service.cbor_round_trip(&original).unwrap();
         assert_eq!(original, round_tripped);
+    }
+
+    #[tokio::test]
+    async fn resolve_uses_indexed_entity_lookup_instead_of_table_scan() {
+        use std::sync::Arc;
+
+        struct LookupOnlyDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for LookupOnlyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("resolve should not scan the entity table")
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not bulk-load all edges")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => {
+                        vec![json!({"from_id": "entity:bob", "to_id": "entity:openai"})]
+                    }
+                    "entity:bob" => vec![json!({"from_id": "entity:alice", "to_id": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(match normalized_name {
+                    "dima ivanov" => Some(json!({"entity_id": "entity:existing"})),
+                    "openai" => Some(json!({"entity_id": "entity:openai"})),
+                    _ => None,
+                })
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                panic!("resolve should not create when indexed lookup finds a record")
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = MemoryService::new(
+            Arc::new(LookupOnlyDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let resolved = service
+            .resolve(
+                EntityCandidate {
+                    entity_type: "person".to_string(),
+                    canonical_name: "Dima Ivanov".to_string(),
+                    aliases: vec![],
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resolved, "entity:existing");
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_uses_db_side_neighbor_lookups() {
+        use std::sync::Arc;
+
+        struct TraversalDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for TraversalDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => {
+                        vec![json!({"from_id": "entity:bob", "to_id": "entity:openai"})]
+                    }
+                    "entity:bob" => vec![json!({"from_id": "entity:alice", "to_id": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = MemoryService::new(
+            Arc::new(TraversalDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:openai".to_string(),
+            ]
+        );
     }
 }

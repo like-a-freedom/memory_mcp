@@ -6,38 +6,37 @@ This document records the line-by-line validation of the external review against
 
 | Review item | Status | Current evidence | Documentation consequence |
 | --- | --- | --- | --- |
-| Temporal fields are `TYPE string` instead of `TYPE datetime` | Confirmed | `src/migrations/__Initial.surql` declares `t_ref`, `t_ingested`, `t_valid`, `t_invalid`, and related fields as `string` / `option<string>` | Treat native datetime migration as P0; mark bi-temporal support as partial rather than done |
-| FTS index exists but is not used as the real query path | Confirmed | `src/migrations/__Initial.surql` defines `fact_content_search`; `src/storage.rs::select_facts_filtered()` still executes `SELECT * FROM fact` and filters in Rust when `query_contains` is present | Downgrade FTS / `as_of` retrieval claims to partial |
-| Provenance is ignored in fact persistence | Confirmed | `src/service/core.rs::add_fact()` takes `_provenance` and writes `"provenance": {}` | Mark auditability / explainability as partial |
-| Provenance is ignored in edge persistence | Confirmed | `src/service/episode.rs::store_edge()` writes `"provenance": {}` | Same as above |
-| Edge indexes on `from_id` / `to_id` are missing | Confirmed | Only `edge_relation` index exists in `src/migrations/__Initial.surql` | Add index work to first implementation wave |
-| `find_entity_record()` performs full table scan | Confirmed | `src/service/core.rs::find_entity_record()` calls `select_table("entity", namespace)` and scans in Rust | Downgrade entity resolution claims to partial |
-| `explain()` is a pass-through adapter | Confirmed | `src/service/core.rs::explain()` only maps `context_pack` to `ExplainItem` | Mark `explain` API as partial |
-| `find_intro_chain()` loads all edges into memory before BFS | Confirmed | `src/service/core.rs::find_intro_chain()` loads `select_edges_filtered()` results into `HashMap<String, Vec<String>>` | Document scalability limitation and native graph roadmap |
-| Edges are stored as flat records, not native `RELATE` edges | Confirmed | `src/service/episode.rs::store_edge()` writes records into `edge`; schema uses `DEFINE TABLE edge`, not `TYPE RELATION` | Clarify that graph support is currently logical, not native Surreal graph traversal |
-| Embeddings are absent | Confirmed | No `embedding` fields in `src/models.rs` or `src/migrations/__Initial.surql`; no provider trait exists | Mark hybrid semantic retrieval as roadmap |
-| Entity extraction is regex-only and Anglo-centric | Confirmed | `src/service/core.rs` compiles `[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+`; `src/service/episode.rs::extract_entities()` resolves only `person` / `company` | Downgrade extraction completeness to partial |
-| Edge invalidation on conflict is not implemented | Confirmed | `src/service/episode.rs::store_edge()` returns early when the deterministic edge already exists | Mark FR-GR-05 as not done |
-| Community detection is placeholder-level and not used in retrieval | Confirmed | `src/service/episode.rs::update_communities()` groups entities from one episode; `src/service/context.rs` never reads `community` | Mark communities as partial and retrieval integration as pending |
-| Migration checksum/versioning is not implemented | Confirmed | `script_migration.checksum` exists in schema, but `src/storage.rs::apply_migrations_impl()` only runs `__Initial.surql` | Mark migrations/versioning as partial |
-| `Mutex<Surreal<Db>>` / `Mutex<Surreal<Client>>` serializes DB access | Confirmed | `src/storage.rs::DbEngine` wraps both engines in `tokio::sync::Mutex` | Capture concurrency limitation in roadmap |
+| Temporal fields are `TYPE string` instead of `TYPE datetime` | Still confirmed | `src/migrations/__Initial.surql` still uses string-backed temporal fields | Keep native datetime migration as remaining work |
+| FTS index exists but is not used as the only retrieval path | Still confirmed | `src/storage.rs::select_facts_filtered()` remains the lexical retrieval entry point | Document retrieval as lexical/community/graph hybrid, not pure vector ranking |
+| Provenance is ignored in fact persistence | Resolved | `src/service/core.rs::add_fact()` persists the supplied `provenance` payload | Promote provenance persistence from roadmap to implemented |
+| Provenance is ignored in edge persistence | Resolved | `src/service/episode.rs::store_edge()` persists edge provenance through `relate_edge()` | Same as above |
+| Edge indexes on `from_id` / `to_id` are missing | Resolved | `src/migrations/__Initial.surql` now defines `edge_from_id` and `edge_to_id` | Remove stale index-gap claims |
+| `find_entity_record()` performs full table scan | Resolved | `src/service/core.rs::find_entity_record()` now calls `select_entity_lookup()` | Promote indexed entity lookup to implemented |
+| `explain()` is a pass-through adapter | Still confirmed | `src/service/core.rs::explain()` still reshapes citation items without provenance traversal | Keep `explain` marked partial |
+| `find_intro_chain()` loads all edges into memory before BFS | Resolved | `src/service/core.rs::find_intro_chain()` now uses DB-side neighbor lookups | Update graph traversal notes to reflect current pushdown |
+| Edges are stored as flat records, not native `RELATE` edges | Resolved | `src/migrations/__Initial.surql` defines `edge TYPE RELATION`; `src/storage.rs::relate_edge()` uses `RELATE` | Promote native relation storage to implemented |
+| Embeddings are absent | Partially resolved | `src/models.rs`, `src/migrations/__Initial.surql`, and `src/service/embedding.rs` now provide embedding fields, indexes, and a `NullEmbedder` scaffold | Document semantic retrieval as scaffolded but disabled by default |
+| Entity extraction is regex-only and Anglo-centric | Still confirmed | `src/service/entity_extraction.rs` keeps regex fallback as the default extractor | Keep extraction completeness marked partial |
+| Edge invalidation on conflict is not implemented | Resolved for active triple versions | `src/service/episode.rs::invalidate_conflicting_edges()` invalidates prior active versions before insert | Document remaining contradiction work as broader semantic follow-up |
+| Community detection is placeholder-level and not used in retrieval | Resolved | `src/service/episode.rs::update_communities()` builds connected components and `src/service/context.rs` reads community summaries during retrieval | Promote community retrieval from pending to implemented baseline |
+| Migration checksum/versioning is not implemented | Resolved | `src/storage.rs::apply_migrations_impl()` records `script_name`, `checksum`, and `executed_at`, and rejects modified applied migrations | Promote migration bookkeeping from partial to implemented |
+| `Mutex<Surreal<Db>>` / `Mutex<Surreal<Client>>` serializes DB access | Still confirmed | `src/storage.rs::DbEngine` still wraps both engines in `tokio::sync::Mutex` | Keep concurrency limitation documented |
 
 ## What changed in the specification
 
-The main changes were applied to `docs/MEMORY_SYSTEM_SPEC.md`:
+The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
 
-- corrected inflated `✅ Done` statuses to `⚠️ Partial` or `❌ Not done`
-- added an explicit implementation reality-check section
-- clarified that current context assembly is recency-first, not true hybrid retrieval
-- clarified that `explain` is not yet provenance expansion
-- moved embeddings, native `RELATE`, and checksummed migrations into explicit pending work
+- preserved the remaining partial gaps (native datetime schema, richer extraction, real `explain`, security hardening)
+- promoted implemented remediation work: provenance persistence, indexed entity lookup, native `RELATE` edges, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced migrations
+- updated local-operation and stdio host examples to match the current Rust workspace layout
+- recorded verification commands and exact pass counts from this remediation pass
 
 ## Documentation-only conclusions
 
-1. The external review is materially accurate and still current.
-2. The repository has a solid Rust/MCP foundation, but several architectural claims in the spec described target-state behavior rather than implemented behavior.
-3. Documentation must distinguish:
+1. The external review was materially accurate at the start of the remediation pass.
+2. Tasks 3-7 closed most of the correctness and graph/storage gaps called out by that review.
+3. Documentation must still distinguish:
    - **implemented now**
    - **partially implemented / correctness gap**
    - **target architecture / roadmap**
-4. The next engineering pass should start with correctness and observability fixes before semantic-layer expansion.
+4. The next engineering pass should focus on documentation/security hardening, native datetime typing, richer extraction quality, and production deployment controls.

@@ -3,8 +3,9 @@
 //! These tests verify that different service components work together correctly.
 
 use chrono::{TimeZone, Utc};
-use serde_json::json;
+use memory_mcp::service::{EmbeddingProvider, EntityExtractor};
 use memory_mcp::storage::DbClient;
+use serde_json::json;
 
 mod common;
 
@@ -150,6 +151,133 @@ async fn test_service_extract_persists_edge_provenance() {
             .and_then(|value| value.get("source_episode"))
             == Some(&json!(episode_id))
     }));
+}
+
+#[tokio::test]
+async fn test_service_semantic_scaffolding_exposes_default_abstractions() {
+    let embedder = memory_mcp::service::NullEmbedder;
+    let embedding = embedder.embed_text("hello semantic world").await.unwrap();
+    assert_eq!(embedding, None);
+
+    let extractor = memory_mcp::service::RegexEntityExtractor::new().unwrap();
+    let candidates = extractor
+        .extract_candidates("Alice Smith met Bob Jones at Acme Inc")
+        .await
+        .unwrap();
+
+    assert_eq!(candidates.len(), 3);
+    assert_eq!(candidates[0].canonical_name, "Acme Inc");
+    assert_eq!(candidates[1].canonical_name, "Alice Smith");
+    assert_eq!(candidates[2].canonical_name, "Bob Jones");
+}
+
+#[tokio::test]
+async fn test_service_semantic_scaffolding_persists_embedding_slots() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "semantic-slot-1".to_string(),
+                content: "Alice Smith reviewed ARR improvements".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let entity_id = service.resolve_person("Alice Smith").await.unwrap();
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Alice Smith reviewed ARR improvements",
+            "Alice Smith reviewed ARR improvements",
+            &episode_id,
+            Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
+            "org",
+            0.8,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_id}),
+        )
+        .await
+        .unwrap();
+
+    let episode = db_client
+        .select_one(&episode_id, "org")
+        .await
+        .unwrap()
+        .expect("stored episode");
+    let entity = db_client
+        .select_one(&entity_id, "org")
+        .await
+        .unwrap()
+        .expect("stored entity");
+    let fact = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .unwrap()
+        .expect("stored fact");
+
+    assert!(episode.get("embedding").is_none());
+    assert!(entity.get("embedding").is_none());
+    assert!(fact.get("embedding").is_none());
+}
+
+#[tokio::test]
+async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
+    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+    let carol_id = service.resolve_person("Carol White").await.unwrap();
+
+    for (source_id, content) in [
+        ("community-merge-1", "Alice Smith met Bob Jones"),
+        ("community-merge-2", "Bob Jones met Carol White"),
+    ] {
+        let episode_id = service
+            .ingest(
+                memory_mcp::models::IngestRequest {
+                    source_type: "meeting".to_string(),
+                    source_id: source_id.to_string(),
+                    content: content.to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2024, 4, 2, 10, 0, 0).unwrap(),
+                    scope: "org".to_string(),
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await
+            .unwrap();
+        service.extract(&episode_id, None).await.unwrap();
+    }
+
+    let communities = db_client.select_table("community", "org").await.unwrap();
+    let merged = communities.iter().find(|community| {
+        let Some(members) = community
+            .get("member_entities")
+            .and_then(|value| value.as_array())
+        else {
+            return false;
+        };
+        let members: Vec<_> = members.iter().filter_map(|value| value.as_str()).collect();
+        members.contains(&alice_id.as_str())
+            && members.contains(&bob_id.as_str())
+            && members.contains(&carol_id.as_str())
+    });
+
+    assert!(
+        merged.is_some(),
+        "expected a merged community containing Alice, Bob, and Carol"
+    );
 }
 
 #[tokio::test]

@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::models::{AccessContext, EntityCandidate, IngestRequest, InvalidateRequest};
+use memory_mcp::storage::DbClient;
 
 mod common;
 
@@ -123,11 +124,11 @@ async fn test_invalidate_and_explain() {
                     content: "ARR is $1M".to_string(),
                     quote: "ARR is $1M".to_string(),
                     source_episode: episode_id.clone(),
-                        scope: None,
-                        t_ref: None,
-                        t_ingested: None,
-                        provenance: serde_json::Value::Null,
-                        citation_context: None,
+                    scope: None,
+                    t_ref: None,
+                    t_ingested: None,
+                    provenance: serde_json::Value::Null,
+                    citation_context: None,
                 }],
             },
             None,
@@ -223,6 +224,131 @@ async fn test_graph_intro_chain_as_of_filters_edges() {
         .await
         .expect("chain future");
     assert_eq!(chain_future, vec![alice, bob, openai]);
+}
+
+#[tokio::test]
+async fn test_relate_repeated_write_invalidates_previous_edge_version() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let alice = service.resolve_person("Alice").await.expect("alice");
+    let bob = service.resolve_person("Bob").await.expect("bob");
+
+    service
+        .relate(&alice, "knows", &bob)
+        .await
+        .expect("relate 1");
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    service
+        .relate(&alice, "knows", &bob)
+        .await
+        .expect("relate 2");
+
+    let edges = db_client.select_table("edge", "org").await.expect("edges");
+    let knows_edges: Vec<_> = edges
+        .into_iter()
+        .filter_map(|edge| edge.as_object().cloned())
+        .filter(|edge| {
+            edge.get("from_id").and_then(|value| value.as_str()) == Some(alice.as_str())
+                && edge.get("relation").and_then(|value| value.as_str()) == Some("knows")
+                && edge.get("to_id").and_then(|value| value.as_str()) == Some(bob.as_str())
+        })
+        .collect();
+
+    assert_eq!(knows_edges.len(), 2);
+
+    let invalidated_edges: Vec<_> = knows_edges
+        .iter()
+        .filter(|edge| edge.get("t_invalid").is_some())
+        .collect();
+    assert_eq!(invalidated_edges.len(), 1);
+    assert!(invalidated_edges[0].get("t_invalid_ingested").is_some());
+
+    let active_edges: Vec<_> = knows_edges
+        .iter()
+        .filter(|edge| edge.get("t_invalid").is_none())
+        .collect();
+    assert_eq!(active_edges.len(), 1);
+}
+
+#[tokio::test]
+async fn test_assemble_context_uses_matching_community_summary() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t_ref = Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap();
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "community-retrieval-1".to_string(),
+                content: "Alice Smith met Bob Jones to plan next steps".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest");
+
+    let extraction = service.extract(&episode_id, None).await.expect("extract");
+    let alice_id = extraction
+        .entities
+        .iter()
+        .find(|entity| entity.canonical_name == "Alice Smith")
+        .map(|entity| entity.entity_id.clone())
+        .expect("alice entity");
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Prototype milestone is blocked",
+            "Prototype milestone is blocked",
+            &episode_id,
+            t_ref,
+            "org",
+            0.8,
+            vec![alice_id],
+            vec![],
+            serde_json::json!({"source_episode": episode_id}),
+        )
+        .await
+        .expect("add fact");
+
+    let communities = db_client
+        .select_table("community", "org")
+        .await
+        .expect("communities");
+    assert!(!communities.is_empty());
+    assert!(communities.iter().any(|community| {
+        community
+            .get("summary")
+            .and_then(|value| value.as_str())
+            .is_some_and(|summary| summary.contains("Bob Jones"))
+    }));
+
+    let facts = db_client.select_table("fact", "org").await.expect("facts");
+    assert!(facts.iter().any(|fact| {
+        fact.get("fact_id").and_then(|value| value.as_str()) == Some(fact_id.as_str())
+    }));
+
+    let context = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "Bob Jones".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 5,
+            access: None,
+        })
+        .await
+        .expect("assemble");
+
+    assert!(context.iter().any(|item| item.fact_id == fact_id));
+    assert!(
+        context
+            .iter()
+            .any(|item| item.rationale.contains("community"))
+    );
 }
 
 #[tokio::test]

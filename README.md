@@ -102,6 +102,44 @@ cargo run
 
 The binary uses stdio transport, which makes it suitable for local MCP client integration.
 
+### Run with environment
+
+```bash
+SURREALDB_URL=rocksdb://./data/surreal.db \
+SURREALDB_DB_NAME=memory \
+SURREALDB_NAMESPACES=org,personal \
+SURREALDB_USERNAME=root \
+SURREALDB_PASSWORD=root \
+LOG_LEVEL=info \
+cargo run --quiet --bin memory_mcp
+```
+
+### VS Code MCP host example
+
+If you run the server directly from this workspace, a stdio host configuration can point at Cargo:
+
+```json
+{
+    "mcpServers": {
+        "memory-mcp": {
+            "command": "cargo",
+            "args": ["run", "--quiet", "--bin", "memory_mcp"],
+            "cwd": "/path/to/memory_mcp",
+            "env": {
+                "SURREALDB_URL": "rocksdb://./data/surreal.db",
+                "SURREALDB_DB_NAME": "memory",
+                "SURREALDB_NAMESPACES": "org,personal",
+                "SURREALDB_USERNAME": "root",
+                "SURREALDB_PASSWORD": "root",
+                "LOG_LEVEL": "info"
+            }
+        }
+    }
+}
+```
+
+After `cargo build --release` or `cargo install --path .`, you can switch `command` to `./target/release/memory_mcp` or `memory_mcp` respectively.
+
 ## Configuration
 
 Configuration is loaded from environment variables.
@@ -184,6 +222,12 @@ cargo test --test service_acceptance
 cargo test --test tools_e2e
 ```
 
+Verified in this remediation pass:
+
+- `cargo test semantic_scaffolding --test service_integration` → `2 passed; 0 failed`
+- `cargo test --test service_acceptance` → `11 passed; 0 failed`
+- `cargo test --test service_integration` → `11 passed; 0 failed`
+
 Coverage output is stored under `coverage/` when generated with Tarpaulin.
 
 ## Project layout
@@ -212,6 +256,7 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 
 - [`docs/MEMORY_SYSTEM_SPEC.md`](docs/MEMORY_SYSTEM_SPEC.md) — full system specification
 - [`docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md`](docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md) — curated references for intent- and skills-driven MCP design
+- [`docs/security-hardening-roadmap.md`](docs/security-hardening-roadmap.md) — current query-surface inventory, deployment assumptions, and remaining hardening work
 
 ## Contributing
 

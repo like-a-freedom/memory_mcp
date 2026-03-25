@@ -9,66 +9,87 @@ use crate::models::Edge;
 use crate::models::Episode;
 use crate::models::{ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink};
 
+fn unwrap_string_value(v: &Value) -> Option<&str> {
+    if let Some(s) = v.as_str() {
+        Some(s)
+    } else if let Some(obj) = v.as_object() {
+        obj.get("String")
+            .and_then(Value::as_str)
+            .or_else(|| obj.get("Datetime").and_then(Value::as_str))
+            .or_else(|| obj.get("Strand").and_then(Value::as_str))
+            .or_else(|| {
+                obj.get("Strand")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+            .or_else(|| {
+                obj.get("Datetime")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+    } else {
+        None
+    }
+}
+
+fn unwrap_array_value(v: &Value) -> Option<&Vec<Value>> {
+    if let Some(arr) = v.as_array() {
+        Some(arr)
+    } else if let Some(obj) = v.as_object() {
+        obj.get("Array").and_then(Value::as_array)
+    } else {
+        None
+    }
+}
+
+fn unwrap_embedding(value: Option<&Value>) -> Option<Vec<f32>> {
+    value.and_then(unwrap_array_value).map(|values| {
+        values
+            .iter()
+            .filter_map(|entry| {
+                entry.as_f64().map(|number| number as f32).or_else(|| {
+                    entry
+                        .as_object()
+                        .and_then(|obj| {
+                            obj.get("Number")
+                                .and_then(Value::as_f64)
+                                .or_else(|| obj.get("Float").and_then(Value::as_f64))
+                        })
+                        .map(|number| number as f32)
+                })
+            })
+            .collect()
+    })
+}
+
 /// Parse an episode from a database record.
 #[must_use]
 pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
-    fn unwrap_string(v: &Value) -> Option<&str> {
-        if let Some(s) = v.as_str() {
-            Some(s)
-        } else if let Some(obj) = v.as_object() {
-            obj.get("String")
-                .and_then(Value::as_str)
-                .or_else(|| obj.get("Datetime").and_then(Value::as_str))
-                .or_else(|| obj.get("Strand").and_then(Value::as_str))
-                .or_else(|| {
-                    obj.get("Strand")
-                        .and_then(|inner| inner.get("String"))
-                        .and_then(Value::as_str)
-                })
-                .or_else(|| {
-                    obj.get("Datetime")
-                        .and_then(|inner| inner.get("String"))
-                        .and_then(Value::as_str)
-                })
-        } else {
-            None
-        }
-    }
-
-    fn unwrap_array(v: &Value) -> Option<&Vec<Value>> {
-        if let Some(arr) = v.as_array() {
-            Some(arr)
-        } else if let Some(obj) = v.as_object() {
-            obj.get("Array").and_then(Value::as_array)
-        } else {
-            None
-        }
-    }
-
     Some(Episode {
-        episode_id: unwrap_string(record.get("episode_id")?)?.to_string(),
-        source_type: unwrap_string(record.get("source_type")?)?.to_string(),
-        source_id: unwrap_string(record.get("source_id")?)?.to_string(),
-        content: unwrap_string(record.get("content")?)?.to_string(),
-        t_ref: parse_iso(unwrap_string(record.get("t_ref")?)?)?,
-        t_ingested: parse_iso(unwrap_string(record.get("t_ingested")?)?)?,
-        scope: unwrap_string(record.get("scope")?)?.to_string(),
+        episode_id: unwrap_string_value(record.get("episode_id")?)?.to_string(),
+        source_type: unwrap_string_value(record.get("source_type")?)?.to_string(),
+        source_id: unwrap_string_value(record.get("source_id")?)?.to_string(),
+        content: unwrap_string_value(record.get("content")?)?.to_string(),
+        t_ref: parse_iso(unwrap_string_value(record.get("t_ref")?)?)?,
+        t_ingested: parse_iso(unwrap_string_value(record.get("t_ingested")?)?)?,
+        scope: unwrap_string_value(record.get("scope")?)?.to_string(),
         visibility_scope: record
             .get("visibility_scope")
-            .and_then(unwrap_string)
+            .and_then(unwrap_string_value)
             .unwrap_or_default()
             .to_string(),
         policy_tags: record
             .get("policy_tags")
-            .and_then(unwrap_array)
+            .and_then(unwrap_array_value)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(unwrap_string)
+                    .filter_map(unwrap_string_value)
                     .map(String::from)
                     .collect()
             })
             .unwrap_or_default(),
+        embedding: unwrap_embedding(record.get("embedding")),
     })
 }
 
@@ -77,53 +98,20 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
 pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
     let map = record.as_object()?;
 
-    fn unwrap_string(v: &Value) -> Option<&str> {
-        if let Some(s) = v.as_str() {
-            Some(s)
-        } else if let Some(obj) = v.as_object() {
-            obj.get("String")
-                .and_then(Value::as_str)
-                .or_else(|| obj.get("Datetime").and_then(Value::as_str))
-                .or_else(|| obj.get("Strand").and_then(Value::as_str))
-                .or_else(|| {
-                    obj.get("Strand")
-                        .and_then(|inner| inner.get("String"))
-                        .and_then(Value::as_str)
-                })
-                .or_else(|| {
-                    obj.get("Datetime")
-                        .and_then(|inner| inner.get("String"))
-                        .and_then(Value::as_str)
-                })
-        } else {
-            None
-        }
-    }
-
-    fn unwrap_array(v: &Value) -> Option<&Vec<Value>> {
-        if let Some(arr) = v.as_array() {
-            Some(arr)
-        } else if let Some(obj) = v.as_object() {
-            obj.get("Array").and_then(|a| a.as_array())
-        } else {
-            None
-        }
-    }
-
-    let t_valid_str = unwrap_string(map.get("t_valid")?)?;
+    let t_valid_str = unwrap_string_value(map.get("t_valid")?)?;
     let t_valid = parse_iso(t_valid_str)?;
     let t_ingested = map
         .get("t_ingested")
-        .and_then(unwrap_string)
+        .and_then(unwrap_string_value)
         .and_then(parse_iso)
         .unwrap_or(t_valid);
 
-    let fact_id = unwrap_string(map.get("fact_id")?)?.to_string();
-    let fact_type = unwrap_string(map.get("fact_type")?)?.to_string();
-    let content = unwrap_string(map.get("content")?)?.to_string();
-    let quote = unwrap_string(map.get("quote")?)?.to_string();
-    let source_episode = unwrap_string(map.get("source_episode")?)?.to_string();
-    let scope = unwrap_string(map.get("scope")?)
+    let fact_id = unwrap_string_value(map.get("fact_id")?)?.to_string();
+    let fact_type = unwrap_string_value(map.get("fact_type")?)?.to_string();
+    let content = unwrap_string_value(map.get("content")?)?.to_string();
+    let quote = unwrap_string_value(map.get("quote")?)?.to_string();
+    let source_episode = unwrap_string_value(map.get("source_episode")?)?.to_string();
+    let scope = unwrap_string_value(map.get("scope")?)
         .unwrap_or_default()
         .to_string();
 
@@ -137,11 +125,11 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         t_ingested,
         t_invalid: map
             .get("t_invalid")
-            .and_then(unwrap_string)
+            .and_then(unwrap_string_value)
             .and_then(parse_iso),
         t_invalid_ingested: map
             .get("t_invalid_ingested")
-            .and_then(unwrap_string)
+            .and_then(unwrap_string_value)
             .and_then(parse_iso),
         confidence: map
             .get("confidence")
@@ -159,11 +147,11 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
             .unwrap_or(0.0),
         entity_links: map
             .get("entity_links")
-            .and_then(unwrap_array)
+            .and_then(unwrap_array_value)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(unwrap_string)
+                    .filter_map(unwrap_string_value)
                     .map(String::from)
                     .collect()
             })
@@ -171,16 +159,17 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         scope,
         policy_tags: map
             .get("policy_tags")
-            .and_then(unwrap_array)
+            .and_then(unwrap_array_value)
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(unwrap_string)
+                    .filter_map(unwrap_string_value)
                     .map(String::from)
                     .collect()
             })
             .unwrap_or_default(),
         provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
+        embedding: unwrap_embedding(map.get("embedding")),
     })
 }
 
@@ -189,38 +178,20 @@ pub async fn extract_entities(
     service: &crate::service::MemoryService,
     content: &str,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
-    use crate::models::EntityCandidate;
-
-    let candidates: std::collections::HashSet<_> = service
-        .name_regex
-        .find_iter(content)
-        .map(|mat| mat.as_str().to_string())
-        .collect();
+    let candidates = service.entity_extractor.extract_candidates(content).await?;
 
     let mut entities = Vec::with_capacity(candidates.len());
 
     for candidate in candidates {
-        let entity_type = if candidate.contains("Corp") || candidate.contains("Inc") {
-            "company"
-        } else {
-            "person"
-        };
+        let entity_type = candidate.entity_type.clone();
+        let canonical_name = candidate.canonical_name.clone();
 
-        let entity_id = service
-            .resolve(
-                EntityCandidate {
-                    entity_type: entity_type.to_string(),
-                    canonical_name: candidate.clone(),
-                    aliases: Vec::new(),
-                },
-                None,
-            )
-            .await?;
+        let entity_id = service.resolve(candidate, None).await?;
 
         entities.push(ExtractedEntity {
             entity_id,
-            entity_type: entity_type.to_string(),
-            canonical_name: candidate,
+            entity_type,
+            canonical_name,
         });
     }
 
@@ -405,6 +376,8 @@ pub(crate) async fn store_edge(
         return Ok(());
     }
 
+    invalidate_conflicting_edges(service, edge, namespace).await?;
+
     let mut payload_map = serde_json::Map::new();
     payload_map.insert("edge_id".to_string(), Value::String(edge_id.clone()));
     payload_map.insert("from_id".to_string(), Value::String(edge.from_id.clone()));
@@ -436,10 +409,139 @@ pub(crate) async fn store_edge(
 
     service
         .db_client
-        .create(&edge_id, Value::Object(payload_map), namespace)
+        .relate_edge(
+            namespace,
+            &edge_id,
+            &edge.from_id,
+            &edge.to_id,
+            Value::Object(payload_map),
+        )
         .await?;
 
     Ok(())
+}
+
+#[derive(Debug)]
+struct StoredEdgeVersion {
+    edge_id: String,
+    from_id: String,
+    relation: String,
+    to_id: String,
+    t_valid: chrono::DateTime<chrono::Utc>,
+    t_ingested: chrono::DateTime<chrono::Utc>,
+    t_invalid: Option<chrono::DateTime<chrono::Utc>>,
+    t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+async fn invalidate_conflicting_edges(
+    service: &crate::service::MemoryService,
+    new_edge: &Edge,
+    namespace: &str,
+) -> Result<(), MemoryError> {
+    let existing_edges = service.db_client.select_table("edge", namespace).await?;
+
+    for existing in existing_edges
+        .iter()
+        .filter_map(stored_edge_version_from_record)
+        .filter(|existing| edge_versions_conflict(existing, new_edge))
+    {
+        service
+            .db_client
+            .update(
+                &existing.edge_id,
+                serde_json::json!({
+                    "t_invalid": super::normalize_dt(new_edge.t_valid),
+                    "t_invalid_ingested": super::normalize_dt(new_edge.t_ingested),
+                }),
+                namespace,
+            )
+            .await?;
+    }
+
+    Ok(())
+}
+
+/// In the current flat-edge model, only active versions of the same logical
+/// edge triple conflict. Broader semantic contradictions (for example,
+/// relation-specific exclusivity across different targets) are deferred until
+/// Task 5 introduces graph-native relation semantics.
+fn edge_versions_conflict(existing: &StoredEdgeVersion, new_edge: &Edge) -> bool {
+    existing.from_id == new_edge.from_id
+        && existing.relation == new_edge.relation
+        && existing.to_id == new_edge.to_id
+        && existing.t_valid <= new_edge.t_valid
+        && existing.t_ingested <= new_edge.t_ingested
+        && existing
+            .t_invalid
+            .is_none_or(|t_invalid| t_invalid > new_edge.t_valid)
+        && existing
+            .t_invalid_ingested
+            .is_none_or(|t_invalid_ingested| t_invalid_ingested > new_edge.t_ingested)
+}
+
+fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> {
+    let map = record.as_object()?;
+
+    let edge_id = map
+        .get("edge_id")
+        .and_then(unwrap_record_string)
+        .or_else(|| map.get("id").and_then(unwrap_record_string))?
+        .to_string();
+
+    Some(StoredEdgeVersion {
+        edge_id,
+        from_id: map
+            .get("from_id")
+            .and_then(unwrap_record_string)?
+            .to_string(),
+        relation: map
+            .get("relation")
+            .and_then(unwrap_record_string)?
+            .to_string(),
+        to_id: map.get("to_id").and_then(unwrap_record_string)?.to_string(),
+        t_valid: map
+            .get("t_valid")
+            .and_then(unwrap_record_string)
+            .and_then(parse_iso)?,
+        t_ingested: map
+            .get("t_ingested")
+            .and_then(unwrap_record_string)
+            .and_then(parse_iso)?,
+        t_invalid: map
+            .get("t_invalid")
+            .and_then(unwrap_record_string)
+            .and_then(parse_iso),
+        t_invalid_ingested: map
+            .get("t_invalid_ingested")
+            .and_then(unwrap_record_string)
+            .and_then(parse_iso),
+    })
+}
+
+fn unwrap_record_string(value: &Value) -> Option<&str> {
+    if let Some(value) = value.as_str() {
+        Some(value)
+    } else if let Some(object) = value.as_object() {
+        object
+            .get("String")
+            .and_then(Value::as_str)
+            .or_else(|| object.get("Datetime").and_then(Value::as_str))
+            .or_else(|| object.get("Strand").and_then(Value::as_str))
+            .or_else(|| {
+                object
+                    .get("Strand")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+            .or_else(|| {
+                object
+                    .get("Datetime")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+            })
+    } else {
+        None
+    }
 }
 
 /// Update community memberships.
@@ -454,48 +556,24 @@ async fn update_communities(
         return Ok(());
     }
 
-    let community_id = super::ids::deterministic_community_id(entity_ids);
     let namespace = service.namespace_for_scope(scope);
-
-    let mut names = Vec::new();
-    let records = service
-        .db_client
-        .select_table("entity", &service.default_namespace)
-        .await?;
-
-    for record in records {
-        if let Value::Object(map) = record {
-            let entity_id = map
-                .get("entity_id")
-                .and_then(Value::as_str)
-                .or_else(|| map.get("id").and_then(Value::as_str))
-                .unwrap_or("");
-
-            if entity_ids.contains(&entity_id.to_string()) {
-                names.push(
-                    map.get("canonical_name")
-                        .and_then(Value::as_str)
-                        .unwrap_or(entity_id)
-                        .to_string(),
-                );
-            }
-        }
+    let member_entities =
+        collect_connected_entity_component(service, entity_ids, &namespace).await?;
+    if member_entities.len() < 2 {
+        return Ok(());
     }
 
-    let summary = if !names.is_empty() {
-        names.iter().take(3).cloned().collect::<Vec<_>>().join(", ")
-    } else {
-        entity_ids
-            .iter()
-            .take(3)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
+    let summary = build_community_summary(service, &namespace, &member_entities).await?;
+    let overlapping = find_overlapping_communities(service, &namespace, &member_entities).await?;
+    let community_id = overlapping
+        .iter()
+        .map(|community| community.community_id.clone())
+        .min()
+        .unwrap_or_else(|| super::ids::deterministic_community_id(&member_entities));
 
     let payload = json!({
         "community_id": community_id,
-        "member_entities": entity_ids,
+        "member_entities": member_entities,
         "summary": summary,
         "updated_at": super::normalize_dt(super::query::now()),
     });
@@ -516,7 +594,232 @@ async fn update_communities(
             .await?;
     }
 
+    for stale in overlapping
+        .into_iter()
+        .filter(|community| community.community_id != community_id)
+    {
+        service
+            .db_client
+            .query(
+                "DELETE type::record($community_id);",
+                Some(json!({"community_id": stale.community_id})),
+                &namespace,
+            )
+            .await?;
+    }
+
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct StoredCommunity {
+    community_id: String,
+    member_entities: Vec<String>,
+}
+
+async fn collect_connected_entity_component(
+    service: &crate::service::MemoryService,
+    entity_ids: &[String],
+    namespace: &str,
+) -> Result<Vec<String>, MemoryError> {
+    let cutoff = super::normalize_dt(super::query::now());
+    let edges = service
+        .db_client
+        .select_edges_filtered(namespace, &cutoff)
+        .await?;
+
+    let mut adjacency: std::collections::HashMap<String, std::collections::BTreeSet<String>> =
+        std::collections::HashMap::new();
+    let mut mentioned_in: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let mut involved_in: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
+    for edge in edges.iter().filter_map(stored_edge_version_from_record) {
+        if is_entity_id(&edge.from_id) && is_entity_id(&edge.to_id) {
+            adjacency
+                .entry(edge.from_id.clone())
+                .or_default()
+                .insert(edge.to_id.clone());
+            adjacency
+                .entry(edge.to_id)
+                .or_default()
+                .insert(edge.from_id);
+            continue;
+        }
+
+        match edge.relation.as_str() {
+            "mentioned_in" if is_entity_id(&edge.from_id) && edge.to_id.starts_with("episode:") => {
+                mentioned_in
+                    .entry(edge.to_id)
+                    .or_default()
+                    .push(edge.from_id);
+            }
+            "involved_in" if is_entity_id(&edge.from_id) && edge.to_id.starts_with("fact:") => {
+                involved_in
+                    .entry(edge.to_id)
+                    .or_default()
+                    .push(edge.from_id);
+            }
+            _ => {}
+        }
+    }
+
+    for members in mentioned_in.values().chain(involved_in.values()) {
+        connect_entity_group(&mut adjacency, members);
+    }
+
+    let mut visited = std::collections::BTreeSet::new();
+    let mut queue = std::collections::VecDeque::new();
+
+    for entity_id in entity_ids
+        .iter()
+        .filter(|entity_id| is_entity_id(entity_id))
+    {
+        if visited.insert(entity_id.clone()) {
+            queue.push_back(entity_id.clone());
+        }
+    }
+
+    while let Some(current) = queue.pop_front() {
+        if let Some(neighbors) = adjacency.get(&current) {
+            for neighbor in neighbors {
+                if visited.insert(neighbor.clone()) {
+                    queue.push_back(neighbor.clone());
+                }
+            }
+        }
+    }
+
+    Ok(visited.into_iter().collect())
+}
+
+fn connect_entity_group(
+    adjacency: &mut std::collections::HashMap<String, std::collections::BTreeSet<String>>,
+    members: &[String],
+) {
+    for member in members {
+        adjacency.entry(member.clone()).or_default();
+    }
+
+    for (index, left) in members.iter().enumerate() {
+        for right in members.iter().skip(index + 1) {
+            adjacency
+                .entry(left.clone())
+                .or_default()
+                .insert(right.clone());
+            adjacency
+                .entry(right.clone())
+                .or_default()
+                .insert(left.clone());
+        }
+    }
+}
+
+async fn build_community_summary(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    member_entities: &[String],
+) -> Result<String, MemoryError> {
+    let records = service.db_client.select_table("entity", namespace).await?;
+    let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
+    let mut names = records
+        .iter()
+        .filter_map(|record| record.as_object())
+        .filter_map(|record| {
+            let entity_id = record
+                .get("entity_id")
+                .and_then(unwrap_record_string)
+                .or_else(|| record.get("id").and_then(unwrap_record_string))?;
+            if !member_set.contains(entity_id) {
+                return None;
+            }
+
+            Some(
+                record
+                    .get("canonical_name")
+                    .and_then(unwrap_record_string)
+                    .unwrap_or(entity_id)
+                    .to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    names.sort();
+    names.dedup();
+
+    if names.is_empty() {
+        Ok(member_entities
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", "))
+    } else {
+        Ok(names.into_iter().take(3).collect::<Vec<_>>().join(", "))
+    }
+}
+
+async fn find_overlapping_communities(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    member_entities: &[String],
+) -> Result<Vec<StoredCommunity>, MemoryError> {
+    let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
+    let communities = service
+        .db_client
+        .select_table("community", namespace)
+        .await?;
+
+    Ok(communities
+        .iter()
+        .filter_map(stored_community_from_record)
+        .filter(|community| {
+            community
+                .member_entities
+                .iter()
+                .any(|member| member_set.contains(member))
+        })
+        .collect())
+}
+
+fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
+    let map = record.as_object()?;
+    let community_id = map
+        .get("community_id")
+        .and_then(unwrap_record_string)
+        .or_else(|| map.get("id").and_then(unwrap_record_string))?
+        .to_string();
+    let member_entities = map
+        .get("member_entities")
+        .and_then(unwrap_record_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(unwrap_record_string)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Some(StoredCommunity {
+        community_id,
+        member_entities,
+    })
+}
+
+fn unwrap_record_array(value: &Value) -> Option<&Vec<Value>> {
+    if let Some(array) = value.as_array() {
+        Some(array)
+    } else if let Some(object) = value.as_object() {
+        object.get("Array").and_then(Value::as_array)
+    } else {
+        None
+    }
+}
+
+fn is_entity_id(record_id: &str) -> bool {
+    record_id.starts_with("entity:")
 }
 
 #[cfg(test)]
