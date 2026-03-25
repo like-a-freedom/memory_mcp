@@ -30,19 +30,16 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache cargo target (host + linux target)
-        if: runner.os == 'Linux'
+      - name: Cache cargo target directory
         uses: actions/cache@v5
         with:
-          path: |
-            target
-            target/x86_64-unknown-linux-gnu
-          key: ${{ runner.os }}-cargo-target-x86_64-unknown-linux-gnu-${{ hashFiles('**/Cargo.lock') }}
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-target-x86_64-unknown-linux-gnu-
+            ${{ runner.os }}-cargo-target-
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
         with:
           toolchain: stable
           components: rustfmt,clippy
@@ -122,7 +119,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Set up Rust toolchain (with cache)
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
         with:
           toolchain: stable
           components: clippy
@@ -141,20 +138,20 @@ jobs:
       - name: Build Linux release (if Linux)
         if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
         run: |
-          cargo build -p intervals_icu_mcp --release --target x86_64-unknown-linux-gnu
+          cargo build -p memory_mcp --release --target x86_64-unknown-linux-gnu
           mkdir -p app/${{ matrix.platform.target }}
-          cp target/${{ matrix.platform.target }}/release/intervals_icu_mcp app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+          cp target/${{ matrix.platform.target }}/release/memory_mcp app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
 
       - name: Build binary
         if: matrix.platform.target != 'x86_64-unknown-linux-gnu'
-        run: cargo build -p intervals_icu_mcp --release --target ${{ matrix.platform.target }}
+        run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }}
 
       - name: Prepare artifact (Unix)
         if: matrix.platform.os != 'windows-latest'
         run: |
           mkdir -p app/${{ matrix.platform.target }}
           if [ ! -f app/${{ matrix.platform.target }}/${{ matrix.platform.bin }} ]; then
-            cp target/${{ matrix.platform.target }}/release/intervals_icu_mcp app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+            cp target/${{ matrix.platform.target }}/release/memory_mcp app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
           fi
 
       - name: Prepare artifact (Windows)
@@ -162,7 +159,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path app/${{ matrix.platform.target }}
-          Copy-Item target/${{ matrix.platform.target }}/release/intervals_icu_mcp.exe app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+          Copy-Item target/${{ matrix.platform.target }}/release/memory_mcp.exe app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
 
       - name: Generate SHA-256 (Unix)
         if: matrix.platform.os != 'windows-latest'
@@ -220,5 +217,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            ghcr.io/${{ github.repository_owner }}/rusty-intervals-mcp:latest
-            ghcr.io/${{ github.repository_owner }}/rusty-intervals-mcp:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/rusty-memory-mcp:latest
+            ghcr.io/${{ github.repository_owner }}/rusty-memory-mcp:${{ github.ref_name }}

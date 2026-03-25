@@ -822,7 +822,9 @@ memory_mcp/
 | `SURREALDB_NAMESPACES` | ✅ | Comma-separated namespaces (e.g., `user_123,team_456,org_789`) | — |
 | `SURREALDB_USERNAME` | ✅ | Username for authentication | — |
 | `SURREALDB_PASSWORD` | ✅ | Password for authentication | — |
-| `LOG_LEVEL` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `info` |
+| `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | `false` |
+| `SURREALDB_DATA_DIR` | ❌ | Optional embedded RocksDB data directory (`./data/surrealdb` by default) | `./data/surrealdb` |
+| `LOG_LEVEL` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `warn` |
 
 ### 11.2 Installation
 
