@@ -206,8 +206,6 @@ mod tests {
         assert_eq!(items[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
     }
 
-    // ==================== Additional Parser Tests ====================
-
     #[test]
     fn parse_datetime_parses_rfc3339() {
         use chrono::Datelike;
@@ -259,9 +257,7 @@ mod tests {
     #[test]
     fn content_hash_produces_hex_string() {
         let hash = content_hash("test");
-        // First 16 chars of SHA-256 hex
         assert_eq!(hash.len(), 16);
-        // All characters should be hex
         assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
@@ -343,8 +339,8 @@ mod tests {
 
     #[test]
     fn parse_context_items_preserves_unicode() {
-        let raw = r#"[{"content":"Привет мир","id":"episode:123"}]"#;
+        let raw = r#"[{"content":"Hello world ✓","id":"episode:123"}]"#;
         let items = parse_context_items(raw).unwrap();
-        assert_eq!(items[0].content, "Привет мир");
+        assert_eq!(items[0].content, "Hello world ✓");
     }
 }

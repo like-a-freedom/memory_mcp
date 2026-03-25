@@ -225,7 +225,6 @@ pub async fn extract_facts(
     let mut facts = Vec::new();
     let normalized = episode.content.to_lowercase();
 
-    // Detect metric facts
     if normalized.contains("arr") || episode.content.contains('$') {
         let fact_id = service
             .add_fact(
@@ -247,7 +246,6 @@ pub async fn extract_facts(
         });
     }
 
-    // Detect promise facts
     if is_promise_statement(&normalized) {
         let fact_id = service
             .add_fact(
@@ -280,7 +278,7 @@ pub fn is_promise_statement(content: &str) -> bool {
         Regex::new(r"\b(i will|i'll|will\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule)|going to\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule))\b")
             .expect("promise regex is valid")
     });
-    content.contains("сделаю") || promise_re.is_match(content)
+    promise_re.is_match(content)
 }
 
 /// Extract entities and facts from an episode.
@@ -315,7 +313,6 @@ pub async fn extract_from_episode(
     let mut links = Vec::new();
     let edge_ingested = super::query::now();
 
-    // Create entity-episode edges
     for entity in &entities {
         links.push(ExtractedLink {
             entity_id: entity.entity_id.clone(),
@@ -337,7 +334,6 @@ pub async fn extract_from_episode(
         store_edge(service, &edge, &namespace).await?;
     }
 
-    // Create entity-fact edges
     for fact in &facts {
         for entity in &entities {
             let edge = Edge {
@@ -356,7 +352,6 @@ pub async fn extract_from_episode(
         }
     }
 
-    // Update communities
     let entity_ids: Vec<String> = entities
         .iter()
         .map(|entity| entity.entity_id.clone())
@@ -544,7 +539,6 @@ mod tests {
     fn episode_from_record_returns_none_for_missing_required_field() {
         let mut record = serde_json::Map::new();
         record.insert("episode_id".to_string(), json!("episode:test123"));
-        // Missing source_type
 
         assert!(episode_from_record(&record).is_none());
     }
@@ -588,7 +582,6 @@ mod tests {
         record.insert("t_ref".to_string(), json!("2024-01-15T10:30:00Z"));
         record.insert("t_ingested".to_string(), json!("2024-01-15T10:31:00Z"));
         record.insert("scope".to_string(), json!("org"));
-        // No visibility_scope or policy_tags
 
         let episode = episode_from_record(&record).unwrap();
         assert_eq!(episode.visibility_scope, "");
@@ -657,7 +650,7 @@ mod tests {
         assert!(is_promise_statement("i'll deliver the report tomorrow"));
         assert!(is_promise_statement("will complete the project"));
         assert!(is_promise_statement("going to implement the feature"));
-        assert!(is_promise_statement("I сделаю это завтра"));
+        assert!(is_promise_statement("I will do this tomorrow"));
     }
 
     #[test]

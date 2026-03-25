@@ -65,7 +65,6 @@ impl SurrealConfig {
 
         let embedded = parse_bool_env("SURREALDB_EMBEDDED").unwrap_or(false);
 
-        // URL is required unless running in embedded mode
         let url = if embedded {
             env::var("SURREALDB_URL").ok()
         } else {

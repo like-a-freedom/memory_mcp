@@ -20,10 +20,6 @@ use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 
-// ============================================================================
-// Database client trait
-// ============================================================================
-
 /// Trait for database operations, enabling dependency injection and testing.
 #[async_trait]
 pub trait DbClient: Send + Sync {
@@ -81,10 +77,6 @@ pub trait DbClient: Send + Sync {
     /// Applies database migrations for a namespace.
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError>;
 }
-
-// ============================================================================
-// SurrealDB client implementation
-// ============================================================================
 
 /// Unified database client that works with both embedded and remote SurrealDB.
 pub struct SurrealDbClient {
@@ -245,8 +237,6 @@ impl SurrealDbClient {
     /// Ask the connected SurrealDB instance for a server version string.
     /// Returns Ok(None) if the information cannot be retrieved.
     pub async fn server_version(&self, namespace: &str) -> Result<Option<String>, MemoryError> {
-        // "INFO FOR DB" is an informational command that returns DB metadata.
-        // Treat failures as non-fatal (return Ok(None)).
         let sql = "INFO FOR DB";
         let res = if self.is_local() {
             match self.with_namespace_local(namespace).await {
@@ -649,10 +639,6 @@ impl DbClient for SurrealDbClient {
     }
 }
 
-// ============================================================================
-// Helper functions
-// ============================================================================
-
 /// Build SQL query for selecting a single record.
 fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     if let Some(idx) = record_id.find(':') {
@@ -764,11 +750,9 @@ fn surreal_to_json(value: SurrealValue) -> Value {
 fn find_version_in_json(v: &Value) -> Option<String> {
     use regex::Regex;
 
-    // Simple semver-ish matcher (e.g. 3.0.0)
     let ver_re = Regex::new(r"\d+\.\d+(?:\.\d+)?").unwrap();
 
     match v {
-        // Only accept plain strings that look like a version or mention SurrealDB.
         Value::String(s) => {
             if ver_re.is_match(s) || s.to_lowercase().contains("surreal") {
                 Some(s.clone())
@@ -777,7 +761,6 @@ fn find_version_in_json(v: &Value) -> Option<String> {
             }
         }
         Value::Object(map) => {
-            // Prefer explicit keys containing "version" and return their string value
             for (k, val) in map.iter() {
                 if k.to_lowercase().contains("version") {
                     if let Some(s) = val.as_str() {
@@ -789,7 +772,6 @@ fn find_version_in_json(v: &Value) -> Option<String> {
                     }
                 }
             }
-            // Otherwise search nested values for a version-like string
             for (_, val) in map.iter() {
                 if let Some(found) = find_version_in_json(val) {
                     return Some(found);
@@ -805,7 +787,6 @@ fn find_version_in_json(v: &Value) -> Option<String> {
             }
             None
         }
-        // Don't coerce arbitrary JSON to a version string
         _ => None,
     }
 }
@@ -998,9 +979,6 @@ fn normalize_surreal_json(v: &Value) -> Value {
                 .map(|(k, v)| (k.clone(), normalize_surreal_json(v)))
                 .collect(),
         ),
-        // Keep JSON null as-is for write payloads.
-        // Converting null into {"None": {}} causes SurrealDB v3 type coercion
-        // failures for optional scalar fields (e.g., option<string>).
         J::Null => J::Null,
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
@@ -1063,8 +1041,6 @@ mod tests {
             .server_version("testns")
             .await
             .expect("server_version");
-        // Server version may be unavailable for embedded engines; ensure we
-        // don't error and that any returned string is non-empty.
         if let Some(s) = ver {
             assert!(!s.is_empty());
         }
@@ -1170,7 +1146,6 @@ mod tests {
         assert!(vars["content"]["due_date"].is_null());
     }
 
-    // ----------------- find_version_in_json tests -----------------
     #[test]
     fn find_version_in_json_prefers_version_key() {
         let j = json!({"meta": {"server": {"version": "3.0.0"}}});
@@ -1197,8 +1172,6 @@ mod tests {
         let j = json!([{"info": "x"}, {"version": "3.1.0"}]);
         assert_eq!(find_version_in_json(&j), Some("3.1.0".to_string()));
     }
-
-    // Tests for query builder helper functions
 
     #[test]
     fn build_select_one_query_with_fact_id() {
@@ -1249,7 +1222,6 @@ mod tests {
         let content = json!({"id": "fact:abc123", "name": "updated"});
         let (sql, vars) = build_update_query("fact:abc123", content).unwrap();
         assert_eq!(sql, "UPDATE fact:⟨abc123⟩ MERGE $content RETURN *");
-        // The 'id' field should be removed from content
         let content_val = vars.get("content").unwrap();
         assert!(content_val.get("id").is_none());
         assert_eq!(content_val.get("name").unwrap(), "updated");
@@ -1261,8 +1233,6 @@ mod tests {
         let result = build_update_query("invalid_format", content);
         assert!(matches!(result, Err(MemoryError::Storage(_))));
     }
-
-    // ==================== Additional Helper Function Tests ====================
 
     #[test]
     fn extract_first_record_from_nested_object() {
@@ -1385,13 +1355,11 @@ mod tests {
             "t_valid": "2024-01-15T10:00:00Z",
             "t_ingested": "2024-01-15T10:00:00Z"
         });
-        // Record valid at 10:00, checking at 09:00 - should not be visible
         assert!(!record_is_visible_for_scope(
             &record,
             "org",
             "2024-01-15T09:00:00Z"
         ));
-        // Record valid at 10:00, checking at 11:00 - should be visible
         assert!(record_is_visible_for_scope(
             &record,
             "org",
@@ -1408,13 +1376,11 @@ mod tests {
             "t_invalid": "2024-01-15T12:00:00Z",
             "t_invalid_ingested": "2024-01-15T12:00:00Z"
         });
-        // Record invalidated at 12:00, checking at 13:00 - should not be visible
         assert!(!record_is_visible_for_scope(
             &record,
             "org",
             "2024-01-15T13:00:00Z"
         ));
-        // Record invalidated at 12:00, checking at 11:00 - should be visible
         assert!(record_is_visible_for_scope(
             &record,
             "org",
@@ -1476,7 +1442,6 @@ mod tests {
         let temp = tempdir().unwrap();
         let deep_path = temp.path().join("a/b/c/deep.db");
 
-        // Should not fail even if parent doesn't exist
         assert!(ensure_dir_exists(&deep_path).is_ok());
         assert!(deep_path.parent().unwrap().exists());
     }
@@ -1488,16 +1453,13 @@ mod tests {
         let temp = tempdir().unwrap();
         let existing_path = temp.path().join("existing.db");
 
-        // First call creates the directory
         assert!(ensure_dir_exists(&existing_path).is_ok());
-        // Second call should also succeed
         assert!(ensure_dir_exists(&existing_path).is_ok());
     }
 
     #[test]
     fn ensure_dir_exists_handles_no_parent() {
         let path = std::path::Path::new("test.db");
-        // Should succeed if there's no parent directory
         assert!(ensure_dir_exists(path).is_ok());
     }
 }

@@ -136,8 +136,6 @@ mod tests {
 
     #[test]
     fn preprocess_search_query_drops_short_words() {
-        // Only words with length < 2 are dropped (i.e., "a")
-        // "an", "be", "to", "of" have length 2, so they're kept
         let result = preprocess_search_query("a an I be to of query");
         assert_eq!(result, "an be to of query");
     }
@@ -168,7 +166,6 @@ mod tests {
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let confidence = decayed_confidence(&fact, now);
-        // After 365 days with 365 day half-life, confidence should be ~0.5
         assert!(confidence > 0.4 && confidence < 0.6);
     }
 
@@ -192,7 +189,6 @@ mod tests {
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let confidence = decayed_confidence(&fact, now);
-        // After ~180 days with 180 day half-life, confidence should be ~0.5
         assert!(confidence > 0.4 && confidence < 0.6);
     }
 

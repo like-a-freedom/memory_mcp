@@ -18,7 +18,6 @@ mod ids;
 mod query;
 mod validation;
 
-// Constants
 pub use constants::*;
 mod constants {
     /// Half-life in days for metric and promise fact confidence decay.
@@ -34,7 +33,6 @@ mod constants {
     pub const CONTEXT_CACHE_SIZE: usize = 512;
 }
 
-// Re-export commonly used items
 pub use cache::{CacheKey, SafeMutex, invalidate_cache_by_scope};
 pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
 pub use ids::{
@@ -47,5 +45,4 @@ pub use query::{
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
-// Internal helpers
 pub(crate) use core::log_event;

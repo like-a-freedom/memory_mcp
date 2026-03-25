@@ -128,13 +128,11 @@ mod tests {
         assert_eq!(*guard, 42);
         drop(guard);
 
-        // Poison the mutex
         let _ = std::panic::catch_unwind(|| {
             let _guard = mutex.lock().unwrap();
             panic!("poison");
         });
 
-        // Should still be able to lock
         let guard = mutex.safe_lock();
         assert_eq!(*guard, 42);
     }
@@ -146,7 +144,6 @@ mod tests {
 
         let cutoff = Utc::now();
 
-        // Add entries for different scopes
         let key1 = CacheKey::new("query1", "org", cutoff, 5, None);
         let key2 = CacheKey::new("query2", "org", cutoff, 5, None);
         let key3 = CacheKey::new("query3", "personal", cutoff, 5, None);
@@ -167,10 +164,8 @@ mod tests {
             guard.put(key3.clone(), vec![item("fact:3")]);
         }
 
-        // Invalidate org scope
         invalidate_cache_by_scope(&cache, "org");
 
-        // Check that org entries are removed but personal remains
         let mut guard = cache.safe_lock();
         assert!(guard.get(&key1).is_none());
         assert!(guard.get(&key2).is_none());

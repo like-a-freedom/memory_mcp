@@ -57,9 +57,6 @@ impl MemoryService {
     pub async fn new_from_env() -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
 
-        // Startup log: emit effective DB storage location so misconfigured
-        // working directories are easy to diagnose. Use Info level so the
-        // message appears by default in normal runs.
         let effective_data_dir = config.data_dir_or_default();
         let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
         let mut startup_event = std::collections::HashMap::new();
@@ -72,8 +69,6 @@ impl MemoryService {
                 "remote"
             }),
         );
-        // Only include the effective data dir for embedded mode to avoid
-        // exposing unnecessary fields for remote mode.
         if config.embedded {
             startup_event.insert(
                 "effective_data_dir".to_string(),
@@ -96,8 +91,6 @@ impl MemoryService {
             .unwrap_or_else(|| "default".to_string());
         let db_client = SurrealDbClient::connect(&config, &default_namespace).await?;
 
-        // Query server + client versions and emit a compact startup event so
-        // operators can quickly confirm compatibility (non-fatal on failure).
         let server_version = match db_client.server_version(&default_namespace).await {
             Ok(Some(v)) => Some(v),
             Ok(None) => None,
@@ -614,8 +607,6 @@ impl MemoryService {
         Ok(decoded)
     }
 
-    // ==================== Private Helpers ====================
-
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
         let _ = self
             .db_client
@@ -741,8 +732,6 @@ impl MemoryService {
     }
 }
 
-// ==================== Rate Limiter ====================
-
 pub(crate) struct RateLimiter {
     rps: f64,
     burst: f64,
@@ -777,8 +766,6 @@ impl RateLimiter {
         true
     }
 }
-
-// ==================== Helper Functions ====================
 
 pub(crate) fn log_event(
     op: &str,
@@ -874,12 +861,9 @@ mod tests {
     use crate::models::{AccessContext, AccessScopeAllow};
     use serde_json::json;
 
-    // ==================== Rate Limiter Tests ====================
-
     #[test]
     fn rate_limiter_allows_burst() {
         let limiter = RateLimiter::new(10, 5);
-        // Should allow burst of 5 requests
         for _ in 0..5 {
             assert!(limiter.allow("test-user"));
         }
@@ -890,7 +874,6 @@ mod tests {
         let limiter = RateLimiter::new(10, 2);
         assert!(limiter.allow("test-user"));
         assert!(limiter.allow("test-user"));
-        // Third request should be blocked
         assert!(!limiter.allow("test-user"));
     }
 
@@ -899,11 +882,8 @@ mod tests {
         let limiter = RateLimiter::new(10, 1);
         assert!(limiter.allow("user-1"));
         assert!(!limiter.allow("user-1"));
-        // Different user should be allowed
         assert!(limiter.allow("user-2"));
     }
-
-    // ==================== Helper Function Tests ====================
 
     #[test]
     fn log_event_creates_expected_structure() {
@@ -1024,12 +1004,9 @@ mod tests {
         graph.insert("B".to_string(), vec!["C".to_string()]);
         graph.insert("C".to_string(), vec!["D".to_string()]);
 
-        // Path A->B->C->D has 3 edges
-        // With max_hops=1, we can only reach B
         let path = bfs_path(&graph, "A", "D", 1);
         assert_eq!(path, None);
 
-        // With max_hops=3, we can reach D
         let path = bfs_path(&graph, "A", "D", 3);
         assert!(path.is_some());
     }
@@ -1066,17 +1043,12 @@ mod tests {
 
     #[test]
     fn bfs_path_returns_single_element_for_same_node() {
-        // Note: Current implementation doesn't handle start==target specially
-        // It will return None since we only check neighbors
         let mut graph = HashMap::new();
         graph.insert("A".to_string(), vec![]);
 
         let path = bfs_path(&graph, "A", "A", 5);
-        // Current behavior: returns None for same node
         assert_eq!(path, None);
     }
-
-    // ==================== Namespace Tests ====================
 
     #[test]
     fn namespace_for_scope_returns_exact_match() {
@@ -1194,8 +1166,6 @@ mod tests {
         .unwrap()
     }
 
-    // ==================== Access Control Tests ====================
-
     #[test]
     fn is_scope_allowed_returns_true_when_no_restrictions() {
         let service = create_test_service(vec!["org"]);
@@ -1251,8 +1221,6 @@ mod tests {
         assert!(service.is_scope_allowed("org", &access));
     }
 
-    // ==================== Rate Limiter Enforcement Tests ====================
-
     #[test]
     fn enforce_rate_limit_allows_without_caller_id() {
         let service = create_test_service(vec!["org"]);
@@ -1267,7 +1235,6 @@ mod tests {
             caller_id: Some("user-1".to_string()),
             ..Default::default()
         };
-        // First request should pass
         assert!(service.enforce_rate_limit(Some(&access)).is_ok());
     }
 

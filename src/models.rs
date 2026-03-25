@@ -7,10 +7,6 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-// ============================================================================
-// Newtype wrappers for domain types
-// ============================================================================
-
 /// Unique identifier for an episode.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 #[serde(transparent)]
@@ -90,10 +86,6 @@ pub struct CommunityId(pub String);
 #[serde(transparent)]
 pub struct EdgeId(pub String);
 
-// ============================================================================
-// Request types
-// ============================================================================
-
 /// Request to ingest a new episode into memory.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IngestRequest {
@@ -170,10 +162,6 @@ pub struct AssembleContextRequest {
     pub access: Option<AccessPayload>,
 }
 
-// ============================================================================
-// MCP output types
-// ============================================================================
-
 /// A compact extracted entity returned by the MCP `extract` tool.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedEntity {
@@ -226,10 +214,6 @@ pub struct AssembledContextItem {
     pub provenance: serde_json::Value,
     pub rationale: String,
 }
-
-// ============================================================================
-// Access control types
-// ============================================================================
 
 /// Defines allowed scope transitions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -292,10 +276,6 @@ impl AccessContext {
         true
     }
 }
-
-// ============================================================================
-// Domain entities
-// ============================================================================
 
 /// An episode represents a unit of ingested content.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -363,10 +343,6 @@ pub struct Community {
     pub updated_at: DateTime<Utc>,
 }
 
-// ============================================================================
-// Default values
-// ============================================================================
-
 #[must_use]
 pub fn default_scope() -> String {
     "org".to_string()
@@ -376,10 +352,6 @@ pub fn default_scope() -> String {
 pub fn default_budget() -> i32 {
     5
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -473,8 +445,6 @@ mod tests {
         assert!(access.is_scope_allowed("any_scope"));
     }
 
-    // ==================== Additional ID Type Tests ====================
-
     #[test]
     fn episode_id_clone() {
         let id1 = EpisodeId::from("episode:test123");
@@ -495,8 +465,6 @@ mod tests {
         let id2 = id1.clone();
         assert_eq!(id1.0, id2.0);
     }
-
-    // ==================== Additional AccessContext Tests ====================
 
     #[test]
     fn access_context_from_payload_with_none() {
@@ -559,7 +527,7 @@ mod tests {
             }]),
         };
         assert!(access.is_scope_allowed("personal"));
-        assert!(access.is_scope_allowed("org")); // Allowed via cross_scope
+        assert!(access.is_scope_allowed("org"));
         assert!(!access.is_scope_allowed("private"));
     }
 

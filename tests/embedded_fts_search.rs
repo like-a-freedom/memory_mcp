@@ -10,7 +10,6 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
     let service = embedded_support::setup_embedded_service().await?;
     let t = Utc::now() - Duration::days(1);
 
-    // Add facts with content that has non-adjacent words matching the query
     service
         .add_fact(
             "note",
@@ -41,12 +40,11 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         )
         .await?;
 
-    // Multi-word query: "Delta Enrollment" — no contiguous substring in content
     let ctx = service
         .assemble_context(AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
             scope: "org".to_string(),
-            as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+            as_of: None,
             budget: 10,
             access: None,
         })
@@ -62,7 +60,6 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         "Result content should contain 'enrollment', got: {content}"
     );
 
-    // Query with episode reference that should be stripped by preprocessing
     let ctx2 = service
         .assemble_context(AssembleContextRequest {
             query: "mobile certs tokens ports episode:fts_test_2".to_string(),
@@ -78,7 +75,6 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         "Query with episode ref should find facts after preprocessing (got empty)"
     );
 
-    // Single word query still works (regression check)
     let ctx3 = service
         .assemble_context(AssembleContextRequest {
             query: "cert".to_string(),

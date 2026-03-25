@@ -45,7 +45,6 @@ pub async fn assemble_context(
         return Ok(vec![]);
     }
 
-    // Check cache
     let cache_key = CacheKey::new(
         &request.query,
         &request.scope,
@@ -72,7 +71,6 @@ pub async fn assemble_context(
         return Ok(cached);
     }
 
-    // Query database
     let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
@@ -94,7 +92,6 @@ pub async fn assemble_context(
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    // Filter and process results
     let mut active = filter_facts_by_policy(fact_records, &access);
     sort_facts_by_recency(&mut active);
 
@@ -119,7 +116,6 @@ pub async fn assemble_context(
         })
         .collect();
 
-    // Cache and return
     {
         let mut cache = service.context_cache.safe_lock();
         cache.put(cache_key, results.clone());
@@ -157,7 +153,6 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
             };
 
             if let Some(fact) = super::episode::fact_from_record(fact_item) {
-                // Tag filtering
                 if !fact.policy_tags.is_empty()
                     && let Some(allowed_tags) = &access.allowed_tags
                 {
@@ -362,7 +357,6 @@ mod tests {
     fn filter_facts_by_policy_handles_wrapped_objects() {
         let access = AccessContext::default();
 
-        // Simulate SurrealDB response format with wrapped Object
         let records = vec![json!({
             "Object": {
                 "fact_id": "fact:1",
@@ -384,7 +378,6 @@ mod tests {
     fn filter_facts_by_policy_handles_array_wrapped_objects() {
         let access = AccessContext::default();
 
-        // Simulate SurrealDB response format with Array of Objects
         let records = vec![json!({
             "Array": [
                 {

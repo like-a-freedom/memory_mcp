@@ -13,7 +13,7 @@ async fn test_mcp_tools_flow() {
     let ingest_params = serde_json::json!({
         "source_type": "email",
         "source_id": "MSG-203",
-        "content": "Сделаю до пятницы. ARR $2M",
+        "content": "I will finish it by Friday. ARR $2M",
         "t_ref": "2026-01-10T00:00:00Z",
         "scope": "org"
     });
@@ -72,7 +72,6 @@ async fn test_mcp_tools_flow() {
     let explanation = explanation.result;
     assert_eq!(explanation[0].source_episode, episode_id);
 
-    // Backwards-compatible: allow passing an array of episode id strings
     let ingest_params2 = serde_json::json!({
         "source_type": "email",
         "source_id": "MSG-204",
@@ -107,7 +106,6 @@ async fn test_mcp_full_flow_end_to_end() {
     let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
-    // Ingest content that contains ARR and a promise
     let ingest_params = serde_json::json!({
         "source_type": "email",
         "source_id": "E2E-1",
@@ -122,7 +120,6 @@ async fn test_mcp_full_flow_end_to_end() {
         .0
         .result;
 
-    // Extract
     let extract_params = serde_json::json!({"episode_id": episode_id});
     let extraction = mcp
         .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
@@ -134,7 +131,6 @@ async fn test_mcp_full_flow_end_to_end() {
     assert!(facts.iter().any(|f| f.fact_type == "metric"));
     assert!(facts.iter().any(|f| f.fact_type == "promise"));
 
-    // Assemble
     let assemble_params = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
     let context = mcp
         .assemble_context(Parameters(
@@ -146,7 +142,6 @@ async fn test_mcp_full_flow_end_to_end() {
         .result;
     assert!(!context.is_empty());
 
-    // Explain
     let context_items = serde_json::to_string(&vec![serde_json::json!({"content": "ARR $1M","quote": "ARR $1M","source_episode": episode_id.clone()})]).unwrap();
     let explain_params = serde_json::json!({"context_items": context_items});
     let explanation = mcp
@@ -157,7 +152,6 @@ async fn test_mcp_full_flow_end_to_end() {
         .result;
     assert_eq!(explanation[0].source_episode, episode_id);
 
-    // Invalidate the metric fact (use a past date so it's considered invalid)
     let fact_id = context[0].fact_id.clone();
     let invalidate_params = serde_json::json!({"fact_id": fact_id, "reason": "superseded", "t_invalid": "2026-02-04T00:00:00Z"});
     let _ = mcp
@@ -167,8 +161,6 @@ async fn test_mcp_full_flow_end_to_end() {
         .await
         .expect("invalidate");
 
-    // Assemble again, ensure invalidated fact is not returned
-    // Recompute as_of to be current time so invalidation is visible at this cutoff
     let assemble_params_after = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
     let context_after = mcp
         .assemble_context(Parameters(
@@ -235,14 +227,11 @@ async fn test_mcp_extract_no_input_returns_soft_result() {
     );
 }
 
-/// Regression: explain must accept loose objects with `id` instead of `source_episode`
-/// and missing `quote` — the exact payload shape that caused the production crash.
 #[tokio::test]
 async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
     let service = common::make_service().await;
     let mcp = MemoryMcp::new(service);
 
-    // Shape: [{content, id, source_type}] — no quote, no source_episode
     let context_items = serde_json::to_string(&vec![
         serde_json::json!({"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"}),
         serde_json::json!({"content":"ASSIGNEE: Anton Solovey — Split requirements","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}),
@@ -261,7 +250,6 @@ async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
     assert_eq!(explanation[1].source_episode, "task:ha8caz3sb2fxr9ju2sbc");
 }
 
-/// Regression: explain must accept objects with `id` + `quote` but no `source_episode`.
 #[tokio::test]
 async fn test_mcp_explain_objects_with_quote_and_id() {
     let service = common::make_service().await;
@@ -282,7 +270,6 @@ async fn test_mcp_explain_objects_with_quote_and_id() {
     assert_eq!(explanation[0].quote, "q");
 }
 
-/// Explain accepts a mixed array of strings and objects.
 #[tokio::test]
 async fn test_mcp_explain_mixed_array() {
     let service = common::make_service().await;

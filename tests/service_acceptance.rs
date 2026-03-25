@@ -12,7 +12,7 @@ async fn test_ingest_extract_and_assemble() {
             IngestRequest {
                 source_type: "email".to_string(),
                 source_id: "MSG-201".to_string(),
-                content: "ARR вырос до $3M. Сделаю до пятницы.".to_string(),
+                content: "ARR grew to $3M. I will send the update by Friday.".to_string(),
                 t_ref: now - chrono::Duration::days(1),
                 scope: "org".to_string(),
                 t_ingested: None,
@@ -307,7 +307,6 @@ async fn test_multiword_query_retrieval_quality() {
     let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
 
-    // Add facts with various content that should match multi-word queries
     service
         .add_fact(
             "note",
@@ -356,12 +355,11 @@ async fn test_multiword_query_retrieval_quality() {
         .await
         .expect("add fact 3");
 
-    // Test 1: Multi-word query where words are non-adjacent in content
     let ctx = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
             scope: "org".to_string(),
-            as_of: None, // defaults to now(), ensuring t_ingested <= cutoff
+            as_of: None,
             budget: 10,
             access: None,
         })
@@ -372,7 +370,6 @@ async fn test_multiword_query_retrieval_quality() {
         "Delta Enrollment: expected matches for non-adjacent multi-word query"
     );
 
-    // Test 2: Query with episode refs and OR — should be preprocessed and still find results
     let ctx2 = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: "fleet checklist certs tokens ports pending checklist episode:035d8d47"
@@ -389,7 +386,6 @@ async fn test_multiword_query_retrieval_quality() {
         "mobile checklist query with episode ref: expected matches"
     );
 
-    // Test 3: Query with quotes
     let ctx3 = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: r#"release notes v2.2 Module "Module_6.0_Archive - Component v2.1.md" episode:8de581d5"#.to_string(),

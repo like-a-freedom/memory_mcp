@@ -1,307 +1,229 @@
-# Memory MCP (Rust) — QuickStart и примеры использования 🧠🔧
+# Memory MCP
 
-Краткое описание
-- Этот репозиторий содержит Rust‑версию Memory MCP сервера (`memory_mcp`) с stdio-only RMCP транспортом и встроенной/удалённой поддержкой SurrealDB.
-- Сервер намеренно **memory-only**: он хранит факты о сущностях и связях, извлекает структуру из эпизодов, резолвит сущности, инвалидирует устаревшие факты и собирает долгосрочный контекст для LLM.
-- Публичная MCP-поверхность сведена к шести intent-driven инструментам: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`.
+[![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](https://doc.rust-lang.org/edition-guide/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Быстрый старт ✅
-1. Установить (рекомендуется) — через `cargo install`:
+`memory_mcp` is a Rust-based Model Context Protocol (MCP) server that gives AI agents a structured long-term memory layer backed by SurrealDB.
 
-```bash
-cargo install --locked memory_mcp
+It is designed for workflows where agents need more than short-lived chat context: episodic memory, extracted entities and facts, bi-temporal validity, ranked context assembly, and graph-style relationships between people, companies, tasks, and decisions.
+
+## Table of contents
+
+- [Overview](#overview)
+- [What it provides](#what-it-provides)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [MCP tools](#mcp-tools)
+- [Development](#development)
+- [Testing](#testing)
+- [Project layout](#project-layout)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+Memory MCP implements a memory system for AI agents with a few core goals:
+
+- preserve important source material as episodes
+- extract entities, facts, and links in a deterministic way
+- track knowledge over both valid time and transaction time
+- assemble compact, relevant context for downstream reasoning
+- support scope-aware retrieval and access filtering
+
+In practice, that means an agent can ingest content such as emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
+
+## What it provides
+
+- **Bi-temporal knowledge model** for valid time and ingestion time
+- **Episode ingestion** for storing raw source material
+- **Entity resolution** with alias handling and deterministic IDs
+- **Fact extraction** for metrics, promises, and other structured knowledge
+- **Context assembly** for ranked retrieval by query, scope, and time cutoff
+- **Graph relationships** between episodes, entities, and facts
+- **SurrealDB support** for embedded and remote deployments
+- **MCP-native interface** for tool-driven agent workflows
+- **Structured logging** with predictable operational behavior
+
+## Architecture
+
+At a high level, the project follows a layered Rust design:
+
+```text
+Agent / MCP client
+    │
+    ▼
+Memory MCP server (`src/mcp/`)
+    │
+    ▼
+Memory service layer (`src/service/`)
+    │
+    ▼
+Storage layer (`src/storage.rs` + SurrealDB)
 ```
 
-Или собрать бинарник из исходников:
+### Main modules
+
+| Module | Purpose |
+| --- | --- |
+| `mcp` | MCP handlers, params, parsers, and tool-facing types |
+| `service` | Core business logic for ingest, extract, retrieval, graph operations, and validation |
+| `storage` | Database integration and persistence helpers |
+| `models` | Shared domain models and request/response types |
+| `config` | Environment-driven configuration loading |
+| `logging` | Logging setup and log-level utilities |
+
+## Quick start
+
+### Requirements
+
+- Rust 1.85+
+- SurrealDB-compatible runtime configuration
+
+### Build
 
 ```bash
 cargo build --release
 ```
 
-2. Задать необходимые переменные окружения (пример):
+### Install locally
 
 ```bash
-# Example environment variables (can be stored in .env)
-export SURREALDB_DB_NAME=memory              # e.g., memory, testdb, production_db
-export SURREALDB_URL=ws://127.0.0.1:8000/rpc # ws://host:port/rpc (omit for embedded)
-export SURREALDB_EMBEDDED=false             # true | false (recommended: leave unset to infer from SURREALDB_URL)
-export SURREALDB_DATA_DIR=./data/surrealdb  # path used when embedded (default ./data/surrealdb)
-export SURREALDB_NAMESPACES=org,personal,private  # comma-separated namespaces (at least one)
-export SURREALDB_USERNAME=root
-export SURREALDB_PASSWORD=root
-export LOG_LEVEL=info                        # trace | debug | info | warn | error
+cargo install --path .
 ```
 
-### Описание переменных окружения
-
-| Переменная | Описание | Формат / Примеры |
-|---|---|---|
-| `SURREALDB_DB_NAME` | Имя базы в SurrealDB | `memory`, `testdb`, `production_db` |
-| `SURREALDB_URL` | URL SurrealDB (WebSocket RPC). Если пустой — используется embedded SurrealDB | `ws://127.0.0.1:8000/rpc` |
-| `SURREALDB_EMBEDDED` | Принудительно включить embedded режим. Рекомендуется оставить unset и полагаться на `SURREALDB_URL` | `true` / `false` |
-| `SURREALDB_DATA_DIR` | Путь к data dir, используется в embedded режиме | `./data/surrealdb` |
-| `SURREALDB_NAMESPACES` | Спискок namespaces, разделённых запятой | `org,personal,private` |
-| `SURREALDB_USERNAME` | Имя пользователя SurrealDB | `root` |
-| `SURREALDB_PASSWORD` | Пароль SurrealDB | `root` |
-| `LOG_LEVEL` | Уровень логирования | `trace`, `debug`, `info`, `warn`, `error` |
-
-> Советы: храните секреты в CI/секретном хранилище, а не в репозитории. Для локальной разработки используйте `.env` и `set -a; source .env; set +a`.
-
-3. Запустить сервер (stdio transport):
-
-Если установлен через `cargo install`:
+### Run
 
 ```bash
-LOG_LEVEL=info memory_mcp
+cargo run
 ```
 
-Если собран из исходников:
+The binary uses stdio transport, which makes it suitable for local MCP client integration.
+
+## Configuration
+
+Configuration is loaded from environment variables.
+
+### Required variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `SURREALDB_DB_NAME` | Yes | Database name |
+| `SURREALDB_NAMESPACES` | Yes | Comma-separated namespace list |
+| `SURREALDB_USERNAME` | Yes | Database username |
+| `SURREALDB_PASSWORD` | Yes | Database password |
+| `SURREALDB_URL` | Yes for remote mode | SurrealDB connection URL |
+
+### Optional variables
+
+| Variable | Description |
+| --- | --- |
+| `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
+| `SURREALDB_DATA_DIR` | Custom embedded data directory |
+| `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
+
+### Example
 
 ```bash
-LOG_LEVEL=info ./target/release/memory_mcp
+SURREALDB_DB_NAME=memory
+SURREALDB_NAMESPACES=org,personal
+SURREALDB_USERNAME=root
+SURREALDB_PASSWORD=root
+SURREALDB_URL=ws://127.0.0.1:8000/rpc
+SURREALDB_EMBEDDED=false
+LOG_LEVEL=info
 ```
 
-> Сервер ожидает входных сообщений по stdin и отвечает в stdout в формате RMCP/MCP envelope (см. примеры ниже).
+An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
 
----
+## MCP tools
 
-## Пример `mcp.json` (интерфейс инструментов) 🗂️
-Ниже — минимальный пример манифеста `mcp.json`, который описывает доступные инструменты и их контракт.
+The public MCP surface is centered on a small set of high-value operations rather than endpoint-by-endpoint plumbing.
 
-```json
-{
-  "name": "memory_mcp",
-  "version": "0.1.0",
-  "description": "Memory MCP — long-term memory tools for ingest, extraction, entity resolution, invalidation, context assembly, and explanation",
-  "tools": [
-    {
-      "name": "ingest",
-      "description": "Ingest a document or message into memory (creates an episode)",
-      "input_example": {
-        "source_type": "email",
-        "source_id": "MSG-123",
-        "content": "The email body or raw document",
-        "t_ref": "2026-03-11T10:00:00Z",
-        "scope": "org"
-      }
-    },
-    {
-      "name": "extract",
-      "description": "Extract entities, facts, and links from an episode or inline content",
-      "input_example": { "episode_id": "episode:..." }
-    },
-    {
-      "name": "resolve",
-      "description": "Resolve a canonical entity id from a name and aliases",
-      "input_example": {
-        "entity_type": "person",
-        "canonical_name": "John Doe",
-        "aliases": ["Johnny Doe", "J. Doe"]
-      }
-    },
-    {
-      "name": "assemble_context",
-      "description": "Assemble active ranked context for a natural-language query",
-      "input_example": {
-        "query": "ARR commitments for Alice",
-        "scope": "org",
-        "as_of": "2026-03-11T10:00:00Z",
-        "budget": 10
-      }
-    },
-    {
-      "name": "explain",
-      "description": "Return provenance-ready citations for context items",
-      "input_example": {
-        "context_items": "[{\"content\":\"ARR $2M\",\"quote\":\"ARR $2M\",\"source_episode\":\"episode:abc123\"}]"
-      }
-    },
-    {
-      "name": "invalidate",
-      "description": "Mark a fact as no longer valid while preserving history",
-      "input_example": {
-        "fact_id": "fact:...",
-        "reason": "Superseded by a newer update",
-        "t_invalid": "2026-03-11T10:00:00Z"
-      }
-    }
-  ]
-}
-```
+| Tool | Purpose |
+| --- | --- |
+| `ingest` | Store an episode with source metadata and timestamps |
+| `extract` | Extract entities, facts, and links from an episode or raw content |
+| `assemble_context` | Return ranked memory context for a query |
+| `explain` | Expand context items with source citations and traceable provenance |
+| `invalidate` | Mark a fact as no longer valid as of a given time |
 
-> Поместите `mcp.json` рядом с бинарником или используйте его в CI для документирования интерфейса инструментов.
+This design lines up with the intent-driven MCP guidance reflected in the docs: fewer tools, clearer semantics, better outcomes.
 
-> Важно: legacy-инструменты вроде `create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`, а также alias-обёртки вроде `ingest_document` больше не являются частью публичной MCP-поверхности этого сервера.
+## Development
 
----
-
-### Пример развернутого `mcp.json` (stdio servers) — пример для локальной разработки
-
-Ниже — пример более полного `mcp.json` с несколькими stdio‑серверами. Внимание: секции `env` содержат placeholders вместо реальных секретов — **не** храните секреты в репозитории.
-
-```json
-{
-  "servers": {
-    "memory-mcp": {
-      "type": "stdio",
-      "command": "./target/release/memory_mcp",
-      "env": {
-        "SURREALDB_DB_NAME": "memory",
-        "SURREALDB_URL": "ws://127.0.0.1:8000/rpc",
-        "SURREALDB_NAMESPACES": "org,personal,private",
-        "SURREALDB_USERNAME": "root",
-        "SURREALDB_PASSWORD": "root",
-        "LOG_LEVEL": "info"
-      }
-    },
-    "memory-mcp-embedded": {
-      "type": "stdio",
-      "command": "./target/release/memory_mcp",
-      "env": {
-        "SURREALDB_DB_NAME": "memory",
-        "SURREALDB_EMBEDDED": "true",
-        "SURREALDB_DATA_DIR": "./data/surrealdb",
-        "SURREALDB_NAMESPACES": "org,personal,private",
-        "SURREALDB_USERNAME": "root",
-        "SURREALDB_PASSWORD": "root",
-        "LOG_LEVEL": "info"
-      }
-    }
-  }
-}
-```
-
-> Примечание: значения env в примере совпадают с файлом `.env` в корне репозитория. Для запуска локально можно выполнить:
+### Daily commands
 
 ```bash
-# загрузить переменные из .env (bash/zsh)
-set -a; source .env; set +a
-# затем запустить бинарник
-./target/release/memory_mcp
+cargo check
+cargo fmt
+cargo clippy -- -D warnings
+cargo doc --no-deps
 ```
 
-> Миграции схемы должны лежать в единственной ожидаемой относительной папке `./migrations` (от корня репозитория). При первом старте MCP файлы `*.surql` из `./migrations` будут автоматически применены к базе. Убедитесь, что `./migrations/__Initial.surql` присутствует.
+### Binary entry points
 
-> В CI используйте защищённые переменные/секреты вместо хранения токенов в файлах.
+- `src/main.rs` — main MCP server binary
+- `src/bin/schema_dump.rs` — schema-related utility binary
 
-> Подсказка: для CI используйте безопасные переменные/секреты в самом CI и не вставляйте токены в публичные файлы.
+## Testing
 
-
----
-
-## Примеры реальных сценариев использования (stdin/stdout) 📡
-Ниже — упрощённые примеры последовательного взаимодействия с сервером через stdio (RMCP envelope). Формат сообщения — JSON; конкретная envelope-форма может варьироваться по реализации клиента, но идея следующая:
-
-1) Ингестируем документ:
+Run the full test suite:
 
 ```bash
-printf '%s\n' '{"type":"call","id":"1","tool":"ingest","args": {"source_type":"email","source_id":"MSG-202","content":"Hello from Alice"}}' | ./target/debug/memory_mcp
+cargo test
 ```
 
-Ожидаемый ответ (пример):
-
-```json
-{"type":"response","id":"1","ok":{"status":"success","result":"episode:abc123","guidance":"Call extract next to derive entities and facts."}}
-```
-
-2) Извлекаем сущности/факты из эпизода:
+Useful narrower runs:
 
 ```bash
-printf '%s\n' '{"type":"call","id":"2","tool":"extract","args": {"episode_id":"episode:abc123"}}' | ./target/release/memory_mcp
+cargo test --test service_integration
+cargo test --test service_acceptance
+cargo test --test tools_e2e
 ```
 
-Ответ (пример):
+Coverage output is stored under `coverage/` when generated with Tarpaulin.
 
-```json
-{"type":"response","id":"2","ok":{"status":"success","result":{"episode_id":"episode:abc123","entities":[{"entity_id":"entity:john","type":"person","canonical_name":"John Doe"}],"facts":[{"fact_id":"fact:arr","type":"metric"}],"links":[{"entity_id":"entity:john","episode_id":"episode:abc123"}]},"guidance":"Resolve canonical entities for any ambiguous names before creating manual links."}}
+## Project layout
+
+```text
+.
+├── AGENTS.md
+├── Cargo.toml
+├── README.md
+├── docs/
+├── scripts/
+├── src/
+│   ├── bin/
+│   ├── mcp/
+│   ├── service/
+│   ├── config.rs
+│   ├── lib.rs
+│   ├── logging.rs
+│   ├── main.rs
+│   ├── models.rs
+│   └── storage.rs
+└── tests/
 ```
 
-3) Собираем контекст по запросу (assemble_context):
+## Documentation
 
-```bash
-printf '%s\n' '{"type":"call","id":"3","tool":"assemble_context","args": {"query":"ARR for John","scope":"org","as_of":"2026-03-11T10:00:00Z","budget":25}}' | ./target/debug/memory_mcp
-```
+- [`docs/MEMORY_SYSTEM_SPEC.md`](docs/MEMORY_SYSTEM_SPEC.md) — full system specification
+- [`docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md`](docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md) — curated references for intent- and skills-driven MCP design
 
-Ответ (пример):
+## Contributing
 
-```json
-{"type":"response","id":"3","ok":{"status":"success","result":[{"fact_id":"fact:arr","content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123","confidence":0.93,"provenance":{"source_episode":"episode:abc123"},"rationale":"matched scope=org and active at 2026-03-11"}],"guidance":"Call explain if you need provenance-ready citations for selected items.","has_more":false,"total_count":1}}
-```
+This repository follows the conventions in [`AGENTS.md`](AGENTS.md).
 
-4) Поясняем происхождение (explain):
+In particular:
 
-```bash
-printf '%s\n' '{"type":"call","id":"4","tool":"explain","args":{"context_items":"[{\"content\":\"ARR $2M\",\"quote\":\"ARR $2M\",\"source_episode\":\"episode:abc123\"}]"}}' | ./target/debug/memory_mcp
-```
+- keep public APIs stable unless a change is explicitly requested
+- avoid introducing dependencies without approval
+- prefer typed errors and deterministic behavior
+- run formatting, clippy, and tests before considering work done
 
-Ответ (пример):
+## License
 
-```json
-{"type":"response","id":"4","ok":{"status":"success","result":[{"content":"ARR $2M","quote":"ARR $2M","source_episode":"episode:abc123"}],"guidance":"Use these citations directly in the final response.","has_more":false,"total_count":1}}
-```
-
----
-
-## Пример последовательности в CI (тестовое встраивание) 🧪
-В CI можно запускать бинарник в фоновом процессе и взаимодействовать через stdio (или через тестовый клиент). Пример псевдо‑скрипта:
-
-```bash
-# запустить сервер (в background) и перенаправить stdin/stdout во временные FIFO
-mkfifo /tmp/mcp_in /tmp/mcp_out
-./target/debug/memory_mcp < /tmp/mcp_in > /tmp/mcp_out &
-PID=$!
-# отправить вызов
-echo '{"type":"call","id":"1","tool":"ingest","args":{"source_type":"email","source_id":"MSG-1","content":"CI test"}}' > /tmp/mcp_in
-# прочитать ответ
-head -n 1 /tmp/mcp_out
-# kill $PID после завершения
-kill $PID
-```
-
----
-
-## Полезные переменные окружения и конфиг
-- SURREALDB_DATA_DIR — путь к директории данных при embedded SurrealDB (по умолчанию `./data/surrealdb`).
-- SURREALDB_DB_NAME — имя базы (пример: `testdb`).
-- SURREALDB_USERNAME / SURREALDB_PASSWORD — учётные данные для SurrealDB.
-- `LOG_LEVEL` — уровень логирования (рекомендуемый).
-
----
-
-Если нужно, могу добавить конкретные примеры клиента (Python/Node) для работы с stdio RMCP, или подготовить `mcp.json` с полными JSON‑schema для каждого инструмента. Хотите, чтобы я добавил пример клиентской библиотеки (Python) для интеграции по stdin/stdout? 💬
-
----
-
-## Ускорение инкрементальных сборок и покрытия 📦⚡
-Чтобы `cargo build`, `cargo test`, `cargo tarpaulin` и `cargo llvm-cov` повторно использовали один и тот же кеш и не пересобирали всё с нуля — рекомендую использовать sccache + включить инкрементальную компиляцию для тестового профиля.
-
-Что сделано в репозитории:
-- Включена инкрементальная компиляция для `dev` и `test` (см. `Cargo.toml`).
-- Добавлен локальный cargo‑wrapper `sccache` через `.cargo/config.toml` (необходим `sccache` в PATH).
-
-Быстрый набор команд (macOS):
-
-1) Установить sccache:
-
-```bash
-brew install sccache
-```
-
-2) Включить в текущей сессии (или добавить в `~/.zshrc`/`~/.bashrc`):
-
-```bash
-export RUSTC_WRAPPER=$(which sccache)
-export SCCACHE_CACHE_SIZE=20G   # опционально
-sccache --show-stats            # проверить статистику кеша
-```
-
-3) Запускать как обычно — артефакты будут кешироваться и переиспользоваться:
-
-- `cargo build` — инкрементально
-- `cargo test` — инкрементально (profile.test теперь с incremental = true)
-- `cargo tarpaulin --no-clean` — быстрее повторные прогоны покрытия
-- `cargo llvm-cov` — переиспользует кеш sccache между запусками
-
-Советы и ограничения:
-- Tarpaulin/llvm-cov меняют RUSTFLAGS (инструментирование), поэтому будут использовать отдельные кэш‑ключи, но sccache всё равно уменьшит время повторных сборок для одинаковых флагов.
-- Не запускайте `cargo clean` если хотите сохранять кеш.
+This project is licensed under the **MIT** license. See [`LICENSE`](LICENSE) for details.

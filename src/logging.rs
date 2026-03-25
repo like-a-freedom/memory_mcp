@@ -126,7 +126,6 @@ impl StdoutLogger {
         let mut parts = Vec::with_capacity(event.len() + 2);
         parts.push(format!("[{}] {}", ts, level.as_str().to_uppercase()));
 
-        // Sort keys for deterministic output
         let mut keys: Vec<_> = event.keys().cloned().collect();
         keys.sort();
 
@@ -248,11 +247,8 @@ mod tests {
             "2026-01-01T00:00:00+00:00",
         );
 
-        // Name should be quoted because it contains space
         assert!(line.contains("name=\"Dmitry Ivanov\""));
-        // List should be flattened
         assert!(line.contains("list=[a,b,c]"));
-        // Args object should be flattened
         assert!(line.contains("args="));
         assert!(line.contains("query=ARR"));
         assert!(line.contains("scope=org"));
@@ -270,10 +266,8 @@ mod tests {
             "2026-01-01T00:00:00+00:00",
         );
 
-        // Value should be truncated with ellipsis
         assert!(line.contains("..."));
 
-        // Verify truncated value length
         if let Some(pos) = line.find("long=") {
             let rest = &line[pos + 5..];
             let value = rest.split_whitespace().next().unwrap_or("");

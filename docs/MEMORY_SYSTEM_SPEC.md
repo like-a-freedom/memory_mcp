@@ -8,7 +8,7 @@
 
 ## Document Change History
 
-- **2026-03-11**: Completed memory-only MCP surface cleanup. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService`, kept the public contract focused on six canonical memory tools, updated service internals to return typed extraction/context/explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
+- **2026-03-11**: Completed the cleanup of the memory-only MCP surface. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService` and narrowed the public contract to six canonical memory tools. Updated service internals to return typed extraction, context, and explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
 
 - **2026-02-20**: Fixed `create_task` optional `due_date` coercion regression under SurrealDB 3 by preserving JSON `null` in DB write payload normalization (instead of converting to `{"None": {}}`, which SurrealDB interpreted as an object and rejected for `option<string>`). Added regression coverage for `create_task` with `due_date: null` parameter parsing, payload normalization, and integration flow without due date. Revalidated with full `cargo fmt`, strict `cargo clippy --all-targets --all-features -- -D warnings`, and full test suite.
 - **2026-02-20 (hotfix)**: Fixed SurrealDB server-version detection — `INFO FOR DB` response parsing now prefers explicit `version` keys and version-like strings (semver/SurrealDB labels) and ignores non-version text (DDL/statements). This prevents logging migration DDL as the server version (e.g. `DEFINE ANALYZER ...`). Added unit tests for `find_version_in_json` and verified startup logging no longer reports DDL as the server version.
@@ -41,7 +41,7 @@
 
 ### 1.1 Product Vision
 
-Memory System provides agents with a unified long-term memory/context layer that:
+Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
 - Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships)
 - Delivers ranked context packs to LLMs on-demand with minimal token budget and low latency
@@ -49,9 +49,9 @@ Memory System provides agents with a unified long-term memory/context layer that
 
 ### 1.2 Key Design Principles
 
-1. **Separation of Concerns**: Specialized Memory Agent handles all memory operations; Product Manager Agent delegates via `runSubagent`
-2. **Bi-temporal Modeling**: Track both "when was it true" (validity time) and "when did we learn" (transaction time) for correct historical queries and audit
-3. **Determinism**: All operations produce stable, reproducible results (no randomness, stable sort orders)
+1. **Separation of Concerns**: A specialized Memory Agent handles all memory operations, while the Product Manager Agent delegates via `runSubagent`
+2. **Bi-temporal Modeling**: Track both "when was it true" (validity time) and "when did we learn it" (transaction time) to support accurate historical queries and reliable audit trails
+3. **Determinism**: All operations produce stable, reproducible results, with no randomness and consistent sort order
 4. **Access Control**: Strict scope isolation (personal/team/org/private-domain) with policy-based filtering
 5. **Single Source of Truth**: SurrealDB as the only storage backend (no in-memory alternatives)
 
@@ -90,8 +90,8 @@ Memory System provides agents with a unified long-term memory/context layer that
 
 - **PDM Agent** focuses on product strategy, roadmapping, requirements engineering
 - **Memory Agent** (specialized sub-agent) handles all memory operations
-- Skills like `context-assembly`, `entity-tracking`, `stakeholder-analysis`, `decision-tracking`, `ingest-episode` are **embedded** in Memory Agent prompt (not standalone skills)
-- PDM delegates via `runSubagent(agentName: "memory", ...)` instead of calling MCP tools directly
+- Skills like `context-assembly`, `entity-tracking`, `stakeholder-analysis`, `decision-tracking`, and `ingest-episode` are embedded in the Memory Agent prompt rather than exposed as standalone skills
+- PDM delegates via `runSubagent(agentName: "memory", ...)` rather than calling MCP tools directly
 
 ---
 
@@ -244,16 +244,16 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-IN-02**: When new document/event arrives, ingestion pipeline MUST trigger automatically (near-real-time) and re-index changes on schedule.  
 **Status**: ✅ Done
 
-**FR-IN-03**: For each incoming object, MUST save "raw episode" (preserving text/metadata) and link to original (URI/ID/audio timeframe).  
+**FR-IN-03**: For each incoming object, the system MUST save the raw episode (preserving text and metadata) and link it back to the original source via URI, ID, or audio timeframe.  
 **Status**: ✅ Done
 
 **FR-IN-04**: For each episode, MUST record `t_ref` (reference time of event) and `t_ingested` (when added to system) for bi-temporal logic.  
 **Status**: ✅ Done
 
-**FR-IN-05**: Idempotent ingest MUST use deterministic `episode_id` based on `source_type`, `source_id`, `t_ref`, and `scope`.  
+**FR-IN-05**: Ingestion MUST use a deterministic `episode_id` based on `source_type`, `source_id`, `t_ref`, and `scope`.  
 **Status**: ✅ Done
 
-**FR-IN-06**: Normalization rules for sources and identifiers MUST be documented and applied before computing deterministic IDs (trim/unicode normalization, timezone normalization, email/case canonicalization) to avoid collisions and ensure stability across re-ingests.  
+**FR-IN-06**: Normalization rules for sources and identifiers MUST be documented and applied before computing deterministic IDs (trim/unicode normalization, timezone normalization, email/case canonicalization) to avoid collisions and ensure stability across repeated ingestion runs.  
 **Status**: ✅ Done
 
 ### 5.2 SurrealDB Transports and Protocols
@@ -261,13 +261,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-IN-07**: System MUST support SurrealDB transports: **RPC** (preferred for production, typed RPC + CBOR), **HTTP** (stateless endpoints: `/sql`, import/export), **CBOR** (binary encoding with SurrealDB custom tags) for efficient and type-safe data exchange.  
 **Status**: ✅ Done
 
-**FR-IN-08**: All RPC/HTTP interactions MUST be logged in execution/event log (who/what/when/args/result) with transport type and content-type (application/cbor or application/json).  
+**FR-IN-08**: All RPC and HTTP interactions MUST be logged in the execution/event log with actor, action, timestamp, arguments, result, transport type, and content type (`application/cbor` or `application/json`).  
 **Status**: ✅ Done
 
-**FR-IN-09**: Use of session variables (`vars`) in RPC MUST be explicit and included in operation log; session-dependent behavior must be controllable and reproducible.  
+**FR-IN-09**: Use of session variables (`vars`) in RPC MUST be explicit and included in the operation log; session-dependent behavior must remain controllable and reproducible.  
 **Status**: ✅ Done
 
-**FR-IN-10**: Serialization using CBOR MUST use agreed SurrealDB CBOR tags for dates/IDs/decimal/uuid/geometry to ensure correct round-trip and determinism.  
+**FR-IN-10**: CBOR serialization MUST use SurrealDB's standard CBOR tags for dates, IDs, decimals, UUIDs, and geometry values to ensure correct round-tripping and deterministic behavior.  
 **Status**: ✅ Done
 
 ### 5.3 SurrealDB Storage Backend (Single Source of Truth)
@@ -301,12 +301,12 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).  
 **Status**: ✅ Done
 
-**FR-EX-04**: To improve extraction quality, SHOULD apply "two-pass" scheme (extract → self-check/reflection) to reduce hallucinations and omissions.  
+**FR-EX-04**: To improve extraction quality, the system SHOULD use a two-step flow—initial extraction followed by self-validation—to reduce hallucinations and omissions.  
 **Status**: ✅ Done
 
 ### 5.5 Entity Resolution (Deduplication)
 
-**FR-ER-01**: System MUST support aliases and entity merging (e.g., "Митя/Дима/Dmitry Ivanov").  
+**FR-ER-01**: System MUST support aliases and entity merging (for example, "Mitya/Dima/Dmitry Ivanov").  
 **Status**: ✅ Done
 
 **FR-ER-02**: System MUST provide hybrid deduplication: (a) embedding similarity + (b) text features + (c) LLM verification based on episode context.  
@@ -343,7 +343,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-TM-01**: System MUST support decay (confidence degradation over time) by default with configurable half-life per fact type (e.g., one year for metrics/promises).  
 **Status**: ✅ Done
 
-**FR-TM-02**: System MUST support fact invalidation (supersede) when new contradictory fact appears, not just "graceful forgetting".  
+**FR-TM-02**: System MUST support explicit fact invalidation (supersession) when a new contradictory fact appears, rather than relying only on gradual confidence decay.  
 **Status**: ✅ Done
 
 **FR-TM-03**: System MUST implement bi-temporal model: store validity time of fact (T) and transaction/ingest time (T′) for audit, retroactive corrections, and correct "as-of" answers.  
@@ -375,7 +375,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search and vector indexes; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.  
 **Status**: ✅ Done
 
-**FR-CA-07**: To reduce query variability, agents MUST be provided canonical query templates and typed memory-skills (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). Skills should validate input using JSON Schema.  
+**FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
 
 **FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.  
@@ -383,13 +383,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
-**FR-AG-01**: System MUST provide six canonical memory operations: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`.  
+**FR-AG-01**: System MUST expose six canonical memory operations: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, and `explain`.  
 **Status**: ✅ Done
 
 **FR-AG-02**: Canonical memory operations MUST be accessible via MCP interface (stdio/http/socket) so IDEs/assistants can call them uniformly.  
 **Status**: ✅ Done
 
-**FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: merges and invalidations are logged, and callers can request citations/explanations via `explain`.  
+**FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.  
 **Status**: ✅ Done
 
 **FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
@@ -397,13 +397,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 ### 5.10 UI/UX (Minimum for "Context Graph")
 
-**FR-UX-01**: UI MUST allow selecting counterparty/partner/project and get answers:
+**FR-UX-01**: The UI MUST let users select a contact, partner, or project and get answers to questions such as:
 - "Who promised what to whom? Is it fulfilled?"
 - "What metrics/deals were mentioned and how did they change?"
 - "What tasks for me/team, priority, deadline?"  
 **Status**: ✅ Done
 
-**FR-UX-02**: Each answer MUST have quote and link to primary source (episode/document/timecode).  
+**FR-UX-02**: Each answer MUST include a quote and a link to the primary source (episode, document, or timecode).  
 **Status**: ✅ Done
 
 **FR-UX-03**: UI MUST allow launching next flow ("find intro to OpenAI → generate email draft") from context screen.  
@@ -468,7 +468,7 @@ All IDs MUST be deterministic to ensure idempotence:
 
 - Public MCP surface is intentionally limited to the six canonical memory tools above.
 - Legacy UI/draft/helper tools are not part of the current public contract.
-- `extract` returns a soft partial response with an empty typed result when neither `episode_id` nor content is supplied.
+- `extract` returns a graceful partial response with an empty typed result when neither `episode_id` nor content is supplied.
 - List-style responses use decision-ready envelope fields such as `status`, `guidance`, `has_more`, `total_count`, and `next_offset`.
 
 ### 7.5 Tool Call Logging and Observability
@@ -772,11 +772,11 @@ memory_mcp/
 | **API-05** | `assemble_context(query, scope, as_of, budget) → context_pack` | ✅ Done |
 | **API-06** | `explain(context_pack) → episode links/quotes` | ✅ Done |
 
-**Note:** SurrealMCP and SurrealDB transports MUST support production settings: authentication (JWT/auth server), rate limits (RPS/burst), and different transports (stdio/http/socket/RPC/HTTP). API-01..API-06 MUST be accessible via RPC/HTTP and, where appropriate, accept/return CBOR-encoded payloads; all calls must be logged in execution/event log with transport and content-type info.
+**Note:** SurrealMCP and SurrealDB transports MUST support production settings, including authentication (JWT/auth server), rate limits (RPS/burst), and multiple transport modes (stdio, HTTP, socket, RPC). API-01 through API-06 MUST be accessible over RPC/HTTP and, where appropriate, accept and return CBOR-encoded payloads. All calls must be logged in the execution/event log together with transport and content-type information.
 
 ### 10.2 Acceptance Tests (High-Level)
 
-**AT-01**: After adding email with promise "will do by Friday", system shows promise at counterparty with quote and link to email.  
+**AT-01**: After adding an email with the promise "will do by Friday," the system shows that promise on the relevant contact record together with a quote and a link to the email.  
 **Status**: ✅ Done
 
 **AT-02**: If 6 months later new email states "ARR grew to $3M", old fact "$1M ARR" becomes invalidated (or confidence drops sharply), UI shows metric dynamics.  
@@ -785,7 +785,7 @@ memory_mcp/
 **AT-03**: User without `hr.salary` scope cannot extract/see salary facts via UI or agent skill.  
 **Status**: ✅ Done
 
-**AT-04**: Query "who can introduce to OpenAI" returns chain via graph traversal (2-3 hops) confirmed by sources.  
+**AT-04**: The query "who can introduce me to OpenAI" returns a relationship chain found through graph traversal (2-3 hops) and backed by source evidence.  
 **Status**: ✅ Done
 
 **AT-05**: CBOR round-trip verification: datetime/record id/decimal preserved without loss with RPC+CBOR.  

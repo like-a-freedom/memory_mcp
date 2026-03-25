@@ -164,7 +164,6 @@ impl MemoryMcp {
             );
         }
 
-        // If episode_id provided, extract directly
         if let Some(ref episode_id) = episode_id {
             match self.service.extract(episode_id, Some(access)).await {
                 Ok(result) => {
@@ -195,7 +194,6 @@ impl MemoryMcp {
             }
         }
 
-        // Otherwise, ingest content first then extract
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
             if enable_logging {
@@ -675,7 +673,6 @@ mod tests {
 
     #[test]
     fn parse_datetime_handles_null() {
-        // Test that None input returns None
         let result: Option<chrono::DateTime<chrono::Utc>> = None;
         assert!(result.is_none());
     }
@@ -695,7 +692,4 @@ mod tests {
         assert!(parse_datetime("invalid").is_none());
         assert!(parse_datetime("").is_none());
     }
-
-    // Note: normalize_optional_string, content_hash, default_scope, and empty_extract_result
-    // are tested in src/mcp/parsers.rs tests module
 }

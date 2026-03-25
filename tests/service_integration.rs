@@ -11,7 +11,6 @@ mod common;
 async fn test_service_ingest_and_extract_flow() {
     let service = common::make_service().await;
 
-    // Ingest an episode
     let request = memory_mcp::models::IngestRequest {
         source_type: "meeting".to_string(),
         source_id: "integration-test-1".to_string(),
@@ -26,7 +25,6 @@ async fn test_service_ingest_and_extract_flow() {
     let episode_id = service.ingest(request, None).await.unwrap();
     assert!(episode_id.starts_with("episode:"));
 
-    // Extract entities and facts
     let result = service.extract(&episode_id, None).await.unwrap();
 
     assert_eq!(result.episode_id, episode_id);
@@ -38,18 +36,15 @@ async fn test_service_ingest_and_extract_flow() {
 async fn test_service_resolve_and_relate_entities() {
     let service = common::make_service().await;
 
-    // Resolve entities
     let alice_id = service.resolve_person("Alice Smith").await.unwrap();
     assert!(alice_id.starts_with("entity:"));
 
     let bob_id = service.resolve_person("Bob Jones").await.unwrap();
     assert!(bob_id.starts_with("entity:"));
 
-    // Same person should resolve to same ID
     let alice_id_2 = service.resolve_person("Alice Smith").await.unwrap();
     assert_eq!(alice_id, alice_id_2);
 
-    // Create relationship
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
 }
 
@@ -59,7 +54,6 @@ async fn test_service_add_fact_and_assemble_context() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    // Add facts
     let _fact_id = service
         .add_fact(
             "metric",
@@ -76,7 +70,6 @@ async fn test_service_add_fact_and_assemble_context() {
         .await
         .unwrap();
 
-    // Assemble context
     let request = memory_mcp::models::AssembleContextRequest {
         query: "ARR metric".to_string(),
         scope: "org".to_string(),
@@ -98,7 +91,6 @@ async fn test_service_fact_invalidation() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    // Add a fact
     let fact_id = service
         .add_fact(
             "metric",
@@ -115,7 +107,6 @@ async fn test_service_fact_invalidation() {
         .await
         .unwrap();
 
-    // Verify fact is visible before invalidation
     let request_before = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
         scope: "org".to_string(),
@@ -126,7 +117,6 @@ async fn test_service_fact_invalidation() {
     let context_before = service.assemble_context(request_before).await.unwrap();
     assert!(context_before.iter().any(|f| f.fact_id == fact_id));
 
-    // Invalidate the fact
     let t_invalid = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
     service
         .invalidate(
@@ -140,7 +130,6 @@ async fn test_service_fact_invalidation() {
         .await
         .unwrap();
 
-    // Verify fact is not visible after invalidation (for queries after t_invalid)
     let request_after = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
         scope: "org".to_string(),
@@ -158,7 +147,6 @@ async fn test_service_cache_behavior() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    // Add a fact
     service
         .add_fact(
             "note",
@@ -175,7 +163,6 @@ async fn test_service_cache_behavior() {
         .await
         .unwrap();
 
-    // First query
     let request = memory_mcp::models::AssembleContextRequest {
         query: "Test content".to_string(),
         scope: "org".to_string(),
@@ -186,7 +173,6 @@ async fn test_service_cache_behavior() {
     let result1 = service.assemble_context(request.clone()).await.unwrap();
     assert!(!result1.is_empty());
 
-    // Second query (should return same results)
     let result2 = service.assemble_context(request).await.unwrap();
     assert_eq!(result1.len(), result2.len());
 }
@@ -197,7 +183,6 @@ async fn test_service_scope_isolation() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    // Add facts to different scopes
     service
         .add_fact(
             "note",
@@ -230,7 +215,6 @@ async fn test_service_scope_isolation() {
         .await
         .unwrap();
 
-    // Query org scope - should only see org facts
     let request_org = memory_mcp::models::AssembleContextRequest {
         query: "scope fact".to_string(),
         scope: "org".to_string(),
