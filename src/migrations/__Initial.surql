@@ -81,6 +81,7 @@ DEFINE INDEX entity_canonical_name ON TABLE entity COLUMNS canonical_name;
 DEFINE INDEX entity_canonical_name_normalized ON TABLE entity COLUMNS canonical_name_normalized;
 DEFINE INDEX entity_aliases ON TABLE entity COLUMNS aliases;
 DEFINE INDEX fact_content_search ON TABLE fact COLUMNS content FULLTEXT ANALYZER simple;
+DEFINE INDEX community_summary_search ON TABLE community COLUMNS summary FULLTEXT ANALYZER simple;
 DEFINE INDEX episode_embedding_hnsw ON episode FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST EUCLIDEAN TYPE F32 EFC 150 M 8;
 DEFINE INDEX entity_embedding_hnsw ON entity FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST EUCLIDEAN TYPE F32 EFC 150 M 8;
 DEFINE INDEX fact_embedding_hnsw ON fact FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST EUCLIDEAN TYPE F32 EFC 150 M 8;

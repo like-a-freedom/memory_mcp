@@ -160,7 +160,7 @@ Configuration is loaded from environment variables.
 | --- | --- |
 | `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
 | `SURREALDB_DATA_DIR` | Custom embedded data directory |
-| `SURREALDB_EMBEDDING_DIMENSION` | HNSW vector dimension for embedding indexes (default: `4`) |
+| `SURREALDB_EMBEDDING_DIMENSION` | HNSW vector dimension for embedding indexes (default: `4`; typical production values are `768`, `1024`, or `1536`) |
 | `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
 
 ### Example
@@ -176,7 +176,7 @@ SURREALDB_EMBEDDING_DIMENSION=1536
 LOG_LEVEL=info
 ```
 
-If you enable a real embedding provider, set `SURREALDB_EMBEDDING_DIMENSION` to the model output size (for example `768` or `1536`). Changing it for an already-initialized database should be treated as a schema migration because existing HNSW indexes will need to be recreated.
+If you enable a real embedding provider, set `SURREALDB_EMBEDDING_DIMENSION` to the model output size (for example `nomic-embed-text = 768`, `mxbai-embed-large = 1024`, `text-embedding-3-small = 1536`). Changing it for an already-initialized database is **not** automatic: drop and recreate the embedding indexes (or rebuild the DB) before writing vectors with the new dimension.
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
 

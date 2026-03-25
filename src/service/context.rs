@@ -297,16 +297,14 @@ async fn find_matching_communities(
     namespace: &str,
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
-    let normalized_query = query.to_lowercase();
     let communities = service
         .db_client
-        .select_table("community", namespace)
+        .select_communities_matching_summary(namespace, query)
         .await?;
 
     Ok(communities
         .iter()
         .filter_map(stored_community_summary_from_value)
-        .filter(|community| community.summary.to_lowercase().contains(&normalized_query))
         .collect())
 }
 

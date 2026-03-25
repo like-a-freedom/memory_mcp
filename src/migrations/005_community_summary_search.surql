@@ -1,0 +1,10 @@
+-- Versioned migration scaffold for community summary full-text search.
+--
+-- Fresh installs already receive the `community_summary_search` FULLTEXT index
+-- from `__Initial.surql`.
+-- This numbered migration anchors the historical upgrade step for existing
+-- databases where community retrieval should move from in-memory substring
+-- scans to DB-side summary search.
+--
+-- Intended upgrade operations for existing databases:
+--   - DEFINE INDEX community_summary_search ON TABLE community COLUMNS summary FULLTEXT ANALYZER simple

@@ -1181,6 +1181,14 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn relate_edge(
                 &self,
                 _namespace: &str,
@@ -1401,6 +1409,14 @@ mod tests {
                 })
             }
 
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn relate_edge(
                 &self,
                 _namespace: &str,
@@ -1536,6 +1552,14 @@ mod tests {
             ) -> Result<Option<Value>, MemoryError> {
                 assert_eq!(normalized_name, "openai");
                 Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn relate_edge(

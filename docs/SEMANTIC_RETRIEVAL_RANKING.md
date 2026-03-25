@@ -33,6 +33,15 @@ Before a real embedder is turned on by default:
 - validate that hybrid ranking is stable under missing vectors
 - add explicit acceptance tests for mixed FTS + graph + embedding scoring
 
+## Deployment note for vector dimensions
+
+- The repository default remains `4` so test fixtures and inert `NullEmbedder` flows stay lightweight.
+- Real embedder configurations should set `SURREALDB_EMBEDDING_DIMENSION` explicitly:
+   - `nomic-embed-text` → `768`
+   - `mxbai-embed-large` → `1024`
+   - `text-embedding-3-small` → `1536`
+- Changing the dimension for an already-initialized database is a manual migration step today. SurrealDB HNSW indexes must be dropped and recreated (or the database rebuilt) before persisting vectors with the new size.
+
 ## Why the default stays inert
 
 Keeping the default embedder inert avoids accidental ranking drift while the retrieval blend is still being designed. That gives us the extension points now without changing observable behavior today.

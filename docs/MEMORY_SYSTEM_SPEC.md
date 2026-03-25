@@ -9,6 +9,7 @@
 ## Document Change History
 
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
+- **2026-03-25 (embedding follow-up)**: Added configurable `SURREALDB_EMBEDDING_DIMENSION`, DB-side community summary full-text search, and an explicit manual-reindex warning for dimension changes. Verified with strict `cargo clippy --all-targets -- -D warnings` and full `cargo test`.
 
 - **2026-03-11**: Completed the cleanup of the memory-only MCP surface. Removed legacy non-memory service APIs (`create_task`, `send_message_draft`, `schedule_meeting`, `update_metric`, `ui_*`) from `MemoryService` and narrowed the public contract to six canonical memory tools. Updated service internals to return typed extraction, context, and explanation models, refreshed `README.md` and this specification, and revalidated with `cargo fmt --all`, `cargo test`, and `cargo clippy --all-targets -- -D warnings`.
 
@@ -360,7 +361,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-TM-03**: System MUST implement bi-temporal model: store validity time of fact (T) and transaction/ingest time (T′) for audit, retroactive corrections, and correct "as-of" answers.  
-**Status**: ⚠️ Partial — the model exists, but temporal fields are string-typed and text-query retrieval currently bypasses DB-side temporal filtering.
+**Status**: ✅ Done
 
 **FR-TM-04**: Retrieval MUST support "as-of" queries (snapshot at date): show context as it was at meeting/email time.  
 **Status**: ✅ Done
@@ -386,7 +387,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Done
 
 **FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search and vector indexes; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.  
-**Status**: ⚠️ Partial — analyzer support exists for FTS and vector index definitions exist, but production embedding retrieval is still disabled by default.
+**Status**: ⚠️ Partial — analyzer support exists for fact and community FTS, and vector index definitions are configurable by dimension, but production embedding retrieval is still disabled by default.
 
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done

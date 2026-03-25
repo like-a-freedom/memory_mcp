@@ -79,6 +79,13 @@ pub trait DbClient: Send + Sync {
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError>;
 
+    /// Selects communities whose summaries match the supplied query using DB-side search.
+    async fn select_communities_matching_summary(
+        &self,
+        namespace: &str,
+        query: &str,
+    ) -> Result<Vec<Value>, MemoryError>;
+
     /// Creates a native graph relation edge while preserving compatibility fields.
     async fn relate_edge(
         &self,
@@ -146,6 +153,17 @@ impl SurrealDbClient {
         default_namespace: &str,
         log_level: &str,
     ) -> Result<Self, MemoryError> {
+        Self::connect_in_memory_with_dimension(database, default_namespace, log_level, 4).await
+    }
+
+    /// Connects to an embedded in-memory SurrealDB instance with an explicit
+    /// embedding dimension for HNSW index creation.
+    pub async fn connect_in_memory_with_dimension(
+        database: &str,
+        default_namespace: &str,
+        log_level: &str,
+        embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
         let db = Surreal::new::<Mem>(())
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB memory init failed: {err}")))?;
@@ -158,7 +176,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Local(Mutex::new(db)),
             database: database.to_string(),
-            embedding_dimension: 4,
+            embedding_dimension,
             logger: StdoutLogger::new(log_level),
         })
     }
@@ -469,6 +487,10 @@ fn versioned_migrations() -> &'static [MigrationScript] {
         MigrationScript {
             file_name: "004_migration_checksums.surql",
             sql: include_str!("migrations/004_migration_checksums.surql"),
+        },
+        MigrationScript {
+            file_name: "005_community_summary_search.surql",
+            sql: include_str!("migrations/005_community_summary_search.surql"),
         },
     ]
 }
@@ -801,6 +823,41 @@ impl DbClient for SurrealDbClient {
         Ok(result)
     }
 
+    async fn select_communities_matching_summary(
+        &self,
+        namespace: &str,
+        query: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_communities_matching_summary",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("query", Value::String(query.to_string())),
+            ],
+        );
+
+        let (sql, vars) = build_select_communities_matching_summary_query(query);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_communities_matching_summary.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
     async fn relate_edge(
         &self,
         namespace: &str,
@@ -1094,6 +1151,13 @@ fn build_select_entity_lookup_query(normalized_name: &str) -> (String, Value) {
         "SELECT * FROM entity WHERE canonical_name_normalized = $name OR aliases CONTAINS $name LIMIT 1"
             .to_string(),
         json!({"name": normalized_name}),
+    )
+}
+
+fn build_select_communities_matching_summary_query(query: &str) -> (String, Value) {
+    (
+        "SELECT * FROM community WHERE summary @@ $query ORDER BY summary ASC LIMIT 25".to_string(),
+        json!({"query": query}),
     )
 }
 
@@ -1450,6 +1514,16 @@ mod tests {
             .expect("select table");
 
         assert!(records.is_empty());
+    }
+
+    #[tokio::test]
+    async fn connect_in_memory_with_dimension_uses_requested_embedding_dimension() {
+        let client =
+            SurrealDbClient::connect_in_memory_with_dimension("testdb", "testns", "warn", 768)
+                .await
+                .expect("connect in memory");
+
+        assert_eq!(client.embedding_dimension, 768);
     }
 
     #[test]
@@ -1893,6 +1967,15 @@ mod tests {
         assert_eq!(vars.get("from_id"), Some(&json!("entity:alice")));
         assert_eq!(vars.get("to_id"), Some(&json!("entity:bob")));
         assert_eq!(vars.get("relation"), Some(&json!("knows")));
+    }
+
+    #[test]
+    fn build_select_communities_matching_summary_query_uses_fulltext_search() {
+        let (sql, vars) = build_select_communities_matching_summary_query("alice project");
+
+        assert!(sql.contains("FROM community WHERE summary @@ $query"));
+        assert!(sql.contains("ORDER BY summary ASC"));
+        assert_eq!(vars.get("query"), Some(&json!("alice project")));
     }
 
     #[test]
