@@ -6,6 +6,7 @@ use super::cache::{CacheKey, SafeMutex};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
+use crate::storage::json_string;
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 
@@ -194,12 +195,19 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
 }
 
 /// Sort facts by recency.
+#[cfg(test)]
 fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
-    facts.sort_by(|a, b| {
-        b.t_valid
-            .cmp(&a.t_valid)
-            .then_with(|| b.fact_id.cmp(&a.fact_id))
-    });
+    facts.sort_by(compare_facts_by_recency);
+}
+
+fn compare_facts_by_recency(
+    left: &crate::models::Fact,
+    right: &crate::models::Fact,
+) -> std::cmp::Ordering {
+    right
+        .t_valid
+        .cmp(&left.t_valid)
+        .then_with(|| left.fact_id.cmp(&right.fact_id))
 }
 
 #[derive(Debug)]
@@ -334,6 +342,14 @@ async fn select_fact_records_for_query(
         fallback_records.extend(term_records);
     }
 
+    let mut seen_fact_ids = std::collections::HashSet::new();
+    fallback_records.retain(|record| {
+        let Some(fact_id) = record.get("fact_id").and_then(Value::as_str) else {
+            return true;
+        };
+        seen_fact_ids.insert(fact_id.to_string())
+    });
+
     Ok(fallback_records)
 }
 
@@ -345,6 +361,13 @@ struct CollectCommunityFactsRequest<'a> {
     access: &'a AccessContext,
     direct_fact_ids: &'a std::collections::HashSet<String>,
     budget: i32,
+}
+
+#[derive(Debug, Clone)]
+struct CommunityMatch {
+    rank: usize,
+    community_id: String,
+    summary: String,
 }
 
 async fn collect_community_facts(
@@ -378,7 +401,8 @@ async fn collect_community_facts(
 
     let community_summary_by_member = matched_communities
         .iter()
-        .flat_map(|community| {
+        .enumerate()
+        .flat_map(|(rank, community)| {
             community
                 .member_entities
                 .iter()
@@ -386,7 +410,11 @@ async fn collect_community_facts(
                 .map(move |entity_id| {
                     (
                         entity_id,
-                        (community.community_id.clone(), community.summary.clone()),
+                        CommunityMatch {
+                            rank,
+                            community_id: community.community_id.clone(),
+                            summary: community.summary.clone(),
+                        },
                     )
                 })
         })
@@ -401,25 +429,32 @@ async fn collect_community_facts(
                 .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
         })
         .collect::<Vec<_>>();
-    sort_facts_by_recency(&mut facts);
+    facts.sort_by(|left, right| {
+        let left_rank = best_community_match(left, &community_summary_by_member)
+            .map(|matched| matched.rank)
+            .unwrap_or(usize::MAX);
+        let right_rank = best_community_match(right, &community_summary_by_member)
+            .map(|matched| matched.rank)
+            .unwrap_or(usize::MAX);
+
+        left_rank
+            .cmp(&right_rank)
+            .then_with(|| compare_facts_by_recency(left, right))
+    });
 
     Ok(facts
         .into_iter()
         .take(request.budget.max(1) as usize)
         .map(|fact| {
-            let rationale = fact
-                .entity_links
-                .iter()
-                .find_map(|entity_id| community_summary_by_member.get(entity_id).cloned())
-                .map_or_else(
-                    || format!("matched community summary for query=\"{}\"", request.query),
-                    |(community_id, summary)| {
-                        format!(
-                            "matched community summary for query=\"{}\" via {}: {}",
-                            request.query, community_id, summary
-                        )
-                    },
-                );
+            let rationale = best_community_match(&fact, &community_summary_by_member).map_or_else(
+                || format!("matched community summary for query=\"{}\"", request.query),
+                |matched| {
+                    format!(
+                        "matched community summary for query=\"{}\" via {}: {}",
+                        request.query, matched.community_id, matched.summary
+                    )
+                },
+            );
             (fact, rationale)
         })
         .collect())
@@ -430,6 +465,7 @@ struct StoredCommunitySummary {
     community_id: String,
     summary: String,
     member_entities: Vec<String>,
+    ft_score: f64,
 }
 
 async fn find_matching_communities(
@@ -442,22 +478,30 @@ async fn find_matching_communities(
         .select_communities_matching_summary(namespace, query)
         .await?;
 
-    Ok(communities
+    let mut matched = communities
         .iter()
         .filter_map(stored_community_summary_from_value)
-        .collect())
+        .collect::<Vec<_>>();
+    matched.sort_by(|left, right| {
+        right
+            .ft_score
+            .total_cmp(&left.ft_score)
+            .then_with(|| left.community_id.cmp(&right.community_id))
+    });
+
+    Ok(matched)
 }
 
 fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunitySummary> {
     let map = value.as_object()?;
     let community_id = map
         .get("community_id")
-        .and_then(unwrap_context_string)
-        .or_else(|| map.get("id").and_then(unwrap_context_string))?
+        .and_then(json_string)
+        .or_else(|| map.get("id").and_then(json_string))?
         .to_string();
     let summary = map
         .get("summary")
-        .and_then(unwrap_context_string)
+        .and_then(json_string)
         .unwrap_or_default()
         .to_string();
     let member_entities = map
@@ -466,11 +510,12 @@ fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunityS
         .map(|values| {
             values
                 .iter()
-                .filter_map(unwrap_context_string)
+                .filter_map(json_string)
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    let ft_score = map.get("ft_score").and_then(Value::as_f64).unwrap_or(0.0);
 
     if summary.is_empty() || member_entities.is_empty() {
         return None;
@@ -480,26 +525,8 @@ fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunityS
         community_id,
         summary,
         member_entities,
+        ft_score,
     })
-}
-
-fn unwrap_context_string(value: &Value) -> Option<&str> {
-    if let Some(value) = value.as_str() {
-        Some(value)
-    } else if let Some(object) = value.as_object() {
-        object
-            .get("String")
-            .and_then(Value::as_str)
-            .or_else(|| object.get("Strand").and_then(Value::as_str))
-            .or_else(|| {
-                object
-                    .get("Strand")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-            })
-    } else {
-        None
-    }
 }
 
 fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
@@ -510,6 +537,16 @@ fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
     } else {
         None
     }
+}
+
+fn best_community_match<'a>(
+    fact: &crate::models::Fact,
+    matches_by_entity: &'a std::collections::HashMap<String, CommunityMatch>,
+) -> Option<&'a CommunityMatch> {
+    fact.entity_links
+        .iter()
+        .filter_map(|entity_id| matches_by_entity.get(entity_id))
+        .min_by(|left, right| left.rank.cmp(&right.rank))
 }
 
 #[cfg(test)]
@@ -571,9 +608,208 @@ mod tests {
 
         sort_facts_by_recency(&mut facts);
 
-        assert_eq!(facts[0].fact_id, "fact:c"); // 'c' > 'b' > 'a'
+        assert_eq!(facts[0].fact_id, "fact:a");
         assert_eq!(facts[1].fact_id, "fact:b");
-        assert_eq!(facts[2].fact_id, "fact:a");
+        assert_eq!(facts[2].fact_id, "fact:c");
+    }
+
+    #[tokio::test]
+    async fn select_fact_records_for_query_deduplicates_term_fallback_records() {
+        struct DedupFallbackDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for DedupFallbackDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("atlas launch") => vec![],
+                    Some("atlas") => vec![
+                        json!({
+                            "fact_id": "fact:shared",
+                            "fact_type": "note",
+                            "content": "Atlas launch is scheduled.",
+                            "quote": "Atlas launch is scheduled.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org"
+                        }),
+                        json!({
+                            "fact_id": "fact:atlas-only",
+                            "fact_type": "note",
+                            "content": "Atlas has a risk review.",
+                            "quote": "Atlas has a risk review.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org"
+                        }),
+                    ],
+                    Some("launch") => vec![
+                        json!({
+                            "fact_id": "fact:shared",
+                            "fact_type": "note",
+                            "content": "Atlas launch is scheduled.",
+                            "quote": "Atlas launch is scheduled.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org"
+                        }),
+                        json!({
+                            "fact_id": "fact:launch-only",
+                            "fact_type": "note",
+                            "content": "Launch checklist is ready.",
+                            "quote": "Launch checklist is ready.",
+                            "source_episode": "episode:3",
+                            "t_valid": "2026-01-08T10:30:00Z",
+                            "t_ingested": "2026-01-08T10:30:00Z",
+                            "scope": "org"
+                        }),
+                    ],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(DedupFallbackDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let records = select_fact_records_for_query(
+            &service,
+            "org",
+            "org",
+            "2026-01-15T10:30:00Z",
+            Some("atlas launch"),
+            10,
+        )
+        .await
+        .expect("fallback records");
+
+        let fact_ids = records
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec!["fact:shared", "fact:atlas-only", "fact:launch-only"]
+        );
     }
 
     #[test]
@@ -1280,5 +1516,199 @@ mod tests {
         );
         assert_eq!(results[1].fact_id, "fact:community");
         assert!(results[1].rationale.contains("community:atlas"));
+    }
+
+    #[tokio::test]
+    async fn assemble_context_orders_community_facts_by_matching_summary_relevance() {
+        struct CommunityRankingDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for CommunityRankingDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(
+                    entity_links,
+                    &["entity:alpha".to_string(), "entity:beta".to_string()]
+                );
+
+                Ok(vec![
+                    json!({
+                        "fact_id": "fact:beta",
+                        "fact_type": "note",
+                        "content": "Beta launch note.",
+                        "quote": "Beta launch note.",
+                        "source_episode": "episode:beta",
+                        "t_valid": "2026-01-20T10:30:00Z",
+                        "t_ingested": "2026-01-20T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:beta"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:beta"}
+                    }),
+                    json!({
+                        "fact_id": "fact:alpha",
+                        "fact_type": "note",
+                        "content": "Alpha launch note.",
+                        "quote": "Alpha launch note.",
+                        "source_episode": "episode:alpha",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:alpha"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:alpha"}
+                    }),
+                ])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query, "launch workstream");
+                Ok(vec![
+                    json!({
+                        "community_id": "community:alpha",
+                        "summary": "Alpha launch workstream",
+                        "member_entities": ["entity:alpha"],
+                        "ft_score": 20.0
+                    }),
+                    json!({
+                        "community_id": "community:beta",
+                        "summary": "Beta launch workstream",
+                        "member_entities": ["entity:beta"],
+                        "ft_score": 10.0
+                    }),
+                ])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(CommunityRankingDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "launch workstream".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, "fact:alpha");
+        assert_eq!(results[1].fact_id, "fact:beta");
     }
 }

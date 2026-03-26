@@ -1,5 +1,0 @@
--- Versioned migration scaffold for checksum-enforced migration bookkeeping.
---
--- The runtime now records `script_name`, `checksum`, and `executed_at` in the
--- `script_migration` table and rejects modified applied migrations at startup.
--- This file exists as a stable migration-chain anchor for that behavior.

@@ -66,6 +66,7 @@ pub trait DbClient: Send + Sync {
     ///
     /// This remains part of the production API because community maintenance
     /// currently rebuilds connected components from the active edge set.
+    /// Known limitation: this path still scans the active edge table.
     async fn select_edges_filtered(
         &self,
         namespace: &str,
@@ -489,32 +490,10 @@ struct MigrationScript {
 }
 
 fn versioned_migrations() -> &'static [MigrationScript] {
-    &[
-        MigrationScript {
-            file_name: "001_init.surql",
-            sql: include_str!("migrations/001_init.surql"),
-        },
-        MigrationScript {
-            file_name: "002_datetime_types.surql",
-            sql: include_str!("migrations/002_datetime_types.surql"),
-        },
-        MigrationScript {
-            file_name: "003_edge_indexes.surql",
-            sql: include_str!("migrations/003_edge_indexes.surql"),
-        },
-        MigrationScript {
-            file_name: "004_migration_checksums.surql",
-            sql: include_str!("migrations/004_migration_checksums.surql"),
-        },
-        MigrationScript {
-            file_name: "005_community_summary_search.surql",
-            sql: include_str!("migrations/005_community_summary_search.surql"),
-        },
-        MigrationScript {
-            file_name: "006_simplified_search_redesign.surql",
-            sql: include_str!("migrations/006_simplified_search_redesign.surql"),
-        },
-    ]
+    &[MigrationScript {
+        file_name: "006_simplified_search_redesign.surql",
+        sql: include_str!("migrations/006_simplified_search_redesign.surql"),
+    }]
 }
 
 fn migration_record_id(file_name: &str) -> String {
@@ -588,7 +567,7 @@ fn validate_applied_migration(
     Ok(())
 }
 
-fn json_string(value: &Value) -> Option<&str> {
+pub(crate) fn json_string(value: &Value) -> Option<&str> {
     if let Some(value) = value.as_str() {
         Some(value)
     } else if let Some(object) = value.as_object() {
@@ -788,6 +767,9 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
+        // Community maintenance still needs the active edge set as a whole.
+        // Keep the limitation explicit here so future refactors do not mistake
+        // this for a bounded neighbor lookup.
         let sql = String::from(
             "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC",
         );
@@ -1232,6 +1214,8 @@ fn build_select_edge_neighbors_query(
     direction: GraphDirection,
 ) -> (String, Value) {
     let node_field = match direction {
+        // For `RELATE from -> edge -> to`, incoming edges to `node_id` place the
+        // node on the `out` side, while outgoing edges place it on `in`.
         GraphDirection::Incoming => "out",
         GraphDirection::Outgoing => "in",
     };
@@ -1251,26 +1235,27 @@ fn build_relate_edge_query(
     content: Value,
 ) -> (String, Value) {
     let normalized = normalize_surreal_json(&content);
+    let edge_record_literal = record_literal(edge_id);
 
     if let Value::Object(map) = normalized {
         let (assignments, mut vars) = build_set_assignments("edge", map);
-        let mut all_assignments = vec!["id = $edge".to_string()];
-        all_assignments.extend(assignments);
+        let all_assignments = assignments;
         vars.insert("edge_id".to_string(), json!(edge_id));
         vars.insert("in_id".to_string(), json!(from_id));
         vars.insert("out_id".to_string(), json!(to_id));
 
         (
             format!(
-                "LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET {} RETURN *",
+                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET {} RETURN *",
                 all_assignments.join(", ")
             ),
             Value::Object(vars),
         )
     } else {
         (
-            "LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET id = $edge, content = $content RETURN *"
-                .to_string(),
+            format!(
+                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET content = $content RETURN *"
+            ),
             json!({
                 "edge_id": edge_id,
                 "in_id": from_id,
@@ -1279,6 +1264,13 @@ fn build_relate_edge_query(
             }),
         )
     }
+}
+
+fn record_literal(record_id: &str) -> String {
+    record_id.split_once(':').map_or_else(
+        || record_id.to_string(),
+        |(table, key)| format!("{table}:⟨{key}⟩"),
+    )
 }
 
 fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
@@ -1653,18 +1645,19 @@ mod tests {
             .await
             .expect("apply migrations");
 
-        let record_id = migration_record_id("004_migration_checksums.surql");
+        let record_id = migration_record_id("006_simplified_search_redesign.surql");
         let record = client
             .select_one(&record_id, "testns")
             .await
             .expect("select migration record")
             .expect("stored migration record");
-        let expected_checksum =
-            migration_checksum(include_str!("migrations/004_migration_checksums.surql"));
+        let expected_checksum = migration_checksum(include_str!(
+            "migrations/006_simplified_search_redesign.surql"
+        ));
 
         assert_eq!(
             record.get("script_name").and_then(json_string),
-            Some("004_migration_checksums.surql")
+            Some("006_simplified_search_redesign.surql")
         );
         assert_eq!(
             record.get("checksum").and_then(json_string),
@@ -1684,12 +1677,12 @@ mod tests {
             .await
             .expect("initial apply migrations");
 
-        let record_id = migration_record_id("003_edge_indexes.surql");
+        let record_id = migration_record_id("006_simplified_search_redesign.surql");
         client
             .update(
                 &record_id,
                 json!({
-                    "script_name": "003_edge_indexes.surql",
+                    "script_name": "006_simplified_search_redesign.surql",
                     "checksum": "tampered",
                     "executed_at": chrono::Utc::now().to_rfc3339(),
                 }),
@@ -1912,6 +1905,34 @@ mod tests {
     }
 
     #[test]
+    fn versioned_migrations_keep_only_single_live_upgrade_script() {
+        let migrations = versioned_migrations();
+
+        assert_eq!(
+            migrations.len(),
+            1,
+            "one-binary delivery should keep a single runtime upgrade migration"
+        );
+        assert_eq!(
+            migrations[0].file_name,
+            "006_simplified_search_redesign.surql"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_006_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "006_simplified_search_redesign.surql")
+            .expect("migration 006 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 006 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
     fn extract_first_record_from_nested_object() {
         let nested = json!({
             "Object": {
@@ -2094,13 +2115,22 @@ mod tests {
             }),
         );
 
-        assert!(sql.starts_with("LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET"));
-        assert!(sql.contains("id = $edge"));
+        assert!(sql.starts_with(
+            "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> edge:⟨abc123⟩ -> $out SET"
+        ));
+        assert!(sql.contains("RELATE $in -> edge:⟨abc123⟩ -> $out"));
+        assert!(!sql.contains("SET id = $edge"));
         assert!(sql.contains("edge_id = $edge_id"));
         assert_eq!(vars.get("edge_id"), Some(&json!("edge:abc123")));
         assert_eq!(vars.get("in_id"), Some(&json!("entity:alice")));
         assert_eq!(vars.get("out_id"), Some(&json!("entity:bob")));
         assert_eq!(vars.get("relation"), Some(&json!("knows")));
+    }
+
+    #[test]
+    fn record_literal_preserves_table_and_wraps_key() {
+        assert_eq!(record_literal("edge:abc123"), "edge:⟨abc123⟩");
+        assert_eq!(record_literal("edge"), "edge");
     }
 
     #[test]

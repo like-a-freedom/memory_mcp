@@ -53,6 +53,17 @@ fn build_startup_versions_event(
     m
 }
 
+async fn apply_startup_migrations(
+    db_client: &Arc<dyn DbClient>,
+    namespaces: &[String],
+) -> Result<(), MemoryError> {
+    for namespace in namespaces {
+        db_client.apply_migrations(namespace).await?;
+    }
+
+    Ok(())
+}
+
 impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
@@ -114,10 +125,7 @@ impl MemoryService {
             50,
             100,
         )?;
-        service
-            .db_client
-            .apply_migrations(&service.default_namespace)
-            .await?;
+        apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
         Ok(service)
     }
@@ -1075,6 +1083,161 @@ mod tests {
         assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
         assert!(!evt.contains_key("surrealdb_server_version"));
+    }
+
+    #[tokio::test]
+    async fn apply_startup_migrations_runs_for_every_namespace() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct StartupMigrationDbClient {
+            calls: Arc<Mutex<Vec<String>>>,
+            apply_count: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for StartupMigrationDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+                self.apply_count.fetch_add(1, Ordering::SeqCst);
+                self.calls.safe_lock().push(namespace.to_string());
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(StartupMigrationDbClient {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            apply_count: AtomicUsize::new(0),
+        });
+        let db_client_dyn: Arc<dyn DbClient> = db_client.clone();
+        let namespaces = vec![
+            "org".to_string(),
+            "personal".to_string(),
+            "private".to_string(),
+        ];
+
+        apply_startup_migrations(&db_client_dyn, &namespaces)
+            .await
+            .expect("startup migrations");
+
+        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 3);
+        assert_eq!(
+            db_client.calls.safe_lock().clone(),
+            vec![
+                "org".to_string(),
+                "personal".to_string(),
+                "private".to_string(),
+            ]
+        );
     }
 
     #[test]

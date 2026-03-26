@@ -10,7 +10,7 @@
 
 ## Status snapshot (updated after actual execution)
 
-- **Wave 1 — mostly complete:** fresh schema/config/model contract locked; startup migration file exists and is registered; the numbered migration still needs a fuller existing-DB upgrade script instead of the current scaffold.
+- **Wave 1 — implemented:** fresh schema/config/model contract is locked; runtime migrations are embedded in the binary, reduced to the single live upgrade script `006_simplified_search_redesign.surql`, and applied on startup for all configured namespaces.
 - **Wave 2 — implemented:** embedding service/config/persistence plumbing removed from runtime and tests.
 - **Wave 3 — implemented:** native `in` / `out` graph traversal and stronger lexical full-text ordering are in place and verified.
 - **Wave 4 — partial:** semantic lookup removal, deterministic fusion, and rationale improvements are implemented; multilabel query flags and bounded graph expansion from the original plan are still not fully landed.
@@ -60,7 +60,7 @@
 - [x] **Step 1: Write a failing migration test asserting the startup migration registry includes `006_simplified_search_redesign.surql`**
 - [x] **Step 2: Write a failing embedded-schema test asserting the analyzer definition uses `memory_fts` with punctuation-aware tokenization**
 - [x] **Step 3: Update `__Initial.surql` to remove embedding fields/indexes, define `memory_fts`, and define edge endpoint/index expectations for fresh databases**
-- [ ] **Step 4: Add `006_simplified_search_redesign.surql` to drop embedding fields/indexes, replace the analyzer/indexes, and move edge endpoint indexing to `in` / `out` for upgraded databases**
+- [x] **Step 4: Add `006_simplified_search_redesign.surql` to drop embedding fields/indexes, replace the analyzer/indexes, and move edge endpoint indexing to `in` / `out` for upgraded databases**
 - [x] **Step 5: Remove `embedding_dimension` rendering from `src/storage.rs` and simplify in-memory client constructors accordingly**
 - [x] **Step 6: Update `tests/common/mod.rs` helpers to use the simplified in-memory constructor path**
 - [x] **Step 7: Run the focused schema/migration tests and verify they pass**

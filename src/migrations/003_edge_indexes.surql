@@ -1,5 +1,0 @@
--- Versioned migration scaffold for edge index backfills.
---
--- Fresh installs already receive edge indexes from `__Initial.surql`.
--- This file remains as a numbered checkpoint so migration bookkeeping can
--- validate that the historical migration chain has not changed after apply.
