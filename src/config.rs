@@ -8,8 +8,6 @@ use std::path::PathBuf;
 
 use crate::service::MemoryError;
 
-const DEFAULT_EMBEDDING_DIMENSION: usize = 4;
-
 /// Configuration for SurrealDB connection.
 ///
 /// Supports both embedded (RocksDB) and remote (WebSocket) modes.
@@ -41,8 +39,6 @@ pub struct SurrealConfig {
     pub embedded: bool,
     /// Optional path to RocksDB data directory.
     pub data_dir: Option<String>,
-    /// HNSW vector dimension used when creating embedding indexes.
-    pub embedding_dimension: usize,
 }
 
 impl SurrealConfig {
@@ -59,7 +55,6 @@ impl SurrealConfig {
     /// | `SURREALDB_NAMESPACES` | Yes | Comma-separated namespaces |
     /// | `SURREALDB_USERNAME` | Yes | Database username |
     /// | `SURREALDB_PASSWORD` | Yes | Database password |
-    /// | `SURREALDB_EMBEDDING_DIMENSION` | No | HNSW embedding dimension (default: 4) |
     /// | `LOG_LEVEL` | No | Logging level (default: "warn") |
     ///
     /// Security note: embedded mode is the preferred local default. Remote mode
@@ -95,8 +90,6 @@ impl SurrealConfig {
             .map_err(|_| MemoryError::ConfigMissing("SURREALDB_USERNAME".to_string()))?;
         let password = env::var("SURREALDB_PASSWORD")
             .map_err(|_| MemoryError::ConfigMissing("SURREALDB_PASSWORD".to_string()))?;
-        let embedding_dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?
-            .unwrap_or(DEFAULT_EMBEDDING_DIMENSION);
         let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "warn".to_string());
         let data_dir = env::var("SURREALDB_DATA_DIR").ok();
 
@@ -109,7 +102,6 @@ impl SurrealConfig {
             log_level,
             embedded,
             data_dir,
-            embedding_dimension,
         })
     }
 
@@ -173,7 +165,6 @@ pub struct SurrealConfigBuilder {
     log_level: String,
     embedded: bool,
     data_dir: Option<String>,
-    embedding_dimension: Option<usize>,
 }
 
 impl SurrealConfigBuilder {
@@ -226,12 +217,6 @@ impl SurrealConfigBuilder {
         self
     }
 
-    /// Sets the embedding vector dimension for HNSW indexes.
-    pub fn embedding_dimension(mut self, dimension: usize) -> Self {
-        self.embedding_dimension = Some(dimension);
-        self
-    }
-
     /// Builds the configuration.
     ///
     /// # Errors
@@ -264,9 +249,6 @@ impl SurrealConfigBuilder {
             log_level: self.log_level,
             embedded: self.embedded,
             data_dir: self.data_dir,
-            embedding_dimension: self
-                .embedding_dimension
-                .unwrap_or(DEFAULT_EMBEDDING_DIMENSION),
         })
     }
 }
@@ -278,32 +260,6 @@ fn parse_bool_env(var_name: &str) -> Option<bool> {
     env::var(var_name)
         .ok()
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
-}
-
-/// Parses a positive usize environment variable.
-///
-/// # Errors
-///
-/// Returns `MemoryError::ConfigInvalid` if the variable is present but not a
-/// positive integer.
-fn parse_usize_env(var_name: &str) -> Result<Option<usize>, MemoryError> {
-    let Some(raw) = env::var(var_name).ok() else {
-        return Ok(None);
-    };
-
-    let value = raw.parse::<usize>().map_err(|_| {
-        MemoryError::ConfigInvalid(format!(
-            "{var_name} must be a positive integer, got `{raw}`"
-        ))
-    })?;
-
-    if value == 0 {
-        return Err(MemoryError::ConfigInvalid(format!(
-            "{var_name} must be greater than zero"
-        )));
-    }
-
-    Ok(Some(value))
 }
 
 /// Parses a comma-separated list from an environment variable.
@@ -325,6 +281,12 @@ fn parse_comma_list(var_name: &str) -> Result<Vec<String>, MemoryError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn builder_sets_all_fields() {
@@ -337,7 +299,6 @@ mod tests {
             .log_level("debug")
             .embedded(true)
             .data_dir("/tmp/data")
-            .embedding_dimension(768)
             .build()
             .expect("valid config");
 
@@ -349,19 +310,6 @@ mod tests {
         assert_eq!(config.log_level, "debug");
         assert!(config.embedded);
         assert_eq!(config.data_dir, Some("/tmp/data".to_string()));
-        assert_eq!(config.embedding_dimension, 768);
-    }
-
-    #[test]
-    fn builder_defaults_embedding_dimension() {
-        let config = SurrealConfigBuilder::new()
-            .db_name("test")
-            .namespace("test")
-            .credentials("u", "p")
-            .build()
-            .expect("valid config");
-
-        assert_eq!(config.embedding_dimension, 4);
     }
 
     #[test]
@@ -436,5 +384,35 @@ mod tests {
             .build()
             .expect("valid config");
         assert_eq!(config.data_dir_or_default(), "relative/custom/path");
+    }
+
+    #[test]
+    fn from_env_ignores_removed_embedding_dimension_variable() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("SURREALDB_DB_NAME", "memory");
+            env::set_var("SURREALDB_EMBEDDED", "true");
+            env::set_var("SURREALDB_NAMESPACES", "org");
+            env::set_var("SURREALDB_USERNAME", "user");
+            env::set_var("SURREALDB_PASSWORD", "pass");
+            env::set_var("SURREALDB_EMBEDDING_DIMENSION", "not-a-number");
+        }
+
+        let result = SurrealConfig::from_env();
+
+        unsafe {
+            env::remove_var("SURREALDB_DB_NAME");
+            env::remove_var("SURREALDB_EMBEDDED");
+            env::remove_var("SURREALDB_NAMESPACES");
+            env::remove_var("SURREALDB_USERNAME");
+            env::remove_var("SURREALDB_PASSWORD");
+            env::remove_var("SURREALDB_EMBEDDING_DIMENSION");
+        }
+
+        assert!(
+            result.is_ok(),
+            "removed embedding dimension env var should be ignored rather than validated"
+        );
     }
 }

@@ -8,6 +8,7 @@
 
 ## Document Change History
 
+- **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
 - **2026-03-25 (embedding follow-up)**: Added configurable `SURREALDB_EMBEDDING_DIMENSION`, DB-side community summary full-text search, and an explicit manual-reindex warning for dimension changes. Verified with strict `cargo clippy --all-targets -- -D warnings` and full `cargo test`.
 
@@ -43,6 +44,8 @@
 ## 1. Executive Summary
 
 ### 1.1 Product Vision
+
+> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` to avoid conflating shipped behavior with planned redesign.
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes

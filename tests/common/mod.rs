@@ -9,14 +9,10 @@ pub async fn make_service() -> MemoryService {
         "personal".to_string(),
         "private".to_string(),
     ];
-    let db_client = SurrealDbClient::connect_in_memory_with_namespaces_and_dimension(
-        "memory_test",
-        &namespaces,
-        "warn",
-        4,
-    )
-    .await
-    .expect("connect in memory service");
+    let db_client =
+        SurrealDbClient::connect_in_memory_with_namespaces("memory_test", &namespaces, "warn")
+            .await
+            .expect("connect in memory service");
     for namespace in &namespaces {
         db_client
             .apply_migrations(namespace)
@@ -24,14 +20,8 @@ pub async fn make_service() -> MemoryService {
             .expect("apply in-memory migrations");
     }
 
-    MemoryService::new(
-        Arc::new(db_client),
-        namespaces,
-        "warn".to_string(),
-        50,
-        100,
-    )
-    .expect("service init")
+    MemoryService::new(Arc::new(db_client), namespaces, "warn".to_string(), 50, 100)
+        .expect("service init")
 }
 
 #[allow(dead_code)]
@@ -42,12 +32,7 @@ pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>)
         "private".to_string(),
     ];
     let db_client = Arc::new(
-        SurrealDbClient::connect_in_memory_with_namespaces_and_dimension(
-            "memory_test",
-            &namespaces,
-            "warn",
-            4,
-        )
+        SurrealDbClient::connect_in_memory_with_namespaces("memory_test", &namespaces, "warn")
             .await
             .expect("connect in memory service"),
     );
@@ -58,14 +43,8 @@ pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>)
             .expect("apply in-memory migrations");
     }
 
-    let service = MemoryService::new(
-        db_client.clone(),
-        namespaces,
-        "warn".to_string(),
-        50,
-        100,
-    )
-    .expect("service init");
+    let service = MemoryService::new(db_client.clone(), namespaces, "warn".to_string(), 50, 100)
+        .expect("service init");
 
     (service, db_client)
 }

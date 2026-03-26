@@ -42,26 +42,6 @@ fn unwrap_array_value(v: &Value) -> Option<&Vec<Value>> {
     }
 }
 
-fn unwrap_embedding(value: Option<&Value>) -> Option<Vec<f32>> {
-    value.and_then(unwrap_array_value).map(|values| {
-        values
-            .iter()
-            .filter_map(|entry| {
-                entry.as_f64().map(|number| number as f32).or_else(|| {
-                    entry
-                        .as_object()
-                        .and_then(|obj| {
-                            obj.get("Number")
-                                .and_then(Value::as_f64)
-                                .or_else(|| obj.get("Float").and_then(Value::as_f64))
-                        })
-                        .map(|number| number as f32)
-                })
-            })
-            .collect()
-    })
-}
-
 /// Parse an episode from a database record.
 #[must_use]
 pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
@@ -89,7 +69,6 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
                     .collect()
             })
             .unwrap_or_default(),
-        embedding: unwrap_embedding(record.get("embedding")),
     })
 }
 
@@ -169,7 +148,6 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
             })
             .unwrap_or_default(),
         provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
-        embedding: unwrap_embedding(map.get("embedding")),
     })
 }
 
@@ -303,9 +281,9 @@ pub async fn extract_from_episode(
         });
 
         let edge = Edge {
-            from_id: entity.entity_id.clone(),
+            in_id: entity.entity_id.clone(),
             relation: "mentioned_in".to_string(),
-            to_id: episode_id.to_string(),
+            out_id: episode_id.to_string(),
             strength: 1.0,
             confidence: 0.9,
             provenance: json!({"source_episode": episode_id}),
@@ -320,9 +298,9 @@ pub async fn extract_from_episode(
     for fact in &facts {
         for entity in &entities {
             let edge = Edge {
-                from_id: entity.entity_id.clone(),
+                in_id: entity.entity_id.clone(),
                 relation: "involved_in".to_string(),
-                to_id: fact.fact_id.clone(),
+                out_id: fact.fact_id.clone(),
                 strength: 0.8,
                 confidence: 0.85,
                 provenance: json!({"source_episode": episode_id}),
@@ -369,7 +347,7 @@ pub(crate) async fn store_edge(
     use serde_json::json;
 
     let edge_id =
-        super::ids::deterministic_edge_id(&edge.from_id, &edge.relation, &edge.to_id, edge.t_valid);
+        super::ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
 
     let existing = service.db_client.select_one(&edge_id, namespace).await?;
     if existing.is_some() {
@@ -380,9 +358,9 @@ pub(crate) async fn store_edge(
 
     let mut payload_map = serde_json::Map::new();
     payload_map.insert("edge_id".to_string(), Value::String(edge_id.clone()));
-    payload_map.insert("from_id".to_string(), Value::String(edge.from_id.clone()));
+    payload_map.insert("in".to_string(), Value::String(edge.in_id.clone()));
     payload_map.insert("relation".to_string(), Value::String(edge.relation.clone()));
-    payload_map.insert("to_id".to_string(), Value::String(edge.to_id.clone()));
+    payload_map.insert("out".to_string(), Value::String(edge.out_id.clone()));
     payload_map.insert("strength".to_string(), json!(edge.strength));
     payload_map.insert("confidence".to_string(), json!(edge.confidence));
     payload_map.insert("provenance".to_string(), edge.provenance.clone());
@@ -412,8 +390,8 @@ pub(crate) async fn store_edge(
         .relate_edge(
             namespace,
             &edge_id,
-            &edge.from_id,
-            &edge.to_id,
+            &edge.in_id,
+            &edge.out_id,
             Value::Object(payload_map),
         )
         .await?;
@@ -424,9 +402,9 @@ pub(crate) async fn store_edge(
 #[derive(Debug)]
 struct StoredEdgeVersion {
     edge_id: String,
-    from_id: String,
+    in_id: String,
     relation: String,
-    to_id: String,
+    out_id: String,
     t_valid: chrono::DateTime<chrono::Utc>,
     t_ingested: chrono::DateTime<chrono::Utc>,
     t_invalid: Option<chrono::DateTime<chrono::Utc>>,
@@ -466,9 +444,9 @@ async fn invalidate_conflicting_edges(
 /// relation-specific exclusivity across different targets) are deferred until
 /// Task 5 introduces graph-native relation semantics.
 fn edge_versions_conflict(existing: &StoredEdgeVersion, new_edge: &Edge) -> bool {
-    existing.from_id == new_edge.from_id
+    existing.in_id == new_edge.in_id
         && existing.relation == new_edge.relation
-        && existing.to_id == new_edge.to_id
+        && existing.out_id == new_edge.out_id
         && existing.t_valid <= new_edge.t_valid
         && existing.t_ingested <= new_edge.t_ingested
         && existing
@@ -485,59 +463,77 @@ fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> 
     let edge_id = map
         .get("edge_id")
         .and_then(unwrap_record_string)
-        .or_else(|| map.get("id").and_then(unwrap_record_string))?
-        .to_string();
+        .or_else(|| map.get("id").and_then(unwrap_record_string))?;
 
     Some(StoredEdgeVersion {
         edge_id,
-        from_id: map
-            .get("from_id")
-            .and_then(unwrap_record_string)?
-            .to_string(),
-        relation: map
-            .get("relation")
-            .and_then(unwrap_record_string)?
-            .to_string(),
-        to_id: map.get("to_id").and_then(unwrap_record_string)?.to_string(),
+        in_id: map.get("in").and_then(unwrap_record_string)?,
+        relation: map.get("relation").and_then(unwrap_record_string)?,
+        out_id: map.get("out").and_then(unwrap_record_string)?,
         t_valid: map
             .get("t_valid")
             .and_then(unwrap_record_string)
+            .as_deref()
             .and_then(parse_iso)?,
         t_ingested: map
             .get("t_ingested")
             .and_then(unwrap_record_string)
+            .as_deref()
             .and_then(parse_iso)?,
         t_invalid: map
             .get("t_invalid")
             .and_then(unwrap_record_string)
+            .as_deref()
             .and_then(parse_iso),
         t_invalid_ingested: map
             .get("t_invalid_ingested")
             .and_then(unwrap_record_string)
+            .as_deref()
             .and_then(parse_iso),
     })
 }
 
-fn unwrap_record_string(value: &Value) -> Option<&str> {
+fn unwrap_record_string(value: &Value) -> Option<String> {
     if let Some(value) = value.as_str() {
-        Some(value)
+        Some(value.to_string())
     } else if let Some(object) = value.as_object() {
         object
             .get("String")
             .and_then(Value::as_str)
-            .or_else(|| object.get("Datetime").and_then(Value::as_str))
-            .or_else(|| object.get("Strand").and_then(Value::as_str))
+            .map(ToString::to_string)
+            .or_else(|| {
+                object
+                    .get("Datetime")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                object
+                    .get("Strand")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
             .or_else(|| {
                 object
                     .get("Strand")
                     .and_then(|inner| inner.get("String"))
                     .and_then(Value::as_str)
+                    .map(ToString::to_string)
             })
             .or_else(|| {
                 object
                     .get("Datetime")
                     .and_then(|inner| inner.get("String"))
                     .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                object.get("RecordId").and_then(|record_id| {
+                    let record_id = record_id.as_object()?;
+                    let table = record_id.get("table")?.as_str()?;
+                    let key = record_id.get("key")?.as_str()?;
+                    Some(format!("{table}:{key}"))
+                })
             })
     } else {
         None
@@ -652,8 +648,8 @@ async fn collect_connected_entity_component(
 
             for edge in edges.iter().filter_map(stored_edge_version_from_record) {
                 let neighbor = match direction {
-                    crate::storage::GraphDirection::Incoming => edge.from_id,
-                    crate::storage::GraphDirection::Outgoing => edge.to_id,
+                    crate::storage::GraphDirection::Incoming => edge.in_id,
+                    crate::storage::GraphDirection::Outgoing => edge.out_id,
                 };
 
                 if is_entity_id(&neighbor) {
@@ -688,7 +684,7 @@ async fn build_community_summary(
                 .get("entity_id")
                 .and_then(unwrap_record_string)
                 .or_else(|| record.get("id").and_then(unwrap_record_string))?;
-            if !member_set.contains(entity_id) {
+            if !member_set.contains(&entity_id) {
                 return None;
             }
 
@@ -696,8 +692,7 @@ async fn build_community_summary(
                 record
                     .get("canonical_name")
                     .and_then(unwrap_record_string)
-                    .unwrap_or(entity_id)
-                    .to_string(),
+                    .unwrap_or(entity_id),
             )
         })
         .collect::<Vec<_>>();
@@ -745,8 +740,7 @@ fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
     let community_id = map
         .get("community_id")
         .and_then(unwrap_record_string)
-        .or_else(|| map.get("id").and_then(unwrap_record_string))?
-        .to_string();
+        .or_else(|| map.get("id").and_then(unwrap_record_string))?;
     let member_entities = map
         .get("member_entities")
         .and_then(unwrap_record_array)
@@ -754,7 +748,6 @@ fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
             values
                 .iter()
                 .filter_map(unwrap_record_string)
-                .map(ToString::to_string)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
@@ -921,6 +914,51 @@ mod tests {
     }
 
     #[test]
+    fn unwrap_record_string_handles_record_id() {
+        let value = json!({"RecordId": {"table": "entity", "key": "alice"}});
+        assert_eq!(
+            unwrap_record_string(&value),
+            Some("entity:alice".to_string())
+        );
+    }
+
+    #[test]
+    fn episode_from_record_ignores_legacy_embedding_field() {
+        let mut record = serde_json::Map::new();
+        record.insert("episode_id".to_string(), json!("episode:test123"));
+        record.insert("source_type".to_string(), json!("email"));
+        record.insert("source_id".to_string(), json!("msg-123"));
+        record.insert("content".to_string(), json!("Test content"));
+        record.insert("t_ref".to_string(), json!("2024-01-15T10:30:00Z"));
+        record.insert("t_ingested".to_string(), json!("2024-01-15T10:31:00Z"));
+        record.insert("scope".to_string(), json!("org"));
+        record.insert("embedding".to_string(), json!([0.1, 0.2, 0.3]));
+
+        let episode = episode_from_record(&record).expect("episode");
+        let value = serde_json::to_value(&episode).expect("serialize episode");
+        assert_eq!(value.get("embedding"), None);
+    }
+
+    #[test]
+    fn fact_from_record_ignores_legacy_embedding_field() {
+        let record = json!({
+            "fact_id": "fact:test123",
+            "fact_type": "note",
+            "content": "Test fact",
+            "quote": "Test quote",
+            "source_episode": "episode:abc",
+            "t_valid": "2024-01-15T10:30:00Z",
+            "t_ingested": "2024-01-15T10:31:00Z",
+            "scope": "org",
+            "embedding": [0.1, 0.2, 0.3]
+        });
+
+        let fact = fact_from_record(&record).expect("fact");
+        let value = serde_json::to_value(&fact).expect("serialize fact");
+        assert_eq!(value.get("embedding"), None);
+    }
+
+    #[test]
     fn is_promise_statement_detects_promise_patterns() {
         assert!(is_promise_statement("i will finish this task"));
         assert!(is_promise_statement("i'll deliver the report tomorrow"));
@@ -991,17 +1029,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _embedding: &[f32],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1020,9 +1047,9 @@ mod tests {
                 let mk = |from_id: &str, relation: &str, to_id: &str| {
                     json!({
                         "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
-                        "from_id": from_id,
+                        "in": from_id,
                         "relation": relation,
-                        "to_id": to_id,
+                        "out": to_id,
                         "t_valid": "2024-01-01T00:00:00Z",
                         "t_ingested": "2024-01-01T00:00:00Z"
                     })

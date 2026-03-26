@@ -243,13 +243,19 @@ async fn test_relate_repeated_write_invalidates_previous_edge_version() {
         .expect("relate 2");
 
     let edges = db_client.select_table("edge", "org").await.expect("edges");
+    let to_record_id = |record_id: &str| {
+        let (table, key) = record_id
+            .split_once(':')
+            .expect("record id should contain table prefix");
+        serde_json::json!({"RecordId": {"table": table, "key": key}})
+    };
     let knows_edges: Vec<_> = edges
         .into_iter()
         .filter_map(|edge| edge.as_object().cloned())
         .filter(|edge| {
-            edge.get("from_id").and_then(|value| value.as_str()) == Some(alice.as_str())
+            edge.get("in") == Some(&to_record_id(&alice))
                 && edge.get("relation").and_then(|value| value.as_str()) == Some("knows")
-                && edge.get("to_id").and_then(|value| value.as_str()) == Some(bob.as_str())
+                && edge.get("out") == Some(&to_record_id(&bob))
         })
         .collect();
 

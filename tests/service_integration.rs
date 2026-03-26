@@ -3,7 +3,7 @@
 //! These tests verify that different service components work together correctly.
 
 use chrono::{TimeZone, Utc};
-use memory_mcp::service::{EmbeddingProvider, EntityExtractor};
+use memory_mcp::service::EntityExtractor;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -48,6 +48,29 @@ async fn test_service_resolve_and_relate_entities() {
     assert_eq!(alice_id, alice_id_2);
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_service_relate_persists_native_edge_endpoints() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
+    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+
+    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
+
+    let edges = db_client.select_table("edge", "org").await.unwrap();
+    let edge = edges.first().expect("stored edge");
+
+    let to_record_id = |record_id: &str| {
+        let (table, key) = record_id
+            .split_once(':')
+            .expect("record id should contain table prefix");
+        json!({"RecordId": {"table": table, "key": key}})
+    };
+
+    assert_eq!(edge.get("in"), Some(&to_record_id(&alice_id)));
+    assert_eq!(edge.get("out"), Some(&to_record_id(&bob_id)));
 }
 
 #[tokio::test]
@@ -154,11 +177,7 @@ async fn test_service_extract_persists_edge_provenance() {
 }
 
 #[tokio::test]
-async fn test_service_semantic_scaffolding_exposes_default_abstractions() {
-    let embedder = memory_mcp::service::NullEmbedder;
-    let embedding = embedder.embed_text("hello semantic world").await.unwrap();
-    assert_eq!(embedding, None);
-
+async fn test_service_exposes_regex_entity_extractor() {
     let extractor = memory_mcp::service::RegexEntityExtractor::new().unwrap();
     let candidates = extractor
         .extract_candidates("Alice Smith met Bob Jones at Acme Inc")
@@ -172,7 +191,7 @@ async fn test_service_semantic_scaffolding_exposes_default_abstractions() {
 }
 
 #[tokio::test]
-async fn test_service_semantic_scaffolding_persists_embedding_slots() {
+async fn test_service_persists_records_without_embedding_fields() {
     let (service, db_client) = common::make_service_with_client().await;
 
     let episode_id = service

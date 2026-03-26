@@ -8,13 +8,8 @@ pub async fn setup_embedded_service() -> Result<MemoryService, MemoryError> {
         "private".to_string(),
     ];
     let db_client =
-        SurrealDbClient::connect_in_memory_with_namespaces_and_dimension(
-            "embedded_test",
-            &namespaces,
-            "warn",
-            4,
-        )
-        .await?;
+        SurrealDbClient::connect_in_memory_with_namespaces("embedded_test", &namespaces, "warn")
+            .await?;
     for namespace in &namespaces {
         db_client.apply_migrations(namespace).await?;
     }

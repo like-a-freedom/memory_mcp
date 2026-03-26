@@ -1,0 +1,19 @@
+-- Breaking search redesign migration scaffold.
+--
+-- Fresh installs receive the new no-embeddings schema and `memory_fts`
+-- analyzer directly from `__Initial.surql`.
+--
+-- This numbered migration anchors the historical upgrade step for existing
+-- databases that must move from embedding/HNSW scaffolding and the old
+-- whitespace-only analyzer to the simplified lexical-first runtime.
+--
+-- Intended upgrade operations for existing databases:
+--   - REMOVE INDEX episode_embedding_hnsw ON TABLE episode
+--   - REMOVE INDEX entity_embedding_hnsw ON TABLE entity
+--   - REMOVE INDEX fact_embedding_hnsw ON TABLE fact
+--   - REMOVE FIELD embedding ON TABLE episode
+--   - REMOVE FIELD embedding ON TABLE entity
+--   - REMOVE FIELD embedding ON TABLE fact
+--   - DEFINE ANALYZER memory_fts TOKENIZERS class FILTERS lowercase, ascii, snowball(english)
+--   - REBUILD or redefine fact/community full-text indexes on `memory_fts`
+--   - migrate edge traversal/indexing from `from_id`/`to_id` to native `in`/`out`

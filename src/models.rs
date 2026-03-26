@@ -299,8 +299,6 @@ pub struct Episode {
     pub scope: String,
     pub visibility_scope: String,
     pub policy_tags: Vec<String>,
-    #[serde(default)]
-    pub embedding: Option<Vec<f32>>,
 }
 
 /// An entity represents a canonical named thing.
@@ -310,8 +308,6 @@ pub struct Entity {
     pub entity_type: String,
     pub canonical_name: String,
     pub aliases: Vec<String>,
-    #[serde(default)]
-    pub embedding: Option<Vec<f32>>,
 }
 
 /// A fact represents a piece of knowledge extracted from an episode.
@@ -331,16 +327,16 @@ pub struct Fact {
     pub scope: String,
     pub policy_tags: Vec<String>,
     pub provenance: serde_json::Value,
-    #[serde(default)]
-    pub embedding: Option<Vec<f32>>,
 }
 
 /// An edge represents a relationship between entities or facts.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Edge {
-    pub from_id: String,
+    #[serde(rename = "in")]
+    pub in_id: String,
     pub relation: String,
-    pub to_id: String,
+    #[serde(rename = "out")]
+    pub out_id: String,
     pub strength: f64,
     pub confidence: f64,
     pub provenance: serde_json::Value,
@@ -372,6 +368,7 @@ pub fn default_budget() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn access_context_from_payload_maps_fields() {
@@ -555,5 +552,59 @@ mod tests {
     #[test]
     fn default_budget_returns_5() {
         assert_eq!(default_budget(), 5);
+    }
+
+    #[test]
+    fn episode_serialization_omits_embedding_field() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "meeting".to_string(),
+            source_id: "src-1".to_string(),
+            content: "hello".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: "org".to_string(),
+            policy_tags: vec![],
+        };
+
+        let value = serde_json::to_value(&episode).expect("serialize episode");
+        assert_eq!(value.get("embedding"), None);
+    }
+
+    #[test]
+    fn entity_serialization_omits_embedding_field() {
+        let entity = Entity {
+            entity_id: "entity:alice".to_string(),
+            entity_type: "person".to_string(),
+            canonical_name: "Alice".to_string(),
+            aliases: vec!["alice".to_string()],
+        };
+
+        let value = serde_json::to_value(&entity).expect("serialize entity");
+        assert_eq!(value.get("embedding"), None);
+    }
+
+    #[test]
+    fn fact_serialization_omits_embedding_field() {
+        let fact = Fact {
+            fact_id: "fact:test".to_string(),
+            fact_type: "note".to_string(),
+            content: "content".to_string(),
+            quote: "quote".to_string(),
+            source_episode: "episode:test".to_string(),
+            t_valid: Utc::now(),
+            t_ingested: Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 0.9,
+            entity_links: vec!["entity:alice".to_string()],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: json!({"source_episode": "episode:test"}),
+        };
+
+        let value = serde_json::to_value(&fact).expect("serialize fact");
+        assert_eq!(value.get("embedding"), None);
     }
 }

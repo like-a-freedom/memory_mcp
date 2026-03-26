@@ -15,13 +15,12 @@ use crate::models::{
 };
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
+use super::EntityExtractor;
 use super::cache::{CacheKey, SafeMutex};
-use super::embedding::NullEmbedder;
 use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
-use super::{EmbeddingProvider, EntityExtractor};
 
 /// Core service for memory operations.
 #[derive(Clone)]
@@ -34,7 +33,6 @@ pub struct MemoryService {
     pub(crate) context_cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) analyzers: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) indexes: Arc<Mutex<HashMap<String, Value>>>,
-    pub(crate) embedder: Arc<dyn EmbeddingProvider>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
 }
 
@@ -188,7 +186,6 @@ impl MemoryService {
             context_cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
             analyzers: Arc::new(Mutex::new(HashMap::new())),
             indexes: Arc::new(Mutex::new(HashMap::new())),
-            embedder: Arc::new(NullEmbedder),
             entity_extractor: Arc::new(RegexEntityExtractor::new()?),
         })
     }
@@ -230,8 +227,7 @@ impl MemoryService {
         let existing = self.db_client.select_one(&episode_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = request.t_ingested.unwrap_or_else(super::query::now);
-            let embedding = self.embedder.embed_text(&request.content).await?;
-            let mut payload = json!({
+            let payload = json!({
                 "episode_id": episode_id,
                 "source_type": request.source_type,
                 "source_id": request.source_id,
@@ -242,9 +238,6 @@ impl MemoryService {
                 "visibility_scope": request.visibility_scope.unwrap_or_else(|| request.scope.clone()),
                 "policy_tags": request.policy_tags,
             });
-            if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
-                object.insert("embedding".to_string(), json!(embedding));
-            }
             self.db_client
                 .create(&episode_id, payload, &namespace)
                 .await?;
@@ -346,7 +339,6 @@ impl MemoryService {
         }
 
         let entity_id = deterministic_entity_id(&candidate.entity_type, &candidate.canonical_name);
-        let embedding = self.embedder.embed_text(&candidate.canonical_name).await?;
         let aliases = candidate
             .aliases
             .into_iter()
@@ -354,16 +346,13 @@ impl MemoryService {
             .map(|alias| super::normalize_text(&alias))
             .collect::<Vec<_>>();
 
-        let mut payload = json!({
+        let payload = json!({
             "entity_id": entity_id,
             "entity_type": candidate.entity_type,
             "canonical_name": candidate.canonical_name,
             "canonical_name_normalized": normalized,
             "aliases": aliases.clone(),
         });
-        if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
-            object.insert("embedding".to_string(), json!(embedding));
-        }
         self.db_client
             .create(&entity_id, payload, &namespace)
             .await?;
@@ -393,8 +382,7 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
-            let embedding = self.embedder.embed_text(content).await?;
-            let mut payload = json!({
+            let payload = json!({
                 "fact_id": fact_id.clone(),
                 "fact_type": fact_type,
                 "content": content,
@@ -408,9 +396,6 @@ impl MemoryService {
                 "policy_tags": policy_tags,
                 "provenance": provenance,
             });
-            if let (Some(embedding), Some(object)) = (embedding, payload.as_object_mut()) {
-                object.insert("embedding".to_string(), json!(embedding));
-            }
             let created = self.db_client.create(&fact_id, payload, &namespace).await?;
             if created.is_null() {
                 return Err(MemoryError::Storage(
@@ -498,9 +483,9 @@ impl MemoryService {
     ) -> Result<(), MemoryError> {
         use crate::models::Edge;
         let edge = Edge {
-            from_id: from_id.to_string(),
+            in_id: from_id.to_string(),
             relation: relation.to_string(),
-            to_id: to_id.to_string(),
+            out_id: to_id.to_string(),
             strength: 1.0,
             confidence: 0.8,
             provenance: json!({"source": "manual"}),
@@ -565,15 +550,15 @@ impl MemoryService {
                         .await?
                     {
                         if let Value::Object(map) = record
-                            && let (Some(from_id), Some(to_id)) = (
-                                map.get("from_id").and_then(string_from_value),
-                                map.get("to_id").and_then(string_from_value),
+                            && let (Some(in_id), Some(out_id)) = (
+                                map.get("in").and_then(string_from_value),
+                                map.get("out").and_then(string_from_value),
                             )
-                            && visited.insert(from_id.clone())
+                            && visited.insert(in_id.clone())
                         {
-                            next_hop.insert(from_id.clone(), to_id);
-                            candidate_starts.insert(from_id.clone());
-                            next_frontier.push(from_id);
+                            next_hop.insert(in_id.clone(), out_id);
+                            candidate_starts.insert(in_id.clone());
+                            next_frontier.push(in_id);
                         }
                     }
                 }
@@ -848,6 +833,12 @@ fn string_from_value(value: &Value) -> Option<String> {
             {
                 return Some(s.clone());
             }
+            if let Some(Value::Object(record_id)) = map.get("RecordId")
+                && let (Some(Value::String(table)), Some(Value::String(key))) =
+                    (record_id.get("table"), record_id.get("key"))
+            {
+                return Some(format!("{table}:{key}"));
+            }
             None
         }
         _ => None,
@@ -1002,6 +993,12 @@ mod tests {
     fn string_from_value_handles_nested_strand() {
         let value = json!({"Strand": {"String": "test"}});
         assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_record_id() {
+        let value = json!({"RecordId": {"table": "entity", "key": "alice"}});
+        assert_eq!(string_from_value(&value), Some("entity:alice".to_string()));
     }
 
     #[test]
@@ -1161,17 +1158,6 @@ mod tests {
                 _scope: &str,
                 _cutoff: &str,
                 _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _embedding: &[f32],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1404,17 +1390,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _embedding: &[f32],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1434,9 +1409,9 @@ mod tests {
 
                 Ok(match node_id {
                     "entity:openai" => {
-                        vec![json!({"from_id": "entity:bob", "to_id": "entity:openai"})]
+                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
                     }
-                    "entity:bob" => vec![json!({"from_id": "entity:alice", "to_id": "entity:bob"})],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
                     _ => vec![],
                 })
             }
@@ -1574,17 +1549,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _embedding: &[f32],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1604,9 +1568,9 @@ mod tests {
 
                 Ok(match node_id {
                     "entity:openai" => {
-                        vec![json!({"from_id": "entity:bob", "to_id": "entity:openai"})]
+                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
                     }
-                    "entity:bob" => vec![json!({"from_id": "entity:alice", "to_id": "entity:bob"})],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
                     _ => vec![],
                 })
             }

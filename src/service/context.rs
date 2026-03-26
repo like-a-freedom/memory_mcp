@@ -7,6 +7,8 @@ use super::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
 
+const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
+
 /// Assemble context for a query.
 pub async fn assemble_context(
     service: &crate::service::MemoryService,
@@ -90,33 +92,14 @@ pub async fn assemble_context(
     )
     .await?;
 
-    let mut active = filter_facts_by_policy(fact_records, &access);
-    sort_facts_by_recency(&mut active);
-
-    let mut rationale_by_fact_id = std::collections::HashMap::new();
+    let direct_facts = filter_facts_by_policy(fact_records, &access);
+    let mut community_facts = Vec::new();
     if let Some(query) = query_opt {
-        let direct_fact_ids: std::collections::HashSet<_> =
-            active.iter().map(|fact| fact.fact_id.clone()).collect();
-        let semantic_facts = collect_semantic_facts(
-            service,
-            CollectSemanticFactsRequest {
-                namespace: &namespace,
-                scope: &request.scope,
-                cutoff_iso: &cutoff_iso,
-                query,
-                access: &access,
-                direct_fact_ids: &direct_fact_ids,
-                budget: request.budget,
-            },
-        )
-        .await?;
-
-        for (fact, rationale) in semantic_facts {
-            rationale_by_fact_id.insert(fact.fact_id.clone(), rationale);
-            active.push(fact);
-        }
-
-        let community_facts = collect_community_facts(
+        let direct_fact_ids: std::collections::HashSet<_> = direct_facts
+            .iter()
+            .map(|fact| fact.fact_id.clone())
+            .collect();
+        community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
                 namespace: &namespace,
@@ -129,45 +112,30 @@ pub async fn assemble_context(
             },
         )
         .await?;
-
-        for (fact, rationale) in community_facts {
-            rationale_by_fact_id.insert(fact.fact_id.clone(), rationale);
-            active.push(fact);
-        }
-
-        sort_facts_by_recency(&mut active);
-        let mut deduped = Vec::with_capacity(active.len());
-        let mut seen = std::collections::HashSet::new();
-        for fact in active {
-            if seen.insert(fact.fact_id.clone()) {
-                deduped.push(fact);
-            }
-        }
-        active = deduped;
     }
 
-    let results: Vec<AssembledContextItem> = active
+    let mut ranked_facts = build_ranked_context_facts(
+        direct_facts,
+        community_facts,
+        query_opt,
+        &request.scope,
+        cutoff,
+    );
+    sort_ranked_context_facts(&mut ranked_facts);
+
+    let results: Vec<AssembledContextItem> = ranked_facts
         .into_iter()
         .take(request.budget.max(1) as usize)
-        .map(|fact| {
-            let confidence = super::decayed_confidence(&fact, cutoff);
-            let rationale = rationale_by_fact_id
-                .remove(&fact.fact_id)
-                .unwrap_or_else(|| {
-                    format!(
-                        "matched scope={} and active at {}",
-                        request.scope,
-                        cutoff.date_naive()
-                    )
-                });
+        .map(|ranked| {
+            let confidence = super::decayed_confidence(&ranked.fact, cutoff);
             AssembledContextItem {
-                fact_id: fact.fact_id,
-                content: fact.content,
-                quote: fact.quote,
-                source_episode: fact.source_episode,
+                fact_id: ranked.fact.fact_id,
+                content: ranked.fact.content,
+                quote: ranked.fact.quote,
+                source_episode: ranked.fact.source_episode,
                 confidence,
-                provenance: fact.provenance,
-                rationale,
+                provenance: ranked.fact.provenance,
+                rationale: ranked.rationale,
             }
         })
         .collect();
@@ -234,6 +202,98 @@ fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     });
 }
 
+#[derive(Debug)]
+struct RankedContextFact {
+    fact: crate::models::Fact,
+    rationale: String,
+    fusion_score: f64,
+    source_priority: u8,
+}
+
+fn build_ranked_context_facts(
+    direct_facts: Vec<crate::models::Fact>,
+    community_facts: Vec<(crate::models::Fact, String)>,
+    query_opt: Option<&str>,
+    scope: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> Vec<RankedContextFact> {
+    let mut ranked_by_fact_id = std::collections::HashMap::<String, RankedContextFact>::new();
+
+    for (rank, fact) in direct_facts.into_iter().enumerate() {
+        let fact_id = fact.fact_id.clone();
+        ranked_by_fact_id
+            .entry(fact_id)
+            .and_modify(|candidate| {
+                candidate.fusion_score += reciprocal_rank(rank);
+                candidate.source_priority = 0;
+            })
+            .or_insert_with(|| RankedContextFact {
+                rationale: default_direct_rationale(query_opt, scope, cutoff),
+                fact,
+                fusion_score: reciprocal_rank(rank),
+                source_priority: 0,
+            });
+    }
+
+    for (rank, (fact, rationale)) in community_facts.into_iter().enumerate() {
+        let fact_id = fact.fact_id.clone();
+        if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
+            candidate.fusion_score += reciprocal_rank(rank);
+            continue;
+        }
+
+        ranked_by_fact_id.insert(
+            fact_id,
+            RankedContextFact {
+                fact,
+                rationale,
+                fusion_score: reciprocal_rank(rank),
+                source_priority: 1,
+            },
+        );
+    }
+
+    ranked_by_fact_id.into_values().collect()
+}
+
+fn reciprocal_rank(rank: usize) -> f64 {
+    1.0 / (RECIPROCAL_RANK_FUSION_K + rank as f64 + 1.0)
+}
+
+fn default_direct_rationale(
+    query_opt: Option<&str>,
+    scope: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> String {
+    query_opt.map_or_else(
+        || {
+            format!(
+                "matched scope={} and active at {}",
+                scope,
+                cutoff.date_naive()
+            )
+        },
+        |query| {
+            format!(
+                "matched lexical query=\"{}\" in scope={} and active at {}",
+                query,
+                scope,
+                cutoff.date_naive()
+            )
+        },
+    )
+}
+
+fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
+    facts.sort_by(|a, b| {
+        b.fusion_score
+            .total_cmp(&a.fusion_score)
+            .then_with(|| a.source_priority.cmp(&b.source_priority))
+            .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
+            .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+    });
+}
+
 async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
     namespace: &str,
@@ -287,57 +347,6 @@ struct CollectCommunityFactsRequest<'a> {
     budget: i32,
 }
 
-struct CollectSemanticFactsRequest<'a> {
-    namespace: &'a str,
-    scope: &'a str,
-    cutoff_iso: &'a str,
-    query: &'a str,
-    access: &'a AccessContext,
-    direct_fact_ids: &'a std::collections::HashSet<String>,
-    budget: i32,
-}
-
-async fn collect_semantic_facts(
-    service: &crate::service::MemoryService,
-    request: CollectSemanticFactsRequest<'_>,
-) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
-    let Some(embedding) = service.embedder.embed_text(request.query).await? else {
-        return Ok(Vec::new());
-    };
-
-    let semantic_records = service
-        .db_client
-        .select_facts_by_embedding(
-            request.namespace,
-            request.scope,
-            request.cutoff_iso,
-            &embedding,
-            request.budget.max(1),
-        )
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-
-    let mut facts = filter_facts_by_policy(semantic_records, request.access)
-        .into_iter()
-        .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
-        .collect::<Vec<_>>();
-    sort_facts_by_recency(&mut facts);
-
-    Ok(facts
-        .into_iter()
-        .take(request.budget.max(1) as usize)
-        .map(|fact| {
-            (
-                fact,
-                format!(
-                    "matched semantic embedding for query=\"{}\"",
-                    request.query
-                ),
-            )
-        })
-        .collect())
-}
-
 async fn collect_community_facts(
     service: &crate::service::MemoryService,
     request: CollectCommunityFactsRequest<'_>,
@@ -370,12 +379,16 @@ async fn collect_community_facts(
     let community_summary_by_member = matched_communities
         .iter()
         .flat_map(|community| {
-            community.member_entities.iter().cloned().map(move |entity_id| {
-                (
-                    entity_id,
-                    (community.community_id.clone(), community.summary.clone()),
-                )
-            })
+            community
+                .member_entities
+                .iter()
+                .cloned()
+                .map(move |entity_id| {
+                    (
+                        entity_id,
+                        (community.community_id.clone(), community.summary.clone()),
+                    )
+                })
         })
         .collect::<std::collections::HashMap<_, _>>();
 
@@ -407,10 +420,7 @@ async fn collect_community_facts(
                         )
                     },
                 );
-            (
-                fact,
-                rationale,
-            )
+            (fact, rationale)
         })
         .collect())
 }
@@ -527,7 +537,6 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
-            embedding: None,
         }
     }
 
@@ -773,7 +782,9 @@ mod tests {
                 if query_contains.is_some() {
                     Ok(vec![])
                 } else {
-                    panic!("community fact expansion should not use unfiltered select_facts_filtered fallback")
+                    panic!(
+                        "community fact expansion should not use unfiltered select_facts_filtered fallback"
+                    )
                 }
             }
 
@@ -814,19 +825,8 @@ mod tests {
                         "entity_links": ["entity:mallory"],
                         "policy_tags": [],
                         "provenance": {"source_episode": "episode:2"}
-                    })
+                    }),
                 ])
-            }
-
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _embedding: &[f32],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn select_edges_filtered(
@@ -947,23 +947,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn assemble_context_uses_semantic_embedding_lookup_when_available() {
-        struct SemanticDbClient {
-            semantic_lookup_calls: AtomicUsize,
-        }
-
-        struct FixedEmbedder;
+    async fn assemble_context_without_lexical_or_graph_matches_returns_empty() {
+        struct EmptyDbClient;
 
         #[async_trait::async_trait]
-        impl crate::service::EmbeddingProvider for FixedEmbedder {
-            async fn embed_text(&self, text: &str) -> Result<Option<Vec<f32>>, MemoryError> {
-                assert_eq!(text, "alice platform");
-                Ok(Some(vec![0.1, 0.2, 0.3, 0.4]))
-            }
-        }
-
-        #[async_trait::async_trait]
-        impl DbClient for SemanticDbClient {
+        impl DbClient for EmptyDbClient {
             async fn select_one(
                 &self,
                 _record_id: &str,
@@ -1000,32 +988,6 @@ mod tests {
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_facts_by_embedding(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                embedding: &[f32],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                self.semantic_lookup_calls.fetch_add(1, Ordering::SeqCst);
-                assert_eq!(embedding, &[0.1, 0.2, 0.3, 0.4]);
-
-                Ok(vec![json!({
-                    "fact_id": "fact:semantic",
-                    "fact_type": "note",
-                    "content": "Alice owns the platform roadmap",
-                    "quote": "Alice owns the platform roadmap",
-                    "source_episode": "episode:semantic",
-                    "t_valid": "2026-01-15T10:30:00Z",
-                    "t_ingested": "2026-01-15T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": ["entity:alice"],
-                    "policy_tags": [],
-                    "provenance": {"source_episode": "episode:semantic"}
-                })])
             }
 
             async fn select_edges_filtered(
@@ -1105,10 +1067,8 @@ mod tests {
             }
         }
 
-        let db_client = Arc::new(SemanticDbClient {
-            semantic_lookup_calls: AtomicUsize::new(0),
-        });
-        let mut service = crate::service::MemoryService::new(
+        let db_client = Arc::new(EmptyDbClient);
+        let service = crate::service::MemoryService::new(
             db_client.clone(),
             vec!["org".to_string()],
             "warn".to_string(),
@@ -1116,7 +1076,6 @@ mod tests {
             100,
         )
         .expect("service");
-        service.embedder = Arc::new(FixedEmbedder);
 
         let results = assemble_context(
             &service,
@@ -1131,9 +1090,195 @@ mod tests {
         .await
         .expect("assemble context");
 
-        assert_eq!(db_client.semantic_lookup_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].fact_id, "fact:semantic");
-        assert!(results[0].rationale.contains("semantic embedding"));
+        assert!(
+            results.is_empty(),
+            "without lexical or graph matches, assemble_context should return no results"
+        );
+    }
+
+    #[tokio::test]
+    async fn assemble_context_prefers_direct_lexical_matches_over_newer_community_expansion() {
+        struct FusionDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for FusionDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query_contains, Some("atlas launch"));
+                Ok(vec![json!({
+                    "fact_id": "fact:direct",
+                    "fact_type": "note",
+                    "content": "Atlas launch checklist is blocked on DNS cutover.",
+                    "quote": "Atlas launch checklist is blocked on DNS cutover.",
+                    "source_episode": "episode:direct",
+                    "t_valid": "2026-01-10T10:30:00Z",
+                    "t_ingested": "2026-01-10T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": ["entity:atlas"],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:direct"},
+                    "ft_score": 100.0
+                })])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(entity_links, &["entity:atlas".to_string()]);
+                Ok(vec![json!({
+                    "fact_id": "fact:community",
+                    "fact_type": "note",
+                    "content": "Atlas team sync moved to Friday.",
+                    "quote": "Atlas team sync moved to Friday.",
+                    "source_episode": "episode:community",
+                    "t_valid": "2026-01-15T10:30:00Z",
+                    "t_ingested": "2026-01-15T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": ["entity:atlas"],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:community"}
+                })])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query, "atlas launch");
+                Ok(vec![json!({
+                    "community_id": "community:atlas",
+                    "summary": "Atlas launch workstream",
+                    "member_entities": ["entity:atlas"]
+                })])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(FusionDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "atlas launch".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, "fact:direct");
+        assert!(
+            results[0].rationale.contains("lexical"),
+            "direct lexical result should explain itself as a lexical match, got: {}",
+            results[0].rationale
+        );
+        assert_eq!(results[1].fact_id, "fact:community");
+        assert!(results[1].rationale.contains("community:atlas"));
     }
 }

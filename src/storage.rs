@@ -62,16 +62,6 @@ pub trait DbClient: Send + Sync {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects semantically similar facts using the embedding index when embeddings are available.
-    async fn select_facts_by_embedding(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        embedding: &[f32],
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
-
     /// Selects edges with DB-side filtering for bi-temporal visibility.
     ///
     /// This remains part of the production API because community maintenance
@@ -146,7 +136,6 @@ pub trait DbClient: Send + Sync {
 /// Unified database client that works with both embedded and remote SurrealDB.
 pub struct SurrealDbClient {
     engine: DbEngine,
-    embedding_dimension: usize,
     logger: StdoutLogger,
 }
 
@@ -166,32 +155,19 @@ impl SurrealDbClient {
         default_namespace: &str,
         log_level: &str,
     ) -> Result<Self, MemoryError> {
-        Self::connect_in_memory_with_dimension(database, default_namespace, log_level, 4).await
-    }
-
-    /// Connects to an embedded in-memory SurrealDB instance with an explicit
-    /// embedding dimension for HNSW index creation.
-    pub async fn connect_in_memory_with_dimension(
-        database: &str,
-        default_namespace: &str,
-        log_level: &str,
-        embedding_dimension: usize,
-    ) -> Result<Self, MemoryError> {
-        Self::connect_in_memory_with_namespaces_and_dimension(
+        Self::connect_in_memory_with_namespaces(
             database,
             &[default_namespace.to_string()],
             log_level,
-            embedding_dimension,
         )
         .await
     }
 
     /// Connects to an embedded in-memory SurrealDB instance for multiple namespaces.
-    pub async fn connect_in_memory_with_namespaces_and_dimension(
+    pub async fn connect_in_memory_with_namespaces(
         database: &str,
         namespaces: &[String],
         log_level: &str,
-        embedding_dimension: usize,
     ) -> Result<Self, MemoryError> {
         let db = Surreal::new::<Mem>(())
             .await
@@ -200,7 +176,6 @@ impl SurrealDbClient {
 
         Ok(Self {
             engine: DbEngine::Local(clients),
-            embedding_dimension,
             logger: StdoutLogger::new(log_level),
         })
     }
@@ -218,7 +193,6 @@ impl SurrealDbClient {
 
         Ok(Self {
             engine,
-            embedding_dimension: config.embedding_dimension,
             logger: StdoutLogger::new(&config.log_level),
         })
     }
@@ -347,10 +321,7 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        let initial_schema = render_initial_schema_sql(
-            include_str!("migrations/__Initial.surql"),
-            self.embedding_dimension,
-        );
+        let initial_schema = render_initial_schema_sql(include_str!("migrations/__Initial.surql"));
 
         self.execute_raw_query(&initial_schema, None, namespace)
             .await?;
@@ -507,8 +478,8 @@ async fn build_remote_namespace_clients(
     Ok(clients)
 }
 
-fn render_initial_schema_sql(template: &str, embedding_dimension: usize) -> String {
-    template.replace("{{EMBEDDING_DIMENSION}}", &embedding_dimension.to_string())
+fn render_initial_schema_sql(template: &str) -> String {
+    template.to_string()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -538,6 +509,10 @@ fn versioned_migrations() -> &'static [MigrationScript] {
         MigrationScript {
             file_name: "005_community_summary_search.surql",
             sql: include_str!("migrations/005_community_summary_search.surql"),
+        },
+        MigrationScript {
+            file_name: "006_simplified_search_redesign.surql",
+            sql: include_str!("migrations/006_simplified_search_redesign.surql"),
         },
     ]
 }
@@ -800,51 +775,6 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_facts_by_embedding(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        embedding: &[f32],
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_facts_by_embedding",
-            vec![
-                ("scope", Value::String(scope.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-                (
-                    "embedding_dimension",
-                    Value::Number(serde_json::Number::from(embedding.len())),
-                ),
-            ],
-        );
-
-        let (sql, vars) = build_select_facts_by_embedding_query(scope, cutoff, embedding, limit);
-
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_facts_by_embedding.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
     async fn select_edges_filtered(
         &self,
         namespace: &str,
@@ -859,7 +789,7 @@ impl DbClient for SurrealDbClient {
         );
 
         let sql = String::from(
-            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY from_id ASC, to_id ASC, t_valid DESC",
+            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC",
         );
 
         let vars = serde_json::json!({ "cutoff": cutoff });
@@ -1253,10 +1183,12 @@ fn build_select_facts_filtered_query(
         vars.insert("query".to_string(), json!(query));
 
         format!(
-            "SELECT * FROM fact WHERE {base_where} AND content @@ $query ORDER BY t_valid DESC LIMIT $limit"
+            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND content @1@ $query ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
-        format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit")
+        format!(
+            "SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit"
+        )
     };
 
     (sql, Value::Object(vars))
@@ -1275,26 +1207,6 @@ fn build_select_facts_by_entity_links_query(
             "cutoff": cutoff,
             "entity_links": entity_links,
             "limit": limit,
-        }),
-    )
-}
-
-fn build_select_facts_by_embedding_query(
-    scope: &str,
-    cutoff: &str,
-    embedding: &[f32],
-    limit: i32,
-) -> (String, Value) {
-    let knn_limit = limit.max(1);
-    (
-        format!(
-            "SELECT *, vector::distance::cosine(embedding, $embedding) AS semantic_distance FROM fact WHERE embedding <|{knn_limit},150|> $embedding AND scope = $scope AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY semantic_distance ASC, t_valid DESC LIMIT $limit"
-        ),
-        json!({
-            "scope": scope,
-            "cutoff": cutoff,
-            "embedding": embedding,
-            "limit": knn_limit,
         }),
     )
 }
@@ -1320,13 +1232,13 @@ fn build_select_edge_neighbors_query(
     direction: GraphDirection,
 ) -> (String, Value) {
     let node_field = match direction {
-        GraphDirection::Incoming => "to_id",
-        GraphDirection::Outgoing => "from_id",
+        GraphDirection::Incoming => "out",
+        GraphDirection::Outgoing => "in",
     };
 
     (
         format!(
-            "SELECT * FROM edge WHERE {node_field} = $node_id AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY from_id ASC, to_id ASC, t_valid DESC"
+            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC"
         ),
         json!({"node_id": node_id, "cutoff": cutoff}),
     )
@@ -1345,24 +1257,24 @@ fn build_relate_edge_query(
         let mut all_assignments = vec!["id = $edge".to_string()];
         all_assignments.extend(assignments);
         vars.insert("edge_id".to_string(), json!(edge_id));
-        vars.insert("from_id".to_string(), json!(from_id));
-        vars.insert("to_id".to_string(), json!(to_id));
+        vars.insert("in_id".to_string(), json!(from_id));
+        vars.insert("out_id".to_string(), json!(to_id));
 
         (
             format!(
-                "LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET {} RETURN *",
+                "LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET {} RETURN *",
                 all_assignments.join(", ")
             ),
             Value::Object(vars),
         )
     } else {
         (
-            "LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET id = $edge, content = $content RETURN *"
+            "LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET id = $edge, content = $content RETURN *"
                 .to_string(),
             json!({
                 "edge_id": edge_id,
-                "from_id": from_id,
-                "to_id": to_id,
+                "in_id": from_id,
+                "out_id": to_id,
                 "content": normalized,
             }),
         )
@@ -1670,21 +1582,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connect_in_memory_with_dimension_uses_requested_embedding_dimension() {
-        let client =
-            SurrealDbClient::connect_in_memory_with_dimension("testdb", "testns", "warn", 768)
-                .await
-                .expect("connect in memory");
+    async fn connect_in_memory_with_namespaces_initializes_requested_namespaces() {
+        let client = SurrealDbClient::connect_in_memory_with_namespaces(
+            "testdb",
+            &["testns".to_string(), "alt".to_string()],
+            "warn",
+        )
+        .await
+        .expect("connect in memory");
 
-        assert_eq!(client.embedding_dimension, 768);
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations in default namespace");
+        client
+            .apply_migrations("alt")
+            .await
+            .expect("apply migrations in secondary namespace");
+
+        let primary = client
+            .select_table("event_log", "testns")
+            .await
+            .expect("select default namespace table");
+        let secondary = client
+            .select_table("event_log", "alt")
+            .await
+            .expect("select secondary namespace table");
+
+        assert!(primary.is_empty());
+        assert!(secondary.is_empty());
     }
 
     #[tokio::test]
-    async fn connect_in_memory_with_dimension_applies_hnsw_indexes_with_requested_dimension() {
-        let client =
-            SurrealDbClient::connect_in_memory_with_dimension("testdb", "testns", "warn", 768)
-                .await
-                .expect("connect in memory");
+    async fn connect_in_memory_applies_memory_fts_indexes() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
 
         client
             .apply_migrations("testns")
@@ -1697,8 +1630,8 @@ mod tests {
             .expect("info for table fact");
         let info_json = surreal_to_json(info);
 
-        assert!(json_contains_text(&info_json, "fact_embedding_hnsw"));
-        assert!(json_contains_text(&info_json, "DIMENSION 768"));
+        assert!(json_contains_text(&info_json, "fact_content_search"));
+        assert!(json_contains_text(&info_json, "memory_fts"));
     }
 
     #[test]
@@ -1966,6 +1899,19 @@ mod tests {
     }
 
     #[test]
+    fn versioned_migrations_include_simplified_search_redesign() {
+        let file_names = versioned_migrations()
+            .iter()
+            .map(|migration| migration.file_name)
+            .collect::<Vec<_>>();
+
+        assert!(
+            file_names.contains(&"006_simplified_search_redesign.surql"),
+            "startup migration registry should include the breaking search redesign migration"
+        );
+    }
+
+    #[test]
     fn extract_first_record_from_nested_object() {
         let nested = json!({
             "Object": {
@@ -2081,9 +2027,10 @@ mod tests {
             "expected temporal predicate, got: {sql}"
         );
         assert!(
-            sql.contains("content @@ $query"),
+            sql.contains("content @1@ $query"),
             "expected fulltext operator for text search, got: {sql}"
         );
+        assert!(sql.contains("search::score(1) AS ft_score"));
         assert_eq!(vars["scope"], json!("org"));
         assert_eq!(vars["cutoff"], json!("2026-01-15T00:00:00Z"));
         assert_eq!(vars["query"], json!("ARR growth"));
@@ -2095,25 +2042,11 @@ mod tests {
         let (sql, _vars) =
             build_select_facts_filtered_query("org", "2026-01-15T00:00:00Z", Some("ARR growth"), 5);
 
-        assert!(sql.contains("content @@ $query"));
+        assert!(sql.contains("content @1@ $query"));
         assert!(
             !sql.contains("CONTAINS"),
             "unexpected substring fallback in query: {sql}"
         );
-    }
-
-    #[test]
-    fn build_select_facts_by_embedding_query_uses_knn_cosine_search() {
-        let embedding = vec![0.1_f32, 0.2, 0.3, 0.4];
-        let (sql, vars) =
-            build_select_facts_by_embedding_query("org", "2026-01-15T00:00:00Z", &embedding, 5);
-
-        assert!(sql.contains("embedding <|5,150|> $embedding"));
-        assert!(sql.contains("vector::distance::cosine(embedding, $embedding)"));
-        assert_eq!(vars["scope"], json!("org"));
-        assert_eq!(vars["cutoff"], json!("2026-01-15T00:00:00Z"));
-        assert_eq!(vars["embedding"], json!(embedding));
-        assert_eq!(vars["limit"], json!(5));
     }
 
     #[test]
@@ -2135,8 +2068,9 @@ mod tests {
             GraphDirection::Incoming,
         );
 
-        assert!(sql.contains("to_id = $node_id"));
+        assert!(sql.contains("out = <record> $node_id"));
         assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
+        assert!(sql.contains("ORDER BY in ASC, out ASC, t_valid DESC"));
         assert_eq!(
             vars,
             json!({"node_id": "entity:openai", "cutoff": "2026-01-15T00:00:00Z"})
@@ -2151,9 +2085,7 @@ mod tests {
             "entity:bob",
             json!({
                 "edge_id": "edge:abc123",
-                "from_id": "entity:alice",
                 "relation": "knows",
-                "to_id": "entity:bob",
                 "strength": 1.0,
                 "confidence": 0.8,
                 "provenance": {"source": "manual"},
@@ -2162,12 +2094,27 @@ mod tests {
             }),
         );
 
-        assert!(sql.starts_with("LET $from = <record> $from_id; LET $to = <record> $to_id; LET $edge = <record> $edge_id; RELATE $from -> edge -> $to SET"));
+        assert!(sql.starts_with("LET $in = <record> $in_id; LET $out = <record> $out_id; LET $edge = <record> $edge_id; RELATE $in -> edge -> $out SET"));
         assert!(sql.contains("id = $edge"));
+        assert!(sql.contains("edge_id = $edge_id"));
         assert_eq!(vars.get("edge_id"), Some(&json!("edge:abc123")));
-        assert_eq!(vars.get("from_id"), Some(&json!("entity:alice")));
-        assert_eq!(vars.get("to_id"), Some(&json!("entity:bob")));
+        assert_eq!(vars.get("in_id"), Some(&json!("entity:alice")));
+        assert_eq!(vars.get("out_id"), Some(&json!("entity:bob")));
         assert_eq!(vars.get("relation"), Some(&json!("knows")));
+    }
+
+    #[test]
+    fn build_select_facts_filtered_query_orders_by_fulltext_score_first() {
+        let (sql, vars) = build_select_facts_filtered_query(
+            "org",
+            "2026-01-15T00:00:00Z",
+            Some("atlas launch"),
+            5,
+        );
+
+        assert!(sql.contains("search::score("));
+        assert!(sql.contains("ORDER BY ft_score DESC, t_valid DESC, fact_id ASC"));
+        assert_eq!(vars.get("query"), Some(&json!("atlas launch")));
     }
 
     #[test]
@@ -2194,14 +2141,15 @@ mod tests {
     }
 
     #[test]
-    fn render_initial_schema_sql_replaces_embedding_dimension_placeholder() {
+    fn render_initial_schema_sql_returns_template_without_placeholder_substitution() {
         let rendered = render_initial_schema_sql(
-            "DEFINE INDEX fact_embedding_hnsw ON fact FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST COSINE TYPE F32 EFC 150 M 8;",
-            768,
+            "DEFINE ANALYZER memory_fts TOKENIZERS class FILTERS lowercase, ascii, snowball(english);",
         );
 
-        assert!(rendered.contains("HNSW DIMENSION 768 DIST COSINE"));
-        assert!(!rendered.contains("{{EMBEDDING_DIMENSION}}"));
+        assert_eq!(
+            rendered,
+            "DEFINE ANALYZER memory_fts TOKENIZERS class FILTERS lowercase, ascii, snowball(english);"
+        );
     }
 
     #[test]
