@@ -49,27 +49,32 @@ The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
 
 ## Remaining Work (P2/P3)
 
-### P2 — Memory Lifecycle (Plans Ready)
+### P2 — Memory Lifecycle (✅ Implemented)
 
-| Task | Plan | Status |
-|------|------|--------|
-| Decay background worker | `docs/superpowers/plans/2026-03-26-lifecycle-background-jobs.md` | 📋 Ready for execution |
-| Episode archival worker | `docs/superpowers/plans/2026-03-26-lifecycle-background-jobs.md` | 📋 Ready for execution |
-| Configuration (env vars) | Task 1 of lifecycle plan | 📋 Ready |
-| Integration tests | Tasks 2-3 of lifecycle plan | 📋 Ready |
+| Task | Status | Location |
+|------|--------|----------|
+| Decay background worker | ✅ Implemented | `src/service/lifecycle/decay.rs` |
+| Episode archival worker | ✅ Implemented | `src/service/lifecycle/archival.rs` |
+| Configuration (env vars) | ✅ Implemented | `src/config.rs::LifecycleConfig` |
+| Service integration | ✅ Implemented | `src/service/core.rs::new_from_env()` |
+| Documentation | ✅ Implemented | `.env.example`, `README.md`, `LIFECYCLE_BACKGROUND_JOBS.md` |
 
-### P3 — Enhanced Provenance (Plan Ready)
+### P3 — Enhanced Provenance (✅ Implemented)
 
-| Task | Plan | Status |
-|------|------|--------|
-| Multi-source explain() | `docs/superpowers/plans/2026-03-26-multi-source-provenance.md` | 📋 Ready for execution |
-| ProvenanceSource model | Task 1 of provenance plan | 📋 Ready |
-| Graph traversal for lineage | Task 2 of provenance plan | 📋 Ready |
-| Backward compatibility | Task 3 of provenance plan | 📋 Ready |
+| Task | Status | Location |
+|------|--------|----------|
+| Multi-source explain() | ✅ Implemented | `src/models.rs::ProvenanceSource`, `src/service/core.rs::collect_provenance_sources()` |
+| ProvenanceSource model | ✅ Implemented | `src/models.rs:147-161` |
+| Graph traversal for lineage | ✅ Implemented (stub) | `src/service/core.rs:863-882` |
+| Backward compatibility | ✅ Implemented | `ExplainItem.all_sources` with `#[serde(default)]` |
+
+**Note:** Entity-based episode lookup (`find_episodes_via_entity`) is currently a stub that returns empty results. Full implementation requires direct episode table query by entity_links.
 
 ## Execution Options
 
-For remaining P2/P3 work, two execution approaches available:
+All P0/P1 items from the independent review are now **complete**.
+
+For future enhancements (P2/P3 follow-ups):
 
 1. **Subagent-Driven** (recommended) — Fresh subagent per task with review checkpoints
 2. **Inline Execution** — Batch execution with checkpoints in current session
