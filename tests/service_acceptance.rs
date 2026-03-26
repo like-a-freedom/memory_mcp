@@ -129,6 +129,7 @@ async fn test_invalidate_and_explain() {
                     t_ingested: None,
                     provenance: serde_json::Value::Null,
                     citation_context: None,
+                    all_sources: vec![],
                 }],
             },
             None,
