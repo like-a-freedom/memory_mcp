@@ -44,6 +44,7 @@ async fn explain_returns_direct_provenance_source() {
     // Act: Call explain
     let request = ExplainRequest {
         context_pack: vec![ExplainItem {
+            fact_id: None,
             content: "Alice will deliver the report".to_string(),
             quote: episode_content.to_string(),
             source_episode: episode_id.to_string(),
@@ -108,6 +109,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
     // Act: Call explain with minimal request (backward compatible)
     let request = ExplainRequest {
         context_pack: vec![ExplainItem {
+            fact_id: None,
             content: String::new(),
             quote: String::new(),
             source_episode: episode_id.to_string(),
@@ -162,6 +164,7 @@ async fn explain_populates_all_sources_field() {
     // Act
     let request = ExplainRequest {
         context_pack: vec![ExplainItem {
+            fact_id: None,
             content: "Task completed".to_string(),
             quote: "Task completed".to_string(),
             source_episode: episode_id.to_string(),

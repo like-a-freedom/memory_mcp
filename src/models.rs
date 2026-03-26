@@ -121,6 +121,8 @@ pub struct ExplainRequest {
 /// A single item to explain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExplainItem {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fact_id: Option<String>,
     pub content: String,
     pub quote: String,
     pub source_episode: String,
@@ -142,6 +144,7 @@ pub struct ExplainItem {
 impl Default for ExplainItem {
     fn default() -> Self {
         Self {
+            fact_id: None,
             content: String::new(),
             quote: String::new(),
             source_episode: String::new(),

@@ -49,3 +49,4 @@ cobertura.xml
 flamegraph.svg
 perf.data
 perf.data.old
+lcov.info

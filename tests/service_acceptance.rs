@@ -121,6 +121,7 @@ async fn test_invalidate_and_explain() {
         .explain(
             memory_mcp::models::ExplainRequest {
                 context_pack: vec![memory_mcp::models::ExplainItem {
+                    fact_id: None,
                     content: "ARR is $1M".to_string(),
                     quote: "ARR is $1M".to_string(),
                     source_episode: episode_id.clone(),

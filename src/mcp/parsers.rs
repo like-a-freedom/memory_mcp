@@ -1,7 +1,7 @@
 //! Utility functions for parsing and validation.
 
 use chrono::{DateTime, Utc};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::Digest;
 
 use crate::models::ExplainItem;
@@ -47,6 +47,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 ..Default::default()
             },
             Value::Object(ref map) => {
+                let fact_id = map.get("fact_id").and_then(Value::as_str).map(String::from);
                 let content = map
                     .get("content")
                     .and_then(Value::as_str)
@@ -64,6 +65,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     .unwrap_or("")
                     .to_string();
                 ExplainItem {
+                    fact_id,
                     content,
                     quote,
                     source_episode,

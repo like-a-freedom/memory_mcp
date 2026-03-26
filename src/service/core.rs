@@ -785,10 +785,31 @@ impl MemoryService {
             return Ok(item);
         };
 
+        // Look up entity_links from the fact record if fact_id is available
+        let entity_links = if let Some(ref fact_id) = item.fact_id {
+            let (fact_record, _) = self.find_fact_record(fact_id).await?;
+            fact_record
+                .and_then(|r| {
+                    r.get("entity_links")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect::<Vec<_>>()
+                        })
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
         // Collect all provenance sources including linked episodes
-        let all_sources = self.collect_provenance_sources(&item, &episode).await?;
+        let all_sources = self
+            .collect_provenance_sources(&episode, &entity_links)
+            .await?;
 
         Ok(ExplainItem {
+            fact_id: item.fact_id,
             content: if item.content.is_empty() {
                 episode.content.clone()
             } else {
@@ -812,8 +833,8 @@ impl MemoryService {
     /// Collects all provenance sources for a fact including linked episodes.
     async fn collect_provenance_sources(
         &self,
-        item: &ExplainItem,
         primary_episode: &crate::models::Episode,
+        entity_links: &[String],
     ) -> Result<Vec<ProvenanceSource>, MemoryError> {
         let mut sources = Vec::new();
 
@@ -828,17 +849,7 @@ impl MemoryService {
 
         // 2. Traverse entity_links to find connected episodes
         let namespace = self.default_namespace.clone();
-        for entity_id in &item
-            .provenance
-            .get("entity_links")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default()
-        {
+        for entity_id in entity_links {
             let linked_episodes = self.find_episodes_via_entity(entity_id, &namespace).await?;
 
             for ep in linked_episodes {
