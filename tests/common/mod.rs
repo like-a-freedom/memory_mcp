@@ -4,21 +4,29 @@ use memory_mcp::service::MemoryService;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 pub async fn make_service() -> MemoryService {
-    let db_client = SurrealDbClient::connect_in_memory("memory_test", "org", "warn")
-        .await
-        .expect("connect in memory service");
-    db_client
-        .apply_migrations("org")
-        .await
-        .expect("apply in-memory migrations");
+    let namespaces = vec![
+        "org".to_string(),
+        "personal".to_string(),
+        "private".to_string(),
+    ];
+    let db_client = SurrealDbClient::connect_in_memory_with_namespaces_and_dimension(
+        "memory_test",
+        &namespaces,
+        "warn",
+        4,
+    )
+    .await
+    .expect("connect in memory service");
+    for namespace in &namespaces {
+        db_client
+            .apply_migrations(namespace)
+            .await
+            .expect("apply in-memory migrations");
+    }
 
     MemoryService::new(
         Arc::new(db_client),
-        vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ],
+        namespaces,
         "warn".to_string(),
         50,
         100,
@@ -28,23 +36,31 @@ pub async fn make_service() -> MemoryService {
 
 #[allow(dead_code)]
 pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>) {
+    let namespaces = vec![
+        "org".to_string(),
+        "personal".to_string(),
+        "private".to_string(),
+    ];
     let db_client = Arc::new(
-        SurrealDbClient::connect_in_memory("memory_test", "org", "warn")
+        SurrealDbClient::connect_in_memory_with_namespaces_and_dimension(
+            "memory_test",
+            &namespaces,
+            "warn",
+            4,
+        )
             .await
             .expect("connect in memory service"),
     );
-    db_client
-        .apply_migrations("org")
-        .await
-        .expect("apply in-memory migrations");
+    for namespace in &namespaces {
+        db_client
+            .apply_migrations(namespace)
+            .await
+            .expect("apply in-memory migrations");
+    }
 
     let service = MemoryService::new(
         db_client.clone(),
-        vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ],
+        namespaces,
         "warn".to_string(),
         50,
         100,

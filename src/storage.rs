@@ -15,7 +15,6 @@ use surrealdb::engine::local::RocksDb;
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 use surrealdb::types::Value as SurrealValue;
-use tokio::sync::Mutex;
 
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
@@ -50,6 +49,26 @@ pub trait DbClient: Send + Sync {
         scope: &str,
         cutoff: &str,
         query_contains: Option<&str>,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects facts that mention any of the supplied entity links using DB-side filtering.
+    async fn select_facts_by_entity_links(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        entity_links: &[String],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects semantically similar facts using the embedding index when embeddings are available.
+    async fn select_facts_by_embedding(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        embedding: &[f32],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
@@ -127,20 +146,14 @@ pub trait DbClient: Send + Sync {
 /// Unified database client that works with both embedded and remote SurrealDB.
 pub struct SurrealDbClient {
     engine: DbEngine,
-    database: String,
     embedding_dimension: usize,
     logger: StdoutLogger,
 }
 
 /// Internal enum representing the database engine type.
 enum DbEngine {
-    // We intentionally retain the outer mutex because this service rebases one
-    // shared Surreal client onto different namespaces/databases per operation.
-    // `use_ns` / `use_db` are called through `&self`, so removing this guard
-    // without introducing namespace-scoped clients would let concurrent calls
-    // race on shared session context.
-    Local(Mutex<Surreal<Db>>),
-    Remote(Mutex<Surreal<Client>>),
+    Local(std::collections::HashMap<String, Surreal<Db>>),
+    Remote(std::collections::HashMap<String, Surreal<Client>>),
 }
 
 impl SurrealDbClient {
@@ -164,18 +177,29 @@ impl SurrealDbClient {
         log_level: &str,
         embedding_dimension: usize,
     ) -> Result<Self, MemoryError> {
+        Self::connect_in_memory_with_namespaces_and_dimension(
+            database,
+            &[default_namespace.to_string()],
+            log_level,
+            embedding_dimension,
+        )
+        .await
+    }
+
+    /// Connects to an embedded in-memory SurrealDB instance for multiple namespaces.
+    pub async fn connect_in_memory_with_namespaces_and_dimension(
+        database: &str,
+        namespaces: &[String],
+        log_level: &str,
+        embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
         let db = Surreal::new::<Mem>(())
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB memory init failed: {err}")))?;
-
-        db.use_ns(default_namespace)
-            .use_db(database)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+        let clients = build_local_namespace_clients(&db, namespaces, database).await?;
 
         Ok(Self {
-            engine: DbEngine::Local(Mutex::new(db)),
-            database: database.to_string(),
+            engine: DbEngine::Local(clients),
             embedding_dimension,
             logger: StdoutLogger::new(log_level),
         })
@@ -194,7 +218,6 @@ impl SurrealDbClient {
 
         Ok(Self {
             engine,
-            database: config.db_name.clone(),
             embedding_dimension: config.embedding_dimension,
             logger: StdoutLogger::new(&config.log_level),
         })
@@ -203,7 +226,7 @@ impl SurrealDbClient {
     /// Connects to embedded RocksDB instance.
     async fn connect_embedded(
         config: &SurrealConfig,
-        default_namespace: &str,
+        _default_namespace: &str,
     ) -> Result<DbEngine, MemoryError> {
         use surrealdb::opt::{Config as SurrealOptConfig, capabilities::Capabilities};
 
@@ -229,18 +252,16 @@ impl SurrealDbClient {
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
 
-        db.use_ns(default_namespace)
-            .use_db(&config.db_name)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+        let clients =
+            build_local_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
 
-        Ok(DbEngine::Local(Mutex::new(db)))
+        Ok(DbEngine::Local(clients))
     }
 
     /// Connects to remote WebSocket instance.
     async fn connect_remote(
         config: &SurrealConfig,
-        default_namespace: &str,
+        _default_namespace: &str,
     ) -> Result<DbEngine, MemoryError> {
         let url = normalize_url(config.url.as_deref().unwrap_or(""));
         let db = Surreal::new::<Ws>(url.as_str())
@@ -254,26 +275,18 @@ impl SurrealDbClient {
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
 
-        db.use_ns(default_namespace)
-            .use_db(&config.db_name)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+        let clients =
+            build_remote_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
 
-        Ok(DbEngine::Remote(Mutex::new(db)))
+        Ok(DbEngine::Remote(clients))
     }
 
     /// Gets a database handle with namespace set.
     async fn with_namespace_local(&self, namespace: &str) -> Result<Surreal<Db>, MemoryError> {
         match &self.engine {
-            DbEngine::Local(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(&self.database)
-                    .await
-                    .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-                Ok(guard.clone())
-            }
+            DbEngine::Local(clients) => clients.get(namespace).cloned().ok_or_else(|| {
+                MemoryError::Storage(format!("SurrealDB namespace not initialized: {namespace}"))
+            }),
             DbEngine::Remote(_) => Err(MemoryError::Storage("expected local engine".into())),
         }
     }
@@ -281,15 +294,9 @@ impl SurrealDbClient {
     /// Gets a database handle with namespace set.
     async fn with_namespace_remote(&self, namespace: &str) -> Result<Surreal<Client>, MemoryError> {
         match &self.engine {
-            DbEngine::Remote(db) => {
-                let guard = db.lock().await;
-                guard
-                    .use_ns(namespace)
-                    .use_db(&self.database)
-                    .await
-                    .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-                Ok(guard.clone())
-            }
+            DbEngine::Remote(clients) => clients.get(namespace).cloned().ok_or_else(|| {
+                MemoryError::Storage(format!("SurrealDB namespace not initialized: {namespace}"))
+            }),
             DbEngine::Local(_) => Err(MemoryError::Storage("expected remote engine".into())),
         }
     }
@@ -458,6 +465,46 @@ impl SurrealDbClient {
         }
         Ok(())
     }
+}
+
+async fn build_local_namespace_clients(
+    base: &Surreal<Db>,
+    namespaces: &[String],
+    database: &str,
+) -> Result<std::collections::HashMap<String, Surreal<Db>>, MemoryError> {
+    let mut clients = std::collections::HashMap::with_capacity(namespaces.len());
+
+    for namespace in namespaces {
+        let client = base.clone();
+        client
+            .use_ns(namespace)
+            .use_db(database)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+        clients.insert(namespace.clone(), client);
+    }
+
+    Ok(clients)
+}
+
+async fn build_remote_namespace_clients(
+    base: &Surreal<Client>,
+    namespaces: &[String],
+    database: &str,
+) -> Result<std::collections::HashMap<String, Surreal<Client>>, MemoryError> {
+    let mut clients = std::collections::HashMap::with_capacity(namespaces.len());
+
+    for namespace in namespaces {
+        let client = base.clone();
+        client
+            .use_ns(namespace)
+            .use_db(database)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
+        clients.insert(namespace.clone(), client);
+    }
+
+    Ok(clients)
 }
 
 fn render_initial_schema_sql(template: &str, embedding_dimension: usize) -> String {
@@ -698,6 +745,97 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_facts_filtered.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_facts_by_entity_links(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        entity_links: &[String],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_facts_by_entity_links",
+            vec![
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+                (
+                    "entity_link_count",
+                    Value::Number(serde_json::Number::from(entity_links.len())),
+                ),
+            ],
+        );
+
+        let (sql, vars) =
+            build_select_facts_by_entity_links_query(scope, cutoff, entity_links, limit);
+
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_facts_by_entity_links.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_facts_by_embedding(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        embedding: &[f32],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_facts_by_embedding",
+            vec![
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("namespace", Value::String(namespace.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+                (
+                    "embedding_dimension",
+                    Value::Number(serde_json::Number::from(embedding.len())),
+                ),
+            ],
+        );
+
+        let (sql, vars) = build_select_facts_by_embedding_query(scope, cutoff, embedding, limit);
+
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_facts_by_embedding.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
@@ -1112,38 +1250,53 @@ fn build_select_facts_filtered_query(
     ]);
 
     let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
-        let words: Vec<String> = query
-            .split_whitespace()
-            .filter(|word| word.len() >= 2)
-            .map(|word| word.to_lowercase())
-            .collect();
-
         vars.insert("query".to_string(), json!(query));
 
-        let fallback = if words.is_empty() {
-            String::new()
-        } else {
-            let predicates = words
-                .iter()
-                .enumerate()
-                .map(|(index, word)| {
-                    let key = format!("word_{index}");
-                    vars.insert(key.clone(), json!(word));
-                    format!("string::lowercase(content) CONTAINS ${key}")
-                })
-                .collect::<Vec<_>>()
-                .join(" AND ");
-            format!(" OR ({predicates})")
-        };
-
         format!(
-            "SELECT * FROM fact WHERE {base_where} AND (content @@ $query{fallback}) ORDER BY t_valid DESC LIMIT $limit"
+            "SELECT * FROM fact WHERE {base_where} AND content @@ $query ORDER BY t_valid DESC LIMIT $limit"
         )
     } else {
         format!("SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC LIMIT $limit")
     };
 
     (sql, Value::Object(vars))
+}
+
+fn build_select_facts_by_entity_links_query(
+    scope: &str,
+    cutoff: &str,
+    entity_links: &[String],
+    limit: i32,
+) -> (String, Value) {
+    (
+        "SELECT * FROM fact WHERE scope = $scope AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit".to_string(),
+        json!({
+            "scope": scope,
+            "cutoff": cutoff,
+            "entity_links": entity_links,
+            "limit": limit,
+        }),
+    )
+}
+
+fn build_select_facts_by_embedding_query(
+    scope: &str,
+    cutoff: &str,
+    embedding: &[f32],
+    limit: i32,
+) -> (String, Value) {
+    let knn_limit = limit.max(1);
+    (
+        format!(
+            "SELECT *, vector::distance::cosine(embedding, $embedding) AS semantic_distance FROM fact WHERE embedding <|{knn_limit},150|> $embedding AND scope = $scope AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY semantic_distance ASC, t_valid DESC LIMIT $limit"
+        ),
+        json!({
+            "scope": scope,
+            "cutoff": cutoff,
+            "embedding": embedding,
+            "limit": knn_limit,
+        }),
+    )
 }
 
 fn build_select_entity_lookup_query(normalized_name: &str) -> (String, Value) {
@@ -1938,6 +2091,32 @@ mod tests {
     }
 
     #[test]
+    fn build_select_facts_filtered_query_with_text_query_does_not_add_substring_fallback() {
+        let (sql, _vars) =
+            build_select_facts_filtered_query("org", "2026-01-15T00:00:00Z", Some("ARR growth"), 5);
+
+        assert!(sql.contains("content @@ $query"));
+        assert!(
+            !sql.contains("CONTAINS"),
+            "unexpected substring fallback in query: {sql}"
+        );
+    }
+
+    #[test]
+    fn build_select_facts_by_embedding_query_uses_knn_cosine_search() {
+        let embedding = vec![0.1_f32, 0.2, 0.3, 0.4];
+        let (sql, vars) =
+            build_select_facts_by_embedding_query("org", "2026-01-15T00:00:00Z", &embedding, 5);
+
+        assert!(sql.contains("embedding <|5,150|> $embedding"));
+        assert!(sql.contains("vector::distance::cosine(embedding, $embedding)"));
+        assert_eq!(vars["scope"], json!("org"));
+        assert_eq!(vars["cutoff"], json!("2026-01-15T00:00:00Z"));
+        assert_eq!(vars["embedding"], json!(embedding));
+        assert_eq!(vars["limit"], json!(5));
+    }
+
+    #[test]
     fn build_select_entity_lookup_query_parameterizes_canonical_and_alias_match() {
         let (sql, vars) = build_select_entity_lookup_query("dmitry ivanov");
 
@@ -2017,11 +2196,11 @@ mod tests {
     #[test]
     fn render_initial_schema_sql_replaces_embedding_dimension_placeholder() {
         let rendered = render_initial_schema_sql(
-            "DEFINE INDEX fact_embedding_hnsw ON fact FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST EUCLIDEAN TYPE F32 EFC 150 M 8;",
+            "DEFINE INDEX fact_embedding_hnsw ON fact FIELDS embedding HNSW DIMENSION {{EMBEDDING_DIMENSION}} DIST COSINE TYPE F32 EFC 150 M 8;",
             768,
         );
 
-        assert!(rendered.contains("HNSW DIMENSION 768"));
+        assert!(rendered.contains("HNSW DIMENSION 768 DIST COSINE"));
         assert!(!rendered.contains("{{EMBEDDING_DIMENSION}}"));
     }
 

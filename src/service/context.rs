@@ -80,17 +80,15 @@ pub async fn assemble_context(
         Some(cleaned_query.as_str())
     };
 
-    let fact_records = service
-        .db_client
-        .select_facts_filtered(
-            &namespace,
-            &request.scope,
-            &cutoff_iso,
-            query_opt,
-            request.budget,
-        )
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let fact_records = select_fact_records_for_query(
+        service,
+        &namespace,
+        &request.scope,
+        &cutoff_iso,
+        query_opt,
+        request.budget,
+    )
+    .await?;
 
     let mut active = filter_facts_by_policy(fact_records, &access);
     sort_facts_by_recency(&mut active);
@@ -99,6 +97,25 @@ pub async fn assemble_context(
     if let Some(query) = query_opt {
         let direct_fact_ids: std::collections::HashSet<_> =
             active.iter().map(|fact| fact.fact_id.clone()).collect();
+        let semantic_facts = collect_semantic_facts(
+            service,
+            CollectSemanticFactsRequest {
+                namespace: &namespace,
+                scope: &request.scope,
+                cutoff_iso: &cutoff_iso,
+                query,
+                access: &access,
+                direct_fact_ids: &direct_fact_ids,
+                budget: request.budget,
+            },
+        )
+        .await?;
+
+        for (fact, rationale) in semantic_facts {
+            rationale_by_fact_id.insert(fact.fact_id.clone(), rationale);
+            active.push(fact);
+        }
+
         let community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
@@ -217,6 +234,49 @@ fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     });
 }
 
+async fn select_fact_records_for_query(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    scope: &str,
+    cutoff_iso: &str,
+    query_opt: Option<&str>,
+    limit: i32,
+) -> Result<Vec<Value>, MemoryError> {
+    let initial = service
+        .db_client
+        .select_facts_filtered(namespace, scope, cutoff_iso, query_opt, limit)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    if !initial.is_empty() {
+        return Ok(initial);
+    }
+
+    let Some(query) = query_opt else {
+        return Ok(initial);
+    };
+
+    let fallback_terms = query
+        .split_whitespace()
+        .filter(|term| !term.trim().is_empty())
+        .collect::<Vec<_>>();
+    if fallback_terms.len() < 2 {
+        return Ok(initial);
+    }
+
+    let mut fallback_records = Vec::new();
+    for term in fallback_terms {
+        let term_records = service
+            .db_client
+            .select_facts_filtered(namespace, scope, cutoff_iso, Some(term), limit)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+        fallback_records.extend(term_records);
+    }
+
+    Ok(fallback_records)
+}
+
 struct CollectCommunityFactsRequest<'a> {
     namespace: &'a str,
     scope: &'a str,
@@ -225,6 +285,57 @@ struct CollectCommunityFactsRequest<'a> {
     access: &'a AccessContext,
     direct_fact_ids: &'a std::collections::HashSet<String>,
     budget: i32,
+}
+
+struct CollectSemanticFactsRequest<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff_iso: &'a str,
+    query: &'a str,
+    access: &'a AccessContext,
+    direct_fact_ids: &'a std::collections::HashSet<String>,
+    budget: i32,
+}
+
+async fn collect_semantic_facts(
+    service: &crate::service::MemoryService,
+    request: CollectSemanticFactsRequest<'_>,
+) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
+    let Some(embedding) = service.embedder.embed_text(request.query).await? else {
+        return Ok(Vec::new());
+    };
+
+    let semantic_records = service
+        .db_client
+        .select_facts_by_embedding(
+            request.namespace,
+            request.scope,
+            request.cutoff_iso,
+            &embedding,
+            request.budget.max(1),
+        )
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    let mut facts = filter_facts_by_policy(semantic_records, request.access)
+        .into_iter()
+        .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
+        .collect::<Vec<_>>();
+    sort_facts_by_recency(&mut facts);
+
+    Ok(facts
+        .into_iter()
+        .take(request.budget.max(1) as usize)
+        .map(|fact| {
+            (
+                fact,
+                format!(
+                    "matched semantic embedding for query=\"{}\"",
+                    request.query
+                ),
+            )
+        })
+        .collect())
 }
 
 async fn collect_community_facts(
@@ -237,22 +348,36 @@ async fn collect_community_facts(
         return Ok(Vec::new());
     }
 
-    let member_ids: std::collections::HashSet<_> = matched_communities
+    let member_ids = matched_communities
         .iter()
         .flat_map(|community| community.member_entities.iter().cloned())
-        .collect();
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
 
     let fallback_records = service
         .db_client
-        .select_facts_filtered(
+        .select_facts_by_entity_links(
             request.namespace,
             request.scope,
             request.cutoff_iso,
-            None,
-            request.budget.max(1) * 10,
+            &member_ids,
+            request.budget.max(1),
         )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    let community_summary_by_member = matched_communities
+        .iter()
+        .flat_map(|community| {
+            community.member_entities.iter().cloned().map(move |entity_id| {
+                (
+                    entity_id,
+                    (community.community_id.clone(), community.summary.clone()),
+                )
+            })
+        })
+        .collect::<std::collections::HashMap<_, _>>();
 
     let mut facts = filter_facts_by_policy(fallback_records, request.access)
         .into_iter()
@@ -260,27 +385,31 @@ async fn collect_community_facts(
         .filter(|fact| {
             fact.entity_links
                 .iter()
-                .any(|entity_id| member_ids.contains(entity_id))
+                .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
         })
         .collect::<Vec<_>>();
     sort_facts_by_recency(&mut facts);
-
-    let community_summary = matched_communities
-        .iter()
-        .map(|community| community.summary.as_str())
-        .collect::<Vec<_>>()
-        .join(" | ");
 
     Ok(facts
         .into_iter()
         .take(request.budget.max(1) as usize)
         .map(|fact| {
+            let rationale = fact
+                .entity_links
+                .iter()
+                .find_map(|entity_id| community_summary_by_member.get(entity_id).cloned())
+                .map_or_else(
+                    || format!("matched community summary for query=\"{}\"", request.query),
+                    |(community_id, summary)| {
+                        format!(
+                            "matched community summary for query=\"{}\" via {}: {}",
+                            request.query, community_id, summary
+                        )
+                    },
+                );
             (
                 fact,
-                format!(
-                    "matched community summary for query=\"{}\" via {}",
-                    request.query, community_summary
-                ),
+                rationale,
             )
         })
         .collect())
@@ -288,6 +417,7 @@ async fn collect_community_facts(
 
 #[derive(Debug)]
 struct StoredCommunitySummary {
+    community_id: String,
     summary: String,
     member_entities: Vec<String>,
 }
@@ -310,6 +440,11 @@ async fn find_matching_communities(
 
 fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunitySummary> {
     let map = value.as_object()?;
+    let community_id = map
+        .get("community_id")
+        .and_then(unwrap_context_string)
+        .or_else(|| map.get("id").and_then(unwrap_context_string))?
+        .to_string();
     let summary = map
         .get("summary")
         .and_then(unwrap_context_string)
@@ -332,6 +467,7 @@ fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunityS
     }
 
     Some(StoredCommunitySummary {
+        community_id,
         summary,
         member_entities,
     })
@@ -605,6 +741,7 @@ mod tests {
     async fn assemble_context_uses_db_side_community_lookup_for_summary_matches() {
         struct CommunityLookupDbClient {
             community_lookup_calls: AtomicUsize,
+            entity_link_fact_calls: AtomicUsize,
         }
 
         #[async_trait::async_trait]
@@ -636,7 +773,23 @@ mod tests {
                 if query_contains.is_some() {
                     Ok(vec![])
                 } else {
-                    Ok(vec![json!({
+                    panic!("community fact expansion should not use unfiltered select_facts_filtered fallback")
+                }
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(entity_links, &["entity:alice".to_string()]);
+
+                Ok(vec![
+                    json!({
                         "fact_id": "fact:community",
                         "fact_type": "note",
                         "content": "Alice works on project Atlas",
@@ -648,8 +801,32 @@ mod tests {
                         "entity_links": ["entity:alice"],
                         "policy_tags": [],
                         "provenance": {"source_episode": "episode:1"}
-                    })])
-                }
+                    }),
+                    json!({
+                        "fact_id": "fact:other",
+                        "fact_type": "note",
+                        "content": "Mallory works elsewhere",
+                        "quote": "Mallory works elsewhere",
+                        "source_episode": "episode:2",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:mallory"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:2"}
+                    })
+                ])
+            }
+
+            async fn select_facts_by_embedding(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _embedding: &[f32],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_edges_filtered(
@@ -738,6 +915,7 @@ mod tests {
 
         let db_client = Arc::new(CommunityLookupDbClient {
             community_lookup_calls: AtomicUsize::new(0),
+            entity_link_fact_calls: AtomicUsize::new(0),
         });
         let service = crate::service::MemoryService::new(
             db_client.clone(),
@@ -762,7 +940,200 @@ mod tests {
         .expect("assemble context");
 
         assert_eq!(db_client.community_lookup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(db_client.entity_link_fact_calls.load(Ordering::SeqCst), 1);
         assert_eq!(results.len(), 1);
-        assert!(results[0].rationale.contains("matched community summary"));
+        assert_eq!(results[0].fact_id, "fact:community");
+        assert!(results[0].rationale.contains("community:atlas"));
+    }
+
+    #[tokio::test]
+    async fn assemble_context_uses_semantic_embedding_lookup_when_available() {
+        struct SemanticDbClient {
+            semantic_lookup_calls: AtomicUsize,
+        }
+
+        struct FixedEmbedder;
+
+        #[async_trait::async_trait]
+        impl crate::service::EmbeddingProvider for FixedEmbedder {
+            async fn embed_text(&self, text: &str) -> Result<Option<Vec<f32>>, MemoryError> {
+                assert_eq!(text, "alice platform");
+                Ok(Some(vec![0.1, 0.2, 0.3, 0.4]))
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for SemanticDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_embedding(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                embedding: &[f32],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.semantic_lookup_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(embedding, &[0.1, 0.2, 0.3, 0.4]);
+
+                Ok(vec![json!({
+                    "fact_id": "fact:semantic",
+                    "fact_type": "note",
+                    "content": "Alice owns the platform roadmap",
+                    "quote": "Alice owns the platform roadmap",
+                    "source_episode": "episode:semantic",
+                    "t_valid": "2026-01-15T10:30:00Z",
+                    "t_ingested": "2026-01-15T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": ["entity:alice"],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:semantic"}
+                })])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(SemanticDbClient {
+            semantic_lookup_calls: AtomicUsize::new(0),
+        });
+        let mut service = crate::service::MemoryService::new(
+            db_client.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+        service.embedder = Arc::new(FixedEmbedder);
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "alice platform".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(db_client.semantic_lookup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "fact:semantic");
+        assert!(results[0].rationale.contains("semantic embedding"));
     }
 }

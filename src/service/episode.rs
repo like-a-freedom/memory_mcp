@@ -623,54 +623,9 @@ async fn collect_connected_entity_component(
     namespace: &str,
 ) -> Result<Vec<String>, MemoryError> {
     let cutoff = super::normalize_dt(super::query::now());
-    let edges = service
-        .db_client
-        .select_edges_filtered(namespace, &cutoff)
-        .await?;
-
-    let mut adjacency: std::collections::HashMap<String, std::collections::BTreeSet<String>> =
-        std::collections::HashMap::new();
-    let mut mentioned_in: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    let mut involved_in: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-
-    for edge in edges.iter().filter_map(stored_edge_version_from_record) {
-        if is_entity_id(&edge.from_id) && is_entity_id(&edge.to_id) {
-            adjacency
-                .entry(edge.from_id.clone())
-                .or_default()
-                .insert(edge.to_id.clone());
-            adjacency
-                .entry(edge.to_id)
-                .or_default()
-                .insert(edge.from_id);
-            continue;
-        }
-
-        match edge.relation.as_str() {
-            "mentioned_in" if is_entity_id(&edge.from_id) && edge.to_id.starts_with("episode:") => {
-                mentioned_in
-                    .entry(edge.to_id)
-                    .or_default()
-                    .push(edge.from_id);
-            }
-            "involved_in" if is_entity_id(&edge.from_id) && edge.to_id.starts_with("fact:") => {
-                involved_in
-                    .entry(edge.to_id)
-                    .or_default()
-                    .push(edge.from_id);
-            }
-            _ => {}
-        }
-    }
-
-    for members in mentioned_in.values().chain(involved_in.values()) {
-        connect_entity_group(&mut adjacency, members);
-    }
-
     let mut visited = std::collections::BTreeSet::new();
     let mut queue = std::collections::VecDeque::new();
+    let mut traversed_nodes = std::collections::HashSet::new();
 
     for entity_id in entity_ids
         .iter()
@@ -682,38 +637,40 @@ async fn collect_connected_entity_component(
     }
 
     while let Some(current) = queue.pop_front() {
-        if let Some(neighbors) = adjacency.get(&current) {
-            for neighbor in neighbors {
-                if visited.insert(neighbor.clone()) {
-                    queue.push_back(neighbor.clone());
+        if !traversed_nodes.insert(current.clone()) {
+            continue;
+        }
+
+        for direction in [
+            crate::storage::GraphDirection::Incoming,
+            crate::storage::GraphDirection::Outgoing,
+        ] {
+            let edges = service
+                .db_client
+                .select_edge_neighbors(namespace, &current, &cutoff, direction)
+                .await?;
+
+            for edge in edges.iter().filter_map(stored_edge_version_from_record) {
+                let neighbor = match direction {
+                    crate::storage::GraphDirection::Incoming => edge.from_id,
+                    crate::storage::GraphDirection::Outgoing => edge.to_id,
+                };
+
+                if is_entity_id(&neighbor) {
+                    if visited.insert(neighbor.clone()) {
+                        queue.push_back(neighbor);
+                    }
+                    continue;
+                }
+
+                if is_traversable_context_node(&neighbor) {
+                    queue.push_back(neighbor);
                 }
             }
         }
     }
 
     Ok(visited.into_iter().collect())
-}
-
-fn connect_entity_group(
-    adjacency: &mut std::collections::HashMap<String, std::collections::BTreeSet<String>>,
-    members: &[String],
-) {
-    for member in members {
-        adjacency.entry(member.clone()).or_default();
-    }
-
-    for (index, left) in members.iter().enumerate() {
-        for right in members.iter().skip(index + 1) {
-            adjacency
-                .entry(left.clone())
-                .or_default()
-                .insert(right.clone());
-            adjacency
-                .entry(right.clone())
-                .or_default()
-                .insert(left.clone());
-        }
-    }
 }
 
 async fn build_community_summary(
@@ -820,6 +777,10 @@ fn unwrap_record_array(value: &Value) -> Option<&Vec<Value>> {
 
 fn is_entity_id(record_id: &str) -> bool {
     record_id.starts_with("entity:")
+}
+
+fn is_traversable_context_node(record_id: &str) -> bool {
+    record_id.starts_with("episode:") || record_id.starts_with("fact:")
 }
 
 #[cfg(test)]
@@ -981,5 +942,191 @@ mod tests {
         assert!(is_promise_statement("i will finish this"));
         assert!(is_promise_statement("i'll deliver"));
         assert!(is_promise_statement("will complete the task"));
+    }
+
+    #[tokio::test]
+    async fn collect_connected_entity_component_uses_neighbor_queries_instead_of_edge_scan() {
+        use crate::storage::{DbClient, GraphDirection};
+        use std::sync::Arc;
+
+        struct NeighborOnlyDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for NeighborOnlyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_embedding(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _embedding: &[f32],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("community traversal should not scan the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mk = |from_id: &str, relation: &str, to_id: &str| {
+                    json!({
+                        "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
+                        "from_id": from_id,
+                        "relation": relation,
+                        "to_id": to_id,
+                        "t_valid": "2024-01-01T00:00:00Z",
+                        "t_ingested": "2024-01-01T00:00:00Z"
+                    })
+                };
+
+                Ok(match (node_id, direction) {
+                    ("entity:alice", GraphDirection::Outgoing) => {
+                        vec![mk("entity:alice", "mentioned_in", "episode:shared")]
+                    }
+                    ("episode:shared", GraphDirection::Incoming) => vec![
+                        mk("entity:alice", "mentioned_in", "episode:shared"),
+                        mk("entity:bob", "mentioned_in", "episode:shared"),
+                    ],
+                    ("entity:bob", GraphDirection::Outgoing) => {
+                        vec![mk("entity:bob", "involved_in", "fact:joint")]
+                    }
+                    ("fact:joint", GraphDirection::Incoming) => vec![
+                        mk("entity:bob", "involved_in", "fact:joint"),
+                        mk("entity:carol", "involved_in", "fact:joint"),
+                    ],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(NeighborOnlyDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let connected =
+            collect_connected_entity_component(&service, &["entity:alice".to_string()], "org")
+                .await
+                .unwrap();
+
+        assert_eq!(
+            connected,
+            vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:carol".to_string(),
+            ]
+        );
     }
 }
