@@ -22,10 +22,19 @@ pub struct RegexEntityExtractor {
 
 impl RegexEntityExtractor {
     /// Creates a new regex-backed entity extractor.
+    ///
+    /// Supports both ASCII and Unicode letters (Cyrillic, etc.).
+    /// Pattern matches:
+    /// - Multi-word capitalized names: "Alice Smith", "Иван Петров"
+    /// - Single-token CamelCase: "OpenAI", "PostgreSQL"
+    ///
+    /// Minimum 3 characters to avoid noise like "I", "At", "In".
     pub fn new() -> Result<Self, MemoryError> {
         Ok(Self {
-            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|[A-Z][A-Za-z0-9]{2,}")
-                .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
+            name_regex: Regex::new(
+                r"[\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+)+|[\p{Lu}][\p{L}\p{N}]{2,}",
+            )
+            .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
         })
     }
 }
@@ -124,5 +133,24 @@ mod tests {
         assert!(names.contains(&"OpenAI".to_string()));
         assert!(names.contains(&"Monday".to_string()));
         assert!(names.contains(&"San Francisco".to_string()));
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_supports_unicode_names() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates("Иван Петров встретился с Maria Garcia в компании TechCorp")
+            .await
+            .unwrap();
+
+        let names = candidates
+            .into_iter()
+            .map(|candidate| candidate.canonical_name)
+            .collect::<Vec<_>>();
+
+        // Should include Cyrillic and Latin names
+        assert!(names.contains(&"Иван Петров".to_string()));
+        assert!(names.contains(&"Maria Garcia".to_string()));
+        assert!(names.contains(&"TechCorp".to_string()));
     }
 }

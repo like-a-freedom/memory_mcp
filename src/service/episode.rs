@@ -613,6 +613,11 @@ struct StoredCommunity {
     member_entities: Vec<String>,
 }
 
+/// Collects all entities connected via edges to the given seed entities.
+///
+/// Uses BFS traversal over the active edge set (bounded by `ACTIVE_EDGE_SCAN_LIMIT = 10_000`).
+/// If the edge table exceeds this limit, the traversal will be incomplete.
+/// A warning is logged when the limit is hit (see `db.select_edges_filtered.limit_hit`).
 async fn collect_connected_entity_component(
     service: &crate::service::MemoryService,
     entity_ids: &[String],

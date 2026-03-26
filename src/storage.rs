@@ -805,6 +805,27 @@ impl DbClient for SurrealDbClient {
         let normalized = surreal_to_json(surreal_val);
         let results = extract_records(normalized);
 
+        // Warn if the edge scan hit the limit — community detection will be incomplete
+        if results.len() == ACTIVE_EDGE_SCAN_LIMIT as usize {
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                Value::String("db.select_edges_filtered.limit_hit".to_string()),
+            );
+            event.insert(
+                "warning".to_string(),
+                Value::String(format!(
+                    "Edge scan hit limit of {} edges; community detection may be incomplete",
+                    ACTIVE_EDGE_SCAN_LIMIT
+                )),
+            );
+            event.insert(
+                "count".to_string(),
+                Value::Number(serde_json::Number::from(results.len())),
+            );
+            self.logger.log(event, LogLevel::Warn);
+        }
+
         self.log_op(
             "db.select_edges_filtered.result",
             vec![(
