@@ -645,6 +645,23 @@ mod tests {
     }
 
     #[test]
+    fn tool_response_schema_exposes_list_pagination_contract() {
+        let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
+        let properties = schema["properties"].as_object().expect("properties object");
+
+        for key in [
+            "status",
+            "result",
+            "guidance",
+            "has_more",
+            "total_count",
+            "next_offset",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
+    }
+
+    #[test]
     fn explain_tool_response_schema_exposes_citation_items() {
         let schema = schema_json::<ToolResponse<Vec<ExplainItem>>>();
         let result = &schema["properties"]["result"];
@@ -654,6 +671,61 @@ mod tests {
             result["items"]["$ref"] == "#/$defs/ExplainItem"
                 || result["items"]["$ref"] == "#/definitions/ExplainItem"
         );
+    }
+
+    #[test]
+    fn explain_item_schema_exposes_enriched_citation_fields() {
+        let schema = schema_json::<ToolResponse<Vec<ExplainItem>>>();
+        let defs = schema
+            .get("$defs")
+            .or_else(|| schema.get("definitions"))
+            .and_then(serde_json::Value::as_object)
+            .expect("schema definitions");
+        let explain_item = defs.get("ExplainItem").expect("ExplainItem definition");
+        let properties = explain_item["properties"]
+            .as_object()
+            .expect("properties object");
+
+        for key in [
+            "content",
+            "quote",
+            "source_episode",
+            "scope",
+            "t_ref",
+            "t_ingested",
+            "provenance",
+            "citation_context",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
+    }
+
+    #[test]
+    fn assembled_context_item_schema_exposes_rationale_and_provenance() {
+        let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
+        let defs = schema
+            .get("$defs")
+            .or_else(|| schema.get("definitions"))
+            .and_then(serde_json::Value::as_object)
+            .expect("schema definitions");
+        let context_item = defs
+            .get("AssembledContextItem")
+            .expect("AssembledContextItem definition");
+        let properties = context_item["properties"]
+            .as_object()
+            .expect("properties object");
+
+        for key in [
+            "fact_id",
+            "content",
+            "quote",
+            "source_episode",
+            "confidence",
+            "provenance",
+            "rationale",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
     }
 
     #[test]

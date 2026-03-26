@@ -141,6 +141,24 @@ mod tests {
     }
 
     #[test]
+    fn extract_params_schema_exposes_both_episode_and_inline_content_entry_points() {
+        let schema = schema_json::<ExtractParams>();
+        let properties = schema["properties"].as_object().expect("properties object");
+
+        for key in [
+            "episode_id",
+            "content",
+            "text",
+            "source_type",
+            "source_id",
+            "t_ref",
+            "scope",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
+    }
+
+    #[test]
     fn assemble_context_params_schema_keeps_flat_primitives() {
         let schema = schema_json::<AssembleContextParams>();
         let properties = schema["properties"].as_object().expect("properties object");

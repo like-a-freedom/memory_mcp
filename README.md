@@ -208,7 +208,8 @@ cargo doc --no-deps
 ### Binary entry points
 
 - `src/main.rs` — main MCP server binary
-- `src/bin/schema_dump.rs` — schema-related utility binary
+
+MCP input/output schemas are exposed by the server itself through the protocol's tool metadata and remain regression-covered by the schema tests under `src/mcp/`.
 
 ## Testing
 
@@ -244,7 +245,6 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 ├── docs/
 ├── scripts/
 ├── src/
-│   ├── bin/
 │   ├── mcp/
 │   ├── service/
 │   ├── config.rs
