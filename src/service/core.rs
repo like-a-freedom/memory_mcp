@@ -1,7 +1,7 @@
 //! MemoryService implementation - core service orchestration.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
@@ -16,7 +16,7 @@ use crate::models::{
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
 use super::EntityExtractor;
-use super::cache::{CacheKey, SafeMutex};
+use super::cache::CacheKey;
 use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
@@ -32,7 +32,8 @@ pub struct MemoryService {
     pub(crate) default_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
-    pub(crate) context_cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    pub(crate) context_cache:
+        Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) analyzers: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) indexes: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
@@ -233,7 +234,7 @@ impl MemoryService {
             default_namespace: namespaces[0].clone(),
             logger,
             rate_limiter: Arc::new(RateLimiter::new(rate_limit_rps, rate_limit_burst)),
-            context_cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
+            context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             analyzers: Arc::new(Mutex::new(HashMap::new())),
             indexes: Arc::new(Mutex::new(HashMap::new())),
             entity_extractor: Arc::new(RegexEntityExtractor::new()?),
@@ -452,7 +453,7 @@ impl MemoryService {
                     "failed to persist fact record".to_string(),
                 ));
             }
-            super::cache::invalidate_cache_by_scope(&self.context_cache, scope);
+            super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
         }
         Ok(fact_id)
     }
@@ -486,7 +487,7 @@ impl MemoryService {
         self.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
-        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope);
+        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
         Ok("ok".to_string())
     }
 
@@ -516,6 +517,58 @@ impl MemoryService {
         self.resolve(
             EntityCandidate {
                 entity_type: "company".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Resolves a location entity.
+    pub async fn resolve_location(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve(
+            EntityCandidate {
+                entity_type: "location".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Resolves a product entity.
+    pub async fn resolve_product(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve(
+            EntityCandidate {
+                entity_type: "product".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Resolves an event entity.
+    pub async fn resolve_event(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve(
+            EntityCandidate {
+                entity_type: "event".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Resolves a concept entity.
+    pub async fn resolve_concept(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve(
+            EntityCandidate {
+                entity_type: "concept".to_string(),
                 canonical_name: name.to_string(),
                 aliases: Vec::new(),
             },
@@ -886,30 +939,42 @@ impl MemoryService {
         entity_id: &str,
         namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
-        // Query episodes where entity appears in entity_links
-        let sql = "SELECT * FROM episode WHERE entity_links CONTAINS $entity_id ORDER BY t_ref DESC LIMIT 10";
+        // Traverse: entity -> involved_in edge -> fact -> source_episode -> episode
+        let sql = "SELECT * FROM episode WHERE source_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE out FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
         let result: serde_json::Value = self
             .db_client
             .query(sql, Some(json!({"entity_id": entity_id})), namespace)
             .await?;
 
-        // Extract episodes from result
         let episodes: Vec<crate::models::Episode> = result
             .as_array()
-            .map(|arr: &Vec<serde_json::Value>| {
+            .map(|arr| {
                 arr.iter()
-                    .filter_map(|v: &serde_json::Value| {
-                        v.get("Object").and_then(|obj| obj.as_object()).and_then(
-                            |obj: &serde_json::Map<String, serde_json::Value>| {
-                                super::episode::episode_from_record(obj)
-                            },
-                        )
+                    .filter_map(|v| {
+                        if let Some(obj) = v.as_object() {
+                            super::episode::episode_from_record(obj)
+                        } else {
+                            v.get("Object")
+                                .and_then(|o| o.as_object())
+                                .and_then(super::episode::episode_from_record)
+                        }
                     })
                     .collect()
             })
             .unwrap_or_default();
 
         Ok(episodes)
+    }
+}
+
+/// Trait for safe mutex locking that handles poisoned locks gracefully.
+pub(crate) trait SafeMutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T> SafeMutex<T> for Mutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 

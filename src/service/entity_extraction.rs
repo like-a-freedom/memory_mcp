@@ -50,20 +50,91 @@ impl EntityExtractor for RegexEntityExtractor {
 
         let mut entities = candidates
             .into_iter()
-            .map(|candidate| EntityCandidate {
-                entity_type: if candidate.contains("Corp") || candidate.contains("Inc") {
-                    "company".to_string()
-                } else {
-                    "person".to_string()
-                },
-                canonical_name: candidate,
-                aliases: Vec::new(),
+            .map(|candidate| {
+                let entity_type = classify_entity_type(&candidate);
+                EntityCandidate {
+                    entity_type: entity_type.to_string(),
+                    canonical_name: candidate,
+                    aliases: Vec::new(),
+                }
             })
             .collect::<Vec<_>>();
 
         entities.sort_by(|left, right| left.canonical_name.cmp(&right.canonical_name));
         Ok(entities)
     }
+}
+
+/// Classifies an entity candidate into a type based on naming patterns.
+fn classify_entity_type(name: &str) -> &'static str {
+    static COMPANY_SUFFIXES: &[&str] = &[
+        "Corp",
+        "Inc",
+        "Ltd",
+        "LLC",
+        "GmbH",
+        "AG",
+        "SA",
+        "PLC",
+        "Company",
+        "Group",
+        "Systems",
+        "Technologies",
+        "Solutions",
+        "Labs",
+        "Studio",
+        "Partners",
+        "Associates",
+        "Holdings",
+        "Foundation",
+        "Institute",
+        "University",
+        "Academy",
+        "Limited",
+    ];
+
+    static EVENT_INDICATORS: &[&str] = &[
+        "Conference",
+        "Summit",
+        "Meetup",
+        "Hackathon",
+        "Workshop",
+        "Festival",
+        "Ceremony",
+        "Award",
+        "Championship",
+        "Olympics",
+    ];
+
+    static LOCATION_INDICATORS: &[&str] = &[
+        "City",
+        "County",
+        "State",
+        "Province",
+        "Country",
+        "District",
+        "Region",
+        "Territory",
+        "Island",
+    ];
+
+    for suffix in COMPANY_SUFFIXES {
+        if name.contains(suffix) {
+            return "company";
+        }
+    }
+    for indicator in EVENT_INDICATORS {
+        if name.contains(indicator) {
+            return "event";
+        }
+    }
+    for indicator in LOCATION_INDICATORS {
+        if name.contains(indicator) {
+            return "location";
+        }
+    }
+
+    "person"
 }
 
 #[cfg(test)]
@@ -152,5 +223,40 @@ mod tests {
         assert!(names.contains(&"Иван Петров".to_string()));
         assert!(names.contains(&"Maria Garcia".to_string()));
         assert!(names.contains(&"TechCorp".to_string()));
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_classifies_company_types() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        // Use company names that the regex can extract (multi-word or with lowercase)
+        let candidates = extractor
+            .extract_candidates("Acme Corp and Globex Inc and Initech Limited")
+            .await
+            .unwrap();
+
+        for candidate in &candidates {
+            assert_eq!(
+                candidate.entity_type, "company",
+                "{:?} should be classified as company",
+                candidate.canonical_name
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_classifies_event_types() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates("Tech Summit in San Francisco")
+            .await
+            .unwrap();
+
+        let types: std::collections::HashMap<_, _> = candidates
+            .iter()
+            .map(|c| (c.canonical_name.as_str(), c.entity_type.as_str()))
+            .collect();
+
+        assert_eq!(types.get("Tech Summit"), Some(&"event"));
+        assert_eq!(types.get("San Francisco"), Some(&"person"));
     }
 }

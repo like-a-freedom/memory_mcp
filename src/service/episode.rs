@@ -148,6 +148,20 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
             })
             .unwrap_or_default(),
         provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
+        ft_score: map
+            .get("ft_score")
+            .and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(obj) = v.as_object() {
+                    obj.get("Number")
+                        .and_then(|n| n.as_f64())
+                        .or_else(|| obj.get("Float").and_then(|n| n.as_f64()))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0.0),
     })
 }
 
@@ -198,7 +212,11 @@ pub async fn extract_facts(
                 0.7,
                 Vec::new(),
                 Vec::new(),
-                json!({"source_episode": episode.episode_id}),
+                json!({
+                    "source_episode": episode.episode_id,
+                    "source_type": episode.source_type,
+                    "source_id": episode.source_id,
+                }),
             )
             .await?;
         facts.push(ExtractedFact {
@@ -219,7 +237,11 @@ pub async fn extract_facts(
                 0.7,
                 Vec::new(),
                 Vec::new(),
-                json!({"source_episode": episode.episode_id}),
+                json!({
+                    "source_episode": episode.episode_id,
+                    "source_type": episode.source_type,
+                    "source_id": episode.source_id,
+                }),
             )
             .await?;
         facts.push(ExtractedFact {

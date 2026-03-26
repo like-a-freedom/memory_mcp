@@ -1,9 +1,10 @@
 //! Context cache management.
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use lru::LruCache;
+use tokio::sync::RwLock;
 
 use crate::models::AssembledContextItem;
 
@@ -46,23 +47,12 @@ impl CacheKey {
     }
 }
 
-/// Trait for safe mutex locking that handles poisoned locks gracefully.
-pub trait SafeMutex<T> {
-    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
-}
-
-impl<T> SafeMutex<T> for Mutex<T> {
-    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T> {
-        self.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-}
-
 /// Invalidate cache entries for a specific scope.
-pub fn invalidate_cache_by_scope(
-    cache: &Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+pub async fn invalidate_cache_by_scope(
+    cache: &Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     scope: &str,
 ) {
-    let mut guard = cache.safe_lock();
+    let mut guard = cache.write().await;
     let keys_to_remove: Vec<CacheKey> = guard
         .iter()
         .filter(|(key, _)| key.matches_scope(scope))
@@ -121,26 +111,10 @@ mod tests {
         assert!(!key.matches_scope("personal"));
     }
 
-    #[test]
-    fn safe_mutex_handles_poisoned_lock() {
-        let mutex = Mutex::new(42);
-        let guard = mutex.safe_lock();
-        assert_eq!(*guard, 42);
-        drop(guard);
-
-        let _ = std::panic::catch_unwind(|| {
-            let _guard = mutex.lock().unwrap();
-            panic!("poison");
-        });
-
-        let guard = mutex.safe_lock();
-        assert_eq!(*guard, 42);
-    }
-
-    #[test]
-    fn invalidate_cache_by_scope_removes_matching_entries() {
-        let cache: Arc<Mutex<LruCache<CacheKey, Vec<AssembledContextItem>>>> =
-            Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
+    #[tokio::test]
+    async fn invalidate_cache_by_scope_removes_matching_entries() {
+        let cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>> =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
 
         let cutoff = Utc::now();
 
@@ -149,7 +123,7 @@ mod tests {
         let key3 = CacheKey::new("query3", "personal", cutoff, 5, None);
 
         {
-            let mut guard = cache.safe_lock();
+            let mut guard = cache.write().await;
             let item = |fact_id: &str| AssembledContextItem {
                 fact_id: fact_id.to_string(),
                 content: "content".to_string(),
@@ -164,9 +138,9 @@ mod tests {
             guard.put(key3.clone(), vec![item("fact:3")]);
         }
 
-        invalidate_cache_by_scope(&cache, "org");
+        invalidate_cache_by_scope(&cache, "org").await;
 
-        let mut guard = cache.safe_lock();
+        let mut guard = cache.write().await;
         assert!(guard.get(&key1).is_none());
         assert!(guard.get(&key2).is_none());
         assert!(guard.get(&key3).is_some());

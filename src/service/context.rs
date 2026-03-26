@@ -2,7 +2,7 @@
 
 use serde_json::{Value, json};
 
-use super::cache::{CacheKey, SafeMutex};
+use super::cache::CacheKey;
 use super::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
@@ -57,7 +57,7 @@ pub async fn assemble_context(
     );
 
     let cached = {
-        let mut cache = service.context_cache.safe_lock();
+        let mut cache = service.context_cache.write().await;
         cache.get(&cache_key).cloned()
     };
 
@@ -94,13 +94,43 @@ pub async fn assemble_context(
     .await?;
 
     let direct_facts = filter_facts_by_policy(fact_records, &access);
-    let mut community_facts = Vec::new();
-    if let Some(query) = query_opt {
+
+    // Alias expansion: search for additional facts using entity aliases
+    let mut expanded_facts = Vec::new();
+    let ranked_facts = if let Some(query) = query_opt {
+        let expanded_queries = expand_query_with_aliases(service, query, &namespace).await;
         let direct_fact_ids: std::collections::HashSet<_> = direct_facts
             .iter()
             .map(|fact| fact.fact_id.clone())
             .collect();
-        community_facts = collect_community_facts(
+
+        for expanded_query in &expanded_queries {
+            if expanded_query == query {
+                continue;
+            }
+            let extra_records = select_fact_records_for_query(
+                service,
+                &namespace,
+                &request.scope,
+                &cutoff_iso,
+                Some(expanded_query),
+                request.budget,
+            )
+            .await?;
+            for fact in filter_facts_by_policy(extra_records, &access) {
+                if !direct_fact_ids.contains(&fact.fact_id) {
+                    expanded_facts.push(fact);
+                }
+            }
+        }
+
+        let all_direct_ids: std::collections::HashSet<_> = direct_facts
+            .iter()
+            .chain(expanded_facts.iter())
+            .map(|fact| fact.fact_id.clone())
+            .collect();
+
+        let community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
                 namespace: &namespace,
@@ -108,21 +138,30 @@ pub async fn assemble_context(
                 cutoff_iso: &cutoff_iso,
                 query,
                 access: &access,
-                direct_fact_ids: &direct_fact_ids,
+                direct_fact_ids: &all_direct_ids,
                 budget: request.budget,
             },
         )
         .await?;
-    }
 
-    let mut ranked_facts = build_ranked_context_facts(
-        direct_facts,
-        community_facts,
-        query_opt,
-        &request.scope,
-        cutoff,
-    );
-    sort_ranked_context_facts(&mut ranked_facts);
+        let mut all_direct = direct_facts;
+        all_direct.extend(expanded_facts);
+
+        let mut ranked_facts = build_ranked_context_facts(
+            all_direct,
+            community_facts,
+            query_opt,
+            &request.scope,
+            cutoff,
+        );
+        sort_ranked_context_facts(&mut ranked_facts);
+        ranked_facts
+    } else {
+        let mut ranked_facts =
+            build_ranked_context_facts(direct_facts, Vec::new(), query_opt, &request.scope, cutoff);
+        sort_ranked_context_facts(&mut ranked_facts);
+        ranked_facts
+    };
 
     let results: Vec<AssembledContextItem> = ranked_facts
         .into_iter()
@@ -142,7 +181,7 @@ pub async fn assemble_context(
         .collect();
 
     {
-        let mut cache = service.context_cache.safe_lock();
+        let mut cache = service.context_cache.write().await;
         cache.put(cache_key, results.clone());
     }
 
@@ -219,6 +258,7 @@ struct RankedContextFact {
     rationale: String,
     fusion_score: f64,
     source_priority: u8,
+    decayed_confidence: f64,
 }
 
 fn build_ranked_context_facts(
@@ -232,24 +272,29 @@ fn build_ranked_context_facts(
 
     for (rank, fact) in direct_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
+        let confidence = super::decayed_confidence(&fact, cutoff);
         ranked_by_fact_id
             .entry(fact_id)
             .and_modify(|candidate| {
                 candidate.fusion_score += reciprocal_rank(rank);
                 candidate.source_priority = 0;
+                candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             })
             .or_insert_with(|| RankedContextFact {
                 rationale: default_direct_rationale(query_opt, scope, cutoff),
                 fact,
                 fusion_score: reciprocal_rank(rank),
                 source_priority: 0,
+                decayed_confidence: confidence,
             });
     }
 
     for (rank, (fact, rationale)) in community_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
+        let confidence = super::decayed_confidence(&fact, cutoff);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += reciprocal_rank(rank);
+            candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             continue;
         }
 
@@ -260,6 +305,7 @@ fn build_ranked_context_facts(
                 rationale,
                 fusion_score: reciprocal_rank(rank),
                 source_priority: 1,
+                decayed_confidence: confidence,
             },
         );
     }
@@ -297,12 +343,62 @@ fn default_direct_rationale(
 
 fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
     facts.sort_by(|a, b| {
-        b.fusion_score
-            .total_cmp(&a.fusion_score)
+        // Composite score: fusion_score weighted by decayed_confidence
+        let score_a = a.fusion_score * a.decayed_confidence.max(0.01);
+        let score_b = b.fusion_score * b.decayed_confidence.max(0.01);
+        score_b
+            .total_cmp(&score_a)
             .then_with(|| a.source_priority.cmp(&b.source_priority))
             .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
             .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
     });
+}
+
+/// Expands a search query with entity aliases for broader recall.
+///
+/// Looks up entities whose canonical names appear in the query,
+/// and returns additional query terms derived from their aliases.
+async fn expand_query_with_aliases(
+    service: &crate::service::MemoryService,
+    query: &str,
+    namespace: &str,
+) -> Vec<String> {
+    let mut expanded = Vec::new();
+    let terms: Vec<&str> = query.split_whitespace().collect();
+
+    for term in &terms {
+        if term.len() < 3 {
+            continue;
+        }
+        let normalized = super::normalize_text(term);
+        if let Ok(Some(record)) = service
+            .db_client
+            .select_entity_lookup(namespace, &normalized)
+            .await
+            && let Some(aliases) = record.get("aliases").and_then(|v| v.as_array())
+        {
+            for alias in aliases {
+                if let Some(alias_str) = alias.as_str() {
+                    let alias_expanded = terms
+                        .iter()
+                        .map(|t| {
+                            if super::normalize_text(t) == normalized {
+                                alias_str.to_string()
+                            } else {
+                                t.to_string()
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if alias_expanded != query {
+                        expanded.push(alias_expanded);
+                    }
+                }
+            }
+        }
+    }
+
+    expanded
 }
 
 async fn select_fact_records_for_query(
@@ -577,6 +673,7 @@ mod tests {
             scope: "org".to_string(),
             policy_tags: vec![],
             provenance: json!({}),
+            ft_score: 0.0,
         }
     }
 
