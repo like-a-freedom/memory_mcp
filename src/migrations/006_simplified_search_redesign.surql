@@ -10,9 +10,6 @@ REMOVE INDEX IF EXISTS fact_embedding_hnsw ON TABLE fact;
 REMOVE FIELD IF EXISTS embedding ON TABLE episode;
 REMOVE FIELD IF EXISTS embedding ON TABLE entity;
 REMOVE FIELD IF EXISTS embedding ON TABLE fact;
-
-REMOVE FIELD IF EXISTS from_id ON TABLE edge;
-REMOVE FIELD IF EXISTS to_id ON TABLE edge;
 REMOVE INDEX IF EXISTS edge_from ON TABLE edge;
 REMOVE INDEX IF EXISTS edge_to ON TABLE edge;
 
@@ -47,5 +44,8 @@ DEFINE INDEX OVERWRITE edge_in ON TABLE edge COLUMNS in;
 DEFINE INDEX OVERWRITE edge_out ON TABLE edge COLUMNS out;
 DEFINE INDEX OVERWRITE community_members ON TABLE community COLUMNS member_entities;
 
-UPDATE edge SET in = <record> from_id WHERE in IS NONE AND from_id != NONE;
-UPDATE edge SET out = <record> to_id WHERE out IS NONE AND to_id != NONE;
+UPDATE edge SET in = type::record(from_id) WHERE in IS NONE AND from_id IS NOT NONE;
+UPDATE edge SET out = type::record(to_id) WHERE out IS NONE AND to_id IS NOT NONE;
+
+REMOVE FIELD IF EXISTS from_id ON TABLE edge;
+REMOVE FIELD IF EXISTS to_id ON TABLE edge;

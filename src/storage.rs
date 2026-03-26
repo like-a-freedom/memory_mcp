@@ -593,6 +593,28 @@ pub(crate) fn json_string(value: &Value) -> Option<&str> {
     }
 }
 
+pub(crate) fn json_f64(value: &Value) -> Option<f64> {
+    if let Some(value) = value.as_f64() {
+        return Some(value);
+    }
+
+    let object = value.as_object()?;
+
+    object
+        .get("Number")
+        .and_then(json_f64)
+        .or_else(|| object.get("Float").and_then(json_f64))
+        .or_else(|| object.get("Int").and_then(json_f64))
+        .or_else(|| object.get("Decimal").and_then(json_f64))
+        .or_else(|| {
+            object
+                .get("String")
+                .and_then(Value::as_str)?
+                .parse::<f64>()
+                .ok()
+        })
+}
+
 #[async_trait]
 impl DbClient for SurrealDbClient {
     async fn select_one(
@@ -1626,6 +1648,44 @@ mod tests {
         assert!(json_contains_text(&info_json, "memory_fts"));
     }
 
+    #[tokio::test]
+    async fn connect_in_memory_fresh_install_provisions_full_post_redesign_schema() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let community_info = client
+            .execute_query("INFO FOR TABLE community", None, "testns")
+            .await
+            .expect("info for table community");
+        let edge_info = client
+            .execute_query("INFO FOR TABLE edge", None, "testns")
+            .await
+            .expect("info for table edge");
+        let migration_info = client
+            .execute_query("INFO FOR TABLE script_migration", None, "testns")
+            .await
+            .expect("info for table script_migration");
+
+        let community_json = surreal_to_json(community_info);
+        let edge_json = surreal_to_json(edge_info);
+        let migration_json = surreal_to_json(migration_info);
+
+        assert!(json_contains_text(
+            &community_json,
+            "community_summary_search"
+        ));
+        assert!(json_contains_text(&community_json, "memory_fts"));
+        assert!(json_contains_text(&edge_json, "edge_in"));
+        assert!(json_contains_text(&edge_json, "edge_out"));
+        assert!(json_contains_text(&migration_json, "checksum"));
+    }
+
     #[test]
     fn validate_table_name_rejects_unexpected_identifier() {
         let error = validate_table_name("fact; DELETE user").expect_err("invalid table");
@@ -1697,6 +1757,47 @@ mod tests {
             .expect_err("modified applied migration should be rejected");
         assert!(
             matches!(error, MemoryError::ConfigInvalid(message) if message.contains("modified after execution"))
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_migrations_upgrades_legacy_edge_endpoints_to_native_records() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .query(
+                "DEFINE TABLE entity SCHEMAFULL;\nDEFINE FIELD entity_id ON entity TYPE string;\nDEFINE TABLE edge TYPE RELATION;\nDEFINE FIELD edge_id ON edge TYPE string;\nDEFINE FIELD from_id ON edge TYPE string;\nDEFINE FIELD to_id ON edge TYPE string;\nDEFINE FIELD relation ON edge TYPE string;\nDEFINE FIELD t_valid ON edge TYPE datetime;\nDEFINE FIELD t_ingested ON edge TYPE datetime;\nCREATE entity:⟨alice⟩ SET entity_id = 'entity:alice';\nCREATE entity:⟨bob⟩ SET entity_id = 'entity:bob';\nRELATE entity:⟨alice⟩ -> edge:⟨legacy⟩ -> entity:⟨bob⟩ SET edge_id = 'edge:legacy', from_id = 'entity:alice', to_id = 'entity:bob', relation = 'knows', t_valid = type::datetime('2026-01-15T00:00:00Z'), t_ingested = type::datetime('2026-01-15T00:00:00Z');\nUPDATE edge:⟨legacy⟩ SET in = NONE, out = NONE;",
+                None,
+                "testns",
+            )
+            .await
+            .expect("seed legacy edge record");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let edges = client
+            .select_table("edge", "testns")
+            .await
+            .expect("select migrated edge table");
+        assert_eq!(
+            edges.len(),
+            1,
+            "expected one migrated edge row, got: {edges:?}"
+        );
+        let edge = &edges[0];
+
+        assert_eq!(
+            edge.get("in"),
+            Some(&json!({"RecordId": {"table": "entity", "key": "alice"}}))
+        );
+        assert_eq!(
+            edge.get("out"),
+            Some(&json!({"RecordId": {"table": "entity", "key": "bob"}}))
         );
     }
 
@@ -2188,6 +2289,18 @@ mod tests {
         assert_eq!(
             normalize_surreal_json(&datetime),
             json!("2026-01-15T00:00:00Z")
+        );
+    }
+
+    #[test]
+    fn json_f64_handles_wrapped_number_variants() {
+        assert_eq!(json_f64(&json!(42.5)), Some(42.5));
+        assert_eq!(json_f64(&json!({"Number": 42.5})), Some(42.5));
+        assert_eq!(json_f64(&json!({"Float": 42.5})), Some(42.5));
+        assert_eq!(json_f64(&json!({"Int": 42})), Some(42.0));
+        assert_eq!(
+            json_f64(&json!({"Decimal": {"String": "42.5"}})),
+            Some(42.5)
         );
     }
 }

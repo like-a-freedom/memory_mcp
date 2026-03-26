@@ -57,6 +57,8 @@ async fn apply_startup_migrations(
     db_client: &Arc<dyn DbClient>,
     namespaces: &[String],
 ) -> Result<(), MemoryError> {
+    // SurrealDB namespaces are isolated schema domains, so startup must
+    // apply the embedded schema contract to each configured namespace.
     for namespace in namespaces {
         db_client.apply_migrations(namespace).await?;
     }

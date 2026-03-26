@@ -6,7 +6,7 @@ use super::cache::{CacheKey, SafeMutex};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
-use crate::storage::json_string;
+use crate::storage::{json_f64, json_string};
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 
@@ -194,7 +194,10 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
     facts
 }
 
-/// Sort facts by recency.
+/// Test-only convenience wrapper around the production comparator below.
+///
+/// Production code uses `compare_facts_by_recency` directly in composite sorts,
+/// while tests keep this helper to assert the standalone ordering contract.
 #[cfg(test)]
 fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
     facts.sort_by(compare_facts_by_recency);
@@ -515,7 +518,7 @@ fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunityS
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let ft_score = map.get("ft_score").and_then(Value::as_f64).unwrap_or(0.0);
+    let ft_score = map.get("ft_score").and_then(json_f64).unwrap_or(0.0);
 
     if summary.is_empty() || member_entities.is_empty() {
         return None;
@@ -1709,6 +1712,20 @@ mod tests {
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].fact_id, "fact:alpha");
+        assert!(results[0].rationale.contains("community:alpha"));
         assert_eq!(results[1].fact_id, "fact:beta");
+    }
+
+    #[test]
+    fn stored_community_summary_from_value_handles_wrapped_ft_score_number() {
+        let summary = stored_community_summary_from_value(&json!({
+            "community_id": "community:atlas",
+            "summary": "Atlas workstream",
+            "member_entities": ["entity:atlas"],
+            "ft_score": {"Number": 42.5}
+        }))
+        .expect("community summary");
+
+        assert_eq!(summary.ft_score, 42.5);
     }
 }
