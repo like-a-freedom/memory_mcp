@@ -24,7 +24,7 @@ impl RegexEntityExtractor {
     /// Creates a new regex-backed entity extractor.
     pub fn new() -> Result<Self, MemoryError> {
         Ok(Self {
-            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|[A-Z][A-Za-z0-9]+")
+            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|[A-Z][A-Za-z0-9]{2,}")
                 .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
         })
     }
@@ -99,5 +99,30 @@ mod tests {
                 "PostgreSQL".to_string(),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_filters_out_short_words() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates("I met Bob at OpenAI on Monday at San Francisco")
+            .await
+            .unwrap();
+
+        let names = candidates
+            .into_iter()
+            .map(|candidate| candidate.canonical_name)
+            .collect::<Vec<_>>();
+
+        // Should NOT include: I, At, In, On (1-2 letter words)
+        // Should include: Bob, OpenAI, Monday, San Francisco (3+ chars)
+        assert!(!names.contains(&"I".to_string()));
+        assert!(!names.contains(&"At".to_string()));
+        assert!(!names.contains(&"On".to_string()));
+
+        assert!(names.contains(&"Bob".to_string()));
+        assert!(names.contains(&"OpenAI".to_string()));
+        assert!(names.contains(&"Monday".to_string()));
+        assert!(names.contains(&"San Francisco".to_string()));
     }
 }
