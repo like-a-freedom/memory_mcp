@@ -39,6 +39,8 @@ pub struct SurrealConfig {
     pub embedded: bool,
     /// Optional path to RocksDB data directory.
     pub data_dir: Option<String>,
+    /// Lifecycle background job configuration.
+    pub lifecycle: LifecycleConfig,
 }
 
 impl SurrealConfig {
@@ -93,6 +95,8 @@ impl SurrealConfig {
         let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "warn".to_string());
         let data_dir = env::var("SURREALDB_DATA_DIR").ok();
 
+        let lifecycle = LifecycleConfig::from_env();
+
         Ok(Self {
             db_name,
             url,
@@ -102,6 +106,7 @@ impl SurrealConfig {
             log_level,
             embedded,
             data_dir,
+            lifecycle,
         })
     }
 
@@ -117,6 +122,108 @@ impl SurrealConfig {
         self.data_dir
             .clone()
             .unwrap_or_else(default_embedded_data_dir)
+    }
+
+    /// Returns the lifecycle configuration.
+    #[must_use]
+    pub fn lifecycle(&self) -> LifecycleConfig {
+        LifecycleConfig::from_env()
+    }
+}
+
+/// Configuration for background lifecycle jobs.
+///
+/// Controls confidence decay refresh and episode archival workers.
+/// Both workers are disabled by default and must be explicitly enabled.
+///
+/// # Environment Variables
+///
+/// | Variable | Default | Description |
+/// |----------|---------|-------------|
+/// | `LIFECYCLE_ENABLED` | false | Enable background workers |
+/// | `LIFECYCLE_DECAY_INTERVAL_SECS` | 3600 | Decay job interval (seconds) |
+/// | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | 86400 | Archival job interval (seconds) |
+/// | `LIFECYCLE_DECAY_THRESHOLD` | 0.3 | Confidence threshold for invalidation |
+/// | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | 90 | Days before episode archival |
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use memory_mcp::config::LifecycleConfig;
+///
+/// let config = LifecycleConfig::from_env();
+/// if config.enabled {
+///     // Start background workers
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct LifecycleConfig {
+    /// Enable background lifecycle workers.
+    pub enabled: bool,
+    /// Interval for decay refresh job (seconds).
+    pub decay_interval_secs: u64,
+    /// Interval for episode archival job (seconds).
+    pub archival_interval_secs: u64,
+    /// Confidence threshold below which facts are marked invalid.
+    pub decay_confidence_threshold: f64,
+    /// Days after which episodes are archived (no active facts).
+    pub archival_age_days: u32,
+}
+
+impl Default for LifecycleConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            decay_interval_secs: 3600,
+            archival_interval_secs: 86400,
+            decay_confidence_threshold: 0.3,
+            archival_age_days: 90,
+        }
+    }
+}
+
+impl LifecycleConfig {
+    /// Loads lifecycle configuration from environment variables.
+    ///
+    /// # Environment Variables
+    ///
+    /// | Variable | Default | Description |
+    /// |----------|---------|-------------|
+    /// | `LIFECYCLE_ENABLED` | false | Enable background workers |
+    /// | `LIFECYCLE_DECAY_INTERVAL_SECS` | 3600 | Decay job interval |
+    /// | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | 86400 | Archival job interval |
+    /// | `LIFECYCLE_DECAY_THRESHOLD` | 0.3 | Confidence threshold |
+    /// | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | 90 | Episode age threshold |
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use memory_mcp::config::LifecycleConfig;
+    ///
+    /// let config = LifecycleConfig::from_env();
+    /// assert!(!config.enabled); // disabled by default
+    /// ```
+    #[must_use]
+    pub fn from_env() -> Self {
+        Self {
+            enabled: parse_bool_env("LIFECYCLE_ENABLED").unwrap_or(false),
+            decay_interval_secs: env::var("LIFECYCLE_DECAY_INTERVAL_SECS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(3600),
+            archival_interval_secs: env::var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(86400),
+            decay_confidence_threshold: env::var("LIFECYCLE_DECAY_THRESHOLD")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.3),
+            archival_age_days: env::var("LIFECYCLE_ARCHIVAL_AGE_DAYS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(90),
+        }
     }
 }
 
@@ -165,6 +272,7 @@ pub struct SurrealConfigBuilder {
     log_level: String,
     embedded: bool,
     data_dir: Option<String>,
+    lifecycle: LifecycleConfig,
 }
 
 impl SurrealConfigBuilder {
@@ -217,6 +325,12 @@ impl SurrealConfigBuilder {
         self
     }
 
+    /// Sets the lifecycle configuration.
+    pub fn lifecycle_config(mut self, config: LifecycleConfig) -> Self {
+        self.lifecycle = config;
+        self
+    }
+
     /// Builds the configuration.
     ///
     /// # Errors
@@ -249,6 +363,7 @@ impl SurrealConfigBuilder {
             log_level: self.log_level,
             embedded: self.embedded,
             data_dir: self.data_dir,
+            lifecycle: self.lifecycle,
         })
     }
 }
@@ -384,6 +499,45 @@ mod tests {
             .build()
             .expect("valid config");
         assert_eq!(config.data_dir_or_default(), "relative/custom/path");
+    }
+
+    #[test]
+    fn lifecycle_config_defaults() {
+        let config = LifecycleConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.decay_interval_secs, 3600);
+        assert_eq!(config.archival_interval_secs, 86400);
+        assert_eq!(config.decay_confidence_threshold, 0.3);
+        assert_eq!(config.archival_age_days, 90);
+    }
+
+    #[test]
+    fn lifecycle_config_from_env() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("LIFECYCLE_ENABLED", "true");
+            env::set_var("LIFECYCLE_DECAY_INTERVAL_SECS", "1800");
+            env::set_var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS", "43200");
+            env::set_var("LIFECYCLE_DECAY_THRESHOLD", "0.5");
+            env::set_var("LIFECYCLE_ARCHIVAL_AGE_DAYS", "60");
+        }
+
+        let config = LifecycleConfig::from_env();
+
+        unsafe {
+            env::remove_var("LIFECYCLE_ENABLED");
+            env::remove_var("LIFECYCLE_DECAY_INTERVAL_SECS");
+            env::remove_var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS");
+            env::remove_var("LIFECYCLE_DECAY_THRESHOLD");
+            env::remove_var("LIFECYCLE_ARCHIVAL_AGE_DAYS");
+        }
+
+        assert!(config.enabled);
+        assert_eq!(config.decay_interval_secs, 1800);
+        assert_eq!(config.archival_interval_secs, 43200);
+        assert_eq!(config.decay_confidence_threshold, 0.5);
+        assert_eq!(config.archival_age_days, 60);
     }
 
     #[test]
