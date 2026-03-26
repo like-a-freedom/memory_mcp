@@ -145,6 +145,7 @@ impl SurrealConfig {
 /// | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | 86400 | Archival job interval (seconds) |
 /// | `LIFECYCLE_DECAY_THRESHOLD` | 0.3 | Confidence threshold for invalidation |
 /// | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | 90 | Days before episode archival |
+/// | `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | 365 | Half-life (days) for decay computation |
 ///
 /// # Examples
 ///
@@ -168,6 +169,8 @@ pub struct LifecycleConfig {
     pub decay_confidence_threshold: f64,
     /// Days after which episodes are archived (no active facts).
     pub archival_age_days: u32,
+    /// Half-life in days for confidence decay computation.
+    pub decay_half_life_days: f64,
 }
 
 impl Default for LifecycleConfig {
@@ -178,6 +181,7 @@ impl Default for LifecycleConfig {
             archival_interval_secs: 86400,
             decay_confidence_threshold: 0.3,
             archival_age_days: 90,
+            decay_half_life_days: 365.0,
         }
     }
 }
@@ -194,6 +198,7 @@ impl LifecycleConfig {
     /// | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | 86400 | Archival job interval |
     /// | `LIFECYCLE_DECAY_THRESHOLD` | 0.3 | Confidence threshold |
     /// | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | 90 | Episode age threshold |
+    /// | `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | 365 | Half-life for decay |
     ///
     /// # Examples
     ///
@@ -223,6 +228,10 @@ impl LifecycleConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(90),
+            decay_half_life_days: env::var("LIFECYCLE_DECAY_HALF_LIFE_DAYS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(365.0),
         }
     }
 }
@@ -509,6 +518,7 @@ mod tests {
         assert_eq!(config.archival_interval_secs, 86400);
         assert_eq!(config.decay_confidence_threshold, 0.3);
         assert_eq!(config.archival_age_days, 90);
+        assert_eq!(config.decay_half_life_days, 365.0);
     }
 
     #[test]
@@ -521,6 +531,7 @@ mod tests {
             env::set_var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS", "43200");
             env::set_var("LIFECYCLE_DECAY_THRESHOLD", "0.5");
             env::set_var("LIFECYCLE_ARCHIVAL_AGE_DAYS", "60");
+            env::set_var("LIFECYCLE_DECAY_HALF_LIFE_DAYS", "180");
         }
 
         let config = LifecycleConfig::from_env();
@@ -531,6 +542,7 @@ mod tests {
             env::remove_var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS");
             env::remove_var("LIFECYCLE_DECAY_THRESHOLD");
             env::remove_var("LIFECYCLE_ARCHIVAL_AGE_DAYS");
+            env::remove_var("LIFECYCLE_DECAY_HALF_LIFE_DAYS");
         }
 
         assert!(config.enabled);
@@ -538,6 +550,7 @@ mod tests {
         assert_eq!(config.archival_interval_secs, 43200);
         assert_eq!(config.decay_confidence_threshold, 0.5);
         assert_eq!(config.archival_age_days, 60);
+        assert_eq!(config.decay_half_life_days, 180.0);
     }
 
     #[test]

@@ -137,22 +137,21 @@ impl MemoryService {
             let decay_service = service.clone();
             let decay_config = config.lifecycle.clone();
 
-            let _ = spawn_decay_worker(
+            let _decay_handle = spawn_decay_worker(
                 decay_service,
                 decay_config.decay_interval_secs,
                 decay_config.decay_confidence_threshold,
-            )
-            .await;
+                decay_config.decay_half_life_days,
+            );
 
             let archival_service = service.clone();
             let archival_config = config.lifecycle.clone();
 
-            let _ = spawn_archival_worker(
+            let _archival_handle = spawn_archival_worker(
                 archival_service,
                 archival_config.archival_interval_secs,
                 archival_config.archival_age_days,
-            )
-            .await;
+            );
 
             let mut event = std::collections::HashMap::new();
             event.insert(
@@ -1369,6 +1368,33 @@ mod tests {
                 Ok(Value::Null)
             }
 
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
                 self.apply_count.fetch_add(1, Ordering::SeqCst);
                 self.calls.safe_lock().push(namespace.to_string());
@@ -1560,6 +1586,32 @@ mod tests {
                 Ok(Value::Null)
             }
 
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
@@ -1799,6 +1851,32 @@ mod tests {
                 Ok(Value::Null)
             }
 
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
@@ -1955,6 +2033,32 @@ mod tests {
                 Ok(Value::Null)
             }
 
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
@@ -2109,6 +2213,32 @@ mod tests {
                 Ok(Value::Null)
             }
 
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }

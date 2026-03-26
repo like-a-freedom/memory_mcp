@@ -8,6 +8,8 @@ use tokio::time::{self, Duration as TokioDuration};
 
 use crate::service::{MemoryError, MemoryService};
 
+const ARCHIVAL_BATCH_LIMIT: i32 = 500;
+
 /// Spawns the archival worker background task.
 pub fn spawn_archival_worker(
     service: MemoryService,
@@ -71,37 +73,17 @@ pub async fn run_archival_pass(
 ) -> Result<usize, MemoryError> {
     let now = Utc::now();
     let cutoff = now - chrono::Duration::days(age_days as i64);
+    let cutoff_str = crate::service::normalize_dt(cutoff);
     let namespace = service.default_namespace.clone();
 
-    // Fetch all episodes
     let episodes = service
         .db_client
-        .select_table("episode", &namespace)
+        .select_episodes_for_archival(&namespace, &cutoff_str, ARCHIVAL_BATCH_LIMIT)
         .await?;
 
     let mut archived = 0;
 
     for record in episodes {
-        // Skip already archived episodes
-        if let Some(status) = record.get("status").and_then(|v| v.as_str())
-            && status == "archived"
-        {
-            continue;
-        }
-
-        // Check episode age
-        let t_ref = record
-            .get("t_ref")
-            .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or(now);
-
-        if t_ref > cutoff {
-            continue; // Episode is not old enough
-        }
-
-        // Check if episode has any active facts
         let episode_id = record
             .get("episode_id")
             .and_then(|v| v.as_str())
@@ -111,7 +93,6 @@ pub async fn run_archival_pass(
             check_episode_has_active_facts(service, episode_id, &namespace).await?;
 
         if !has_active_facts {
-            // Archive the episode
             let payload = json!({
                 "status": "archived",
                 "archived_at": crate::service::normalize_dt(now),
@@ -135,11 +116,10 @@ async fn check_episode_has_active_facts(
     episode_id: &str,
     namespace: &str,
 ) -> Result<bool, MemoryError> {
-    // Query facts linked to this episode using select_facts_filtered
     let cutoff = crate::service::normalize_dt(Utc::now());
     let facts = service
         .db_client
-        .select_facts_filtered(namespace, episode_id, &cutoff, None, 1)
+        .select_active_facts_by_episode(namespace, episode_id, &cutoff, 1)
         .await?;
 
     Ok(!facts.is_empty())

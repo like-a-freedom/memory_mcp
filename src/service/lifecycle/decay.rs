@@ -14,6 +14,7 @@ pub fn spawn_decay_worker(
     service: MemoryService,
     interval_secs: u64,
     threshold: f64,
+    half_life_days: f64,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
@@ -27,15 +28,13 @@ pub fn spawn_decay_worker(
             "interval_secs".to_string(),
             serde_json::Value::Number(serde_json::Number::from(interval_secs)),
         );
-        event.insert(
-            "threshold".to_string(),
-            serde_json::Value::Number(serde_json::Number::from(threshold as i64)),
-        );
+        event.insert("threshold".to_string(), json!(threshold));
+        event.insert("half_life_days".to_string(), json!(half_life_days));
         service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
             interval.tick().await;
-            match run_decay_pass(&service, threshold).await {
+            match run_decay_pass(&service, threshold, half_life_days).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();
                     event.insert(
@@ -65,13 +64,21 @@ pub fn spawn_decay_worker(
     })
 }
 
+const DECAY_BATCH_LIMIT: i32 = 1000;
+
 /// Runs a single decay pass, invalidating facts below threshold.
-pub async fn run_decay_pass(service: &MemoryService, threshold: f64) -> Result<usize, MemoryError> {
+pub async fn run_decay_pass(
+    service: &MemoryService,
+    threshold: f64,
+    half_life_days: f64,
+) -> Result<usize, MemoryError> {
     let now = Utc::now();
     let namespace = service.default_namespace.clone();
 
-    // Fetch all active facts
-    let facts = service.db_client.select_table("fact", &namespace).await?;
+    let facts = service
+        .db_client
+        .select_active_facts(&namespace, DECAY_BATCH_LIMIT)
+        .await?;
 
     let mut invalidated = 0;
 
@@ -93,7 +100,7 @@ pub async fn run_decay_pass(service: &MemoryService, threshold: f64) -> Result<u
 
         // Compute decayed confidence using standard decay formula
         let days_since_valid = (now - t_valid).num_days() as f64;
-        let decay_rate = 0.693 / 365.0; // ln(2) / half-life (1 year)
+        let decay_rate = (2.0_f64).ln() / half_life_days;
         let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
 
         if decayed < threshold {

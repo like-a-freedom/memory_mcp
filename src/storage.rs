@@ -91,6 +91,38 @@ pub trait DbClient: Send + Sync {
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError>;
 
+    /// Selects active (non-invalidated) facts with an optional limit.
+    ///
+    /// Returns facts where `t_invalid IS NULL`, ordered by `t_valid ASC`.
+    /// This avoids full table scans in lifecycle workers.
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects episodes eligible for archival.
+    ///
+    /// Returns non-archived episodes older than the cutoff, ordered by `t_ref ASC`.
+    async fn select_episodes_for_archival(
+        &self,
+        namespace: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects active facts linked to a specific episode.
+    ///
+    /// Returns facts where `source_episode = $episode_id` and `t_invalid IS NULL`
+    /// (or `t_invalid > $cutoff`), limited to `limit`.
+    async fn select_active_facts_by_episode(
+        &self,
+        namespace: &str,
+        episode_id: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
     /// Selects communities whose summaries match the supplied query using DB-side search.
     async fn select_communities_matching_summary(
         &self,
@@ -941,6 +973,117 @@ impl DbClient for SurrealDbClient {
         Ok(result)
     }
 
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_active_facts",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, vars) = build_select_active_facts_query(limit);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_active_facts.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_episodes_for_archival(
+        &self,
+        namespace: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_episodes_for_archival",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, vars) = build_select_episodes_for_archival_query(cutoff, limit);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_episodes_for_archival.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_active_facts_by_episode(
+        &self,
+        namespace: &str,
+        episode_id: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_active_facts_by_episode",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("episode_id", Value::String(episode_id.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, vars) = build_select_active_facts_by_episode_query(episode_id, cutoff, limit);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_active_facts_by_episode.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
     async fn select_communities_matching_summary(
         &self,
         namespace: &str,
@@ -1258,6 +1401,31 @@ fn build_select_facts_by_entity_links_query(
             "entity_links": entity_links,
             "limit": limit,
         }),
+    )
+}
+
+fn build_select_active_facts_query(limit: i32) -> (String, Value) {
+    (
+        "SELECT * FROM fact WHERE t_invalid IS NULL ORDER BY t_valid ASC LIMIT $limit".to_string(),
+        json!({"limit": limit}),
+    )
+}
+
+fn build_select_episodes_for_archival_query(cutoff: &str, limit: i32) -> (String, Value) {
+    (
+        "SELECT * FROM episode WHERE status != 'archived' AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit".to_string(),
+        json!({"cutoff": cutoff, "limit": limit}),
+    )
+}
+
+fn build_select_active_facts_by_episode_query(
+    episode_id: &str,
+    cutoff: &str,
+    limit: i32,
+) -> (String, Value) {
+    (
+        "SELECT * FROM fact WHERE source_episode = $episode_id AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff)) LIMIT $limit".to_string(),
+        json!({"episode_id": episode_id, "cutoff": cutoff, "limit": limit}),
     )
 }
 
@@ -2387,5 +2555,39 @@ mod tests {
             json_f64(&json!({"Decimal": {"String": "42.5"}})),
             Some(42.5)
         );
+    }
+
+    #[test]
+    fn build_select_active_facts_query_filters_by_t_invalid() {
+        let (sql, vars) = build_select_active_facts_query(500);
+
+        assert!(sql.contains("FROM fact WHERE t_invalid IS NULL"));
+        assert!(sql.contains("ORDER BY t_valid ASC"));
+        assert!(sql.contains("LIMIT $limit"));
+        assert_eq!(vars.get("limit"), Some(&json!(500)));
+    }
+
+    #[test]
+    fn build_select_episodes_for_archival_query_filters_by_status_and_age() {
+        let (sql, vars) = build_select_episodes_for_archival_query("2025-06-01T00:00:00Z", 100);
+
+        assert!(sql.contains("FROM episode WHERE status != 'archived'"));
+        assert!(sql.contains("t_ref < type::datetime($cutoff)"));
+        assert!(sql.contains("ORDER BY t_ref ASC"));
+        assert!(sql.contains("LIMIT $limit"));
+        assert_eq!(vars.get("cutoff"), Some(&json!("2025-06-01T00:00:00Z")));
+        assert_eq!(vars.get("limit"), Some(&json!(100)));
+    }
+
+    #[test]
+    fn build_select_active_facts_by_episode_query_uses_source_episode() {
+        let (sql, vars) =
+            build_select_active_facts_by_episode_query("episode:abc", "2026-01-15T00:00:00Z", 1);
+
+        assert!(sql.contains("source_episode = $episode_id"));
+        assert!(sql.contains("t_invalid IS NONE OR t_invalid > type::datetime($cutoff)"));
+        assert_eq!(vars.get("episode_id"), Some(&json!("episode:abc")));
+        assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
+        assert_eq!(vars.get("limit"), Some(&json!(1)));
     }
 }

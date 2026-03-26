@@ -17,7 +17,7 @@ async fn decay_pass_with_empty_database() {
         .expect("service created");
 
     // Act: Run decay pass
-    let count = run_decay_pass(&service, 0.3)
+    let count = run_decay_pass(&service, 0.3, 365.0)
         .await
         .expect("decay pass completed");
 
@@ -53,7 +53,7 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
         .expect("fact added");
 
     // Act: Run decay pass with 0.3 threshold
-    let count = run_decay_pass(&service, 0.3)
+    let count = run_decay_pass(&service, 0.3, 365.0)
         .await
         .expect("decay pass completed");
 
@@ -107,11 +107,11 @@ async fn decay_pass_different_thresholds_produce_different_results() {
         .expect("fact added");
 
     // Act: Run with different thresholds
-    let count_low = run_decay_pass(&service, 0.2)
+    let count_low = run_decay_pass(&service, 0.2, 365.0)
         .await
         .expect("decay pass completed");
 
-    let count_high = run_decay_pass(&service, 0.8)
+    let count_high = run_decay_pass(&service, 0.8, 365.0)
         .await
         .expect("decay pass completed");
 
