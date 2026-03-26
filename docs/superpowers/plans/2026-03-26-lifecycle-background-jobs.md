@@ -1,7 +1,7 @@
 # Memory Lifecycle Background Jobs Implementation Plan
 
 > **Status:** ✅ **COMPLETE** (2026-03-26)
-> **Implementation:** All core tasks completed. See `src/service/lifecycle/` module.
+> **Implementation:** All tasks completed including integration tests. See `src/service/lifecycle/` module.
 
 **Goal:** Implement background jobs for confidence decay refresh and episode archival to prevent unbounded growth and maintain memory hygiene.
 
@@ -20,7 +20,7 @@
 | Task 3: Episode Archival Job | ✅ Complete | `c8aff5b` |
 | Task 4: Wire Up Workers | ✅ Complete | `343af30` |
 | Task 5: Documentation | ✅ Complete | `c8acd51` |
-| **Integration Tests** | ⚠️ Deferred | Manual testing via public APIs |
+| **Task 6: Integration Tests** | ✅ Complete | `c25b259` |
 
 ---
 
@@ -33,10 +33,12 @@
 - ✅ **Created:** `src/service/lifecycle/mod.rs` (public)
 - ✅ **Modified:** `src/service/mod.rs`
 - ✅ **Modified:** `src/config.rs`
+- ✅ **Modified:** `src/service/core.rs` (public namespace_for_scope, db_client)
 - ✅ **Modified:** `.env.example`
 - ✅ **Modified:** `README.md`
 - ✅ **Created:** `docs/LIFECYCLE_BACKGROUND_JOBS.md`
-- ⚠️ **Tests:** Integration tests deferred - manual testing supported via `run_decay_pass()` and `run_archival_pass()`
+- ✅ **Created:** `tests/lifecycle_decay.rs` (3 tests)
+- ✅ **Created:** `tests/lifecycle_archival.rs` (3 tests)
 
 ---
 
@@ -81,14 +83,17 @@
 - [x] **Step 3: Export decayed_confidence_raw helper** ✅
   - **Resolved:** Inline decay formula used instead of separate helper
 
-- [x] **Step 4: Write integration test for decay job** ⚠️
-  - **Status:** Deferred - manual testing via `run_decay_pass()` public function
+- [x] **Step 4: Write integration test for decay job** ✅
+  - **Implemented:** `tests/lifecycle_decay.rs` (3 tests)
+  - **Tests:** `decay_pass_with_empty_database`, `decay_pass_preserves_recent_high_confidence_facts`, `decay_pass_different_thresholds_produce_different_results`
 
-- [x] **Step 5: Run decay test** ⚠️
-  - **Status:** Skipped (test deferred)
+- [x] **Step 5: Run decay test** ✅
+  - **Command:** `cargo test --test lifecycle_decay -- --test-threads=1`
+  - **Result:** PASS (3 tests)
 
 - [x] **Step 6: Commit** ✅
   - **Commit:** `c8aff5b feat(lifecycle): implement decay and archival background workers`
+  - **Commit:** `c25b259 test: add integration tests for lifecycle and provenance`
 
 ---
 
@@ -99,14 +104,17 @@
 - [x] **Step 1: Create archival job implementation** ✅
   - **Implemented:** `src/service/lifecycle/archival.rs`
 
-- [x] **Step 2: Write integration test for archival job** ⚠️
-  - **Status:** Deferred - manual testing via `run_archival_pass()` public function
+- [x] **Step 2: Write integration test for archival job** ✅
+  - **Implemented:** `tests/lifecycle_archival.rs` (3 tests)
+  - **Tests:** `archival_pass_with_empty_database`, `archival_pass_preserves_episodes_with_active_facts`, `archival_pass_different_thresholds`
 
-- [x] **Step 3: Run archival tests** ⚠️
-  - **Status:** Skipped (test deferred)
+- [x] **Step 3: Run archival tests** ✅
+  - **Command:** `cargo test --test lifecycle_archival -- --test-threads=1`
+  - **Result:** PASS (3 tests)
 
 - [x] **Step 4: Commit** ✅
   - **Commit:** `c8aff5b feat(lifecycle): implement decay and archival background workers`
+  - **Commit:** `c25b259 test: add integration tests for lifecycle and provenance`
 
 ---
 
@@ -154,6 +162,30 @@
 
 ---
 
+## Task 6: Integration Tests ✅
+
+**Files:** `tests/lifecycle_decay.rs`, `tests/lifecycle_archival.rs`
+
+- [x] **Step 1: Create lifecycle decay tests** ✅
+  - **File:** `tests/lifecycle_decay.rs`
+  - **Tests:** 3 tests covering empty database, recent facts preservation, threshold differences
+
+- [x] **Step 2: Create lifecycle archival tests** ✅
+  - **File:** `tests/lifecycle_archival.rs`
+  - **Tests:** 3 tests covering empty database, active facts preservation, threshold differences
+
+- [x] **Step 3: Make MemoryService APIs public for testing** ✅
+  - **Modified:** `src/service/core.rs` — `pub fn namespace_for_scope()`, `pub db_client`
+
+- [x] **Step 4: Run all lifecycle tests** ✅
+  - **Command:** `cargo test --test lifecycle_decay --test lifecycle_archival -- --test-threads=1`
+  - **Result:** PASS (6 tests total)
+
+- [x] **Step 5: Commit** ✅
+  - **Commit:** `c25b259 test: add integration tests for lifecycle and provenance`
+
+---
+
 ## Verification
 
 **All verification steps completed:**
@@ -163,24 +195,30 @@ cargo fmt — ✅
 cargo check — ✅
 cargo clippy -- -D warnings — ✅
 cargo test --lib — ✅ (269 tests passed)
+cargo test --test lifecycle_decay --test lifecycle_archival -- --test-threads=1 — ✅ (6 tests passed)
 ```
 
 ---
 
-## Remaining Work
+## Running Tests
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| Integration tests for decay worker | Low | Manual testing possible via `run_decay_pass()` (public) |
-| Integration tests for archival worker | Low | Manual testing possible via `run_archival_pass()` (public) |
+**Note:** Tests require `--test-threads=1` due to embedded SurrealDB LOCK file contention:
+
+```bash
+# Run lifecycle tests
+cargo test --test lifecycle_decay --test lifecycle_archival -- --test-threads=1
+
+# Run all tests
+cargo test -- --test-threads=1
+```
 
 ---
 
 ## Summary
 
-**Lifecycle background jobs are fully implemented and operational.** 
+**Lifecycle background jobs are fully implemented and tested.** 
 
 - Workers can be enabled via `LIFECYCLE_ENABLED=true` environment variable
 - Module is public (`pub mod lifecycle`) for testing access
-- Manual testing supported via exported `run_decay_pass()` and `run_archival_pass()` functions
-- Integration test files deferred but functionality is testable via public APIs
+- **6 integration tests** verify decay and archival logic
+- Full documentation in `.env.example`, `README.md`, and `docs/LIFECYCLE_BACKGROUND_JOBS.md`

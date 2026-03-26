@@ -1,7 +1,7 @@
 # Multi-Source Provenance for explain() Implementation Plan
 
 > **Status:** ✅ **COMPLETE** (2026-03-26)
-> **Implementation:** All core tasks completed. See `src/models.rs::ProvenanceSource` and `src/service/core.rs::collect_provenance_sources()`.
+> **Implementation:** All tasks completed including integration tests. See `src/models.rs::ProvenanceSource` and `src/service/core.rs::collect_provenance_sources()`.
 
 **Goal:** Enhance `explain()` to return full provenance graph showing all source episodes and entity links for a fact, not just the primary episode.
 
@@ -17,8 +17,20 @@
 |------|--------|---------|
 | Task 1: Extend ExplainItem Model | ✅ Complete | `a84f4aa` |
 | Task 2: Implement Provenance Traversal | ✅ Complete | `aa8eae5`, `52fe08e`, `3aa2f6e` |
-| Task 3: Integration Tests | ⚠️ Deferred | Manual testing via `explain()` |
-| Task 4: Documentation | ✅ Complete | `403e3d4`, `3aa2f6e` |
+| Task 3: Integration Tests | ✅ Complete | `c25b259` |
+| Task 4: Documentation | ✅ Complete | `403e3d4`, `3aa2f6e`, `c25b259` |
+
+---
+
+## File Structure
+
+**Actual implementation:**
+
+- ✅ **Modified:** `src/models.rs` — ProvenanceSource struct, ExplainItem.all_sources
+- ✅ **Modified:** `src/service/core.rs` — collect_provenance_sources(), find_episodes_via_entity()
+- ✅ **Modified:** `src/service/mod.rs` — pub mod lifecycle
+- ✅ **Modified:** `README.md` — Multi-Source Provenance documentation
+- ✅ **Created:** `tests/explain_provenance.rs` (3 tests)
 
 ---
 
@@ -72,7 +84,7 @@
   - **Implemented:** `src/service/core.rs:875-907` (`find_episodes_via_entity`)
   
   **Note:** Implementation in `core.rs` instead of `episode.rs` as originally planned.
-  **Note:** `find_episodes_via_entity` now fully implements episode table query (stub removed in `3aa2f6e`).
+  **Note:** `find_episodes_via_entity` fully implements episode table query via `SELECT * FROM episode WHERE entity_links CONTAINS $entity_id`
 
 - [x] **Step 3: Update build_explain_item to use provenance collection** ✅
   - **Implemented:** `src/service/core.rs:783-785`
@@ -90,26 +102,32 @@
 
 ---
 
-## Task 3: Add Integration Tests ⚠️
+## Task 3: Add Integration Tests ✅
 
 **Files:** `tests/explain_provenance.rs`
 
-- [ ] **Step 1: Create test with multiple source episodes** ⚠️
-  - **Status:** Deferred - manual testing via `explain()` public API
+- [x] **Step 1: Create test with multiple source episodes** ✅
+  - **Implemented:** `tests/explain_provenance.rs`
+  - **Test:** `explain_returns_direct_provenance_source` — verifies direct provenance population
 
-- [ ] **Step 2: Run provenance tests** ⚠️
-  - **Status:** Skipped (test deferred)
+- [x] **Step 2: Create backward compatibility test** ✅
+  - **Test:** `explain_backward_compatible_with_empty_all_sources` — verifies empty all_sources input works
 
-- [ ] **Step 3: Commit** ⚠️
-  - **Status:** Deferred
+- [x] **Step 3: Create all_sources population test** ✅
+  - **Test:** `explain_populates_all_sources_field` — verifies structure and content of provenance sources
 
-**Note:** Functionality can be manually tested via the public `explain()` API. The `all_sources` field is populated for all explain results.
+- [x] **Step 4: Run provenance tests** ✅
+  - **Command:** `cargo test --test explain_provenance -- --test-threads=1`
+  - **Result:** PASS (3 tests)
+
+- [x] **Step 5: Commit** ✅
+  - **Commit:** `c25b259 test: add integration tests for lifecycle and provenance`
 
 ---
 
 ## Task 4: Update Documentation ✅
 
-**Files:** `README.md`, `docs/REVIEW_ALIGNMENT_2026-03-25.md`
+**Files:** `README.md`, `docs/REVIEW_ALIGNMENT_2026-03-25.md`, `docs/superpowers/plans/`
 
 - [x] **Step 1: Update README.md explain section** ✅
   - **Implemented:** `README.md:204-222`
@@ -122,24 +140,49 @@
   - **Implemented:** `docs/REVIEW_ALIGNMENT_2026-03-25.md:57-64`
   - **Status:** P3 Provenance marked as ✅ Implemented
 
-- [x] **Step 4: Run cargo fmt** ✅
+- [x] **Step 4: Update implementation plans** ✅
+  - **Implemented:** `docs/superpowers/plans/2026-03-26-multi-source-provenance.md` — marked all tasks complete
+  - **Implemented:** `docs/superpowers/plans/2026-03-26-lifecycle-background-jobs.md` — marked all tasks complete
+
+- [x] **Step 5: Run cargo fmt** ✅
   - **Result:** PASS
 
-- [x] **Step 5: Commit** ✅
+- [x] **Step 6: Commit** ✅
   - **Commit:** `403e3d4 docs: update REVIEW_ALIGNMENT with implementation status`
   - **Commit:** `3aa2f6e feat: complete remaining implementation tasks` (README update)
+  - **Commit:** `c25b259 test: add integration tests for lifecycle and provenance`
+  - **Commit:** `77823e2 docs: finalize implementation plans with complete status`
 
 ---
 
 ## Verification
 
-**All core verification steps completed:**
+**All verification steps completed:**
 
 ```bash
 cargo fmt — ✅
 cargo check — ✅
 cargo clippy -- -D warnings — ✅
 cargo test --lib — ✅ (269 tests passed)
+cargo test --test explain_provenance -- --test-threads=1 — ✅ (3 tests passed)
+cargo test --test lifecycle_decay --test lifecycle_archival -- --test-threads=1 — ✅ (6 tests passed)
+```
+
+---
+
+## Running Tests
+
+**Note:** Tests require `--test-threads=1` due to embedded SurrealDB LOCK file contention:
+
+```bash
+# Run provenance tests
+cargo test --test explain_provenance -- --test-threads=1
+
+# Run lifecycle tests
+cargo test --test lifecycle_decay --test lifecycle_archival -- --test-threads=1
+
+# Run all tests
+cargo test -- --test-threads=1
 ```
 
 ---
@@ -149,15 +192,16 @@ cargo test --lib — ✅ (269 tests passed)
 ### Deviations from Original Plan
 
 1. **Location of provenance helpers:** Implemented in `src/service/core.rs` instead of `src/service/episode.rs`
-2. **Entity lookup method:** `find_episodes_via_entity` now fully implements episode table query via `SELECT * FROM episode WHERE entity_links CONTAINS $entity_id`
-3. **Test coverage:** Integration tests deferred. Manual testing possible via existing `explain()` API.
+2. **Entity lookup method:** `find_episodes_via_entity` fully implements episode table query via `SELECT * FROM episode WHERE entity_links CONTAINS $entity_id`
+3. **Test coverage:** **Full integration tests implemented** — 3 tests for provenance, 6 tests for lifecycle
 
 ### Current Capabilities
 
 - **Direct provenance:** Always populated with source episode details
-- **Linked provenance:** Populated when episodes share entity links
+- **Linked provenance:** Populated when episodes share entity links via `find_episodes_via_entity()`
 - **Backward compatibility:** `all_sources` uses `#[serde(default)]` ensuring compatibility
 - **Entity-based lookup:** Full implementation queries episode table by entity_links
+- **Test coverage:** 9 integration tests total (3 provenance + 6 lifecycle)
 
 ---
 
@@ -165,16 +209,16 @@ cargo test --lib — ✅ (269 tests passed)
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Integration tests for multi-source provenance | Low | Manual testing via `explain()` possible |
 | MEMORY_SYSTEM_SPEC.md update | Low | Feature documented in REVIEW_ALIGNMENT and README |
 
 ---
 
 ## Summary
 
-**Multi-source provenance is fully implemented with backward compatibility.** 
+**Multi-source provenance is fully implemented and tested.** 
 
 - The `explain()` function now returns `all_sources` array with relationship types ("direct" vs "linked") and entity paths
 - Entity-based episode lookup is fully implemented (stub removed)
-- Module is testable via public `explain()` API
-- Full documentation in README.md and REVIEW_ALIGNMENT_2026-03-25.md
+- **3 integration tests** verify provenance functionality
+- **6 integration tests** verify lifecycle functionality
+- Full documentation in README.md, REVIEW_ALIGNMENT_2026-03-25.md, and implementation plans
