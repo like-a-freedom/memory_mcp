@@ -44,6 +44,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 t_ingested: None,
                 provenance: Value::Null,
                 citation_context: None,
+                ..Default::default()
             },
             Value::Object(ref map) => {
                 let content = map
@@ -71,6 +72,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     t_ingested: None,
                     provenance: Value::Null,
                     citation_context: None,
+                    ..Default::default()
                 }
             }
             _ => ExplainItem {
@@ -82,6 +84,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 t_ingested: None,
                 provenance: Value::Null,
                 citation_context: None,
+                ..Default::default()
             },
         })
         .collect();

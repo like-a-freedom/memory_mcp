@@ -11,7 +11,7 @@ use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{
     AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
-    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
+    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest, ProvenanceSource,
 };
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
@@ -796,7 +796,14 @@ impl MemoryService {
                 "source_type": episode.source_type,
                 "source_id": episode.source_id,
             }),
-            citation_context: Some(episode.content),
+            citation_context: Some(episode.content.clone()),
+            all_sources: vec![ProvenanceSource {
+                episode_id: episode.episode_id.clone(),
+                episode_content: episode.content.clone(),
+                episode_t_ref: crate::service::normalize_dt(episode.t_ref),
+                relationship: "direct".to_string(),
+                entity_path: None,
+            }],
         })
     }
 }

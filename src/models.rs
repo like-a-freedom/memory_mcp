@@ -134,6 +134,41 @@ pub struct ExplainItem {
     pub provenance: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub citation_context: Option<String>,
+    /// All provenance sources for this fact (direct + linked episodes).
+    #[serde(default)]
+    pub all_sources: Vec<ProvenanceSource>,
+}
+
+impl Default for ExplainItem {
+    fn default() -> Self {
+        Self {
+            content: String::new(),
+            quote: String::new(),
+            source_episode: String::new(),
+            scope: None,
+            t_ref: None,
+            t_ingested: None,
+            provenance: serde_json::Value::Null,
+            citation_context: None,
+            all_sources: Vec::new(),
+        }
+    }
+}
+
+/// A single provenance source for a fact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ProvenanceSource {
+    /// Source episode ID.
+    pub episode_id: String,
+    /// Source episode content (excerpt).
+    pub episode_content: String,
+    /// Source episode timestamp.
+    pub episode_t_ref: String,
+    /// Relationship to fact: "direct" (created fact) or "linked" (via entity).
+    pub relationship: String,
+    /// Entity link path (if relationship is "linked").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_path: Option<String>,
 }
 
 /// Request to extract entities and facts from an episode.
