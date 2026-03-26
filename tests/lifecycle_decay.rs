@@ -9,6 +9,7 @@ use memory_mcp::MemoryService;
 use serde_json::json;
 
 #[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_with_empty_database() {
     // Setup: Fresh service
     let service = MemoryService::new_from_env()
@@ -26,6 +27,7 @@ async fn decay_pass_with_empty_database() {
 }
 
 #[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_preserves_recent_high_confidence_facts() {
     // Setup
     let service = MemoryService::new_from_env()
@@ -61,6 +63,7 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
 }
 
 #[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_different_thresholds_produce_different_results() {
     // Setup: Create facts with different ages
     let service = MemoryService::new_from_env()
