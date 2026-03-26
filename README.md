@@ -162,6 +162,11 @@ Configuration is loaded from environment variables.
 | `SURREALDB_DATA_DIR` | Custom embedded data directory |
 | `SURREALDB_EMBEDDING_DIMENSION` | HNSW vector dimension for embedding indexes (default: `4`; typical production values are `768`, `1024`, or `1536`) |
 | `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
+| `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
+| `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
+| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
+| `LIFECYCLE_DECAY_THRESHOLD` | Confidence threshold for fact invalidation (default: `0.3`) |
+| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | Days before archiving episodes (default: `90`) |
 
 ### Example
 
@@ -174,6 +179,13 @@ SURREALDB_URL=ws://127.0.0.1:8000/rpc
 SURREALDB_EMBEDDED=false
 SURREALDB_EMBEDDING_DIMENSION=1536
 LOG_LEVEL=info
+
+# Lifecycle background jobs (optional)
+LIFECYCLE_ENABLED=true
+LIFECYCLE_DECAY_INTERVAL_SECS=3600
+LIFECYCLE_ARCHIVAL_INTERVAL_SECS=86400
+LIFECYCLE_DECAY_THRESHOLD=0.3
+LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 ```
 
 If you enable a real embedding provider, set `SURREALDB_EMBEDDING_DIMENSION` to the model output size (for example `nomic-embed-text = 768`, `mxbai-embed-large = 1024`, `text-embedding-3-small = 1536`). Changing it for an already-initialized database is **not** automatic: drop and recreate the embedding indexes (or rebuild the DB) before writing vectors with the new dimension.
