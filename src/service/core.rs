@@ -840,9 +840,7 @@ impl MemoryService {
             })
             .unwrap_or_default()
         {
-            let linked_episodes = self
-                .find_episodes_via_entity(entity_id, &namespace)
-                .await?;
+            let linked_episodes = self.find_episodes_via_entity(entity_id, &namespace).await?;
 
             for ep in linked_episodes {
                 // Skip if this is the primary source (already added)
@@ -884,11 +882,7 @@ impl MemoryService {
         let sql = "SELECT * FROM episode WHERE entity_links CONTAINS $entity_id ORDER BY t_ref DESC LIMIT 10";
         let result: serde_json::Value = self
             .db_client
-            .query(
-                sql,
-                Some(json!({"entity_id": entity_id})),
-                namespace,
-            )
+            .query(sql, Some(json!({"entity_id": entity_id})), namespace)
             .await?;
 
         // Extract episodes from result
@@ -897,9 +891,11 @@ impl MemoryService {
             .map(|arr: &Vec<serde_json::Value>| {
                 arr.iter()
                     .filter_map(|v: &serde_json::Value| {
-                        v.get("Object")
-                            .and_then(|obj| obj.as_object())
-                            .and_then(|obj: &serde_json::Map<String, serde_json::Value>| super::episode::episode_from_record(obj))
+                        v.get("Object").and_then(|obj| obj.as_object()).and_then(
+                            |obj: &serde_json::Map<String, serde_json::Value>| {
+                                super::episode::episode_from_record(obj)
+                            },
+                        )
                     })
                     .collect()
             })

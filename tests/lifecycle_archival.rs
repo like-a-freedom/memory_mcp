@@ -4,8 +4,8 @@
 //! that are older than the threshold and have no active facts.
 
 use chrono::{Duration, Utc};
-use memory_mcp::service::lifecycle::run_archival_pass;
 use memory_mcp::MemoryService;
+use memory_mcp::service::lifecycle::run_archival_pass;
 use serde_json::json;
 
 #[tokio::test]
@@ -119,6 +119,7 @@ async fn archival_pass_different_thresholds() {
     assert!(
         count_300 >= count_100,
         "Higher threshold should archive at least as many: {} vs {}",
-        count_300, count_100
+        count_300,
+        count_100
     );
 }

@@ -10,8 +10,8 @@
 //! ```
 
 use chrono::Utc;
-use memory_mcp::models::{ExplainItem, ExplainRequest};
 use memory_mcp::MemoryService;
+use memory_mcp::models::{ExplainItem, ExplainRequest};
 use serde_json::json;
 
 #[tokio::test]

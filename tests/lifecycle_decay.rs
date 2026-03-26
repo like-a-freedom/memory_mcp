@@ -4,8 +4,8 @@
 //! whose confidence has decayed below the configured threshold.
 
 use chrono::{Duration, Utc};
-use memory_mcp::service::lifecycle::run_decay_pass;
 use memory_mcp::MemoryService;
+use memory_mcp::service::lifecycle::run_decay_pass;
 use serde_json::json;
 
 #[tokio::test]
@@ -119,6 +119,7 @@ async fn decay_pass_different_thresholds_produce_different_results() {
     assert!(
         count_high >= count_low,
         "Higher threshold should invalidate at least as many: {} vs {}",
-        count_high, count_low
+        count_high,
+        count_low
     );
 }
