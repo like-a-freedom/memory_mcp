@@ -367,7 +367,7 @@ async fn expand_query_with_aliases(
     let terms: Vec<&str> = query.split_whitespace().collect();
 
     for term in &terms {
-        if term.len() < 3 {
+        if term.len() < 2 {
             continue;
         }
         let normalized = super::normalize_text(term);

@@ -951,13 +951,10 @@ impl MemoryService {
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| {
-                        if let Some(obj) = v.as_object() {
-                            super::episode::episode_from_record(obj)
-                        } else {
-                            v.get("Object")
-                                .and_then(|o| o.as_object())
-                                .and_then(super::episode::episode_from_record)
-                        }
+                        let obj = v.as_object().or_else(|| {
+                            v.get("Object").and_then(|o| o.as_object())
+                        })?;
+                        super::episode::episode_from_record(obj)
                     })
                     .collect()
             })

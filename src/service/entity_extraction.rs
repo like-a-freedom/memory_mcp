@@ -66,6 +66,10 @@ impl EntityExtractor for RegexEntityExtractor {
 }
 
 /// Classifies an entity candidate into a type based on naming patterns.
+///
+/// Limitation: regex-based classification cannot detect toponyms (city names,
+/// country names) without a gazetteer. Locations are only detected when the
+/// name contains explicit indicators like "City", "County", etc.
 fn classify_entity_type(name: &str) -> &'static str {
     static COMPANY_SUFFIXES: &[&str] = &[
         "Corp",
@@ -256,7 +260,11 @@ mod tests {
             .map(|c| (c.canonical_name.as_str(), c.entity_type.as_str()))
             .collect();
 
+        // "Tech Summit" contains the "Summit" indicator → classified as event
         assert_eq!(types.get("Tech Summit"), Some(&"event"));
+
+        // "San Francisco" has no suffix/indicator match → defaults to "person"
+        // (regex-based classification cannot detect toponyms without a gazetteer)
         assert_eq!(types.get("San Francisco"), Some(&"person"));
     }
 }
