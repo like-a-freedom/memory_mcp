@@ -26,7 +26,8 @@ use super::validation::{validate_entity_candidate, validate_fact_input, validate
 /// Core service for memory operations.
 #[derive(Clone)]
 pub struct MemoryService {
-    pub(crate) db_client: Arc<dyn DbClient>,
+    /// Database client for storage operations.
+    pub db_client: Arc<dyn DbClient>,
     pub(crate) namespaces: Vec<String>,
     pub(crate) default_namespace: String,
     pub(crate) logger: StdoutLogger,
@@ -681,7 +682,9 @@ impl MemoryService {
         Ok(())
     }
 
-    pub(crate) fn namespace_for_scope(&self, scope: &str) -> String {
+    /// Returns the namespace for a given scope.
+    #[must_use]
+    pub fn namespace_for_scope(&self, scope: &str) -> String {
         if self.namespaces.contains(&scope.to_string()) {
             return scope.to_string();
         }
