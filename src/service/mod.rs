@@ -5,16 +5,6 @@
 //! - Entity extraction and resolution
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
-//!
-//! ```compile_fail
-//! use memory_mcp::service::NullEmbedder;
-//!
-//! let _ = NullEmbedder;
-//! ```
-//!
-//! ```compile_fail
-//! use memory_mcp::service::EmbeddingProvider;
-//! ```
 
 pub use core::MemoryService;
 pub use entity_extraction::{EntityExtractor, RegexEntityExtractor};

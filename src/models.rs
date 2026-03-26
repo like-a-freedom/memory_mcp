@@ -408,7 +408,6 @@ pub fn default_budget() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn access_context_from_payload_maps_fields() {

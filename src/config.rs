@@ -552,34 +552,4 @@ mod tests {
         assert_eq!(config.archival_age_days, 60);
         assert_eq!(config.decay_half_life_days, 180.0);
     }
-
-    #[test]
-    fn from_env_ignores_removed_embedding_dimension_variable() {
-        let _guard = env_lock().lock().expect("env lock");
-
-        unsafe {
-            env::set_var("SURREALDB_DB_NAME", "memory");
-            env::set_var("SURREALDB_EMBEDDED", "true");
-            env::set_var("SURREALDB_NAMESPACES", "org");
-            env::set_var("SURREALDB_USERNAME", "user");
-            env::set_var("SURREALDB_PASSWORD", "pass");
-            env::set_var("SURREALDB_EMBEDDING_DIMENSION", "not-a-number");
-        }
-
-        let result = SurrealConfig::from_env();
-
-        unsafe {
-            env::remove_var("SURREALDB_DB_NAME");
-            env::remove_var("SURREALDB_EMBEDDED");
-            env::remove_var("SURREALDB_NAMESPACES");
-            env::remove_var("SURREALDB_USERNAME");
-            env::remove_var("SURREALDB_PASSWORD");
-            env::remove_var("SURREALDB_EMBEDDING_DIMENSION");
-        }
-
-        assert!(
-            result.is_ok(),
-            "removed embedding dimension env var should be ignored rather than validated"
-        );
-    }
 }

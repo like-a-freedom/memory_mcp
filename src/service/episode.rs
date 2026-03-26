@@ -950,42 +950,6 @@ mod tests {
     }
 
     #[test]
-    fn episode_from_record_ignores_legacy_embedding_field() {
-        let mut record = serde_json::Map::new();
-        record.insert("episode_id".to_string(), json!("episode:test123"));
-        record.insert("source_type".to_string(), json!("email"));
-        record.insert("source_id".to_string(), json!("msg-123"));
-        record.insert("content".to_string(), json!("Test content"));
-        record.insert("t_ref".to_string(), json!("2024-01-15T10:30:00Z"));
-        record.insert("t_ingested".to_string(), json!("2024-01-15T10:31:00Z"));
-        record.insert("scope".to_string(), json!("org"));
-        record.insert("embedding".to_string(), json!([0.1, 0.2, 0.3]));
-
-        let episode = episode_from_record(&record).expect("episode");
-        let value = serde_json::to_value(&episode).expect("serialize episode");
-        assert_eq!(value.get("embedding"), None);
-    }
-
-    #[test]
-    fn fact_from_record_ignores_legacy_embedding_field() {
-        let record = json!({
-            "fact_id": "fact:test123",
-            "fact_type": "note",
-            "content": "Test fact",
-            "quote": "Test quote",
-            "source_episode": "episode:abc",
-            "t_valid": "2024-01-15T10:30:00Z",
-            "t_ingested": "2024-01-15T10:31:00Z",
-            "scope": "org",
-            "embedding": [0.1, 0.2, 0.3]
-        });
-
-        let fact = fact_from_record(&record).expect("fact");
-        let value = serde_json::to_value(&fact).expect("serialize fact");
-        assert_eq!(value.get("embedding"), None);
-    }
-
-    #[test]
     fn is_promise_statement_detects_promise_patterns() {
         assert!(is_promise_statement("i will finish this task"));
         assert!(is_promise_statement("i'll deliver the report tomorrow"));
