@@ -2,11 +2,11 @@
 //!
 //! Periodically marks facts with decayed confidence below threshold as invalid.
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
-use crate::service::{decayed_confidence, MemoryService, MemoryError};
+use crate::service::{MemoryService, MemoryError};
 use crate::storage::json_f64;
 
 /// Spawns the decay worker background task.
@@ -68,7 +68,7 @@ pub async fn run_decay_pass(
     threshold: f64,
 ) -> Result<usize, MemoryError> {
     let now = Utc::now();
-    let namespace = service.default_namespace().unwrap_or("memory");
+    let namespace = service.default_namespace.clone();
 
     // Fetch all active facts
     let facts = service
@@ -97,7 +97,10 @@ pub async fn run_decay_pass(
             .and_then(json_f64)
             .unwrap_or(0.5);
 
-        let decayed = decayed_confidence(base_confidence, t_valid, now);
+        // Compute decayed confidence using standard decay formula
+        let days_since_valid = (now - t_valid).num_days() as f64;
+        let decay_rate = 0.693 / 365.0; // ln(2) / half-life (1 year)
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
 
         if decayed < threshold {
             // Mark as invalid

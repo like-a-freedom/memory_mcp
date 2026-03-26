@@ -27,6 +27,7 @@ mod entity_extraction;
 mod episode;
 mod error;
 mod ids;
+mod lifecycle;
 mod query;
 mod validation;
 
@@ -47,6 +48,7 @@ mod constants {
 
 pub use cache::{CacheKey, SafeMutex, invalidate_cache_by_scope};
 pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
+pub use lifecycle::{run_archival_pass, run_decay_pass, spawn_archival_worker, spawn_decay_worker};
 pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
     deterministic_episode_id, deterministic_fact_id, hash_prefix,

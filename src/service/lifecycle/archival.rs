@@ -2,7 +2,7 @@
 //!
 //! Periodically marks old episodes as archived when they have no active facts.
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
@@ -67,8 +67,8 @@ pub async fn run_archival_pass(
     age_days: u32,
 ) -> Result<usize, MemoryError> {
     let now = Utc::now();
-    let cutoff = now - Duration::days(age_days as i64);
-    let namespace = service.default_namespace().unwrap_or("memory");
+    let cutoff = now - chrono::Duration::days(age_days as i64);
+    let namespace = service.default_namespace.clone();
 
     // Fetch all episodes
     let episodes = service
@@ -80,10 +80,9 @@ pub async fn run_archival_pass(
 
     for record in episodes {
         // Skip already archived episodes
-        if let Some(status) = record.get("status").and_then(|v| v.as_str()) {
-            if status == "archived" {
-                continue;
-            }
+        if let Some(status) = record.get("status").and_then(|v| v.as_str())
+            && status == "archived" {
+            continue;
         }
 
         // Check episode age
@@ -131,22 +130,12 @@ async fn check_episode_has_active_facts(
     episode_id: &str,
     namespace: &str,
 ) -> Result<bool, MemoryError> {
-    // Query facts linked to this episode
-    let sql = "SELECT * FROM fact WHERE source_episode = $episode_id AND t_invalid IS NONE";
-    let result = service
+    // Query facts linked to this episode using select_facts_filtered
+    let cutoff = crate::service::normalize_dt(Utc::now());
+    let facts = service
         .db_client
-        .execute_query(
-            sql,
-            Some(json!({"episode_id": episode_id})),
-            namespace,
-        )
+        .select_facts_filtered(namespace, episode_id, &cutoff, None, 1)
         .await?;
 
-    // Check if result array is non-empty
-    let has_facts = result
-        .as_array()
-        .map(|arr| !arr.is_empty())
-        .unwrap_or(false);
-
-    Ok(has_facts)
+    Ok(!facts.is_empty())
 }

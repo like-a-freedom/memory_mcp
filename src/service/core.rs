@@ -20,6 +20,7 @@ use super::cache::{CacheKey, SafeMutex};
 use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
+use super::lifecycle::{spawn_archival_worker, spawn_decay_worker};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
 /// Core service for memory operations.
@@ -129,6 +130,42 @@ impl MemoryService {
         )?;
         apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
+
+        // Spawn lifecycle workers if enabled
+        if config.lifecycle.enabled {
+            let decay_service = service.clone();
+            let decay_config = config.lifecycle.clone();
+
+            let _ = spawn_decay_worker(
+                decay_service,
+                decay_config.decay_interval_secs,
+                decay_config.decay_confidence_threshold,
+            )
+            .await;
+
+            let archival_service = service.clone();
+            let archival_config = config.lifecycle.clone();
+
+            let _ = spawn_archival_worker(
+                archival_service,
+                archival_config.archival_interval_secs,
+                archival_config.archival_age_days,
+            )
+            .await;
+
+            let mut event = std::collections::HashMap::new();
+            event.insert("op".to_string(), serde_json::json!("lifecycle.workers.started"));
+            event.insert(
+                "decay_interval".to_string(),
+                serde_json::json!(config.lifecycle.decay_interval_secs),
+            );
+            event.insert(
+                "archival_interval".to_string(),
+                serde_json::json!(config.lifecycle.archival_interval_secs),
+            );
+            service.logger.log(event, crate::logging::LogLevel::Info);
+        }
+
         Ok(service)
     }
 
