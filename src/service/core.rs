@@ -790,13 +790,11 @@ impl MemoryService {
             let (fact_record, _) = self.find_fact_record(fact_id).await?;
             fact_record
                 .and_then(|r| {
-                    r.get("entity_links")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(String::from))
-                                .collect::<Vec<_>>()
-                        })
+                    r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
                 })
                 .unwrap_or_default()
         } else {
@@ -1638,6 +1636,165 @@ mod tests {
         .unwrap()
     }
 
+    fn create_test_service_with_rate_limit(rps: i32, burst: i32) -> MemoryService {
+        use crate::storage::DbClient;
+        use std::sync::Arc;
+
+        struct MockDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for MockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        MemoryService::new(
+            Arc::new(MockDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            rps,
+            burst,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn is_scope_allowed_returns_true_when_no_restrictions() {
         let service = create_test_service(vec!["org"]);
@@ -2271,5 +2428,234 @@ mod tests {
             vec!["entity:carol".to_string(), "entity:openai".to_string()],
             "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
         );
+    }
+
+    #[test]
+    fn log_event_with_full_access_context() {
+        let access = AccessContext {
+            caller_id: Some("test-user".to_string()),
+            allowed_scopes: Some(vec!["personal".to_string(), "org".to_string()]),
+            allowed_tags: Some(vec!["tag1".to_string()]),
+            session_vars: Some(json!({"session": "value"})),
+            transport: Some("grpc".to_string()),
+            content_type: Some("application/grpc".to_string()),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "personal".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let access_val = event.get("access").unwrap();
+        assert_eq!(
+            access_val.get("caller_id").unwrap().as_str(),
+            Some("test-user")
+        );
+        assert_eq!(
+            access_val
+                .get("allowed_scopes")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(access_val.get("transport").unwrap().as_str(), Some("grpc"));
+        assert_eq!(
+            access_val.get("content_type").unwrap().as_str(),
+            Some("application/grpc")
+        );
+    }
+
+    #[test]
+    fn log_event_without_access_context_omits_access_field() {
+        let event = log_event("test_op", json!({}), json!({}), None);
+        assert!(!event.contains_key("access"));
+    }
+
+    #[test]
+    fn serialize_access_with_all_none_fields() {
+        let access = AccessContext {
+            caller_id: None,
+            allowed_scopes: None,
+            allowed_tags: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        let serialized = serialize_access(&access);
+        assert!(serialized.get("caller_id").is_some());
+        assert!(serialized.get("allowed_scopes").is_some());
+        assert!(serialized.get("allowed_tags").is_some());
+        assert!(serialized.get("session_vars").is_some());
+        assert!(serialized.get("transport").is_some());
+        assert!(serialized.get("content_type").is_some());
+        assert!(serialized.get("cross_scope_allow").is_some());
+    }
+
+    #[test]
+    fn string_from_value_handles_object_without_expected_keys() {
+        let value = json!({"Other": "value"});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
+    fn string_from_value_handles_record_id_missing_fields() {
+        let value = json!({"RecordId": {"table": "entity"}});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
+    fn rate_limiter_new_initializes_correctly() {
+        let limiter = RateLimiter::new(100, 50);
+        let tokens = limiter.tokens.safe_lock();
+        let last = limiter.last.safe_lock();
+        assert!(tokens.is_empty());
+        assert!(last.is_empty());
+        drop(tokens);
+        drop(last);
+    }
+
+    #[test]
+    fn rate_limiter_burst_allows_initial_requests() {
+        let limiter = RateLimiter::new(10, 5);
+        for _ in 0..5 {
+            assert!(limiter.allow("burst-user"));
+        }
+        assert!(!limiter.allow("burst-user"));
+    }
+
+    #[test]
+    fn rate_limiter_empty_string_caller_id() {
+        let limiter = RateLimiter::new(10, 1);
+        assert!(limiter.allow(""));
+        assert!(!limiter.allow(""));
+    }
+
+    #[test]
+    fn namespace_for_scope_handles_various_inputs() {
+        let service = create_test_service(vec!["org", "personal", "private"]);
+
+        assert_eq!(service.namespace_for_scope("org"), "org");
+        assert_eq!(service.namespace_for_scope("personal"), "personal");
+        assert_eq!(service.namespace_for_scope("private"), "private");
+        assert_eq!(service.namespace_for_scope("unknown"), "org");
+        assert_eq!(service.namespace_for_scope(""), "org");
+        assert_eq!(service.namespace_for_scope("ORG"), "org");
+    }
+
+    #[test]
+    fn is_scope_allowed_with_empty_allowed_scopes() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(!service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_with_multiple_allowed_scopes() {
+        let service = create_test_service(vec!["org", "personal"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
+            ..Default::default()
+        };
+        assert!(service.is_scope_allowed("org", &access));
+        assert!(service.is_scope_allowed("personal", &access));
+        assert!(!service.is_scope_allowed("private", &access));
+    }
+
+    #[test]
+    fn enforce_rate_limit_with_burst_capacity() {
+        let service = create_test_service_with_rate_limit(10, 5);
+        let access = AccessContext {
+            caller_id: Some("burst-test".to_string()),
+            ..Default::default()
+        };
+
+        for _ in 0..5 {
+            assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+        }
+    }
+
+    #[test]
+    fn enforce_rate_limit_multiple_users_isolated() {
+        let service = create_test_service_with_rate_limit(10, 1);
+
+        let user1 = AccessContext {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        let user2 = AccessContext {
+            caller_id: Some("user-2".to_string()),
+            ..Default::default()
+        };
+
+        assert!(service.enforce_rate_limit(Some(&user1)).is_ok());
+        assert!(!service.enforce_rate_limit(Some(&user1)).is_ok());
+
+        assert!(service.enforce_rate_limit(Some(&user2)).is_ok());
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_builds_correct_path() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+        next_hop.insert("B".to_string(), "C".to_string());
+        next_hop.insert("C".to_string(), "D".to_string());
+
+        let path = build_intro_chain_from_start("A", "D", &next_hop);
+        assert_eq!(
+            path,
+            Some(vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_returns_none_for_unreachable() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+        next_hop.insert("B".to_string(), "C".to_string());
+
+        let path = build_intro_chain_from_start("A", "Z", &next_hop);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_handles_direct_connection() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+
+        let path = build_intro_chain_from_start("A", "B", &next_hop);
+        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
+    }
+
+    #[test]
+    fn bfs_path_handles_empty_graph() {
+        let graph: HashMap<String, Vec<String>> = HashMap::new();
+        let path = bfs_path(&graph, "A", "B", 5);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn bfs_path_finds_shortest_path_in_complex_graph() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string(), "C".to_string()]);
+        graph.insert("B".to_string(), vec!["D".to_string()]);
+        graph.insert("C".to_string(), vec!["D".to_string(), "E".to_string()]);
+        graph.insert("D".to_string(), vec!["F".to_string()]);
+        graph.insert("E".to_string(), vec!["F".to_string()]);
+        graph.insert("F".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "F", 10);
+        assert!(path.is_some());
+        let path = path.unwrap();
+        assert!(path.len() <= 4);
     }
 }

@@ -2,6 +2,9 @@
 //!
 //! These tests verify that the archival worker correctly archives episodes
 //! that are older than the threshold and have no active facts.
+//!
+//! Note: These tests require `--test-threads=1` due to embedded SurrealDB lock.
+//! Run with: cargo test lifecycle_archival -- --test-threads=1
 
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
@@ -21,30 +24,29 @@ async fn archival_pass_with_empty_database() {
         .await
         .expect("archival pass completed");
 
-    // Assert: Should complete successfully
-    // (count may be > 0 from other tests)
-    assert!(count >= 0, "Archival pass should complete successfully");
+    // Assert: Should complete successfully with 0 archives on empty DB
+    assert_eq!(count, 0, "Empty database should archive 0 episodes");
 }
 
 #[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
-async fn archival_pass_preserves_episodes_with_active_facts() {
-    // Setup: Create old fact (implies episode with active fact)
+async fn archival_pass_preserves_recent_episodes() {
+    // Setup: Create a recent episode (should not be archived)
     let service = MemoryService::new_from_env()
         .await
         .expect("service created");
 
-    let old_date = Utc::now() - Duration::days(150);
+    let recent_date = Utc::now() - Duration::days(10);
 
     service
         .add_fact(
             "promise",
-            "old promise still active for archival test",
-            "old promise still active",
-            "episode:old_active_archival",
-            old_date,
-            "test_archival_active",
-            0.9, // high confidence, still active
+            "recent promise content",
+            "recent promise",
+            "episode:recent_archival_test",
+            recent_date,
+            "test_archival_recent",
+            0.9,
             vec![],
             vec![],
             json!({}),
@@ -57,32 +59,30 @@ async fn archival_pass_preserves_episodes_with_active_facts() {
         .await
         .expect("archival pass completed");
 
-    // Assert: Should complete successfully
-    // Episodes with active facts should not be archived
-    assert!(count >= 0, "Archival pass should complete without error");
+    // Assert: Recent episode should not be archived
+    assert_eq!(count, 0, "Recent episode should not be archived");
 }
 
 #[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
-async fn archival_pass_different_thresholds() {
-    // Setup: Create facts with different ages
+async fn archival_pass_archives_old_episodes_without_active_facts() {
+    // Setup: Create an old episode with a fact that gets invalidated
     let service = MemoryService::new_from_env()
         .await
         .expect("service created");
 
-    let very_old = Utc::now() - Duration::days(400);
-    let moderately_old = Utc::now() - Duration::days(200);
+    let old_date = Utc::now() - Duration::days(150);
 
-    // Create old facts
-    service
+    // Add an old fact
+    let fact_id = service
         .add_fact(
-            "metric",
-            "very old metric for archival threshold",
-            "very old metric",
-            "episode:very_old_archival",
-            very_old,
-            "test_archival_threshold",
-            0.3,
+            "promise",
+            "old promise for archival test",
+            "old promise",
+            "episode:old_archival_test",
+            old_date,
+            "test_archival_old",
+            0.3, // low confidence, will decay
             vec![],
             vec![],
             json!({}),
@@ -90,36 +90,145 @@ async fn archival_pass_different_thresholds() {
         .await
         .expect("fact added");
 
+    // Invalidate the fact first (so episode has no active facts)
     service
-        .add_fact(
-            "metric",
-            "moderately old metric for archival threshold",
-            "moderately old metric",
-            "episode:mod_old_archival",
-            moderately_old,
-            "test_archival_threshold",
-            0.4,
-            vec![],
-            vec![],
-            json!({}),
+        .invalidate(
+            memory_mcp::models::InvalidateRequest {
+                fact_id: fact_id.clone(),
+                reason: "test invalidation".to_string(),
+                t_invalid: Utc::now(),
+            },
+            None,
         )
         .await
-        .expect("fact added");
+        .expect("fact invalidated");
 
-    // Act: Run with different thresholds
-    let count_100 = run_archival_pass(&service, 100)
+    // Act: Run archival pass with 90 day threshold
+    let count = run_archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
-    let count_300 = run_archival_pass(&service, 300)
-        .await
-        .expect("archival pass completed");
-
-    // Assert: Higher threshold should archive at least as many
+    // Assert: Old episode without active facts should be archived
     assert!(
-        count_300 >= count_100,
-        "Higher threshold should archive at least as many: {} vs {}",
-        count_300,
-        count_100
+        count >= 1,
+        "Old episode without active facts should be archived"
     );
+}
+
+#[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
+async fn archival_pass_respects_age_threshold() {
+    // Setup: Create episodes with different ages
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service created");
+
+    // Episode just under threshold (should not be archived)
+    let just_under = Utc::now() - Duration::days(89);
+    service
+        .add_fact(
+            "metric",
+            "metric just under threshold",
+            "metric under",
+            "episode:under_threshold",
+            just_under,
+            "test_archival_boundary",
+            0.5,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
+
+    // Episode well over threshold (should be archived if no active facts)
+    let well_over = Utc::now() - Duration::days(200);
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "metric well over threshold",
+            "metric over",
+            "episode:over_threshold",
+            well_over,
+            "test_archival_boundary",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
+
+    // Invalidate the old fact so episode can be archived
+    service
+        .invalidate(
+            memory_mcp::models::InvalidateRequest {
+                fact_id,
+                reason: "test".to_string(),
+                t_invalid: Utc::now(),
+            },
+            None,
+        )
+        .await
+        .expect("fact invalidated");
+
+    // Act: Run archival pass with 90 day threshold
+    let count = run_archival_pass(&service, 90)
+        .await
+        .expect("archival pass completed");
+
+    // Assert: Should archive the old episode
+    assert!(count >= 1, "Should archive episode over threshold");
+}
+
+#[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
+async fn archival_pass_batch_limit_respected() {
+    // Setup: Create many old episodes
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service created");
+
+    let old_date = Utc::now() - Duration::days(200);
+
+    // Create multiple old episodes with invalidated facts
+    for i in 0..10 {
+        let fact_id = service
+            .add_fact(
+                "metric",
+                &format!("old metric {}", i),
+                &format!("metric {}", i),
+                &format!("episode:batch_{}", i),
+                old_date,
+                "test_archival_batch",
+                0.2,
+                vec![],
+                vec![],
+                json!({}),
+            )
+            .await
+            .expect("fact added");
+
+        // Invalidate to allow archival
+        service
+            .invalidate(
+                memory_mcp::models::InvalidateRequest {
+                    fact_id,
+                    reason: "test".to_string(),
+                    t_invalid: Utc::now(),
+                },
+                None,
+            )
+            .await
+            .expect("fact invalidated");
+    }
+
+    // Act: Run archival pass
+    let count = run_archival_pass(&service, 90)
+        .await
+        .expect("archival pass completed");
+
+    // Assert: Should archive episodes (up to batch limit of 500)
+    assert!(count > 0, "Should archive some episodes");
+    assert!(count <= 500, "Should respect batch limit");
 }

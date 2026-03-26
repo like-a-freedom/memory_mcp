@@ -1,7 +1,7 @@
 //! Utility functions for parsing and validation.
 
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::Digest;
 
 use crate::models::ExplainItem;
