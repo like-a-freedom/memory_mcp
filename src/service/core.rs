@@ -874,12 +874,35 @@ impl MemoryService {
     /// Finds all episodes that mention or are linked to an entity.
     async fn find_episodes_via_entity(
         &self,
-        _entity_id: &str,
-        _namespace: &str,
+        entity_id: &str,
+        namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
-        // TODO: implement proper episode lookup by entity
         // Query episodes where entity appears in entity_links
-        Ok(Vec::new())
+        let sql = "SELECT * FROM episode WHERE entity_links CONTAINS $entity_id ORDER BY t_ref DESC LIMIT 10";
+        let result: serde_json::Value = self
+            .db_client
+            .query(
+                sql,
+                Some(json!({"entity_id": entity_id})),
+                namespace,
+            )
+            .await?;
+
+        // Extract episodes from result
+        let episodes: Vec<crate::models::Episode> = result
+            .as_array()
+            .map(|arr: &Vec<serde_json::Value>| {
+                arr.iter()
+                    .filter_map(|v: &serde_json::Value| {
+                        v.get("Object")
+                            .and_then(|obj| obj.as_object())
+                            .and_then(|obj: &serde_json::Map<String, serde_json::Value>| super::episode::episode_from_record(obj))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(episodes)
     }
 }
 

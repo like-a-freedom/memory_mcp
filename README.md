@@ -201,8 +201,25 @@ The public MCP surface is centered on a small set of high-value operations rathe
 | `ingest` | Store an episode with source metadata and timestamps |
 | `extract` | Extract entities, facts, and links from an episode or raw content |
 | `assemble_context` | Return ranked memory context for a query |
-| `explain` | Expand context items with source citations and traceable provenance |
+| `explain` | Expand context items with source citations and multi-source provenance |
 | `invalidate` | Mark a fact as no longer valid as of a given time |
+
+### `explain` Multi-Source Provenance
+
+The `explain()` operation returns complete provenance lineage for each fact:
+
+- **Direct sources** — episodes that directly generated the fact
+- **Linked sources** — episodes connected via shared entities
+
+**Returns:**
+- `all_sources`: Array of provenance sources including:
+  - `episode_id`: Source episode identifier
+  - `episode_content`: Excerpt from the episode
+  - `episode_t_ref`: Episode timestamp
+  - `relationship`: "direct" (created fact) or "linked" (via entity)
+  - `entity_path`: Path from fact to episode via entity (if linked)
+
+This enables full audit trails, understanding of information propagation, and building trust through transparency.
 
 This design lines up with the intent-driven MCP guidance reflected in the docs: fewer tools, clearer semantics, better outcomes.
 

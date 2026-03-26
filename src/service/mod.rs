@@ -27,7 +27,7 @@ mod entity_extraction;
 mod episode;
 mod error;
 mod ids;
-mod lifecycle;
+pub mod lifecycle;
 mod query;
 mod validation;
 
