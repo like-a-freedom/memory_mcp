@@ -369,8 +369,11 @@ fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::{DbClient, GraphDirection};
     use chrono::Utc;
     use serde_json::json;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn create_test_fact(fact_id: &str, t_valid: chrono::DateTime<Utc>) -> crate::models::Fact {
         crate::models::Fact {
@@ -596,5 +599,170 @@ mod tests {
 
         let result = filter_facts_by_policy(records, &access);
         assert_eq!(result.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn assemble_context_uses_db_side_community_lookup_for_summary_matches() {
+        struct CommunityLookupDbClient {
+            community_lookup_calls: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for CommunityLookupDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("assemble_context should not scan community with select_table")
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                if query_contains.is_some() {
+                    Ok(vec![])
+                } else {
+                    Ok(vec![json!({
+                        "fact_id": "fact:community",
+                        "fact_type": "note",
+                        "content": "Alice works on project Atlas",
+                        "quote": "Alice works on project Atlas",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:alice"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:1"}
+                    })])
+                }
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.community_lookup_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(query, "alice atlas");
+
+                Ok(vec![json!({
+                    "community_id": "community:atlas",
+                    "summary": "Alice and the Atlas project team",
+                    "member_entities": ["entity:alice"]
+                })])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(CommunityLookupDbClient {
+            community_lookup_calls: AtomicUsize::new(0),
+        });
+        let service = crate::service::MemoryService::new(
+            db_client.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "alice atlas".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(db_client.community_lookup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].rationale.contains("matched community summary"));
     }
 }

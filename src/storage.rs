@@ -1156,7 +1156,7 @@ fn build_select_entity_lookup_query(normalized_name: &str) -> (String, Value) {
 
 fn build_select_communities_matching_summary_query(query: &str) -> (String, Value) {
     (
-        "SELECT * FROM community WHERE summary @@ $query ORDER BY summary ASC LIMIT 25".to_string(),
+        "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ $query ORDER BY ft_score DESC, summary ASC LIMIT 25".to_string(),
         json!({"query": query}),
     )
 }
@@ -1524,6 +1524,28 @@ mod tests {
                 .expect("connect in memory");
 
         assert_eq!(client.embedding_dimension, 768);
+    }
+
+    #[tokio::test]
+    async fn connect_in_memory_with_dimension_applies_hnsw_indexes_with_requested_dimension() {
+        let client =
+            SurrealDbClient::connect_in_memory_with_dimension("testdb", "testns", "warn", 768)
+                .await
+                .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let info = client
+            .execute_query("INFO FOR TABLE fact", None, "testns")
+            .await
+            .expect("info for table fact");
+        let info_json = surreal_to_json(info);
+
+        assert!(json_contains_text(&info_json, "fact_embedding_hnsw"));
+        assert!(json_contains_text(&info_json, "DIMENSION 768"));
     }
 
     #[test]
@@ -1973,9 +1995,23 @@ mod tests {
     fn build_select_communities_matching_summary_query_uses_fulltext_search() {
         let (sql, vars) = build_select_communities_matching_summary_query("alice project");
 
-        assert!(sql.contains("FROM community WHERE summary @@ $query"));
-        assert!(sql.contains("ORDER BY summary ASC"));
+        assert!(sql.contains("FROM community WHERE summary @1@ $query"));
+        assert!(sql.contains("search::score(1) AS ft_score"));
+        assert!(sql.contains("ORDER BY ft_score DESC, summary ASC"));
         assert_eq!(vars.get("query"), Some(&json!("alice project")));
+    }
+
+    fn json_contains_text(value: &Value, expected: &str) -> bool {
+        match value {
+            Value::String(text) => text.contains(expected),
+            Value::Array(values) => values
+                .iter()
+                .any(|value| json_contains_text(value, expected)),
+            Value::Object(map) => map
+                .values()
+                .any(|value| json_contains_text(value, expected)),
+            _ => false,
+        }
     }
 
     #[test]
