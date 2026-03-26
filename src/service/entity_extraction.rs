@@ -24,7 +24,7 @@ impl RegexEntityExtractor {
     /// Creates a new regex-backed entity extractor.
     pub fn new() -> Result<Self, MemoryError> {
         Ok(Self {
-            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+")
+            name_regex: Regex::new(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|[A-Z][A-Za-z0-9]+")
                 .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
         })
     }
@@ -73,5 +73,31 @@ mod tests {
         assert_eq!(candidates[0].canonical_name, "Acme Inc");
         assert_eq!(candidates[1].canonical_name, "Alice Smith");
         assert_eq!(candidates[2].canonical_name, "Bob Jones");
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_includes_single_token_camel_case_names() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates(
+                "OpenAI partnered with Anthropic while PostgreSQL backed Alice Smith",
+            )
+            .await
+            .unwrap();
+
+        let names = candidates
+            .into_iter()
+            .map(|candidate| candidate.canonical_name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            names,
+            vec![
+                "Alice Smith".to_string(),
+                "Anthropic".to_string(),
+                "OpenAI".to_string(),
+                "PostgreSQL".to_string(),
+            ]
+        );
     }
 }

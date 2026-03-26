@@ -20,6 +20,8 @@ use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 
+const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
+
 /// Traversal direction for graph neighbor queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraphDirection {
@@ -792,11 +794,7 @@ impl DbClient for SurrealDbClient {
         // Community maintenance still needs the active edge set as a whole.
         // Keep the limitation explicit here so future refactors do not mistake
         // this for a bounded neighbor lookup.
-        let sql = String::from(
-            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC",
-        );
-
-        let vars = serde_json::json!({ "cutoff": cutoff });
+        let (sql, vars) = build_select_edges_filtered_query(cutoff);
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
@@ -876,8 +874,35 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_select_entity_lookup_query(normalized_name);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+        let (canonical_sql, canonical_vars) =
+            build_select_entity_lookup_canonical_query(normalized_name);
+        let canonical_result = match self
+            .execute_query(&canonical_sql, Some(canonical_vars), namespace)
+            .await
+        {
+            Ok(value) => {
+                let normalized = surreal_to_json(value);
+                extract_first_record(normalized)
+            }
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(None);
+            }
+            Err(err) => return Err(err),
+        };
+
+        if canonical_result.is_some() {
+            self.log_op(
+                "db.select_entity_lookup.result",
+                vec![("found", Value::Bool(true))],
+            );
+            return Ok(canonical_result);
+        }
+
+        let (alias_sql, alias_vars) = build_select_entity_lookup_alias_query(normalized_name);
+        let surreal_val = match self
+            .execute_query(&alias_sql, Some(alias_vars), namespace)
+            .await
+        {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
                 return Ok(None);
@@ -1215,10 +1240,25 @@ fn build_select_facts_by_entity_links_query(
     )
 }
 
-fn build_select_entity_lookup_query(normalized_name: &str) -> (String, Value) {
+fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
     (
-        "SELECT * FROM entity WHERE canonical_name_normalized = $name OR aliases CONTAINS $name LIMIT 1"
-            .to_string(),
+        format!(
+            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"
+        ),
+        json!({ "cutoff": cutoff }),
+    )
+}
+
+fn build_select_entity_lookup_canonical_query(normalized_name: &str) -> (String, Value) {
+    (
+        "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1".to_string(),
+        json!({"name": normalized_name}),
+    )
+}
+
+fn build_select_entity_lookup_alias_query(normalized_name: &str) -> (String, Value) {
+    (
+        "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1".to_string(),
         json!({"name": normalized_name}),
     )
 }
@@ -2172,14 +2212,38 @@ mod tests {
     }
 
     #[test]
-    fn build_select_entity_lookup_query_parameterizes_canonical_and_alias_match() {
-        let (sql, vars) = build_select_entity_lookup_query("dmitry ivanov");
+    fn build_select_entity_lookup_canonical_query_parameterizes_exact_match() {
+        let (sql, vars) = build_select_entity_lookup_canonical_query("dmitry ivanov");
 
         assert_eq!(
             sql,
-            "SELECT * FROM entity WHERE canonical_name_normalized = $name OR aliases CONTAINS $name LIMIT 1"
+            "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1"
         );
         assert_eq!(vars, json!({"name": "dmitry ivanov"}));
+    }
+
+    #[test]
+    fn build_select_entity_lookup_alias_query_parameterizes_alias_match() {
+        let (sql, vars) = build_select_entity_lookup_alias_query("dmitry ivanov");
+
+        assert_eq!(
+            sql,
+            "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1"
+        );
+        assert_eq!(vars, json!({"name": "dmitry ivanov"}));
+    }
+
+    #[test]
+    fn build_select_edges_filtered_query_applies_hard_limit() {
+        let (sql, vars) = build_select_edges_filtered_query("2026-01-15T00:00:00Z");
+
+        assert!(sql.contains("FROM edge WHERE"));
+        assert!(sql.contains("ORDER BY in ASC, out ASC, t_valid DESC"));
+        assert!(
+            sql.contains("LIMIT 10000"),
+            "active edge scans should stay bounded, got: {sql}"
+        );
+        assert_eq!(vars, json!({"cutoff": "2026-01-15T00:00:00Z"}));
     }
 
     #[test]

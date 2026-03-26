@@ -1,6 +1,6 @@
 //! MemoryService implementation - core service orchestration.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -540,9 +540,10 @@ impl MemoryService {
         let cutoff_iso = super::normalize_dt(cutoff);
 
         let mut frontier = vec![target_id.clone()];
-        let mut visited = std::collections::HashSet::from([target_id.clone()]);
+        let mut visited = HashSet::from([target_id.clone()]);
         let mut next_hop: HashMap<String, String> = HashMap::new();
-        let mut candidate_starts = BTreeSet::new();
+        let mut discovered_nodes = HashSet::new();
+        let mut nodes_with_predecessors = HashSet::new();
 
         for _ in 0..max_hops {
             let mut next_frontier = Vec::new();
@@ -567,7 +568,8 @@ impl MemoryService {
                             && visited.insert(in_id.clone())
                         {
                             next_hop.insert(in_id.clone(), out_id);
-                            candidate_starts.insert(in_id.clone());
+                            discovered_nodes.insert(in_id.clone());
+                            nodes_with_predecessors.insert(node_id.clone());
                             next_frontier.push(in_id);
                         }
                     }
@@ -583,22 +585,20 @@ impl MemoryService {
             frontier = next_frontier;
         }
 
-        let Some(start_id) = candidate_starts.into_iter().next() else {
+        let mut candidate_paths = discovered_nodes
+            .into_iter()
+            .filter(|node_id| !nodes_with_predecessors.contains(node_id))
+            .filter_map(|start_id| build_intro_chain_from_start(&start_id, &target_id, &next_hop))
+            .collect::<Vec<_>>();
+
+        candidate_paths
+            .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+
+        let Some(best_path) = candidate_paths.into_iter().next() else {
             return Ok(vec![]);
         };
 
-        let mut path = vec![start_id.clone()];
-        let mut current = start_id;
-
-        while let Some(next) = next_hop.get(&current).cloned() {
-            path.push(next.clone());
-            if next == target_id {
-                return Ok(path);
-            }
-            current = next;
-        }
-
-        Ok(vec![])
+        Ok(best_path)
     }
 
     /// Invalidates a superseded metric.
@@ -853,6 +853,25 @@ fn string_from_value(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+fn build_intro_chain_from_start(
+    start_id: &str,
+    target_id: &str,
+    next_hop: &HashMap<String, String>,
+) -> Option<Vec<String>> {
+    let mut path = vec![start_id.to_string()];
+    let mut current = start_id;
+
+    while let Some(next) = next_hop.get(current) {
+        path.push(next.clone());
+        if next == target_id {
+            return Some(path);
+        }
+        current = next;
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -1818,6 +1837,157 @@ mod tests {
                 "entity:bob".to_string(),
                 "entity:openai".to_string(),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
+        use std::sync::Arc;
+
+        struct ShortestPathDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for ShortestPathDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => vec![
+                        json!({"in": "entity:bob", "out": "entity:openai"}),
+                        json!({"in": "entity:carol", "out": "entity:openai"}),
+                    ],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = MemoryService::new(
+            Arc::new(ShortestPathDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec!["entity:carol".to_string(), "entity:openai".to_string()],
+            "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
         );
     }
 }
