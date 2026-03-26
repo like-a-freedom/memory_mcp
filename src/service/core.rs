@@ -34,8 +34,6 @@ pub struct MemoryService {
     pub(crate) rate_limiter: Arc<RateLimiter>,
     pub(crate) context_cache:
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    pub(crate) analyzers: Arc<Mutex<HashMap<String, Value>>>,
-    pub(crate) indexes: Arc<Mutex<HashMap<String, Value>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
 }
 
@@ -235,8 +233,6 @@ impl MemoryService {
             logger,
             rate_limiter: Arc::new(RateLimiter::new(rate_limit_rps, rate_limit_burst)),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            analyzers: Arc::new(Mutex::new(HashMap::new())),
-            indexes: Arc::new(Mutex::new(HashMap::new())),
             entity_extractor: Arc::new(RegexEntityExtractor::new()?),
         })
     }
@@ -249,12 +245,16 @@ impl MemoryService {
     /// Returns the total count of episodes.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
         let mut total = 0;
+        let sql = "SELECT count() FROM episode GROUP ALL";
         for namespace in &self.namespaces {
-            total += self
-                .db_client
-                .select_table("episode", namespace)
-                .await?
-                .len() as i32;
+            let result = self.db_client.query(sql, None, namespace).await?;
+            let count = result
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|obj| obj.get("count"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0) as i32;
+            total += count;
         }
         Ok(total)
     }
@@ -600,16 +600,6 @@ impl MemoryService {
         super::episode::store_edge(self, &edge, &self.default_namespace).await
     }
 
-    /// Registers an analyzer.
-    pub fn register_analyzer(&self, name: &str, config: Value) {
-        self.analyzers.safe_lock().insert(name.to_string(), config);
-    }
-
-    /// Registers an index.
-    pub fn register_index(&self, name: &str, config: Value) {
-        self.indexes.safe_lock().insert(name.to_string(), config);
-    }
-
     /// Retrieves SurrealDB config.
     pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
         Ok(json!({
@@ -839,9 +829,9 @@ impl MemoryService {
         };
 
         // Look up entity_links from the fact record if fact_id is available
-        let entity_links = if let Some(ref fact_id) = item.fact_id {
-            let (fact_record, _) = self.find_fact_record(fact_id).await?;
-            fact_record
+        let (entity_links, fact_namespace) = if let Some(ref fact_id) = item.fact_id {
+            let (fact_record, namespace) = self.find_fact_record(fact_id).await?;
+            let links = fact_record
                 .and_then(|r| {
                     r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
                         arr.iter()
@@ -849,14 +839,18 @@ impl MemoryService {
                             .collect::<Vec<_>>()
                     })
                 })
-                .unwrap_or_default()
+                .unwrap_or_default();
+            (links, namespace)
         } else {
-            Vec::new()
+            (Vec::new(), None)
         };
+
+        let provenance_namespace =
+            fact_namespace.unwrap_or_else(|| self.namespace_for_scope(&episode.scope));
 
         // Collect all provenance sources including linked episodes
         let all_sources = self
-            .collect_provenance_sources(&episode, &entity_links)
+            .collect_provenance_sources(&episode, &entity_links, &provenance_namespace)
             .await?;
 
         Ok(ExplainItem {
@@ -886,6 +880,7 @@ impl MemoryService {
         &self,
         primary_episode: &crate::models::Episode,
         entity_links: &[String],
+        namespace: &str,
     ) -> Result<Vec<ProvenanceSource>, MemoryError> {
         let mut sources = Vec::new();
 
@@ -899,9 +894,8 @@ impl MemoryService {
         });
 
         // 2. Traverse entity_links to find connected episodes
-        let namespace = self.default_namespace.clone();
         for entity_id in entity_links {
-            let linked_episodes = self.find_episodes_via_entity(entity_id, &namespace).await?;
+            let linked_episodes = self.find_episodes_via_entity(entity_id, namespace).await?;
 
             for ep in linked_episodes {
                 // Skip if this is the primary source (already added)
@@ -940,8 +934,10 @@ impl MemoryService {
         namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
         // Traverse: entity -> involved_in edge -> fact -> source_episode -> episode
-        let sql = "SELECT * FROM episode WHERE source_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE out FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
-        let result: serde_json::Value = self
+        // Note: edge.out is a RecordId, so we cast to string for fact_id comparison.
+        // source_episode stores episode_id values, matched against episode.episode_id.
+        let sql = "SELECT * FROM episode WHERE episode_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE type::string(out) FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
+        let result = self
             .db_client
             .query(sql, Some(json!({"entity_id": entity_id})), namespace)
             .await?;
@@ -951,9 +947,7 @@ impl MemoryService {
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| {
-                        let obj = v.as_object().or_else(|| {
-                            v.get("Object").and_then(|o| o.as_object())
-                        })?;
+                        let obj = v.as_object()?;
                         super::episode::episode_from_record(obj)
                     })
                     .collect()
@@ -2655,7 +2649,7 @@ mod tests {
         };
 
         assert!(service.enforce_rate_limit(Some(&user1)).is_ok());
-        assert!(!service.enforce_rate_limit(Some(&user1)).is_ok());
+        assert!(service.enforce_rate_limit(Some(&user1)).is_err());
 
         assert!(service.enforce_rate_limit(Some(&user2)).is_ok());
     }

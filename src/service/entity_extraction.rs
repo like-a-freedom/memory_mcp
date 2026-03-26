@@ -1,5 +1,8 @@
 //! Pluggable entity extraction abstractions.
 
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
 use async_trait::async_trait;
 use regex::Regex;
 
@@ -65,11 +68,234 @@ impl EntityExtractor for RegexEntityExtractor {
     }
 }
 
+/// Static gazetteer of well-known toponyms for location classification.
+static KNOWN_LOCATIONS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    HashSet::from([
+        // Major cities
+        "New York",
+        "Los Angeles",
+        "Chicago",
+        "Houston",
+        "Phoenix",
+        "Philadelphia",
+        "San Antonio",
+        "San Diego",
+        "Dallas",
+        "Austin",
+        "San Francisco",
+        "Seattle",
+        "Denver",
+        "Boston",
+        "Nashville",
+        "Portland",
+        "Las Vegas",
+        "Miami",
+        "Atlanta",
+        "Minneapolis",
+        "Detroit",
+        "Tampa",
+        "Orlando",
+        "Sacramento",
+        "Pittsburgh",
+        "Cincinnati",
+        "Cleveland",
+        "Indianapolis",
+        "Milwaukee",
+        "Columbus",
+        "Kansas City",
+        "Raleigh",
+        "Virginia Beach",
+        "Baltimore",
+        "Memphis",
+        "Charlotte",
+        "Jacksonville",
+        "San Jose",
+        "Fort Worth",
+        "El Paso",
+        "London",
+        "Paris",
+        "Berlin",
+        "Madrid",
+        "Rome",
+        "Amsterdam",
+        "Vienna",
+        "Prague",
+        "Warsaw",
+        "Budapest",
+        "Dublin",
+        "Lisbon",
+        "Stockholm",
+        "Oslo",
+        "Helsinki",
+        "Copenhagen",
+        "Brussels",
+        "Zurich",
+        "Geneva",
+        "Munich",
+        "Frankfurt",
+        "Hamburg",
+        "Barcelona",
+        "Milan",
+        "Naples",
+        "Tokyo",
+        "Osaka",
+        "Kyoto",
+        "Seoul",
+        "Beijing",
+        "Shanghai",
+        "Hong Kong",
+        "Singapore",
+        "Taipei",
+        "Bangkok",
+        "Mumbai",
+        "Delhi",
+        "Bangalore",
+        "Hyderabad",
+        "Chennai",
+        "Kolkata",
+        "Jakarta",
+        "Manila",
+        "Hanoi",
+        "Kuala Lumpur",
+        "Sydney",
+        "Melbourne",
+        "Brisbane",
+        "Perth",
+        "Auckland",
+        "Toronto",
+        "Vancouver",
+        "Montreal",
+        "Ottawa",
+        "Calgary",
+        "Mexico City",
+        "Sao Paulo",
+        "Buenos Aires",
+        "Lima",
+        "Bogota",
+        "Santiago",
+        "Rio de Janeiro",
+        "Cairo",
+        "Lagos",
+        "Nairobi",
+        "Johannesburg",
+        "Cape Town",
+        "Dubai",
+        "Riyadh",
+        "Tel Aviv",
+        "Istanbul",
+        "Moscow",
+        "Saint Petersburg",
+        "Kiev",
+        "Bucharest",
+        "Stockholm",
+        "Tallinn",
+        "Riga",
+        "Vilnius",
+        "Belgrade",
+        // Countries
+        "United States",
+        "United Kingdom",
+        "Canada",
+        "Australia",
+        "Germany",
+        "France",
+        "Italy",
+        "Spain",
+        "Japan",
+        "China",
+        "India",
+        "Brazil",
+        "Mexico",
+        "Russia",
+        "South Korea",
+        "Indonesia",
+        "Turkey",
+        "Saudi Arabia",
+        "Argentina",
+        "South Africa",
+        "Nigeria",
+        "Egypt",
+        "Poland",
+        "Netherlands",
+        "Belgium",
+        "Sweden",
+        "Norway",
+        "Finland",
+        "Denmark",
+        "Switzerland",
+        "Austria",
+        "Portugal",
+        "Ireland",
+        "Greece",
+        "Czech Republic",
+        "Romania",
+        "Hungary",
+        "Ukraine",
+        "Israel",
+        "Thailand",
+        "Vietnam",
+        "Philippines",
+        "Malaysia",
+        "Singapore",
+        "New Zealand",
+        "Colombia",
+        "Chile",
+        "Peru",
+        // US states
+        "California",
+        "Texas",
+        "Florida",
+        "New York",
+        "Pennsylvania",
+        "Illinois",
+        "Ohio",
+        "Georgia",
+        "North Carolina",
+        "Michigan",
+        "New Jersey",
+        "Virginia",
+        "Washington",
+        "Arizona",
+        "Massachusetts",
+        "Tennessee",
+        "Indiana",
+        "Maryland",
+        "Missouri",
+        "Wisconsin",
+        "Colorado",
+        "Minnesota",
+        "Oregon",
+        "Alabama",
+        "Louisiana",
+        "Kentucky",
+        "South Carolina",
+        "Iowa",
+        "Nevada",
+        "Arkansas",
+        "Connecticut",
+        "Utah",
+        "Oklahoma",
+        "Hawaii",
+        // Regions / continents
+        "Europe",
+        "Asia",
+        "Africa",
+        "North America",
+        "South America",
+        "Oceania",
+        "Antarctica",
+        "Middle East",
+        "Southeast Asia",
+        "East Asia",
+        "Central America",
+        "Caribbean",
+        "Scandinavia",
+        "Balkans",
+        "Nordic",
+    ])
+});
+
 /// Classifies an entity candidate into a type based on naming patterns.
-///
-/// Limitation: regex-based classification cannot detect toponyms (city names,
-/// country names) without a gazetteer. Locations are only detected when the
-/// name contains explicit indicators like "City", "County", etc.
 fn classify_entity_type(name: &str) -> &'static str {
     static COMPANY_SUFFIXES: &[&str] = &[
         "Corp",
@@ -138,7 +364,52 @@ fn classify_entity_type(name: &str) -> &'static str {
         }
     }
 
+    if KNOWN_LOCATIONS.contains(name) {
+        return "location";
+    }
+
     "person"
+}
+
+/// Type alias for the pluggable extraction function used by [`LlmEntityExtractor`].
+///
+/// Takes raw text and returns extracted entity candidates. Implementations
+/// should call out to an LLM, gRPC service, or any other async backend.
+pub type ExtractFn = dyn Fn(&str) -> Result<Vec<EntityCandidate>, MemoryError> + Send + Sync;
+
+/// LLM-backed entity extractor that delegates to a pluggable function.
+///
+/// Activate via config flag `ENTITY_EXTRACTOR=llm`. The extraction function
+/// is injected at construction time — no HTTP client dependency required.
+/// Falls back gracefully: if the function returns an error, returns an
+/// empty candidate list (the caller can retry with [`RegexEntityExtractor`]).
+pub struct LlmEntityExtractor {
+    extract_fn: Box<ExtractFn>,
+}
+
+impl std::fmt::Debug for LlmEntityExtractor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmEntityExtractor").finish()
+    }
+}
+
+impl LlmEntityExtractor {
+    /// Creates a new LLM-backed extractor with the given extraction function.
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(&str) -> Result<Vec<EntityCandidate>, MemoryError> + Send + Sync + 'static,
+    {
+        Self {
+            extract_fn: Box::new(f),
+        }
+    }
+}
+
+#[async_trait]
+impl EntityExtractor for LlmEntityExtractor {
+    async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        (self.extract_fn)(content)
+    }
 }
 
 #[cfg(test)]
@@ -263,8 +534,34 @@ mod tests {
         // "Tech Summit" contains the "Summit" indicator → classified as event
         assert_eq!(types.get("Tech Summit"), Some(&"event"));
 
-        // "San Francisco" has no suffix/indicator match → defaults to "person"
-        // (regex-based classification cannot detect toponyms without a gazetteer)
-        assert_eq!(types.get("San Francisco"), Some(&"person"));
+        // "San Francisco" is in the gazetteer → classified as location
+        assert_eq!(types.get("San Francisco"), Some(&"location"));
+    }
+
+    #[tokio::test]
+    async fn llm_extractor_delegates_to_provided_function() {
+        let extractor = LlmEntityExtractor::new(|_content| {
+            Ok(vec![
+                EntityCandidate {
+                    entity_type: "person".into(),
+                    canonical_name: "Alice Smith".into(),
+                    aliases: vec![],
+                },
+                EntityCandidate {
+                    entity_type: "company".into(),
+                    canonical_name: "Acme Corp".into(),
+                    aliases: vec![],
+                },
+            ])
+        });
+
+        let candidates = extractor
+            .extract_candidates("irrelevant input")
+            .await
+            .unwrap();
+
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].canonical_name, "Alice Smith");
+        assert_eq!(candidates[1].entity_type, "company");
     }
 }

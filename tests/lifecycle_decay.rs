@@ -200,8 +200,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
 
     // Assert: Already invalidated facts should not be counted again
     // (The decay pass skips facts with t_invalid set)
-    // Note: count >= 0 is always true for usize, so we just assert true
-    assert!(true, "Decay pass should complete without re-invalidating");
+    assert_eq!(count, 0, "Decay pass should skip already invalidated facts");
 }
 
 #[tokio::test]

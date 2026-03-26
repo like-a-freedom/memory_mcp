@@ -7,7 +7,7 @@
 //! - Context assembly for queries
 
 pub use core::MemoryService;
-pub use entity_extraction::{EntityExtractor, RegexEntityExtractor};
+pub use entity_extraction::{EntityExtractor, LlmEntityExtractor, RegexEntityExtractor};
 pub use error::MemoryError;
 
 mod cache;

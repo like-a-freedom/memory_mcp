@@ -156,7 +156,7 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
     ) -> Result<Value, MemoryError>;
 
-    /// Executes a raw SQL query.
+    /// Executes a raw SQL query and returns JSON results.
     async fn query(
         &self,
         sql: &str,
@@ -1225,14 +1225,19 @@ impl DbClient for SurrealDbClient {
             );
         }
 
-        self.execute_raw_query(sql, vars, namespace).await?;
+        let surreal_val = self.execute_query(sql, vars, namespace).await?;
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
 
         self.log_op(
             "db.query.result",
-            vec![("result", Value::String("ok".to_string()))],
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
         );
 
-        Ok(Value::Null)
+        Ok(Value::Array(results))
     }
 
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {

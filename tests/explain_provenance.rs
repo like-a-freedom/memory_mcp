@@ -9,6 +9,8 @@
 //! cargo test --test explain_provenance -- --test-threads=1
 //! ```
 
+mod common;
+
 use chrono::Utc;
 use memory_mcp::MemoryService;
 use memory_mcp::models::{ExplainItem, ExplainRequest};
@@ -67,7 +69,7 @@ async fn explain_returns_direct_provenance_source() {
     let item = &result[0];
 
     assert!(
-        item.all_sources.len() >= 1,
+        !item.all_sources.is_empty(),
         "Should have at least one provenance source (direct), got {}",
         item.all_sources.len()
     );
@@ -130,7 +132,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
     // Assert: Verify backward compatibility
     assert!(!result.is_empty(), "Should return results");
     assert!(
-        result[0].all_sources.len() >= 1,
+        !result[0].all_sources.is_empty(),
         "Should populate all_sources with at least direct source"
     );
 }
@@ -205,4 +207,150 @@ async fn explain_populates_all_sources_field() {
             source.relationship
         );
     }
+}
+
+#[tokio::test]
+async fn explain_includes_linked_episodes_via_shared_entity() {
+    let service = common::make_service().await;
+    let t_ref = Utc::now();
+    let scope = "org";
+
+    // Shared entity
+    let entity_id = memory_mcp::service::deterministic_entity_id("person", "Alice Smith");
+
+    // Episode A
+    let episode_a_id =
+        memory_mcp::service::deterministic_episode_id("email", "linked-ep-a", t_ref, scope);
+    service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "email".into(),
+                source_id: "linked-ep-a".into(),
+                content: "Alice Smith closed a deal".into(),
+                t_ref,
+                scope: scope.into(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest A");
+
+    // Fact A: explicitly linked to entity
+    let fact_a_id = service
+        .add_fact(
+            "metric",
+            "Alice Smith closed $5M deal",
+            "Alice Smith closed a $5M deal",
+            &episode_a_id,
+            t_ref,
+            scope,
+            0.9,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_a_id}),
+        )
+        .await
+        .expect("add fact A");
+
+    // Episode B
+    let episode_b_id =
+        memory_mcp::service::deterministic_episode_id("email", "linked-ep-b", t_ref, scope);
+    service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "email".into(),
+                source_id: "linked-ep-b".into(),
+                content: "Alice Smith presented results".into(),
+                t_ref,
+                scope: scope.into(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest B");
+
+    // Fact B: also linked to same entity
+    let fact_b_id = service
+        .add_fact(
+            "fact",
+            "Alice Smith presented quarterly results",
+            "Alice Smith presented quarterly results",
+            &episode_b_id,
+            t_ref,
+            scope,
+            0.85,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_b_id}),
+        )
+        .await
+        .expect("add fact B");
+
+    // Create involved_in edges: entity → fact A, entity → fact B
+    let now = memory_mcp::service::now();
+    for (fact_id, _edge_suffix) in [(&fact_a_id, "a"), (&fact_b_id, "b")] {
+        let edge_id =
+            memory_mcp::service::deterministic_edge_id(&entity_id, "involved_in", fact_id, t_ref);
+        service
+            .db_client
+            .relate_edge(
+                scope,
+                &edge_id,
+                &entity_id,
+                fact_id,
+                json!({
+                    "edge_id": edge_id,
+                    "relation": "involved_in",
+                    "strength": 0.8,
+                    "confidence": 0.85,
+                    "t_valid": memory_mcp::service::normalize_dt(t_ref),
+                    "t_ingested": memory_mcp::service::normalize_dt(now),
+                }),
+            )
+            .await
+            .expect("relate edge");
+    }
+
+    // Explain fact A — should include episode B as linked source via entity
+    let request = ExplainRequest {
+        context_pack: vec![ExplainItem {
+            fact_id: Some(fact_a_id),
+            content: "Alice Smith closed $5M deal".into(),
+            quote: "Alice Smith closed a $5M deal".into(),
+            source_episode: episode_a_id.clone(),
+            scope: None,
+            t_ref: None,
+            t_ingested: None,
+            provenance: json!({"source_episode": episode_a_id}),
+            citation_context: None,
+            all_sources: vec![],
+        }],
+    };
+
+    let result = service
+        .explain(request, None)
+        .await
+        .expect("explain completed");
+
+    assert!(!result.is_empty(), "Should return explain results");
+    let item = &result[0];
+
+    // Must have at least 2 sources: direct (episode A) + linked (episode B)
+    assert!(
+        item.all_sources.len() >= 2,
+        "Should have direct + linked sources, got {} sources: {:?}",
+        item.all_sources.len(),
+        item.all_sources
+    );
+
+    let has_direct = item.all_sources.iter().any(|s| s.relationship == "direct");
+    let has_linked = item.all_sources.iter().any(|s| s.relationship == "linked");
+    assert!(has_direct, "Should have a direct provenance source");
+    assert!(has_linked, "Should have a linked provenance source");
 }
