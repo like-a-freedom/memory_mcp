@@ -17,6 +17,7 @@ use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
 use super::EntityExtractor;
 use super::cache::CacheKey;
+use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
 use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
@@ -35,6 +36,7 @@ pub struct MemoryService {
     pub(crate) context_cache:
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
+    pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
 }
 
 use lru::LruCache;
@@ -121,12 +123,15 @@ impl MemoryService {
             build_startup_versions_event(client_version, server_version.as_deref());
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
-        let service = Self::new(
+        let embedding_provider = create_embedding_provider(&config.embedding)?;
+
+        let service = Self::new_with_embedding_provider(
             Arc::new(db_client),
             config.namespaces,
             config.log_level,
             50,
             100,
+            embedding_provider,
         )?;
         apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
@@ -186,6 +191,28 @@ impl MemoryService {
             rate_limit_rps,
             rate_limit_burst,
             super::CONTEXT_CACHE_SIZE,
+            Arc::new(DisabledEmbeddingProvider::new(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            )),
+        )
+    }
+
+    pub(crate) fn new_with_embedding_provider(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+    ) -> Result<Self, MemoryError> {
+        Self::build(
+            db_client,
+            namespaces,
+            log_level,
+            rate_limit_rps,
+            rate_limit_burst,
+            super::CONTEXT_CACHE_SIZE,
+            embedding_provider,
         )
     }
 
@@ -206,6 +233,9 @@ impl MemoryService {
             rate_limit_rps,
             rate_limit_burst,
             cache_size,
+            Arc::new(DisabledEmbeddingProvider::new(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            )),
         )
     }
 
@@ -216,6 +246,7 @@ impl MemoryService {
         rate_limit_rps: i32,
         rate_limit_burst: i32,
         cache_size: usize,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, MemoryError> {
         if namespaces.is_empty() {
             return Err(MemoryError::ConfigInvalid(
@@ -234,6 +265,7 @@ impl MemoryService {
             rate_limiter: Arc::new(RateLimiter::new(rate_limit_rps, rate_limit_burst)),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             entity_extractor: Arc::new(RegexEntityExtractor::new()?),
+            embedding_provider,
         })
     }
 
@@ -433,21 +465,52 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
-            let payload = json!({
-                "fact_id": fact_id.clone(),
-                "fact_type": fact_type,
-                "content": content,
-                "quote": quote,
-                "source_episode": source_episode,
-                "t_valid": super::normalize_dt(t_valid),
-                "t_ingested": super::normalize_dt(t_ingested),
-                "confidence": confidence,
-                "entity_links": entity_links,
-                "scope": scope,
-                "policy_tags": policy_tags,
-                "provenance": provenance,
-            });
-            let created = self.db_client.create(&fact_id, payload, &namespace).await?;
+            let mut payload = serde_json::Map::from_iter([
+                ("fact_id".to_string(), json!(fact_id.clone())),
+                ("fact_type".to_string(), json!(fact_type)),
+                ("content".to_string(), json!(content)),
+                ("quote".to_string(), json!(quote)),
+                ("source_episode".to_string(), json!(source_episode)),
+                ("t_valid".to_string(), json!(super::normalize_dt(t_valid))),
+                (
+                    "t_ingested".to_string(),
+                    json!(super::normalize_dt(t_ingested)),
+                ),
+                ("confidence".to_string(), json!(confidence)),
+                ("entity_links".to_string(), json!(entity_links)),
+                ("scope".to_string(), json!(scope)),
+                ("policy_tags".to_string(), json!(policy_tags)),
+                ("provenance".to_string(), provenance),
+            ]);
+
+            match self
+                .generate_embedding(&format!("{fact_type}\n{content}\n{quote}"))
+                .await
+            {
+                Ok(Some(embedding)) => {
+                    payload.insert("embedding".to_string(), json!(embedding));
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.write_skipped")),
+                            (
+                                "provider".to_string(),
+                                json!(self.embedding_provider.provider_name()),
+                            ),
+                            ("error".to_string(), json!(err.to_string())),
+                            ("fact_type".to_string(), json!(fact_type)),
+                        ]),
+                        LogLevel::Warn,
+                    );
+                }
+            }
+
+            let created = self
+                .db_client
+                .create(&fact_id, Value::Object(payload), &namespace)
+                .await?;
             if created.is_null() {
                 return Err(MemoryError::Storage(
                     "failed to persist fact record".to_string(),
@@ -456,6 +519,17 @@ impl MemoryService {
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
         }
         Ok(fact_id)
+    }
+
+    pub(crate) async fn generate_embedding(
+        &self,
+        input: &str,
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        if !self.embedding_provider.is_enabled() {
+            return Ok(None);
+        }
+
+        self.embedding_provider.embed(input).await.map(Some)
     }
 
     /// Invalidates a fact.
@@ -1121,8 +1195,12 @@ fn bfs_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::EntityCandidate;
     use crate::models::{AccessContext, AccessScopeAllow};
+    use crate::service::EmbeddingProvider;
+    use crate::storage::SurrealDbClient;
+    use async_trait::async_trait;
     use serde_json::json;
 
     #[test]
@@ -2483,6 +2561,285 @@ mod tests {
             chain,
             vec!["entity:carol".to_string(), "entity:openai".to_string()],
             "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
+        use std::sync::Arc;
+
+        struct DiamondTraversalDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for DiamondTraversalDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => vec![
+                        json!({"in": "entity:bob", "out": "entity:openai"}),
+                        json!({"in": "entity:carol", "out": "entity:openai"}),
+                    ],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    "entity:carol" => vec![json!({"in": "entity:diana", "out": "entity:carol"})],
+                    "entity:alice" => vec![json!({"in": "entity:erin", "out": "entity:alice"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = MemoryService::new(
+            Arc::new(DiamondTraversalDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 4, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:diana".to_string(),
+                "entity:carol".to_string(),
+                "entity:openai".to_string(),
+            ],
+            "the traversal should keep the shorter diamond branch instead of returning the deeper alternative"
+        );
+    }
+
+    struct StaticTestEmbeddingProvider {
+        salary_vector: Vec<f64>,
+        neutral_vector: Vec<f64>,
+    }
+
+    impl StaticTestEmbeddingProvider {
+        fn new() -> Self {
+            let mut salary_vector = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+            salary_vector[0] = 1.0;
+            let mut neutral_vector = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+            neutral_vector[1] = 1.0;
+            Self {
+                salary_vector,
+                neutral_vector,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StaticTestEmbeddingProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "test"
+        }
+
+        fn dimension(&self) -> usize {
+            DEFAULT_EMBEDDING_DIMENSION
+        }
+
+        async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+            let normalized = input.to_ascii_lowercase();
+            if normalized.contains("salary raise") || normalized.contains("compensation increase") {
+                return Ok(self.salary_vector.clone());
+            }
+
+            Ok(self.neutral_vector.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn add_fact_persists_embedding_when_provider_enabled() {
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "testdb",
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory"),
+        );
+        db_client.apply_migrations("org").await.expect("migrations");
+
+        let service = MemoryService::new_with_embedding_provider(
+            db_client.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(StaticTestEmbeddingProvider::new()),
+        )
+        .expect("service");
+
+        let fact_id = service
+            .add_fact(
+                "note",
+                "Compensation increase approved for engineering",
+                "Compensation increase approved",
+                "episode:test",
+                Utc::now(),
+                "org",
+                0.9,
+                vec![],
+                vec![],
+                json!({"source_episode": "episode:test"}),
+            )
+            .await
+            .expect("add fact");
+
+        let fact = db_client
+            .select_one(&fact_id, "org")
+            .await
+            .expect("select fact")
+            .expect("stored fact");
+
+        assert_eq!(
+            fact.get("embedding")
+                .and_then(|value| value.as_array())
+                .map(Vec::len),
+            Some(DEFAULT_EMBEDDING_DIMENSION)
         );
     }
 

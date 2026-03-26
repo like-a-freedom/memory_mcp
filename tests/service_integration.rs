@@ -191,7 +191,7 @@ async fn test_service_exposes_regex_entity_extractor() {
 }
 
 #[tokio::test]
-async fn test_service_persists_records_without_embedding_fields() {
+async fn test_service_does_not_persist_fact_embeddings_without_provider() {
     let (service, db_client) = common::make_service_with_client().await;
 
     let episode_id = service
@@ -247,6 +247,43 @@ async fn test_service_persists_records_without_embedding_fields() {
     assert!(episode.get("embedding").is_none());
     assert!(entity.get("embedding").is_none());
     assert!(fact.get("embedding").is_none());
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_without_provider_skips_semantic_similarity() {
+    let service = common::make_service().await;
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Compensation increase approved for the engineering team",
+            "Compensation increase approved",
+            "episode:semantic-similarity",
+            Utc.with_ymd_and_hms(2024, 4, 3, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:semantic-similarity"}),
+        )
+        .await
+        .unwrap();
+
+    let context = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "salary raise".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now()),
+            budget: 5,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        context.iter().all(|item| item.fact_id != fact_id),
+        "semantic-only matches should stay disabled without an embedding provider"
+    );
 }
 
 #[tokio::test]

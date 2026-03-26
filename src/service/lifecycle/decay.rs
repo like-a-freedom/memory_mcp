@@ -73,54 +73,53 @@ pub async fn run_decay_pass(
     half_life_days: f64,
 ) -> Result<usize, MemoryError> {
     let now = Utc::now();
-    let namespace = service.default_namespace.clone();
-
-    let facts = service
-        .db_client
-        .select_active_facts(&namespace, DECAY_BATCH_LIMIT)
-        .await?;
-
     let mut invalidated = 0;
 
-    for record in facts {
-        // Skip already invalidated facts
-        if record.get("t_invalid").is_some() {
-            continue;
-        }
+    for namespace in &service.namespaces {
+        let facts = service
+            .db_client
+            .select_active_facts(namespace, DECAY_BATCH_LIMIT)
+            .await?;
 
-        // Compute decayed confidence
-        let t_valid = record
-            .get("t_valid")
-            .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or(now);
+        for record in facts {
+            if record
+                .get("t_invalid")
+                .is_some_and(|value| !value.is_null())
+            {
+                continue;
+            }
 
-        let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
-
-        // Compute decayed confidence using standard decay formula
-        let days_since_valid = (now - t_valid).num_days() as f64;
-        let decay_rate = (2.0_f64).ln() / half_life_days;
-        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
-
-        if decayed < threshold {
-            // Mark as invalid
-            let fact_id = record
-                .get("fact_id")
+            let t_valid = record
+                .get("t_valid")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))?;
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or(now);
 
-            let payload = json!({
-                "t_invalid": crate::service::normalize_dt(now),
-                "t_invalid_ingested": crate::service::normalize_dt(now),
-            });
+            let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
 
-            service
-                .db_client
-                .update(fact_id, payload, &namespace)
-                .await?;
+            let days_since_valid = (now - t_valid).num_days() as f64;
+            let decay_rate = (2.0_f64).ln() / half_life_days;
+            let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
 
-            invalidated += 1;
+            if decayed < threshold {
+                let fact_id = record
+                    .get("fact_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))?;
+
+                let payload = json!({
+                    "t_invalid": crate::service::normalize_dt(now),
+                    "t_invalid_ingested": crate::service::normalize_dt(now),
+                });
+
+                service
+                    .db_client
+                    .update(fact_id, payload, namespace)
+                    .await?;
+
+                invalidated += 1;
+            }
         }
     }
 

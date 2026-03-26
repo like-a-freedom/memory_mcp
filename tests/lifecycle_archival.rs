@@ -9,7 +9,74 @@
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
 use memory_mcp::service::lifecycle::run_archival_pass;
+use memory_mcp::storage::DbClient;
 use serde_json::json;
+
+mod common;
+
+#[tokio::test]
+async fn archival_pass_processes_all_configured_namespaces() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(150);
+
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "personal-archival-1".to_string(),
+                content: "Personal archival candidate".to_string(),
+                t_ref: old_date,
+                scope: "personal".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest episode");
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Personal archival fact",
+            "Personal archival fact",
+            &episode_id,
+            old_date,
+            "personal",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("add fact");
+
+    service
+        .invalidate(
+            memory_mcp::models::InvalidateRequest {
+                fact_id,
+                reason: "prepare archival".to_string(),
+                t_invalid: Utc::now(),
+            },
+            None,
+        )
+        .await
+        .expect("invalidate fact");
+
+    let count = run_archival_pass(&service, 90)
+        .await
+        .expect("archival pass completed");
+
+    assert_eq!(count, 1, "archival should include non-default namespaces");
+
+    let episode = db_client
+        .select_one(&episode_id, "personal")
+        .await
+        .expect("select episode")
+        .expect("stored episode");
+    assert_eq!(episode.get("status"), Some(&json!("archived")));
+}
 
 #[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]

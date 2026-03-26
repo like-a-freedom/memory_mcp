@@ -21,6 +21,7 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 
 const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
+const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
 
 /// Traversal direction for graph neighbor queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,9 +67,9 @@ pub trait DbClient: Send + Sync {
 
     /// Selects edges with DB-side filtering for bi-temporal visibility.
     ///
-    /// This remains part of the production API because community maintenance
-    /// currently rebuilds connected components from the active edge set.
-    /// Known limitation: this path still scans the active edge table.
+    /// This helper is retained for compatibility and targeted tests. The live
+    /// community traversal path prefers `select_edge_neighbors` to avoid
+    /// materializing the full edge table.
     async fn select_edges_filtered(
         &self,
         namespace: &str,
@@ -172,6 +173,7 @@ pub trait DbClient: Send + Sync {
 pub struct SurrealDbClient {
     engine: DbEngine,
     logger: StdoutLogger,
+    fact_embedding_dimension: usize,
 }
 
 /// Internal enum representing the database engine type.
@@ -212,6 +214,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Local(clients),
             logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
         })
     }
 
@@ -229,6 +232,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine,
             logger: StdoutLogger::new(&config.log_level),
+            fact_embedding_dimension: config.embedding.dimension,
         })
     }
 
@@ -356,7 +360,10 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        let initial_schema = render_initial_schema_sql(include_str!("migrations/__Initial.surql"));
+        let initial_schema = render_initial_schema_sql(
+            include_str!("migrations/__Initial.surql"),
+            self.fact_embedding_dimension,
+        );
 
         self.execute_raw_query(&initial_schema, None, namespace)
             .await?;
@@ -385,15 +392,16 @@ impl SurrealDbClient {
         migration: &MigrationScript,
     ) -> Result<(), MemoryError> {
         let record_id = migration_record_id(migration.file_name);
-        let checksum = migration_checksum(migration.sql);
+        let rendered_sql = render_migration_sql(migration.sql, self.fact_embedding_dimension);
+        let checksum = migration_checksum(&rendered_sql);
 
         if let Some(existing) = self.select_one(&record_id, namespace).await? {
             validate_applied_migration(&existing, migration.file_name, &checksum)?;
             return Ok(());
         }
 
-        if migration_has_statements(migration.sql) {
-            self.execute_raw_query(migration.sql, None, namespace)
+        if migration_has_statements(&rendered_sql) {
+            self.execute_raw_query(&rendered_sql, None, namespace)
                 .await?;
         }
 
@@ -513,8 +521,18 @@ async fn build_remote_namespace_clients(
     Ok(clients)
 }
 
-fn render_initial_schema_sql(template: &str) -> String {
-    template.to_string()
+fn render_initial_schema_sql(template: &str, embedding_dimension: usize) -> String {
+    template.replace(
+        FACT_EMBEDDING_DIMENSION_PLACEHOLDER,
+        &embedding_dimension.to_string(),
+    )
+}
+
+fn render_migration_sql(template: &str, embedding_dimension: usize) -> String {
+    template.replace(
+        FACT_EMBEDDING_DIMENSION_PLACEHOLDER,
+        &embedding_dimension.to_string(),
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -524,10 +542,20 @@ struct MigrationScript {
 }
 
 fn versioned_migrations() -> &'static [MigrationScript] {
-    &[MigrationScript {
-        file_name: "006_simplified_search_redesign.surql",
-        sql: include_str!("migrations/006_simplified_search_redesign.surql"),
-    }]
+    &[
+        MigrationScript {
+            file_name: "006_simplified_search_redesign.surql",
+            sql: include_str!("migrations/006_simplified_search_redesign.surql"),
+        },
+        MigrationScript {
+            file_name: "007_episode_archival_fields.surql",
+            sql: include_str!("migrations/007_episode_archival_fields.surql"),
+        },
+        MigrationScript {
+            file_name: "008_fact_semantic_embeddings.surql",
+            sql: include_str!("migrations/008_fact_semantic_embeddings.surql"),
+        },
+    ]
 }
 
 fn migration_record_id(file_name: &str) -> String {
@@ -823,9 +851,8 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        // Community maintenance still needs the active edge set as a whole.
-        // Keep the limitation explicit here so future refactors do not mistake
-        // this for a bounded neighbor lookup.
+        // Retained for compatibility/test coverage; production traversal prefers
+        // bounded neighbor lookups via `select_edge_neighbors`.
         let (sql, vars) = build_select_edges_filtered_query(cutoff);
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
@@ -1271,20 +1298,7 @@ fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     if let Some(idx) = record_id.find(':') {
         let table = &record_id[..idx];
         let id = &record_id[idx + 1..];
-        let id_field = match table {
-            "fact" => Some("fact_id"),
-            "entity" => Some("entity_id"),
-            "edge" => Some("edge_id"),
-            "community" => Some("community_id"),
-            _ => None,
-        };
-
-        if let Some(field) = id_field {
-            (
-                format!("SELECT * FROM {table} WHERE {field} = $id"),
-                Some(Value::String(record_id.to_string())),
-            )
-        } else if !id.is_empty() {
+        if !id.is_empty() {
             (format!("SELECT * FROM {table}:⟨{id}⟩"), None)
         } else {
             (format!("SELECT * FROM {record_id}"), None)
@@ -1411,7 +1425,7 @@ fn build_select_facts_by_entity_links_query(
 
 fn build_select_active_facts_query(limit: i32) -> (String, Value) {
     (
-        "SELECT * FROM fact WHERE t_invalid IS NULL ORDER BY t_valid ASC LIMIT $limit".to_string(),
+        "SELECT * FROM fact WHERE (t_invalid IS NONE OR t_invalid IS NULL) ORDER BY t_valid ASC LIMIT $limit".to_string(),
         json!({"limit": limit}),
     )
 }
@@ -1429,7 +1443,7 @@ fn build_select_active_facts_by_episode_query(
     limit: i32,
 ) -> (String, Value) {
     (
-        "SELECT * FROM fact WHERE source_episode = $episode_id AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff)) LIMIT $limit".to_string(),
+        "SELECT * FROM fact WHERE source_episode = $episode_id AND (t_invalid IS NONE OR t_invalid IS NULL OR t_invalid > type::datetime($cutoff)) LIMIT $limit".to_string(),
         json!({"episode_id": episode_id, "cutoff": cutoff, "limit": limit}),
     )
 }
@@ -1541,7 +1555,7 @@ fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
 
 fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
     match table {
-        "episode" => &["t_ref", "t_ingested"],
+        "episode" => &["t_ref", "t_ingested", "archived_at"],
         "fact" | "edge" => &["t_valid", "t_ingested", "t_invalid", "t_invalid_ingested"],
         "community" => &["updated_at"],
         "event_log" => &["ts"],
@@ -1893,10 +1907,18 @@ mod tests {
             .await
             .expect("apply migrations");
 
+        let episode_info = client
+            .execute_query("INFO FOR TABLE episode", None, "testns")
+            .await
+            .expect("info for table episode");
         let community_info = client
             .execute_query("INFO FOR TABLE community", None, "testns")
             .await
             .expect("info for table community");
+        let fact_info = client
+            .execute_query("INFO FOR TABLE fact", None, "testns")
+            .await
+            .expect("info for table fact");
         let edge_info = client
             .execute_query("INFO FOR TABLE edge", None, "testns")
             .await
@@ -1906,10 +1928,16 @@ mod tests {
             .await
             .expect("info for table script_migration");
 
+        let episode_json = surreal_to_json(episode_info);
         let community_json = surreal_to_json(community_info);
+        let fact_json = surreal_to_json(fact_info);
         let edge_json = surreal_to_json(edge_info);
         let migration_json = surreal_to_json(migration_info);
 
+        assert!(json_contains_text(&episode_json, "status"));
+        assert!(json_contains_text(&episode_json, "archived_at"));
+        assert!(json_contains_text(&fact_json, "embedding"));
+        assert!(json_contains_text(&fact_json, "fact_embedding_hnsw"));
         assert!(json_contains_text(
             &community_json,
             "community_summary_search"
@@ -2169,15 +2197,15 @@ mod tests {
     #[test]
     fn build_select_one_query_with_fact_id() {
         let (sql, bind) = build_select_one_query("fact:abc123");
-        assert_eq!(sql, "SELECT * FROM fact WHERE fact_id = $id");
-        assert_eq!(bind, Some(json!("fact:abc123")));
+        assert_eq!(sql, "SELECT * FROM fact:⟨abc123⟩");
+        assert_eq!(bind, None);
     }
 
     #[test]
     fn build_select_one_query_with_entity_id() {
         let (sql, bind) = build_select_one_query("entity:xyz789");
-        assert_eq!(sql, "SELECT * FROM entity WHERE entity_id = $id");
-        assert_eq!(bind, Some(json!("entity:xyz789")));
+        assert_eq!(sql, "SELECT * FROM entity:⟨xyz789⟩");
+        assert_eq!(bind, None);
     }
 
     #[test]
@@ -2237,20 +2265,33 @@ mod tests {
             file_names.contains(&"006_simplified_search_redesign.surql"),
             "startup migration registry should include the breaking search redesign migration"
         );
+        assert!(
+            file_names.contains(&"007_episode_archival_fields.surql"),
+            "startup migration registry should include the archival schema follow-up migration"
+        );
+        assert!(
+            file_names.contains(&"008_fact_semantic_embeddings.surql"),
+            "startup migration registry should include the semantic embedding follow-up migration"
+        );
     }
 
     #[test]
-    fn versioned_migrations_keep_only_single_live_upgrade_script() {
+    fn versioned_migrations_keep_runtime_upgrade_scripts_in_order() {
         let migrations = versioned_migrations();
 
         assert_eq!(
             migrations.len(),
-            1,
-            "one-binary delivery should keep a single runtime upgrade migration"
+            3,
+            "runtime migration registry should include redesign, archival, and semantic embedding upgrades"
         );
         assert_eq!(
             migrations[0].file_name,
             "006_simplified_search_redesign.surql"
+        );
+        assert_eq!(migrations[1].file_name, "007_episode_archival_fields.surql");
+        assert_eq!(
+            migrations[2].file_name,
+            "008_fact_semantic_embeddings.surql"
         );
     }
 
@@ -2264,6 +2305,32 @@ mod tests {
         assert!(
             migration_has_statements(migration.sql),
             "migration 006 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_007_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "007_episode_archival_fields.surql")
+            .expect("migration 007 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 007 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_008_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "008_fact_semantic_embeddings.surql")
+            .expect("migration 008 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 008 must stay executable for existing databases"
         );
     }
 
@@ -2530,14 +2597,15 @@ mod tests {
     }
 
     #[test]
-    fn render_initial_schema_sql_returns_template_without_placeholder_substitution() {
+    fn render_initial_schema_sql_substitutes_embedding_dimension_placeholder() {
         let rendered = render_initial_schema_sql(
-            "DEFINE ANALYZER memory_fts TOKENIZERS class FILTERS lowercase, ascii, snowball(english);",
+            "DEFINE INDEX fact_embedding_hnsw ON TABLE fact FIELDS embedding HNSW DIMENSION __FACT_EMBEDDING_DIMENSION__;",
+            768,
         );
 
         assert_eq!(
             rendered,
-            "DEFINE ANALYZER memory_fts TOKENIZERS class FILTERS lowercase, ascii, snowball(english);"
+            "DEFINE INDEX fact_embedding_hnsw ON TABLE fact FIELDS embedding HNSW DIMENSION 768;"
         );
     }
 
@@ -2566,7 +2634,7 @@ mod tests {
     fn build_select_active_facts_query_filters_by_t_invalid() {
         let (sql, vars) = build_select_active_facts_query(500);
 
-        assert!(sql.contains("FROM fact WHERE t_invalid IS NULL"));
+        assert!(sql.contains("FROM fact WHERE (t_invalid IS NONE OR t_invalid IS NULL)"));
         assert!(sql.contains("ORDER BY t_valid ASC"));
         assert!(sql.contains("LIMIT $limit"));
         assert_eq!(vars.get("limit"), Some(&json!(500)));
@@ -2590,7 +2658,9 @@ mod tests {
             build_select_active_facts_by_episode_query("episode:abc", "2026-01-15T00:00:00Z", 1);
 
         assert!(sql.contains("source_episode = $episode_id"));
-        assert!(sql.contains("t_invalid IS NONE OR t_invalid > type::datetime($cutoff)"));
+        assert!(sql.contains(
+            "t_invalid IS NONE OR t_invalid IS NULL OR t_invalid > type::datetime($cutoff)"
+        ));
         assert_eq!(vars.get("episode_id"), Some(&json!("episode:abc")));
         assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
         assert_eq!(vars.get("limit"), Some(&json!(1)));

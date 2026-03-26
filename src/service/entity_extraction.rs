@@ -1,6 +1,8 @@
 //! Pluggable entity extraction abstractions.
 
 use std::collections::HashSet;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::LazyLock;
 
 use async_trait::async_trait;
@@ -368,14 +370,17 @@ fn classify_entity_type(name: &str) -> &'static str {
         return "location";
     }
 
-    "person"
+    "unknown"
 }
 
 /// Type alias for the pluggable extraction function used by [`LlmEntityExtractor`].
 ///
 /// Takes raw text and returns extracted entity candidates. Implementations
 /// should call out to an LLM, gRPC service, or any other async backend.
-pub type ExtractFn = dyn Fn(&str) -> Result<Vec<EntityCandidate>, MemoryError> + Send + Sync;
+type ExtractFuture =
+    Pin<Box<dyn Future<Output = Result<Vec<EntityCandidate>, MemoryError>> + Send>>;
+
+pub type ExtractFn = dyn Fn(String) -> ExtractFuture + Send + Sync;
 
 /// LLM-backed entity extractor that delegates to a pluggable function.
 ///
@@ -395,12 +400,13 @@ impl std::fmt::Debug for LlmEntityExtractor {
 
 impl LlmEntityExtractor {
     /// Creates a new LLM-backed extractor with the given extraction function.
-    pub fn new<F>(f: F) -> Self
+    pub fn new<F, Fut>(f: F) -> Self
     where
-        F: Fn(&str) -> Result<Vec<EntityCandidate>, MemoryError> + Send + Sync + 'static,
+        F: Fn(String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<EntityCandidate>, MemoryError>> + Send + 'static,
     {
         Self {
-            extract_fn: Box::new(f),
+            extract_fn: Box::new(move |content| Box::pin(f(content))),
         }
     }
 }
@@ -408,7 +414,7 @@ impl LlmEntityExtractor {
 #[async_trait]
 impl EntityExtractor for LlmEntityExtractor {
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
-        (self.extract_fn)(content)
+        (self.extract_fn)(content.to_string()).await
     }
 }
 
@@ -539,8 +545,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn regex_entity_extractor_uses_unknown_fallback_for_technical_terms() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates("PostgreSQL integrates with OpenAI")
+            .await
+            .unwrap();
+
+        let types: std::collections::HashMap<_, _> = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.canonical_name.as_str(),
+                    candidate.entity_type.as_str(),
+                )
+            })
+            .collect();
+
+        assert_eq!(types.get("PostgreSQL"), Some(&"unknown"));
+        assert_eq!(types.get("OpenAI"), Some(&"unknown"));
+    }
+
+    #[tokio::test]
     async fn llm_extractor_delegates_to_provided_function() {
-        let extractor = LlmEntityExtractor::new(|_content| {
+        let extractor = LlmEntityExtractor::new(|_content| async move {
             Ok(vec![
                 EntityCandidate {
                     entity_type: "person".into(),

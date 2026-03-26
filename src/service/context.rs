@@ -1,8 +1,11 @@
 //! Context assembly operations.
 
+use std::collections::HashSet;
+
 use serde_json::{Value, json};
 
 use super::cache::CacheKey;
+use super::embedding::{SEMANTIC_MATCH_THRESHOLD, cosine_similarity, embedding_from_value};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
@@ -99,7 +102,7 @@ pub async fn assemble_context(
     let mut expanded_facts = Vec::new();
     let ranked_facts = if let Some(query) = query_opt {
         let expanded_queries = expand_query_with_aliases(service, query, &namespace).await;
-        let direct_fact_ids: std::collections::HashSet<_> = direct_facts
+        let direct_fact_ids: HashSet<_> = direct_facts
             .iter()
             .map(|fact| fact.fact_id.clone())
             .collect();
@@ -124,7 +127,7 @@ pub async fn assemble_context(
             }
         }
 
-        let all_direct_ids: std::collections::HashSet<_> = direct_facts
+        let all_direct_ids: HashSet<_> = direct_facts
             .iter()
             .chain(expanded_facts.iter())
             .map(|fact| fact.fact_id.clone())
@@ -144,12 +147,33 @@ pub async fn assemble_context(
         )
         .await?;
 
+        let excluded_fact_ids = all_direct_ids
+            .iter()
+            .cloned()
+            .chain(community_facts.iter().map(|(fact, _)| fact.fact_id.clone()))
+            .collect::<HashSet<_>>();
+
+        let semantic_facts = collect_semantic_facts(
+            service,
+            CollectSemanticFactsRequest {
+                namespace: &namespace,
+                scope: &request.scope,
+                cutoff,
+                query,
+                access: &access,
+                excluded_fact_ids: &excluded_fact_ids,
+                budget: request.budget,
+            },
+        )
+        .await?;
+
         let mut all_direct = direct_facts;
         all_direct.extend(expanded_facts);
 
         let mut ranked_facts = build_ranked_context_facts(
             all_direct,
             community_facts,
+            semantic_facts,
             query_opt,
             &request.scope,
             cutoff,
@@ -157,8 +181,14 @@ pub async fn assemble_context(
         sort_ranked_context_facts(&mut ranked_facts);
         ranked_facts
     } else {
-        let mut ranked_facts =
-            build_ranked_context_facts(direct_facts, Vec::new(), query_opt, &request.scope, cutoff);
+        let mut ranked_facts = build_ranked_context_facts(
+            direct_facts,
+            Vec::new(),
+            Vec::new(),
+            query_opt,
+            &request.scope,
+            cutoff,
+        );
         sort_ranked_context_facts(&mut ranked_facts);
         ranked_facts
     };
@@ -217,13 +247,8 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
             };
 
             if let Some(fact) = super::episode::fact_from_record(fact_item) {
-                if !fact.policy_tags.is_empty()
-                    && let Some(allowed_tags) = &access.allowed_tags
-                {
-                    let allowed: std::collections::HashSet<_> = allowed_tags.iter().collect();
-                    if !fact.policy_tags.iter().any(|tag| allowed.contains(tag)) {
-                        continue;
-                    }
+                if !fact_allowed_by_policy(&fact, access) {
+                    continue;
                 }
                 facts.push(fact);
             }
@@ -231,6 +256,32 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
     }
 
     facts
+}
+
+fn fact_allowed_by_policy(fact: &crate::models::Fact, access: &AccessContext) -> bool {
+    if fact.policy_tags.is_empty() {
+        return true;
+    }
+
+    let Some(allowed_tags) = &access.allowed_tags else {
+        return true;
+    };
+
+    let allowed: HashSet<_> = allowed_tags.iter().collect();
+    fact.policy_tags.iter().any(|tag| allowed.contains(tag))
+}
+
+fn fact_is_active_at(fact: &crate::models::Fact, cutoff: chrono::DateTime<chrono::Utc>) -> bool {
+    if fact.t_valid > cutoff || fact.t_ingested > cutoff {
+        return false;
+    }
+
+    match (fact.t_invalid, fact.t_invalid_ingested) {
+        (None, _) => true,
+        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
+        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
+        _ => false,
+    }
 }
 
 /// Test-only convenience wrapper around the production comparator below.
@@ -264,6 +315,7 @@ struct RankedContextFact {
 fn build_ranked_context_facts(
     direct_facts: Vec<crate::models::Fact>,
     community_facts: Vec<(crate::models::Fact, String)>,
+    semantic_facts: Vec<(crate::models::Fact, String)>,
     query_opt: Option<&str>,
     scope: &str,
     cutoff: chrono::DateTime<chrono::Utc>,
@@ -305,6 +357,27 @@ fn build_ranked_context_facts(
                 rationale,
                 fusion_score: reciprocal_rank(rank),
                 source_priority: 1,
+                decayed_confidence: confidence,
+            },
+        );
+    }
+
+    for (rank, (fact, rationale)) in semantic_facts.into_iter().enumerate() {
+        let fact_id = fact.fact_id.clone();
+        let confidence = super::decayed_confidence(&fact, cutoff);
+        if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
+            candidate.fusion_score += reciprocal_rank(rank);
+            candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
+            continue;
+        }
+
+        ranked_by_fact_id.insert(
+            fact_id,
+            RankedContextFact {
+                fact,
+                rationale,
+                fusion_score: reciprocal_rank(rank),
+                source_priority: 2,
                 decayed_confidence: confidence,
             },
         );
@@ -462,6 +535,16 @@ struct CollectCommunityFactsRequest<'a> {
     budget: i32,
 }
 
+struct CollectSemanticFactsRequest<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    query: &'a str,
+    access: &'a AccessContext,
+    excluded_fact_ids: &'a HashSet<String>,
+    budget: i32,
+}
+
 #[derive(Debug, Clone)]
 struct CommunityMatch {
     rank: usize,
@@ -559,6 +642,97 @@ async fn collect_community_facts(
         .collect())
 }
 
+async fn collect_semantic_facts(
+    service: &crate::service::MemoryService,
+    request: CollectSemanticFactsRequest<'_>,
+) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
+    let query_embedding = match service.generate_embedding(request.query).await {
+        Ok(Some(embedding)) => embedding,
+        Ok(None) => return Ok(Vec::new()),
+        Err(err) => {
+            service.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.query_skipped")),
+                    (
+                        "provider".to_string(),
+                        json!(service.embedding_provider.provider_name()),
+                    ),
+                    ("error".to_string(), json!(err.to_string())),
+                ]),
+                LogLevel::Warn,
+            );
+            return Ok(Vec::new());
+        }
+    };
+
+    if query_embedding.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let fact_records = service
+        .db_client
+        .select_table("fact", request.namespace)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    let mut ranked_facts = Vec::new();
+    for record in fact_records {
+        let Some(fact) = super::episode::fact_from_record(&record) else {
+            continue;
+        };
+
+        if fact.scope != request.scope
+            || request.excluded_fact_ids.contains(&fact.fact_id)
+            || !fact_allowed_by_policy(&fact, request.access)
+            || !fact_is_active_at(&fact, request.cutoff)
+        {
+            continue;
+        }
+
+        let embedding = record
+            .as_object()
+            .and_then(|map| map.get("embedding"))
+            .and_then(embedding_from_value);
+
+        let Some(embedding) = embedding else {
+            continue;
+        };
+
+        if embedding.len() != query_embedding.len() {
+            continue;
+        }
+
+        let similarity = cosine_similarity(&query_embedding, &embedding);
+        if similarity < SEMANTIC_MATCH_THRESHOLD {
+            continue;
+        }
+
+        ranked_facts.push((similarity, fact));
+    }
+
+    ranked_facts.sort_by(
+        |(left_similarity, left_fact), (right_similarity, right_fact)| {
+            right_similarity
+                .total_cmp(left_similarity)
+                .then_with(|| compare_facts_by_recency(left_fact, right_fact))
+        },
+    );
+
+    Ok(ranked_facts
+        .into_iter()
+        .take(request.budget.max(1) as usize)
+        .map(|(similarity, fact)| {
+            (
+                fact,
+                format!(
+                    "matched semantic similarity={similarity:.3} for query=\"{}\"",
+                    request.query
+                ),
+            )
+        })
+        .collect())
+}
+
 #[derive(Debug)]
 struct StoredCommunitySummary {
     community_id: String,
@@ -651,7 +825,10 @@ fn best_community_match<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_EMBEDDING_DIMENSION;
+    use crate::service::EmbeddingProvider;
     use crate::storage::{DbClient, GraphDirection};
+    use async_trait::async_trait;
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Arc;
@@ -1127,10 +1304,11 @@ mod tests {
 
             async fn select_table(
                 &self,
-                _table: &str,
+                table: &str,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
-                panic!("assemble_context should not scan community with select_table")
+                assert_eq!(table, "fact");
+                Ok(vec![])
             }
 
             async fn select_facts_filtered(
@@ -1941,6 +2119,221 @@ mod tests {
         assert_eq!(results[0].fact_id, "fact:alpha");
         assert!(results[0].rationale.contains("community:alpha"));
         assert_eq!(results[1].fact_id, "fact:beta");
+    }
+
+    #[tokio::test]
+    async fn assemble_context_uses_provider_backed_semantic_similarity() {
+        struct SemanticDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for SemanticDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(table, "fact");
+                let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+                embedding[0] = 1.0;
+                Ok(vec![json!({
+                    "fact_id": "fact:semantic",
+                    "fact_type": "note",
+                    "content": "Compensation increase approved for the engineering team",
+                    "quote": "Compensation increase approved",
+                    "source_episode": "episode:semantic",
+                    "t_valid": "2026-01-15T10:30:00Z",
+                    "t_ingested": "2026-01-15T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": [],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:semantic"},
+                    "embedding": embedding
+                })])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        struct SemanticEmbeddingProvider;
+
+        #[async_trait]
+        impl EmbeddingProvider for SemanticEmbeddingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "test"
+            }
+
+            fn dimension(&self) -> usize {
+                DEFAULT_EMBEDDING_DIMENSION
+            }
+
+            async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+                let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+                embedding[0] = 1.0;
+                Ok(embedding)
+            }
+        }
+
+        let service = crate::service::MemoryService::new_with_embedding_provider(
+            Arc::new(SemanticDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(SemanticEmbeddingProvider),
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "salary raise".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "fact:semantic");
+        assert!(results[0].rationale.contains("semantic similarity"));
     }
 
     #[test]

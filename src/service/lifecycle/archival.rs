@@ -74,36 +74,36 @@ pub async fn run_archival_pass(
     let now = Utc::now();
     let cutoff = now - chrono::Duration::days(age_days as i64);
     let cutoff_str = crate::service::normalize_dt(cutoff);
-    let namespace = service.default_namespace.clone();
-
-    let episodes = service
-        .db_client
-        .select_episodes_for_archival(&namespace, &cutoff_str, ARCHIVAL_BATCH_LIMIT)
-        .await?;
-
     let mut archived = 0;
 
-    for record in episodes {
-        let episode_id = record
-            .get("episode_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
+    for namespace in &service.namespaces {
+        let episodes = service
+            .db_client
+            .select_episodes_for_archival(namespace, &cutoff_str, ARCHIVAL_BATCH_LIMIT)
+            .await?;
 
-        let has_active_facts =
-            check_episode_has_active_facts(service, episode_id, &namespace).await?;
+        for record in episodes {
+            let episode_id = record
+                .get("episode_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
 
-        if !has_active_facts {
-            let payload = json!({
-                "status": "archived",
-                "archived_at": crate::service::normalize_dt(now),
-            });
+            let has_active_facts =
+                check_episode_has_active_facts(service, episode_id, namespace).await?;
 
-            service
-                .db_client
-                .update(episode_id, payload, &namespace)
-                .await?;
+            if !has_active_facts {
+                let payload = json!({
+                    "status": "archived",
+                    "archived_at": crate::service::normalize_dt(now),
+                });
 
-            archived += 1;
+                service
+                    .db_client
+                    .update(episode_id, payload, namespace)
+                    .await?;
+
+                archived += 1;
+            }
         }
     }
 

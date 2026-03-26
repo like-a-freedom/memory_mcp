@@ -9,7 +9,80 @@
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
 use memory_mcp::service::lifecycle::run_decay_pass;
+use memory_mcp::storage::DbClient;
 use serde_json::json;
+
+mod common;
+
+#[tokio::test]
+async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(400);
+
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "old metric in default namespace",
+            "old metric in default namespace",
+            "episode:default_decay_none",
+            old_date,
+            "org",
+            0.4,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
+
+    let count = run_decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(count, 1, "active fact with absent t_invalid should decay");
+
+    let stored = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+    assert!(stored.get("t_invalid").is_some());
+}
+
+#[tokio::test]
+async fn decay_pass_processes_all_configured_namespaces() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(400);
+
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "old metric in personal namespace",
+            "old metric in personal namespace",
+            "episode:personal_decay_old",
+            old_date,
+            "personal",
+            0.4,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
+
+    let count = run_decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(count, 1, "decay should include non-default namespaces");
+
+    let stored = db_client
+        .select_one(&fact_id, "personal")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+    assert!(stored.get("t_invalid").is_some());
+}
 
 #[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]

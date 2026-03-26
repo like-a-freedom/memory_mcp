@@ -8,6 +8,129 @@ use std::path::PathBuf;
 
 use crate::service::MemoryError;
 
+/// Default vector dimension used for fact embeddings.
+pub const DEFAULT_EMBEDDING_DIMENSION: usize = 1536;
+
+/// Default timeout for embedding provider HTTP requests.
+pub const DEFAULT_EMBEDDING_TIMEOUT_SECS: u64 = 15;
+
+/// Supported embedding provider kinds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EmbeddingProviderKind {
+    /// Semantic retrieval is disabled.
+    Disabled,
+    /// OpenAI-compatible `/embeddings` endpoint.
+    OpenAiCompatible,
+    /// Ollama `/api/embeddings` endpoint.
+    Ollama,
+}
+
+/// Configuration for optional embedding provider integration.
+#[derive(Debug, Clone)]
+pub struct EmbeddingConfig {
+    /// Which provider to use.
+    pub provider: EmbeddingProviderKind,
+    /// Provider base URL.
+    pub base_url: Option<String>,
+    /// Embedding model name.
+    pub model: Option<String>,
+    /// Optional API key for OpenAI-compatible providers.
+    pub api_key: Option<String>,
+    /// Request timeout in seconds.
+    pub timeout_secs: u64,
+    /// Expected embedding vector dimension.
+    pub dimension: usize,
+}
+
+impl Default for EmbeddingConfig {
+    fn default() -> Self {
+        Self {
+            provider: EmbeddingProviderKind::Disabled,
+            base_url: None,
+            model: None,
+            api_key: None,
+            timeout_secs: DEFAULT_EMBEDDING_TIMEOUT_SECS,
+            dimension: DEFAULT_EMBEDDING_DIMENSION,
+        }
+    }
+}
+
+impl EmbeddingConfig {
+    /// Loads optional embedding provider configuration from environment variables.
+    ///
+    /// When disabled, the rest of the server keeps working without semantic retrieval.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MemoryError::ConfigInvalid`] for invalid provider names or dimensions,
+    /// and [`MemoryError::ConfigMissing`] when a required variable is absent while
+    /// embeddings are enabled.
+    pub fn from_env() -> Result<Self, MemoryError> {
+        let enabled = parse_bool_env("EMBEDDINGS_ENABLED").unwrap_or(false);
+        let timeout_secs =
+            parse_u64_env("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
+        let dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?
+            .unwrap_or(DEFAULT_EMBEDDING_DIMENSION);
+
+        if !enabled {
+            return Ok(Self {
+                timeout_secs,
+                dimension,
+                ..Self::default()
+            });
+        }
+
+        let provider = match env::var("EMBEDDINGS_PROVIDER")
+            .map_err(|_| MemoryError::ConfigMissing("EMBEDDINGS_PROVIDER".to_string()))?
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "openai" | "openai-compatible" | "openai_compatible" => {
+                EmbeddingProviderKind::OpenAiCompatible
+            }
+            "ollama" => EmbeddingProviderKind::Ollama,
+            other => {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "unsupported EMBEDDINGS_PROVIDER `{other}`"
+                )));
+            }
+        };
+
+        let model = Some(
+            env::var("EMBEDDINGS_MODEL")
+                .map_err(|_| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
+        );
+
+        let base_url = match provider {
+            EmbeddingProviderKind::OpenAiCompatible => Some(
+                env::var("EMBEDDINGS_BASE_URL")
+                    .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+            ),
+            EmbeddingProviderKind::Ollama => Some(
+                env::var("EMBEDDINGS_BASE_URL")
+                    .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()),
+            ),
+            EmbeddingProviderKind::Disabled => None,
+        };
+
+        Ok(Self {
+            provider,
+            base_url,
+            model,
+            api_key: env::var("EMBEDDINGS_API_KEY").ok(),
+            timeout_secs,
+            dimension,
+        })
+    }
+
+    /// Returns true when semantic embeddings should be used.
+    #[must_use]
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self.provider, EmbeddingProviderKind::Disabled)
+    }
+}
+
 /// Configuration for SurrealDB connection.
 ///
 /// Supports both embedded (RocksDB) and remote (WebSocket) modes.
@@ -41,6 +164,8 @@ pub struct SurrealConfig {
     pub data_dir: Option<String>,
     /// Lifecycle background job configuration.
     pub lifecycle: LifecycleConfig,
+    /// Optional embedding provider configuration.
+    pub embedding: EmbeddingConfig,
 }
 
 impl SurrealConfig {
@@ -96,6 +221,7 @@ impl SurrealConfig {
         let data_dir = env::var("SURREALDB_DATA_DIR").ok();
 
         let lifecycle = LifecycleConfig::from_env();
+        let embedding = EmbeddingConfig::from_env()?;
 
         Ok(Self {
             db_name,
@@ -107,6 +233,7 @@ impl SurrealConfig {
             embedded,
             data_dir,
             lifecycle,
+            embedding,
         })
     }
 
@@ -282,6 +409,7 @@ pub struct SurrealConfigBuilder {
     embedded: bool,
     data_dir: Option<String>,
     lifecycle: LifecycleConfig,
+    embedding: EmbeddingConfig,
 }
 
 impl SurrealConfigBuilder {
@@ -340,6 +468,12 @@ impl SurrealConfigBuilder {
         self
     }
 
+    /// Sets optional embedding integration configuration.
+    pub fn embedding_config(mut self, config: EmbeddingConfig) -> Self {
+        self.embedding = config;
+        self
+    }
+
     /// Builds the configuration.
     ///
     /// # Errors
@@ -373,6 +507,7 @@ impl SurrealConfigBuilder {
             embedded: self.embedded,
             data_dir: self.data_dir,
             lifecycle: self.lifecycle,
+            embedding: self.embedding,
         })
     }
 }
@@ -384,6 +519,28 @@ fn parse_bool_env(var_name: &str) -> Option<bool> {
     env::var(var_name)
         .ok()
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
+}
+
+fn parse_u64_env(var_name: &str) -> Result<Option<u64>, MemoryError> {
+    env::var(var_name)
+        .ok()
+        .map(|value| {
+            value.parse::<u64>().map_err(|_| {
+                MemoryError::ConfigInvalid(format!("{var_name} must be an unsigned integer"))
+            })
+        })
+        .transpose()
+}
+
+fn parse_usize_env(var_name: &str) -> Result<Option<usize>, MemoryError> {
+    env::var(var_name)
+        .ok()
+        .map(|value| {
+            value.parse::<usize>().map_err(|_| {
+                MemoryError::ConfigInvalid(format!("{var_name} must be a positive integer"))
+            })
+        })
+        .transpose()
 }
 
 /// Parses a comma-separated list from an environment variable.
@@ -519,6 +676,65 @@ mod tests {
         assert_eq!(config.decay_confidence_threshold, 0.3);
         assert_eq!(config.archival_age_days, 90);
         assert_eq!(config.decay_half_life_days, 365.0);
+    }
+
+    #[test]
+    fn embedding_config_defaults_to_disabled() {
+        let config = EmbeddingConfig::default();
+
+        assert!(!config.is_enabled());
+        assert_eq!(config.provider, EmbeddingProviderKind::Disabled);
+        assert_eq!(config.dimension, DEFAULT_EMBEDDING_DIMENSION);
+        assert_eq!(config.timeout_secs, DEFAULT_EMBEDDING_TIMEOUT_SECS);
+    }
+
+    #[test]
+    fn embedding_config_from_env_supports_ollama() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("EMBEDDINGS_ENABLED", "true");
+            env::set_var("EMBEDDINGS_PROVIDER", "ollama");
+            env::set_var("EMBEDDINGS_MODEL", "nomic-embed-text");
+            env::set_var("EMBEDDINGS_TIMEOUT_SECS", "7");
+            env::set_var("SURREALDB_EMBEDDING_DIMENSION", "768");
+        }
+
+        let config = EmbeddingConfig::from_env().expect("embedding config");
+
+        unsafe {
+            env::remove_var("EMBEDDINGS_ENABLED");
+            env::remove_var("EMBEDDINGS_PROVIDER");
+            env::remove_var("EMBEDDINGS_MODEL");
+            env::remove_var("EMBEDDINGS_TIMEOUT_SECS");
+            env::remove_var("SURREALDB_EMBEDDING_DIMENSION");
+        }
+
+        assert!(config.is_enabled());
+        assert_eq!(config.provider, EmbeddingProviderKind::Ollama);
+        assert_eq!(config.base_url.as_deref(), Some("http://127.0.0.1:11434"));
+        assert_eq!(config.model.as_deref(), Some("nomic-embed-text"));
+        assert_eq!(config.timeout_secs, 7);
+        assert_eq!(config.dimension, 768);
+    }
+
+    #[test]
+    fn embedding_config_from_env_requires_model_when_enabled() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("EMBEDDINGS_ENABLED", "true");
+            env::set_var("EMBEDDINGS_PROVIDER", "openai-compatible");
+        }
+
+        let error = EmbeddingConfig::from_env().expect_err("missing model should error");
+
+        unsafe {
+            env::remove_var("EMBEDDINGS_ENABLED");
+            env::remove_var("EMBEDDINGS_PROVIDER");
+        }
+
+        assert!(matches!(error, MemoryError::ConfigMissing(name) if name == "EMBEDDINGS_MODEL"));
     }
 
     #[test]

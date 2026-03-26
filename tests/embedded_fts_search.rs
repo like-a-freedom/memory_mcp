@@ -155,32 +155,32 @@ fn schema_uses_datetime_for_fact_temporal_fields() {
 }
 
 #[test]
-fn schema_removes_embedding_fields_and_hnsw_indexes() {
+fn schema_defines_fact_embedding_field_and_hnsw_index_only() {
     let schema = include_str!("../src/migrations/__Initial.surql");
 
     assert!(
         !schema.contains("DEFINE FIELD embedding ON episode"),
-        "episode.embedding should be removed from schema"
+        "episode.embedding should stay absent from schema"
     );
     assert!(
         !schema.contains("DEFINE FIELD embedding ON entity"),
-        "entity.embedding should be removed from schema"
+        "entity.embedding should stay absent from schema"
     );
     assert!(
-        !schema.contains("DEFINE FIELD embedding ON fact"),
-        "fact.embedding should be removed from schema"
+        schema.contains("DEFINE FIELD embedding ON fact TYPE option<array>;"),
+        "fact.embedding should be defined for semantic retrieval"
     );
     assert!(
         !schema.contains("episode_embedding_hnsw"),
-        "episode HNSW index should be removed"
+        "episode HNSW index should stay absent"
     );
     assert!(
         !schema.contains("entity_embedding_hnsw"),
-        "entity HNSW index should be removed"
+        "entity HNSW index should stay absent"
     );
     assert!(
-        !schema.contains("fact_embedding_hnsw"),
-        "fact HNSW index should be removed"
+        schema.contains("fact_embedding_hnsw"),
+        "fact HNSW index should be present"
     );
 }
 

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use memory_mcp::service::MemoryService;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 
+#[allow(dead_code)]
 pub async fn make_service() -> MemoryService {
     let namespaces = vec![
         "org".to_string(),

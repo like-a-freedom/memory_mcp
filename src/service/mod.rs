@@ -7,12 +7,14 @@
 //! - Context assembly for queries
 
 pub use core::MemoryService;
+pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
 pub use entity_extraction::{EntityExtractor, LlmEntityExtractor, RegexEntityExtractor};
 pub use error::MemoryError;
 
 mod cache;
 mod context;
 mod core;
+mod embedding;
 mod entity_extraction;
 mod episode;
 mod error;
