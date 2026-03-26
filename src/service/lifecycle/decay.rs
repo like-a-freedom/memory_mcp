@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
-use crate::service::{MemoryService, MemoryError};
+use crate::service::{MemoryError, MemoryService};
 use crate::storage::json_f64;
 
 /// Spawns the decay worker background task.
@@ -19,7 +19,10 @@ pub fn spawn_decay_worker(
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
 
         let mut event = std::collections::HashMap::new();
-        event.insert("op".to_string(), serde_json::Value::String("lifecycle.decay.start".to_string()));
+        event.insert(
+            "op".to_string(),
+            serde_json::Value::String("lifecycle.decay.start".to_string()),
+        );
         event.insert(
             "interval_secs".to_string(),
             serde_json::Value::Number(serde_json::Number::from(interval_secs)),
@@ -28,34 +31,34 @@ pub fn spawn_decay_worker(
             "threshold".to_string(),
             serde_json::Value::Number(serde_json::Number::from(threshold as i64)),
         );
-        service.logger.log(
-            event,
-            crate::logging::LogLevel::Info,
-        );
+        service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
             interval.tick().await;
             match run_decay_pass(&service, threshold).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();
-                    event.insert("op".to_string(), serde_json::Value::String("lifecycle.decay.complete".to_string()));
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.decay.complete".to_string()),
+                    );
                     event.insert(
                         "facts_invalidated".to_string(),
                         serde_json::Value::Number(serde_json::Number::from(count)),
                     );
-                    service.logger.log(
-                        event,
-                        crate::logging::LogLevel::Info,
-                    );
+                    service.logger.log(event, crate::logging::LogLevel::Info);
                 }
                 Err(e) => {
                     let mut event = std::collections::HashMap::new();
-                    event.insert("op".to_string(), serde_json::Value::String("lifecycle.decay.error".to_string()));
-                    event.insert("error".to_string(), serde_json::Value::String(format!("{}", e)));
-                    service.logger.log(
-                        event,
-                        crate::logging::LogLevel::Warn,
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.decay.error".to_string()),
                     );
+                    event.insert(
+                        "error".to_string(),
+                        serde_json::Value::String(format!("{}", e)),
+                    );
+                    service.logger.log(event, crate::logging::LogLevel::Warn);
                 }
             }
         }
@@ -63,18 +66,12 @@ pub fn spawn_decay_worker(
 }
 
 /// Runs a single decay pass, invalidating facts below threshold.
-pub async fn run_decay_pass(
-    service: &MemoryService,
-    threshold: f64,
-) -> Result<usize, MemoryError> {
+pub async fn run_decay_pass(service: &MemoryService, threshold: f64) -> Result<usize, MemoryError> {
     let now = Utc::now();
     let namespace = service.default_namespace.clone();
 
     // Fetch all active facts
-    let facts = service
-        .db_client
-        .select_table("fact", &namespace)
-        .await?;
+    let facts = service.db_client.select_table("fact", &namespace).await?;
 
     let mut invalidated = 0;
 
@@ -92,10 +89,7 @@ pub async fn run_decay_pass(
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or(now);
 
-        let base_confidence = record
-            .get("confidence")
-            .and_then(json_f64)
-            .unwrap_or(0.5);
+        let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
 
         // Compute decayed confidence using standard decay formula
         let days_since_valid = (now - t_valid).num_days() as f64;

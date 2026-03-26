@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
-use crate::service::{MemoryService, MemoryError};
+use crate::service::{MemoryError, MemoryService};
 
 /// Spawns the archival worker background task.
 pub fn spawn_archival_worker(
@@ -18,7 +18,10 @@ pub fn spawn_archival_worker(
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
 
         let mut event = std::collections::HashMap::new();
-        event.insert("op".to_string(), serde_json::Value::String("lifecycle.archival.start".to_string()));
+        event.insert(
+            "op".to_string(),
+            serde_json::Value::String("lifecycle.archival.start".to_string()),
+        );
         event.insert(
             "interval_secs".to_string(),
             serde_json::Value::Number(serde_json::Number::from(interval_secs)),
@@ -27,34 +30,34 @@ pub fn spawn_archival_worker(
             "age_days".to_string(),
             serde_json::Value::Number(serde_json::Number::from(age_days)),
         );
-        service.logger.log(
-            event,
-            crate::logging::LogLevel::Info,
-        );
+        service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
             interval.tick().await;
             match run_archival_pass(&service, age_days).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();
-                    event.insert("op".to_string(), serde_json::Value::String("lifecycle.archival.complete".to_string()));
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.archival.complete".to_string()),
+                    );
                     event.insert(
                         "episodes_archived".to_string(),
                         serde_json::Value::Number(serde_json::Number::from(count)),
                     );
-                    service.logger.log(
-                        event,
-                        crate::logging::LogLevel::Info,
-                    );
+                    service.logger.log(event, crate::logging::LogLevel::Info);
                 }
                 Err(e) => {
                     let mut event = std::collections::HashMap::new();
-                    event.insert("op".to_string(), serde_json::Value::String("lifecycle.archival.error".to_string()));
-                    event.insert("error".to_string(), serde_json::Value::String(format!("{}", e)));
-                    service.logger.log(
-                        event,
-                        crate::logging::LogLevel::Warn,
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.archival.error".to_string()),
                     );
+                    event.insert(
+                        "error".to_string(),
+                        serde_json::Value::String(format!("{}", e)),
+                    );
+                    service.logger.log(event, crate::logging::LogLevel::Warn);
                 }
             }
         }
@@ -81,7 +84,8 @@ pub async fn run_archival_pass(
     for record in episodes {
         // Skip already archived episodes
         if let Some(status) = record.get("status").and_then(|v| v.as_str())
-            && status == "archived" {
+            && status == "archived"
+        {
             continue;
         }
 
@@ -103,7 +107,8 @@ pub async fn run_archival_pass(
             .and_then(|v| v.as_str())
             .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
 
-        let has_active_facts = check_episode_has_active_facts(service, episode_id, &namespace).await?;
+        let has_active_facts =
+            check_episode_has_active_facts(service, episode_id, &namespace).await?;
 
         if !has_active_facts {
             // Archive the episode

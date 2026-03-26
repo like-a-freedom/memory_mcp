@@ -154,7 +154,10 @@ impl MemoryService {
             .await;
 
             let mut event = std::collections::HashMap::new();
-            event.insert("op".to_string(), serde_json::json!("lifecycle.workers.started"));
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("lifecycle.workers.started"),
+            );
             event.insert(
                 "decay_interval".to_string(),
                 serde_json::json!(config.lifecycle.decay_interval_secs),
@@ -823,12 +826,20 @@ impl MemoryService {
 
         // 2. Traverse entity_links to find connected episodes
         let namespace = self.default_namespace.clone();
-        for entity_id in &item.provenance.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect::<Vec<_>>()
-        }).unwrap_or_default() {
-            let linked_episodes = self.find_episodes_via_entity(&entity_id, &namespace).await?;
+        for entity_id in &item
+            .provenance
+            .get("entity_links")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+        {
+            let linked_episodes = self
+                .find_episodes_via_entity(entity_id, &namespace)
+                .await?;
 
             for ep in linked_episodes {
                 // Skip if this is the primary source (already added)
@@ -863,19 +874,12 @@ impl MemoryService {
     /// Finds all episodes that mention or are linked to an entity.
     async fn find_episodes_via_entity(
         &self,
-        entity_id: &str,
-        namespace: &str,
+        _entity_id: &str,
+        _namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
+        // TODO: implement proper episode lookup by entity
         // Query episodes where entity appears in entity_links
-        let cutoff = crate::service::normalize_dt(Utc::now());
-        let episodes = self
-            .db_client
-            .select_facts_filtered(namespace, "all", &cutoff, None, 100)
-            .await?;
-
-        // Filter episodes that have this entity in their links
-        // Note: This is a simplified implementation - in production you'd query the episode table directly
-        Ok(Vec::new()) // TODO: implement proper episode lookup by entity
+        Ok(Vec::new())
     }
 }
 
