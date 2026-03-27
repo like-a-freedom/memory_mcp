@@ -8,6 +8,7 @@
 
 ## Document Change History
 
+- **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
 - **2026-03-25 (embedding follow-up)**: Added configurable `SURREALDB_EMBEDDING_DIMENSION`, DB-side community summary full-text search, and an explicit manual-reindex warning for dimension changes. Verified with strict `cargo clippy --all-targets -- -D warnings` and full `cargo test`.
@@ -309,10 +310,10 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 ### 5.4 Entity and Fact Extraction
 
-**FR-EX-01**: System MUST extract entities: `Person`, `Company`, `Project`, `Deal`, `Product`, `Asset`, `Location` (extensible).  
-**Status**: ⚠️ Partial — current extractor is regex-based and effectively recognizes only title-cased `person` / `company` candidates.
+**FR-EX-01**: System MUST extract entities: `Person`, `Company`, `Project`, `Deal`, `Product`, `Asset`, `Location` (extensible).
+**Status**: ✅ Implemented (2026-03-26) — Unicode-aware regex extractor using `[\p{Lu}][\p{Ll}]+` pattern for Cyrillic/Latin support. Classifies multi-word names as `person`, CamelCase single tokens as `technology`, and recognizes `company`/`event`/`location` via suffix indicators and gazetteer.
 
-**FR-EX-02**: System MUST extract facts/items: `Promise`, `Task`, `Metric`, `Decision`, `Opinion`/`Preference`, `Relationship` (extensible).  
+**FR-EX-02**: System MUST extract facts/items: `Promise`, `Task`, `Metric`, `Decision`, `Opinion`/`Preference`, `Relationship` (extensible).
 **Status**: ⚠️ Partial — current extraction covers only simple `promise` and `metric` heuristics.
 
 **FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).  
@@ -335,8 +336,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-ER-04**: After merge, all facts/links MUST reference canonical entity, preserving provenance.  
 **Status**: ⚠️ Partial — canonical IDs are used at creation time, but post-merge rewriting is not implemented because merge workflows are absent.
 
-**FR-ER-05**: Alias resolution MUST be deterministic (exact match → canonical entity, then stable tie-break rules).  
-**Status**: ✅ Done
+**FR-ER-05**: Alias resolution MUST be deterministic (exact match → canonical entity, then stable tie-break rules).
+**Status**: ✅ Done — aliases normalized via `normalize_text()` at write time; `select_entity_lookup()` and `select_entities_batch()` use `CONTAINSANY` against normalized aliases.
 
 ### 5.6 Relationship Graph (Context Graph)
 
@@ -377,8 +378,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-01**: System MUST assemble context dynamically for task/question: return top-K facts/nodes with quotes and source links.  
 **Status**: ✅ Done
 
-**FR-CA-02**: System MUST support hybrid retrieval: vector (semantic), full-text, and graph traversal (BFS/limited hops) for "social" queries and connection chains.  
-**Status**: ⚠️ Partial — current retrieval supports lexical matching, community-summary expansion, and DB-side graph traversal; embedding retrieval remains scaffolded but disabled by the default `NullEmbedder`.
+**FR-CA-02**: System MUST support hybrid retrieval: vector (semantic), full-text, and graph traversal (BFS/limited hops) for "social" queries and connection chains.
+**Status**: ⚠️ Superseded — per `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, embedding retrieval was intentionally removed from runtime. Current retrieval uses lexical/BM25 full-text as primary, community-summary expansion, and DB-side graph traversal.
 
 **FR-CA-03**: System MUST enforce token budgeting: limits on fact count, quote length, detail levels (brief/standard/deep).  
 **Status**: ✅ Done
@@ -395,8 +396,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
 
-**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.  
-**Status**: ⚠️ Partial — query preprocessing and multi-word matching exist, but the current text-query path still loads all facts and filters in Rust, bypassing DB-side temporal pushdown.
+**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.
+**Status**: ✅ Done — `select_facts_filtered()` uses DB-side `content @1@ $query` with `search::score(1) AS ft_score`; query preprocessing in `preprocess_search_query()` strips noise.
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 

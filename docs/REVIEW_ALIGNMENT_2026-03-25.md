@@ -1,9 +1,19 @@
 # Review Alignment — 2026-03-25
 
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-03-27
 **Status:** P0/P1 items complete. P2 (lifecycle, multi-source provenance) plans ready for execution.
 
 This document records the line-by-line validation of the external review against the current repository state. It is intentionally implementation-focused: each item is marked as confirmed, partially confirmed, or not confirmed based on code inspection.
+
+## 2026-03-27 Critical Fixes
+
+| Issue | Status | Fix |
+| --- | --- | --- |
+| `namespace_for_scope("ORG")` silent fallback | ✅ Fixed | Now normalizes scope to lowercase before prefix matching; logs warn for unknown scopes |
+| `select_entities_batch` unused in hot path | ✅ Not an issue | Already used in `expand_query_with_aliases()` for O(1) batch lookup |
+| Entity aliases not normalized | ✅ Not an issue | Aliases normalized via `normalize_text()` at write time; `CONTAINSANY` works correctly |
+| `cosine_similarity` silent fail in release | ✅ Fixed | Replaced `debug_assert` with `tracing::warn!` for production logging |
+| Entity extraction lacks `person`/`technology` types | ✅ Fixed | Multi-word names → `person`; CamelCase single tokens → `technology` |
 
 ## Validation summary
 
