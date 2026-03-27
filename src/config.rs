@@ -14,6 +14,9 @@ pub const DEFAULT_EMBEDDING_DIMENSION: usize = 1536;
 /// Default timeout for embedding provider HTTP requests.
 pub const DEFAULT_EMBEDDING_TIMEOUT_SECS: u64 = 15;
 
+/// Default cosine similarity threshold for semantic retrieval.
+pub const DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD: f64 = 0.7;
+
 /// Supported embedding provider kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmbeddingProviderKind {
@@ -40,6 +43,8 @@ pub struct EmbeddingConfig {
     pub timeout_secs: u64,
     /// Expected embedding vector dimension.
     pub dimension: usize,
+    /// Minimum cosine similarity required for semantic retrieval.
+    pub similarity_threshold: f64,
 }
 
 impl Default for EmbeddingConfig {
@@ -51,6 +56,7 @@ impl Default for EmbeddingConfig {
             api_key: None,
             timeout_secs: DEFAULT_EMBEDDING_TIMEOUT_SECS,
             dimension: DEFAULT_EMBEDDING_DIMENSION,
+            similarity_threshold: DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
         }
     }
 }
@@ -71,11 +77,14 @@ impl EmbeddingConfig {
             parse_u64_env("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
         let dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?
             .unwrap_or(DEFAULT_EMBEDDING_DIMENSION);
+        let similarity_threshold = parse_f64_env("EMBEDDINGS_SIMILARITY_THRESHOLD")?
+            .unwrap_or(DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD);
 
         if !enabled {
             return Ok(Self {
                 timeout_secs,
                 dimension,
+                similarity_threshold,
                 ..Self::default()
             });
         }
@@ -121,6 +130,7 @@ impl EmbeddingConfig {
             api_key: env::var("EMBEDDINGS_API_KEY").ok(),
             timeout_secs,
             dimension,
+            similarity_threshold,
         })
     }
 
@@ -543,6 +553,17 @@ fn parse_usize_env(var_name: &str) -> Result<Option<usize>, MemoryError> {
         .transpose()
 }
 
+fn parse_f64_env(var_name: &str) -> Result<Option<f64>, MemoryError> {
+    env::var(var_name)
+        .ok()
+        .map(|value| {
+            value.parse::<f64>().map_err(|_| {
+                MemoryError::ConfigInvalid(format!("{var_name} must be a floating-point number"))
+            })
+        })
+        .transpose()
+}
+
 /// Parses a comma-separated list from an environment variable.
 ///
 /// # Errors
@@ -686,6 +707,10 @@ mod tests {
         assert_eq!(config.provider, EmbeddingProviderKind::Disabled);
         assert_eq!(config.dimension, DEFAULT_EMBEDDING_DIMENSION);
         assert_eq!(config.timeout_secs, DEFAULT_EMBEDDING_TIMEOUT_SECS);
+        assert_eq!(
+            config.similarity_threshold,
+            DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD
+        );
     }
 
     #[test]
@@ -698,6 +723,7 @@ mod tests {
             env::set_var("EMBEDDINGS_MODEL", "nomic-embed-text");
             env::set_var("EMBEDDINGS_TIMEOUT_SECS", "7");
             env::set_var("SURREALDB_EMBEDDING_DIMENSION", "768");
+            env::set_var("EMBEDDINGS_SIMILARITY_THRESHOLD", "0.82");
         }
 
         let config = EmbeddingConfig::from_env().expect("embedding config");
@@ -708,6 +734,7 @@ mod tests {
             env::remove_var("EMBEDDINGS_MODEL");
             env::remove_var("EMBEDDINGS_TIMEOUT_SECS");
             env::remove_var("SURREALDB_EMBEDDING_DIMENSION");
+            env::remove_var("EMBEDDINGS_SIMILARITY_THRESHOLD");
         }
 
         assert!(config.is_enabled());
@@ -716,6 +743,7 @@ mod tests {
         assert_eq!(config.model.as_deref(), Some("nomic-embed-text"));
         assert_eq!(config.timeout_secs, 7);
         assert_eq!(config.dimension, 768);
+        assert_eq!(config.similarity_threshold, 0.82);
     }
 
     #[test]

@@ -9,8 +9,6 @@ use crate::config::{EmbeddingConfig, EmbeddingProviderKind};
 use crate::service::MemoryError;
 use crate::storage::json_f64;
 
-pub(crate) const SEMANTIC_MATCH_THRESHOLD: f64 = 0.25;
-
 /// Abstraction over optional embedding providers.
 #[async_trait]
 pub trait EmbeddingProvider: Send + Sync {

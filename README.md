@@ -167,6 +167,7 @@ Configuration is loaded from environment variables.
 | `EMBEDDINGS_MODEL` | Embedding model name sent to the provider |
 | `EMBEDDINGS_API_KEY` | Optional bearer token for OpenAI-compatible providers |
 | `EMBEDDINGS_TIMEOUT_SECS` | Timeout for embedding requests in seconds (default: `15`) |
+| `EMBEDDINGS_SIMILARITY_THRESHOLD` | Minimum cosine similarity for semantic matches (default: `0.7`) |
 | `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
 | `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
 | `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
@@ -193,6 +194,7 @@ EMBEDDINGS_ENABLED=false
 # EMBEDDINGS_MODEL=text-embedding-3-small
 # EMBEDDINGS_API_KEY=your_api_key_here
 # EMBEDDINGS_TIMEOUT_SECS=15
+# EMBEDDINGS_SIMILARITY_THRESHOLD=0.7
 
 # Lifecycle background jobs (optional)
 LIFECYCLE_ENABLED=true
@@ -203,6 +205,8 @@ LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 ```
 
 Without an embedding provider, the MCP remains fully functional and falls back to lexical/community retrieval only. When `EMBEDDINGS_ENABLED=true`, embeddings are generated eagerly when facts are written; provider outages fail open, so writes still succeed and semantic ranking is simply skipped.
+
+Semantic retrieval only considers facts that already have embeddings and now defaults to a conservative cosine similarity threshold of `0.7`. If your provider/model pair is either too strict or too chatty, tune `EMBEDDINGS_SIMILARITY_THRESHOLD` rather than changing retrieval logic.
 
 If you enable a real embedding provider, set `SURREALDB_EMBEDDING_DIMENSION` to the model output size (for example `nomic-embed-text = 768`, `mxbai-embed-large = 1024`, `text-embedding-3-small = 1536`). Changing it for an already-initialized database is **not** automatic: drop and recreate the embedding indexes (or rebuild the DB) before writing vectors with the new dimension.
 
@@ -217,6 +221,7 @@ EMBEDDINGS_BASE_URL=https://api.openai.com/v1
 EMBEDDINGS_MODEL=text-embedding-3-small
 EMBEDDINGS_API_KEY=your_api_key_here
 SURREALDB_EMBEDDING_DIMENSION=1536
+EMBEDDINGS_SIMILARITY_THRESHOLD=0.7
 ```
 
 Ollama:
@@ -227,6 +232,7 @@ EMBEDDINGS_PROVIDER=ollama
 EMBEDDINGS_BASE_URL=http://127.0.0.1:11434
 EMBEDDINGS_MODEL=nomic-embed-text
 SURREALDB_EMBEDDING_DIMENSION=768
+EMBEDDINGS_SIMILARITY_THRESHOLD=0.7
 ```
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.

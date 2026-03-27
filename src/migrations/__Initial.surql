@@ -30,7 +30,7 @@ DEFINE FIELD t_invalid ON fact TYPE option<datetime>;
 DEFINE FIELD t_invalid_ingested ON fact TYPE option<datetime>;
 DEFINE FIELD confidence ON fact TYPE number;
 DEFINE FIELD entity_links ON fact TYPE array;
-DEFINE FIELD embedding ON fact TYPE option<array>;
+DEFINE FIELD embedding ON fact TYPE option<array<float>>;
 DEFINE FIELD scope ON fact TYPE string;
 DEFINE FIELD policy_tags ON fact TYPE array;
 DEFINE FIELD provenance ON fact TYPE object FLEXIBLE;

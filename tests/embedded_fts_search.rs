@@ -167,7 +167,7 @@ fn schema_defines_fact_embedding_field_and_hnsw_index_only() {
         "entity.embedding should stay absent from schema"
     );
     assert!(
-        schema.contains("DEFINE FIELD embedding ON fact TYPE option<array>;"),
+        schema.contains("DEFINE FIELD embedding ON fact TYPE option<array<float>>;"),
         "fact.embedding should be defined for semantic retrieval"
     );
     assert!(

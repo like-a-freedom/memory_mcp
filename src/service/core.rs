@@ -37,9 +37,18 @@ pub struct MemoryService {
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
     pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
+    pub(crate) embedding_similarity_threshold: f64,
 }
 
 use lru::LruCache;
+
+#[derive(Debug, Clone, Copy)]
+struct ServiceBuildConfig {
+    rate_limit_rps: i32,
+    rate_limit_burst: i32,
+    cache_size: usize,
+    embedding_similarity_threshold: f64,
+}
 
 /// Build a startup versions event payload used for diagnostic logging.
 /// Extracted to a helper so it can be unit-tested independently of logger I/O.
@@ -132,6 +141,7 @@ impl MemoryService {
             50,
             100,
             embedding_provider,
+            config.embedding.similarity_threshold,
         )?;
         apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
@@ -188,9 +198,13 @@ impl MemoryService {
             db_client,
             namespaces,
             log_level,
-            rate_limit_rps,
-            rate_limit_burst,
-            super::CONTEXT_CACHE_SIZE,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size: super::CONTEXT_CACHE_SIZE,
+                embedding_similarity_threshold:
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            },
             Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -204,14 +218,18 @@ impl MemoryService {
         rate_limit_rps: i32,
         rate_limit_burst: i32,
         embedding_provider: Arc<dyn EmbeddingProvider>,
+        embedding_similarity_threshold: f64,
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
             namespaces,
             log_level,
-            rate_limit_rps,
-            rate_limit_burst,
-            super::CONTEXT_CACHE_SIZE,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size: super::CONTEXT_CACHE_SIZE,
+                embedding_similarity_threshold,
+            },
             embedding_provider,
         )
     }
@@ -230,9 +248,13 @@ impl MemoryService {
             db_client,
             namespaces,
             log_level,
-            rate_limit_rps,
-            rate_limit_burst,
-            cache_size,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size,
+                embedding_similarity_threshold:
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            },
             Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -243,9 +265,7 @@ impl MemoryService {
         db_client: Arc<dyn DbClient>,
         namespaces: Vec<String>,
         log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        cache_size: usize,
+        build_config: ServiceBuildConfig,
         embedding_provider: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, MemoryError> {
         if namespaces.is_empty() {
@@ -253,7 +273,7 @@ impl MemoryService {
                 "namespaces cannot be empty".to_string(),
             ));
         }
-        let cache_size = std::num::NonZeroUsize::new(cache_size).ok_or_else(|| {
+        let cache_size = std::num::NonZeroUsize::new(build_config.cache_size).ok_or_else(|| {
             MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
         })?;
         let logger = StdoutLogger::new(&log_level);
@@ -262,10 +282,14 @@ impl MemoryService {
             namespaces: namespaces.clone(),
             default_namespace: namespaces[0].clone(),
             logger,
-            rate_limiter: Arc::new(RateLimiter::new(rate_limit_rps, rate_limit_burst)),
+            rate_limiter: Arc::new(RateLimiter::new(
+                build_config.rate_limit_rps,
+                build_config.rate_limit_burst,
+            )),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             entity_extractor: Arc::new(RegexEntityExtractor::new()?),
             embedding_provider,
+            embedding_similarity_threshold: build_config.embedding_similarity_threshold,
         })
     }
 
@@ -2810,6 +2834,7 @@ mod tests {
             50,
             100,
             Arc::new(StaticTestEmbeddingProvider::new()),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
         )
         .expect("service");
 
