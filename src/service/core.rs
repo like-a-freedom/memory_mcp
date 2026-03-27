@@ -1241,6 +1241,32 @@ impl RateLimiter {
     }
 }
 
+/// Builds a structured log event for tool operations.
+///
+/// This helper creates a consistent event structure for logging MCP tool calls,
+/// including the operation name, arguments, result, and optional access context.
+///
+/// # Arguments
+///
+/// * `op` - Operation name (e.g., "ingest", "extract", "context.assemble")
+/// * `args` - Input arguments as JSON value
+/// * `result` - Operation result as JSON value
+/// * `access` - Optional access context for audit logging
+///
+/// # Returns
+///
+/// A HashMap with keys: `op`, `args`, `result`, and optionally `access`
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let event = log_event(
+///     "ingest",
+///     json!({"content": "..."}),
+///     json!({"episode_id": "abc123"}),
+///     Some(&access_context),
+/// );
+/// ```
 pub(crate) fn log_event(
     op: &str,
     args: Value,
@@ -1257,6 +1283,7 @@ pub(crate) fn log_event(
     event
 }
 
+/// Serializes access context to a JSON value for logging.
 fn serialize_access(access: &AccessContext) -> Value {
     json!({
         "caller_id": access.caller_id,

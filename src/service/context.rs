@@ -96,6 +96,16 @@ pub async fn assemble_context(
         return Ok(cached);
     }
 
+    service.logger.log(
+        super::log_event(
+            "assemble_context.cache_miss",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"status": "computing"}),
+            Some(&access),
+        ),
+        LogLevel::Trace,
+    );
+
     let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
@@ -254,11 +264,11 @@ pub async fn assemble_context(
     service.logger.log(
         super::log_event(
             "assemble_context.cache_set",
-            json!({"scope": request.scope}),
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"count": results.len()}),
             Some(&access),
         ),
-        LogLevel::Debug,
+        LogLevel::Trace,
     );
 
     Ok(results)

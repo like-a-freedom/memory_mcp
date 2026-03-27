@@ -146,7 +146,6 @@ impl MemoryMcp {
         source_id: Option<String>,
         t_ref: Option<String>,
         scope: Option<String>,
-        enable_logging: bool,
     ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
         use super::parsers::normalize_optional_string;
 
@@ -155,40 +154,34 @@ impl MemoryMcp {
         let content = normalize_optional_string(content);
         let text = normalize_optional_string(text);
 
-        if enable_logging {
-            self.service.log_tool_event(
-                "extract.start",
-                json!({"episode_id": episode_id, "has_content": content.is_some() || text.is_some()}),
-                json!({}),
-                LogLevel::Info,
-            );
-        }
+        self.service.log_tool_event(
+            "extract.start",
+            json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
+            json!({}),
+            LogLevel::Info,
+        );
 
         if let Some(ref episode_id) = episode_id {
             match self.service.extract(episode_id, Some(access)).await {
                 Ok(result) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.done",
-                            json!({"episode_id": episode_id}),
-                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
-                            LogLevel::Info,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.done",
+                        json!({"episode_id": episode_id}),
+                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        LogLevel::Info,
+                    );
                     return Ok(ToolResponse::success_with_guidance(
                         result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ));
                 }
                 Err(err) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.error",
-                            json!({"episode_id": episode_id}),
-                            json!({"error": err.to_string()}),
-                            LogLevel::Warn,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.error",
+                        json!({"episode_id": episode_id}),
+                        json!({"error": err.to_string()}),
+                        LogLevel::Warn,
+                    );
                     return Err(mcp_error(err));
                 }
             }
@@ -196,14 +189,12 @@ impl MemoryMcp {
 
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
-            if enable_logging {
-                self.service.log_tool_event(
-                    "extract.no_input",
-                    json!({"episode_id": episode_id, "has_content": false}),
-                    json!({"status": "no_input"}),
-                    LogLevel::Warn,
-                );
-            }
+            self.service.log_tool_event(
+                "extract.no_input",
+                json!({"episode_id": &episode_id, "has_content": false}),
+                json!({"status": "no_input"}),
+                LogLevel::Warn,
+            );
             return Ok(ToolResponse::partial_with_guidance(
                 ExtractResult::empty(),
                 "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
@@ -237,40 +228,34 @@ impl MemoryMcp {
         {
             Ok(episode_id) => match self.service.extract(&episode_id, Some(access)).await {
                 Ok(result) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.done",
-                            json!({"episode_id": episode_id}),
-                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
-                            LogLevel::Info,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.done",
+                        json!({"episode_id": &episode_id}),
+                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        LogLevel::Info,
+                    );
                     Ok(ToolResponse::success_with_guidance(
                         result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ))
                 }
                 Err(err) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.error",
-                            json!({}),
-                            json!({"error": err.to_string()}),
-                            LogLevel::Warn,
-                        );
-                    }
-                    Err(mcp_error(err))
-                }
-            },
-            Err(err) => {
-                if enable_logging {
                     self.service.log_tool_event(
                         "extract.error",
                         json!({}),
                         json!({"error": err.to_string()}),
                         LogLevel::Warn,
                     );
+                    Err(mcp_error(err))
                 }
+            },
+            Err(err) => {
+                self.service.log_tool_event(
+                    "extract.error",
+                    json!({}),
+                    json!({"error": err.to_string()}),
+                    LogLevel::Warn,
+                );
                 Err(mcp_error(err))
             }
         }
@@ -410,7 +395,6 @@ impl MemoryMcp {
                 p.source_id,
                 p.t_ref,
                 p.scope,
-                true,
             )
             .await?;
         Ok(Json(response))
