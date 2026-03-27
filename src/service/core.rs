@@ -471,6 +471,8 @@ impl MemoryService {
         validate_entity_candidate(&candidate)?;
         let namespace = self.default_namespace.clone();
         let normalized = super::normalize_text(&candidate.canonical_name);
+
+        // Check if entity already exists by name
         let existing = self
             .find_entity_record(&candidate.canonical_name, &namespace)
             .await?;
@@ -498,11 +500,30 @@ impl MemoryService {
             "canonical_name_normalized": normalized,
             "aliases": aliases.clone(),
         });
-        self.db_client
-            .create(&entity_id, payload, &namespace)
-            .await?;
 
-        Ok(entity_id)
+        // Attempt to create the entity. If it already exists (race condition),
+        // fetch and return the existing entity ID.
+        match self.db_client.create(&entity_id, payload, &namespace).await {
+            Ok(_) => Ok(entity_id),
+            Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {
+                // Race condition: another request created the entity concurrently.
+                // Fetch and return the existing entity.
+                let existing = self
+                    .find_entity_record(&candidate.canonical_name, &namespace)
+                    .await?;
+                if let Some(record) = existing {
+                    let existing_id = record
+                        .get("entity_id")
+                        .and_then(string_from_value)
+                        .or_else(|| record.get("id").and_then(string_from_value))
+                        .unwrap_or_default();
+                    return Ok(existing_id);
+                }
+                // Fallback: return the deterministic ID even if we couldn't fetch
+                Ok(entity_id)
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Adds a new fact.
