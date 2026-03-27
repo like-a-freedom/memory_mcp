@@ -403,8 +403,14 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
 
-**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.
+**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.
 **Status**: ✅ Done — `select_facts_filtered()` uses DB-side `content @1@ $query` with `search::score(1) AS ft_score`; query preprocessing in `preprocess_search_query()` strips noise.
+
+**FR-CA-09**: `assemble_context` MUST support optional timeline retrieval mode via `view_mode` parameter. When `view_mode=timeline`, results are sorted chronologically by `t_valid` (oldest first) instead of relevance ranking. Optional `window_start` and `window_end` parameters filter facts to a time window.
+**Status**: ✅ Done — implemented 2026-03-27 as part of adaptive memory alignment. Timeline sorting and window filtering applied after fusion ranking, before budget truncation. Backwards-compatible: default `view_mode=None` preserves standard relevance ordering.
+
+**FR-CA-10**: FTS retrieval MUST match facts via both `content` and `index_keys` fields. `index_keys` populated at ingest with canonical entity names, aliases, and temporal markers (month-year, ISO date components) extracted from fact content.
+**Status**: ✅ Done — implemented 2026-03-27. SurrealDB FTS index `fact_index_keys_search` on `index_keys` with `memory_fts` analyzer. Query searches `content @1@ $query OR index_keys @1@ $query` with merged scores.
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
@@ -431,8 +437,22 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-UX-02**: Each answer MUST include a quote and a link to the primary source (episode, document, or timecode).  
 **Status**: ✅ Done
 
-**FR-UX-03**: UI MUST allow launching next flow ("find intro to OpenAI → generate email draft") from context screen.  
+**FR-UX-03**: UI MUST allow launching next flow ("find intro to OpenAI → generate email draft") from context screen.
 **Status**: ✅ Done
+
+### 5.11 Adaptive Memory Features (Heat-Aware Lifecycle)
+
+**FR-AM-01**: System MUST track fact access heat via `access_count` and `last_accessed` fields updated on every retrieval and explain operation.
+**Status**: ✅ Done — implemented 2026-03-27. `access_count` incremented by 1 on retrieval, by 3 on explain (stronger signal). SurrealDB atomic updates: `UPDATE fact SET access_count += $boost, last_accessed = time::now()`.
+
+**FR-AM-02**: Lifecycle decay worker MUST skip recently-accessed ("hot") facts even if age-based decay would otherwise invalidate them.
+**Status**: ✅ Done — decay pass checks `is_hot = access_count > 0 && (now - last_accessed).num_days() <= half_life_days`. Hot facts protected from invalidation.
+
+**FR-AM-03**: Lifecycle archival worker MUST skip episodes with recently-accessed facts.
+**Status**: ✅ Done — archival queries filter episodes with `last_accessed >= hot_cutoff` to preserve active memory.
+
+**FR-AM-04**: System MUST support LongMemEval-style acceptance tests covering multi-session reasoning, temporal reasoning, knowledge update, and abstention.
+**Status**: ✅ Done — `tests/longmem_acceptance.rs` covers 5 benchmark categories.
 
 ---
 
@@ -444,7 +464,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 |--------|----------------|---------------------|
 | **Episode** | `id`, `source_type`, `source_id`, `content`, `t_ref`, `t_ingested` | For any fact, can open source episode and see exact quote/fragment. |
 | **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
-| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. |
+| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode`, `index_keys[]`, `access_count`, `last_accessed?` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. `index_keys` populated at ingest with entity names, aliases, and temporal markers for enriched BM25 retrieval. `access_count` and `last_accessed` updated on retrieval and explain for heat-aware lifecycle. |
 | **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
 | **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Communities are maintained as connected components over persisted graph links and can expand retrieval through summary matches. |
 

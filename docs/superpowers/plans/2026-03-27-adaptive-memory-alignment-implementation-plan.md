@@ -75,87 +75,18 @@ This plan was revised after a double review of all specification documents again
 - Create: `tests/longmem_acceptance.rs`
 - Modify: `tests/common/mod.rs`
 
-- [ ] **Step 1: Write the failing acceptance tests for the five benchmark categories**
+- [x] **Step 1: Write the failing acceptance tests for the five benchmark categories**
+- [x] **Step 2: Add helper builders in `tests/common/mod.rs` for multi-session ingest fixtures**
+- [x] **Step 3: Run the new acceptance test file and verify failures are meaningful**
+- [x] **Step 4: Add the remaining benchmark categories as explicit tests**
+- [x] **Step 5: Commit**
 
-```rust
-#[tokio::test]
-async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evidence() {
-    let service = make_service().await;
-
-    ingest_episode(&service, "sess-1", "Alice promised to send the Atlas deck by Friday").await;
-    ingest_episode(&service, "sess-2", "We discussed unrelated travel plans").await;
-    ingest_episode(&service, "sess-3", "Reminder: Atlas launch is still on track").await;
-
-    let items = service
-        .assemble_context(AssembleContextRequest {
-            query: "what did Alice promise about Atlas".into(),
-            scope: "personal".into(),
-            ..Default::default()
-        })
-        .await
-        .expect("context should assemble");
-
-    assert!(items.iter().any(|item| item.content.contains("send the Atlas deck")));
-}
-
-#[tokio::test]
-async fn assemble_context_when_question_is_unanswerable_then_returns_empty() {
-    let service = make_service().await;
-
-    let items = service
-        .assemble_context(AssembleContextRequest {
-            query: "what is Bob's passport number".into(),
-            scope: "personal".into(),
-            ..Default::default()
-        })
-        .await
-        .expect("context should assemble");
-
-    assert!(items.is_empty());
-}
-```
-
-- [ ] **Step 2: Add helper builders in `tests/common/mod.rs` for multi-session ingest fixtures**
-
-Use the existing `make_service()` pattern. Add minimal helpers:
-
-```rust
-/// Ingest an episode and extract entities/facts in one step.
-pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &str) {
-    let request = IngestRequest {
-        source_type: "chat".into(),
-        source_id: source_id.into(),
-        content: content.into(),
-        t_ref: "2026-03-01T10:00:00Z".parse().unwrap(),
-        scope: "personal".into(),
-        ..Default::default()
-    };
-    let episode_id = service.ingest(request, None).await.expect("ingest should succeed");
-    service.extract(ExtractRequest { episode_id: episode_id.0 }, None).await.expect("extract should succeed");
-}
-```
-
-- [ ] **Step 3: Run the new acceptance test file and verify failures are meaningful**
-
-Run: `cargo test --test longmem_acceptance -- --test-threads=1`
-
-Expected: some tests may already pass (direct fact lookup); others fail (temporal, abstention).
-
-- [ ] **Step 4: Add the remaining benchmark categories as explicit tests**
-
-Include at minimum:
-- temporal reasoning (`as_of` with facts before and after a cutoff)
-- knowledge update (invalidated old fact should not appear)
-- multi-session reasoning (facts from different episodes compose)
-- abstention (no matching facts → empty result)
-- evidence retrieval quality for direct fact lookup
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/common/mod.rs tests/longmem_acceptance.rs
-git commit -m "test: add longmem-style acceptance harness"
-```
+**Status:** ✅ **Выполнено** — `tests/longmem_acceptance.rs` created with 5 benchmark categories:
+1. Multi-session reasoning (`assemble_context_when_fact_is_needed_across_sessions_then_returns_evidence`)
+2. Abstention (`assemble_context_when_question_is_unanswerable_then_returns_empty`)
+3. Temporal reasoning with as_of cutoff (`assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_it`)
+4. Knowledge update/supersession (`assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_prefers_active_fact`)
+5. Direct fact lookup (`assemble_context_when_direct_fact_lookup_then_returns_exact_evidence`)
 
 ### Task 2: Add fact-augmented index keys with temporal markers
 
@@ -167,126 +98,20 @@ git commit -m "test: add longmem-style acceptance harness"
 - Test: `tests/service_integration.rs`
 - Test: `tests/embedded_fts_search.rs`
 
-- [ ] **Step 1: Write the failing tests for `index_keys` persistence and FTS matching**
+- [x] **Step 1: Write the failing tests for `index_keys` persistence and FTS matching**
+- [x] **Step 2: Add schema fields to `src/models.rs` and the migration**
+- [x] **Step 3: Populate `index_keys` during extraction**
+- [x] **Step 4: Update FTS query to search both `content` and `index_keys`**
+- [x] **Step 5: Run focused tests**
+- [x] **Step 6: Commit**
 
-```rust
-#[tokio::test]
-async fn add_fact_when_entities_are_present_then_index_keys_include_canonical_names() {
-    let (service, db) = make_service_with_client().await;
-    ingest_episode(&service, "ep-1", "Alice from Atlas promised the deck in March 2026").await;
-
-    // Query fact directly from DB
-    let facts = db.select_table("fact", "personal").await.unwrap();
-    let fact = &facts[0];
-    let index_keys = fact.get("index_keys").and_then(|v| v.as_array()).unwrap();
-    assert!(index_keys.iter().any(|k| k.as_str() == Some("alice")));
-    assert!(index_keys.iter().any(|k| k.as_str() == Some("atlas")));
-}
-
-#[tokio::test]
-async fn assemble_context_when_query_matches_index_key_then_fact_is_returned() {
-    let service = make_service().await;
-    ingest_episode(&service, "ep-1", "Alice from Atlas promised the deck in March 2026").await;
-
-    // Search by entity name that appears in index_keys but may not be in content
-    let items = service
-        .assemble_context(AssembleContextRequest {
-            query: "alice atlas".into(),
-            scope: "personal".into(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    assert!(!items.is_empty());
-}
-```
-
-- [ ] **Step 2: Add schema fields to `src/models.rs` and the migration**
-
-Add to `Fact` struct:
-
-```rust
-#[serde(default)]
-pub index_keys: Vec<String>,
-#[serde(default)]
-pub access_count: i64,
-pub last_accessed: Option<DateTime<Utc>>,
-```
-
-Migration `009_adaptive_memory_alignment.surql`:
-
-```sql
--- Fact-augmented index keys for enriched FTS retrieval
-DEFINE FIELD index_keys ON fact TYPE array<string> VALUE $value OR [];
-DEFINE FIELD access_count ON fact TYPE int VALUE $value OR 0;
-DEFINE FIELD last_accessed ON fact TYPE option<datetime>;
-
--- FTS index on index_keys for BM25 matching alongside fact.content
-DEFINE INDEX fact_index_keys_fts ON fact FIELDS index_keys SEARCH ANALYZER memory_fts BM25;
-```
-
-Update `fact_from_record()` in `src/service/episode.rs` to parse the new fields with `#[serde(default)]`.
-
-- [ ] **Step 3: Populate `index_keys` during extraction**
-
-In the extraction path (after entity resolution), build index keys from:
-- canonical entity names (lowercased),
-- entity aliases (lowercased),
-- extracted temporal markers from fact content (regex: month names, `YYYY-MM`, explicit date phrases).
-
-```rust
-fn build_index_keys(entities: &[ExtractedEntity], t_valid: DateTime<Utc>) -> Vec<String> {
-    let mut keys: Vec<String> = entities
-        .iter()
-        .map(|e| e.canonical_name.to_lowercase())
-        .collect();
-
-    // Add temporal markers from the fact's valid time
-    keys.push(t_valid.format("%B %Y").to_string().to_lowercase()); // "march 2026"
-    keys.push(t_valid.format("%Y-%m").to_string());                 // "2026-03"
-
-    keys.sort();
-    keys.dedup();
-    keys
-}
-```
-
-Temporal markers go into `index_keys` at write time — no read-time query expansion needed.
-
-- [ ] **Step 4: Update FTS query to search both `content` and `index_keys`**
-
-Modify `build_select_facts_filtered_query` in `src/storage.rs`:
-
-```sql
-SELECT *, search::score(1) AS ft_score
-FROM fact
-WHERE scope = $scope
-  AND t_valid <= type::datetime($cutoff)
-  AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff))
-  AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff)
-       OR t_invalid_ingested > type::datetime($cutoff))
-  AND (content @1@ $query OR index_keys @1@ $query)
-ORDER BY ft_score DESC, t_valid DESC, fact_id ASC
-LIMIT $limit
-```
-
-> Note: SurrealDB FTS `@N@` operator on array fields searches all elements. Both `content` and `index_keys` share the same score slot `@1@` — SurrealDB merges scores from both fields. Verify in integration test.
-
-- [ ] **Step 5: Run focused tests**
-
-Run: `cargo test --test service_integration --test embedded_fts_search -- --test-threads=1`
-
-Expected: PASS with new coverage for `index_keys` and temporal marker retrieval.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/models.rs src/service/episode.rs src/storage.rs \
-  src/migrations/009_adaptive_memory_alignment.surql \
-  tests/service_integration.rs tests/embedded_fts_search.rs
-git commit -m "feat: add fact-augmented index keys with temporal markers"
-```
+**Status:** ✅ **Выполнено** — Implementation complete:
+- `Fact` struct has `index_keys: Vec<String>`, `access_count: i64`, `last_accessed: Option<DateTime<Utc>>`
+- Migration `009_adaptive_memory_alignment.surql` defines fields and FTS index
+- `build_fact_index_keys()` in `src/service/core.rs` populates from entity names, aliases, and temporal markers
+- `extract_temporal_index_keys()` extracts month-year and ISO date patterns from content
+- FTS query in `src/storage.rs` searches `content @1@ $query OR index_keys @1@ $query`
+- Test `test_service_extract_persists_index_keys_for_entities_and_temporal_markers` verifies persistence
 
 ### Task 3: Make lifecycle policies heat-aware
 
@@ -384,20 +209,15 @@ if decayed < threshold && !is_hot {
 
 Archival similarly checks `last_accessed` on facts linked to the episode.
 
-- [ ] **Step 5: Run lifecycle tests**
+- [x] **Step 5: Run lifecycle tests**
+- [x] **Step 6: Commit**
 
-Run: `cargo test --test lifecycle_archival --test lifecycle_decay --test explain_provenance -- --test-threads=1`
-
-Expected: PASS with hot-fact protection and explain-boosted access counts.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/service/context.rs src/service/core.rs src/storage.rs \
-  src/service/lifecycle/archival.rs src/service/lifecycle/decay.rs \
-  tests/lifecycle_archival.rs tests/lifecycle_decay.rs tests/explain_provenance.rs
-git commit -m "feat: make lifecycle policies heat-aware"
-```
+**Status:** ✅ **Выполнено** — Implementation complete:
+- `record_fact_access()` in `src/service/core.rs` performs atomic SurrealDB updates
+- `assemble_context` calls `record_fact_access(&item.fact_id, 1)` for returned facts
+- `explain` calls `record_fact_access(&item.fact_id, 3)` for cited facts (stronger signal)
+- Decay worker in `src/service/lifecycle/decay.rs` checks `is_hot` before invalidation
+- Archival worker in `src/service/lifecycle/archival.rs` skips episodes with hot facts
 
 ### Task 4: Add timeline-oriented retrieval mode under `assemble_context`
 
@@ -508,20 +328,16 @@ if is_timeline {
 }
 ```
 
-- [ ] **Step 4: Run service + MCP-level tests**
+- [x] **Step 4: Run service + MCP-level tests**
+- [x] **Step 5: Commit**
 
-Run: `cargo test --test service_integration --test tools_e2e -- --test-threads=1`
-
-Expected: PASS with old callers unchanged and new timeline mode covered.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/models.rs src/mcp/params.rs src/mcp/handlers.rs \
-  src/service/context.rs \
-  tests/tools_e2e.rs tests/service_integration.rs
-git commit -m "feat: add timeline retrieval mode in assemble_context"
-```
+**Status:** ✅ **Выполнено** — Implementation complete:
+- `AssembleContextRequest` extended with `view_mode`, `window_start`, `window_end` optional fields
+- `AssembleContextParams` in `src/mcp/params.rs` has matching optional string fields
+- Timeline sorting and window filtering in `src/service/context.rs` via `sort_ranked_context_facts_for_timeline()`
+- Backwards-compatible: default `view_mode=None` preserves standard relevance ordering
+- Tests: `test_service_assemble_context_timeline_view_sorts_and_filters_by_window` in `tests/service_integration.rs`
+- MCP-level test: `test_mcp_assemble_context_timeline_mode_passes_optional_fields` in `tests/tools_e2e.rs`
 
 ### Task 5: Documentation and full verification
 
@@ -531,74 +347,37 @@ git commit -m "feat: add timeline retrieval mode in assemble_context"
 - Modify: `docs/LIFECYCLE_BACKGROUND_JOBS.md`
 - Verify only: workspace-wide
 
-- [ ] **Step 1: Update MEMORY_SYSTEM_SPEC.md to describe adaptive-memory fields**
+- [x] **Step 1: Update MEMORY_SYSTEM_SPEC.md to describe adaptive-memory fields**
+- [x] **Step 2: Update LIFECYCLE_BACKGROUND_JOBS.md**
+- [x] **Step 3: Add retrieval notes to README**
+- [x] **Step 4: Run formatting and repository verification**
+- [x] **Step 5: Inspect diff shape before merging**
+- [x] **Step 6: Commit**
 
-Document:
-- `fact.index_keys` — populated at ingest with entity names, aliases, temporal markers
-- `fact.access_count` / `fact.last_accessed` — updated on retrieval and explain
-- heat-aware lifecycle skip for recently-accessed facts
-- `assemble_context` optional `view_mode=timeline`, `window_start`, `window_end`
-- LongMemEval-style acceptance harness coverage
-
-- [ ] **Step 2: Update LIFECYCLE_BACKGROUND_JOBS.md**
-
-Document heat-aware behavior: decay and archival workers now skip facts with recent `last_accessed`.
-
-- [ ] **Step 3: Add retrieval notes to README**
-
-```md
-### Adaptive Memory Features
-
-- Fact-augmented index keys: entity names, aliases, and temporal markers indexed at ingest for enriched BM25 retrieval.
-- Heat-aware lifecycle: recently-accessed facts are protected from decay/archival.
-- Timeline retrieval: `assemble_context` supports `view_mode=timeline` with optional `window_start`/`window_end`.
-- LongMem-style acceptance tests cover information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention.
-```
-
-- [ ] **Step 4: Run formatting and repository verification**
-
-```bash
-cargo fmt --all
-cargo check
-cargo clippy --all-targets -- -D warnings
-cargo test -- --test-threads=1
-```
-
-All must pass.
-
-- [ ] **Step 5: Inspect diff shape before merging**
-
-Run: `git diff --stat`
-Expected: only the planned Rust, migration, test, and documentation files are changed.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add README.md docs/MEMORY_SYSTEM_SPEC.md docs/LIFECYCLE_BACKGROUND_JOBS.md src tests
-git commit -m "docs: align runtime docs with adaptive memory improvements"
-```
+**Status:** ✅ **Выполнено** — Documentation complete:
+- `MEMORY_SYSTEM_SPEC.md`: Added §5.11 Adaptive Memory Features, updated §6.1 Core Objects with new fields, added FR-CA-09/FR-CA-10
+- `LIFECYCLE_BACKGROUND_JOBS.md`: Added "Heat-Aware Lifecycle (Adaptive Memory)" section with access heat tracking details
+- `README.md`: Added "Adaptive Memory Features" section under MCP tools
 
 ---
 
 ## Self-review checklist
 
-- [ ] Every requirement from `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` §8 maps to at least one task.
-- [ ] No task reintroduces embeddings or HNSW runtime dependencies.
-- [ ] No task adds a new public MCP tool.
-- [ ] No task adds a separate `usage_event` table — access heat uses fields on `fact`.
-- [ ] No task adds a `FactType` enum — `fact_type: String` remains.
-- [ ] No task requires an LLM at runtime.
-- [ ] Tests exist for all five benchmark categories.
-- [ ] Timeline behavior is backwards-compatible and deterministic.
-- [ ] Lifecycle behavior is driven by measured `access_count` / `last_accessed`, not only TTL.
-- [ ] Temporal markers are indexed at write time, not expanded at read time.
+- [x] Every requirement from `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` §8 maps to at least one task.
+- [x] No task reintroduces embeddings or HNSW runtime dependencies.
+- [x] No task adds a new public MCP tool.
+- [x] No task adds a separate `usage_event` table — access heat uses fields on `fact`.
+- [x] No task adds a `FactType` enum — `fact_type: String` remains.
+- [x] No task requires an LLM at runtime.
+- [x] Tests exist for all five benchmark categories.
+- [x] Timeline behavior is backwards-compatible and deterministic.
+- [x] Lifecycle behavior is driven by measured `access_count` / `last_accessed`, not only TTL.
+- [x] Temporal markers are indexed at write time, not expanded at read time.
 
-## Execution handoff
+## Execution status
 
-Plan complete and saved to `docs/superpowers/plans/2026-03-27-adaptive-memory-alignment-implementation-plan.md`. Two execution options:
-
-**1. Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks, fast iteration
-
-**2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints
-
-**Which approach?**
+**All tasks completed 2026-03-27.** Implementation verified by:
+- `tests/longmem_acceptance.rs` — 5 benchmark category tests
+- `tests/service_integration.rs` — `index_keys` persistence and timeline mode tests
+- `tests/tools_e2e.rs` — MCP-level timeline mode test
+- Existing lifecycle and decay tests — heat-aware behavior
