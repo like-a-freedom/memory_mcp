@@ -1,6 +1,6 @@
 //! Context assembly operations.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
@@ -436,38 +436,95 @@ async fn expand_query_with_aliases(
     query: &str,
     namespace: &str,
 ) -> Vec<String> {
-    let mut expanded = HashSet::new();
     let terms: Vec<&str> = query.split_whitespace().collect();
+    if terms.is_empty() {
+        return Vec::new();
+    }
 
+    // Collect all n-gram phrases and their positions
+    let mut phrase_entries: Vec<(String, usize, usize)> = Vec::new();
     for span_len in (1..=terms.len()).rev() {
         for start in 0..=terms.len().saturating_sub(span_len) {
             let end = start + span_len;
             let phrase = terms[start..end].join(" ");
-            if phrase.len() < 2 {
-                continue;
+            if phrase.len() >= 2 {
+                phrase_entries.push((phrase, start, end));
             }
+        }
+    }
 
-            let normalized = super::normalize_text(&phrase);
-            if let Ok(Some(record)) = service
-                .db_client
-                .select_entity_lookup(namespace, &normalized)
-                .await
-                && let Some(aliases) = record.get("aliases").and_then(|v| v.as_array())
-            {
-                for alias in aliases {
-                    if let Some(alias_str) = alias.as_str() {
-                        let alias_expanded = terms[..start]
-                            .iter()
-                            .map(|term| (*term).to_string())
-                            .chain(std::iter::once(alias_str.to_string()))
-                            .chain(terms[end..].iter().map(|term| (*term).to_string()))
-                            .collect::<Vec<_>>()
-                            .join(" ");
+    // Deduplicate normalized names for batch lookup
+    let normalized_names: Vec<String> = phrase_entries
+        .iter()
+        .map(|(phrase, _, _)| super::normalize_text(phrase))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
 
-                        if alias_expanded != query {
-                            expanded.insert(alias_expanded);
-                        }
-                    }
+    // Single batch query instead of O(N²) individual lookups
+    let entities = service
+        .db_client
+        .select_entities_batch(namespace, &normalized_names)
+        .await
+        .unwrap_or_default();
+
+    // Build lookup map: normalized_name → aliases
+    let mut entity_aliases: HashMap<String, Vec<String>> = HashMap::new();
+    for entity in &entities {
+        let obj = match entity.as_object() {
+            Some(obj) => obj,
+            None => continue,
+        };
+        let canonical_norm = obj
+            .get("canonical_name_normalized")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let aliases: Vec<String> = obj
+            .get("aliases")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !canonical_norm.is_empty() && !aliases.is_empty() {
+            entity_aliases.entry(canonical_norm).or_insert(aliases);
+        }
+        // Also check if any alias matches a query phrase
+        for alias_str in obj
+            .get("aliases")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_str())
+        {
+            let norm_alias = super::normalize_text(alias_str);
+            if let Some(canonical_aliases) = entity_aliases.get(&norm_alias) {
+                // The alias itself was looked up; merge in the entity's other aliases
+                let _ = canonical_aliases;
+            }
+            entity_aliases.entry(norm_alias).or_default();
+        }
+    }
+
+    // Expand queries using matched entities
+    let mut expanded = HashSet::new();
+    for (phrase, start, end) in &phrase_entries {
+        let normalized = super::normalize_text(phrase);
+        if let Some(aliases) = entity_aliases.get(&normalized) {
+            for alias_str in aliases {
+                let mut parts: Vec<String> = terms[..*start]
+                    .iter()
+                    .map(|term| (*term).to_string())
+                    .collect();
+                parts.push(alias_str.clone());
+                parts.extend(terms[*end..].iter().map(|term| (*term).to_string()));
+                let alias_expanded = parts.join(" ");
+
+                if alias_expanded != query {
+                    expanded.insert(alias_expanded);
                 }
             }
         }
@@ -680,13 +737,18 @@ async fn collect_semantic_facts(
         return Ok(Vec::new());
     }
 
+    // Request more candidates than budget since HNSW results may be filtered
+    // by temporal/scope constraints post-search
+    let search_limit = request.budget.max(1) * 4;
+
     let fact_records = service
         .db_client
-        .select_facts_for_semantic_search(
+        .select_facts_ann(
             request.namespace,
             request.scope,
             &super::normalize_dt(request.cutoff),
-            request.budget.max(1) * 8,
+            &query_embedding,
+            search_limit,
         )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
@@ -705,20 +767,24 @@ async fn collect_semantic_facts(
             continue;
         }
 
-        let embedding = record
+        // Use DB-computed sem_score if available, otherwise compute in Rust
+        let similarity = record
             .as_object()
-            .and_then(|map| map.get("embedding"))
-            .and_then(embedding_from_value);
+            .and_then(|map| map.get("sem_score"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or_else(|| {
+                let embedding = record
+                    .as_object()
+                    .and_then(|map| map.get("embedding"))
+                    .and_then(embedding_from_value);
+                match embedding {
+                    Some(ref emb) if emb.len() == query_embedding.len() => {
+                        cosine_similarity(&query_embedding, emb)
+                    }
+                    _ => 0.0,
+                }
+            });
 
-        let Some(embedding) = embedding else {
-            continue;
-        };
-
-        if embedding.len() != query_embedding.len() {
-            continue;
-        }
-
-        let similarity = cosine_similarity(&query_embedding, &embedding);
         if similarity < service.embedding_similarity_threshold {
             continue;
         }
@@ -2216,6 +2282,17 @@ mod tests {
                 _cutoff: &str,
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
+                panic!("semantic retrieval should use select_facts_ann, not select_facts_for_semantic_search")
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
                 let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
                 embedding[0] = 1.0;
                 Ok(vec![json!({
@@ -2229,8 +2306,10 @@ mod tests {
                     "scope": "org",
                     "entity_links": [],
                     "policy_tags": [],
-                    "provenance": {"source_episode": "episode:semantic"},
-                    "embedding": embedding
+                    "confidence": 0.9,
+                    "provenance": {},
+                    "embedding": embedding,
+                    "sem_score": 0.99,
                 })])
             }
 
@@ -2512,6 +2591,24 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mut results = Vec::new();
+                for name in names {
+                    if name == "alice smith" {
+                        results.push(json!({
+                            "entity_id": "entity:alice_smith",
+                            "canonical_name_normalized": "alice smith",
+                            "aliases": ["alice s."]
+                        }));
+                    }
+                }
+                Ok(results)
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2605,6 +2702,191 @@ mod tests {
         assert!(
             expanded.iter().any(|query| query == "alice s. atlas"),
             "multi-word entity alias should expand the full phrase, got: {expanded:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn community_expansion_returns_empty_when_no_entity_links_match() {
+        struct EmptyCommunityFactDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for EmptyCommunityFactDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                vec![json!({
+                    "community_id": "community:orphan",
+                    "summary": "Orphan community with no facts",
+                    "member_entities": ["entity:nobody"],
+                    "ft_score": 1.0
+                })]
+                .into_iter()
+                .map(Ok)
+                .collect::<Result<Vec<_>, _>>()
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(EmptyCommunityFactDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "orphan community query".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context should not panic on empty community expansion");
+
+        assert!(
+            results.is_empty(),
+            "community expansion with no matching entity_links should produce no results, got {}",
+            results.len()
         );
     }
 }

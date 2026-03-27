@@ -76,6 +76,22 @@ pub trait DbClient: Send + Sync {
         self.select_table("fact", namespace).await
     }
 
+    /// Selects nearest-neighbor facts via HNSW ANN index.
+    ///
+    /// Uses SurrealDB's `<|K,EF|>` operator to leverage the HNSW index
+    /// on the `embedding` field, returning only the top-K candidates
+    /// with DB-side cosine similarity scoring.
+    async fn select_facts_ann(
+        &self,
+        _namespace: &str,
+        _scope: &str,
+        _cutoff: &str,
+        _query_vec: &[f64],
+        _limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
     /// Selects edges with DB-side filtering for bi-temporal visibility.
     ///
     /// This helper is retained for compatibility and targeted tests. The live
@@ -102,6 +118,19 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError>;
+
+    /// Batch entity lookup by multiple normalized names.
+    ///
+    /// Returns all entities whose `canonical_name_normalized` matches any
+    /// of the supplied names, or whose `aliases` contain any of them.
+    /// Deduplicates by entity_id.
+    async fn select_entities_batch(
+        &self,
+        _namespace: &str,
+        _names: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
 
     /// Selects active (non-invalidated) facts with an optional limit.
     ///
@@ -888,6 +917,46 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
+    async fn select_facts_ann(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_vec: &[f64],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_facts_ann",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, vars) = build_select_facts_ann_query(scope, cutoff, query_vec, limit);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_facts_ann.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
     async fn select_edges_filtered(
         &self,
         namespace: &str,
@@ -1048,6 +1117,50 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(result)
+    }
+
+    async fn select_entities_batch(
+        &self,
+        namespace: &str,
+        names: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.log_op(
+            "db.select_entities_batch",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                (
+                    "names_count",
+                    Value::Number(serde_json::Number::from(names.len())),
+                ),
+            ],
+        );
+
+        let sql = "SELECT * FROM entity WHERE canonical_name_normalized IN $names OR aliases CONTAINSANY $names";
+        let vars = json!({"names": names});
+
+        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_entities_batch.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
     }
 
     async fn select_active_facts(
@@ -1483,6 +1596,37 @@ fn build_select_facts_for_semantic_search_query(
         json!({
             "scope": scope,
             "cutoff": cutoff,
+            "limit": limit,
+        }),
+    )
+}
+
+fn build_select_facts_ann_query(
+    scope: &str,
+    cutoff: &str,
+    query_vec: &[f64],
+    limit: i32,
+) -> (String, Value) {
+    // HNSW ef_search defaults to 4 * K for better recall
+    let ef_search = (limit * 4).max(16);
+    let sql = format!(
+        "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
+         FROM fact \
+         WHERE scope = $scope \
+           AND embedding IS NOT NONE \
+           AND embedding IS NOT NULL \
+           AND t_valid <= type::datetime($cutoff) \
+           AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
+           AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) \
+           AND embedding <|${limit}, {ef_search}|> $query_vec \
+         ORDER BY sem_score DESC"
+    );
+    (
+        sql,
+        json!({
+            "scope": scope,
+            "cutoff": cutoff,
+            "query_vec": query_vec,
             "limit": limit,
         }),
     )

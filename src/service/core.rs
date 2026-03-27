@@ -512,6 +512,13 @@ impl MemoryService {
                 .await
             {
                 Ok(Some(embedding)) => {
+                    let expected_dim = self.embedding_provider.dimension();
+                    if embedding.len() != expected_dim {
+                        return Err(MemoryError::Validation(format!(
+                            "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
+                            embedding.len()
+                        )));
+                    }
                     payload.insert("embedding".to_string(), json!(embedding));
                 }
                 Ok(None) => {}

@@ -133,8 +133,19 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
         return 0.0;
     }
 
-    let dimensions = left.len().min(right.len());
-    (0..dimensions).map(|idx| left[idx] * right[idx]).sum()
+    debug_assert_eq!(
+        left.len(),
+        right.len(),
+        "cosine_similarity requires equal dimensions, got {} vs {}",
+        left.len(),
+        right.len()
+    );
+
+    if left.len() != right.len() {
+        return 0.0;
+    }
+
+    left.iter().zip(right.iter()).map(|(l, r)| l * r).sum()
 }
 
 fn normalize_embedding(mut embedding: Vec<f64>) -> Vec<f64> {
