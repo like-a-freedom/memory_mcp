@@ -120,6 +120,7 @@ pub struct ExplainRequest {
 
 /// A single item to explain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_id: Option<String>,
@@ -160,6 +161,7 @@ impl Default for ExplainItem {
 
 /// A single provenance source for a fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProvenanceSource {
     /// Source episode ID.
     pub episode_id: String,
@@ -242,6 +244,7 @@ pub struct ExtractedLink {
 
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExtractResult {
     pub episode_id: String,
     pub entities: Vec<ExtractedEntity>,
@@ -259,6 +262,7 @@ impl ExtractResult {
 
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,

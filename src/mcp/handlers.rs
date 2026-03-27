@@ -23,6 +23,7 @@ use super::parsers::{content_hash, parse_context_items, parse_datetime};
 
 /// Response wrapper for tool results.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolResponse<T> {
     /// Result status for the tool call.
     pub status: String,
@@ -654,13 +655,14 @@ mod tests {
         let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
         let properties = schema["properties"].as_object().expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
             "status",
             "result",
             "guidance",
-            "has_more",
-            "total_count",
-            "next_offset",
+            "hasMore",
+            "totalCount",
+            "nextOffset",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -691,15 +693,16 @@ mod tests {
             .as_object()
             .expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
             "content",
             "quote",
-            "source_episode",
+            "sourceEpisode",
             "scope",
-            "t_ref",
-            "t_ingested",
+            "tRef",
+            "tIngested",
             "provenance",
-            "citation_context",
+            "citationContext",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -720,11 +723,12 @@ mod tests {
             .as_object()
             .expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
-            "fact_id",
+            "factId",
             "content",
             "quote",
-            "source_episode",
+            "sourceEpisode",
             "confidence",
             "provenance",
             "rationale",

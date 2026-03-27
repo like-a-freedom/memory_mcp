@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Parameters for the `ingest` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct IngestParams {
     /// Type of source (e.g., "email", "tfs_work_item", "document")
     pub source_type: String,
@@ -31,6 +32,7 @@ pub struct IngestParams {
 
 /// Parameters for the `explain` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExplainParams {
     /// JSON array string of context items to explain.
     ///
@@ -43,6 +45,7 @@ pub struct ExplainParams {
 
 /// Parameters for the `extract` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExtractParams {
     /// Episode ID to extract from (optional if content provided)
     pub episode_id: Option<String>,
@@ -62,6 +65,7 @@ pub struct ExtractParams {
 
 /// Parameters for the `resolve` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolveParams {
     /// Type of entity (e.g., "person", "project", "company")
     pub entity_type: String,
@@ -74,6 +78,7 @@ pub struct ResolveParams {
 
 /// Parameters for the `invalidate` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct InvalidateParams {
     /// ID of the fact to invalidate
     pub fact_id: String,
@@ -85,6 +90,7 @@ pub struct InvalidateParams {
 
 /// Parameters for the `assemble_context` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AssembleContextParams {
     /// The query to assemble context for
     pub query: String,
@@ -117,15 +123,16 @@ mod tests {
         let schema = schema_json::<IngestParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
-            "source_type",
-            "source_id",
+            "sourceType",
+            "sourceId",
             "content",
-            "t_ref",
+            "tRef",
             "scope",
-            "t_ingested",
-            "visibility_scope",
-            "policy_tags",
+            "tIngested",
+            "visibilityScope",
+            "policyTags",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -143,7 +150,8 @@ mod tests {
     #[test]
     fn explain_params_schema_requires_json_array_string() {
         let schema = schema_json::<ExplainParams>();
-        assert_eq!(schema["properties"]["context_items"]["type"], "string");
+        // Field is renamed to camelCase for MCP/JSON compatibility
+        assert_eq!(schema["properties"]["contextItems"]["type"], "string");
     }
 
     #[test]
@@ -151,13 +159,14 @@ mod tests {
         let schema = schema_json::<ExtractParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
-            "episode_id",
+            "episodeId",
             "content",
             "text",
-            "source_type",
-            "source_id",
-            "t_ref",
+            "sourceType",
+            "sourceId",
+            "tRef",
             "scope",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
@@ -169,20 +178,21 @@ mod tests {
         let schema = schema_json::<AssembleContextParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         assert_eq!(properties["query"]["type"], "string");
         assert_eq!(properties["scope"]["type"], "string");
-        assert_eq!(properties["as_of"]["type"], "string");
+        assert_eq!(properties["asOf"]["type"], "string");
         assert_eq!(properties["budget"]["type"], "integer");
         assert_eq!(
-            properties["view_mode"]["type"],
+            properties["viewMode"]["type"],
             serde_json::json!(["string", "null"])
         );
         assert_eq!(
-            properties["window_start"]["type"],
+            properties["windowStart"]["type"],
             serde_json::json!(["string", "null"])
         );
         assert_eq!(
-            properties["window_end"]["type"],
+            properties["windowEnd"]["type"],
             serde_json::json!(["string", "null"])
         );
     }

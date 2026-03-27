@@ -27,11 +27,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let server = MemoryMcp::new(memory_service);
 
-    let schema = schemars::schema_for!(memory_mcp::mcp::AssembleContextParams);
-    if let Ok(json) = serde_json::to_string_pretty(&schema) {
-        let _ = std::fs::write("/tmp/assemble_context_schema.json", json);
-    }
-
     let mut serve_event = std::collections::HashMap::new();
     serve_event.insert("op".to_string(), serde_json::json!("main.serve_starting"));
     logger.log(serve_event, LogLevel::Info);
