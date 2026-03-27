@@ -830,20 +830,46 @@ impl MemoryService {
     }
 
     /// Returns the namespace for a given scope.
+    ///
+    /// Normalizes scope to lowercase for prefix matching.
+    /// Returns default namespace for unknown scopes with a warning log.
     #[must_use]
     pub fn namespace_for_scope(&self, scope: &str) -> String {
-        if self.namespaces.contains(&scope.to_string()) {
-            return scope.to_string();
+        let scope_lower = scope.to_lowercase();
+
+        if self.namespaces.contains(&scope_lower) {
+            return scope_lower;
         }
-        if scope.starts_with("personal") && self.namespaces.contains(&"personal".to_string()) {
+        if scope_lower.starts_with("personal") && self.namespaces.contains(&"personal".to_string())
+        {
             return "personal".to_string();
         }
-        if scope.starts_with("private") && self.namespaces.contains(&"private".to_string()) {
+        if scope_lower.starts_with("private") && self.namespaces.contains(&"private".to_string()) {
             return "private".to_string();
         }
-        if scope.starts_with("org") && self.namespaces.contains(&"org".to_string()) {
+        if scope_lower.starts_with("org") && self.namespaces.contains(&"org".to_string()) {
             return "org".to_string();
         }
+
+        // Log warning for unknown scope before returning default
+        self.logger.log(
+            std::collections::HashMap::from([
+                (
+                    "op".to_string(),
+                    serde_json::Value::String("scope.namespace_fallback".to_string()),
+                ),
+                (
+                    "scope".to_string(),
+                    serde_json::Value::String(scope.to_string()),
+                ),
+                (
+                    "resolved_namespace".to_string(),
+                    serde_json::Value::String(self.default_namespace.clone()),
+                ),
+            ]),
+            crate::logging::LogLevel::Warn,
+        );
+
         self.default_namespace.clone()
     }
 
