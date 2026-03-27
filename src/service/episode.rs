@@ -1259,8 +1259,8 @@ mod tests {
 
     #[tokio::test]
     async fn find_overlapping_communities_uses_index_based_lookup() {
-        use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
         static SELECT_COMMUNITIES_BY_MEMBER_CALLED: AtomicBool = AtomicBool::new(false);
         static SELECT_TABLE_CALLED: AtomicBool = AtomicBool::new(false);

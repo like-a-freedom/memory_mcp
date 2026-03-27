@@ -17,10 +17,10 @@ use crate::models::{
 use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
+use super::AnnoEntityExtractor;
 use super::EntityExtractor;
 use super::cache::CacheKey;
 use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
-use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::lifecycle::{spawn_archival_worker, spawn_decay_worker};
@@ -289,7 +289,7 @@ impl MemoryService {
                 build_config.rate_limit_burst,
             )),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor: Arc::new(RegexEntityExtractor::new()?),
+            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
         })

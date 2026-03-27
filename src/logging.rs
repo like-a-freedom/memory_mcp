@@ -151,7 +151,12 @@ impl StdoutLogger {
         let mut parts = Vec::with_capacity(event.len() + 3);
 
         if let Some(correlation_id) = self.correlation_id {
-            parts.push(format!("[{}] {} {}", ts, level.as_str().to_uppercase(), correlation_id));
+            parts.push(format!(
+                "[{}] {} {}",
+                ts,
+                level.as_str().to_uppercase(),
+                correlation_id
+            ));
         } else {
             parts.push(format!("[{}] {}", ts, level.as_str().to_uppercase()));
         }

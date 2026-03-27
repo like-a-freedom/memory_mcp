@@ -143,7 +143,10 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
     if left.len() != right.len() {
         use std::collections::HashMap;
         let mut event = HashMap::new();
-        event.insert("op".to_string(), json!("cosine_similarity.dimension_mismatch"));
+        event.insert(
+            "op".to_string(),
+            json!("cosine_similarity.dimension_mismatch"),
+        );
         event.insert("left_dim".to_string(), json!(left.len()));
         event.insert("right_dim".to_string(), json!(right.len()));
         embedding_logger().log(event, LogLevel::Warn);

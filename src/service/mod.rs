@@ -6,11 +6,13 @@
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
 
+pub use anno_entity_extractor::AnnoEntityExtractor;
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
 pub use entity_extraction::{EntityExtractor, LlmEntityExtractor, RegexEntityExtractor};
 pub use error::MemoryError;
 
+mod anno_entity_extractor;
 mod cache;
 mod context;
 mod core;

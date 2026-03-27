@@ -91,7 +91,7 @@ pub async fn invalidate_cache_by_scope(
         .filter(|(key, _)| key.matches_scope(scope))
         .map(|(key, _)| key.clone())
         .collect();
-    
+
     let count = keys_to_remove.len();
     if count > 0 {
         let mut event = HashMap::new();
@@ -100,7 +100,7 @@ pub async fn invalidate_cache_by_scope(
         event.insert("invalidated_count".to_string(), json!(count));
         cache_logger().log(event, LogLevel::Trace);
     }
-    
+
     for key in keys_to_remove {
         guard.pop(&key);
     }

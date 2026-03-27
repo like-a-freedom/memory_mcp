@@ -1,13 +1,13 @@
 use rmcp::ServiceExt;
 use rmcp::transport::io::stdio;
 
-use memory_mcp::{MemoryMcp, MemoryService};
 use memory_mcp::logging::{LogLevel, StdoutLogger};
+use memory_mcp::{MemoryMcp, MemoryService};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let logger = StdoutLogger::new("info");
-    
+
     let startup_ts = chrono::Utc::now();
     let mut startup_event = std::collections::HashMap::new();
     startup_event.insert("op".to_string(), serde_json::json!("main.startup"));
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(Box::new(err) as Box<dyn std::error::Error>);
         }
     };
-    
+
     let server = MemoryMcp::new(memory_service);
 
     let schema = schemars::schema_for!(memory_mcp::mcp::AssembleContextParams);
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(Box::new(err) as Box<dyn std::error::Error>);
         }
     };
-    
+
     let mut running_event = std::collections::HashMap::new();
     running_event.insert("op".to_string(), serde_json::json!("main.running"));
     logger.log(running_event, LogLevel::Info);
@@ -70,7 +70,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let duration = chrono::Utc::now().signed_duration_since(startup_ts);
     let mut duration_event = std::collections::HashMap::new();
     duration_event.insert("op".to_string(), serde_json::json!("main.session_duration"));
-    duration_event.insert("duration_secs".to_string(), serde_json::json!(duration.num_seconds()));
+    duration_event.insert(
+        "duration_secs".to_string(),
+        serde_json::json!(duration.num_seconds()),
+    );
     logger.log(duration_event, LogLevel::Info);
 
     Ok(())

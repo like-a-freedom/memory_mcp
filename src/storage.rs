@@ -1389,7 +1389,10 @@ impl DbClient for SurrealDbClient {
             "db.select_communities_by_member_entities",
             vec![
                 ("namespace", Value::String(namespace.to_string())),
-                ("member_count", Value::Number(serde_json::Number::from(member_entities.len()))),
+                (
+                    "member_count",
+                    Value::Number(serde_json::Number::from(member_entities.len())),
+                ),
             ],
         );
 
@@ -1779,7 +1782,9 @@ fn build_select_communities_matching_summary_query(query: &str) -> (String, Valu
     )
 }
 
-fn build_select_communities_by_member_entities_query(member_entities: &[String]) -> (String, Value) {
+fn build_select_communities_by_member_entities_query(
+    member_entities: &[String],
+) -> (String, Value) {
     (
         "SELECT * FROM community WHERE member_entities CONTAINSANY $members ORDER BY community_id ASC".to_string(),
         json!({"members": member_entities}),
@@ -2591,6 +2596,10 @@ mod tests {
             file_names.contains(&"009_adaptive_memory_alignment.surql"),
             "startup migration registry should include the adaptive memory alignment migration"
         );
+        assert!(
+            file_names.contains(&"010_coerce_t_ingested_to_datetime.surql"),
+            "startup migration registry should include the datetime coercion follow-up migration"
+        );
     }
 
     #[test]
@@ -2599,8 +2608,8 @@ mod tests {
 
         assert_eq!(
             migrations.len(),
-            4,
-            "runtime migration registry should include redesign, archival, semantic embedding, and adaptive memory upgrades"
+            5,
+            "runtime migration registry should include redesign, archival, semantic embedding, adaptive memory, and datetime coercion upgrades"
         );
         assert_eq!(
             migrations[0].file_name,
@@ -2614,6 +2623,10 @@ mod tests {
         assert_eq!(
             migrations[3].file_name,
             "009_adaptive_memory_alignment.surql"
+        );
+        assert_eq!(
+            migrations[4].file_name,
+            "010_coerce_t_ingested_to_datetime.surql"
         );
     }
 
@@ -2653,6 +2666,19 @@ mod tests {
         assert!(
             migration_has_statements(migration.sql),
             "migration 008 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_010_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "010_coerce_t_ingested_to_datetime.surql")
+            .expect("migration 010 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 010 must stay executable for existing databases"
         );
     }
 
