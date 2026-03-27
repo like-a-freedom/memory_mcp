@@ -296,8 +296,30 @@ impl MemoryService {
     }
 
     /// Public helper for tool-level logging.
-    pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
+    pub fn log_tool_event(
+        &self,
+        op: &str,
+        args: Value,
+        result: Value,
+        level: LogLevel,
+    ) {
         self.logger.log(log_event(op, args, result, None), level);
+    }
+
+    /// Public helper for tool-level logging with duration.
+    pub fn log_tool_event_with_duration(
+        &self,
+        op: &str,
+        args: Value,
+        result: Value,
+        level: LogLevel,
+        duration: std::time::Duration,
+    ) {
+        let mut args_with_duration = args.clone();
+        let duration_ms = duration.as_millis();
+        args_with_duration["duration_ms"] = json!(duration_ms);
+        self.logger
+            .log(log_event(op, args_with_duration, result, None), level);
     }
 
     /// Returns the total count of episodes.

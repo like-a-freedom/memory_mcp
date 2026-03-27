@@ -15,6 +15,7 @@ use crate::models::{
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::service::MemoryService;
+use crate::timing::OperationTimer;
 
 use super::error::mcp_error;
 use super::params::*;
@@ -300,6 +301,7 @@ impl MemoryMcp {
             policy_tags: p.policy_tags.clone(),
         };
 
+        let timer = OperationTimer::new("ingest");
         self.service.log_tool_event(
             "ingest.start",
             json!({"source_type": p.source_type, "source_id": p.source_id, "scope": p.scope}),
@@ -309,11 +311,12 @@ impl MemoryMcp {
 
         match self.service.ingest(request, Some(access)).await {
             Ok(episode_id) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "ingest.done",
                     json!({"source_id": p.source_id}),
                     json!({"episode_id": &episode_id}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     episode_id,
@@ -321,11 +324,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "ingest.error",
                     json!({"source_id": p.source_id}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -344,6 +348,7 @@ impl MemoryMcp {
             .map_err(|msg| ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, None))?;
         let request = ExplainRequest { context_pack };
 
+        let timer = OperationTimer::new("explain");
         self.service.log_tool_event(
             "explain.start",
             json!({"count": request.context_pack.len()}),
@@ -353,11 +358,12 @@ impl MemoryMcp {
 
         match self.service.explain(request, Some(access)).await {
             Ok(explanations) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "explain.done",
                     json!({}),
                     json!({"count": explanations.len()}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 let count = explanations.len();
                 Ok(Json(ToolResponse::complete_list(
@@ -367,11 +373,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "explain.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -415,6 +422,7 @@ impl MemoryMcp {
             aliases: p.aliases.clone(),
         };
 
+        let timer = OperationTimer::new("resolve");
         self.service.log_tool_event(
             "resolve.start",
             json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
@@ -424,11 +432,12 @@ impl MemoryMcp {
 
         match self.service.resolve(candidate, Some(access)).await {
             Ok(entity_id) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "resolve.done",
                     json!({}),
                     json!({"entity_id": &entity_id}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     entity_id,
@@ -436,11 +445,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "resolve.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -469,6 +479,7 @@ impl MemoryMcp {
             t_invalid,
         };
 
+        let timer = OperationTimer::new("invalidate");
         self.service.log_tool_event(
             "invalidate.start",
             json!({"fact_id": request.fact_id}),
@@ -478,11 +489,12 @@ impl MemoryMcp {
 
         match self.service.invalidate(request, Some(access)).await {
             Ok(res) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "invalidate.done",
                     json!({"fact_id": p.fact_id}),
                     json!({"result": res}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     res,
@@ -490,11 +502,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "invalidate.error",
                     json!({"fact_id": p.fact_id}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -529,6 +542,7 @@ impl MemoryMcp {
             access: None,
         };
 
+        let timer = OperationTimer::new("assemble_context");
         self.service.log_tool_event(
             "assemble_context.start",
             json!({"scope": request.scope, "query": request.query}),
@@ -538,11 +552,12 @@ impl MemoryMcp {
 
         match self.service.assemble_context(request).await {
             Ok(results) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "assemble_context.done",
                     json!({}),
                     json!({"count": results.len()}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 let count = results.len();
                 Ok(Json(ToolResponse::complete_list(
@@ -552,11 +567,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "assemble_context.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
