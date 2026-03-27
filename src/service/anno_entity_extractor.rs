@@ -7,12 +7,11 @@ use async_trait::async_trait;
 
 use crate::models::EntityCandidate;
 
-use super::{EntityExtractor, MemoryError, RegexEntityExtractor};
+use super::{EntityExtractor, MemoryError};
 
 /// Extracts entity candidates with `anno`'s stacked NER model.
 pub struct AnnoEntityExtractor {
     model: StackedNER,
-    regex_fallback: RegexEntityExtractor,
 }
 
 impl AnnoEntityExtractor {
@@ -24,7 +23,6 @@ impl AnnoEntityExtractor {
         // labels into groups of ~20-30 per `docs/BACKENDS.md` guidance.
         Ok(Self {
             model: StackedNER::default(),
-            regex_fallback: RegexEntityExtractor::new()?,
         })
     }
 }
@@ -64,12 +62,6 @@ impl EntityExtractor for AnnoEntityExtractor {
                     aliases: Vec::new(),
                 },
             );
-        }
-
-        for candidate in self.regex_fallback.extract_candidates(content).await? {
-            candidates
-                .entry(candidate.canonical_name.clone())
-                .or_insert(candidate);
         }
 
         Ok(candidates.into_values().collect())
@@ -132,10 +124,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn anno_extractor_preserves_single_token_camel_case_names() {
+    async fn anno_extractor_ignores_sentence_case_common_nouns() {
         let extractor = AnnoEntityExtractor::new().unwrap();
         let candidates = extractor
-            .extract_candidates("OpenAI partnered with PostgreSQL")
+            .extract_candidates("Yesterday we reviewed the draft and discussed next steps.")
             .await
             .unwrap();
 
@@ -144,8 +136,10 @@ mod tests {
             .map(|candidate| candidate.canonical_name.as_str())
             .collect();
 
-        assert!(names.contains(&"OpenAI"));
-        assert!(names.contains(&"PostgreSQL"));
+        assert!(
+            !names.contains(&"Yesterday"),
+            "anno extractor should not re-introduce regex-only sentence-case noise"
+        );
     }
 
     #[tokio::test]

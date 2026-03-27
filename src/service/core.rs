@@ -296,13 +296,7 @@ impl MemoryService {
     }
 
     /// Public helper for tool-level logging.
-    pub fn log_tool_event(
-        &self,
-        op: &str,
-        args: Value,
-        result: Value,
-        level: LogLevel,
-    ) {
+    pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
         self.logger.log(log_event(op, args, result, None), level);
     }
 
