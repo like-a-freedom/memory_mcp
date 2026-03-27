@@ -1073,6 +1073,14 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,

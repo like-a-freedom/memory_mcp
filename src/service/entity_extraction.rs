@@ -370,6 +370,21 @@ fn classify_entity_type(name: &str) -> &'static str {
         return "location";
     }
 
+    // Multi-word names without company suffixes are likely persons
+    // (e.g., "Alice Smith", "Иван Петров", "Maria Garcia")
+    if name.split_whitespace().count() >= 2 {
+        return "person";
+    }
+
+    // Single-word CamelCase names are likely technologies/products
+    // (e.g., "PostgreSQL", "OpenAI", "Kubernetes", "TensorFlow")
+    if name.chars().next().map(char::is_uppercase).unwrap_or(false)
+        && name.chars().any(|c| c.is_uppercase())
+        && !name.contains(' ')
+    {
+        return "technology";
+    }
+
     "unknown"
 }
 
@@ -545,7 +560,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn regex_entity_extractor_uses_unknown_fallback_for_technical_terms() {
+    async fn regex_entity_extractor_classifies_person_types() {
+        let extractor = RegexEntityExtractor::new().unwrap();
+        let candidates = extractor
+            .extract_candidates("Alice Smith met Bob Jones")
+            .await
+            .unwrap();
+
+        let types: std::collections::HashMap<_, _> = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.canonical_name.as_str(),
+                    candidate.entity_type.as_str(),
+                )
+            })
+            .collect();
+
+        // Multi-word names without company suffixes are classified as person
+        assert_eq!(types.get("Alice Smith"), Some(&"person"));
+        assert_eq!(types.get("Bob Jones"), Some(&"person"));
+    }
+
+    #[tokio::test]
+    async fn regex_entity_extractor_classifies_technology_types() {
         let extractor = RegexEntityExtractor::new().unwrap();
         let candidates = extractor
             .extract_candidates("PostgreSQL integrates with OpenAI")
@@ -562,8 +600,9 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(types.get("PostgreSQL"), Some(&"unknown"));
-        assert_eq!(types.get("OpenAI"), Some(&"unknown"));
+        // Single-word CamelCase names are classified as technology
+        assert_eq!(types.get("PostgreSQL"), Some(&"technology"));
+        assert_eq!(types.get("OpenAI"), Some(&"technology"));
     }
 
     #[tokio::test]

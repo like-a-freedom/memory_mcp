@@ -133,15 +133,12 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
         return 0.0;
     }
 
-    debug_assert_eq!(
-        left.len(),
-        right.len(),
-        "cosine_similarity requires equal dimensions, got {} vs {}",
-        left.len(),
-        right.len()
-    );
-
     if left.len() != right.len() {
+        tracing::warn!(
+            "cosine_similarity dimension mismatch: left={}, right={}",
+            left.len(),
+            right.len()
+        );
         return 0.0;
     }
 

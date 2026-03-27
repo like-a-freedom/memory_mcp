@@ -113,11 +113,9 @@ pub trait DbClient: Send + Sync {
     /// Deduplicates by entity_id.
     async fn select_entities_batch(
         &self,
-        _namespace: &str,
-        _names: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        names: &[String],
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects active (non-invalidated) facts with an optional limit.
     ///
@@ -1552,7 +1550,8 @@ fn build_select_facts_ann_query(
            AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
            AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) \
            AND embedding <|${limit}, {ef_search}|> $query_vec \
-         ORDER BY sem_score DESC"
+         ORDER BY sem_score DESC \
+         LIMIT $limit"
     );
     (
         sql,

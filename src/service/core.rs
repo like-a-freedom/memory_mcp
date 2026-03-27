@@ -1496,6 +1496,14 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1725,6 +1733,14 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1893,6 +1909,14 @@ mod tests {
                 _normalized_name: &str,
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_facts_ann(
@@ -2171,6 +2195,14 @@ mod tests {
                 })
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -2364,6 +2396,14 @@ mod tests {
                 Ok(Some(json!({"entity_id": "entity:openai"})))
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -2555,6 +2595,14 @@ mod tests {
                 Ok(Some(json!({"entity_id": "entity:openai"})))
             }
 
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -2743,6 +2791,14 @@ mod tests {
             ) -> Result<Option<Value>, MemoryError> {
                 assert_eq!(normalized_name, "openai");
                 Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_facts_ann(
