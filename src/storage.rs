@@ -117,6 +117,30 @@ pub trait DbClient: Send + Sync {
         names: &[String],
     ) -> Result<Vec<Value>, MemoryError>;
 
+    /// Selects entities by their IDs in a single batch query.
+    ///
+    /// Returns all entities whose `entity_id` is in the supplied list.
+    async fn select_entities_by_ids(
+        &self,
+        _namespace: &str,
+        _entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
+    /// Selects edges matching a specific (in, relation, out) triple.
+    ///
+    /// Used for targeted invalidation without full table scans.
+    async fn select_edges_for_triple(
+        &self,
+        _namespace: &str,
+        _in_id: &str,
+        _relation: &str,
+        _out_id: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
     /// Selects active (non-invalidated) facts with an optional limit.
     ///
     /// Returns facts where `t_invalid IS NULL`, ordered by `t_valid ASC`.
@@ -1131,6 +1155,71 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(results)
+    }
+
+    async fn select_entities_by_ids(
+        &self,
+        namespace: &str,
+        entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        if entity_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.log_op(
+            "db.select_entities_by_ids",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(entity_ids.len())),
+            )],
+        );
+
+        let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
+        let vars = json!({"entity_ids": entity_ids});
+
+        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        Ok(extract_records(normalized))
+    }
+
+    async fn select_edges_for_triple(
+        &self,
+        namespace: &str,
+        in_id: &str,
+        relation: &str,
+        out_id: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_edges_for_triple",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("in_id", Value::String(in_id.to_string())),
+                ("relation", Value::String(relation.to_string())),
+            ],
+        );
+
+        let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation AND out = <record> $out_id";
+        let vars = json!({
+            "in_id": in_id,
+            "relation": relation,
+            "out_id": out_id,
+        });
+
+        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        Ok(extract_records(normalized))
     }
 
     async fn select_active_facts(

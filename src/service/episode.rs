@@ -230,7 +230,7 @@ pub async fn extract_facts(
         .map(|entity| entity.entity_id.clone())
         .collect::<Vec<_>>();
 
-    if normalized.contains("arr") || episode.content.contains('$') {
+    if is_metric_statement(&episode.content) {
         let fact_id = service
             .add_fact(
                 "metric",
@@ -292,6 +292,19 @@ pub fn is_promise_statement(content: &str) -> bool {
             .expect("promise regex is valid")
     });
     promise_re.is_match(content)
+}
+
+/// Detects metric-related content using word-boundary matching.
+///
+/// Matches financial metrics (ARR, MRR, NRR, revenue, churn) and dollar amounts.
+/// Avoids false positives on words like "barrel", "narrative", "arrive".
+pub fn is_metric_statement(content: &str) -> bool {
+    static METRIC_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let metric_re = METRIC_RE.get_or_init(|| {
+        Regex::new(r"\b(ARR|MRR|NRR|revenue|churn|ROI|LTV|CAC|NPS|EBITDA)\b|\$\d")
+            .expect("metric regex is valid")
+    });
+    metric_re.is_match(content)
 }
 
 /// Extract entities and facts from an episode.
@@ -468,7 +481,15 @@ async fn invalidate_conflicting_edges(
     new_edge: &Edge,
     namespace: &str,
 ) -> Result<(), MemoryError> {
-    let existing_edges = service.db_client.select_table("edge", namespace).await?;
+    let existing_edges = service
+        .db_client
+        .select_edges_for_triple(
+            namespace,
+            &new_edge.in_id,
+            &new_edge.relation,
+            &new_edge.out_id,
+        )
+        .await?;
 
     for existing in existing_edges
         .iter()
@@ -731,26 +752,23 @@ async fn build_community_summary(
     namespace: &str,
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
-    let records = service.db_client.select_table("entity", namespace).await?;
-    let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
+    let records = service
+        .db_client
+        .select_entities_by_ids(namespace, member_entities)
+        .await?;
     let mut names = records
         .iter()
         .filter_map(|record| record.as_object())
         .filter_map(|record| {
-            let entity_id = record
-                .get("entity_id")
+            record
+                .get("canonical_name")
                 .and_then(unwrap_record_string)
-                .or_else(|| record.get("id").and_then(unwrap_record_string))?;
-            if !member_set.contains(&entity_id) {
-                return None;
-            }
-
-            Some(
-                record
-                    .get("canonical_name")
-                    .and_then(unwrap_record_string)
-                    .unwrap_or(entity_id),
-            )
+                .or_else(|| {
+                    record
+                        .get("entity_id")
+                        .and_then(unwrap_record_string)
+                        .or_else(|| record.get("id").and_then(unwrap_record_string))
+                })
         })
         .collect::<Vec<_>>();
 

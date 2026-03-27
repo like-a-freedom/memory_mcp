@@ -380,8 +380,18 @@ impl MemoryService {
         let mut explanations = Vec::with_capacity(request.context_pack.len());
         for item in request.context_pack {
             let explanation = self.build_explain_item(item).await?;
-            if let Some(fact_id) = explanation.fact_id.as_deref() {
-                let _ = self.record_fact_access(fact_id, 3).await;
+            if let Some(fact_id) = explanation.fact_id.as_deref()
+                && let Err(err) = self.record_fact_access(fact_id, 3).await
+            {
+                self.logger.log(
+                    log_event(
+                        "explain.access_track_error",
+                        json!({"fact_id": fact_id}),
+                        json!({"error": err.to_string()}),
+                        access.as_ref(),
+                    ),
+                    LogLevel::Warn,
+                );
             }
             explanations.push(explanation);
         }

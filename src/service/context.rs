@@ -71,7 +71,17 @@ pub async fn assemble_context(
 
     if let Some(cached) = cached {
         for item in &cached {
-            let _ = service.record_fact_access(&item.fact_id, 1).await;
+            if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
+                service.logger.log(
+                    super::log_event(
+                        "assemble_context.access_track_error",
+                        json!({"fact_id": item.fact_id}),
+                        json!({"error": err.to_string()}),
+                        Some(&access),
+                    ),
+                    LogLevel::Warn,
+                );
+            }
         }
 
         service.logger.log(
@@ -223,7 +233,17 @@ pub async fn assemble_context(
         .collect();
 
     for item in &results {
-        let _ = service.record_fact_access(&item.fact_id, 1).await;
+        if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
+            service.logger.log(
+                super::log_event(
+                    "assemble_context.access_track_error",
+                    json!({"fact_id": item.fact_id}),
+                    json!({"error": err.to_string()}),
+                    Some(&access),
+                ),
+                LogLevel::Warn,
+            );
+        }
     }
 
     {
@@ -532,21 +552,6 @@ async fn expand_query_with_aliases(
             .unwrap_or_default();
         if !canonical_norm.is_empty() && !aliases.is_empty() {
             entity_aliases.entry(canonical_norm).or_insert(aliases);
-        }
-        // Also check if any alias matches a query phrase
-        for alias_str in obj
-            .get("aliases")
-            .and_then(|v| v.as_array())
-            .into_iter()
-            .flatten()
-            .filter_map(|v| v.as_str())
-        {
-            let norm_alias = super::normalize_text(alias_str);
-            if let Some(canonical_aliases) = entity_aliases.get(&norm_alias) {
-                // The alias itself was looked up; merge in the entity's other aliases
-                let _ = canonical_aliases;
-            }
-            entity_aliases.entry(norm_alias).or_default();
         }
     }
 
