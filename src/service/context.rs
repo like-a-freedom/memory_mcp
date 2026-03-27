@@ -1063,11 +1063,12 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1461,11 +1462,12 @@ mod tests {
                 ])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1658,11 +1660,12 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1871,11 +1874,12 @@ mod tests {
                 })])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -2098,11 +2102,12 @@ mod tests {
                 ])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -2273,16 +2278,6 @@ mod tests {
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 panic!("semantic retrieval should not scan the full fact table")
-            }
-
-            async fn select_facts_for_semantic_search(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("semantic retrieval should use select_facts_ann, not select_facts_for_semantic_search")
             }
 
             async fn select_facts_ann(
@@ -2548,11 +2543,12 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_for_semantic_search(
+            async fn select_facts_ann(
                 &self,
                 _namespace: &str,
                 _scope: &str,
                 _cutoff: &str,
+                _query_vec: &[f64],
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -2773,6 +2769,17 @@ mod tests {
                 _normalized_name: &str,
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_communities_matching_summary(

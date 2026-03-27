@@ -65,17 +65,6 @@ pub trait DbClient: Send + Sync {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects candidate facts for semantic retrieval using DB-side temporal and scope filtering.
-    async fn select_facts_for_semantic_search(
-        &self,
-        namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.select_table("fact", namespace).await
-    }
-
     /// Selects nearest-neighbor facts via HNSW ANN index.
     ///
     /// Uses SurrealDB's `<|K,EF|>` operator to leverage the HNSW index
@@ -83,14 +72,12 @@ pub trait DbClient: Send + Sync {
     /// with DB-side cosine similarity scoring.
     async fn select_facts_ann(
         &self,
-        _namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        _query_vec: &[f64],
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_vec: &[f64],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects edges with DB-side filtering for bi-temporal visibility.
     ///
@@ -878,45 +865,6 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_facts_for_semantic_search(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_facts_for_semantic_search",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("scope", Value::String(scope.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-            ],
-        );
-
-        let (sql, vars) = build_select_facts_for_semantic_search_query(scope, cutoff, limit);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_facts_for_semantic_search.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
     async fn select_facts_ann(
         &self,
         namespace: &str,
@@ -1581,21 +1529,6 @@ fn build_select_facts_by_entity_links_query(
             "scope": scope,
             "cutoff": cutoff,
             "entity_links": entity_links,
-            "limit": limit,
-        }),
-    )
-}
-
-fn build_select_facts_for_semantic_search_query(
-    scope: &str,
-    cutoff: &str,
-    limit: i32,
-) -> (String, Value) {
-    (
-        "SELECT * FROM fact WHERE scope = $scope AND embedding IS NOT NONE AND embedding IS NOT NULL AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY t_valid DESC, fact_id ASC LIMIT $limit".to_string(),
-        json!({
-            "scope": scope,
-            "cutoff": cutoff,
             "limit": limit,
         }),
     )
@@ -2847,25 +2780,6 @@ mod tests {
         assert!(sql.contains("ORDER BY t_valid ASC"));
         assert!(sql.contains("LIMIT $limit"));
         assert_eq!(vars.get("limit"), Some(&json!(500)));
-    }
-
-    #[test]
-    fn build_select_facts_for_semantic_search_query_filters_db_side() {
-        let (sql, vars) =
-            build_select_facts_for_semantic_search_query("org", "2026-01-15T00:00:00Z", 7);
-
-        assert!(sql.contains("FROM fact WHERE scope = $scope"));
-        assert!(sql.contains("embedding IS NOT NONE"));
-        assert!(sql.contains("embedding IS NOT NULL"));
-        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
-        assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
-        assert!(sql.contains(
-            "t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)"
-        ));
-        assert!(sql.contains("ORDER BY t_valid DESC, fact_id ASC"));
-        assert_eq!(vars.get("scope"), Some(&json!("org")));
-        assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
-        assert_eq!(vars.get("limit"), Some(&json!(7)));
     }
 
     #[test]

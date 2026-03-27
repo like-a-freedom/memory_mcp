@@ -1496,6 +1496,17 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1714,6 +1725,17 @@ mod tests {
                 Ok(None)
             }
 
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1871,6 +1893,17 @@ mod tests {
                 _normalized_name: &str,
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_communities_matching_summary(
@@ -2138,6 +2171,17 @@ mod tests {
                 })
             }
 
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2320,6 +2364,17 @@ mod tests {
                 Ok(Some(json!({"entity_id": "entity:openai"})))
             }
 
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2500,6 +2555,17 @@ mod tests {
                 Ok(Some(json!({"entity_id": "entity:openai"})))
             }
 
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2677,6 +2743,17 @@ mod tests {
             ) -> Result<Option<Value>, MemoryError> {
                 assert_eq!(normalized_name, "openai");
                 Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_communities_matching_summary(
