@@ -90,8 +90,11 @@ pub async fn run_archival_pass(
 
             let has_active_facts =
                 check_episode_has_active_facts(service, episode_id, namespace).await?;
+            let has_recent_heat =
+                check_episode_has_recent_fact_access(service, episode_id, namespace, age_days)
+                    .await?;
 
-            if !has_active_facts {
+            if !has_active_facts && !has_recent_heat {
                 let payload = json!({
                     "status": "archived",
                     "archived_at": crate::service::normalize_dt(now),
@@ -123,4 +126,24 @@ async fn check_episode_has_active_facts(
         .await?;
 
     Ok(!facts.is_empty())
+}
+
+async fn check_episode_has_recent_fact_access(
+    service: &MemoryService,
+    episode_id: &str,
+    namespace: &str,
+    age_days: u32,
+) -> Result<bool, MemoryError> {
+    let hot_cutoff =
+        crate::service::normalize_dt(Utc::now() - chrono::Duration::days(age_days as i64));
+    let result = service
+        .db_client
+        .query(
+            "SELECT fact_id FROM fact WHERE source_episode = $episode_id AND last_accessed IS NOT NONE AND last_accessed >= type::datetime($hot_cutoff) LIMIT 1",
+            Some(json!({"episode_id": episode_id, "hot_cutoff": hot_cutoff})),
+            namespace,
+        )
+        .await?;
+
+    Ok(result.as_array().is_some_and(|rows| !rows.is_empty()))
 }

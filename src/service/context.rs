@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
-use super::cache::CacheKey;
+use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
@@ -56,6 +56,11 @@ pub async fn assemble_context(
         &request.scope,
         cutoff,
         request.budget,
+        CacheView::new(
+            request.view_mode.as_deref(),
+            request.window_start,
+            request.window_end,
+        ),
         access.allowed_tags.clone(),
     );
 
@@ -65,6 +70,10 @@ pub async fn assemble_context(
     };
 
     if let Some(cached) = cached {
+        for item in &cached {
+            let _ = service.record_fact_access(&item.fact_id, 1).await;
+        }
+
         service.logger.log(
             super::log_event(
                 "assemble_context.cache_hit",
@@ -100,7 +109,7 @@ pub async fn assemble_context(
 
     // Alias expansion: search for additional facts using entity aliases
     let mut expanded_facts = Vec::new();
-    let ranked_facts = if let Some(query) = query_opt {
+    let mut ranked_facts = if let Some(query) = query_opt {
         let expanded_queries = expand_query_with_aliases(service, query, &namespace).await;
         let direct_fact_ids: HashSet<_> = direct_facts
             .iter()
@@ -170,28 +179,31 @@ pub async fn assemble_context(
         let mut all_direct = direct_facts;
         all_direct.extend(expanded_facts);
 
-        let mut ranked_facts = build_ranked_context_facts(
+        build_ranked_context_facts(
             all_direct,
             community_facts,
             semantic_facts,
             query_opt,
             &request.scope,
             cutoff,
-        );
-        sort_ranked_context_facts(&mut ranked_facts);
-        ranked_facts
+        )
     } else {
-        let mut ranked_facts = build_ranked_context_facts(
+        build_ranked_context_facts(
             direct_facts,
             Vec::new(),
             Vec::new(),
             query_opt,
             &request.scope,
             cutoff,
-        );
-        sort_ranked_context_facts(&mut ranked_facts);
-        ranked_facts
+        )
     };
+
+    apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
+    if request.view_mode.as_deref() == Some("timeline") {
+        sort_ranked_context_facts_for_timeline(&mut ranked_facts);
+    } else {
+        sort_ranked_context_facts(&mut ranked_facts);
+    }
 
     let results: Vec<AssembledContextItem> = ranked_facts
         .into_iter()
@@ -209,6 +221,10 @@ pub async fn assemble_context(
             }
         })
         .collect();
+
+    for item in &results {
+        let _ = service.record_fact_access(&item.fact_id, 1).await;
+    }
 
     {
         let mut cache = service.context_cache.write().await;
@@ -424,6 +440,31 @@ fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
             .then_with(|| a.source_priority.cmp(&b.source_priority))
             .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
             .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+    });
+}
+
+fn sort_ranked_context_facts_for_timeline(facts: &mut [RankedContextFact]) {
+    facts.sort_by(|a, b| {
+        a.fact
+            .t_valid
+            .cmp(&b.fact.t_valid)
+            .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+    });
+}
+
+fn apply_time_window(
+    facts: &mut Vec<RankedContextFact>,
+    window_start: Option<chrono::DateTime<chrono::Utc>>,
+    window_end: Option<chrono::DateTime<chrono::Utc>>,
+) {
+    if window_start.is_none() && window_end.is_none() {
+        return;
+    }
+
+    facts.retain(|ranked| {
+        let after_start = window_start.is_none_or(|start| ranked.fact.t_valid >= start);
+        let before_end = window_end.is_none_or(|end| ranked.fact.t_valid <= end);
+        after_start && before_end
     });
 }
 
@@ -928,6 +969,9 @@ mod tests {
             t_invalid: None,
             t_invalid_ingested: None,
             confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
@@ -1619,6 +1663,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -1815,6 +1862,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2041,6 +2091,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2286,6 +2339,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2523,6 +2579,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2940,6 +2999,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )

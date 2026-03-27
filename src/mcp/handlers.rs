@@ -532,11 +532,16 @@ impl MemoryMcp {
                 .ok()
                 .map(|dt| dt.with_timezone(&chrono::Utc))
         };
+        let window_start = p.window_start.as_deref().and_then(parse_datetime);
+        let window_end = p.window_end.as_deref().and_then(parse_datetime);
         let request = AssembleContextRequest {
             query: p.query.clone(),
             scope: p.scope.clone(),
             as_of,
             budget: p.budget,
+            view_mode: p.view_mode.clone(),
+            window_start,
+            window_end,
             access: None,
         };
 

@@ -7,7 +7,7 @@ use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
 use crate::service::{MemoryError, MemoryService};
-use crate::storage::json_f64;
+use crate::storage::{json_f64, json_i64};
 
 /// Spawns the decay worker background task.
 pub fn spawn_decay_worker(
@@ -97,12 +97,22 @@ pub async fn run_decay_pass(
                 .unwrap_or(now);
 
             let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
+            let access_count = record.get("access_count").and_then(json_i64).unwrap_or(0);
+            let last_accessed = record
+                .get("last_accessed")
+                .and_then(|value| value.as_str())
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                .map(|dt| dt.with_timezone(&Utc));
 
             let days_since_valid = (now - t_valid).num_days() as f64;
             let decay_rate = (2.0_f64).ln() / half_life_days;
             let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+            let is_hot = access_count > 0
+                && last_accessed.is_some_and(|last_accessed| {
+                    (now - last_accessed).num_days() as f64 <= half_life_days
+                });
 
-            if decayed < threshold {
+            if decayed < threshold && !is_hot {
                 let fact_id = record
                     .get("fact_id")
                     .and_then(|v| v.as_str())

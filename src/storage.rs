@@ -580,6 +580,10 @@ fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "008_fact_semantic_embeddings.surql",
             sql: include_str!("migrations/008_fact_semantic_embeddings.surql"),
         },
+        MigrationScript {
+            file_name: "009_adaptive_memory_alignment.surql",
+            sql: include_str!("migrations/009_adaptive_memory_alignment.surql"),
+        },
     ]
 }
 
@@ -698,6 +702,26 @@ pub(crate) fn json_f64(value: &Value) -> Option<f64> {
                 .get("String")
                 .and_then(Value::as_str)?
                 .parse::<f64>()
+                .ok()
+        })
+}
+
+pub(crate) fn json_i64(value: &Value) -> Option<i64> {
+    if let Some(value) = value.as_i64() {
+        return Some(value);
+    }
+
+    let object = value.as_object()?;
+
+    object
+        .get("Number")
+        .and_then(json_i64)
+        .or_else(|| object.get("Int").and_then(json_i64))
+        .or_else(|| {
+            object
+                .get("String")
+                .and_then(Value::as_str)?
+                .parse::<i64>()
                 .ok()
         })
 }
@@ -1504,7 +1528,7 @@ fn build_select_facts_filtered_query(
         vars.insert("query".to_string(), json!(query));
 
         format!(
-            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND content @1@ $query ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ $query OR index_keys @1@ $query) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
         format!(
@@ -1697,7 +1721,13 @@ fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
 fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
     match table {
         "episode" => &["t_ref", "t_ingested", "archived_at"],
-        "fact" | "edge" => &["t_valid", "t_ingested", "t_invalid", "t_invalid_ingested"],
+        "fact" | "edge" => &[
+            "t_valid",
+            "t_ingested",
+            "t_invalid",
+            "t_invalid_ingested",
+            "last_accessed",
+        ],
         "community" => &["updated_at"],
         "event_log" => &["ts"],
         "task" => &["due_date"],
@@ -2414,6 +2444,10 @@ mod tests {
             file_names.contains(&"008_fact_semantic_embeddings.surql"),
             "startup migration registry should include the semantic embedding follow-up migration"
         );
+        assert!(
+            file_names.contains(&"009_adaptive_memory_alignment.surql"),
+            "startup migration registry should include the adaptive memory alignment migration"
+        );
     }
 
     #[test]
@@ -2422,8 +2456,8 @@ mod tests {
 
         assert_eq!(
             migrations.len(),
-            3,
-            "runtime migration registry should include redesign, archival, and semantic embedding upgrades"
+            4,
+            "runtime migration registry should include redesign, archival, semantic embedding, and adaptive memory upgrades"
         );
         assert_eq!(
             migrations[0].file_name,
@@ -2433,6 +2467,10 @@ mod tests {
         assert_eq!(
             migrations[2].file_name,
             "008_fact_semantic_embeddings.surql"
+        );
+        assert_eq!(
+            migrations[3].file_name,
+            "009_adaptive_memory_alignment.surql"
         );
     }
 

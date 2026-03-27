@@ -79,6 +79,85 @@ async fn archival_pass_processes_all_configured_namespaces() {
 }
 
 #[tokio::test]
+async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archival() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(150);
+
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "personal-archival-hot-1".to_string(),
+                content: "Personal hot archival candidate".to_string(),
+                t_ref: old_date,
+                scope: "personal".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest episode");
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Personal hot archival fact",
+            "Personal hot archival fact",
+            &episode_id,
+            old_date,
+            "personal",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("add fact");
+
+    service
+        .invalidate(
+            memory_mcp::models::InvalidateRequest {
+                fact_id: fact_id.clone(),
+                reason: "prepare archival".to_string(),
+                t_invalid: Utc::now(),
+            },
+            None,
+        )
+        .await
+        .expect("invalidate fact");
+
+    db_client
+        .update(
+            &fact_id,
+            json!({
+                "access_count": 5,
+                "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
+            }),
+            "personal",
+        )
+        .await
+        .expect("touch fact");
+
+    let count = run_archival_pass(&service, 90)
+        .await
+        .expect("archival pass completed");
+
+    assert_eq!(
+        count, 0,
+        "episode with recently accessed fact should stay live"
+    );
+
+    let episode = db_client
+        .select_one(&episode_id, "personal")
+        .await
+        .expect("select episode")
+        .expect("stored episode");
+    assert_ne!(episode.get("status"), Some(&json!("archived")));
+}
+
+#[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn archival_pass_with_empty_database() {
     // Setup

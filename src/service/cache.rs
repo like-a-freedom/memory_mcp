@@ -15,7 +15,31 @@ pub struct CacheKey {
     scope: String,
     cutoff: String,
     budget: i32,
+    view: CacheView,
     tags: Option<Vec<String>>,
+}
+
+/// Timeline-specific cache parameters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct CacheView {
+    view_mode: Option<String>,
+    window_start: Option<String>,
+    window_end: Option<String>,
+}
+
+impl CacheView {
+    #[must_use]
+    pub fn new(
+        view_mode: Option<&str>,
+        window_start: Option<DateTime<Utc>>,
+        window_end: Option<DateTime<Utc>>,
+    ) -> Self {
+        Self {
+            view_mode: view_mode.map(ToString::to_string),
+            window_start: window_start.map(super::bucket_to_hour),
+            window_end: window_end.map(super::bucket_to_hour),
+        }
+    }
 }
 
 impl CacheKey {
@@ -25,6 +49,7 @@ impl CacheKey {
         scope: &str,
         cutoff: DateTime<Utc>,
         budget: i32,
+        view: CacheView,
         tags: Option<Vec<String>>,
     ) -> Self {
         let mut tags = tags;
@@ -36,6 +61,7 @@ impl CacheKey {
             scope: scope.to_string(),
             cutoff: super::bucket_to_hour(cutoff),
             budget,
+            view,
             tags,
         }
     }
@@ -73,7 +99,14 @@ mod tests {
     #[test]
     fn cache_key_new_normalizes_query() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 0).unwrap();
-        let key = CacheKey::new("  Test Query  ", "org", cutoff, 5, None);
+        let key = CacheKey::new(
+            "  Test Query  ",
+            "org",
+            cutoff,
+            5,
+            CacheView::default(),
+            None,
+        );
         assert_eq!(key.query, "test query");
         assert_eq!(key.scope, "org");
         assert_eq!(key.budget, 5);
@@ -82,7 +115,7 @@ mod tests {
     #[test]
     fn cache_key_new_buckets_cutoff_to_hour() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 45).unwrap();
-        let key = CacheKey::new("query", "org", cutoff, 5, None);
+        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
         assert_eq!(key.cutoff, "2024-01-01T12:00:00Z");
     }
 
@@ -90,7 +123,7 @@ mod tests {
     fn cache_key_new_sorts_tags() {
         let cutoff = Utc::now();
         let tags = Some(vec!["zebra".to_string(), "apple".to_string()]);
-        let key = CacheKey::new("query", "org", cutoff, 5, tags);
+        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), tags);
         assert_eq!(
             key.tags,
             Some(vec!["apple".to_string(), "zebra".to_string()])
@@ -100,14 +133,14 @@ mod tests {
     #[test]
     fn cache_key_matches_scope_returns_true_for_same_scope() {
         let cutoff = Utc::now();
-        let key = CacheKey::new("query", "org", cutoff, 5, None);
+        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
         assert!(key.matches_scope("org"));
     }
 
     #[test]
     fn cache_key_matches_scope_returns_false_for_different_scope() {
         let cutoff = Utc::now();
-        let key = CacheKey::new("query", "org", cutoff, 5, None);
+        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
         assert!(!key.matches_scope("personal"));
     }
 
@@ -118,9 +151,9 @@ mod tests {
 
         let cutoff = Utc::now();
 
-        let key1 = CacheKey::new("query1", "org", cutoff, 5, None);
-        let key2 = CacheKey::new("query2", "org", cutoff, 5, None);
-        let key3 = CacheKey::new("query3", "personal", cutoff, 5, None);
+        let key1 = CacheKey::new("query1", "org", cutoff, 5, CacheView::default(), None);
+        let key2 = CacheKey::new("query2", "org", cutoff, 5, CacheView::default(), None);
+        let key3 = CacheKey::new("query3", "personal", cutoff, 5, CacheView::default(), None);
 
         {
             let mut guard = cache.write().await;

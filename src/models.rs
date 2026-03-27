@@ -205,6 +205,12 @@ pub struct AssembleContextRequest {
     pub as_of: Option<DateTime<Utc>>,
     #[serde(default = "default_budget")]
     pub budget: i32,
+    #[serde(default)]
+    pub view_mode: Option<String>,
+    #[serde(default)]
+    pub window_start: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub window_end: Option<DateTime<Utc>>,
     #[serde(skip_serializing, default)]
     #[schemars(skip)]
     pub access: Option<AccessPayload>,
@@ -361,6 +367,12 @@ pub struct Fact {
     pub t_invalid: Option<DateTime<Utc>>,
     pub t_invalid_ingested: Option<DateTime<Utc>>,
     pub confidence: f64,
+    #[serde(default)]
+    pub index_keys: Vec<String>,
+    #[serde(default)]
+    pub access_count: i64,
+    #[serde(default)]
+    pub last_accessed: Option<DateTime<Utc>>,
     pub entity_links: Vec<String>,
     pub scope: String,
     pub policy_tags: Vec<String>,

@@ -1,6 +1,6 @@
 mod embedded_support;
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::AssembleContextRequest;
 
 /// Integration test: verifies that multi-word queries work through the full
@@ -46,6 +46,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await?;
@@ -66,6 +69,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await?;
@@ -81,6 +87,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await?;
@@ -119,6 +128,9 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await?;
@@ -128,6 +140,66 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
         "punctuation-aware FTS should match atlas_launch for query 'atlas launch'"
     );
     assert!(ctx[0].content.contains("atlas_launch"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
+    let alice_id = service.resolve_person("Alice Smith").await?;
+
+    service
+        .add_fact(
+            "note",
+            "Quarterly launch review finalized.",
+            "launch review finalized",
+            "episode:fts_index_keys",
+            t,
+            "org",
+            0.9,
+            vec![alice_id],
+            vec![],
+            serde_json::json!({"source_episode": "episode:fts_index_keys"}),
+        )
+        .await?;
+
+    let person_ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "alice smith".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !person_ctx.is_empty(),
+        "query should match canonical entity name through fact.index_keys"
+    );
+
+    let time_ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "march 2026".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !time_ctx.is_empty(),
+        "query should match temporal marker through fact.index_keys"
+    );
 
     Ok(())
 }

@@ -124,6 +124,31 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
                 }
             })
             .unwrap_or(0.0),
+        index_keys: map
+            .get("index_keys")
+            .and_then(unwrap_array_value)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(unwrap_string_value)
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        access_count: map
+            .get("access_count")
+            .and_then(|v| {
+                v.as_i64().or_else(|| {
+                    v.as_object()
+                        .and_then(|obj| obj.get("Number"))
+                        .and_then(Value::as_i64)
+                })
+            })
+            .unwrap_or(0),
+        last_accessed: map
+            .get("last_accessed")
+            .and_then(unwrap_string_value)
+            .and_then(parse_iso),
         entity_links: map
             .get("entity_links")
             .and_then(unwrap_array_value)
@@ -194,11 +219,16 @@ pub async fn extract_entities(
 pub async fn extract_facts(
     service: &crate::service::MemoryService,
     episode: &Episode,
+    entities: &[ExtractedEntity],
 ) -> Result<Vec<ExtractedFact>, MemoryError> {
     use serde_json::json;
 
     let mut facts = Vec::new();
     let normalized = episode.content.to_lowercase();
+    let entity_links = entities
+        .iter()
+        .map(|entity| entity.entity_id.clone())
+        .collect::<Vec<_>>();
 
     if normalized.contains("arr") || episode.content.contains('$') {
         let fact_id = service
@@ -210,7 +240,7 @@ pub async fn extract_facts(
                 episode.t_ref,
                 &episode.scope,
                 0.7,
-                Vec::new(),
+                entity_links.clone(),
                 Vec::new(),
                 json!({
                     "source_episode": episode.episode_id,
@@ -235,7 +265,7 @@ pub async fn extract_facts(
                 episode.t_ref,
                 &episode.scope,
                 0.7,
-                Vec::new(),
+                entity_links.clone(),
                 Vec::new(),
                 json!({
                     "source_episode": episode.episode_id,
@@ -292,7 +322,7 @@ pub async fn extract_from_episode(
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
     let entities = extract_entities(service, &episode.content).await?;
-    let facts = extract_facts(service, &episode).await?;
+    let facts = extract_facts(service, &episode, &entities).await?;
     let mut links = Vec::new();
     let edge_ingested = super::query::now();
 

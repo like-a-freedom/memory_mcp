@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use rmcp::handler::server::wrapper::Parameters;
 
 use memory_mcp::mcp::MemoryMcp;
@@ -352,4 +352,45 @@ async fn test_mcp_explain_loads_episode_context() {
         explanation[0].provenance.get("source_id"),
         Some(&serde_json::json!("EXPLAIN-CTX-1"))
     );
+}
+
+#[tokio::test]
+async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
+    let service = common::make_service().await;
+
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas planning started",
+        Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas budget increased",
+        Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+
+    let mcp = MemoryMcp::new(service);
+    let params = serde_json::json!({
+        "query": "atlas",
+        "scope": "personal",
+        "as_of": Utc::now().to_rfc3339(),
+        "budget": 10,
+        "view_mode": "timeline",
+        "window_start": "2026-02-01T00:00:00Z",
+        "window_end": "2026-02-28T23:59:59Z"
+    });
+
+    let context = mcp
+        .assemble_context(Parameters(serde_json::from_value(params).unwrap()))
+        .await
+        .expect("assemble timeline")
+        .0
+        .result;
+
+    assert_eq!(context.len(), 1);
+    assert_eq!(context[0].content, "Atlas budget increased");
 }

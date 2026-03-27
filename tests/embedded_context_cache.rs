@@ -28,6 +28,9 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
         scope: "org".to_string(),
         as_of: Some(now),
         budget: 5,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: Some(AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,

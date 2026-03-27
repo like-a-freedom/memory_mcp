@@ -85,6 +85,53 @@ async fn decay_pass_processes_all_configured_namespaces() {
 }
 
 #[tokio::test]
+async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(400);
+
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "old but hot metric",
+            "old but hot metric",
+            "episode:hot_decay_skip",
+            old_date,
+            "personal",
+            0.4,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
+
+    db_client
+        .update(
+            &fact_id,
+            json!({
+                "access_count": 5,
+                "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
+            }),
+            "personal",
+        )
+        .await
+        .expect("touch fact");
+
+    let count = run_decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(count, 0, "recently accessed fact should stay active");
+
+    let stored = db_client
+        .select_one(&fact_id, "personal")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+    assert!(stored.get("t_invalid").is_none_or(|value| value.is_null()));
+}
+
+#[tokio::test]
 #[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_with_empty_database() {
     // Setup: Fresh service

@@ -96,6 +96,12 @@ pub struct AssembleContextParams {
     /// Maximum number of facts to return (default: 5)
     #[serde(default = "super::default_budget")]
     pub budget: i32,
+    /// Optional retrieval view mode (for example, "timeline")
+    pub view_mode: Option<String>,
+    /// Optional lower bound for result timestamps (ISO 8601 format)
+    pub window_start: Option<String>,
+    /// Optional upper bound for result timestamps (ISO 8601 format)
+    pub window_end: Option<String>,
 }
 
 #[cfg(test)]
@@ -167,5 +173,17 @@ mod tests {
         assert_eq!(properties["scope"]["type"], "string");
         assert_eq!(properties["as_of"]["type"], "string");
         assert_eq!(properties["budget"]["type"], "integer");
+        assert_eq!(
+            properties["view_mode"]["type"],
+            serde_json::json!(["string", "null"])
+        );
+        assert_eq!(
+            properties["window_start"]["type"],
+            serde_json::json!(["string", "null"])
+        );
+        assert_eq!(
+            properties["window_end"]["type"],
+            serde_json::json!(["string", "null"])
+        );
     }
 }
