@@ -616,6 +616,10 @@ fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "009_adaptive_memory_alignment.surql",
             sql: include_str!("migrations/009_adaptive_memory_alignment.surql"),
         },
+        MigrationScript {
+            file_name: "010_coerce_t_ingested_to_datetime.surql",
+            sql: include_str!("migrations/010_coerce_t_ingested_to_datetime.surql"),
+        },
     ]
 }
 
