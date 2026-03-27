@@ -192,7 +192,7 @@ impl SurrealConfig {
     /// | `SURREALDB_NAMESPACES` | Yes | Comma-separated namespaces |
     /// | `SURREALDB_USERNAME` | Yes | Database username |
     /// | `SURREALDB_PASSWORD` | Yes | Database password |
-    /// | `LOG_LEVEL` | No | Logging level (default: "warn") |
+    /// | `RUST_LOG` | No | Logging level (default: "info") |
     ///
     /// Security note: embedded mode is the preferred local default. Remote mode
     /// should be paired with scoped credentials and host-level authentication.
@@ -227,7 +227,7 @@ impl SurrealConfig {
             .map_err(|_| MemoryError::ConfigMissing("SURREALDB_USERNAME".to_string()))?;
         let password = env::var("SURREALDB_PASSWORD")
             .map_err(|_| MemoryError::ConfigMissing("SURREALDB_PASSWORD".to_string()))?;
-        let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "warn".to_string());
+        let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
         let data_dir = env::var("SURREALDB_DATA_DIR").ok();
 
         let lifecycle = LifecycleConfig::from_env();

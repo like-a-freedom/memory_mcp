@@ -110,7 +110,7 @@ SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=org,personal \
 SURREALDB_USERNAME=root \
 SURREALDB_PASSWORD=root \
-LOG_LEVEL=info \
+RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
 
@@ -131,7 +131,7 @@ If you run the server directly from this workspace, a stdio host configuration c
                 "SURREALDB_NAMESPACES": "org,personal",
                 "SURREALDB_USERNAME": "root",
                 "SURREALDB_PASSWORD": "root",
-                "LOG_LEVEL": "info"
+                "RUST_LOG": "info"
             }
         }
     }
@@ -160,7 +160,7 @@ Configuration is loaded from environment variables.
 | --- | --- |
 | `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
 | `SURREALDB_DATA_DIR` | Custom embedded data directory |
-| `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
+| `RUST_LOG` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
 | `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
 | `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
@@ -176,7 +176,7 @@ SURREALDB_USERNAME=root
 SURREALDB_PASSWORD=root
 SURREALDB_URL=ws://127.0.0.1:8000/rpc
 SURREALDB_EMBEDDED=false
-LOG_LEVEL=info
+RUST_LOG=info
 
 # Lifecycle background jobs (optional)
 LIFECYCLE_ENABLED=true

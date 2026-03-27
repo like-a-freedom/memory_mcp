@@ -695,7 +695,7 @@ memory_mcp/
 #### 9.2.8 Configuration and Environment
 
 - [x] Required env vars: `SURREALDB_DB_NAME`, `SURREALDB_URL`, `SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`
-- [x] Optional: `LOG_LEVEL` (unified variable, `RUST_LOG` removed from docs)
+- [x] Optional: `RUST_LOG` (standard Rust logging variable)
 - [x] Fail-fast behavior on missing/invalid config
 - [x] Documentation: recommend `cargo install --locked memory_mcp`, provide examples for installed and built binaries
 
@@ -874,7 +874,7 @@ memory_mcp/
 | `SURREALDB_PASSWORD` | ✅ | Password for authentication | — |
 | `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | `false` |
 | `SURREALDB_DATA_DIR` | ❌ | Optional embedded RocksDB data directory (`./data/surrealdb` by default) | `./data/surrealdb` |
-| `LOG_LEVEL` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `warn` |
+| `RUST_LOG` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `info` |
 
 ### 11.2 Installation
 
@@ -913,7 +913,7 @@ SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=user_solovey \
 SURREALDB_USERNAME=root \
 SURREALDB_PASSWORD=root \
-LOG_LEVEL=info \
+RUST_LOG=info \
 memory_mcp
 ```
 
@@ -934,7 +934,7 @@ memory_mcp
         "SURREALDB_NAMESPACES": "user_solovey",
         "SURREALDB_USERNAME": "root",
         "SURREALDB_PASSWORD": "root",
-        "LOG_LEVEL": "info"
+        "RUST_LOG": "info"
       }
     }
   }
