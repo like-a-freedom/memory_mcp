@@ -1,6 +1,6 @@
 # Memory System — Unified Specification
 
-**Version:** 2.2  
+**Version:** 2.3  
 **Date:** February 5, 2026  
 **Status:** Consolidated (supersedes all previous SPEC.md versions)
 
@@ -8,6 +8,7 @@
 
 ## Document Change History
 
+- **2026-03-27**: Added explicit reference to `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface.
 - **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
@@ -46,7 +47,7 @@
 
 ### 1.1 Product Vision
 
-> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` to avoid conflating shipped behavior with planned redesign.
+> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, and the broader **adaptive-memory target state** is described in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`. This document remains the source of truth for shipped behavior.
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
@@ -110,6 +111,12 @@ The target architecture remains valid, but several roadmap items are intentional
 - Community maintenance is implemented as a deterministic connected-components baseline, while more advanced clustering/consolidation remains deferred.
 - Embedded/local deployments intentionally keep a shared `Mutex<Surreal<_>>` because namespace rebasing (`use_ns` / `use_db`) is session-scoped; a namespace-scoped client pool remains known throughput tech debt.
 - `RegexEntityExtractor` is the deterministic fallback extractor today; broader multilingual / NLP extraction remains a follow-up.
+
+The current repository direction also intentionally constrains future work:
+
+- retrieval evolution should remain lexical/BM25 + graph first unless explicitly re-approved,
+- SOTA-inspired improvements should prefer internal service behavior over MCP tool-surface growth,
+- target-state ideas such as heat-aware retention, time-aware query expansion, and reflective usage signals are roadmap work, not claims about the current runtime.
 
 ---
 
@@ -938,6 +945,8 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 
 - [Subagents with MCP](https://cra.mr/subagents-with-mcp)
 - [MCP, Skills, and Agents](https://cra.mr/mcp-skills-and-agents)
+- `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — retrieval target-state specification
+- `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` — adaptive-memory target-state specification
 - [Memory Agent](/.github/agents/memory.agent.md) — Full 1100+ line agent specification
 - [PDM Agent](/.github/agents/pdm.agent.md) — Product Manager Agent
 
@@ -964,11 +973,13 @@ These documents are superseded by this specification:
 
 ## Document Status
 
-**Current Version**: 2.2  
+**Current Version**: 2.3  
 **Consolidated**: February 5, 2026  
 **Next Review**: When significant requirements change or implementation milestones reached
 
 **Changelog:**
+
+- **2026-03-27**: Linked this runtime spec to the new adaptive-memory target-state design doc, clarifying that SOTA alignment work is tracked separately from shipped behavior and should preserve the simplified lexical/BM25 + graph retrieval direction.
 
 - **2026-03-25**: Reconciled the specification with the validated review findings. Downgraded overstated statuses around temporal typing, FTS pushdown, provenance persistence, explainability, edge invalidation, embeddings, migration versioning, and community retrieval; added an explicit implementation reality-check section.
 
