@@ -1708,6 +1708,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1945,6 +1953,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2119,6 +2135,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2407,6 +2431,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2604,6 +2636,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2807,6 +2847,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -3001,6 +3049,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }

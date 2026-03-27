@@ -180,6 +180,14 @@ pub trait DbClient: Send + Sync {
         query: &str,
     ) -> Result<Vec<Value>, MemoryError>;
 
+    /// Selects communities that contain any of the given member entities.
+    /// Uses array containment check (member_entities CONTAINSANY $members) for index efficiency.
+    async fn select_communities_by_member_entities(
+        &self,
+        namespace: &str,
+        member_entities: &[String],
+    ) -> Result<Vec<Value>, MemoryError>;
+
     /// Creates a native graph relation edge while preserving compatibility fields.
     async fn relate_edge(
         &self,
@@ -1368,6 +1376,41 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
+    async fn select_communities_by_member_entities(
+        &self,
+        namespace: &str,
+        member_entities: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_communities_by_member_entities",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("member_count", Value::Number(serde_json::Number::from(member_entities.len()))),
+            ],
+        );
+
+        let (sql, vars) = build_select_communities_by_member_entities_query(member_entities);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_communities_by_member_entities.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
     async fn relate_edge(
         &self,
         namespace: &str,
@@ -1729,6 +1772,13 @@ fn build_select_communities_matching_summary_query(query: &str) -> (String, Valu
     (
         "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ $query ORDER BY ft_score DESC, summary ASC LIMIT 25".to_string(),
         json!({"query": query}),
+    )
+}
+
+fn build_select_communities_by_member_entities_query(member_entities: &[String]) -> (String, Value) {
+    (
+        "SELECT * FROM community WHERE member_entities CONTAINSANY $members ORDER BY community_id ASC".to_string(),
+        json!({"members": member_entities}),
     )
 }
 

@@ -546,11 +546,17 @@ async fn expand_query_with_aliases(
             Some(obj) => obj,
             None => continue,
         };
+        // Use canonical_name_normalized as primary key, fall back to normalizing canonical_name
         let canonical_norm = obj
             .get("canonical_name_normalized")
             .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
+            .map(|s| s.to_string())
+            .or_else(|| {
+                obj.get("canonical_name")
+                    .and_then(|v| v.as_str())
+                    .map(super::normalize_text)
+            })
+            .unwrap_or_default();
         let aliases: Vec<String> = obj
             .get("aliases")
             .and_then(|v| v.as_array())
@@ -590,6 +596,7 @@ async fn expand_query_with_aliases(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 async fn expand_query_with_aliases_for_test(
     service: &crate::service::MemoryService,
     query: &str,
@@ -640,10 +647,15 @@ async fn select_fact_records_for_query(
 
     let mut seen_fact_ids = std::collections::HashSet::new();
     fallback_records.retain(|record| {
-        let Some(fact_id) = record.get("fact_id").and_then(Value::as_str) else {
+        // Use unwrap_record_string to handle both plain strings and wrapped forms
+        // like {"String": "fact:xyz"} that SurrealDB may return.
+        let Some(fact_id) = record
+            .get("fact_id")
+            .and_then(super::episode::unwrap_record_string)
+        else {
             return true;
         };
-        seen_fact_ids.insert(fact_id.to_string())
+        seen_fact_ids.insert(fact_id)
     });
 
     Ok(fallback_records)
@@ -1167,6 +1179,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1574,6 +1594,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1779,6 +1807,14 @@ mod tests {
                 &self,
                 _namespace: &str,
                 _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2004,6 +2040,14 @@ mod tests {
                 &self,
                 _namespace: &str,
                 _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2247,6 +2291,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2471,6 +2523,14 @@ mod tests {
                 &self,
                 _namespace: &str,
                 _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2727,6 +2787,14 @@ mod tests {
                 Ok(results)
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2908,6 +2976,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
