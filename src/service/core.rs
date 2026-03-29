@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
+use regex::Regex;
 use serde_json::{Value, json};
 
 use crate::config::SurrealConfig;
@@ -13,12 +14,13 @@ use crate::models::{
     AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest, ProvenanceSource,
 };
+use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
+use super::AnnoEntityExtractor;
 use super::EntityExtractor;
 use super::cache::CacheKey;
 use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
-use super::entity_extraction::RegexEntityExtractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::lifecycle::{spawn_archival_worker, spawn_decay_worker};
@@ -287,7 +289,7 @@ impl MemoryService {
                 build_config.rate_limit_burst,
             )),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor: Arc::new(RegexEntityExtractor::new()?),
+            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
         })
@@ -296,6 +298,22 @@ impl MemoryService {
     /// Public helper for tool-level logging.
     pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
         self.logger.log(log_event(op, args, result, None), level);
+    }
+
+    /// Public helper for tool-level logging with duration.
+    pub fn log_tool_event_with_duration(
+        &self,
+        op: &str,
+        args: Value,
+        result: Value,
+        level: LogLevel,
+        duration: std::time::Duration,
+    ) {
+        let mut args_with_duration = args.clone();
+        let duration_ms = duration.as_millis();
+        args_with_duration["duration_ms"] = json!(duration_ms);
+        self.logger
+            .log(log_event(op, args_with_duration, result, None), level);
     }
 
     /// Returns the total count of episodes.
@@ -377,7 +395,21 @@ impl MemoryService {
         self.enforce_rate_limit(access.as_ref())?;
         let mut explanations = Vec::with_capacity(request.context_pack.len());
         for item in request.context_pack {
-            explanations.push(self.build_explain_item(item).await?);
+            let explanation = self.build_explain_item(item).await?;
+            if let Some(fact_id) = explanation.fact_id.as_deref()
+                && let Err(err) = self.record_fact_access(fact_id, 3).await
+            {
+                self.logger.log(
+                    log_event(
+                        "explain.access_track_error",
+                        json!({"fact_id": fact_id}),
+                        json!({"error": err.to_string()}),
+                        access.as_ref(),
+                    ),
+                    LogLevel::Warn,
+                );
+            }
+            explanations.push(explanation);
         }
 
         self.logger.log(
@@ -433,6 +465,8 @@ impl MemoryService {
         validate_entity_candidate(&candidate)?;
         let namespace = self.default_namespace.clone();
         let normalized = super::normalize_text(&candidate.canonical_name);
+
+        // Check if entity already exists by name
         let existing = self
             .find_entity_record(&candidate.canonical_name, &namespace)
             .await?;
@@ -460,11 +494,30 @@ impl MemoryService {
             "canonical_name_normalized": normalized,
             "aliases": aliases.clone(),
         });
-        self.db_client
-            .create(&entity_id, payload, &namespace)
-            .await?;
 
-        Ok(entity_id)
+        // Attempt to create the entity. If it already exists (race condition),
+        // fetch and return the existing entity ID.
+        match self.db_client.create(&entity_id, payload, &namespace).await {
+            Ok(_) => Ok(entity_id),
+            Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {
+                // Race condition: another request created the entity concurrently.
+                // Fetch and return the existing entity.
+                let existing = self
+                    .find_entity_record(&candidate.canonical_name, &namespace)
+                    .await?;
+                if let Some(record) = existing {
+                    let existing_id = record
+                        .get("entity_id")
+                        .and_then(string_from_value)
+                        .or_else(|| record.get("id").and_then(string_from_value))
+                        .unwrap_or_default();
+                    return Ok(existing_id);
+                }
+                // Fallback: return the deterministic ID even if we couldn't fetch
+                Ok(entity_id)
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Adds a new fact.
@@ -489,6 +542,9 @@ impl MemoryService {
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
+            let index_keys = self
+                .build_fact_index_keys(content, &entity_links, t_valid)
+                .await?;
             let mut payload = serde_json::Map::from_iter([
                 ("fact_id".to_string(), json!(fact_id.clone())),
                 ("fact_type".to_string(), json!(fact_type)),
@@ -501,6 +557,8 @@ impl MemoryService {
                     json!(super::normalize_dt(t_ingested)),
                 ),
                 ("confidence".to_string(), json!(confidence)),
+                ("index_keys".to_string(), json!(index_keys)),
+                ("access_count".to_string(), json!(0)),
                 ("entity_links".to_string(), json!(entity_links)),
                 ("scope".to_string(), json!(scope)),
                 ("policy_tags".to_string(), json!(policy_tags)),
@@ -550,6 +608,77 @@ impl MemoryService {
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
         }
         Ok(fact_id)
+    }
+
+    pub(crate) async fn record_fact_access(
+        &self,
+        fact_id: &str,
+        boost: i64,
+    ) -> Result<(), MemoryError> {
+        let (record, namespace) = self.find_fact_record(fact_id).await?;
+        let Some(namespace) = namespace else {
+            return Ok(());
+        };
+        let Some(mut record) = record else {
+            return Ok(());
+        };
+
+        let access_count = record
+            .get("access_count")
+            .and_then(json_i64)
+            .unwrap_or(0)
+            .saturating_add(boost);
+        record.insert("access_count".to_string(), json!(access_count));
+        record.insert(
+            "last_accessed".to_string(),
+            json!(super::normalize_dt(super::query::now())),
+        );
+
+        self.db_client
+            .update(fact_id, Value::Object(record), &namespace)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn build_fact_index_keys(
+        &self,
+        content: &str,
+        entity_links: &[String],
+        t_valid: DateTime<Utc>,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut keys = HashSet::new();
+
+        for entity_id in entity_links {
+            let Some(record) = self.find_entity_record_by_id(entity_id).await? else {
+                continue;
+            };
+            let Some(map) = record.as_object() else {
+                continue;
+            };
+
+            if let Some(name) = map.get("canonical_name").and_then(string_from_value) {
+                let normalized = super::normalize_text(&name);
+                if !normalized.is_empty() {
+                    keys.insert(normalized);
+                }
+            }
+
+            if let Some(aliases) = map.get("aliases").and_then(Value::as_array) {
+                for alias in aliases.iter().filter_map(string_from_value) {
+                    let normalized = super::normalize_text(&alias);
+                    if !normalized.is_empty() {
+                        keys.insert(normalized);
+                    }
+                }
+            }
+        }
+
+        keys.extend(extract_temporal_index_keys(content, t_valid));
+
+        let mut keys = keys.into_iter().collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys)
     }
 
     pub(crate) async fn generate_embedding(
@@ -912,6 +1041,20 @@ impl MemoryService {
             .and_then(|record| record.as_object().cloned()))
     }
 
+    async fn find_entity_record_by_id(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        for namespace in &self.namespaces {
+            let record = self.db_client.select_one(entity_id, namespace).await?;
+            if record.is_some() {
+                return Ok(record);
+            }
+        }
+
+        Ok(None)
+    }
+
     pub(crate) fn is_scope_allowed(&self, scope: &str, access: &AccessContext) -> bool {
         if let Some(scopes) = &access.allowed_scopes
             && !scopes.contains(&scope.to_string())
@@ -1135,6 +1278,32 @@ impl RateLimiter {
     }
 }
 
+/// Builds a structured log event for tool operations.
+///
+/// This helper creates a consistent event structure for logging MCP tool calls,
+/// including the operation name, arguments, result, and optional access context.
+///
+/// # Arguments
+///
+/// * `op` - Operation name (e.g., "ingest", "extract", "context.assemble")
+/// * `args` - Input arguments as JSON value
+/// * `result` - Operation result as JSON value
+/// * `access` - Optional access context for audit logging
+///
+/// # Returns
+///
+/// A HashMap with keys: `op`, `args`, `result`, and optionally `access`
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let event = log_event(
+///     "ingest",
+///     json!({"content": "..."}),
+///     json!({"episode_id": "abc123"}),
+///     Some(&access_context),
+/// );
+/// ```
 pub(crate) fn log_event(
     op: &str,
     args: Value,
@@ -1151,6 +1320,7 @@ pub(crate) fn log_event(
     event
 }
 
+/// Serializes access context to a JSON value for logging.
 fn serialize_access(access: &AccessContext) -> Value {
     json!({
         "caller_id": access.caller_id,
@@ -1189,6 +1359,40 @@ fn string_from_value(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {
+    static MONTH_YEAR_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static ISO_DATE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+    let mut keys = HashSet::from([
+        super::normalize_text(&t_valid.format("%B %Y").to_string()),
+        t_valid.format("%Y-%m").to_string(),
+    ]);
+
+    let month_year_re = MONTH_YEAR_RE.get_or_init(|| {
+        Regex::new(
+            r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
+        )
+        .expect("month-year regex is valid")
+    });
+    for capture in month_year_re.find_iter(content) {
+        keys.insert(super::normalize_text(capture.as_str()));
+    }
+
+    let iso_date_re = ISO_DATE_RE.get_or_init(|| {
+        Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("iso-date regex is valid")
+    });
+    for capture in iso_date_re.find_iter(content) {
+        keys.insert(capture.as_str().to_lowercase());
+    }
+
+    let mut keys = keys
+        .into_iter()
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>();
+    keys.sort();
+    keys
 }
 
 fn build_intro_chain_from_start(
@@ -1541,6 +1745,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1778,6 +1990,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1952,6 +2172,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2240,6 +2468,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2437,6 +2673,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2640,6 +2884,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2834,6 +3086,14 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }

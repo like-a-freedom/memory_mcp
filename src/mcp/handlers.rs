@@ -15,6 +15,7 @@ use crate::models::{
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::service::MemoryService;
+use crate::timing::OperationTimer;
 
 use super::error::mcp_error;
 use super::params::*;
@@ -22,6 +23,7 @@ use super::parsers::{content_hash, parse_context_items, parse_datetime};
 
 /// Response wrapper for tool results.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolResponse<T> {
     /// Result status for the tool call.
     pub status: String,
@@ -146,7 +148,6 @@ impl MemoryMcp {
         source_id: Option<String>,
         t_ref: Option<String>,
         scope: Option<String>,
-        enable_logging: bool,
     ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
         use super::parsers::normalize_optional_string;
 
@@ -155,40 +156,34 @@ impl MemoryMcp {
         let content = normalize_optional_string(content);
         let text = normalize_optional_string(text);
 
-        if enable_logging {
-            self.service.log_tool_event(
-                "extract.start",
-                json!({"episode_id": episode_id, "has_content": content.is_some() || text.is_some()}),
-                json!({}),
-                LogLevel::Info,
-            );
-        }
+        self.service.log_tool_event(
+            "extract.start",
+            json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
+            json!({}),
+            LogLevel::Info,
+        );
 
         if let Some(ref episode_id) = episode_id {
             match self.service.extract(episode_id, Some(access)).await {
                 Ok(result) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.done",
-                            json!({"episode_id": episode_id}),
-                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
-                            LogLevel::Info,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.done",
+                        json!({"episode_id": episode_id}),
+                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        LogLevel::Info,
+                    );
                     return Ok(ToolResponse::success_with_guidance(
                         result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ));
                 }
                 Err(err) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.error",
-                            json!({"episode_id": episode_id}),
-                            json!({"error": err.to_string()}),
-                            LogLevel::Warn,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.error",
+                        json!({"episode_id": episode_id}),
+                        json!({"error": err.to_string()}),
+                        LogLevel::Warn,
+                    );
                     return Err(mcp_error(err));
                 }
             }
@@ -196,14 +191,12 @@ impl MemoryMcp {
 
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
-            if enable_logging {
-                self.service.log_tool_event(
-                    "extract.no_input",
-                    json!({"episode_id": episode_id, "has_content": false}),
-                    json!({"status": "no_input"}),
-                    LogLevel::Warn,
-                );
-            }
+            self.service.log_tool_event(
+                "extract.no_input",
+                json!({"episode_id": &episode_id, "has_content": false}),
+                json!({"status": "no_input"}),
+                LogLevel::Warn,
+            );
             return Ok(ToolResponse::partial_with_guidance(
                 ExtractResult::empty(),
                 "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
@@ -237,40 +230,34 @@ impl MemoryMcp {
         {
             Ok(episode_id) => match self.service.extract(&episode_id, Some(access)).await {
                 Ok(result) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.done",
-                            json!({"episode_id": episode_id}),
-                            json!({"entities": result.entities.len(), "facts": result.facts.len()}),
-                            LogLevel::Info,
-                        );
-                    }
+                    self.service.log_tool_event(
+                        "extract.done",
+                        json!({"episode_id": &episode_id}),
+                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        LogLevel::Info,
+                    );
                     Ok(ToolResponse::success_with_guidance(
                         result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ))
                 }
                 Err(err) => {
-                    if enable_logging {
-                        self.service.log_tool_event(
-                            "extract.error",
-                            json!({}),
-                            json!({"error": err.to_string()}),
-                            LogLevel::Warn,
-                        );
-                    }
-                    Err(mcp_error(err))
-                }
-            },
-            Err(err) => {
-                if enable_logging {
                     self.service.log_tool_event(
                         "extract.error",
                         json!({}),
                         json!({"error": err.to_string()}),
                         LogLevel::Warn,
                     );
+                    Err(mcp_error(err))
                 }
+            },
+            Err(err) => {
+                self.service.log_tool_event(
+                    "extract.error",
+                    json!({}),
+                    json!({"error": err.to_string()}),
+                    LogLevel::Warn,
+                );
                 Err(mcp_error(err))
             }
         }
@@ -315,6 +302,7 @@ impl MemoryMcp {
             policy_tags: p.policy_tags.clone(),
         };
 
+        let timer = OperationTimer::new("ingest");
         self.service.log_tool_event(
             "ingest.start",
             json!({"source_type": p.source_type, "source_id": p.source_id, "scope": p.scope}),
@@ -324,11 +312,12 @@ impl MemoryMcp {
 
         match self.service.ingest(request, Some(access)).await {
             Ok(episode_id) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "ingest.done",
                     json!({"source_id": p.source_id}),
                     json!({"episode_id": &episode_id}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     episode_id,
@@ -336,11 +325,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "ingest.error",
                     json!({"source_id": p.source_id}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -359,6 +349,7 @@ impl MemoryMcp {
             .map_err(|msg| ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, None))?;
         let request = ExplainRequest { context_pack };
 
+        let timer = OperationTimer::new("explain");
         self.service.log_tool_event(
             "explain.start",
             json!({"count": request.context_pack.len()}),
@@ -368,11 +359,12 @@ impl MemoryMcp {
 
         match self.service.explain(request, Some(access)).await {
             Ok(explanations) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "explain.done",
                     json!({}),
                     json!({"count": explanations.len()}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 let count = explanations.len();
                 Ok(Json(ToolResponse::complete_list(
@@ -382,11 +374,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "explain.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -410,7 +403,6 @@ impl MemoryMcp {
                 p.source_id,
                 p.t_ref,
                 p.scope,
-                true,
             )
             .await?;
         Ok(Json(response))
@@ -431,6 +423,7 @@ impl MemoryMcp {
             aliases: p.aliases.clone(),
         };
 
+        let timer = OperationTimer::new("resolve");
         self.service.log_tool_event(
             "resolve.start",
             json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
@@ -440,11 +433,12 @@ impl MemoryMcp {
 
         match self.service.resolve(candidate, Some(access)).await {
             Ok(entity_id) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "resolve.done",
                     json!({}),
                     json!({"entity_id": &entity_id}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     entity_id,
@@ -452,11 +446,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "resolve.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -485,6 +480,7 @@ impl MemoryMcp {
             t_invalid,
         };
 
+        let timer = OperationTimer::new("invalidate");
         self.service.log_tool_event(
             "invalidate.start",
             json!({"fact_id": request.fact_id}),
@@ -494,11 +490,12 @@ impl MemoryMcp {
 
         match self.service.invalidate(request, Some(access)).await {
             Ok(res) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "invalidate.done",
                     json!({"fact_id": p.fact_id}),
                     json!({"result": res}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
                     res,
@@ -506,11 +503,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "invalidate.error",
                     json!({"fact_id": p.fact_id}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -532,14 +530,20 @@ impl MemoryMcp {
                 .ok()
                 .map(|dt| dt.with_timezone(&chrono::Utc))
         };
+        let window_start = p.window_start.as_deref().and_then(parse_datetime);
+        let window_end = p.window_end.as_deref().and_then(parse_datetime);
         let request = AssembleContextRequest {
             query: p.query.clone(),
             scope: p.scope.clone(),
             as_of,
             budget: p.budget,
+            view_mode: p.view_mode.clone(),
+            window_start,
+            window_end,
             access: None,
         };
 
+        let timer = OperationTimer::new("assemble_context");
         self.service.log_tool_event(
             "assemble_context.start",
             json!({"scope": request.scope, "query": request.query}),
@@ -549,11 +553,12 @@ impl MemoryMcp {
 
         match self.service.assemble_context(request).await {
             Ok(results) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "assemble_context.done",
                     json!({}),
                     json!({"count": results.len()}),
                     LogLevel::Info,
+                    timer.elapsed(),
                 );
                 let count = results.len();
                 Ok(Json(ToolResponse::complete_list(
@@ -563,11 +568,12 @@ impl MemoryMcp {
                 )))
             }
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "assemble_context.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
@@ -649,13 +655,14 @@ mod tests {
         let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
         let properties = schema["properties"].as_object().expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
             "status",
             "result",
             "guidance",
-            "has_more",
-            "total_count",
-            "next_offset",
+            "hasMore",
+            "totalCount",
+            "nextOffset",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -686,15 +693,16 @@ mod tests {
             .as_object()
             .expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
             "content",
             "quote",
-            "source_episode",
+            "sourceEpisode",
             "scope",
-            "t_ref",
-            "t_ingested",
+            "tRef",
+            "tIngested",
             "provenance",
-            "citation_context",
+            "citationContext",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -715,11 +723,12 @@ mod tests {
             .as_object()
             .expect("properties object");
 
+        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
-            "fact_id",
+            "factId",
             "content",
             "quote",
-            "source_episode",
+            "sourceEpisode",
             "confidence",
             "provenance",
             "rationale",

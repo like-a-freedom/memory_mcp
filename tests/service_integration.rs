@@ -100,6 +100,9 @@ async fn test_service_add_fact_and_assemble_context() {
         scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: None,
     };
 
@@ -174,6 +177,59 @@ async fn test_service_extract_persists_edge_provenance() {
             .and_then(|value| value.get("source_episode"))
             == Some(&json!(episode_id))
     }));
+}
+
+#[tokio::test]
+async fn test_service_extract_persists_index_keys_for_entities_and_temporal_markers() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let episode_id = common::ingest_episode(
+        &service,
+        "index-keys-1",
+        "Alice Smith from Atlas Corp will send the launch deck in March 2026.",
+    )
+    .await;
+
+    let facts = db_client.select_table("fact", "personal").await.unwrap();
+    let fact = facts
+        .iter()
+        .find(|record| {
+            record
+                .get("source_episode")
+                .and_then(|value| value.as_str())
+                == Some(episode_id.as_str())
+        })
+        .expect("extracted fact for seeded episode");
+
+    let index_keys = fact
+        .get("index_keys")
+        .and_then(|value| value.as_array())
+        .expect("index_keys array should be present");
+
+    assert!(
+        index_keys
+            .iter()
+            .any(|value| value.as_str() == Some("alice smith")),
+        "expected canonical person name in index_keys"
+    );
+    assert!(
+        index_keys
+            .iter()
+            .any(|value| value.as_str() == Some("atlas corp")),
+        "expected canonical company name in index_keys"
+    );
+    assert!(
+        index_keys
+            .iter()
+            .any(|value| value.as_str() == Some("march 2026")),
+        "expected explicit temporal phrase in index_keys"
+    );
+    assert!(
+        index_keys
+            .iter()
+            .any(|value| value.as_str() == Some("2026-03")),
+        "expected normalized year-month marker in index_keys"
+    );
 }
 
 #[tokio::test]
@@ -275,6 +331,9 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             scope: "org".to_string(),
             as_of: Some(Utc::now()),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -363,6 +422,9 @@ async fn test_service_fact_invalidation() {
         scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: None,
     };
     let context_before = service.assemble_context(request_before).await.unwrap();
@@ -386,6 +448,9 @@ async fn test_service_fact_invalidation() {
         scope: "org".to_string(),
         as_of: Some(Utc.with_ymd_and_hms(2024, 12, 1, 0, 0, 0).unwrap()),
         budget: 10,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: None,
     };
     let context_after = service.assemble_context(request_after).await.unwrap();
@@ -419,6 +484,9 @@ async fn test_service_cache_behavior() {
         scope: "org".to_string(),
         as_of: None,
         budget: 5,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: None,
     };
     let result1 = service.assemble_context(request.clone()).await.unwrap();
@@ -426,6 +494,55 @@ async fn test_service_cache_behavior() {
 
     let result2 = service.assemble_context(request).await.unwrap();
     assert_eq!(result1.len(), result2.len());
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_records_fact_access_heat() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Heat tracking note for retrieval",
+            "Heat tracking note for retrieval",
+            "episode:heat-retrieval",
+            Utc::with_ymd_and_hms(&Utc, 2026, 3, 1, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:heat-retrieval"}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "heat tracking retrieval".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+
+    let stored = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .unwrap()
+        .expect("stored fact");
+
+    assert_eq!(
+        stored.get("access_count").and_then(|value| value.as_i64()),
+        Some(1)
+    );
+    assert!(stored.get("last_accessed").is_some());
 }
 
 #[tokio::test]
@@ -471,8 +588,61 @@ async fn test_service_scope_isolation() {
         scope: "org".to_string(),
         as_of: None,
         budget: 10,
+        view_mode: None,
+        window_start: None,
+        window_end: None,
         access: None,
     };
     let org_results = service.assemble_context(request_org).await.unwrap();
     assert!(org_results.iter().all(|r| { r.content.contains("Org") }));
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window() {
+    let service = common::make_service().await;
+
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas planning started",
+        Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas budget increased",
+        Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas launch confirmed",
+        Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "atlas".to_string(),
+            scope: "personal".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: Some("timeline".to_string()),
+            window_start: Some(Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap()),
+            window_end: Some(Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap()),
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    let contents = items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        contents,
+        vec!["Atlas budget increased", "Atlas launch confirmed"]
+    );
 }

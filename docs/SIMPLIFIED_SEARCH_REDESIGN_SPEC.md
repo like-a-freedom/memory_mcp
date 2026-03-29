@@ -5,6 +5,8 @@
 **Scope:** Search and retrieval only  
 **Precedence:** This document defines the intended target design for the next implementation wave. It does **not** claim that the current runtime already matches this design.
 
+> Companion note: this document covers **retrieval only**. The broader adaptive-memory target state that incorporates SOTA-aligned lifecycle, reflection, and evaluation work is documented separately in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
+
 ---
 
 ## 1. Why this redesign exists

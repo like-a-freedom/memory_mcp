@@ -21,17 +21,64 @@ The following lifecycle jobs are now fully implemented:
   - Marks facts with decayed confidence < threshold as invalid
   - **Configuration:** `LIFECYCLE_DECAY_INTERVAL_SECS` (default: 1 hour)
   - **Threshold:** `LIFECYCLE_DECAY_THRESHOLD` (default: 0.3)
+  - **Heat-aware:** Skips recently-accessed facts (`access_count > 0` and `last_accessed` within half-life)
 
 - **episode archival**
   - Archives episodes older than threshold without active facts
   - Preserves data but excludes from default queries
   - **Configuration:** `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` (default: 24 hours)
   - **Age threshold:** `LIFECYCLE_ARCHIVAL_AGE_DAYS` (default: 90 days)
+  - **Heat-aware:** Skips episodes with facts accessed within `LIFECYCLE_ARCHIVAL_AGE_DAYS / 2`
 
 - **embedding backfill** (REMOVED from scope)
   - ~~Populate missing embeddings after a real provider is enabled~~
   - ~~Reindex vector fields after dimension or provider changes~~
   - **Status:** Superseded by `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — embeddings removed from runtime
+
+## Heat-Aware Lifecycle (Adaptive Memory)
+
+As of 2026-03-27, lifecycle workers use access heat signals to protect active memories:
+
+### Access Heat Tracking
+
+- **`access_count`** (int, default 0): Incremented on every fact access
+  - `+1` for retrieval via `assemble_context`
+  - `+3` for citation via `explain` (stronger signal)
+- **`last_accessed`** (datetime, nullable): Updated to `time::now()` on access
+
+Implementation uses SurrealDB atomic updates:
+```sql
+UPDATE type::thing('fact', $id) SET access_count += $boost, last_accessed = time::now()
+```
+
+### Decay Worker Heat Check
+
+Before invalidating a fact due to low decayed confidence, the decay worker checks:
+
+```rust
+let is_hot = access_count > 0
+    && last_accessed.is_some_and(|la| (now - la).num_days() as f64 <= half_life_days);
+
+if decayed < threshold && !is_hot {
+    // invalidate fact
+}
+```
+
+This prevents frequently-accessed facts from being invalidated purely due to age.
+
+### Archival Worker Heat Check
+
+The archival worker skips episodes that have any facts accessed recently:
+
+```sql
+SELECT fact_id FROM fact 
+WHERE source_episode = $episode_id 
+  AND last_accessed IS NOT NONE 
+  AND last_accessed >= type::datetime($hot_cutoff) 
+LIMIT 1
+```
+
+If any hot facts exist, the episode is preserved regardless of age.
 
 ## Configuration
 

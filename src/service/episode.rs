@@ -124,6 +124,31 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
                 }
             })
             .unwrap_or(0.0),
+        index_keys: map
+            .get("index_keys")
+            .and_then(unwrap_array_value)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(unwrap_string_value)
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        access_count: map
+            .get("access_count")
+            .and_then(|v| {
+                v.as_i64().or_else(|| {
+                    v.as_object()
+                        .and_then(|obj| obj.get("Number"))
+                        .and_then(Value::as_i64)
+                })
+            })
+            .unwrap_or(0),
+        last_accessed: map
+            .get("last_accessed")
+            .and_then(unwrap_string_value)
+            .and_then(parse_iso),
         entity_links: map
             .get("entity_links")
             .and_then(unwrap_array_value)
@@ -194,13 +219,18 @@ pub async fn extract_entities(
 pub async fn extract_facts(
     service: &crate::service::MemoryService,
     episode: &Episode,
+    entities: &[ExtractedEntity],
 ) -> Result<Vec<ExtractedFact>, MemoryError> {
     use serde_json::json;
 
     let mut facts = Vec::new();
     let normalized = episode.content.to_lowercase();
+    let entity_links = entities
+        .iter()
+        .map(|entity| entity.entity_id.clone())
+        .collect::<Vec<_>>();
 
-    if normalized.contains("arr") || episode.content.contains('$') {
+    if is_metric_statement(&episode.content) {
         let fact_id = service
             .add_fact(
                 "metric",
@@ -210,7 +240,7 @@ pub async fn extract_facts(
                 episode.t_ref,
                 &episode.scope,
                 0.7,
-                Vec::new(),
+                entity_links.clone(),
                 Vec::new(),
                 json!({
                     "source_episode": episode.episode_id,
@@ -235,7 +265,7 @@ pub async fn extract_facts(
                 episode.t_ref,
                 &episode.scope,
                 0.7,
-                Vec::new(),
+                entity_links.clone(),
                 Vec::new(),
                 json!({
                     "source_episode": episode.episode_id,
@@ -262,6 +292,19 @@ pub fn is_promise_statement(content: &str) -> bool {
             .expect("promise regex is valid")
     });
     promise_re.is_match(content)
+}
+
+/// Detects metric-related content using word-boundary matching.
+///
+/// Matches financial metrics (ARR, MRR, NRR, revenue, churn) and dollar amounts.
+/// Avoids false positives on words like "barrel", "narrative", "arrive".
+pub fn is_metric_statement(content: &str) -> bool {
+    static METRIC_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let metric_re = METRIC_RE.get_or_init(|| {
+        Regex::new(r"\b(ARR|MRR|NRR|revenue|churn|ROI|LTV|CAC|NPS|EBITDA)\b|\$\d")
+            .expect("metric regex is valid")
+    });
+    metric_re.is_match(content)
 }
 
 /// Extract entities and facts from an episode.
@@ -292,7 +335,7 @@ pub async fn extract_from_episode(
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
     let entities = extract_entities(service, &episode.content).await?;
-    let facts = extract_facts(service, &episode).await?;
+    let facts = extract_facts(service, &episode, &entities).await?;
     let mut links = Vec::new();
     let edge_ingested = super::query::now();
 
@@ -438,7 +481,15 @@ async fn invalidate_conflicting_edges(
     new_edge: &Edge,
     namespace: &str,
 ) -> Result<(), MemoryError> {
-    let existing_edges = service.db_client.select_table("edge", namespace).await?;
+    let existing_edges = service
+        .db_client
+        .select_edges_for_triple(
+            namespace,
+            &new_edge.in_id,
+            &new_edge.relation,
+            &new_edge.out_id,
+        )
+        .await?;
 
     for existing in existing_edges
         .iter()
@@ -465,6 +516,12 @@ async fn invalidate_conflicting_edges(
 /// edge triple conflict. Broader semantic contradictions (for example,
 /// relation-specific exclusivity across different targets) are deferred until
 /// Task 5 introduces graph-native relation semantics.
+///
+/// Conflict requires BOTH timestamps to be <=: an existing edge is invalidated
+/// only when the new edge is strictly newer in both t_valid AND t_ingested.
+/// This is intentional: if t_valid is older but t_ingested is newer (retroactive
+/// data entry), the edge should NOT be invalidated. Using OR would incorrectly
+/// invalidate edges in such scenarios.
 fn edge_versions_conflict(existing: &StoredEdgeVersion, new_edge: &Edge) -> bool {
     existing.in_id == new_edge.in_id
         && existing.relation == new_edge.relation
@@ -515,7 +572,7 @@ fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> 
     })
 }
 
-fn unwrap_record_string(value: &Value) -> Option<String> {
+pub(crate) fn unwrap_record_string(value: &Value) -> Option<String> {
     if let Some(value) = value.as_str() {
         Some(value.to_string())
     } else if let Some(object) = value.as_object() {
@@ -701,26 +758,23 @@ async fn build_community_summary(
     namespace: &str,
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
-    let records = service.db_client.select_table("entity", namespace).await?;
-    let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
+    let records = service
+        .db_client
+        .select_entities_by_ids(namespace, member_entities)
+        .await?;
     let mut names = records
         .iter()
         .filter_map(|record| record.as_object())
         .filter_map(|record| {
-            let entity_id = record
-                .get("entity_id")
+            record
+                .get("canonical_name")
                 .and_then(unwrap_record_string)
-                .or_else(|| record.get("id").and_then(unwrap_record_string))?;
-            if !member_set.contains(&entity_id) {
-                return None;
-            }
-
-            Some(
-                record
-                    .get("canonical_name")
-                    .and_then(unwrap_record_string)
-                    .unwrap_or(entity_id),
-            )
+                .or_else(|| {
+                    record
+                        .get("entity_id")
+                        .and_then(unwrap_record_string)
+                        .or_else(|| record.get("id").and_then(unwrap_record_string))
+                })
         })
         .collect::<Vec<_>>();
 
@@ -745,9 +799,11 @@ async fn find_overlapping_communities(
     member_entities: &[String],
 ) -> Result<Vec<StoredCommunity>, MemoryError> {
     let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
+
+    // Use index-based lookup via CONTAINSANY instead of full table scan.
     let communities = service
         .db_client
-        .select_table("community", namespace)
+        .select_communities_by_member_entities(namespace, member_entities)
         .await?;
 
     Ok(communities
@@ -1092,6 +1148,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1190,6 +1254,224 @@ mod tests {
                 "entity:bob".to_string(),
                 "entity:carol".to_string(),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn find_overlapping_communities_uses_index_based_lookup() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        static SELECT_COMMUNITIES_BY_MEMBER_CALLED: AtomicBool = AtomicBool::new(false);
+        static SELECT_TABLE_CALLED: AtomicBool = AtomicBool::new(false);
+
+        #[derive(Clone)]
+        struct IndexLookupDbClient;
+
+        #[async_trait::async_trait]
+        impl crate::storage::DbClient for IndexLookupDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<serde_json::Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                SELECT_TABLE_CALLED.store(true, Ordering::SeqCst);
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: crate::storage::GraphDirection,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<serde_json::Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: serde_json::Value,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: serde_json::Value,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: serde_json::Value,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<serde_json::Value>,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn select_entities_by_ids(
+                &self,
+                _namespace: &str,
+                _ids: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(IndexLookupDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let _ = find_overlapping_communities(
+            &service,
+            "org",
+            &["entity:alice".to_string(), "entity:bob".to_string()],
+        )
+        .await;
+
+        assert!(
+            SELECT_COMMUNITIES_BY_MEMBER_CALLED.load(Ordering::SeqCst),
+            "find_overlapping_communities should call select_communities_by_member_entities"
+        );
+        assert!(
+            !SELECT_TABLE_CALLED.load(Ordering::SeqCst),
+            "find_overlapping_communities should NOT call select_table (full scan)"
         );
     }
 }

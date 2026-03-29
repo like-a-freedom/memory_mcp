@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use rmcp::handler::server::wrapper::Parameters;
 
 use memory_mcp::mcp::MemoryMcp;
@@ -11,10 +11,10 @@ async fn test_mcp_tools_flow() {
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
-        "source_type": "email",
-        "source_id": "MSG-203",
+        "sourceType": "email",
+        "sourceId": "MSG-203",
         "content": "I will finish it by Friday. ARR $2M",
-        "t_ref": "2026-01-10T00:00:00Z",
+        "tRef": "2026-01-10T00:00:00Z",
         "scope": "org"
     });
     let episode_id = mcp
@@ -30,7 +30,7 @@ async fn test_mcp_tools_flow() {
     let episode_id = episode_id.result;
 
     let extract_params = serde_json::json!({
-        "episode_id": episode_id
+        "episodeId": episode_id
     });
     let extraction = mcp
         .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
@@ -44,7 +44,7 @@ async fn test_mcp_tools_flow() {
     let assemble_params = serde_json::json!({
         "query": "ARR",
         "scope": "org",
-        "as_of": Utc::now().to_rfc3339(),
+        "asOf": Utc::now().to_rfc3339(),
         "budget": 5
     });
     let context = mcp
@@ -59,10 +59,10 @@ async fn test_mcp_tools_flow() {
     let context_items = serde_json::to_string(&vec![serde_json::json!({
         "content": "ARR $2M",
         "quote": "ARR $2M",
-        "source_episode": episode_id.clone()
+        "sourceEpisode": episode_id.clone()
     })])
     .unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let explain_params = serde_json::json!({"contextItems": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
@@ -73,10 +73,10 @@ async fn test_mcp_tools_flow() {
     assert_eq!(explanation[0].source_episode, episode_id);
 
     let ingest_params2 = serde_json::json!({
-        "source_type": "email",
-        "source_id": "MSG-204",
+        "sourceType": "email",
+        "sourceId": "MSG-204",
         "content": "Follow-up: ARR $500k",
-        "t_ref": "2026-01-11T00:00:00Z",
+        "tRef": "2026-01-11T00:00:00Z",
         "scope": "org"
     });
     let episode_id2 = mcp
@@ -88,7 +88,7 @@ async fn test_mcp_tools_flow() {
 
     let context_items_ids =
         serde_json::to_string(&vec![episode_id.clone(), episode_id2.clone()]).unwrap();
-    let explain_params_ids = serde_json::json!({"context_items": context_items_ids});
+    let explain_params_ids = serde_json::json!({"contextItems": context_items_ids});
     let explanation_ids = mcp
         .explain(Parameters(
             serde_json::from_value(explain_params_ids).unwrap(),
@@ -107,10 +107,10 @@ async fn test_mcp_full_flow_end_to_end() {
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
-        "source_type": "email",
-        "source_id": "E2E-1",
+        "sourceType": "email",
+        "sourceId": "E2E-1",
         "content": "I will deliver ARR $1M by next week.",
-        "t_ref": "2026-02-05T00:00:00Z",
+        "tRef": "2026-02-05T00:00:00Z",
         "scope": "org"
     });
     let episode_id = mcp
@@ -120,7 +120,7 @@ async fn test_mcp_full_flow_end_to_end() {
         .0
         .result;
 
-    let extract_params = serde_json::json!({"episode_id": episode_id});
+    let extract_params = serde_json::json!({"episodeId": episode_id});
     let extraction = mcp
         .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
         .await
@@ -131,7 +131,7 @@ async fn test_mcp_full_flow_end_to_end() {
     assert!(facts.iter().any(|f| f.fact_type == "metric"));
     assert!(facts.iter().any(|f| f.fact_type == "promise"));
 
-    let assemble_params = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
+    let assemble_params = serde_json::json!({"query": "ARR", "scope": "org", "asOf": Utc::now().to_rfc3339(), "budget": 5});
     let context = mcp
         .assemble_context(Parameters(
             serde_json::from_value(assemble_params.clone()).unwrap(),
@@ -142,8 +142,8 @@ async fn test_mcp_full_flow_end_to_end() {
         .result;
     assert!(!context.is_empty());
 
-    let context_items = serde_json::to_string(&vec![serde_json::json!({"content": "ARR $1M","quote": "ARR $1M","source_episode": episode_id.clone()})]).unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let context_items = serde_json::to_string(&vec![serde_json::json!({"content": "ARR $1M","quote": "ARR $1M","sourceEpisode": episode_id.clone()})]).unwrap();
+    let explain_params = serde_json::json!({"contextItems": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
@@ -153,7 +153,7 @@ async fn test_mcp_full_flow_end_to_end() {
     assert_eq!(explanation[0].source_episode, episode_id);
 
     let fact_id = context[0].fact_id.clone();
-    let invalidate_params = serde_json::json!({"fact_id": fact_id, "reason": "superseded", "t_invalid": "2026-02-04T00:00:00Z"});
+    let invalidate_params = serde_json::json!({"factId": fact_id, "reason": "superseded", "tInvalid": "2026-02-04T00:00:00Z"});
     let _ = mcp
         .invalidate(Parameters(
             serde_json::from_value(invalidate_params).unwrap(),
@@ -161,7 +161,7 @@ async fn test_mcp_full_flow_end_to_end() {
         .await
         .expect("invalidate");
 
-    let assemble_params_after = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
+    let assemble_params_after = serde_json::json!({"query": "ARR", "scope": "org", "asOf": Utc::now().to_rfc3339(), "budget": 5});
     let context_after = mcp
         .assemble_context(Parameters(
             serde_json::from_value(assemble_params_after).unwrap(),
@@ -183,10 +183,10 @@ async fn test_mcp_ingest_validation_error() {
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
-        "source_type": "",
-        "source_id": "MSG-204",
+        "sourceType": "",
+        "sourceId": "MSG-204",
         "content": "Missing source_type",
-        "t_ref": "2026-01-10T00:00:00Z",
+        "tRef": "2026-01-10T00:00:00Z",
         "scope": "org"
     });
 
@@ -207,7 +207,7 @@ async fn test_mcp_extract_no_input_returns_soft_result() {
     let mcp = MemoryMcp::new(service);
 
     let extract_params = serde_json::json!({
-        "episode_id": "",
+        "episodeId": "",
         "content": "",
         "text": null
     });
@@ -233,10 +233,10 @@ async fn test_mcp_explain_loose_objects_without_quote_and_source_episode() {
     let mcp = MemoryMcp::new(service);
 
     let context_items = serde_json::to_string(&vec![
-        serde_json::json!({"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"}),
-        serde_json::json!({"content":"ASSIGNEE: Anton Solovey — Split requirements","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}),
+        serde_json::json!({"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","sourceType":"task"}),
+        serde_json::json!({"content":"ASSIGNEE: Anton Solovey — Split requirements","id":"task:ha8caz3sb2fxr9ju2sbc","sourceType":"task"}),
     ]).unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let explain_params = serde_json::json!({"contextItems": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
@@ -256,10 +256,10 @@ async fn test_mcp_explain_objects_with_quote_and_id() {
     let mcp = MemoryMcp::new(service);
 
     let context_items = serde_json::to_string(&vec![
-        serde_json::json!({"content":"data","quote":"q","id":"task:abc","source_type":"task"}),
+        serde_json::json!({"content":"data","quote":"q","id":"task:abc","sourceType":"task"}),
     ])
     .unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let explain_params = serde_json::json!({"contextItems": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
@@ -280,7 +280,7 @@ async fn test_mcp_explain_mixed_array() {
         serde_json::json!({"content":"info","id":"task:obj"}),
     ])
     .unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let explain_params = serde_json::json!({"contextItems": context_items});
     let explanation = mcp
         .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
         .await
@@ -299,10 +299,10 @@ async fn test_mcp_explain_loads_episode_context() {
     let mcp = MemoryMcp::new(service);
 
     let ingest_params = serde_json::json!({
-        "source_type": "email",
-        "source_id": "EXPLAIN-CTX-1",
+        "sourceType": "email",
+        "sourceId": "EXPLAIN-CTX-1",
         "content": "Customer confirmed ARR is now $3M and expects renewal next quarter.",
-        "t_ref": "2026-02-15T08:30:00Z",
+        "tRef": "2026-02-15T08:30:00Z",
         "scope": "org"
     });
     let episode_id = mcp
@@ -315,13 +315,13 @@ async fn test_mcp_explain_loads_episode_context() {
     let context_items = serde_json::to_string(&vec![serde_json::json!({
         "content": "ARR is now $3M",
         "quote": "ARR is now $3M",
-        "source_episode": episode_id.clone()
+        "sourceEpisode": episode_id.clone()
     })])
     .unwrap();
 
     let explanation = mcp
         .explain(Parameters(
-            serde_json::from_value(serde_json::json!({"context_items": context_items})).unwrap(),
+            serde_json::from_value(serde_json::json!({"contextItems": context_items})).unwrap(),
         ))
         .await
         .expect("explain with loaded episode context")
@@ -352,4 +352,45 @@ async fn test_mcp_explain_loads_episode_context() {
         explanation[0].provenance.get("source_id"),
         Some(&serde_json::json!("EXPLAIN-CTX-1"))
     );
+}
+
+#[tokio::test]
+async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
+    let service = common::make_service().await;
+
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas planning started",
+        Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas budget increased",
+        Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap(),
+    )
+    .await;
+
+    let mcp = MemoryMcp::new(service);
+    let params = serde_json::json!({
+        "query": "atlas",
+        "scope": "personal",
+        "asOf": Utc::now().to_rfc3339(),
+        "budget": 10,
+        "viewMode": "timeline",
+        "windowStart": "2026-02-01T00:00:00Z",
+        "windowEnd": "2026-02-28T23:59:59Z"
+    });
+
+    let context = mcp
+        .assemble_context(Parameters(serde_json::from_value(params).unwrap()))
+        .await
+        .expect("assemble timeline")
+        .0
+        .result;
+
+    assert_eq!(context.len(), 1);
+    assert_eq!(context[0].content, "Atlas budget increased");
 }

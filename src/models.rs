@@ -120,6 +120,7 @@ pub struct ExplainRequest {
 
 /// A single item to explain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_id: Option<String>,
@@ -160,6 +161,7 @@ impl Default for ExplainItem {
 
 /// A single provenance source for a fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProvenanceSource {
     /// Source episode ID.
     pub episode_id: String,
@@ -205,6 +207,12 @@ pub struct AssembleContextRequest {
     pub as_of: Option<DateTime<Utc>>,
     #[serde(default = "default_budget")]
     pub budget: i32,
+    #[serde(default)]
+    pub view_mode: Option<String>,
+    #[serde(default)]
+    pub window_start: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub window_end: Option<DateTime<Utc>>,
     #[serde(skip_serializing, default)]
     #[schemars(skip)]
     pub access: Option<AccessPayload>,
@@ -236,6 +244,7 @@ pub struct ExtractedLink {
 
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExtractResult {
     pub episode_id: String,
     pub entities: Vec<ExtractedEntity>,
@@ -253,6 +262,7 @@ impl ExtractResult {
 
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,
@@ -361,6 +371,12 @@ pub struct Fact {
     pub t_invalid: Option<DateTime<Utc>>,
     pub t_invalid_ingested: Option<DateTime<Utc>>,
     pub confidence: f64,
+    #[serde(default)]
+    pub index_keys: Vec<String>,
+    #[serde(default)]
+    pub access_count: i64,
+    #[serde(default)]
+    pub last_accessed: Option<DateTime<Utc>>,
     pub entity_links: Vec<String>,
     pub scope: String,
     pub policy_tags: Vec<String>,

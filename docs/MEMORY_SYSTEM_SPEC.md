@@ -1,6 +1,6 @@
 # Memory System — Unified Specification
 
-**Version:** 2.2  
+**Version:** 2.3  
 **Date:** February 5, 2026  
 **Status:** Consolidated (supersedes all previous SPEC.md versions)
 
@@ -8,6 +8,7 @@
 
 ## Document Change History
 
+- **2026-03-27**: Added explicit reference to `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface.
 - **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
@@ -46,7 +47,7 @@
 
 ### 1.1 Product Vision
 
-> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` to avoid conflating shipped behavior with planned redesign.
+> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, and the broader **adaptive-memory target state** is described in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`. This document remains the source of truth for shipped behavior.
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
@@ -110,6 +111,12 @@ The target architecture remains valid, but several roadmap items are intentional
 - Community maintenance is implemented as a deterministic connected-components baseline, while more advanced clustering/consolidation remains deferred.
 - Embedded/local deployments intentionally keep a shared `Mutex<Surreal<_>>` because namespace rebasing (`use_ns` / `use_db`) is session-scoped; a namespace-scoped client pool remains known throughput tech debt.
 - `RegexEntityExtractor` is the deterministic fallback extractor today; broader multilingual / NLP extraction remains a follow-up.
+
+The current repository direction also intentionally constrains future work:
+
+- retrieval evolution should remain lexical/BM25 + graph first unless explicitly re-approved,
+- SOTA-inspired improvements should prefer internal service behavior over MCP tool-surface growth,
+- target-state ideas such as heat-aware retention, time-aware query expansion, and reflective usage signals are roadmap work, not claims about the current runtime.
 
 ---
 
@@ -396,8 +403,14 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
 
-**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` OR fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.
+**FR-CA-08**: `assemble_context` MUST support multi-word queries where query terms appear non-adjacently in fact content. Implementation uses SurrealDB `@@` full-text search operator (primary) with per-word `CONTAINS` fallback. Query preprocessing strips `episode:xxx` references, boolean operators, quoted phrases, and tokens < 2 characters.
 **Status**: ✅ Done — `select_facts_filtered()` uses DB-side `content @1@ $query` with `search::score(1) AS ft_score`; query preprocessing in `preprocess_search_query()` strips noise.
+
+**FR-CA-09**: `assemble_context` MUST support optional timeline retrieval mode via `view_mode` parameter. When `view_mode=timeline`, results are sorted chronologically by `t_valid` (oldest first) instead of relevance ranking. Optional `window_start` and `window_end` parameters filter facts to a time window.
+**Status**: ✅ Done — implemented 2026-03-27 as part of adaptive memory alignment. Timeline sorting and window filtering applied after fusion ranking, before budget truncation. Backwards-compatible: default `view_mode=None` preserves standard relevance ordering.
+
+**FR-CA-10**: FTS retrieval MUST match facts via both `content` and `index_keys` fields. `index_keys` populated at ingest with canonical entity names, aliases, and temporal markers (month-year, ISO date components) extracted from fact content.
+**Status**: ✅ Done — implemented 2026-03-27. SurrealDB FTS index `fact_index_keys_search` on `index_keys` with `memory_fts` analyzer. Query searches `content @1@ $query OR index_keys @1@ $query` with merged scores.
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
@@ -424,8 +437,22 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-UX-02**: Each answer MUST include a quote and a link to the primary source (episode, document, or timecode).  
 **Status**: ✅ Done
 
-**FR-UX-03**: UI MUST allow launching next flow ("find intro to OpenAI → generate email draft") from context screen.  
+**FR-UX-03**: UI MUST allow launching next flow ("find intro to OpenAI → generate email draft") from context screen.
 **Status**: ✅ Done
+
+### 5.11 Adaptive Memory Features (Heat-Aware Lifecycle)
+
+**FR-AM-01**: System MUST track fact access heat via `access_count` and `last_accessed` fields updated on every retrieval and explain operation.
+**Status**: ✅ Done — implemented 2026-03-27. `access_count` incremented by 1 on retrieval, by 3 on explain (stronger signal). SurrealDB atomic updates: `UPDATE fact SET access_count += $boost, last_accessed = time::now()`.
+
+**FR-AM-02**: Lifecycle decay worker MUST skip recently-accessed ("hot") facts even if age-based decay would otherwise invalidate them.
+**Status**: ✅ Done — decay pass checks `is_hot = access_count > 0 && (now - last_accessed).num_days() <= half_life_days`. Hot facts protected from invalidation.
+
+**FR-AM-03**: Lifecycle archival worker MUST skip episodes with recently-accessed facts.
+**Status**: ✅ Done — archival queries filter episodes with `last_accessed >= hot_cutoff` to preserve active memory.
+
+**FR-AM-04**: System MUST support LongMemEval-style acceptance tests covering multi-session reasoning, temporal reasoning, knowledge update, and abstention.
+**Status**: ✅ Done — `tests/longmem_acceptance.rs` covers 5 benchmark categories.
 
 ---
 
@@ -437,7 +464,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 |--------|----------------|---------------------|
 | **Episode** | `id`, `source_type`, `source_id`, `content`, `t_ref`, `t_ingested` | For any fact, can open source episode and see exact quote/fragment. |
 | **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
-| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. |
+| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode`, `index_keys[]`, `access_count`, `last_accessed?` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. `index_keys` populated at ingest with entity names, aliases, and temporal markers for enriched BM25 retrieval. `access_count` and `last_accessed` updated on retrieval and explain for heat-aware lifecycle. |
 | **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
 | **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Communities are maintained as connected components over persisted graph links and can expand retrieval through summary matches. |
 
@@ -668,7 +695,7 @@ memory_mcp/
 #### 9.2.8 Configuration and Environment
 
 - [x] Required env vars: `SURREALDB_DB_NAME`, `SURREALDB_URL`, `SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`
-- [x] Optional: `LOG_LEVEL` (unified variable, `RUST_LOG` removed from docs)
+- [x] Optional: `RUST_LOG` (standard Rust logging variable)
 - [x] Fail-fast behavior on missing/invalid config
 - [x] Documentation: recommend `cargo install --locked memory_mcp`, provide examples for installed and built binaries
 
@@ -847,7 +874,7 @@ memory_mcp/
 | `SURREALDB_PASSWORD` | ✅ | Password for authentication | — |
 | `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | `false` |
 | `SURREALDB_DATA_DIR` | ❌ | Optional embedded RocksDB data directory (`./data/surrealdb` by default) | `./data/surrealdb` |
-| `LOG_LEVEL` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `warn` |
+| `RUST_LOG` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `info` |
 
 ### 11.2 Installation
 
@@ -886,7 +913,7 @@ SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=user_solovey \
 SURREALDB_USERNAME=root \
 SURREALDB_PASSWORD=root \
-LOG_LEVEL=info \
+RUST_LOG=info \
 memory_mcp
 ```
 
@@ -907,7 +934,7 @@ memory_mcp
         "SURREALDB_NAMESPACES": "user_solovey",
         "SURREALDB_USERNAME": "root",
         "SURREALDB_PASSWORD": "root",
-        "LOG_LEVEL": "info"
+        "RUST_LOG": "info"
       }
     }
   }
@@ -938,6 +965,8 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 
 - [Subagents with MCP](https://cra.mr/subagents-with-mcp)
 - [MCP, Skills, and Agents](https://cra.mr/mcp-skills-and-agents)
+- `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — retrieval target-state specification
+- `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` — adaptive-memory target-state specification
 - [Memory Agent](/.github/agents/memory.agent.md) — Full 1100+ line agent specification
 - [PDM Agent](/.github/agents/pdm.agent.md) — Product Manager Agent
 
@@ -964,11 +993,13 @@ These documents are superseded by this specification:
 
 ## Document Status
 
-**Current Version**: 2.2  
+**Current Version**: 2.3  
 **Consolidated**: February 5, 2026  
 **Next Review**: When significant requirements change or implementation milestones reached
 
 **Changelog:**
+
+- **2026-03-27**: Linked this runtime spec to the new adaptive-memory target-state design doc, clarifying that SOTA alignment work is tracked separately from shipped behavior and should preserve the simplified lexical/BM25 + graph retrieval direction.
 
 - **2026-03-25**: Reconciled the specification with the validated review findings. Downgraded overstated statuses around temporal typing, FTS pushdown, provenance persistence, explainability, edge invalidation, embeddings, migration versioning, and community retrieval; added an explicit implementation reality-check section.
 

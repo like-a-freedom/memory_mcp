@@ -117,6 +117,30 @@ pub trait DbClient: Send + Sync {
         names: &[String],
     ) -> Result<Vec<Value>, MemoryError>;
 
+    /// Selects entities by their IDs in a single batch query.
+    ///
+    /// Returns all entities whose `entity_id` is in the supplied list.
+    async fn select_entities_by_ids(
+        &self,
+        _namespace: &str,
+        _entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
+    /// Selects edges matching a specific (in, relation, out) triple.
+    ///
+    /// Used for targeted invalidation without full table scans.
+    async fn select_edges_for_triple(
+        &self,
+        _namespace: &str,
+        _in_id: &str,
+        _relation: &str,
+        _out_id: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
     /// Selects active (non-invalidated) facts with an optional limit.
     ///
     /// Returns facts where `t_invalid IS NULL`, ordered by `t_valid ASC`.
@@ -154,6 +178,14 @@ pub trait DbClient: Send + Sync {
         &self,
         namespace: &str,
         query: &str,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects communities that contain any of the given member entities.
+    /// Uses array containment check (member_entities CONTAINSANY $members) for index efficiency.
+    async fn select_communities_by_member_entities(
+        &self,
+        namespace: &str,
+        member_entities: &[String],
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Creates a native graph relation edge while preserving compatibility fields.
@@ -580,6 +612,14 @@ fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "008_fact_semantic_embeddings.surql",
             sql: include_str!("migrations/008_fact_semantic_embeddings.surql"),
         },
+        MigrationScript {
+            file_name: "009_adaptive_memory_alignment.surql",
+            sql: include_str!("migrations/009_adaptive_memory_alignment.surql"),
+        },
+        MigrationScript {
+            file_name: "010_coerce_t_ingested_to_datetime.surql",
+            sql: include_str!("migrations/010_coerce_t_ingested_to_datetime.surql"),
+        },
     ]
 }
 
@@ -698,6 +738,26 @@ pub(crate) fn json_f64(value: &Value) -> Option<f64> {
                 .get("String")
                 .and_then(Value::as_str)?
                 .parse::<f64>()
+                .ok()
+        })
+}
+
+pub(crate) fn json_i64(value: &Value) -> Option<i64> {
+    if let Some(value) = value.as_i64() {
+        return Some(value);
+    }
+
+    let object = value.as_object()?;
+
+    object
+        .get("Number")
+        .and_then(json_i64)
+        .or_else(|| object.get("Int").and_then(json_i64))
+        .or_else(|| {
+            object
+                .get("String")
+                .and_then(Value::as_str)?
+                .parse::<i64>()
                 .ok()
         })
 }
@@ -1109,6 +1169,71 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
+    async fn select_entities_by_ids(
+        &self,
+        namespace: &str,
+        entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        if entity_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.log_op(
+            "db.select_entities_by_ids",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(entity_ids.len())),
+            )],
+        );
+
+        let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
+        let vars = json!({"entity_ids": entity_ids});
+
+        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        Ok(extract_records(normalized))
+    }
+
+    async fn select_edges_for_triple(
+        &self,
+        namespace: &str,
+        in_id: &str,
+        relation: &str,
+        out_id: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_edges_for_triple",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("in_id", Value::String(in_id.to_string())),
+                ("relation", Value::String(relation.to_string())),
+            ],
+        );
+
+        let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation AND out = <record> $out_id";
+        let vars = json!({
+            "in_id": in_id,
+            "relation": relation,
+            "out_id": out_id,
+        });
+
+        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        Ok(extract_records(normalized))
+    }
+
     async fn select_active_facts(
         &self,
         namespace: &str,
@@ -1246,6 +1371,44 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_communities_matching_summary.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_communities_by_member_entities(
+        &self,
+        namespace: &str,
+        member_entities: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_communities_by_member_entities",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                (
+                    "member_count",
+                    Value::Number(serde_json::Number::from(member_entities.len())),
+                ),
+            ],
+        );
+
+        let (sql, vars) = build_select_communities_by_member_entities_query(member_entities);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_communities_by_member_entities.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
@@ -1504,7 +1667,7 @@ fn build_select_facts_filtered_query(
         vars.insert("query".to_string(), json!(query));
 
         format!(
-            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND content @1@ $query ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ $query OR index_keys @1@ $query) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
         format!(
@@ -1619,6 +1782,15 @@ fn build_select_communities_matching_summary_query(query: &str) -> (String, Valu
     )
 }
 
+fn build_select_communities_by_member_entities_query(
+    member_entities: &[String],
+) -> (String, Value) {
+    (
+        "SELECT * FROM community WHERE member_entities CONTAINSANY $members ORDER BY community_id ASC".to_string(),
+        json!({"members": member_entities}),
+    )
+}
+
 fn build_select_edge_neighbors_query(
     node_id: &str,
     cutoff: &str,
@@ -1697,7 +1869,13 @@ fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
 fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
     match table {
         "episode" => &["t_ref", "t_ingested", "archived_at"],
-        "fact" | "edge" => &["t_valid", "t_ingested", "t_invalid", "t_invalid_ingested"],
+        "fact" | "edge" => &[
+            "t_valid",
+            "t_ingested",
+            "t_invalid",
+            "t_invalid_ingested",
+            "last_accessed",
+        ],
         "community" => &["updated_at"],
         "event_log" => &["ts"],
         "task" => &["due_date"],
@@ -2414,6 +2592,14 @@ mod tests {
             file_names.contains(&"008_fact_semantic_embeddings.surql"),
             "startup migration registry should include the semantic embedding follow-up migration"
         );
+        assert!(
+            file_names.contains(&"009_adaptive_memory_alignment.surql"),
+            "startup migration registry should include the adaptive memory alignment migration"
+        );
+        assert!(
+            file_names.contains(&"010_coerce_t_ingested_to_datetime.surql"),
+            "startup migration registry should include the datetime coercion follow-up migration"
+        );
     }
 
     #[test]
@@ -2422,8 +2608,8 @@ mod tests {
 
         assert_eq!(
             migrations.len(),
-            3,
-            "runtime migration registry should include redesign, archival, and semantic embedding upgrades"
+            5,
+            "runtime migration registry should include redesign, archival, semantic embedding, adaptive memory, and datetime coercion upgrades"
         );
         assert_eq!(
             migrations[0].file_name,
@@ -2433,6 +2619,14 @@ mod tests {
         assert_eq!(
             migrations[2].file_name,
             "008_fact_semantic_embeddings.surql"
+        );
+        assert_eq!(
+            migrations[3].file_name,
+            "009_adaptive_memory_alignment.surql"
+        );
+        assert_eq!(
+            migrations[4].file_name,
+            "010_coerce_t_ingested_to_datetime.surql"
         );
     }
 
@@ -2472,6 +2666,19 @@ mod tests {
         assert!(
             migration_has_statements(migration.sql),
             "migration 008 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_010_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "010_coerce_t_ingested_to_datetime.surql")
+            .expect("migration 010 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 010 must stay executable for existing databases"
         );
     }
 

@@ -110,7 +110,7 @@ SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=org,personal \
 SURREALDB_USERNAME=root \
 SURREALDB_PASSWORD=root \
-LOG_LEVEL=info \
+RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
 
@@ -131,7 +131,7 @@ If you run the server directly from this workspace, a stdio host configuration c
                 "SURREALDB_NAMESPACES": "org,personal",
                 "SURREALDB_USERNAME": "root",
                 "SURREALDB_PASSWORD": "root",
-                "LOG_LEVEL": "info"
+                "RUST_LOG": "info"
             }
         }
     }
@@ -160,7 +160,7 @@ Configuration is loaded from environment variables.
 | --- | --- |
 | `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
 | `SURREALDB_DATA_DIR` | Custom embedded data directory |
-| `LOG_LEVEL` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
+| `RUST_LOG` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
 | `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
 | `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
@@ -176,7 +176,7 @@ SURREALDB_USERNAME=root
 SURREALDB_PASSWORD=root
 SURREALDB_URL=ws://127.0.0.1:8000/rpc
 SURREALDB_EMBEDDED=false
-LOG_LEVEL=info
+RUST_LOG=info
 
 # Lifecycle background jobs (optional)
 LIFECYCLE_ENABLED=true
@@ -218,6 +218,20 @@ The `explain()` operation returns complete provenance lineage for each fact:
 This enables full audit trails, understanding of information propagation, and building trust through transparency.
 
 This design lines up with the intent-driven MCP guidance reflected in the docs: fewer tools, clearer semantics, better outcomes.
+
+### Adaptive Memory Features
+
+As of 2026-03-27, `memory_mcp` implements adaptive memory alignment with SOTA research:
+
+- **Fact-augmented index keys**: Entity names, aliases, and temporal markers (month-year, ISO dates) indexed at ingest for enriched BM25 retrieval. FTS matches on both `content` and `index_keys`.
+
+- **Heat-aware lifecycle**: Recently-accessed facts protected from decay/archival via `access_count` and `last_accessed` fields. Retrieval increments by 1, explain increments by 3 (stronger signal).
+
+- **Timeline retrieval**: `assemble_context` supports `view_mode=timeline` with optional `window_start`/`window_end` for chronological queries. Results sorted by `t_valid` (oldest first).
+
+- **LongMemEval-style acceptance tests**: Coverage for multi-session reasoning, temporal reasoning, knowledge update, abstention, and direct fact lookup.
+
+See `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` for target-state design and `docs/MEMORY_SYSTEM_SPEC.md` for current runtime contract.
 
 ## Development
 

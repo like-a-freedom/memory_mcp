@@ -14,6 +14,7 @@ mod common;
 use chrono::Utc;
 use memory_mcp::MemoryService;
 use memory_mcp::models::{ExplainItem, ExplainRequest};
+use memory_mcp::storage::DbClient;
 use serde_json::json;
 
 #[tokio::test]
@@ -353,4 +354,60 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     let has_linked = item.all_sources.iter().any(|s| s.relationship == "linked");
     assert!(has_direct, "Should have a direct provenance source");
     assert!(has_linked, "Should have a linked provenance source");
+}
+
+#[tokio::test]
+async fn explain_when_fact_is_cited_then_access_count_increases() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Explain access boost note",
+            "Explain access boost note",
+            "episode:explain-boost",
+            Utc::now(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:explain-boost"}),
+        )
+        .await
+        .expect("fact added");
+
+    let result = service
+        .explain(
+            ExplainRequest {
+                context_pack: vec![ExplainItem {
+                    fact_id: Some(fact_id.clone()),
+                    content: "Explain access boost note".to_string(),
+                    quote: "Explain access boost note".to_string(),
+                    source_episode: "episode:explain-boost".to_string(),
+                    scope: None,
+                    t_ref: None,
+                    t_ingested: None,
+                    provenance: json!({"source_episode": "episode:explain-boost"}),
+                    citation_context: None,
+                    all_sources: vec![],
+                }],
+            },
+            None,
+        )
+        .await
+        .expect("explain completed");
+
+    assert_eq!(result.len(), 1);
+
+    let stored = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+
+    assert_eq!(
+        stored.get("access_count").and_then(|value| value.as_i64()),
+        Some(3)
+    );
+    assert!(stored.get("last_accessed").is_some());
 }

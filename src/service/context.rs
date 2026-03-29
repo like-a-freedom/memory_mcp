@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
-use super::cache::CacheKey;
+use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
@@ -56,6 +56,11 @@ pub async fn assemble_context(
         &request.scope,
         cutoff,
         request.budget,
+        CacheView::new(
+            request.view_mode.as_deref(),
+            request.window_start,
+            request.window_end,
+        ),
         access.allowed_tags.clone(),
     );
 
@@ -65,6 +70,20 @@ pub async fn assemble_context(
     };
 
     if let Some(cached) = cached {
+        for item in &cached {
+            if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
+                service.logger.log(
+                    super::log_event(
+                        "assemble_context.access_track_error",
+                        json!({"fact_id": item.fact_id}),
+                        json!({"error": err.to_string()}),
+                        Some(&access),
+                    ),
+                    LogLevel::Warn,
+                );
+            }
+        }
+
         service.logger.log(
             super::log_event(
                 "assemble_context.cache_hit",
@@ -76,6 +95,16 @@ pub async fn assemble_context(
         );
         return Ok(cached);
     }
+
+    service.logger.log(
+        super::log_event(
+            "assemble_context.cache_miss",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"status": "computing"}),
+            Some(&access),
+        ),
+        LogLevel::Trace,
+    );
 
     let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
@@ -100,7 +129,7 @@ pub async fn assemble_context(
 
     // Alias expansion: search for additional facts using entity aliases
     let mut expanded_facts = Vec::new();
-    let ranked_facts = if let Some(query) = query_opt {
+    let mut ranked_facts = if let Some(query) = query_opt {
         let expanded_queries = expand_query_with_aliases(service, query, &namespace).await;
         let direct_fact_ids: HashSet<_> = direct_facts
             .iter()
@@ -170,28 +199,31 @@ pub async fn assemble_context(
         let mut all_direct = direct_facts;
         all_direct.extend(expanded_facts);
 
-        let mut ranked_facts = build_ranked_context_facts(
+        build_ranked_context_facts(
             all_direct,
             community_facts,
             semantic_facts,
             query_opt,
             &request.scope,
             cutoff,
-        );
-        sort_ranked_context_facts(&mut ranked_facts);
-        ranked_facts
+        )
     } else {
-        let mut ranked_facts = build_ranked_context_facts(
+        build_ranked_context_facts(
             direct_facts,
             Vec::new(),
             Vec::new(),
             query_opt,
             &request.scope,
             cutoff,
-        );
-        sort_ranked_context_facts(&mut ranked_facts);
-        ranked_facts
+        )
     };
+
+    apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
+    if request.view_mode.as_deref() == Some("timeline") {
+        sort_ranked_context_facts_for_timeline(&mut ranked_facts);
+    } else {
+        sort_ranked_context_facts(&mut ranked_facts);
+    }
 
     let results: Vec<AssembledContextItem> = ranked_facts
         .into_iter()
@@ -210,6 +242,20 @@ pub async fn assemble_context(
         })
         .collect();
 
+    for item in &results {
+        if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
+            service.logger.log(
+                super::log_event(
+                    "assemble_context.access_track_error",
+                    json!({"fact_id": item.fact_id}),
+                    json!({"error": err.to_string()}),
+                    Some(&access),
+                ),
+                LogLevel::Warn,
+            );
+        }
+    }
+
     {
         let mut cache = service.context_cache.write().await;
         cache.put(cache_key, results.clone());
@@ -218,11 +264,11 @@ pub async fn assemble_context(
     service.logger.log(
         super::log_event(
             "assemble_context.cache_set",
-            json!({"scope": request.scope}),
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"count": results.len()}),
             Some(&access),
         ),
-        LogLevel::Debug,
+        LogLevel::Trace,
     );
 
     Ok(results)
@@ -427,6 +473,31 @@ fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
     });
 }
 
+fn sort_ranked_context_facts_for_timeline(facts: &mut [RankedContextFact]) {
+    facts.sort_by(|a, b| {
+        a.fact
+            .t_valid
+            .cmp(&b.fact.t_valid)
+            .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+    });
+}
+
+fn apply_time_window(
+    facts: &mut Vec<RankedContextFact>,
+    window_start: Option<chrono::DateTime<chrono::Utc>>,
+    window_end: Option<chrono::DateTime<chrono::Utc>>,
+) {
+    if window_start.is_none() && window_end.is_none() {
+        return;
+    }
+
+    facts.retain(|ranked| {
+        let after_start = window_start.is_none_or(|start| ranked.fact.t_valid >= start);
+        let before_end = window_end.is_none_or(|end| ranked.fact.t_valid <= end);
+        after_start && before_end
+    });
+}
+
 /// Expands a search query with entity aliases for broader recall.
 ///
 /// Looks up entities whose canonical names appear in the query,
@@ -475,11 +546,17 @@ async fn expand_query_with_aliases(
             Some(obj) => obj,
             None => continue,
         };
+        // Use canonical_name_normalized as primary key, fall back to normalizing canonical_name
         let canonical_norm = obj
             .get("canonical_name_normalized")
             .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
+            .map(|s| s.to_string())
+            .or_else(|| {
+                obj.get("canonical_name")
+                    .and_then(|v| v.as_str())
+                    .map(super::normalize_text)
+            })
+            .unwrap_or_default();
         let aliases: Vec<String> = obj
             .get("aliases")
             .and_then(|v| v.as_array())
@@ -491,21 +568,6 @@ async fn expand_query_with_aliases(
             .unwrap_or_default();
         if !canonical_norm.is_empty() && !aliases.is_empty() {
             entity_aliases.entry(canonical_norm).or_insert(aliases);
-        }
-        // Also check if any alias matches a query phrase
-        for alias_str in obj
-            .get("aliases")
-            .and_then(|v| v.as_array())
-            .into_iter()
-            .flatten()
-            .filter_map(|v| v.as_str())
-        {
-            let norm_alias = super::normalize_text(alias_str);
-            if let Some(canonical_aliases) = entity_aliases.get(&norm_alias) {
-                // The alias itself was looked up; merge in the entity's other aliases
-                let _ = canonical_aliases;
-            }
-            entity_aliases.entry(norm_alias).or_default();
         }
     }
 
@@ -534,6 +596,7 @@ async fn expand_query_with_aliases(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 async fn expand_query_with_aliases_for_test(
     service: &crate::service::MemoryService,
     query: &str,
@@ -584,10 +647,15 @@ async fn select_fact_records_for_query(
 
     let mut seen_fact_ids = std::collections::HashSet::new();
     fallback_records.retain(|record| {
-        let Some(fact_id) = record.get("fact_id").and_then(Value::as_str) else {
+        // Use unwrap_record_string to handle both plain strings and wrapped forms
+        // like {"String": "fact:xyz"} that SurrealDB may return.
+        let Some(fact_id) = record
+            .get("fact_id")
+            .and_then(super::episode::unwrap_record_string)
+        else {
             return true;
         };
-        seen_fact_ids.insert(fact_id.to_string())
+        seen_fact_ids.insert(fact_id)
     });
 
     Ok(fallback_records)
@@ -928,6 +996,9 @@ mod tests {
             t_invalid: None,
             t_invalid_ingested: None,
             confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
@@ -1104,6 +1175,14 @@ mod tests {
                 &self,
                 _namespace: &str,
                 _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1515,6 +1594,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1619,6 +1706,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -1721,6 +1811,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1815,6 +1913,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -1943,6 +2044,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2041,6 +2150,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2179,6 +2291,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2286,6 +2406,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2400,6 +2523,14 @@ mod tests {
                 &self,
                 _namespace: &str,
                 _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -2523,6 +2654,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )
@@ -2651,6 +2785,14 @@ mod tests {
                     }
                 }
                 Ok(results)
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
 
             async fn select_communities_matching_summary(
@@ -2838,6 +2980,14 @@ mod tests {
                 Ok(vec![])
             }
 
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2940,6 +3090,9 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
                 access: None,
             },
         )

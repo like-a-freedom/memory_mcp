@@ -47,7 +47,11 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 ..Default::default()
             },
             Value::Object(ref map) => {
-                let fact_id = map.get("fact_id").and_then(Value::as_str).map(String::from);
+                let fact_id = map
+                    .get("factId")
+                    .or_else(|| map.get("fact_id"))
+                    .and_then(Value::as_str)
+                    .map(String::from);
                 let content = map
                     .get("content")
                     .and_then(Value::as_str)
@@ -59,7 +63,8 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     .unwrap_or("")
                     .to_string();
                 let source_episode = map
-                    .get("source_episode")
+                    .get("sourceEpisode")
+                    .or_else(|| map.get("source_episode"))
                     .or_else(|| map.get("id"))
                     .and_then(Value::as_str)
                     .unwrap_or("")

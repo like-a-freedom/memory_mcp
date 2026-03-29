@@ -6,8 +6,15 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::{Value, json};
 
 use crate::config::{EmbeddingConfig, EmbeddingProviderKind};
+use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 use crate::storage::json_f64;
+
+static EMBEDDING_LOGGER: std::sync::OnceLock<StdoutLogger> = std::sync::OnceLock::new();
+
+fn embedding_logger() -> &'static StdoutLogger {
+    EMBEDDING_LOGGER.get_or_init(|| StdoutLogger::new("warn"))
+}
 
 /// Abstraction over optional embedding providers.
 #[async_trait]
@@ -134,11 +141,15 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
     }
 
     if left.len() != right.len() {
-        tracing::warn!(
-            "cosine_similarity dimension mismatch: left={}, right={}",
-            left.len(),
-            right.len()
+        use std::collections::HashMap;
+        let mut event = HashMap::new();
+        event.insert(
+            "op".to_string(),
+            json!("cosine_similarity.dimension_mismatch"),
         );
+        event.insert("left_dim".to_string(), json!(left.len()));
+        event.insert("right_dim".to_string(), json!(right.len()));
+        embedding_logger().log(event, LogLevel::Warn);
         return 0.0;
     }
 

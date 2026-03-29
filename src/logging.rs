@@ -5,9 +5,12 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::time::Duration;
 
 use chrono::Utc;
 use serde_json::Value;
+
+use crate::correlation::CorrelationId;
 
 /// Log level for filtering log output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -73,6 +76,7 @@ impl std::fmt::Display for LogLevel {
 #[derive(Clone)]
 pub struct StdoutLogger {
     level: LogLevel,
+    correlation_id: Option<CorrelationId>,
 }
 
 impl StdoutLogger {
@@ -81,6 +85,25 @@ impl StdoutLogger {
     pub fn new(level: &str) -> Self {
         Self {
             level: LogLevel::parse(level),
+            correlation_id: None,
+        }
+    }
+
+    /// Creates a new logger with a correlation ID for tracing.
+    #[must_use]
+    pub fn with_correlation(level: &str, correlation_id: CorrelationId) -> Self {
+        Self {
+            level: LogLevel::parse(level),
+            correlation_id: Some(correlation_id),
+        }
+    }
+
+    /// Returns a new logger with the specified correlation ID.
+    #[must_use]
+    pub fn with_correlation_id(&self, correlation_id: CorrelationId) -> Self {
+        Self {
+            level: self.level,
+            correlation_id: Some(correlation_id),
         }
     }
 
@@ -102,7 +125,7 @@ impl StdoutLogger {
             return;
         }
 
-        let line = Self::format_event_line(&event, level);
+        let line = self.format_event_line_with_correlation(&event, level);
 
         let mut stderr = io::stderr();
         let _ = stderr.write_all(line.as_bytes());
@@ -115,6 +138,40 @@ impl StdoutLogger {
     pub fn format_event_line(event: &HashMap<String, Value>, level: LogLevel) -> String {
         let ts = Utc::now().to_rfc3339();
         Self::format_event_line_with_ts(event, level, &ts)
+    }
+
+    /// Formats an event with correlation ID.
+    #[must_use]
+    fn format_event_line_with_correlation(
+        &self,
+        event: &HashMap<String, Value>,
+        level: LogLevel,
+    ) -> String {
+        let ts = Utc::now().to_rfc3339();
+        let mut parts = Vec::with_capacity(event.len() + 3);
+
+        if let Some(correlation_id) = self.correlation_id {
+            parts.push(format!(
+                "[{}] {} {}",
+                ts,
+                level.as_str().to_uppercase(),
+                correlation_id
+            ));
+        } else {
+            parts.push(format!("[{}] {}", ts, level.as_str().to_uppercase()));
+        }
+
+        let mut keys: Vec<_> = event.keys().cloned().collect();
+        keys.sort();
+
+        for key in keys {
+            if let Some(value) = event.get(&key) {
+                let value_str = value_to_string(value);
+                parts.push(format!("{}={}", key, quote_if_needed(&value_str)));
+            }
+        }
+
+        parts.join(" ")
     }
 
     /// Formats an event with a provided timestamp.
@@ -138,12 +195,31 @@ impl StdoutLogger {
 
         parts.join(" ")
     }
+
+    /// Formats a duration in human-readable form.
+    #[must_use]
+    pub fn format_duration(duration: Duration) -> String {
+        let secs = duration.as_secs();
+        let millis = duration.subsec_millis();
+
+        if secs >= 1 {
+            format!("{}.{:03}s", secs, millis)
+        } else {
+            format!("{}ms", millis)
+        }
+    }
 }
 
 /// Converts a JSON value to a string representation.
 ///
 /// Objects are flattened to key=value pairs, arrays to comma-separated lists.
 /// Long values are truncated to MAX_LEN characters.
+///
+/// Special handling for Rust artifacts:
+/// - `Some(value)` → extracts inner value
+/// - `None` → "null"
+/// - `Ok(value)` → extracts inner value
+/// - `Err(value)` → formats as "Err(error_msg)"
 fn value_to_string(value: &Value) -> String {
     const MAX_LEN: usize = 200;
 
@@ -157,6 +233,29 @@ fn value_to_string(value: &Value) -> String {
             format!("[{}]", elems.join(","))
         }
         Value::Object(map) => {
+            // Handle Rust Option/Result artifacts from serde
+            if let Some(Value::String(inner)) = map.get("Some") {
+                return inner.clone();
+            }
+            if let Some(inner) = map.get("Some") {
+                return value_to_string(inner);
+            }
+            if map.contains_key("None") {
+                return "null".to_string();
+            }
+            if let Some(Value::String(inner)) = map.get("Ok") {
+                return inner.clone();
+            }
+            if let Some(inner) = map.get("Ok") {
+                return value_to_string(inner);
+            }
+            if let Some(Value::String(err)) = map.get("Err") {
+                return format!("Err({})", err);
+            }
+            if let Some(inner) = map.get("Err") {
+                return format!("Err({})", value_to_string(inner));
+            }
+
             let mut pairs = Vec::with_capacity(map.len());
             let mut keys: Vec<_> = map.keys().cloned().collect();
             keys.sort();
@@ -300,5 +399,40 @@ mod tests {
         assert!(trace_logger.is_enabled(LogLevel::Trace));
         assert!(trace_logger.is_enabled(LogLevel::Debug));
         assert!(trace_logger.is_enabled(LogLevel::Info));
+    }
+
+    #[test]
+    fn value_to_string_handles_option_some() {
+        let some_value = json!({"Some": "hello"});
+        assert_eq!(value_to_string(&some_value), "hello");
+
+        // Nested SurrealDB-style Some with String wrapper
+        let some_nested = json!({"Some": {"String": "world"}});
+        // This extracts the inner object which is {String=world}
+        assert_eq!(value_to_string(&some_nested), "{String=world}");
+    }
+
+    #[test]
+    fn value_to_string_handles_option_none() {
+        let none_value = json!({"None": null});
+        assert_eq!(value_to_string(&none_value), "null");
+    }
+
+    #[test]
+    fn value_to_string_handles_result_ok() {
+        let ok_value = json!({"Ok": "success"});
+        assert_eq!(value_to_string(&ok_value), "success");
+
+        let ok_nested = json!({"Ok": {"value": 42}});
+        assert_eq!(value_to_string(&ok_nested), "{value=42}");
+    }
+
+    #[test]
+    fn value_to_string_handles_result_err() {
+        let err_value = json!({"Err": "not found"});
+        assert_eq!(value_to_string(&err_value), "Err(not found)");
+
+        let err_nested = json!({"Err": {"code": 404}});
+        assert_eq!(value_to_string(&err_nested), "Err({code=404})");
     }
 }

@@ -36,6 +36,9 @@ async fn test_ingest_extract_and_assemble() {
             scope: "org".to_string(),
             as_of: Some(now + chrono::Duration::seconds(1)),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -111,6 +114,9 @@ async fn test_invalidate_and_explain() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 20, 0, 0, 0).unwrap()),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -165,6 +171,9 @@ async fn test_policy_tag_filtering() {
             scope: "private-hr".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: Some(memory_mcp::models::AccessPayload {
                 allowed_scopes: Some(vec!["private-hr".to_string()]),
                 allowed_tags: Some(vec!["deal.pipeline".to_string()]),
@@ -346,6 +355,9 @@ async fn test_assemble_context_uses_matching_community_summary() {
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -407,6 +419,9 @@ async fn test_rate_limit_determinism() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: Some(memory_mcp::models::AccessPayload {
                 allowed_scopes: access.allowed_scopes.clone(),
                 allowed_tags: None,
@@ -425,6 +440,9 @@ async fn test_rate_limit_determinism() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: Some(memory_mcp::models::AccessPayload {
                 allowed_scopes: access.allowed_scopes.clone(),
                 allowed_tags: None,
@@ -500,6 +518,9 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -516,6 +537,9 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
@@ -531,6 +555,9 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
             access: None,
         })
         .await
