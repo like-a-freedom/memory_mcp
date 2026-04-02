@@ -1,0 +1,309 @@
+mod embedded_support;
+
+use chrono::{Duration, TimeZone, Utc};
+use memory_mcp::models::AssembleContextRequest;
+
+/// Integration test: verifies that multi-word queries work through the full
+/// SurrealDB stack (embedded) with the configured full-text analyzer.
+#[tokio::test]
+async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc::now() - Duration::days(1);
+
+    embedded_support::add_fact(
+        &service,
+        "note",
+        "Survey: Delta site includes enrollment workflow and gateway component on host alpha",
+        "Delta Survey",
+        "episode:fts_test_1",
+        t,
+        "org",
+        0.9,
+        vec![],
+        vec![],
+        serde_json::json!({"source_episode": "episode:fts_test_1"}),
+    )
+    .await?;
+
+    embedded_support::add_fact(
+        &service,
+            "note",
+            "Checklist entry: cert rotation scheduled, token refresh in progress, ports 5223 and 443 open",
+            "cert checklist",
+            "episode:fts_test_2",
+            t,
+            "org",
+            0.85,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:fts_test_2"}),
+        )
+        .await?;
+
+    let ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "Delta Enrollment".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !ctx.is_empty(),
+        "Multi-word FTS query 'Delta Enrollment' should find facts (got empty)"
+    );
+    let content = &ctx[0].content;
+    assert!(
+        content.contains("enrollment"),
+        "Result content should contain 'enrollment', got: {content}"
+    );
+
+    let ctx2 = service
+        .assemble_context(AssembleContextRequest {
+            query: "mobile certs tokens ports episode:fts_test_2".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !ctx2.is_empty(),
+        "Query with episode ref should find facts after preprocessing (got empty)"
+    );
+
+    let ctx3 = service
+        .assemble_context(AssembleContextRequest {
+            query: "cert".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !ctx3.is_empty(),
+        "Single-word query 'cert' should still find facts (regression)"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc::now() - Duration::days(1);
+
+    embedded_support::add_fact(
+        &service,
+        "note",
+        "Deployment note: atlas_launch reached green status after final checklist.",
+        "atlas_launch reached green status",
+        "episode:fts_separator",
+        t,
+        "org",
+        0.9,
+        vec![],
+        vec![],
+        serde_json::json!({"source_episode": "episode:fts_separator"}),
+    )
+    .await?;
+
+    let ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "atlas launch".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !ctx.is_empty(),
+        "punctuation-aware FTS should match atlas_launch for query 'atlas launch'"
+    );
+    assert!(ctx[0].content.contains("atlas_launch"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
+    let alice_id = service.resolve_person("Alice Smith").await?;
+
+    embedded_support::add_fact(
+        &service,
+        "note",
+        "Quarterly launch review finalized.",
+        "launch review finalized",
+        "episode:fts_index_keys",
+        t,
+        "org",
+        0.9,
+        vec![alice_id],
+        vec![],
+        serde_json::json!({"source_episode": "episode:fts_index_keys"}),
+    )
+    .await?;
+
+    let person_ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "alice smith".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !person_ctx.is_empty(),
+        "query should match canonical entity name through fact.index_keys"
+    );
+
+    let time_ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "march 2026".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !time_ctx.is_empty(),
+        "query should match temporal marker through fact.index_keys"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn schema_uses_datetime_for_fact_temporal_fields() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        schema.contains("DEFINE FIELD t_valid ON fact TYPE datetime;"),
+        "fact.t_valid should use datetime in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_ingested ON fact TYPE datetime;"),
+        "fact.t_ingested should use datetime in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_invalid ON fact TYPE option<datetime>;"),
+        "fact.t_invalid should use option<datetime> in schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD t_invalid_ingested ON fact TYPE option<datetime>;"),
+        "fact.t_invalid_ingested should use option<datetime> in schema"
+    );
+}
+
+#[test]
+fn schema_defines_fact_embedding_field_and_hnsw_index_only() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        !schema.contains("DEFINE FIELD embedding ON episode"),
+        "episode.embedding should stay absent from schema"
+    );
+    assert!(
+        !schema.contains("DEFINE FIELD embedding ON entity"),
+        "entity.embedding should stay absent from schema"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD embedding ON fact TYPE option<array<float>>;"),
+        "fact.embedding should be defined for semantic retrieval"
+    );
+    assert!(
+        !schema.contains("episode_embedding_hnsw"),
+        "episode HNSW index should stay absent"
+    );
+    assert!(
+        !schema.contains("entity_embedding_hnsw"),
+        "entity HNSW index should stay absent"
+    );
+    assert!(
+        schema.contains("fact_embedding_hnsw"),
+        "fact HNSW index should be present"
+    );
+}
+
+#[test]
+fn schema_uses_memory_fts_analyzer() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        schema.contains("DEFINE ANALYZER memory_fts"),
+        "schema should define the new memory_fts analyzer"
+    );
+    assert!(
+        schema.contains("TOKENIZERS class"),
+        "memory_fts should use class tokenization"
+    );
+    assert!(
+        schema.contains("FILTERS lowercase, ascii, snowball(english);"),
+        "memory_fts should normalize case, ascii, and English stemming"
+    );
+    assert!(
+        schema.contains("FULLTEXT ANALYZER memory_fts"),
+        "full-text indexes should use the memory_fts analyzer"
+    );
+}
+
+#[test]
+fn schema_uses_native_edge_endpoints() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        schema.contains("DEFINE FIELD in ON edge"),
+        "edge schema should define the native `in` endpoint"
+    );
+    assert!(
+        schema.contains("DEFINE FIELD out ON edge"),
+        "edge schema should define the native `out` endpoint"
+    );
+    assert!(
+        schema.contains("DEFINE INDEX edge_in ON TABLE edge COLUMNS in;"),
+        "edge schema should index the native `in` endpoint"
+    );
+    assert!(
+        schema.contains("DEFINE INDEX edge_out ON TABLE edge COLUMNS out;"),
+        "edge schema should index the native `out` endpoint"
+    );
+    assert!(
+        !schema.contains("DEFINE FIELD from_id ON edge"),
+        "legacy from_id field should be removed from edge schema"
+    );
+    assert!(
+        !schema.contains("DEFINE FIELD to_id ON edge"),
+        "legacy to_id field should be removed from edge schema"
+    );
+}

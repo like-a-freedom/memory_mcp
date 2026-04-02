@@ -1,0 +1,11 @@
+[
+    {
+        "id": "lat-001",
+        "description": "Small personal-memory retrieval workload",
+        "query": "project status",
+        "scope": "personal",
+        "episode_count": 25,
+        "warmup_iterations": 3,
+        "measured_iterations": 10
+    }
+]

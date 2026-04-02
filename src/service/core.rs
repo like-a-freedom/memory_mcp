@@ -1,0 +1,2647 @@
+//! MemoryService implementation - core service orchestration.
+
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
+
+use chrono::{DateTime, Utc};
+use regex::Regex;
+use serde_json::{Value, json};
+
+use crate::config::SurrealConfig;
+use crate::logging::{LogLevel, StdoutLogger};
+use crate::models::{
+    AccessContext, AppSession, AssembleContextRequest, AssembledContextItem, EntityCandidate,
+    ExplainItem, ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest, ProvenanceSource,
+};
+use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
+use crate::storage::{json_f64, json_i64};
+
+use super::AnnoEntityExtractor;
+use super::EntityExtractor;
+use super::apps::AppSessionManager;
+use super::cache::CacheKey;
+use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
+use super::entity_extraction::create_entity_extractor;
+use super::error::MemoryError;
+use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
+use super::lifecycle::{spawn_archival_worker, spawn_decay_worker};
+use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+
+/// Input request for creating a new fact record.
+///
+/// This struct groups all parameters for [`MemoryService::add_fact`] into a single
+/// type, improving API ergonomics and future extensibility.
+pub struct AddFactRequest<'a> {
+    pub fact_type: &'a str,
+    pub content: &'a str,
+    pub quote: &'a str,
+    pub source_episode: &'a str,
+    pub t_valid: DateTime<Utc>,
+    pub scope: &'a str,
+    pub confidence: f64,
+    pub entity_links: Vec<String>,
+    pub policy_tags: Vec<String>,
+    pub provenance: Value,
+}
+
+/// Core service for memory operations.
+#[derive(Clone)]
+pub struct MemoryService {
+    /// Database client for storage operations.
+    pub db_client: Arc<dyn DbClient>,
+    pub(crate) namespaces: Vec<String>,
+    pub(crate) default_namespace: String,
+    pub(crate) logger: StdoutLogger,
+    pub(crate) rate_limiter: Arc<RateLimiter>,
+    pub(crate) context_cache:
+        Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
+    pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
+    pub(crate) embedding_similarity_threshold: f64,
+    pub(crate) app_session_manager: AppSessionManager,
+    /// Clock function for deterministic testing. Uses Utc::now() in production.
+    #[cfg(test)]
+    pub(crate) clock: Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>,
+}
+
+use lru::LruCache;
+
+#[derive(Debug, Clone, Copy)]
+struct ServiceBuildConfig {
+    rate_limit_rps: i32,
+    rate_limit_burst: i32,
+    cache_size: usize,
+    embedding_similarity_threshold: f64,
+}
+
+/// Build a startup versions event payload used for diagnostic logging.
+/// Extracted to a helper so it can be unit-tested independently of logger I/O.
+fn build_startup_versions_event(
+    client_version: &str,
+    server_version: Option<&str>,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let mut m = std::collections::HashMap::new();
+    m.insert("op".to_string(), json!("startup.versions"));
+    m.insert("client_version".to_string(), json!(client_version));
+    if let Some(sv) = server_version {
+        m.insert("surrealdb_server_version".to_string(), json!(sv));
+    }
+    m
+}
+
+async fn apply_startup_migrations(
+    db_client: &Arc<dyn DbClient>,
+    namespaces: &[String],
+) -> Result<(), MemoryError> {
+    // SurrealDB namespaces are isolated schema domains, so startup must
+    // apply the embedded schema contract to each configured namespace.
+    for namespace in namespaces {
+        db_client.apply_migrations(namespace).await?;
+    }
+
+    Ok(())
+}
+
+const FACT_ACCESS_RETRY_LIMIT: usize = 3;
+const FACT_ACCESS_RETRY_BASE_DELAY_MS: u64 = 10;
+
+impl MemoryService {
+    /// Determines the state of a fact/episode record based on t_invalid field.
+    pub(crate) fn fact_state(record: &Value) -> &'static str {
+        match record.as_object() {
+            Some(map) => match map.get("t_invalid") {
+                Some(v) if !v.is_null() => "invalidated",
+                _ => "active",
+            },
+            None => "active",
+        }
+    }
+
+    /// Validates that the session belongs to the expected app.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MemoryError::App`] if the session app_id does not match.
+    pub(crate) fn require_app(session: &AppSession, expected_app: &str) -> Result<(), MemoryError> {
+        if session.app_id != expected_app {
+            return Err(MemoryError::App(format!(
+                "session is not a {expected_app} session"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Extracts a required string field from the session target.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MemoryError::App`] if the field is missing or not a string.
+    pub(crate) fn require_target_str<'a>(
+        session: &'a AppSession,
+        key: &str,
+    ) -> Result<&'a str, MemoryError> {
+        session
+            .target
+            .get(key)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MemoryError::App(format!("{key} not found in session")))
+    }
+
+    /// Creates a new `MemoryService` from environment variables.
+    pub async fn new_from_env() -> Result<Self, MemoryError> {
+        let config = SurrealConfig::from_env()?;
+        let default_namespace = config
+            .default_namespace()
+            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?
+            .to_string();
+        let config_namespaces = config.namespaces.clone();
+        let config_log_level = config.log_level.clone();
+
+        let effective_data_dir = config.data_dir_or_default();
+        let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
+        let mut startup_event = std::collections::HashMap::new();
+        startup_event.insert("op".to_string(), serde_json::json!("startup"));
+        startup_event.insert(
+            "db_mode".to_string(),
+            serde_json::json!(if config.embedded {
+                "embedded"
+            } else {
+                "remote"
+            }),
+        );
+        startup_event.insert(
+            "namespaces".to_string(),
+            serde_json::json!(config.namespaces.clone()),
+        );
+        if config.embedded {
+            startup_event.insert(
+                "data_dir".to_string(),
+                serde_json::json!(effective_data_dir),
+            );
+        } else if let Some(url) = &config.url {
+            startup_event.insert("url".to_string(), serde_json::json!(url));
+        }
+        startup_logger.log(startup_event, crate::logging::LogLevel::Info);
+
+        let db_client = SurrealDbClient::connect(&config, &default_namespace).await?;
+        let server_version = match db_client.server_version(&default_namespace).await {
+            Ok(version) => version,
+            Err(err) => {
+                let mut event = std::collections::HashMap::new();
+                event.insert(
+                    "op".to_string(),
+                    serde_json::json!("startup.version_probe_failed"),
+                );
+                event.insert("error".to_string(), serde_json::json!(err.to_string()));
+                startup_logger.log(event, crate::logging::LogLevel::Warn);
+                None
+            }
+        };
+
+        let client_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
+        let versions_event =
+            build_startup_versions_event(client_version, server_version.as_deref());
+        startup_logger.log(versions_event, crate::logging::LogLevel::Info);
+
+        let embedding_provider =
+            create_embedding_provider(&config.embedding, &config.data_dir_or_default()).await?;
+
+        let entity_extractor =
+            create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
+
+        let service = Self::new_with_embedding_provider(
+            Arc::new(db_client),
+            config_namespaces,
+            config_log_level,
+            50,
+            100,
+            embedding_provider,
+            config.embedding.similarity_threshold,
+            entity_extractor,
+        )?;
+        apply_startup_migrations(&service.db_client, &service.namespaces).await?;
+        service.check_surrealdb_connection().await?;
+
+        // Spawn embedding migration if needed
+        {
+            let db = service.db_client.clone();
+            let provider = service.embedding_provider.clone();
+            let config_ns = config.embedding.clone();
+            let ns = default_namespace.to_string();
+            let logger = service.logger.clone();
+            tokio::spawn(async move {
+                if let Err(e) = crate::service::migration::run_if_needed(
+                    db.as_ref(),
+                    provider,
+                    &config_ns,
+                    &ns,
+                    &logger,
+                )
+                .await
+                {
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::json!("embedding.migration.failed"),
+                    );
+                    event.insert("error".to_string(), serde_json::json!(e.to_string()));
+                    logger.log(event, LogLevel::Error);
+                }
+            });
+        }
+
+        // Spawn lifecycle workers if enabled
+        if config.lifecycle.enabled {
+            let decay_service = service.clone();
+            let decay_config = config.lifecycle.clone();
+
+            let _decay_handle = spawn_decay_worker(
+                decay_service,
+                decay_config.decay_interval_secs,
+                decay_config.decay_confidence_threshold,
+                decay_config.decay_half_life_days,
+            );
+
+            let archival_service = service.clone();
+            let archival_config = config.lifecycle.clone();
+
+            let _archival_handle = spawn_archival_worker(
+                archival_service,
+                archival_config.archival_interval_secs,
+                archival_config.archival_age_days,
+            );
+
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("lifecycle.workers.started"),
+            );
+            event.insert(
+                "decay_interval".to_string(),
+                serde_json::json!(config.lifecycle.decay_interval_secs),
+            );
+            event.insert(
+                "archival_interval".to_string(),
+                serde_json::json!(config.lifecycle.archival_interval_secs),
+            );
+            service.logger.log(event, crate::logging::LogLevel::Info);
+        }
+
+        Ok(service)
+    }
+
+    /// Creates a new service instance.
+    pub fn new(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+    ) -> Result<Self, MemoryError> {
+        Self::build(
+            db_client,
+            namespaces,
+            log_level,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size: super::CONTEXT_CACHE_SIZE,
+                embedding_similarity_threshold:
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            },
+            Arc::new(DisabledEmbeddingProvider::new(Some(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            ))),
+            Arc::new(AnnoEntityExtractor::new()?),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_with_embedding_provider(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+        embedding_similarity_threshold: f64,
+        entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> Result<Self, MemoryError> {
+        Self::build(
+            db_client,
+            namespaces,
+            log_level,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size: super::CONTEXT_CACHE_SIZE,
+                embedding_similarity_threshold,
+            },
+            embedding_provider,
+            entity_extractor,
+        )
+    }
+
+    /// Creates a service with custom embedding and entity extraction providers.
+    /// Exposed for integration tests that need the full ML stack.
+    #[doc(hidden)]
+    #[allow(dead_code, clippy::too_many_arguments)]
+    pub fn new_with_providers(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+        embedding_similarity_threshold: f64,
+        entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> Result<Self, MemoryError> {
+        Self::new_with_embedding_provider(
+            db_client,
+            namespaces,
+            log_level,
+            rate_limit_rps,
+            rate_limit_burst,
+            embedding_provider,
+            embedding_similarity_threshold,
+            entity_extractor,
+        )
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn new_with_cache_size(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        cache_size: usize,
+    ) -> Result<Self, MemoryError> {
+        Self::build(
+            db_client,
+            namespaces,
+            log_level,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size,
+                embedding_similarity_threshold:
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            },
+            Arc::new(DisabledEmbeddingProvider::new(Some(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            ))),
+            Arc::new(super::AnnoEntityExtractor::new()?),
+        )
+    }
+
+    fn build(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        build_config: ServiceBuildConfig,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+        entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> Result<Self, MemoryError> {
+        if namespaces.is_empty() {
+            return Err(MemoryError::ConfigInvalid(
+                "namespaces cannot be empty".to_string(),
+            ));
+        }
+        let cache_size = std::num::NonZeroUsize::new(build_config.cache_size).ok_or_else(|| {
+            MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
+        })?;
+        let logger = StdoutLogger::new(&log_level);
+        let app_session_manager = AppSessionManager::new();
+        Ok(Self {
+            db_client,
+            namespaces: namespaces.clone(),
+            default_namespace: namespaces[0].clone(),
+            logger,
+            rate_limiter: Arc::new(RateLimiter::new(
+                build_config.rate_limit_rps,
+                build_config.rate_limit_burst,
+            )),
+            context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
+            entity_extractor,
+            embedding_provider,
+            embedding_similarity_threshold: build_config.embedding_similarity_threshold,
+            app_session_manager,
+            #[cfg(test)]
+            clock: Arc::new(Utc::now),
+        })
+    }
+
+    /// Returns the current time. Uses injected clock in tests, Utc::now() in production.
+    #[cfg(test)]
+    pub(crate) fn now(&self) -> DateTime<Utc> {
+        (self.clock)()
+    }
+
+    /// Returns the current time. Uses injected clock in tests, Utc::now() in production.
+    #[cfg(not(test))]
+    pub(crate) fn now(&self) -> DateTime<Utc> {
+        Utc::now()
+    }
+
+    /// Creates a new MemoryService with a custom clock function for deterministic testing.
+    #[cfg(test)]
+    pub(crate) fn new_with_clock(
+        db_client: Arc<dyn DbClient>,
+        namespaces: Vec<String>,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        clock: impl Fn() -> DateTime<Utc> + Send + Sync + 'static,
+    ) -> Result<Self, MemoryError> {
+        let mut service = Self::build(
+            db_client,
+            namespaces,
+            log_level,
+            ServiceBuildConfig {
+                rate_limit_rps,
+                rate_limit_burst,
+                cache_size: super::CONTEXT_CACHE_SIZE,
+                embedding_similarity_threshold:
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            },
+            Arc::new(DisabledEmbeddingProvider::new(Some(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            ))),
+            Arc::new(AnnoEntityExtractor::new()?),
+        )?;
+        service.clock = Arc::new(clock);
+        Ok(service)
+    }
+
+    /// Public helper for tool-level logging.
+    pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
+        self.logger.log(
+            crate::log_event!(op, "success",
+                "args" => args,
+                "result" => result
+            ),
+            level,
+        );
+    }
+
+    /// Public helper for tool-level logging with duration.
+    pub fn log_tool_event_with_duration(
+        &self,
+        op: &str,
+        args: Value,
+        result: Value,
+        level: LogLevel,
+        duration: std::time::Duration,
+    ) {
+        let mut args_with_duration = args.clone();
+        let duration_ms = duration.as_millis();
+        args_with_duration["duration_ms"] = json!(duration_ms);
+        self.logger.log(
+            crate::log_event!(op, "success",
+                "args" => args_with_duration,
+                "result" => result
+            ),
+            level,
+        );
+    }
+
+    /// Returns the total count of episodes.
+    pub async fn episode_count(&self) -> Result<i32, MemoryError> {
+        let mut total = 0;
+        let sql = "SELECT count() FROM episode GROUP ALL";
+        for namespace in &self.namespaces {
+            let result = self.db_client.query(sql, None, namespace).await?;
+            let count = result
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|obj| obj.get("count"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0) as i32;
+            total += count;
+        }
+        Ok(total)
+    }
+
+    /// Ingests a new episode.
+    pub async fn ingest(
+        &self,
+        request: IngestRequest,
+        access: Option<AccessContext>,
+    ) -> Result<String, MemoryError> {
+        self.enforce_rate_limit(access.as_ref())?;
+        validate_ingest_request(&request)?;
+
+        let episode_id = deterministic_episode_id(
+            &request.source_type,
+            &request.source_id,
+            request.t_ref,
+            &request.scope,
+        );
+        let namespace = self.resolve_namespace_for_scope(&request.scope)?;
+        let existing = self.db_client.select_one(&episode_id, &namespace).await?;
+        if existing.is_none() {
+            let t_ingested = request.t_ingested.unwrap_or_else(super::query::now);
+            let payload = json!({
+                "episode_id": episode_id,
+                "source_type": request.source_type,
+                "source_id": request.source_id,
+                "content": request.content,
+                "t_ref": super::normalize_dt(request.t_ref),
+                "t_ingested": super::normalize_dt(t_ingested),
+                "scope": request.scope,
+                "visibility_scope": request.visibility_scope.unwrap_or_else(|| request.scope.clone()),
+                "policy_tags": request.policy_tags,
+            });
+            self.db_client
+                .create(&episode_id, payload, &namespace)
+                .await?;
+        }
+
+        self.logger.log(
+            crate::log_event!("ingest", "success",
+                "source_type" => &request.source_type,
+                "source_id" => &request.source_id,
+                "t_ref" => super::normalize_dt(request.t_ref),
+                "scope" => &request.scope,
+                "episode_id" => &episode_id
+            ),
+            LogLevel::Info,
+        );
+
+        Ok(episode_id)
+    }
+
+    /// Provides explanations for context items.
+    pub async fn explain(
+        &self,
+        request: ExplainRequest,
+        access: Option<AccessContext>,
+    ) -> Result<Vec<ExplainItem>, MemoryError> {
+        self.enforce_rate_limit(access.as_ref())?;
+        let mut explanations = Vec::with_capacity(request.context_pack.len());
+        for item in request.context_pack {
+            let explanation = self.build_explain_item(item).await?;
+            if let Some(fact_id) = explanation.fact_id.as_deref()
+                && let Err(err) = self.record_fact_access(fact_id, 3).await
+            {
+                self.logger.log(
+                    crate::log_error!("explain.access_track_error", &err,
+                        "fact_id" => fact_id
+                    ),
+                    LogLevel::Warn,
+                );
+            }
+            explanations.push(explanation);
+        }
+
+        self.logger.log(
+            crate::log_event!("explain", "success",
+                "count" => explanations.len()
+            ),
+            LogLevel::Info,
+        );
+
+        Ok(explanations)
+    }
+
+    /// Extracts entities and facts from an episode.
+    pub async fn extract(
+        &self,
+        episode_id: &str,
+        access: Option<AccessContext>,
+    ) -> Result<ExtractResult, MemoryError> {
+        self.enforce_rate_limit(access.as_ref())?;
+        let (record, _) = self.find_episode_record(episode_id).await?;
+        if record.is_none() {
+            return Err(MemoryError::NotFound(format!(
+                "episode_id not found: {episode_id}"
+            )));
+        }
+        let payload = super::episode::extract_from_episode(self, episode_id).await?;
+        self.logger.log(
+            crate::log_event!("extract", "success",
+                "episode_id" => episode_id,
+                "entities" => payload.entities.len(),
+                "facts" => payload.facts.len(),
+                "links" => payload.links.len()
+            ),
+            LogLevel::Info,
+        );
+        Ok(payload)
+    }
+
+    /// Resolves an entity candidate.
+    pub async fn resolve(
+        &self,
+        candidate: EntityCandidate,
+        access: Option<AccessContext>,
+    ) -> Result<String, MemoryError> {
+        self.enforce_rate_limit(access.as_ref())?;
+        validate_entity_candidate(&candidate)?;
+        let namespace = self.default_namespace.clone();
+        let normalized = super::normalize_text(&candidate.canonical_name);
+
+        // Check if entity already exists by name
+        let existing = self
+            .find_entity_record(&candidate.canonical_name, &namespace)
+            .await?;
+        if let Some(record) = existing {
+            let existing_id = record
+                .get("entity_id")
+                .and_then(string_from_value)
+                .or_else(|| record.get("id").and_then(string_from_value))
+                .unwrap_or_default();
+            return Ok(existing_id);
+        }
+
+        let entity_id = deterministic_entity_id(&candidate.entity_type, &candidate.canonical_name);
+        let aliases = candidate
+            .aliases
+            .into_iter()
+            .filter(|alias| !alias.trim().is_empty())
+            .map(|alias| super::normalize_text(&alias))
+            .collect::<Vec<_>>();
+
+        let payload = json!({
+            "entity_id": entity_id,
+            "entity_type": candidate.entity_type,
+            "canonical_name": candidate.canonical_name,
+            "canonical_name_normalized": normalized,
+            "aliases": aliases.clone(),
+        });
+
+        // Attempt to create the entity. If it already exists (race condition),
+        // fetch and return the existing entity ID.
+        match self.db_client.create(&entity_id, payload, &namespace).await {
+            Ok(_) => Ok(entity_id),
+            Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {
+                // Race condition: another request created the entity concurrently.
+                // Fetch and return the existing entity.
+                let existing = self
+                    .find_entity_record(&candidate.canonical_name, &namespace)
+                    .await?;
+                if let Some(record) = existing {
+                    let existing_id = record
+                        .get("entity_id")
+                        .and_then(string_from_value)
+                        .or_else(|| record.get("id").and_then(string_from_value))
+                        .unwrap_or_default();
+                    return Ok(existing_id);
+                }
+                // Fallback: return the deterministic ID even if we couldn't fetch
+                Ok(entity_id)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Adds a new fact.
+    pub async fn add_fact(&self, req: AddFactRequest<'_>) -> Result<String, MemoryError> {
+        validate_fact_input(
+            req.fact_type,
+            req.content,
+            req.quote,
+            req.source_episode,
+            req.scope,
+        )?;
+
+        let fact_id =
+            deterministic_fact_id(req.fact_type, req.content, req.source_episode, req.t_valid);
+        let namespace = self.resolve_namespace_for_scope(req.scope)?;
+        let existing = self.db_client.select_one(&fact_id, &namespace).await?;
+        if existing.is_none() {
+            let t_ingested = self.now();
+            let index_keys = self
+                .build_fact_index_keys(req.content, &req.entity_links, req.t_valid)
+                .await?;
+            let mut payload = serde_json::Map::from_iter([
+                ("fact_id".to_string(), json!(fact_id.clone())),
+                ("fact_type".to_string(), json!(req.fact_type)),
+                ("content".to_string(), json!(req.content)),
+                ("quote".to_string(), json!(req.quote)),
+                ("source_episode".to_string(), json!(req.source_episode)),
+                (
+                    "t_valid".to_string(),
+                    json!(super::normalize_dt(req.t_valid)),
+                ),
+                (
+                    "t_ingested".to_string(),
+                    json!(super::normalize_dt(t_ingested)),
+                ),
+                ("confidence".to_string(), json!(req.confidence)),
+                ("index_keys".to_string(), json!(index_keys)),
+                ("access_count".to_string(), json!(0)),
+                ("entity_links".to_string(), json!(req.entity_links)),
+                ("scope".to_string(), json!(req.scope)),
+                ("policy_tags".to_string(), json!(req.policy_tags)),
+                ("provenance".to_string(), req.provenance),
+            ]);
+
+            match self
+                .generate_embedding(&format!(
+                    "{}\n{}\n{}",
+                    req.fact_type, req.content, req.quote
+                ))
+                .await
+            {
+                Ok(Some(embedding)) => {
+                    // Dimension is validated by the provider, just use the embedding
+                    payload.insert("embedding".to_string(), json!(embedding));
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.write_skipped")),
+                            (
+                                "provider".to_string(),
+                                json!(self.embedding_provider.provider_name()),
+                            ),
+                            ("error".to_string(), json!(err.to_string())),
+                            ("fact_type".to_string(), json!(req.fact_type)),
+                        ]),
+                        LogLevel::Warn,
+                    );
+                }
+            }
+
+            let created = self
+                .db_client
+                .create(&fact_id, Value::Object(payload), &namespace)
+                .await?;
+            if created.is_null() {
+                return Err(MemoryError::Storage(
+                    "failed to persist fact record".to_string(),
+                ));
+            }
+            super::cache::invalidate_cache_by_scope(&self.context_cache, req.scope).await;
+        }
+        Ok(fact_id)
+    }
+
+    pub(crate) async fn record_fact_access(
+        &self,
+        fact_id: &str,
+        boost: i64,
+    ) -> Result<(), MemoryError> {
+        for attempt in 0..=FACT_ACCESS_RETRY_LIMIT {
+            match self.record_fact_access_once(fact_id, boost).await {
+                Ok(()) => return Ok(()),
+                Err(err)
+                    if self.is_retryable_access_tracking_error(&err)
+                        && attempt < FACT_ACCESS_RETRY_LIMIT =>
+                {
+                    let backoff_ms = FACT_ACCESS_RETRY_BASE_DELAY_MS << attempt;
+                    tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn record_fact_access_once(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
+        let (record, namespace) = self.find_fact_record(fact_id).await?;
+        let Some(namespace) = namespace else {
+            return Ok(());
+        };
+        let Some(mut record) = record else {
+            return Ok(());
+        };
+
+        let access_count = record
+            .get("access_count")
+            .and_then(json_i64)
+            .unwrap_or(0)
+            .saturating_add(boost);
+        record.insert("access_count".to_string(), json!(access_count));
+        record.insert(
+            "last_accessed".to_string(),
+            json!(super::normalize_dt(self.now())),
+        );
+
+        self.db_client
+            .update(fact_id, Value::Object(record), &namespace)
+            .await?;
+
+        Ok(())
+    }
+
+    fn is_retryable_access_tracking_error(&self, err: &MemoryError) -> bool {
+        let MemoryError::Storage(message) = err else {
+            return false;
+        };
+
+        let message = message.to_ascii_lowercase();
+        message.contains("transaction conflict")
+            || message.contains("resource busy")
+            || message.contains("can be retried")
+    }
+
+    async fn build_fact_index_keys(
+        &self,
+        content: &str,
+        entity_links: &[String],
+        t_valid: DateTime<Utc>,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut keys = HashSet::new();
+
+        for entity_id in entity_links {
+            let Some(record) = self.find_entity_record_by_id(entity_id).await? else {
+                continue;
+            };
+            let Some(map) = record.as_object() else {
+                continue;
+            };
+
+            if let Some(name) = map.get("canonical_name").and_then(string_from_value) {
+                let normalized = super::normalize_text(&name);
+                if !normalized.is_empty() {
+                    keys.insert(normalized);
+                }
+            }
+
+            if let Some(aliases) = map.get("aliases").and_then(Value::as_array) {
+                for alias in aliases.iter().filter_map(string_from_value) {
+                    let normalized = super::normalize_text(&alias);
+                    if !normalized.is_empty() {
+                        keys.insert(normalized);
+                    }
+                }
+            }
+        }
+
+        keys.extend(extract_temporal_index_keys(content, t_valid));
+
+        let mut keys = keys.into_iter().collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys)
+    }
+
+    pub(crate) async fn generate_embedding(
+        &self,
+        input: &str,
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        if !self.embedding_provider.is_enabled() {
+            return Ok(None);
+        }
+
+        let timer = crate::timing::OperationTimer::new("embed");
+
+        // Log start of embedding operation
+        self.logger.log(
+            crate::operation_event!(
+                "embed.start",
+                timer,
+                "success",
+                None::<String>,
+                "provider" => self.embedding_provider.provider_name(),
+                "input_length" => input.len()
+            ),
+            crate::logging::LogLevel::Debug,
+        );
+
+        let result = self.embedding_provider.embed(input).await;
+        let duration_ms = timer.elapsed_ms();
+
+        match result {
+            Ok(embedding) => {
+                let level = crate::logging::level_for_duration(duration_ms);
+                let event = crate::operation_event!(
+                    "embed",
+                    timer,
+                    "success",
+                    None::<String>,
+                    "provider" => self.embedding_provider.provider_name(),
+                    "dimension" => embedding.len()
+                );
+                self.logger.log(event, level);
+                Ok(Some(embedding))
+            }
+            Err(e) => {
+                let event = crate::operation_event!(
+                    "embed",
+                    timer,
+                    "error",
+                    Some(e.to_string()),
+                    "provider" => self.embedding_provider.provider_name()
+                );
+                self.logger.log(event, crate::logging::LogLevel::Error);
+                Err(e)
+            }
+        }
+    }
+
+    /// Invalidates a fact.
+    pub async fn invalidate(
+        &self,
+        request: InvalidateRequest,
+        access: Option<AccessContext>,
+    ) -> Result<String, MemoryError> {
+        self.enforce_rate_limit(access.as_ref())?;
+        let (record, namespace) = self.find_fact_record(&request.fact_id).await?;
+        let namespace =
+            namespace.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+        let existing = record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+
+        if existing.get("t_invalid").is_some() {
+            return Ok("already_invalidated".to_string());
+        }
+
+        let scope = existing
+            .get("scope")
+            .and_then(string_from_value)
+            .unwrap_or_else(|| namespace.clone());
+
+        let mut updated = existing;
+        updated.insert(
+            "t_invalid".to_string(),
+            json!(super::normalize_dt(request.t_invalid)),
+        );
+        updated.insert(
+            "t_invalid_ingested".to_string(),
+            json!(super::normalize_dt(self.now())),
+        );
+        self.db_client
+            .update(&request.fact_id, Value::Object(updated), &namespace)
+            .await?;
+        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
+        Ok("ok".to_string())
+    }
+
+    /// Assembles context for a query.
+    pub async fn assemble_context(
+        &self,
+        request: AssembleContextRequest,
+    ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+        super::context::assemble_context(self, request).await
+    }
+
+    /// Resolves a named entity of the given type, creating it if absent.
+    pub async fn resolve_entity_by_type(
+        &self,
+        entity_type: &str,
+        name: &str,
+    ) -> Result<String, MemoryError> {
+        self.resolve(
+            EntityCandidate {
+                entity_type: entity_type.to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Resolves a person entity.
+    pub async fn resolve_person(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("person", name).await
+    }
+
+    /// Resolves a company entity.
+    pub async fn resolve_company(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("company", name).await
+    }
+
+    /// Resolves a location entity.
+    pub async fn resolve_location(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("location", name).await
+    }
+
+    /// Resolves a product entity.
+    pub async fn resolve_product(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("product", name).await
+    }
+
+    /// Resolves an event entity.
+    pub async fn resolve_event(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("event", name).await
+    }
+
+    /// Resolves a concept entity.
+    pub async fn resolve_concept(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("concept", name).await
+    }
+
+    /// Creates a relationship edge between two entities.
+    pub async fn relate(
+        &self,
+        from_id: &str,
+        relation: &str,
+        to_id: &str,
+    ) -> Result<(), MemoryError> {
+        use crate::models::Edge;
+        let edge = Edge {
+            in_id: from_id.to_string(),
+            relation: relation.to_string(),
+            out_id: to_id.to_string(),
+            strength: 1.0,
+            confidence: 0.8,
+            provenance: json!({"source": "manual"}),
+            t_valid: self.now(),
+            t_ingested: self.now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+        };
+        super::episode::store_edge(self, &edge, &self.default_namespace).await
+    }
+
+    /// Retrieves SurrealDB config.
+    pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
+        Ok(json!({
+            "namespaces": self.namespaces.clone(),
+        }))
+    }
+
+    /// Finds an introduction chain.
+    pub async fn find_intro_chain(
+        &self,
+        target_name: &str,
+        max_hops: i32,
+        as_of: Option<DateTime<Utc>>,
+    ) -> Result<Vec<String>, MemoryError> {
+        let target_id = self.find_entity_by_name(target_name).await?;
+        let Some(target_id) = target_id else {
+            return Ok(vec![]);
+        };
+
+        let cutoff = as_of.unwrap_or_else(super::query::now);
+        let cutoff_iso = super::normalize_dt(cutoff);
+
+        let mut frontier = vec![target_id.clone()];
+        let mut visited = HashSet::from([target_id.clone()]);
+        let mut next_hop: HashMap<String, String> = HashMap::new();
+        let mut discovered_nodes = HashSet::new();
+        let mut nodes_with_predecessors = HashSet::new();
+
+        for _ in 0..max_hops {
+            let mut next_frontier = Vec::new();
+
+            for node_id in &frontier {
+                for namespace in &self.namespaces {
+                    for record in self
+                        .db_client
+                        .select_edge_neighbors(
+                            namespace,
+                            node_id,
+                            &cutoff_iso,
+                            GraphDirection::Incoming,
+                        )
+                        .await?
+                    {
+                        if let Value::Object(map) = record
+                            && let (Some(in_id), Some(out_id)) = (
+                                map.get("in").and_then(string_from_value),
+                                map.get("out").and_then(string_from_value),
+                            )
+                            && visited.insert(in_id.clone())
+                        {
+                            next_hop.insert(in_id.clone(), out_id);
+                            discovered_nodes.insert(in_id.clone());
+                            nodes_with_predecessors.insert(node_id.clone());
+                            next_frontier.push(in_id);
+                        }
+                    }
+                }
+            }
+
+            if next_frontier.is_empty() {
+                break;
+            }
+
+            next_frontier.sort();
+            next_frontier.dedup();
+            frontier = next_frontier;
+        }
+
+        let mut candidate_paths = discovered_nodes
+            .into_iter()
+            .filter(|node_id| !nodes_with_predecessors.contains(node_id))
+            .filter_map(|start_id| build_intro_chain_from_start(&start_id, &target_id, &next_hop))
+            .collect::<Vec<_>>();
+
+        candidate_paths
+            .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+
+        let Some(best_path) = candidate_paths.into_iter().next() else {
+            return Ok(vec![]);
+        };
+
+        Ok(best_path)
+    }
+
+    /// Invalidates a superseded metric.
+    pub async fn invalidate_metric_if_superseded(
+        &self,
+        new_value: f64,
+        old_fact_id: &str,
+        t_invalid: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let (record, _) = self.find_fact_record(old_fact_id).await?;
+        if record.is_none() {
+            return Ok(());
+        }
+        self.invalidate(
+            InvalidateRequest {
+                fact_id: old_fact_id.to_string(),
+                reason: format!("Superseded by {new_value}"),
+                t_invalid,
+            },
+            None,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Performs a CBOR round-trip.
+    pub fn cbor_round_trip(&self, payload: &Value) -> Result<Value, MemoryError> {
+        let encoded = serde_cbor::to_vec(payload)
+            .map_err(|err| MemoryError::Storage(format!("cbor encode error: {err}")))?;
+        let decoded: Value = serde_cbor::from_slice(&encoded)
+            .map_err(|err| MemoryError::Storage(format!("cbor decode error: {err}")))?;
+        Ok(decoded)
+    }
+
+    async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
+        let _ = self
+            .db_client
+            .select_table("event_log", &self.default_namespace)
+            .await?;
+        Ok(())
+    }
+
+    /// Resolves a request scope to a configured namespace.
+    ///
+    /// Scope values must match a configured namespace exactly, ignoring case,
+    /// or use an explicit alias recognized by the service.
+    pub(crate) fn resolve_namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
+        let scope_trimmed = scope.trim();
+        if scope_trimmed.is_empty() {
+            return Err(MemoryError::Validation("scope is required".into()));
+        }
+
+        if let Some(namespace) = self
+            .namespaces
+            .iter()
+            .find(|namespace| namespace.eq_ignore_ascii_case(scope_trimmed))
+        {
+            return Ok(namespace.clone());
+        }
+
+        let scope_lower = scope_trimmed.to_lowercase();
+        if self.is_default_scope_alias(&scope_lower) {
+            return Ok(self.default_namespace.clone());
+        }
+
+        let allowed_scopes = self.allowed_scope_values();
+        self.logger.log(
+            std::collections::HashMap::from([
+                (
+                    "op".to_string(),
+                    serde_json::Value::String("scope.namespace_invalid".to_string()),
+                ),
+                (
+                    "scope".to_string(),
+                    serde_json::Value::String(scope_trimmed.to_string()),
+                ),
+                (
+                    "allowed_scopes".to_string(),
+                    serde_json::json!(allowed_scopes),
+                ),
+            ]),
+            crate::logging::LogLevel::Warn,
+        );
+
+        Err(MemoryError::Validation(format!(
+            "unknown scope `{}`; allowed scopes: {}",
+            scope_trimmed,
+            allowed_scopes.join(", ")
+        )))
+    }
+
+    fn is_default_scope_alias(&self, scope_lower: &str) -> bool {
+        scope_lower == "org"
+            && self.default_namespace != "org"
+            && !self.namespaces.iter().any(|ns| ns == "org")
+    }
+
+    fn allowed_scope_values(&self) -> Vec<String> {
+        let mut allowed = self.namespaces.clone();
+        if self.is_default_scope_alias("org") && !allowed.iter().any(|scope| scope == "org") {
+            allowed.push("org".to_string());
+        }
+        allowed.sort();
+        allowed.dedup();
+        allowed
+    }
+
+    /// Searches for a record across all configured namespaces.
+    ///
+    /// Returns `(Some(record_map), Some(namespace))` if found, or `(None, None)` otherwise.
+    async fn find_record_in_namespaces(
+        &self,
+        record_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        for namespace in &self.namespaces {
+            let record = self.db_client.select_one(record_id, namespace).await?;
+            if let Some(Value::Object(map)) = record {
+                return Ok((Some(map), Some(namespace.clone())));
+            }
+        }
+        Ok((None, None))
+    }
+
+    pub(crate) async fn find_episode_record(
+        &self,
+        episode_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        self.find_record_in_namespaces(episode_id).await
+    }
+
+    pub(crate) async fn find_fact_record(
+        &self,
+        fact_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        self.find_record_in_namespaces(fact_id).await
+    }
+
+    async fn find_entity_record(
+        &self,
+        name: &str,
+        namespace: &str,
+    ) -> Result<Option<serde_json::Map<String, Value>>, MemoryError> {
+        let normalized = super::normalize_text(name);
+        Ok(self
+            .db_client
+            .select_entity_lookup(namespace, &normalized)
+            .await?
+            .and_then(|record| record.as_object().cloned()))
+    }
+
+    async fn find_entity_record_by_id(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        for namespace in &self.namespaces {
+            let record = self.db_client.select_one(entity_id, namespace).await?;
+            if record.is_some() {
+                return Ok(record);
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) fn is_scope_allowed(&self, scope: &str, access: &AccessContext) -> bool {
+        if let Some(scopes) = &access.allowed_scopes
+            && !scopes.contains(&scope.to_string())
+        {
+            return access.cross_scope_allow.as_ref().is_some_and(|cross| {
+                cross
+                    .iter()
+                    .any(|pair| pair.from == "*" && pair.to == scope)
+            });
+        }
+        true
+    }
+
+    pub(crate) fn enforce_rate_limit(
+        &self,
+        access: Option<&AccessContext>,
+    ) -> Result<(), MemoryError> {
+        if let Some(access) = access
+            && let Some(caller) = &access.caller_id
+            && !self.rate_limiter.allow(caller)
+        {
+            return Err(MemoryError::Validation("rate limit exceeded".into()));
+        }
+        Ok(())
+    }
+
+    async fn find_entity_by_name(&self, name: &str) -> Result<Option<String>, MemoryError> {
+        let record = self
+            .find_entity_record(name, &self.default_namespace)
+            .await?;
+        Ok(record.and_then(|map| {
+            map.get("entity_id")
+                .and_then(string_from_value)
+                .or_else(|| map.get("id").and_then(string_from_value))
+        }))
+    }
+
+    async fn build_explain_item(&self, item: ExplainItem) -> Result<ExplainItem, MemoryError> {
+        let (record, _) = self.find_episode_record(&item.source_episode).await?;
+        let Some(record) = record else {
+            return Ok(item);
+        };
+
+        let Some(episode) = super::episode::episode_from_record(&record) else {
+            return Ok(item);
+        };
+
+        // Look up entity_links from the fact record if fact_id is available
+        let (entity_links, fact_namespace) = if let Some(ref fact_id) = item.fact_id {
+            let (fact_record, namespace) = self.find_fact_record(fact_id).await?;
+            let links = fact_record
+                .and_then(|r| {
+                    r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .unwrap_or_default();
+            (links, namespace)
+        } else {
+            (Vec::new(), None)
+        };
+
+        let provenance_namespace = match fact_namespace {
+            Some(namespace) => namespace,
+            None => self.resolve_namespace_for_scope(&episode.scope)?,
+        };
+
+        // Collect all provenance sources including linked episodes
+        let all_sources = self
+            .collect_provenance_sources(&episode, &entity_links, &provenance_namespace)
+            .await?;
+
+        Ok(ExplainItem {
+            fact_id: item.fact_id,
+            content: if item.content.is_empty() {
+                episode.content.clone()
+            } else {
+                item.content
+            },
+            quote: item.quote,
+            source_episode: item.source_episode,
+            scope: Some(episode.scope.clone()),
+            t_ref: Some(episode.t_ref),
+            t_ingested: Some(episode.t_ingested),
+            provenance: json!({
+                "source_episode": episode.episode_id,
+                "source_type": episode.source_type,
+                "source_id": episode.source_id,
+            }),
+            citation_context: Some(episode.content.clone()),
+            all_sources,
+        })
+    }
+
+    /// Collects all provenance sources for a fact including linked episodes.
+    async fn collect_provenance_sources(
+        &self,
+        primary_episode: &crate::models::Episode,
+        entity_links: &[String],
+        namespace: &str,
+    ) -> Result<Vec<ProvenanceSource>, MemoryError> {
+        let mut sources = Vec::new();
+
+        // 1. Add direct source episode
+        sources.push(ProvenanceSource {
+            episode_id: primary_episode.episode_id.clone(),
+            episode_content: primary_episode.content.clone(),
+            episode_t_ref: crate::service::normalize_dt(primary_episode.t_ref),
+            relationship: "direct".to_string(),
+            entity_path: None,
+        });
+
+        // 2. Traverse entity_links to find connected episodes
+        for entity_id in entity_links {
+            let linked_episodes = self.find_episodes_via_entity(entity_id, namespace).await?;
+
+            for ep in linked_episodes {
+                // Skip if this is the primary source (already added)
+                if ep.episode_id == primary_episode.episode_id {
+                    continue;
+                }
+
+                sources.push(ProvenanceSource {
+                    episode_id: ep.episode_id.clone(),
+                    episode_content: ep.content.clone(),
+                    episode_t_ref: crate::service::normalize_dt(ep.t_ref),
+                    relationship: "linked".to_string(),
+                    entity_path: Some(format!("{} -> {}", primary_episode.episode_id, entity_id)),
+                });
+            }
+        }
+
+        // Sort: direct first, then by t_ref descending
+        sources.sort_by(|a, b| {
+            if a.relationship == "direct" {
+                std::cmp::Ordering::Less
+            } else if b.relationship == "direct" {
+                std::cmp::Ordering::Greater
+            } else {
+                b.episode_t_ref.cmp(&a.episode_t_ref)
+            }
+        });
+
+        Ok(sources)
+    }
+
+    /// Finds all episodes that mention or are linked to an entity.
+    async fn find_episodes_via_entity(
+        &self,
+        entity_id: &str,
+        namespace: &str,
+    ) -> Result<Vec<crate::models::Episode>, MemoryError> {
+        let rows = self
+            .db_client
+            .select_episodes_by_entity(namespace, entity_id, 10)
+            .await?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|v| {
+                let obj = v.as_object()?;
+                super::episode::episode_from_record(obj)
+            })
+            .collect())
+    }
+}
+
+pub(crate) fn draft_entity_candidate(
+    item: &crate::models::DraftItem,
+) -> Result<EntityCandidate, MemoryError> {
+    let canonical_name = draft_payload_str(&item.payload, "canonical_name")
+        .or_else(|| draft_payload_str(&item.payload, "name"))
+        .or_else(|| draft_payload_str(&item.payload, "content"))
+        .or_else(|| item.source_snippet.clone())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            MemoryError::InvalidParameter(format!(
+                "draft entity {} is missing canonical_name",
+                item.item_id
+            ))
+        })?;
+
+    Ok(EntityCandidate {
+        entity_type: draft_payload_str(&item.payload, "entity_type")
+            .unwrap_or_else(|| "concept".to_string()),
+        canonical_name,
+        aliases: draft_payload_string_array(&item.payload, "aliases"),
+    })
+}
+
+pub(crate) fn draft_payload_str(payload: &Value, key: &str) -> Option<String> {
+    payload
+        .as_object()
+        .and_then(|map| map.get(key))
+        .and_then(string_from_value)
+}
+
+pub(crate) fn draft_payload_string_array(payload: &Value, key: &str) -> Vec<String> {
+    payload
+        .as_object()
+        .and_then(|map| map.get(key))
+        .and_then(|value| {
+            if let Some(array) = value.as_array() {
+                Some(array)
+            } else {
+                value
+                    .as_object()
+                    .and_then(|inner| inner.get("Array")?.as_array())
+            }
+        })
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(string_from_value)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+pub(crate) fn draft_payload_f64(payload: &Value, key: &str) -> Option<f64> {
+    payload
+        .as_object()
+        .and_then(|map| map.get(key))
+        .and_then(json_f64)
+}
+
+pub(crate) fn draft_payload_datetime(payload: &Value, key: &str) -> Option<DateTime<Utc>> {
+    draft_payload_str(payload, key)
+        .as_deref()
+        .and_then(super::parse_iso)
+}
+
+pub(crate) fn resolve_draft_reference(
+    reference: &str,
+    entity_ids_by_item: &HashMap<String, String>,
+    entity_ids_by_name: &HashMap<String, String>,
+) -> Option<String> {
+    if reference.starts_with("entity:")
+        || reference.starts_with("fact:")
+        || reference.starts_with("episode:")
+    {
+        return Some(reference.to_string());
+    }
+
+    entity_ids_by_item.get(reference).cloned().or_else(|| {
+        entity_ids_by_name
+            .get(&super::normalize_text(reference))
+            .cloned()
+    })
+}
+
+/// Trait for safe mutex locking that handles poisoned locks gracefully.
+pub(crate) trait SafeMutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T> SafeMutex<T> for Mutex<T> {
+    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// Rate limiter using the token bucket algorithm.
+///
+/// # Safety
+///
+/// We use `std::sync::Mutex` instead of `tokio::sync::Mutex` because:
+/// - Guards are always dropped before any `.await` point
+/// - No async operations occur while holding the lock
+/// - This prevents tokio worker thread blocking
+pub(crate) struct RateLimiter {
+    rps: f64,
+    burst: f64,
+    /// Per-key state for token bucket algorithm.
+    tokens: Mutex<HashMap<String, f64>>,
+    last: Mutex<HashMap<String, Instant>>,
+}
+
+impl RateLimiter {
+    pub(crate) fn new(rps: i32, burst: i32) -> Self {
+        Self {
+            rps: (rps.max(1)) as f64,
+            burst: (burst.max(1)) as f64,
+            tokens: Mutex::new(HashMap::new()),
+            last: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn allow(&self, key: &str) -> bool {
+        let mut tokens = self.tokens.safe_lock();
+        let mut last = self.last.safe_lock();
+        let now = Instant::now();
+        let last_time = last.entry(key.to_string()).or_insert(now);
+        let elapsed = now.duration_since(*last_time).as_secs_f64();
+        *last_time = now;
+        let entry = tokens.entry(key.to_string()).or_insert(self.burst);
+        let refill = elapsed * self.rps;
+        *entry = (*entry + refill).min(self.burst);
+        if *entry < 1.0 {
+            return false;
+        }
+        *entry -= 1.0;
+        true
+    }
+}
+
+pub(crate) fn string_from_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.clone()),
+        Value::Object(map) => {
+            if let Some(Value::String(s)) = map.get("String") {
+                return Some(s.clone());
+            }
+            if let Some(Value::String(s)) = map.get("Strand") {
+                return Some(s.clone());
+            }
+            if let Some(Value::Object(inner)) = map.get("Strand")
+                && let Some(Value::String(s)) = inner.get("String")
+            {
+                return Some(s.clone());
+            }
+            if let Some(Value::Object(record_id)) = map.get("RecordId")
+                && let (Some(Value::String(table)), Some(Value::String(key))) =
+                    (record_id.get("table"), record_id.get("key"))
+            {
+                return Some(format!("{table}:{key}"));
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {
+    static MONTH_YEAR_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static ISO_DATE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+
+    let mut keys = HashSet::from([
+        super::normalize_text(&t_valid.format("%B %Y").to_string()),
+        t_valid.format("%Y-%m").to_string(),
+    ]);
+
+    let month_year_re = MONTH_YEAR_RE.get_or_init(|| {
+        Regex::new(
+            r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
+        )
+        .expect("month-year regex is valid")
+    });
+    for capture in month_year_re.find_iter(content) {
+        keys.insert(super::normalize_text(capture.as_str()));
+    }
+
+    let iso_date_re = ISO_DATE_RE.get_or_init(|| {
+        Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("iso-date regex is valid")
+    });
+    for capture in iso_date_re.find_iter(content) {
+        keys.insert(capture.as_str().to_lowercase());
+    }
+
+    let mut keys = keys
+        .into_iter()
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>();
+    keys.sort();
+    keys
+}
+
+fn build_intro_chain_from_start(
+    start_id: &str,
+    target_id: &str,
+    next_hop: &HashMap<String, String>,
+) -> Option<Vec<String>> {
+    let mut path = vec![start_id.to_string()];
+    let mut current = start_id;
+
+    while let Some(next) = next_hop.get(current) {
+        path.push(next.clone());
+        if next == target_id {
+            return Some(path);
+        }
+        current = next;
+    }
+
+    None
+}
+
+#[cfg(test)]
+fn bfs_path(
+    graph: &HashMap<String, Vec<String>>,
+    start: &str,
+    target: &str,
+    max_hops: i32,
+) -> Option<Vec<String>> {
+    use std::collections::HashSet;
+
+    let mut queue: std::collections::VecDeque<(String, Vec<String>)> =
+        std::collections::VecDeque::new();
+    let mut visited = HashSet::new();
+    queue.push_back((start.to_string(), vec![start.to_string()]));
+    visited.insert(start.to_string());
+
+    while let Some((node, path)) = queue.pop_front() {
+        if (path.len() as i32) - 1 > max_hops {
+            continue;
+        }
+        if let Some(neighbors) = graph.get(&node) {
+            for neighbor in neighbors {
+                if visited.contains(neighbor) {
+                    continue;
+                }
+                if neighbor == target {
+                    let mut new_path = path.clone();
+                    new_path.push(neighbor.clone());
+                    return Some(new_path);
+                }
+                visited.insert(neighbor.clone());
+                let mut new_path = path.clone();
+                new_path.push(neighbor.clone());
+                queue.push_back((neighbor.clone(), new_path));
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+    use crate::config::DEFAULT_EMBEDDING_DIMENSION;
+    use crate::models::EntityCandidate;
+    use crate::models::{AccessContext, AccessScopeAllow};
+    use crate::service::EmbeddingProvider;
+    use crate::service::test_support::MockDb;
+    use crate::storage::SurrealDbClient;
+    use async_trait::async_trait;
+    use serde_json::json;
+
+    #[test]
+    fn rate_limiter_allows_burst() {
+        let limiter = RateLimiter::new(10, 5);
+        for _ in 0..5 {
+            assert!(limiter.allow("test-user"));
+        }
+    }
+
+    #[test]
+    fn rate_limiter_blocks_after_burst() {
+        let limiter = RateLimiter::new(10, 2);
+        assert!(limiter.allow("test-user"));
+        assert!(limiter.allow("test-user"));
+        assert!(!limiter.allow("test-user"));
+    }
+
+    #[test]
+    fn rate_limiter_different_users_independent() {
+        let limiter = RateLimiter::new(10, 1);
+        assert!(limiter.allow("user-1"));
+        assert!(!limiter.allow("user-1"));
+        assert!(limiter.allow("user-2"));
+    }
+
+    #[test]
+    fn log_simple_creates_expected_structure() {
+        let event = crate::log_event!(
+            "test_op",
+            "success",
+            "key" => "value",
+            "result" => "ok"
+        );
+        assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
+        assert_eq!(event.get("status").unwrap().as_str(), Some("success"));
+        assert_eq!(event.get("key").unwrap().as_str(), Some("value"));
+        assert_eq!(event.get("result").unwrap().as_str(), Some("ok"));
+    }
+
+    #[test]
+    fn log_error_creates_expected_structure() {
+        let err = std::io::Error::new(std::io::ErrorKind::NotFound, "test error");
+        let event = crate::log_error!(
+            "test_op",
+            &err,
+            "caller" => "test-caller"
+        );
+        assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
+        assert_eq!(event.get("status").unwrap().as_str(), Some("error"));
+        assert!(
+            event
+                .get("error")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("test error")
+        );
+        assert_eq!(event.get("caller").unwrap().as_str(), Some("test-caller"));
+    }
+
+    #[test]
+    fn string_from_value_handles_string() {
+        let value = json!("test");
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_strand() {
+        let value = json!({"Strand": "test"});
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_nested_strand() {
+        let value = json!({"Strand": {"String": "test"}});
+        assert_eq!(string_from_value(&value), Some("test".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_handles_record_id() {
+        let value = json!({"RecordId": {"table": "entity", "key": "alice"}});
+        assert_eq!(string_from_value(&value), Some("entity:alice".to_string()));
+    }
+
+    #[test]
+    fn string_from_value_returns_none_for_other_types() {
+        assert_eq!(string_from_value(&json!(123)), None);
+        assert_eq!(string_from_value(&json!(true)), None);
+        assert_eq!(string_from_value(&json!(null)), None);
+        assert_eq!(string_from_value(&json!([1, 2, 3])), None);
+    }
+
+    #[test]
+    fn bfs_path_finds_direct_connection() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "B", 5);
+        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
+    }
+
+    #[test]
+    fn bfs_path_finds_indirect_connection() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec!["C".to_string()]);
+        graph.insert("C".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "C", 5);
+        assert_eq!(
+            path,
+            Some(vec!["A".to_string(), "B".to_string(), "C".to_string()])
+        );
+    }
+
+    #[test]
+    fn bfs_path_respects_max_hops() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec!["C".to_string()]);
+        graph.insert("C".to_string(), vec!["D".to_string()]);
+
+        let path = bfs_path(&graph, "A", "D", 1);
+        assert_eq!(path, None);
+
+        let path = bfs_path(&graph, "A", "D", 3);
+        assert!(path.is_some());
+    }
+
+    #[test]
+    fn bfs_path_returns_none_for_unreachable() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string()]);
+        graph.insert("B".to_string(), vec![]);
+        graph.insert("C".to_string(), vec![]); // Unreachable from A
+
+        let path = bfs_path(&graph, "A", "C", 5);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn build_startup_versions_event_includes_both_versions() {
+        let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert_eq!(
+            evt.get("surrealdb_server_version").unwrap().as_str(),
+            Some("SurrealDB 3.0.0")
+        );
+    }
+
+    #[test]
+    fn build_startup_versions_event_omits_server_when_none() {
+        let evt = build_startup_versions_event("0.1.0", None);
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert!(!evt.contains_key("surrealdb_server_version"));
+    }
+
+    #[tokio::test]
+    async fn apply_startup_migrations_runs_for_every_namespace() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let apply_count = Arc::new(AtomicUsize::new(0));
+        let mut db_client = MockDb::default();
+        db_client.apply_migrations_fn = Box::new({
+            let calls = Arc::clone(&calls);
+            let apply_count = Arc::clone(&apply_count);
+            move |namespace| {
+                apply_count.fetch_add(1, Ordering::SeqCst);
+                calls.safe_lock().push(namespace.to_string());
+                Ok(())
+            }
+        });
+        let db_client_dyn: Arc<dyn DbClient> = Arc::new(db_client);
+        let namespaces = vec![
+            "org".to_string(),
+            "personal".to_string(),
+            "private".to_string(),
+        ];
+
+        apply_startup_migrations(&db_client_dyn, &namespaces)
+            .await
+            .expect("startup migrations");
+
+        assert_eq!(apply_count.load(Ordering::SeqCst), 3);
+        assert_eq!(
+            calls.safe_lock().clone(),
+            vec![
+                "org".to_string(),
+                "personal".to_string(),
+                "private".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn bfs_path_returns_single_element_for_same_node() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "A", 5);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn resolve_namespace_for_scope_returns_exact_match() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "org");
+        assert_eq!(
+            service.resolve_namespace_for_scope("personal").unwrap(),
+            "personal"
+        );
+    }
+
+    #[test]
+    fn resolve_namespace_for_scope_rejects_unknown_scope() {
+        let service = create_test_service(vec!["org", "personal"]);
+        let err = service.resolve_namespace_for_scope("unknown").unwrap_err();
+        assert!(
+            matches!(err, MemoryError::Validation(message) if message.contains("unknown scope"))
+        );
+    }
+
+    #[test]
+    fn org_scope_is_treated_as_default_namespace_alias_when_org_namespace_missing() {
+        let service = create_test_service(vec!["acme", "personal"]);
+
+        assert!(service.is_default_scope_alias("org"));
+        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "acme");
+        assert_eq!(service.resolve_namespace_for_scope("ORG").unwrap(), "acme");
+    }
+
+    #[tokio::test]
+    async fn ingest_rejects_unknown_scope_instead_of_falling_back() {
+        let service = create_test_service(vec!["org", "personal"]);
+
+        let err = service
+            .ingest(
+                IngestRequest {
+                    source_type: "document".to_string(),
+                    source_id: "catalog-sheet".to_string(),
+                    content: "item code alpha-42 from pricing catalog".to_string(),
+                    t_ref: chrono::Utc::now(),
+                    scope: "team".to_string(),
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await
+            .expect_err("unknown scope should be rejected");
+
+        assert!(
+            matches!(err, MemoryError::Validation(ref message) if message.contains("unknown scope")),
+            "expected validation error for unknown scope, got {err:?}"
+        );
+    }
+
+    fn create_test_service(namespaces: Vec<&str>) -> MemoryService {
+        MemoryService::new_with_clock(
+            Arc::new(MockDb::default()),
+            namespaces.iter().map(|s| s.to_string()).collect(),
+            "warn".to_string(),
+            50,
+            100,
+            chrono::Utc::now,
+        )
+        .unwrap()
+    }
+
+    fn create_test_service_with_rate_limit(rps: i32, burst: i32) -> MemoryService {
+        MemoryService::new_with_clock(
+            Arc::new(MockDb::default()),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            rps,
+            burst,
+            chrono::Utc::now,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_true_when_no_restrictions() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext::default();
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_true_for_allowed_scope() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_false_for_disallowed_scope() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        assert!(!service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_allows_with_cross_scope_wildcard() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        assert!(service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn enforce_rate_limit_allows_without_caller_id() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext::default();
+        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn enforce_rate_limit_allows_within_limit() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn enforce_rate_limit_accepts_none() {
+        let service = create_test_service(vec!["org"]);
+        assert!(service.enforce_rate_limit(None).is_ok());
+    }
+
+    #[test]
+    fn cbor_round_trip_preserves_value() {
+        let service = create_test_service(vec!["org"]);
+        let original = json!({"key": "value", "nested": {"num": 42}});
+        let round_tripped = service.cbor_round_trip(&original).unwrap();
+        assert_eq!(original, round_tripped);
+    }
+
+    #[test]
+    fn cbor_round_trip_handles_arrays() {
+        let service = create_test_service(vec!["org"]);
+        let original = json!([1, 2, 3, "test", {"key": "value"}]);
+        let round_tripped = service.cbor_round_trip(&original).unwrap();
+        assert_eq!(original, round_tripped);
+    }
+
+    #[tokio::test]
+    async fn resolve_uses_indexed_entity_lookup_instead_of_table_scan() {
+        use std::sync::Arc;
+
+        let mut db_client = MockDb::default();
+        db_client.select_table_fn =
+            Box::new(|_, _| panic!("resolve should not scan the entity table"));
+        db_client.select_edges_filtered_fn =
+            Box::new(|_, _| panic!("find_intro_chain should not bulk-load all edges"));
+        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
+            assert_eq!(direction, GraphDirection::Incoming);
+
+            Ok(match node_id {
+                "entity:openai" => vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                _ => vec![],
+            })
+        });
+        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
+            Ok(match normalized_name {
+                "dima ivanov" => Some(json!({"entity_id": "entity:existing"})),
+                "openai" => Some(json!({"entity_id": "entity:openai"})),
+                _ => None,
+            })
+        });
+        db_client.create_fn = Box::new(|_, _, _| {
+            panic!("resolve should not create when indexed lookup finds a record")
+        });
+
+        let service = MemoryService::new(
+            Arc::new(db_client),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let resolved = service
+            .resolve(
+                EntityCandidate {
+                    entity_type: "person".to_string(),
+                    canonical_name: "Dima Ivanov".to_string(),
+                    aliases: vec![],
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resolved, "entity:existing");
+    }
+
+    #[tokio::test]
+    async fn record_fact_access_retries_retryable_transaction_conflicts() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let select_calls = Arc::new(AtomicUsize::new(0));
+        let update_calls = Arc::new(AtomicUsize::new(0));
+
+        let mut db_client = MockDb::default();
+        db_client.select_one_fn = Box::new({
+            let select_calls = Arc::clone(&select_calls);
+            move |record_id, namespace| {
+                assert_eq!(record_id, "fact:heat");
+                assert_eq!(namespace, "acme");
+                select_calls.fetch_add(1, Ordering::SeqCst);
+                Ok(Some(json!({
+                    "fact_id": "fact:heat",
+                    "scope": "org",
+                    "access_count": 0,
+                    "last_accessed": null,
+                })))
+            }
+        });
+        db_client.update_fn = Box::new({
+            let update_calls = Arc::clone(&update_calls);
+            move |record_id, content, namespace| {
+                assert_eq!(record_id, "fact:heat");
+                assert_eq!(namespace, "acme");
+                let call = update_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(
+                    content.get("access_count").and_then(|v| v.as_i64()),
+                    Some(1)
+                );
+                assert!(content.get("last_accessed").is_some());
+
+                if call == 0 {
+                    Err(MemoryError::Storage(
+                        "SurrealDB take failed: Transaction conflict: Resource busy: . This transaction can be retried".to_string(),
+                    ))
+                } else {
+                    Ok(json!({"fact_id": "fact:heat"}))
+                }
+            }
+        });
+
+        let service = MemoryService::new_with_clock(
+            Arc::new(db_client),
+            vec!["acme".to_string(), "personal".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            || {
+                chrono::DateTime::parse_from_rfc3339("2026-04-01T08:44:30Z")
+                    .expect("valid timestamp")
+                    .with_timezone(&chrono::Utc)
+            },
+        )
+        .expect("service");
+
+        service
+            .record_fact_access("fact:heat", 1)
+            .await
+            .expect("retryable conflict should succeed after retry");
+
+        assert_eq!(select_calls.load(Ordering::SeqCst), 2);
+        assert_eq!(update_calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_uses_db_side_neighbor_lookups() {
+        use std::sync::Arc;
+
+        let mut db_client = MockDb::default();
+        db_client.select_edges_filtered_fn =
+            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
+        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
+            assert_eq!(direction, GraphDirection::Incoming);
+
+            Ok(match node_id {
+                "entity:openai" => vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                _ => vec![],
+            })
+        });
+        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
+            assert_eq!(normalized_name, "openai");
+            Ok(Some(json!({"entity_id": "entity:openai"})))
+        });
+
+        let service = MemoryService::new(
+            Arc::new(db_client),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:openai".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
+        use std::sync::Arc;
+
+        let mut db_client = MockDb::default();
+        db_client.select_edges_filtered_fn =
+            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
+        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
+            assert_eq!(direction, GraphDirection::Incoming);
+
+            Ok(match node_id {
+                "entity:openai" => vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                _ => vec![],
+            })
+        });
+        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
+            assert_eq!(normalized_name, "openai");
+            Ok(Some(json!({"entity_id": "entity:openai"})))
+        });
+
+        let service = MemoryService::new(
+            Arc::new(db_client),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec!["entity:carol".to_string(), "entity:openai".to_string()],
+            "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
+        use std::sync::Arc;
+
+        let mut db_client = MockDb::default();
+        db_client.select_edges_filtered_fn =
+            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
+        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
+            assert_eq!(direction, GraphDirection::Incoming);
+
+            Ok(match node_id {
+                "entity:openai" => vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                "entity:carol" => vec![json!({"in": "entity:diana", "out": "entity:carol"})],
+                "entity:alice" => vec![json!({"in": "entity:erin", "out": "entity:alice"})],
+                _ => vec![],
+            })
+        });
+        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
+            assert_eq!(normalized_name, "openai");
+            Ok(Some(json!({"entity_id": "entity:openai"})))
+        });
+
+        let service = MemoryService::new(
+            Arc::new(db_client),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 4, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:diana".to_string(),
+                "entity:carol".to_string(),
+                "entity:openai".to_string(),
+            ],
+            "the traversal should keep the shorter diamond branch instead of returning the deeper alternative"
+        );
+    }
+
+    struct StaticTestEmbeddingProvider {
+        salary_vector: Vec<f64>,
+        neutral_vector: Vec<f64>,
+    }
+
+    impl StaticTestEmbeddingProvider {
+        fn new() -> Self {
+            let mut salary_vector = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+            salary_vector[0] = 1.0;
+            let mut neutral_vector = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+            neutral_vector[1] = 1.0;
+            Self {
+                salary_vector,
+                neutral_vector,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StaticTestEmbeddingProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "test"
+        }
+
+        fn dimension(&self) -> usize {
+            DEFAULT_EMBEDDING_DIMENSION
+        }
+
+        async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+            let normalized = input.to_ascii_lowercase();
+            if normalized.contains("salary raise") || normalized.contains("compensation increase") {
+                return Ok(self.salary_vector.clone());
+            }
+
+            Ok(self.neutral_vector.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn add_fact_persists_embedding_when_provider_enabled() {
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "testdb",
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory"),
+        );
+        db_client.apply_migrations("org").await.expect("migrations");
+
+        let service = MemoryService::new_with_embedding_provider(
+            db_client.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(StaticTestEmbeddingProvider::new()),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(super::AnnoEntityExtractor::new().expect("anno extractor")),
+        )
+        .expect("service");
+
+        let fact_id = service
+            .add_fact(AddFactRequest {
+                fact_type: "note",
+                content: "Compensation increase approved for engineering",
+                quote: "Compensation increase approved",
+                source_episode: "episode:test",
+                t_valid: Utc::now(),
+                scope: "org",
+                confidence: 0.9,
+                entity_links: vec![],
+                policy_tags: vec![],
+                provenance: json!({"source_episode": "episode:test"}),
+            })
+            .await
+            .expect("add fact");
+
+        let fact = db_client
+            .select_one(&fact_id, "org")
+            .await
+            .expect("select fact")
+            .expect("stored fact");
+
+        assert_eq!(
+            fact.get("embedding")
+                .and_then(|value| value.as_array())
+                .map(Vec::len),
+            Some(DEFAULT_EMBEDDING_DIMENSION)
+        );
+    }
+
+    #[test]
+    fn string_from_value_handles_object_without_expected_keys() {
+        let value = json!({"Other": "value"});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
+    fn string_from_value_handles_record_id_missing_fields() {
+        let value = json!({"RecordId": {"table": "entity"}});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
+    fn rate_limiter_new_initializes_correctly() {
+        let limiter = RateLimiter::new(100, 50);
+        let tokens = limiter.tokens.safe_lock();
+        let last = limiter.last.safe_lock();
+        assert!(tokens.is_empty());
+        assert!(last.is_empty());
+        drop(tokens);
+        drop(last);
+    }
+
+    #[test]
+    fn rate_limiter_burst_allows_initial_requests() {
+        let limiter = RateLimiter::new(10, 5);
+        for _ in 0..5 {
+            assert!(limiter.allow("burst-user"));
+        }
+        assert!(!limiter.allow("burst-user"));
+    }
+
+    #[test]
+    fn rate_limiter_empty_string_caller_id() {
+        let limiter = RateLimiter::new(10, 1);
+        assert!(limiter.allow(""));
+        assert!(!limiter.allow(""));
+    }
+
+    #[test]
+    fn resolve_namespace_for_scope_handles_various_inputs() {
+        let service = create_test_service(vec!["org", "personal", "private"]);
+
+        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "org");
+        assert_eq!(
+            service.resolve_namespace_for_scope("personal").unwrap(),
+            "personal"
+        );
+        assert_eq!(
+            service.resolve_namespace_for_scope("private").unwrap(),
+            "private"
+        );
+        assert!(matches!(
+            service.resolve_namespace_for_scope("unknown"),
+            Err(MemoryError::Validation(message)) if message.contains("unknown scope")
+        ));
+        assert!(matches!(
+            service.resolve_namespace_for_scope(""),
+            Err(MemoryError::Validation(message)) if message.contains("scope is required")
+        ));
+        assert_eq!(service.resolve_namespace_for_scope("ORG").unwrap(), "org");
+    }
+
+    #[test]
+    fn is_scope_allowed_with_empty_allowed_scopes() {
+        let service = create_test_service(vec!["org"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(!service.is_scope_allowed("org", &access));
+    }
+
+    #[test]
+    fn is_scope_allowed_with_multiple_allowed_scopes() {
+        let service = create_test_service(vec!["org", "personal"]);
+        let access = AccessContext {
+            allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
+            ..Default::default()
+        };
+        assert!(service.is_scope_allowed("org", &access));
+        assert!(service.is_scope_allowed("personal", &access));
+        assert!(!service.is_scope_allowed("private", &access));
+    }
+
+    #[test]
+    fn enforce_rate_limit_with_burst_capacity() {
+        let service = create_test_service_with_rate_limit(10, 5);
+        let access = AccessContext {
+            caller_id: Some("burst-test".to_string()),
+            ..Default::default()
+        };
+
+        for _ in 0..5 {
+            assert!(service.enforce_rate_limit(Some(&access)).is_ok());
+        }
+    }
+
+    #[test]
+    fn enforce_rate_limit_multiple_users_isolated() {
+        let service = create_test_service_with_rate_limit(10, 1);
+
+        let user1 = AccessContext {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        let user2 = AccessContext {
+            caller_id: Some("user-2".to_string()),
+            ..Default::default()
+        };
+
+        assert!(service.enforce_rate_limit(Some(&user1)).is_ok());
+        assert!(service.enforce_rate_limit(Some(&user1)).is_err());
+
+        assert!(service.enforce_rate_limit(Some(&user2)).is_ok());
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_builds_correct_path() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+        next_hop.insert("B".to_string(), "C".to_string());
+        next_hop.insert("C".to_string(), "D".to_string());
+
+        let path = build_intro_chain_from_start("A", "D", &next_hop);
+        assert_eq!(
+            path,
+            Some(vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_returns_none_for_unreachable() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+        next_hop.insert("B".to_string(), "C".to_string());
+
+        let path = build_intro_chain_from_start("A", "Z", &next_hop);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn build_intro_chain_from_start_handles_direct_connection() {
+        let mut next_hop = HashMap::new();
+        next_hop.insert("A".to_string(), "B".to_string());
+
+        let path = build_intro_chain_from_start("A", "B", &next_hop);
+        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
+    }
+
+    #[test]
+    fn bfs_path_handles_empty_graph() {
+        let graph: HashMap<String, Vec<String>> = HashMap::new();
+        let path = bfs_path(&graph, "A", "B", 5);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn bfs_path_finds_shortest_path_in_complex_graph() {
+        let mut graph = HashMap::new();
+        graph.insert("A".to_string(), vec!["B".to_string(), "C".to_string()]);
+        graph.insert("B".to_string(), vec!["D".to_string()]);
+        graph.insert("C".to_string(), vec!["D".to_string(), "E".to_string()]);
+        graph.insert("D".to_string(), vec!["F".to_string()]);
+        graph.insert("E".to_string(), vec!["F".to_string()]);
+        graph.insert("F".to_string(), vec![]);
+
+        let path = bfs_path(&graph, "A", "F", 10);
+        assert!(path.is_some());
+        let path = path.unwrap();
+        assert!(path.len() <= 4);
+    }
+}

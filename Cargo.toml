@@ -1,0 +1,62 @@
+[package]
+name = "memory_mcp"
+version = "1.0.0"
+edition = "2024"
+resolver = "3"
+license = "MIT"
+
+[dependencies]
+rmcp = { version = "1.3.0", features = ["macros", "transport-io"] }
+tokio = { version = "1.50.0", features = [
+    "rt-multi-thread",
+    "macros",
+    "io-std"
+] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+schemars = "1.2.1"
+chrono = { version = "0.4.44", features = ["serde", "clock"] }
+thiserror = "2.0.18"
+async-trait = "0.1.89"
+anno = { version = "0.4", default-features = false }
+regex = "1.12.3"
+sha2 = "0.10.9"
+hex = "0.4.3"
+uuid = { version = "1.23.0", features = ["v4"] }
+serde_cbor = "0.11.2"
+lru = "0.16.3"
+surrealdb = { version = "3.0.5", features = ["kv-rocksdb", "kv-mem"] }
+reqwest = { version = "0.13.2", default-features = false, features = [
+    "json",
+    "rustls"
+] }
+candle-core = { version = "0.9.2", default-features = false }
+candle-nn = { version = "0.9.2", default-features = false }
+candle-transformers = { version = "0.9.2", default-features = false }
+tokenizers = { version = "0.22.2", default-features = false, features = [
+    "fancy-regex"
+] }
+hf-hub = { version = "0.5.0", default-features = false, features = ["tokio"] }
+
+[dev-dependencies]
+serde_json = "1.0.149"
+tempfile = "3.27.0"
+
+[profile.dev]
+opt-level = 0
+debug = 1
+incremental = true
+codegen-units = 16
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.test]
+inherits = "dev"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

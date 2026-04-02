@@ -1,0 +1,108 @@
+[
+    {
+        "id": "ext-001",
+        "description": "Metric and promise in one episode",
+        "content": "ARR grew to $3M. I will send the update by Friday.",
+        "scope": "org",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "expected": {
+            "entities": [],
+            "fact_types": [
+                "metric",
+                "promise"
+            ]
+        }
+    },
+    {
+        "id": "ext-002",
+        "description": "Promise-only sentence",
+        "content": "I will finish the integration by next Monday.",
+        "scope": "org",
+        "t_ref": "2026-03-02T09:00:00Z",
+        "expected": {
+            "entities": [],
+            "fact_types": [
+                "promise"
+            ]
+        }
+    },
+    {
+        "id": "ext-003",
+        "description": "Metric-only sentence",
+        "content": "Revenue reached $5M in Q4.",
+        "scope": "org",
+        "t_ref": "2026-03-03T09:00:00Z",
+        "expected": {
+            "entities": [],
+            "fact_types": [
+                "metric"
+            ]
+        }
+    },
+    {
+        "id": "ext-004",
+        "description": "Person entity with promise fact",
+        "content": "John Smith promised to deliver the quarterly report by Friday.",
+        "scope": "personal",
+        "t_ref": "2026-03-04T09:00:00Z",
+        "expected": {
+            "entities": [
+                {
+                    "entity_type": "person",
+                    "canonical_name": "John Smith"
+                }
+            ],
+            "fact_types": [
+                "promise"
+            ]
+        }
+    },
+    {
+        "id": "ext-005",
+        "description": "Organization and location entities",
+        "content": "Tim Cook announced that Apple will open a new office in London next year.",
+        "scope": "org",
+        "t_ref": "2026-03-05T09:00:00Z",
+        "expected": {
+            "entities": [
+                {
+                    "entity_type": "person",
+                    "canonical_name": "Tim Cook"
+                },
+                {
+                    "entity_type": "organization",
+                    "canonical_name": "Apple"
+                },
+                {
+                    "entity_type": "location",
+                    "canonical_name": "London"
+                }
+            ],
+            "fact_types": []
+        }
+    },
+    {
+        "id": "ext-006",
+        "description": "Person and organization in business context",
+        "content": "Satya Nadella confirmed that Microsoft acquired Activision Blizzard for sixty-nine billion dollars.",
+        "scope": "org",
+        "t_ref": "2026-03-06T09:00:00Z",
+        "expected": {
+            "entities": [
+                {
+                    "entity_type": "person",
+                    "canonical_name": "Satya Nadella"
+                },
+                {
+                    "entity_type": "organization",
+                    "canonical_name": "Microsoft"
+                },
+                {
+                    "entity_type": "organization",
+                    "canonical_name": "Activision Blizzard"
+                }
+            ],
+            "fact_types": []
+        }
+    }
+]

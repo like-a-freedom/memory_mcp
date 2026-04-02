@@ -1,0 +1,57 @@
+# Stuff
+data/
+dev/
+.env
+AGENTS.md
+
+# Models
+gliner_multi_v2.1
+multilingual-e5-small
+
+# Cargo build artifacts
+/target/
+**/target/
+/scripts
+
+# Cargo.lock
+# - Keep for binaries and applications
+# - Ignore for libraries (uncomment below)
+# Cargo.lock
+
+# Rustfmt backups
+**/*.rs.bk
+**/*.rs.old
+
+# MSVC debug symbols
+*.pdb
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Cargo-specific
+.cargo/
+Cargo.toml.orig
+
+# Rust Analyzer
+rust-project.json
+
+# Benchmarking
+/criterion/
+
+# Code coverage
+tarpaulin-report.html
+cobertura.xml
+*.profraw
+*.profdata
+
+# Flamegraph
+flamegraph.svg
+perf.data
+perf.data.old
+lcov.info
+.worktrees/

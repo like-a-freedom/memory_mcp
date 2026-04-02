@@ -1,0 +1,65 @@
+[
+    {
+        "id": "ret-001",
+        "description": "Promise across sessions found without travel noise",
+        "episodes": [
+            {
+                "source_type": "chat",
+                "source_id": "sess-1",
+                "content": "Alice will send the Atlas deck by Friday.",
+                "t_ref": "2026-03-01T09:00:00Z",
+                "scope": "personal"
+            },
+            {
+                "source_type": "chat",
+                "source_id": "sess-2",
+                "content": "We discussed unrelated travel plans.",
+                "t_ref": "2026-03-01T10:00:00Z",
+                "scope": "personal"
+            }
+        ],
+        "query": {
+            "query": "alice atlas deck",
+            "scope": "personal",
+            "budget": 5,
+            "as_of": null
+        },
+        "expected": {
+            "must_contain": [
+                "Atlas deck"
+            ],
+            "must_not_contain": [
+                "travel plans"
+            ],
+            "expect_empty": false,
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-002",
+        "description": "Unknown passport query should abstain",
+        "episodes": [
+            {
+                "source_type": "chat",
+                "source_id": "sess-3",
+                "content": "We discussed launch readiness and deployment timing.",
+                "t_ref": "2026-03-01T11:00:00Z",
+                "scope": "personal"
+            }
+        ],
+        "query": {
+            "query": "what is Bob's passport number",
+            "scope": "personal",
+            "budget": 5,
+            "as_of": null
+        },
+        "expected": {
+            "must_contain": [],
+            "must_not_contain": [
+                "launch readiness"
+            ],
+            "expect_empty": true,
+            "min_recall_at_k": 1.0
+        }
+    }
+]

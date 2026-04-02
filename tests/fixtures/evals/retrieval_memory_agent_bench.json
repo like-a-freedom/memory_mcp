@@ -1,0 +1,2592 @@
+[
+  {
+    "id": "mab-cr-direct-0-q0",
+    "description": "MAB CR direct retrieval: What is the country of citizenship of the spouse of the author of Our Mutual Fri",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Thomas Kyd was born in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The chairperson of Fatah is Mahmoud Abbas.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Amy Winehouse died in the city of Camden Town.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Hines Ward plays the position of wide receiver.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Bengaluru is located in the continent of Asia.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Pedro Pierluisi worked in the city of Washington, D.C..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Rogério Ceni plays the position of goalkeeper.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The director of British Broadcasting Corporation is Tony Hall, Baron Hall of Birkenhead.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Victoria Beckham is married to David Beckham.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The headquarters of University of Minnesota is located in the city of Minneapolis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of A Wizard of Earthsea is Ursula K. Le Guin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Ferdinand Marcos is married to Imelda Marcos.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The headquarters of University of California, Berkeley is located in the city of Berkeley.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The chief executive officer of Apple Inc. is Tim Cook.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Lisa Leslie plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The univeristy where Galileo Galilei was educated is University of Pisa.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Chanel was founded by Coco Chanel.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Church of Scotland was founded by John Knox.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Slovakia national football team is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Alta IF is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "What is the country of citizenship of the spouse of the author of Our Mutual Friend?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "country",
+        "author",
+        "mutual"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-0-q1",
+    "description": "MAB CR direct retrieval: In which location did the spouse of Igor of Kiev pass away?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Thomas Kyd was born in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The chairperson of Fatah is Mahmoud Abbas.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Amy Winehouse died in the city of Camden Town.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Hines Ward plays the position of wide receiver.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Bengaluru is located in the continent of Asia.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Pedro Pierluisi worked in the city of Washington, D.C..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Rogério Ceni plays the position of goalkeeper.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The director of British Broadcasting Corporation is Tony Hall, Baron Hall of Birkenhead.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Victoria Beckham is married to David Beckham.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The headquarters of University of Minnesota is located in the city of Minneapolis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of A Wizard of Earthsea is Ursula K. Le Guin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Ferdinand Marcos is married to Imelda Marcos.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The headquarters of University of California, Berkeley is located in the city of Berkeley.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The chief executive officer of Apple Inc. is Tim Cook.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Lisa Leslie plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The univeristy where Galileo Galilei was educated is University of Pisa.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Chanel was founded by Coco Chanel.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Church of Scotland was founded by John Knox.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Slovakia national football team is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Alta IF is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "In which location did the spouse of Igor of Kiev pass away?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "igor",
+        "kiev"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-1-q0",
+    "description": "MAB CR direct retrieval: Where did the religion associated with the Bagratuni Dynasty come into existence",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Steve Jobs was born in the city of San Francisco.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Scientology was founded by L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. The type of music that John McVie plays is rock music.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. QuickTime was developed by Apple Inc..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Nicolae Ceaușescu is married to Elena Ceaușescu.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. 2004 NBA Draft is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Sports Interactive is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. Adrian IV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Ford Motor Company was founded by Henry Ford.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Cessna was founded in the city of Wichita.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Germany is located in the continent of Europe.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. The author of 1984 is George Orwell.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. Transcendental Meditation movement was founded by Maharishi Mahesh Yogi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. Gene Roddenberry is married to Majel Barrett.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Graceland was performed by Paul Simon.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The capital of Tang Empire is Chang'an.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Lionel Richie is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. first baseman is associated with the sport of baseball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. The univeristy where Lou Reed was educated is Syracuse University.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Dr. Dre is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Where did the religion associated with the Bagratuni Dynasty come into existence?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "where",
+        "religion",
+        "associated"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-1-q1",
+    "description": "MAB CR direct retrieval: From which continent does the sport of Haverfordwest County A.F.C. originally ha",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Steve Jobs was born in the city of San Francisco.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Scientology was founded by L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. The type of music that John McVie plays is rock music.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. QuickTime was developed by Apple Inc..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Nicolae Ceaușescu is married to Elena Ceaușescu.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. 2004 NBA Draft is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Sports Interactive is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. Adrian IV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Ford Motor Company was founded by Henry Ford.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Cessna was founded in the city of Wichita.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Germany is located in the continent of Europe.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. The author of 1984 is George Orwell.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. Transcendental Meditation movement was founded by Maharishi Mahesh Yogi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. Gene Roddenberry is married to Majel Barrett.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Graceland was performed by Paul Simon.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The capital of Tang Empire is Chang'an.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Lionel Richie is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. first baseman is associated with the sport of baseball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. The univeristy where Lou Reed was educated is Syracuse University.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Dr. Dre is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "From which continent does the sport of Haverfordwest County A.F.C. originally hail?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "from",
+        "continent",
+        "sport"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-2-q0",
+    "description": "MAB CR direct retrieval: In which language are the official documents written in the country of citizensh",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Glenn L. Martin Company was founded by Glenn L. Martin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Ian Marter died in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Katniss Everdeen was created by Suzanne Collins.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Princess Alice, Duchess of Gloucester is affiliated with the religion of Anglicanism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Edward Cullen was performed by Robert Pattinson.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Macbeth was created by William Shakespeare.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Shawn Bradley plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The author of Red Storm Rising is Tom Clancy.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Meilen Tu is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The author of Madame Bovary is Gustave Flaubert.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of American Gods is Neil Gaiman.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Sarah Churchill is a citizen of United Kingdom.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. association football was created in the country of England.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The capital of ancient Rome is Rome.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Wonderwall was performed by Oasis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Vladimir Lenin is married to Nadezhda Krupskaya.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The type of music that Nat King Cole plays is jazz.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Pakistan International Airlines was founded in the city of Karachi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Edmund Burke is a citizen of Kingdom of Ireland.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The director of Grasshopper Manufacture is Goichi Suda.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "In which language are the official documents written in the country of citizenship of Nate \"Tiny\" Archibald?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "language",
+        "official",
+        "written"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-2-q1",
+    "description": "MAB CR direct retrieval: Which sport was Dennis Erickson associated with due to his position on a team?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Glenn L. Martin Company was founded by Glenn L. Martin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Ian Marter died in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Katniss Everdeen was created by Suzanne Collins.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Princess Alice, Duchess of Gloucester is affiliated with the religion of Anglicanism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Edward Cullen was performed by Robert Pattinson.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Macbeth was created by William Shakespeare.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Shawn Bradley plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The author of Red Storm Rising is Tom Clancy.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Meilen Tu is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The author of Madame Bovary is Gustave Flaubert.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of American Gods is Neil Gaiman.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Sarah Churchill is a citizen of United Kingdom.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. association football was created in the country of England.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The capital of ancient Rome is Rome.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Wonderwall was performed by Oasis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Vladimir Lenin is married to Nadezhda Krupskaya.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The type of music that Nat King Cole plays is jazz.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Pakistan International Airlines was founded in the city of Karachi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Edmund Burke is a citizen of Kingdom of Ireland.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The director of Grasshopper Manufacture is Goichi Suda.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which sport was Dennis Erickson associated with due to his position on a team?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "sport",
+        "dennis",
+        "erickson"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-3-q0",
+    "description": "MAB CR direct retrieval: What is the country of origin of the sport played by Christian Abbiati?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. The author of Dianetics is L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The origianl broadcaster of Roseanne is American Broadcasting Company.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Lorenzo Lamas is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Oberliga Süd is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Dikembe Mutombo plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Francis, Duke of Cádiz is a citizen of Spain.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. The company that produced Windows 7 is Microsoft.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. 1986 NBA Playoffs is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. The author of Think and Grow Rich is Napoleon Hill.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Laurie Anderson is affiliated with the religion of Buddhism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Hergé speaks the language of French.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Dante Gabriel Rossetti worked in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The author of Prior Analytics is Aristotle.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The company that produced Buick Riviera is General Motors.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Gregory XV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Grinch was created by Dr. Seuss.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The chairperson of Italian Space Agency is Roberto Battiston.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. The author of Rights of Man is Thomas Paine.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. N. Chandrababu Naidu works in the field of politician.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The headquarters of Newport News Shipbuilding is located in the city of Newport News.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "What is the country of origin of the sport played by Christian Abbiati?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "what",
+        "country",
+        "origin"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-3-q1",
+    "description": "MAB CR direct retrieval: Which religion is the country of citizenship of Karl Lueger predominantly associ",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. The author of Dianetics is L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The origianl broadcaster of Roseanne is American Broadcasting Company.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Lorenzo Lamas is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Oberliga Süd is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Dikembe Mutombo plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Francis, Duke of Cádiz is a citizen of Spain.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. The company that produced Windows 7 is Microsoft.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. 1986 NBA Playoffs is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. The author of Think and Grow Rich is Napoleon Hill.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Laurie Anderson is affiliated with the religion of Buddhism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Hergé speaks the language of French.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Dante Gabriel Rossetti worked in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The author of Prior Analytics is Aristotle.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The company that produced Buick Riviera is General Motors.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Gregory XV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Grinch was created by Dr. Seuss.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The chairperson of Italian Space Agency is Roberto Battiston.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. The author of Rights of Man is Thomas Paine.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. N. Chandrababu Naidu works in the field of politician.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The headquarters of Newport News Shipbuilding is located in the city of Newport News.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which religion is the country of citizenship of Karl Lueger predominantly associated with?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "religion",
+        "country",
+        "karl"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-4-q0",
+    "description": "MAB CR direct retrieval: Which sport is goaltender associated with?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Thomas Kyd was born in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The chairperson of Fatah is Mahmoud Abbas.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Amy Winehouse died in the city of Camden Town.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Hines Ward plays the position of wide receiver.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Bengaluru is located in the continent of Asia.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Pedro Pierluisi worked in the city of Washington, D.C..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Rogério Ceni plays the position of goalkeeper.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The director of British Broadcasting Corporation is Tony Hall, Baron Hall of Birkenhead.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Victoria Beckham is married to David Beckham.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The headquarters of University of Minnesota is located in the city of Minneapolis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of A Wizard of Earthsea is Ursula K. Le Guin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Ferdinand Marcos is married to Imelda Marcos.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The headquarters of University of California, Berkeley is located in the city of Berkeley.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The chief executive officer of Apple Inc. is Tim Cook.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Lisa Leslie plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The univeristy where Galileo Galilei was educated is University of Pisa.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Chanel was founded by Coco Chanel.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Church of Scotland was founded by John Knox.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Slovakia national football team is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Alta IF is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which sport is goaltender associated with?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "sport",
+        "goaltender",
+        "associated"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-4-q1",
+    "description": "MAB CR direct retrieval: What is Nobuhiro Watsuki famous for?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Thomas Kyd was born in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The chairperson of Fatah is Mahmoud Abbas.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Amy Winehouse died in the city of Camden Town.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Hines Ward plays the position of wide receiver.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Bengaluru is located in the continent of Asia.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Pedro Pierluisi worked in the city of Washington, D.C..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Rogério Ceni plays the position of goalkeeper.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The director of British Broadcasting Corporation is Tony Hall, Baron Hall of Birkenhead.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Victoria Beckham is married to David Beckham.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The headquarters of University of Minnesota is located in the city of Minneapolis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of A Wizard of Earthsea is Ursula K. Le Guin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Ferdinand Marcos is married to Imelda Marcos.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The headquarters of University of California, Berkeley is located in the city of Berkeley.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The chief executive officer of Apple Inc. is Tim Cook.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Lisa Leslie plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The univeristy where Galileo Galilei was educated is University of Pisa.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Chanel was founded by Coco Chanel.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Church of Scotland was founded by John Knox.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Slovakia national football team is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Alta IF is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "What is Nobuhiro Watsuki famous for?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "nobuhiro",
+        "watsuki",
+        "famous"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-5-q0",
+    "description": "MAB CR direct retrieval: Which sport is Salem-Keizer Volcanoes associated with?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Steve Jobs was born in the city of San Francisco.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Scientology was founded by L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. The type of music that John McVie plays is rock music.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. QuickTime was developed by Apple Inc..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Nicolae Ceaușescu is married to Elena Ceaușescu.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. 2004 NBA Draft is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Sports Interactive is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. Adrian IV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Ford Motor Company was founded by Henry Ford.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Cessna was founded in the city of Wichita.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Germany is located in the continent of Europe.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. The author of 1984 is George Orwell.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. Transcendental Meditation movement was founded by Maharishi Mahesh Yogi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. Gene Roddenberry is married to Majel Barrett.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Graceland was performed by Paul Simon.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The capital of Tang Empire is Chang'an.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Lionel Richie is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. first baseman is associated with the sport of baseball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. The univeristy where Lou Reed was educated is Syracuse University.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Dr. Dre is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which sport is Salem-Keizer Volcanoes associated with?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "sport",
+        "salem-keizer",
+        "volcanoes"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-5-q1",
+    "description": "MAB CR direct retrieval: What position does Nick Rimando play?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Steve Jobs was born in the city of San Francisco.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Scientology was founded by L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. The type of music that John McVie plays is rock music.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. QuickTime was developed by Apple Inc..",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Nicolae Ceaușescu is married to Elena Ceaușescu.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. 2004 NBA Draft is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Sports Interactive is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. Adrian IV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Ford Motor Company was founded by Henry Ford.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Cessna was founded in the city of Wichita.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Germany is located in the continent of Europe.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. The author of 1984 is George Orwell.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. Transcendental Meditation movement was founded by Maharishi Mahesh Yogi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. Gene Roddenberry is married to Majel Barrett.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Graceland was performed by Paul Simon.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. The capital of Tang Empire is Chang'an.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. Lionel Richie is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. first baseman is associated with the sport of baseball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. The univeristy where Lou Reed was educated is Syracuse University.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. Dr. Dre is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "What position does Nick Rimando play?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "position",
+        "nick",
+        "rimando"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-6-q0",
+    "description": "MAB CR direct retrieval: Which language was The New York Times written in?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Glenn L. Martin Company was founded by Glenn L. Martin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Ian Marter died in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Katniss Everdeen was created by Suzanne Collins.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Princess Alice, Duchess of Gloucester is affiliated with the religion of Anglicanism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Edward Cullen was performed by Robert Pattinson.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Macbeth was created by William Shakespeare.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Shawn Bradley plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The author of Red Storm Rising is Tom Clancy.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Meilen Tu is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The author of Madame Bovary is Gustave Flaubert.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of American Gods is Neil Gaiman.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Sarah Churchill is a citizen of United Kingdom.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. association football was created in the country of England.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The capital of ancient Rome is Rome.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Wonderwall was performed by Oasis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Vladimir Lenin is married to Nadezhda Krupskaya.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The type of music that Nat King Cole plays is jazz.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Pakistan International Airlines was founded in the city of Karachi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Edmund Burke is a citizen of Kingdom of Ireland.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The director of Grasshopper Manufacture is Goichi Suda.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which language was The New York Times written in?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "language",
+        "york",
+        "times"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-6-q1",
+    "description": "MAB CR direct retrieval: Who is the author of Hard Times?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. Glenn L. Martin Company was founded by Glenn L. Martin.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. Ian Marter died in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Katniss Everdeen was created by Suzanne Collins.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Princess Alice, Duchess of Gloucester is affiliated with the religion of Anglicanism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Edward Cullen was performed by Robert Pattinson.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Macbeth was created by William Shakespeare.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. Shawn Bradley plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. The author of Red Storm Rising is Tom Clancy.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. Meilen Tu is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. The author of Madame Bovary is Gustave Flaubert.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. The author of American Gods is Neil Gaiman.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Sarah Churchill is a citizen of United Kingdom.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. association football was created in the country of England.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The capital of ancient Rome is Rome.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Wonderwall was performed by Oasis.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Vladimir Lenin is married to Nadezhda Krupskaya.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The type of music that Nat King Cole plays is jazz.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. Pakistan International Airlines was founded in the city of Karachi.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. Edmund Burke is a citizen of Kingdom of Ireland.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The director of Grasshopper Manufacture is Goichi Suda.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Who is the author of Hard Times?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "author",
+        "hard"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-7-q0",
+    "description": "MAB CR direct retrieval: Which university was Adam Putnam educated at?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. The author of Dianetics is L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The origianl broadcaster of Roseanne is American Broadcasting Company.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Lorenzo Lamas is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Oberliga Süd is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Dikembe Mutombo plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Francis, Duke of Cádiz is a citizen of Spain.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. The company that produced Windows 7 is Microsoft.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. 1986 NBA Playoffs is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. The author of Think and Grow Rich is Napoleon Hill.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Laurie Anderson is affiliated with the religion of Buddhism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Hergé speaks the language of French.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Dante Gabriel Rossetti worked in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The author of Prior Analytics is Aristotle.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The company that produced Buick Riviera is General Motors.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Gregory XV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Grinch was created by Dr. Seuss.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The chairperson of Italian Space Agency is Roberto Battiston.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. The author of Rights of Man is Thomas Paine.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. N. Chandrababu Naidu works in the field of politician.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The headquarters of Newport News Shipbuilding is located in the city of Newport News.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "Which university was Adam Putnam educated at?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "university",
+        "adam",
+        "putnam"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  },
+  {
+    "id": "mab-cr-direct-7-q1",
+    "description": "MAB CR direct retrieval: What type of music does Tito Nieves play?",
+    "episodes": [
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact0",
+        "content": "0. The author of Dianetics is L. Ron Hubbard.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact1",
+        "content": "1. The origianl broadcaster of Roseanne is American Broadcasting Company.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact2",
+        "content": "2. Lorenzo Lamas is a citizen of United States of America.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact3",
+        "content": "3. Oberliga Süd is associated with the sport of association football.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact4",
+        "content": "4. Dikembe Mutombo plays the position of center.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact5",
+        "content": "5. Francis, Duke of Cádiz is a citizen of Spain.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact6",
+        "content": "6. The company that produced Windows 7 is Microsoft.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact7",
+        "content": "7. 1986 NBA Playoffs is associated with the sport of basketball.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact8",
+        "content": "8. The author of Think and Grow Rich is Napoleon Hill.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact9",
+        "content": "9. Laurie Anderson is affiliated with the religion of Buddhism.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact10",
+        "content": "10. Hergé speaks the language of French.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact11",
+        "content": "11. Dante Gabriel Rossetti worked in the city of London.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact12",
+        "content": "12. The author of Prior Analytics is Aristotle.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact13",
+        "content": "13. The company that produced Buick Riviera is General Motors.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact14",
+        "content": "14. Gregory XV is affiliated with the religion of Catholic Church.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact15",
+        "content": "15. Grinch was created by Dr. Seuss.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact16",
+        "content": "16. The chairperson of Italian Space Agency is Roberto Battiston.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact17",
+        "content": "17. The author of Rights of Man is Thomas Paine.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact18",
+        "content": "18. N. Chandrababu Naidu works in the field of politician.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      },
+      {
+        "source_type": "document",
+        "source_id": "mab_cr_fact19",
+        "content": "19. The headquarters of Newport News Shipbuilding is located in the city of Newport News.",
+        "t_ref": "2026-03-01T09:00:00Z",
+        "scope": "org"
+      }
+    ],
+    "query": {
+      "query": "What type of music does Tito Nieves play?",
+      "scope": "org",
+      "budget": 10,
+      "as_of": null
+    },
+    "expected": {
+      "must_contain": [
+        "what",
+        "type",
+        "music"
+      ],
+      "must_not_contain": [],
+      "expect_empty": false,
+      "min_recall_at_k": 1.0
+    }
+  }
+]
