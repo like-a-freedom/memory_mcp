@@ -27,6 +27,7 @@ async fn archival_pass_processes_all_configured_namespaces() {
                 content: "Personal archival candidate".to_string(),
                 t_ref: old_date,
                 scope: "personal".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -36,21 +37,21 @@ async fn archival_pass_processes_all_configured_namespaces() {
         .await
         .expect("ingest episode");
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Personal archival fact",
-        "Personal archival fact",
-        &episode_id,
-        old_date,
-        "personal",
-        0.2,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("add fact");
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Personal archival fact",
+            "Personal archival fact",
+            &episode_id,
+            old_date,
+            "personal",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("add fact");
 
     service
         .invalidate(
@@ -91,6 +92,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
                 content: "Personal hot archival candidate".to_string(),
                 t_ref: old_date,
                 scope: "personal".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -100,21 +102,21 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
         .await
         .expect("ingest episode");
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Personal hot archival fact",
-        "Personal hot archival fact",
-        &episode_id,
-        old_date,
-        "personal",
-        0.2,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("add fact");
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Personal hot archival fact",
+            "Personal hot archival fact",
+            &episode_id,
+            old_date,
+            "personal",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("add fact");
 
     service
         .invalidate(
@@ -184,21 +186,21 @@ async fn archival_pass_preserves_recent_episodes() {
 
     let recent_date = Utc::now() - Duration::days(10);
 
-    common::add_fact(
-        &service,
-        "promise",
-        "recent promise content",
-        "recent promise",
-        "episode:recent_archival_test",
-        recent_date,
-        "test_archival_recent",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("fact added");
+    service
+        .add_fact(
+            "promise",
+            "recent promise content",
+            "recent promise",
+            "episode:recent_archival_test",
+            recent_date,
+            "test_archival_recent",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
 
     // Act: Run archival pass with 90 day threshold
     let count = run_archival_pass(&service, 90)
@@ -220,21 +222,21 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
     let old_date = Utc::now() - Duration::days(150);
 
     // Add an old fact
-    let fact_id = common::add_fact(
-        &service,
-        "promise",
-        "old promise for archival test",
-        "old promise",
-        "episode:old_archival_test",
-        old_date,
-        "test_archival_old",
-        0.3, // low confidence, will decay
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("fact added");
+    let fact_id = service
+        .add_fact(
+            "promise",
+            "old promise for archival test",
+            "old promise",
+            "episode:old_archival_test",
+            old_date,
+            "test_archival_old",
+            0.3, // low confidence, will decay
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
 
     // Invalidate the fact first (so episode has no active facts)
     service
@@ -271,39 +273,39 @@ async fn archival_pass_respects_age_threshold() {
 
     // Episode just under threshold (should not be archived)
     let just_under = Utc::now() - Duration::days(89);
-    common::add_fact(
-        &service,
-        "metric",
-        "metric just under threshold",
-        "metric under",
-        "episode:under_threshold",
-        just_under,
-        "test_archival_boundary",
-        0.5,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("fact added");
+    service
+        .add_fact(
+            "metric",
+            "metric just under threshold",
+            "metric under",
+            "episode:under_threshold",
+            just_under,
+            "test_archival_boundary",
+            0.5,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
 
     // Episode well over threshold (should be archived if no active facts)
     let well_over = Utc::now() - Duration::days(200);
-    let fact_id = common::add_fact(
-        &service,
-        "metric",
-        "metric well over threshold",
-        "metric over",
-        "episode:over_threshold",
-        well_over,
-        "test_archival_boundary",
-        0.2,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("fact added");
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "metric well over threshold",
+            "metric over",
+            "episode:over_threshold",
+            well_over,
+            "test_archival_boundary",
+            0.2,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
 
     // Invalidate the old fact so episode can be archived
     service
@@ -339,21 +341,21 @@ async fn archival_pass_batch_limit_respected() {
 
     // Create multiple old episodes with invalidated facts
     for i in 0..10 {
-        let fact_id = common::add_fact(
-            &service,
-            "metric",
-            &format!("old metric {}", i),
-            &format!("metric {}", i),
-            &format!("episode:batch_{}", i),
-            old_date,
-            "test_archival_batch",
-            0.2,
-            vec![],
-            vec![],
-            json!({}),
-        )
-        .await
-        .expect("fact added");
+        let fact_id = service
+            .add_fact(
+                "metric",
+                &format!("old metric {}", i),
+                &format!("metric {}", i),
+                &format!("episode:batch_{}", i),
+                old_date,
+                "test_archival_batch",
+                0.2,
+                vec![],
+                vec![],
+                json!({}),
+            )
+            .await
+            .expect("fact added");
 
         // Invalidate to allow archival
         service

@@ -1,6 +1,7 @@
 //! Context assembly operations.
 
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use serde_json::{Value, json};
 
@@ -8,75 +9,28 @@ use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
-use crate::storage::{GraphDirection, json_f64, json_string};
+use crate::models::{
+    AccessContext, AssembleContextRequest, AssembledContextItem, FACT_TYPE_EXPERIENCE,
+};
+use crate::storage::GraphDirection;
+use crate::storage::{json_f64, json_string};
 
-const RECIPROCAL_RANK_FUSION_K: f64 = 10.0;
-
-/// Minimum full-text search score for a fact to be considered a quality match.
-/// Facts below this threshold matched on common words only and are not useful.
-const MIN_FT_SCORE_THRESHOLD: f64 = 0.0;
-
-/// Multiplier applied to the budget when requesting candidates from the DB.
-/// A wider net lets the ranking layer pick the best facts instead of being
-/// locked into the DB's coarse FTS ordering.
-const CANDIDATE_MULTIPLIER: i32 = 10;
-
-/// Expands a query with temporal synonyms for better FTS recall.
-///
-/// Converts relative temporal expressions like "last month" or "this month"
-/// into concrete month/year strings based on the `as_of` context.
-fn expand_temporal_synonyms(
-    query: &str,
-    as_of: Option<chrono::DateTime<chrono::Utc>>,
-) -> Vec<String> {
-    let mut expansions = vec![query.to_string()];
-    let q_lower = query.to_lowercase();
-
-    if let Some(as_of_dt) = as_of {
-        // "last month" -> actual month name and year
-        if q_lower.contains("last month") {
-            let last_month = as_of_dt
-                .checked_sub_months(chrono::Months::new(1))
-                .unwrap_or(as_of_dt);
-            let month_name = last_month.format("%B").to_string();
-            let year = last_month.format("%Y").to_string();
-            let expanded = query
-                .replace("last month", &format!("{} {}", month_name, year))
-                .replace("Last month", &format!("{} {}", month_name, year));
-            if expanded != query {
-                expansions.push(expanded);
-            }
-        }
-
-        // "this month" -> current month name and year
-        if q_lower.contains("this month") {
-            let month_name = as_of_dt.format("%B").to_string();
-            let year = as_of_dt.format("%Y").to_string();
-            let expanded = query
-                .replace("this month", &format!("{} {}", month_name, year))
-                .replace("This month", &format!("{} {}", month_name, year));
-            if expanded != query {
-                expansions.push(expanded);
-            }
-        }
-    }
-
-    expansions
-}
+const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 
 /// Assemble context for a query.
 pub async fn assemble_context(
     service: &crate::service::MemoryService,
     request: AssembleContextRequest,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let started_at = Instant::now();
     let access = AccessContext::from_payload(request.access.clone());
 
     service.logger.log(
-        crate::log_event!("assemble_context.start", "success",
-            "scope" => &request.scope,
-            "query" => &request.query,
-            "budget" => request.budget
+        super::log_event(
+            "assemble_context.start",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({}),
+            access.as_ref(),
         ),
         LogLevel::Info,
     );
@@ -107,6 +61,8 @@ pub async fn assemble_context(
         &request.scope,
         cutoff,
         request.budget,
+        request.project.as_deref(),
+        &request.fact_types,
         CacheView::new(
             request.view_mode.as_deref(),
             request.window_start,
@@ -122,13 +78,13 @@ pub async fn assemble_context(
 
     if let Some(cached) = cached {
         for item in &cached {
-            if !item.fact_id.starts_with("fact:") {
-                continue;
-            }
             if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
                 service.logger.log(
-                    crate::log_error!("assemble_context.access_track_error", &err,
-                        "fact_id" => &item.fact_id
+                    super::log_event(
+                        "assemble_context.access_track_error",
+                        json!({"fact_id": item.fact_id}),
+                        json!({"error": err.to_string()}),
+                        Some(&access),
                     ),
                     LogLevel::Warn,
                 );
@@ -136,217 +92,378 @@ pub async fn assemble_context(
         }
 
         service.logger.log(
-            crate::log_event!("assemble_context.cache_hit", "success",
-                "scope" => &request.scope,
-                "query" => &request.query,
-                "count" => cached.len()
+            super::log_event(
+                "assemble_context.cache_hit",
+                json!({"scope": request.scope, "query": request.query}),
+                json!({"count": cached.len()}),
+                Some(&access),
             ),
             LogLevel::Info,
         );
+
+        let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+        maybe_record_query_log(service, &request, &cached, true, latency_ms, &access).await;
         return Ok(cached);
     }
 
     service.logger.log(
-        crate::log_event!("assemble_context.cache_miss", "computing",
-            "scope" => &request.scope,
-            "query" => &request.query,
-            "budget" => request.budget
+        super::log_event(
+            "assemble_context.cache_miss",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"status": "computing"}),
+            Some(&access),
         ),
         LogLevel::Trace,
     );
 
-    let namespace = service.resolve_namespace_for_scope(&request.scope)?;
+    let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
-    let temporal_expansions = expand_temporal_synonyms(&cleaned_query, request.as_of);
-
     let query_opt = if cleaned_query.is_empty() {
         None
     } else {
         Some(cleaned_query.as_str())
     };
+    let project_opt = request
+        .project
+        .as_deref()
+        .filter(|project| !project.trim().is_empty());
+    let requested_view_mode = request
+        .view_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let fact_types = request
+        .fact_types
+        .iter()
+        .filter_map(|fact_type| {
+            let trimmed = fact_type.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        })
+        .collect::<Vec<_>>();
 
-    let fact_records = select_fact_records_for_query(
-        service,
-        &namespace,
-        &request.scope,
-        &cutoff_iso,
-        query_opt,
-        request.budget,
-    )
-    .await?;
+    service.logger.log(
+        super::log_event(
+            "assemble_context.features",
+            json!({
+                "scope": request.scope,
+                "query": request.query,
+                "budget": request.budget,
+                "project": project_opt,
+                "view_mode": requested_view_mode,
+                "fact_type_count": fact_types.len(),
+                "window_start": request.window_start.map(super::normalize_dt),
+                "window_end": request.window_end.map(super::normalize_dt),
+                "query_logging_enabled": service.is_query_logging_enabled(),
+            }),
+            json!({}),
+            Some(&access),
+        ),
+        LogLevel::Debug,
+    );
 
-    let direct_facts = filter_facts_by_policy(fact_records, &access);
+    if let Some(view_mode) = requested_view_mode
+        && !matches!(view_mode, "facets" | "wake_up" | "map" | "timeline")
+    {
+        service.logger.log(
+            super::log_event(
+                "assemble_context.view_mode_unknown",
+                json!({"scope": request.scope, "query": request.query, "view_mode": view_mode}),
+                json!({"fallback": "default_ranked_retrieval"}),
+                Some(&access),
+            ),
+            LogLevel::Warn,
+        );
+    }
 
-    // Alias expansion: search for additional facts using entity aliases
-    let mut expanded_facts = Vec::new();
-    let mut ranked_facts = if let Some(query) = query_opt {
-        let alias_expansions = expand_query_with_aliases(service, query, &namespace).await;
-        // Combine temporal and alias expansions for broader recall
-        let expanded_queries: Vec<String> = temporal_expansions
-            .into_iter()
-            .filter(|q| q != query)
-            .chain(alias_expansions.into_iter().filter(|q| q != query))
-            .collect();
-        let direct_fact_ids: HashSet<_> = direct_facts
-            .iter()
-            .map(|fact| fact.fact_id.clone())
-            .collect();
+    let mut results: Vec<AssembledContextItem> = if requested_view_mode == Some("facets") {
+        build_facets_view(
+            service,
+            &namespace,
+            &request.scope,
+            cutoff,
+            project_opt,
+            request.budget,
+            &access,
+        )
+        .await?
+    } else if requested_view_mode == Some("wake_up") {
+        build_wake_up_view(
+            service,
+            &namespace,
+            &request.scope,
+            cutoff,
+            project_opt,
+            &fact_types,
+            request.budget,
+            &access,
+        )
+        .await?
+    } else if requested_view_mode == Some("map") {
+        build_map_view(service, &namespace, cutoff, request.budget).await?
+    } else {
+        let lexical_result = select_fact_records_for_query(
+            service,
+            &namespace,
+            &request.scope,
+            &cutoff_iso,
+            query_opt,
+            request.budget,
+            project_opt,
+            &fact_types,
+        )
+        .await?;
 
-        for expanded_query in &expanded_queries {
-            if expanded_query == query {
-                continue;
+        let direct_retrieval_tier = lexical_result.retrieval_tier;
+        let direct_facts =
+            filter_facts_by_constraints(lexical_result.records, &access, project_opt, &fact_types);
+
+        // Alias expansion: search for additional facts using entity aliases
+        let mut expanded_facts = Vec::new();
+        let mut ranked_facts = if let Some(query) = query_opt {
+            let temporal_facts = collect_temporal_facts(
+                service,
+                CollectTemporalFactsRequest {
+                    namespace: &namespace,
+                    scope: &request.scope,
+                    cutoff_iso: &cutoff_iso,
+                    cutoff,
+                    query,
+                    access: &access,
+                    project: project_opt,
+                    fact_types: &fact_types,
+                    budget: request.budget,
+                },
+            )
+            .await?;
+
+            let expanded_queries = expand_query_with_aliases(service, query, &namespace).await;
+            let direct_fact_ids: HashSet<_> = direct_facts
+                .iter()
+                .chain(temporal_facts.iter())
+                .map(|fact| fact.fact_id.clone())
+                .collect();
+
+            for expanded_query in &expanded_queries {
+                if expanded_query == query {
+                    continue;
+                }
+                let extra_records = select_fact_records_for_query(
+                    service,
+                    &namespace,
+                    &request.scope,
+                    &cutoff_iso,
+                    Some(expanded_query),
+                    request.budget,
+                    project_opt,
+                    &fact_types,
+                )
+                .await?;
+                for fact in filter_facts_by_constraints(
+                    extra_records.records,
+                    &access,
+                    project_opt,
+                    &fact_types,
+                ) {
+                    if !direct_fact_ids.contains(&fact.fact_id) {
+                        expanded_facts.push(fact);
+                    }
+                }
             }
-            let extra_records = select_fact_records_for_query(
+            let all_direct_ids: HashSet<_> = direct_facts
+                .iter()
+                .chain(temporal_facts.iter())
+                .chain(expanded_facts.iter())
+                .map(|fact| fact.fact_id.clone())
+                .collect();
+
+            let community_facts = collect_community_facts(
+                service,
+                CollectCommunityFactsRequest {
+                    namespace: &namespace,
+                    scope: &request.scope,
+                    cutoff_iso: &cutoff_iso,
+                    query,
+                    access: &access,
+                    project: project_opt,
+                    fact_types: &fact_types,
+                    direct_fact_ids: &all_direct_ids,
+                    budget: request.budget,
+                },
+            )
+            .await?;
+
+            let excluded_fact_ids = all_direct_ids
+                .iter()
+                .cloned()
+                .chain(
+                    community_facts
+                        .iter()
+                        .map(|(fact, _, _)| fact.fact_id.clone()),
+                )
+                .collect::<HashSet<_>>();
+
+            let semantic_facts = collect_semantic_facts(
+                service,
+                CollectSemanticFactsRequest {
+                    namespace: &namespace,
+                    scope: &request.scope,
+                    cutoff,
+                    query,
+                    access: &access,
+                    project: project_opt,
+                    fact_types: &fact_types,
+                    excluded_fact_ids: &excluded_fact_ids,
+                    budget: request.budget,
+                },
+            )
+            .await?;
+
+            let mut lexical_facts = direct_facts
+                .into_iter()
+                .map(|fact| (fact, direct_retrieval_tier))
+                .collect::<Vec<_>>();
+            lexical_facts.extend(
+                temporal_facts
+                    .into_iter()
+                    .map(|fact| (fact, RetrievalTier::TemporalExpanded)),
+            );
+            lexical_facts.extend(
+                expanded_facts
+                    .into_iter()
+                    .map(|fact| (fact, RetrievalTier::AliasExpanded)),
+            );
+
+            build_ranked_context_facts(
+                lexical_facts,
+                community_facts,
+                semantic_facts,
+                query_opt,
+                &request.scope,
+                cutoff,
+            )
+        } else {
+            build_ranked_context_facts(
+                direct_facts
+                    .into_iter()
+                    .map(|fact| (fact, RetrievalTier::Direct))
+                    .collect(),
+                Vec::new(),
+                Vec::new(),
+                query_opt,
+                &request.scope,
+                cutoff,
+            )
+        };
+
+        if ranked_facts.is_empty() && query_opt.is_some() {
+            let episode_records = select_episode_records_for_query(
                 service,
                 &namespace,
                 &request.scope,
                 &cutoff_iso,
-                Some(expanded_query),
+                query_opt,
                 request.budget,
+                project_opt,
             )
             .await?;
-            for fact in filter_facts_by_policy(extra_records, &access) {
-                if !direct_fact_ids.contains(&fact.fact_id) {
-                    expanded_facts.push(fact);
-                }
+            build_episode_fallback_items(
+                filter_episodes_by_constraints(episode_records, &access, project_opt),
+                query_opt,
+                &request.scope,
+                cutoff,
+                request.window_start,
+                request.window_end,
+                requested_view_mode == Some("timeline"),
+                request.budget,
+            )
+        } else {
+            apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
+            if requested_view_mode == Some("timeline") {
+                sort_ranked_context_facts_for_timeline(&mut ranked_facts);
+            } else {
+                sort_ranked_context_facts(&mut ranked_facts);
             }
+
+            ranked_facts
+                .into_iter()
+                .take(request.budget.max(1) as usize)
+                .map(|ranked| {
+                    let confidence = super::decayed_confidence(&ranked.fact, cutoff);
+                    AssembledContextItem {
+                        fact_id: ranked.fact.fact_id,
+                        content: ranked.fact.content,
+                        quote: ranked.fact.quote,
+                        source_episode: ranked.fact.source_episode,
+                        confidence,
+                        provenance: ranked.fact.provenance,
+                        rationale: ranked.rationale,
+                        retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
+                    }
+                })
+                .collect()
         }
+    };
 
-        let all_direct_ids: HashSet<_> = direct_facts
-            .iter()
-            .chain(expanded_facts.iter())
-            .map(|fact| fact.fact_id.clone())
-            .collect();
-
-        let community_facts = collect_community_facts(
+    if requested_view_mode != Some("facets")
+        && requested_view_mode != Some("wake_up")
+        && requested_view_mode != Some("map")
+    {
+        let appended_experience = append_recent_experience_items(
+            &mut results,
             service,
-            CollectCommunityFactsRequest {
-                namespace: &namespace,
-                scope: &request.scope,
-                cutoff_iso: &cutoff_iso,
-                query,
-                access: &access,
-                direct_fact_ids: &all_direct_ids,
-                budget: request.budget,
-            },
-        )
-        .await?;
-
-        let excluded_fact_ids = all_direct_ids
-            .iter()
-            .cloned()
-            .chain(community_facts.iter().map(|(fact, _)| fact.fact_id.clone()))
-            .collect::<HashSet<_>>();
-
-        let semantic_facts = collect_semantic_facts(
-            service,
-            CollectSemanticFactsRequest {
+            RecentExperienceRequest {
                 namespace: &namespace,
                 scope: &request.scope,
                 cutoff,
-                query,
+                project: project_opt,
                 access: &access,
-                excluded_fact_ids: &excluded_fact_ids,
                 budget: request.budget,
+                fact_types: &fact_types,
             },
         )
         .await?;
 
-        // Entity-graph expansion: resolve query entities, walk 1-hop neighbors,
-        // and retrieve facts for the full entity set. This surfaces facts that
-        // FTS alone would miss for multi-hop queries.
-        let entity_expansion_facts = collect_entity_expansion_facts(
-            service,
-            CollectEntityExpansionFactsRequest {
-                namespace: &namespace,
-                scope: &request.scope,
-                cutoff_iso: &cutoff_iso,
-                query,
-                access: &access,
-                excluded_fact_ids: &excluded_fact_ids,
-                budget: request.budget,
-            },
-        )
-        .await?;
-
-        // Merge entity expansion facts with semantic facts for ranking
-        let mut combined_semantic = semantic_facts;
-        combined_semantic.extend(entity_expansion_facts);
-
-        let mut all_direct = direct_facts;
-        all_direct.extend(expanded_facts);
-
-        build_ranked_context_facts(
-            all_direct,
-            community_facts,
-            combined_semantic,
-            query_opt,
-            &request.scope,
-            cutoff,
-        )
-    } else {
-        build_ranked_context_facts(
-            direct_facts,
-            Vec::new(),
-            Vec::new(),
-            query_opt,
-            &request.scope,
-            cutoff,
-        )
-    };
-
-    apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
-    if request.view_mode.as_deref() == Some("timeline") {
-        sort_ranked_context_facts_for_timeline(&mut ranked_facts);
-    } else {
-        sort_ranked_context_facts(&mut ranked_facts);
+        if appended_experience > 0 {
+            service.logger.log(
+                super::log_event(
+                    "assemble_context.experience_appended",
+                    json!({"scope": request.scope, "query": request.query}),
+                    json!({"count": appended_experience}),
+                    Some(&access),
+                ),
+                LogLevel::Trace,
+            );
+        }
     }
 
-    // Diversify results: cap the number of facts from any single source_episode
-    // so one topic cluster cannot dominate the entire result set.
-    diversify_ranked_facts(&mut ranked_facts);
-
-    let mut results: Vec<AssembledContextItem> = ranked_facts
-        .into_iter()
-        .take(request.budget.max(1) as usize)
-        .map(|ranked| {
-            let confidence = super::decayed_confidence(&ranked.fact, cutoff);
-            AssembledContextItem {
-                fact_id: ranked.fact.fact_id,
-                content: ranked.fact.content,
-                quote: ranked.fact.quote,
-                source_episode: ranked.fact.source_episode,
-                confidence,
-                provenance: ranked.fact.provenance,
-                rationale: ranked.rationale,
-                t_ref: ranked.fact.t_ref.or(Some(ranked.fact.t_valid)),
-                t_valid: Some(ranked.fact.t_valid),
-            }
-        })
-        .collect();
-
-    append_episode_fallback_items(
-        service,
-        &namespace,
-        &request.scope,
-        cleaned_query.as_str(),
-        request.budget,
-        &access,
-        request.window_start,
-        request.window_end,
-        &mut results,
-    )
-    .await?;
+    service.logger.log(
+        super::log_event(
+            "assemble_context.results",
+            json!({
+                "scope": request.scope,
+                "query": request.query,
+                "view_mode": requested_view_mode,
+                "project": project_opt,
+            }),
+            json!({
+                "count": results.len(),
+                "retrieval_tiers": summarize_retrieval_tiers(&results),
+                "supplemental_experience": supplemental_experience_count(&results),
+            }),
+            Some(&access),
+        ),
+        LogLevel::Trace,
+    );
 
     for item in &results {
-        if !item.fact_id.starts_with("fact:") {
-            continue;
-        }
         if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
             service.logger.log(
-                crate::log_error!("assemble_context.access_track_error", &err,
-                    "fact_id" => &item.fact_id
+                super::log_event(
+                    "assemble_context.access_track_error",
+                    json!({"fact_id": item.fact_id}),
+                    json!({"error": err.to_string()}),
+                    Some(&access),
                 ),
                 LogLevel::Warn,
             );
@@ -359,20 +476,329 @@ pub async fn assemble_context(
     }
 
     service.logger.log(
-        crate::log_event!("assemble_context.cache_set", "success",
-            "scope" => &request.scope,
-            "query" => &request.query,
-            "budget" => request.budget,
-            "count" => results.len()
+        super::log_event(
+            "assemble_context.cache_set",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"count": results.len()}),
+            Some(&access),
         ),
         LogLevel::Trace,
     );
 
+    let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+    maybe_record_query_log(service, &request, &results, false, latency_ms, &access).await;
+
     Ok(results)
 }
 
-/// Filter facts by policy tags.
-fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<crate::models::Fact> {
+async fn record_query_log(
+    service: &crate::service::MemoryService,
+    request: &AssembleContextRequest,
+    results: &[AssembledContextItem],
+    cache_hit: bool,
+    latency_ms: f64,
+) -> Result<(), MemoryError> {
+    let namespace = service.namespace_for_scope(&request.scope);
+    let logged_at = super::now();
+    let project = request
+        .project
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let view_mode = request
+        .view_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let retrieval_tier = results
+        .iter()
+        .filter_map(|item| item.retrieval_tier.as_deref())
+        .map(str::trim)
+        .find(|value| !value.is_empty());
+
+    let record_id = format!(
+        "query_log:{}",
+        super::hash_prefix(&format!(
+            "{}|{}|{}|{}|{}|{}|{}|{}",
+            super::normalize_text(&request.scope),
+            super::normalize_text(&request.query),
+            super::normalize_text(project.unwrap_or_default()),
+            super::normalize_text(view_mode.unwrap_or_default()),
+            super::normalize_text(retrieval_tier.unwrap_or_default()),
+            results.len(),
+            if cache_hit { "1" } else { "0" },
+            super::normalize_dt(logged_at),
+        ))
+    );
+
+    let mut payload = serde_json::Map::from_iter([
+        ("query_log_id".to_string(), json!(record_id.clone())),
+        (
+            "logged_at".to_string(),
+            json!(super::normalize_dt(logged_at)),
+        ),
+        ("scope".to_string(), json!(request.scope.clone())),
+        ("query".to_string(), json!(request.query.clone())),
+        ("result_count".to_string(), json!(results.len() as i64)),
+        ("latency_ms".to_string(), json!(latency_ms)),
+        ("cache_hit".to_string(), json!(cache_hit)),
+    ]);
+
+    if let Some(project) = project {
+        payload.insert("project".to_string(), json!(project));
+    }
+    if let Some(view_mode) = view_mode {
+        payload.insert("view_mode".to_string(), json!(view_mode));
+    }
+    if let Some(retrieval_tier) = retrieval_tier {
+        payload.insert("retrieval_tier".to_string(), json!(retrieval_tier));
+    }
+
+    service
+        .db_client
+        .create(&record_id, Value::Object(payload), &namespace)
+        .await?;
+
+    Ok(())
+}
+
+async fn maybe_record_query_log(
+    service: &crate::service::MemoryService,
+    request: &AssembleContextRequest,
+    results: &[AssembledContextItem],
+    cache_hit: bool,
+    latency_ms: f64,
+    access: &AccessContext,
+) {
+    if !service.is_query_logging_enabled() {
+        service.logger.log(
+            super::log_event(
+                "assemble_context.query_log_skipped",
+                json!({
+                    "scope": request.scope,
+                    "query": request.query,
+                    "cache_hit": cache_hit,
+                }),
+                json!({"reason": "disabled"}),
+                Some(access),
+            ),
+            LogLevel::Trace,
+        );
+        return;
+    }
+
+    match record_query_log(service, request, results, cache_hit, latency_ms).await {
+        Ok(()) => {
+            service.logger.log(
+                super::log_event(
+                    "assemble_context.query_log_recorded",
+                    json!({
+                        "scope": request.scope,
+                        "query": request.query,
+                        "cache_hit": cache_hit,
+                    }),
+                    json!({
+                        "result_count": results.len(),
+                        "latency_ms": latency_ms,
+                        "retrieval_tier": primary_retrieval_tier(results),
+                    }),
+                    Some(access),
+                ),
+                LogLevel::Debug,
+            );
+
+            match prune_expired_query_logs(service, &request.scope).await {
+                Ok(pruned_count) if pruned_count > 0 => {
+                    service.logger.log(
+                        super::log_event(
+                            "assemble_context.query_log_pruned",
+                            json!({
+                                "scope": request.scope,
+                                "retention_days": service.query_log_retention_days(),
+                            }),
+                            json!({"count": pruned_count}),
+                            Some(access),
+                        ),
+                        LogLevel::Trace,
+                    );
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    service.logger.log(
+                        super::log_event(
+                            "assemble_context.query_log_prune_error",
+                            json!({
+                                "scope": request.scope,
+                                "retention_days": service.query_log_retention_days(),
+                            }),
+                            json!({"error": err.to_string()}),
+                            Some(access),
+                        ),
+                        LogLevel::Warn,
+                    );
+                }
+            }
+        }
+        Err(err) => {
+            service.logger.log(
+                super::log_event(
+                    "assemble_context.query_log_error",
+                    json!({
+                        "scope": request.scope,
+                        "query": request.query,
+                        "cache_hit": cache_hit,
+                    }),
+                    json!({"error": err.to_string()}),
+                    Some(access),
+                ),
+                LogLevel::Warn,
+            );
+        }
+    }
+}
+
+async fn prune_expired_query_logs(
+    service: &crate::service::MemoryService,
+    scope: &str,
+) -> Result<usize, MemoryError> {
+    let namespace = service.namespace_for_scope(scope);
+    let cutoff =
+        super::now() - chrono::Duration::days(i64::from(service.query_log_retention_days()));
+    let deleted = service
+        .db_client
+        .query(
+            "DELETE query_log WHERE logged_at IS NOT NONE AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
+            Some(json!({"cutoff": super::normalize_dt(cutoff)})),
+            &namespace,
+        )
+        .await?;
+
+    Ok(deleted.as_array().map_or(0, std::vec::Vec::len))
+}
+
+fn primary_retrieval_tier(results: &[AssembledContextItem]) -> Option<&str> {
+    results
+        .iter()
+        .filter_map(|item| item.retrieval_tier.as_deref())
+        .map(str::trim)
+        .find(|value| !value.is_empty())
+}
+
+fn summarize_retrieval_tiers(results: &[AssembledContextItem]) -> Value {
+    let mut counts = serde_json::Map::new();
+
+    for tier in results
+        .iter()
+        .filter_map(|item| item.retrieval_tier.as_deref())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let next = counts
+            .get(tier)
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            .saturating_add(1);
+        counts.insert(tier.to_string(), json!(next));
+    }
+
+    Value::Object(counts)
+}
+
+fn supplemental_experience_count(results: &[AssembledContextItem]) -> usize {
+    results
+        .iter()
+        .filter(|item| item.rationale.starts_with("supplemental experience "))
+        .count()
+}
+
+struct RecentExperienceRequest<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    project: Option<&'a str>,
+    access: &'a AccessContext,
+    budget: i32,
+    fact_types: &'a [String],
+}
+
+async fn append_recent_experience_items(
+    results: &mut Vec<AssembledContextItem>,
+    service: &crate::service::MemoryService,
+    request: RecentExperienceRequest<'_>,
+) -> Result<usize, MemoryError> {
+    let budget = request.budget.max(1) as usize;
+    if results.len() >= budget {
+        return Ok(0);
+    }
+
+    if !request.fact_types.is_empty()
+        && !request
+            .fact_types
+            .iter()
+            .any(|fact_type| fact_type == FACT_TYPE_EXPERIENCE)
+    {
+        return Ok(0);
+    }
+
+    let records = service
+        .db_client
+        .select_active_facts(request.namespace, 500)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let experience_filter = vec![FACT_TYPE_EXPERIENCE.to_string()];
+    let mut facts =
+        filter_facts_by_constraints(records, request.access, request.project, &experience_filter)
+            .into_iter()
+            .filter(|fact| fact.scope == request.scope)
+            .filter(|fact| fact_is_active_at(fact, request.cutoff))
+            .collect::<Vec<_>>();
+
+    facts.sort_by(|left, right| {
+        right
+            .t_ingested
+            .cmp(&left.t_ingested)
+            .then_with(|| compare_facts_by_recency(left, right))
+    });
+
+    let mut seen_fact_ids = results
+        .iter()
+        .map(|item| item.fact_id.clone())
+        .collect::<HashSet<_>>();
+    let mut appended = 0;
+
+    for fact in facts {
+        if results.len() >= budget || !seen_fact_ids.insert(fact.fact_id.clone()) {
+            continue;
+        }
+
+        let confidence = super::decayed_confidence(&fact, request.cutoff);
+
+        results.push(AssembledContextItem {
+            fact_id: fact.fact_id,
+            content: fact.content,
+            quote: fact.quote,
+            source_episode: fact.source_episode,
+            confidence,
+            provenance: fact.provenance,
+            rationale: format!(
+                "supplemental experience recent_t_ingested={}",
+                super::normalize_dt(fact.t_ingested)
+            ),
+            retrieval_tier: None,
+        });
+        appended += 1;
+    }
+
+    Ok(appended)
+}
+
+/// Filter facts by access policy and request-level constraints.
+fn filter_facts_by_constraints(
+    records: Vec<Value>,
+    access: &AccessContext,
+    project: Option<&str>,
+    fact_types: &[String],
+) -> Vec<crate::models::Fact> {
     let mut facts = Vec::new();
 
     for record in records {
@@ -389,10 +815,11 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
                 item
             };
 
+            if !fact_record_allowed(fact_item, access, project, fact_types) {
+                continue;
+            }
+
             if let Some(fact) = super::episode::fact_from_record(fact_item) {
-                if !fact_allowed_by_policy(&fact, access) {
-                    continue;
-                }
                 facts.push(fact);
             }
         }
@@ -401,21 +828,32 @@ fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<cr
     facts
 }
 
-fn fact_allowed_by_policy(fact: &crate::models::Fact, access: &AccessContext) -> bool {
-    if fact.policy_tags.is_empty() {
-        return true;
-    }
-
-    let Some(allowed_tags) = &access.allowed_tags else {
-        return true;
-    };
-
-    let allowed: HashSet<_> = allowed_tags.iter().collect();
-    fact.policy_tags.iter().any(|tag| allowed.contains(tag))
+#[cfg(test)]
+fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<crate::models::Fact> {
+    filter_facts_by_constraints(records, access, None, &[])
 }
 
-fn episode_allowed_by_policy(episode: &crate::models::Episode, access: &AccessContext) -> bool {
-    if episode.policy_tags.is_empty() {
+fn fact_record_allowed(
+    record: &Value,
+    access: &AccessContext,
+    project: Option<&str>,
+    fact_types: &[String],
+) -> bool {
+    fact_record_matches_project(record, project)
+        && fact_record_matches_type(record, fact_types)
+        && fact_record_allowed_by_policy(record, access)
+}
+
+fn fact_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
+    let Some(tags) = raw_object(record)
+        .and_then(|map| map.get("policy_tags"))
+        .and_then(raw_array)
+        .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
+    else {
+        return true;
+    };
+
+    if tags.is_empty() {
         return true;
     }
 
@@ -423,93 +861,406 @@ fn episode_allowed_by_policy(episode: &crate::models::Episode, access: &AccessCo
         return true;
     };
 
-    let allowed: HashSet<_> = allowed_tags.iter().collect();
-    episode.policy_tags.iter().any(|tag| allowed.contains(tag))
+    let allowed = allowed_tags
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    tags.iter().any(|tag| allowed.contains(tag))
+}
+
+fn filter_episodes_by_constraints(
+    records: Vec<Value>,
+    access: &AccessContext,
+    project: Option<&str>,
+) -> Vec<crate::models::Episode> {
+    records
+        .into_iter()
+        .filter(|record| episode_record_allowed(record, access, project))
+        .filter_map(|record| match record {
+            Value::Object(map) => super::episode::episode_from_record(&map),
+            _ => record
+                .get("Object")
+                .and_then(Value::as_object)
+                .and_then(super::episode::episode_from_record),
+        })
+        .collect()
+}
+
+fn episode_record_allowed(record: &Value, access: &AccessContext, project: Option<&str>) -> bool {
+    episode_record_matches_project(record, project)
+        && episode_record_allowed_by_policy(record, access)
+}
+
+fn episode_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
+    let Some(tags) = raw_object(record)
+        .and_then(|map| map.get("policy_tags"))
+        .and_then(raw_array)
+        .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
+    else {
+        return true;
+    };
+
+    if tags.is_empty() {
+        return true;
+    }
+
+    let Some(allowed_tags) = &access.allowed_tags else {
+        return true;
+    };
+
+    let allowed = allowed_tags
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    tags.iter().any(|tag| allowed.contains(tag))
+}
+
+fn fact_record_matches_project(record: &Value, project: Option<&str>) -> bool {
+    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
+        return true;
+    };
+
+    raw_object(record)
+        .and_then(|map| map.get("project"))
+        .and_then(json_string)
+        .is_some_and(|value| value == project)
+}
+
+fn episode_record_matches_project(record: &Value, project: Option<&str>) -> bool {
+    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
+        return true;
+    };
+
+    raw_object(record)
+        .and_then(|map| map.get("project"))
+        .and_then(json_string)
+        .is_some_and(|value| value == project)
+}
+
+fn fact_record_matches_type(record: &Value, fact_types: &[String]) -> bool {
+    if fact_types.is_empty() {
+        return true;
+    }
+
+    raw_object(record)
+        .and_then(|map| map.get("fact_type"))
+        .and_then(json_string)
+        .is_some_and(|value| fact_types.iter().any(|fact_type| fact_type == value))
+}
+
+fn raw_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
+    if let Some(map) = record.as_object() {
+        Some(map)
+    } else {
+        record.get("Object").and_then(Value::as_object)
+    }
+}
+
+fn raw_array(value: &Value) -> Option<&Vec<Value>> {
+    if let Some(array) = value.as_array() {
+        Some(array)
+    } else {
+        value.get("Array").and_then(Value::as_array)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn append_episode_fallback_items(
+fn build_episode_fallback_items(
+    mut episodes: Vec<crate::models::Episode>,
+    query_opt: Option<&str>,
+    scope: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    window_start: Option<chrono::DateTime<chrono::Utc>>,
+    window_end: Option<chrono::DateTime<chrono::Utc>>,
+    timeline_mode: bool,
+    budget: i32,
+) -> Vec<AssembledContextItem> {
+    apply_episode_time_window(&mut episodes, window_start, window_end);
+
+    if timeline_mode {
+        episodes.sort_by(|left, right| {
+            left.t_ref
+                .cmp(&right.t_ref)
+                .then_with(|| left.episode_id.cmp(&right.episode_id))
+        });
+    } else {
+        episodes.sort_by(|left, right| {
+            right
+                .t_ref
+                .cmp(&left.t_ref)
+                .then_with(|| left.episode_id.cmp(&right.episode_id))
+        });
+    }
+
+    episodes
+        .into_iter()
+        .take(budget.max(1) as usize)
+        .map(|episode| AssembledContextItem {
+            fact_id: format!("episode_fallback:{}", episode.episode_id),
+            content: episode.content.clone(),
+            quote: episode.content.clone(),
+            source_episode: episode.episode_id.clone(),
+            confidence: 1.0,
+            provenance: json!({
+                "source_episode": episode.episode_id,
+                "source_type": episode.source_type,
+                "source_id": episode.source_id,
+                "episode_fallback": true,
+            }),
+            rationale: default_episode_fallback_rationale(query_opt, scope, cutoff),
+            retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
+        })
+        .collect()
+}
+
+fn apply_episode_time_window(
+    episodes: &mut Vec<crate::models::Episode>,
+    window_start: Option<chrono::DateTime<chrono::Utc>>,
+    window_end: Option<chrono::DateTime<chrono::Utc>>,
+) {
+    if window_start.is_none() && window_end.is_none() {
+        return;
+    }
+
+    episodes.retain(|episode| {
+        let after_start = window_start.is_none_or(|start| episode.t_ref >= start);
+        let before_end = window_end.is_none_or(|end| episode.t_ref <= end);
+        after_start && before_end
+    });
+}
+
+async fn build_facets_view(
     service: &crate::service::MemoryService,
     namespace: &str,
     scope: &str,
-    cleaned_query: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    project: Option<&str>,
     budget: i32,
     access: &AccessContext,
-    window_start: Option<chrono::DateTime<chrono::Utc>>,
-    window_end: Option<chrono::DateTime<chrono::Utc>>,
-    results: &mut Vec<AssembledContextItem>,
-) -> Result<(), MemoryError> {
-    if cleaned_query.trim().is_empty() || results.len() >= budget.max(1) as usize {
-        return Ok(());
-    }
-
-    let remaining = budget.max(1) as usize - results.len();
-    let seen_source_episodes = results
-        .iter()
-        .map(|item| item.source_episode.clone())
-        .collect::<HashSet<_>>();
-
-    let episode_records = service
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let records = service
         .db_client
-        .select_episodes_by_content(namespace, scope, cleaned_query, remaining as i32)
+        .select_table("episode", namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    for record in episode_records {
-        let Some(map) = record.as_object() else {
+    let mut buckets = HashMap::<String, (usize, chrono::DateTime<chrono::Utc>)>::new();
+
+    for record in records {
+        let Some(map) = raw_object(&record) else {
             continue;
         };
         let Some(episode) = super::episode::episode_from_record(map) else {
             continue;
         };
-        if seen_source_episodes.contains(&episode.episode_id) {
-            continue;
-        }
-        if !service
-            .db_client
-            .select_facts_by_episode_any(namespace, &episode.episode_id, 1)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?
-            .is_empty()
+        if episode.scope != scope
+            || episode.t_ref > cutoff
+            || episode.t_ingested > cutoff
+            || !episode_record_allowed(&record, access, project)
         {
             continue;
         }
-        if !episode_allowed_by_policy(&episode, access) {
-            continue;
-        }
-        if window_start.is_some_and(|start| episode.t_ref < start) {
-            continue;
-        }
-        if window_end.is_some_and(|end| episode.t_ref > end) {
-            continue;
-        }
 
-        results.push(AssembledContextItem {
-            fact_id: episode.episode_id.clone(),
-            content: episode.content.clone(),
-            quote: episode.content.clone(),
-            source_episode: episode.episode_id.clone(),
-            confidence: 0.4,
-            provenance: json!({
-                "source_episode": episode.episode_id,
-                "source_type": episode.source_type,
-                "source_id": episode.source_id,
-                "fallback": "episode_content"
-            }),
-            rationale: format!(
-                "matched lexical query=\"{}\" via episode content fallback in scope={}",
-                cleaned_query, scope
-            ),
-            t_ref: Some(episode.t_ref),
-            t_valid: Some(episode.t_ref),
-        });
+        let label = map
+            .get("project")
+            .and_then(json_string)
+            .filter(|value| !value.trim().is_empty())
+            .map(ToString::to_string)
+            .or_else(|| episode.policy_tags.first().cloned())
+            .unwrap_or_else(|| scope.to_string());
 
-        if results.len() >= budget.max(1) as usize {
-            break;
-        }
+        buckets
+            .entry(label)
+            .and_modify(|(count, latest)| {
+                *count += 1;
+                *latest = (*latest).max(episode.t_ingested);
+            })
+            .or_insert((1, episode.t_ingested));
     }
 
-    Ok(())
+    let mut buckets = buckets.into_iter().collect::<Vec<_>>();
+    buckets.sort_by(
+        |(left_label, (_, left_latest)), (right_label, (_, right_latest))| {
+            right_latest
+                .cmp(left_latest)
+                .then_with(|| left_label.cmp(right_label))
+        },
+    );
+
+    let items = buckets
+        .into_iter()
+        .take(budget.max(1) as usize)
+        .map(|(label, (count, latest))| AssembledContextItem {
+            fact_id: format!("facet:{label}"),
+            content: label.clone(),
+            quote: format!("{count} episodes"),
+            source_episode: format!("facet:{label}"),
+            confidence: 1.0,
+            provenance: json!({
+                "facet": label,
+                "count": count,
+                "max_t_ingested": super::normalize_dt(latest),
+            }),
+            rationale: "view_mode=facets grouped episodes by project/policy/scope".to_string(),
+            retrieval_tier: None,
+        })
+        .collect::<Vec<_>>();
+
+    service.logger.log(
+        super::log_event(
+            "assemble_context.facets_view",
+            json!({"scope": scope, "project": project}),
+            json!({"count": items.len()}),
+            Some(access),
+        ),
+        LogLevel::Debug,
+    );
+
+    Ok(items)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn build_wake_up_view(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    scope: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    project: Option<&str>,
+    fact_types: &[String],
+    budget: i32,
+    access: &AccessContext,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let records = service
+        .db_client
+        .select_table("fact", namespace)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    let mut facts = filter_facts_by_constraints(records, access, project, fact_types)
+        .into_iter()
+        .filter(|fact| fact.scope == scope)
+        .filter(|fact| fact_is_active_at(fact, cutoff))
+        .collect::<Vec<_>>();
+
+    facts.sort_by(|left, right| {
+        let left_persona = left.policy_tags.iter().any(|tag| tag == "persona");
+        let right_persona = right.policy_tags.iter().any(|tag| tag == "persona");
+        right_persona
+            .cmp(&left_persona)
+            .then_with(|| right.t_ingested.cmp(&left.t_ingested))
+            .then_with(|| right.t_valid.cmp(&left.t_valid))
+            .then_with(|| left.fact_id.cmp(&right.fact_id))
+    });
+
+    let persona_count = facts
+        .iter()
+        .filter(|fact| fact.policy_tags.iter().any(|tag| tag == "persona"))
+        .count();
+
+    let items = facts
+        .into_iter()
+        .take(budget.max(1) as usize)
+        .map(|fact| {
+            let persona = fact.policy_tags.iter().any(|tag| tag == "persona");
+            let confidence = if persona {
+                fact.confidence
+                    .max(super::decayed_confidence(&fact, cutoff))
+            } else {
+                super::decayed_confidence(&fact, cutoff)
+            };
+            AssembledContextItem {
+                fact_id: fact.fact_id,
+                content: fact.content,
+                quote: fact.quote,
+                source_episode: fact.source_episode,
+                confidence,
+                provenance: fact.provenance,
+                rationale: format!(
+                    "view_mode=wake_up persona={} recent_t_ingested={}",
+                    persona,
+                    super::normalize_dt(fact.t_ingested)
+                ),
+                retrieval_tier: None,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    service.logger.log(
+        super::log_event(
+            "assemble_context.wake_up_view",
+            json!({"scope": scope, "project": project, "fact_type_count": fact_types.len()}),
+            json!({"count": items.len(), "persona_count": persona_count}),
+            Some(access),
+        ),
+        LogLevel::Debug,
+    );
+
+    Ok(items)
+}
+
+async fn build_map_view(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    budget: i32,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let hub_entities =
+        super::apps::graph::find_hub_entities(service, namespace, cutoff, budget).await?;
+    let communities =
+        super::apps::graph::list_communities(service, namespace, cutoff, budget).await?;
+
+    service.logger.log(
+        super::log_event(
+            "assemble_context.map_view",
+            json!({"namespace": namespace, "budget": budget}),
+            json!({"hub_entities": hub_entities.len(), "communities": communities.len()}),
+            None,
+        ),
+        LogLevel::Debug,
+    );
+
+    let mut items = Vec::with_capacity(hub_entities.len() + communities.len());
+
+    for hub in hub_entities {
+        items.push(AssembledContextItem {
+            fact_id: format!("map:hub:{}", hub.entity_id),
+            content: hub.canonical_name.clone(),
+            quote: format!("{} connections", hub.degree),
+            source_episode: hub.entity_id.clone(),
+            confidence: 1.0,
+            provenance: json!({
+                "kind": "hub_entity",
+                "entity_id": hub.entity_id,
+                "canonical_name": hub.canonical_name,
+                "degree": hub.degree,
+            }),
+            rationale: "view_mode=map ranked hub entities by active graph degree".to_string(),
+            retrieval_tier: None,
+        });
+    }
+
+    for community in communities {
+        let member_count = community.member_entities.len();
+        items.push(AssembledContextItem {
+            fact_id: format!("map:community:{}", community.community_id),
+            content: community.summary.clone(),
+            quote: format!("{member_count} members"),
+            source_episode: community.community_id.clone(),
+            confidence: 1.0,
+            provenance: json!({
+                "kind": "community",
+                "community_id": community.community_id,
+                "member_entities": community.member_entities,
+                "member_count": member_count,
+                "updated_at": community.updated_at.map(super::normalize_dt),
+            }),
+            rationale: "view_mode=map listed active communities from the graph index".to_string(),
+            retrieval_tier: None,
+        });
+    }
+
+    items.truncate(budget.max(1) as usize);
+    Ok(items)
 }
 
 fn fact_is_active_at(fact: &crate::models::Fact, cutoff: chrono::DateTime<chrono::Utc>) -> bool {
@@ -548,14 +1299,50 @@ fn compare_facts_by_recency(
 struct RankedContextFact {
     fact: crate::models::Fact,
     rationale: String,
+    retrieval_tier: RetrievalTier,
     fusion_score: f64,
     source_priority: u8,
     decayed_confidence: f64,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RetrievalTier {
+    Direct,
+    AliasExpanded,
+    TemporalExpanded,
+    GraphExpanded,
+    SemanticExpanded,
+    EpisodeFallback,
+}
+
+impl RetrievalTier {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Direct => "direct",
+            Self::AliasExpanded => "alias",
+            Self::TemporalExpanded => "temporal",
+            Self::GraphExpanded => "graph",
+            Self::SemanticExpanded => "semantic",
+            Self::EpisodeFallback => "fallback",
+        }
+    }
+
+    fn precedence(self) -> u8 {
+        match self {
+            Self::Direct => 0,
+            Self::EpisodeFallback => 1,
+            Self::AliasExpanded => 2,
+            Self::TemporalExpanded => 3,
+            Self::GraphExpanded => 4,
+            Self::SemanticExpanded => 5,
+        }
+    }
+}
+
 fn build_ranked_context_facts(
-    direct_facts: Vec<crate::models::Fact>,
-    community_facts: Vec<(crate::models::Fact, String)>,
+    lexical_facts: Vec<(crate::models::Fact, RetrievalTier)>,
+    community_facts: Vec<(crate::models::Fact, String, f64)>,
     semantic_facts: Vec<(crate::models::Fact, String)>,
     query_opt: Option<&str>,
     scope: &str,
@@ -563,70 +1350,89 @@ fn build_ranked_context_facts(
 ) -> Vec<RankedContextFact> {
     let mut ranked_by_fact_id = std::collections::HashMap::<String, RankedContextFact>::new();
 
-    // Direct lexical matches get full RRF weight
-    let direct_weight = 1.0;
-    for (rank, fact) in direct_facts.into_iter().enumerate() {
+    for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = super::decayed_confidence(&fact, cutoff);
-        let weighted_rrf = reciprocal_rank(rank) * direct_weight;
+        let lexical_score = lexical_fusion_score(rank, &fact);
         ranked_by_fact_id
             .entry(fact_id)
             .and_modify(|candidate| {
-                candidate.fusion_score += weighted_rrf;
+                candidate.fusion_score += lexical_score;
                 candidate.source_priority = 0;
                 candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
+                if retrieval_tier.precedence() > candidate.retrieval_tier.precedence() {
+                    candidate.retrieval_tier = retrieval_tier;
+                    candidate.rationale = build_rationale(
+                        retrieval_tier,
+                        &fact,
+                        candidate.decayed_confidence,
+                        default_direct_rationale(query_opt, scope, cutoff),
+                    );
+                }
             })
             .or_insert_with(|| RankedContextFact {
-                rationale: default_direct_rationale(query_opt, scope, cutoff),
+                rationale: build_rationale(
+                    retrieval_tier,
+                    &fact,
+                    confidence,
+                    default_direct_rationale(query_opt, scope, cutoff),
+                ),
                 fact,
-                fusion_score: weighted_rrf,
+                retrieval_tier,
+                fusion_score: lexical_score,
                 source_priority: 0,
                 decayed_confidence: confidence,
             });
     }
 
-    // Community facts get reduced weight (0.7) since they're indirect
-    let community_weight = 0.7;
-    for (rank, (fact, rationale)) in community_facts.into_iter().enumerate() {
+    for (rank, (fact, rationale, graph_origin_factor)) in community_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = super::decayed_confidence(&fact, cutoff);
-        let weighted_rrf = reciprocal_rank(rank) * community_weight;
+        let weighted_rank = reciprocal_rank(rank) * graph_origin_factor.clamp(0.0, 1.0);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
-            candidate.fusion_score += weighted_rrf;
+            candidate.fusion_score += weighted_rank;
             candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             continue;
         }
+
+        let rationale = build_rationale(RetrievalTier::GraphExpanded, &fact, confidence, rationale);
 
         ranked_by_fact_id.insert(
             fact_id,
             RankedContextFact {
                 fact,
                 rationale,
-                fusion_score: weighted_rrf,
+                retrieval_tier: RetrievalTier::GraphExpanded,
+                fusion_score: weighted_rank,
                 source_priority: 1,
                 decayed_confidence: confidence,
             },
         );
     }
 
-    // Semantic/graph facts get reduced weight (0.5) since they're further indirect
-    let semantic_weight = 0.5;
     for (rank, (fact, rationale)) in semantic_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = super::decayed_confidence(&fact, cutoff);
-        let weighted_rrf = reciprocal_rank(rank) * semantic_weight;
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
-            candidate.fusion_score += weighted_rrf;
+            candidate.fusion_score += reciprocal_rank(rank);
             candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             continue;
         }
+
+        let rationale = build_rationale(
+            RetrievalTier::SemanticExpanded,
+            &fact,
+            confidence,
+            rationale,
+        );
 
         ranked_by_fact_id.insert(
             fact_id,
             RankedContextFact {
                 fact,
                 rationale,
-                fusion_score: weighted_rrf,
+                retrieval_tier: RetrievalTier::SemanticExpanded,
+                fusion_score: reciprocal_rank(rank),
                 source_priority: 2,
                 decayed_confidence: confidence,
             },
@@ -634,6 +1440,10 @@ fn build_ranked_context_facts(
     }
 
     ranked_by_fact_id.into_values().collect()
+}
+
+fn lexical_fusion_score(rank: usize, fact: &crate::models::Fact) -> f64 {
+    reciprocal_rank(rank) * (1.0 + fact.ft_score.max(0.0))
 }
 
 fn reciprocal_rank(rank: usize) -> f64 {
@@ -664,17 +1474,360 @@ fn default_direct_rationale(
     )
 }
 
+fn default_episode_fallback_rationale(
+    query_opt: Option<&str>,
+    scope: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> String {
+    query_opt.map_or_else(
+        || {
+            format!(
+                "tier=fallback fts=0.00 access_count=0 confidence=1.00 matched episode content in scope={} and active at {}",
+                scope,
+                cutoff.date_naive()
+            )
+        },
+        |query| {
+            format!(
+                "tier=fallback fts=0.00 access_count=0 confidence=1.00 matched episode content query=\"{}\" in scope={} and active at {}",
+                query,
+                scope,
+                cutoff.date_naive()
+            )
+        },
+    )
+}
+
+fn build_rationale(
+    retrieval_tier: RetrievalTier,
+    fact: &crate::models::Fact,
+    confidence: f64,
+    detail: String,
+) -> String {
+    format!(
+        "tier={} fts={:.2} access_count={} confidence={:.2} {}",
+        retrieval_tier.as_str(),
+        fact.ft_score.max(0.0),
+        fact.access_count,
+        confidence,
+        detail,
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TemporalQueryExpansion {
+    temporal_groups: Vec<Vec<String>>,
+    residual_query: Option<String>,
+}
+
+fn expand_temporal_synonyms(
+    query: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> Option<TemporalQueryExpansion> {
+    let tokens = query
+        .split_whitespace()
+        .map(normalize_temporal_token)
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut temporal_groups = Vec::new();
+    let mut consumed = vec![false; tokens.len()];
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index].as_str();
+
+        if let Some(month) = month_number(token) {
+            if let Some(year_token) = tokens
+                .get(index + 1)
+                .filter(|next| is_four_digit_year(next))
+                && let Ok(year) = year_token.parse::<i32>()
+            {
+                push_temporal_group(
+                    &mut temporal_groups,
+                    vec![format!("{token} {year}"), format!("{year}-{month:02}")],
+                );
+                consumed[index] = true;
+                consumed[index + 1] = true;
+                index += 2;
+                continue;
+            }
+
+            push_temporal_group(&mut temporal_groups, vec![token.to_string()]);
+            consumed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        if is_weekday_name(token) {
+            push_temporal_group(&mut temporal_groups, weekday_group(cutoff, token));
+            consumed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        if let Some(quarter) = parse_quarter_token(token) {
+            push_temporal_group(&mut temporal_groups, quarter_group(cutoff, quarter));
+            consumed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        if token == "quarter"
+            && let Some(next) = tokens.get(index + 1)
+            && let Some(quarter) = parse_quarter_token(next)
+        {
+            push_temporal_group(&mut temporal_groups, quarter_group(cutoff, quarter));
+            consumed[index] = true;
+            consumed[index + 1] = true;
+            index += 2;
+            continue;
+        }
+
+        if token == "last" && tokens.get(index + 1).is_some_and(|next| next == "quarter") {
+            push_temporal_group(&mut temporal_groups, previous_quarter_group(cutoff));
+            consumed[index] = true;
+            consumed[index + 1] = true;
+            index += 2;
+            continue;
+        }
+
+        if token == "this" && tokens.get(index + 1).is_some_and(|next| next == "week") {
+            push_temporal_group(&mut temporal_groups, current_week_group(cutoff));
+            consumed[index] = true;
+            consumed[index + 1] = true;
+            index += 2;
+            continue;
+        }
+
+        if let Some(relative_shift_days) = relative_day_shift(token) {
+            let target_date = cutoff.date_naive() + chrono::Duration::days(relative_shift_days);
+            push_temporal_group(&mut temporal_groups, day_group_queries(target_date));
+            consumed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        if let Some(date) = parse_iso_date(token) {
+            push_temporal_group(&mut temporal_groups, day_group_queries(date));
+            consumed[index] = true;
+            index += 1;
+            continue;
+        }
+
+        index += 1;
+    }
+
+    if temporal_groups.is_empty() {
+        return None;
+    }
+
+    let residual_terms = tokens
+        .into_iter()
+        .enumerate()
+        .filter_map(|(idx, token)| (!consumed[idx]).then_some(token))
+        .collect::<Vec<_>>();
+
+    Some(TemporalQueryExpansion {
+        temporal_groups,
+        residual_query: (!residual_terms.is_empty()).then(|| residual_terms.join(" ")),
+    })
+}
+
+fn normalize_temporal_token(token: &str) -> String {
+    token
+        .trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+        .to_ascii_lowercase()
+}
+
+fn month_number(token: &str) -> Option<u32> {
+    match token {
+        "january" => Some(1),
+        "february" => Some(2),
+        "march" => Some(3),
+        "april" => Some(4),
+        "may" => Some(5),
+        "june" => Some(6),
+        "july" => Some(7),
+        "august" => Some(8),
+        "september" => Some(9),
+        "october" => Some(10),
+        "november" => Some(11),
+        "december" => Some(12),
+        _ => None,
+    }
+}
+
+fn is_four_digit_year(token: &str) -> bool {
+    token.len() == 4 && token.chars().all(|ch| ch.is_ascii_digit())
+}
+
+fn is_weekday_name(token: &str) -> bool {
+    matches!(
+        token,
+        "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"
+    )
+}
+
+fn parse_quarter_token(token: &str) -> Option<u32> {
+    match token {
+        "q1" | "1" | "first" => Some(1),
+        "q2" | "2" | "second" => Some(2),
+        "q3" | "3" | "third" => Some(3),
+        "q4" | "4" | "fourth" => Some(4),
+        _ => None,
+    }
+}
+
+fn previous_quarter_group(cutoff: chrono::DateTime<chrono::Utc>) -> Vec<String> {
+    use chrono::Datelike;
+
+    let current_quarter = ((cutoff.month() - 1) / 3) + 1;
+    let (year, quarter) = if current_quarter == 1 {
+        (cutoff.year() - 1, 4)
+    } else {
+        (cutoff.year(), current_quarter - 1)
+    };
+
+    quarter_group_for_year(year, quarter)
+}
+
+fn quarter_group(cutoff: chrono::DateTime<chrono::Utc>, quarter: u32) -> Vec<String> {
+    use chrono::Datelike;
+
+    quarter_group_for_year(cutoff.year(), quarter)
+}
+
+fn quarter_group_for_year(year: i32, quarter: u32) -> Vec<String> {
+    let mut group = vec![format!("q{quarter}")];
+    for month in ((quarter - 1) * 3 + 1)..=((quarter - 1) * 3 + 3) {
+        let month_name = month_name(month);
+        group.push(format!("{month_name} {year}"));
+        group.push(format!("{year}-{month:02}"));
+    }
+    group
+}
+
+fn current_week_group(cutoff: chrono::DateTime<chrono::Utc>) -> Vec<String> {
+    let start_of_week = start_of_week(cutoff.date_naive());
+    let mut group = Vec::new();
+    for offset in 0..7 {
+        group.extend(day_group_queries(
+            start_of_week + chrono::Duration::days(offset),
+        ));
+    }
+    group
+}
+
+fn weekday_group(cutoff: chrono::DateTime<chrono::Utc>, token: &str) -> Vec<String> {
+    let Some(target_weekday) = weekday_from_name(token) else {
+        return vec![token.to_string()];
+    };
+
+    let start_of_week = start_of_week(cutoff.date_naive());
+    let target_date =
+        start_of_week + chrono::Duration::days(target_weekday.num_days_from_monday() as i64);
+    day_group_queries(target_date)
+}
+
+fn start_of_week(date: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+
+    date - chrono::Duration::days(date.weekday().num_days_from_monday() as i64)
+}
+
+fn weekday_from_name(token: &str) -> Option<chrono::Weekday> {
+    match token {
+        "monday" => Some(chrono::Weekday::Mon),
+        "tuesday" => Some(chrono::Weekday::Tue),
+        "wednesday" => Some(chrono::Weekday::Wed),
+        "thursday" => Some(chrono::Weekday::Thu),
+        "friday" => Some(chrono::Weekday::Fri),
+        "saturday" => Some(chrono::Weekday::Sat),
+        "sunday" => Some(chrono::Weekday::Sun),
+        _ => None,
+    }
+}
+
+fn relative_day_shift(token: &str) -> Option<i64> {
+    match token {
+        "yesterday" => Some(-1),
+        "today" => Some(0),
+        "tomorrow" => Some(1),
+        _ => None,
+    }
+}
+
+fn parse_iso_date(token: &str) -> Option<chrono::NaiveDate> {
+    chrono::NaiveDate::parse_from_str(token, "%Y-%m-%d").ok()
+}
+
+fn day_group_queries(date: chrono::NaiveDate) -> Vec<String> {
+    use chrono::Datelike;
+
+    vec![
+        date.format("%Y-%m-%d").to_string(),
+        format!("{} {}", month_name(date.month()), date.year()),
+        format!("{}-{:02}", date.year(), date.month()),
+        weekday_name(date.weekday()).to_string(),
+    ]
+}
+
+fn month_name(month: u32) -> &'static str {
+    match month {
+        1 => "january",
+        2 => "february",
+        3 => "march",
+        4 => "april",
+        5 => "may",
+        6 => "june",
+        7 => "july",
+        8 => "august",
+        9 => "september",
+        10 => "october",
+        11 => "november",
+        12 => "december",
+        _ => "",
+    }
+}
+
+fn weekday_name(weekday: chrono::Weekday) -> &'static str {
+    match weekday {
+        chrono::Weekday::Mon => "monday",
+        chrono::Weekday::Tue => "tuesday",
+        chrono::Weekday::Wed => "wednesday",
+        chrono::Weekday::Thu => "thursday",
+        chrono::Weekday::Fri => "friday",
+        chrono::Weekday::Sat => "saturday",
+        chrono::Weekday::Sun => "sunday",
+    }
+}
+
+fn push_temporal_group(groups: &mut Vec<Vec<String>>, queries: Vec<String>) {
+    let mut seen = HashSet::new();
+    let group = queries
+        .into_iter()
+        .map(|query| query.trim().to_ascii_lowercase())
+        .filter(|query| !query.is_empty())
+        .filter(|query| seen.insert(query.clone()))
+        .collect::<Vec<_>>();
+
+    if !group.is_empty() {
+        groups.push(group);
+    }
+}
+
 fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
     facts.sort_by(|a, b| {
-        // Composite score: fusion_score weighted by decayed_confidence,
-        // boosted by the DB's full-text search score when available.
-        let ft_boost_a = 1.0 + a.fact.ft_score;
-        let ft_boost_b = 1.0 + b.fact.ft_score;
-        let score_a = a.fusion_score * a.decayed_confidence.max(0.01) * ft_boost_a;
-        let score_b = b.fusion_score * b.decayed_confidence.max(0.01) * ft_boost_b;
+        // Composite score: fusion_score weighted by decayed_confidence
+        let score_a = a.fusion_score * a.decayed_confidence.max(0.01);
+        let score_b = b.fusion_score * b.decayed_confidence.max(0.01);
         score_b
             .total_cmp(&score_a)
             .then_with(|| a.source_priority.cmp(&b.source_priority))
+            .then_with(|| b.fact.ft_score.total_cmp(&a.fact.ft_score))
             .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
             .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
     });
@@ -703,34 +1856,6 @@ fn apply_time_window(
         let before_end = window_end.is_none_or(|end| ranked.fact.t_valid <= end);
         after_start && before_end
     });
-}
-
-/// Diversify ranked facts by capping the number of facts from any single
-/// source_episode. This prevents one topic cluster from dominating results
-/// when a generic query matches many facts from the same episode chain.
-///
-/// Strategy: greedy pass in score order, keeping at most `max_per_episode`
-/// facts per source_episode. Facts from under-represented episodes get priority.
-fn diversify_ranked_facts(facts: &mut Vec<RankedContextFact>) {
-    // Allow at most 2 facts from the same source_episode in the final set.
-    // This is enough to show both a summary and a detail fact from one topic,
-    // but prevents 5+ facts from the same email thread from dominating.
-    const MAX_PER_EPISODE: usize = 2;
-
-    let mut episode_counts = std::collections::HashMap::<String, usize>::new();
-    let mut kept = Vec::with_capacity(facts.len());
-
-    for fact in facts.drain(..) {
-        let episode = fact.fact.source_episode.clone();
-        let count = episode_counts.entry(episode).or_insert(0);
-        if *count < MAX_PER_EPISODE {
-            *count += 1;
-            kept.push(fact);
-        }
-        // else: skip this fact — episode already well-represented
-    }
-
-    *facts = kept;
 }
 
 /// Expands a search query with entity aliases for broader recall.
@@ -767,32 +1892,10 @@ async fn expand_query_with_aliases(
         .into_iter()
         .collect();
 
-    // Add partial name matching: try individual capitalized words as entity names
-    let mut partial_names: Vec<String> = Vec::new();
-    for term in &terms {
-        if term.len() >= 3
-            && term
-                .chars()
-                .next()
-                .map(|c| c.is_uppercase())
-                .unwrap_or(false)
-        {
-            partial_names.push(super::normalize_text(term));
-        }
-    }
-
-    // Combine with existing phrase lookups, deduplicating
-    let all_lookup_names: Vec<String> = normalized_names
-        .into_iter()
-        .chain(partial_names)
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-
     // Single batch query instead of O(N²) individual lookups
     let entities = service
         .db_client
-        .select_entities_batch(namespace, &all_lookup_names)
+        .select_entities_batch(namespace, &normalized_names)
         .await
         .unwrap_or_default();
 
@@ -862,6 +1965,12 @@ async fn expand_query_with_aliases_for_test(
     expand_query_with_aliases(service, query, namespace).await
 }
 
+struct LexicalQueryResult {
+    records: Vec<Value>,
+    retrieval_tier: RetrievalTier,
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
     namespace: &str,
@@ -869,39 +1978,377 @@ async fn select_fact_records_for_query(
     cutoff_iso: &str,
     query_opt: Option<&str>,
     limit: i32,
-) -> Result<Vec<Value>, MemoryError> {
-    // Request a wider candidate pool so the ranking layer has choices beyond
-    // the DB's coarse FTS ordering.
-    let candidate_limit = (limit * CANDIDATE_MULTIPLIER).max(50);
+    project: Option<&str>,
+    fact_types: &[String],
+) -> Result<LexicalQueryResult, MemoryError> {
+    let query_terms = query_opt
+        .map(super::query::search_query_terms)
+        .unwrap_or_default();
+    let candidate_limit = lexical_candidate_limit(limit);
 
     let initial = service
         .db_client
-        .select_facts_filtered(namespace, scope, cutoff_iso, query_opt, candidate_limit)
+        .select_facts_filtered_advanced(
+            namespace,
+            scope,
+            cutoff_iso,
+            query_opt,
+            candidate_limit,
+            project,
+            fact_types,
+        )
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let initial = rank_lexical_records(initial, &query_terms);
+
+    let Some(_query) = query_opt else {
+        return Ok(LexicalQueryResult {
+            records: initial,
+            retrieval_tier: RetrievalTier::Direct,
+        });
+    };
+
+    if query_terms.len() < 3 {
+        return Ok(LexicalQueryResult {
+            records: initial,
+            retrieval_tier: RetrievalTier::Direct,
+        });
+    }
+
+    let fallback_terms = build_lexical_fallback_queries(&query_terms);
+
+    let mut fallback_records = Vec::new();
+    for term in fallback_terms {
+        let term_records = service
+            .db_client
+            .select_facts_filtered_advanced(
+                namespace,
+                scope,
+                cutoff_iso,
+                Some(term.as_str()),
+                candidate_limit,
+                project,
+                fact_types,
+            )
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+        fallback_records.extend(term_records);
+    }
+
+    let mut seen_fact_ids = std::collections::HashSet::new();
+    fallback_records.retain(|record| {
+        // Use unwrap_record_string to handle both plain strings and wrapped forms
+        // like {"String": "fact:xyz"} that SurrealDB may return.
+        let Some(fact_id) = record
+            .get("fact_id")
+            .and_then(super::episode::unwrap_record_string)
+        else {
+            return true;
+        };
+        seen_fact_ids.insert(fact_id)
+    });
+
+    let fallback_records = rank_lexical_records(fallback_records, &query_terms);
+
+    let initial_score = top_query_score(&initial, &query_terms);
+    let fallback_score = top_query_score(&fallback_records, &query_terms);
+    let best_score = initial_score.max(fallback_score);
+    let best_phrase_overlap = top_phrase_overlap(&initial, &query_terms)
+        .max(top_phrase_overlap(&fallback_records, &query_terms));
+
+    if best_score < query_terms.len().min(4) || (query_terms.len() >= 3 && best_phrase_overlap == 0)
+    {
+        let scanned_records = scan_fact_records_by_query_terms(
+            service,
+            namespace,
+            scope,
+            cutoff_iso,
+            project,
+            fact_types,
+            &query_terms,
+            candidate_limit,
+        )
+        .await?;
+        let scanned_score = top_query_score(&scanned_records, &query_terms);
+        if (query_terms.len() >= 3 && best_phrase_overlap == 0 && !scanned_records.is_empty())
+            || scanned_score > best_score
+        {
+            return Ok(LexicalQueryResult {
+                records: scanned_records,
+                retrieval_tier: RetrievalTier::EpisodeFallback,
+            });
+        }
+    }
+
+    if fallback_score > initial_score {
+        return Ok(LexicalQueryResult {
+            records: fallback_records,
+            retrieval_tier: RetrievalTier::EpisodeFallback,
+        });
+    }
+
+    if !initial.is_empty() {
+        return Ok(LexicalQueryResult {
+            records: initial,
+            retrieval_tier: RetrievalTier::Direct,
+        });
+    }
+
+    let retrieval_tier = if fallback_records.is_empty() {
+        RetrievalTier::Direct
+    } else {
+        RetrievalTier::EpisodeFallback
+    };
+
+    Ok(LexicalQueryResult {
+        records: fallback_records,
+        retrieval_tier,
+    })
+}
+
+fn lexical_candidate_limit(limit: i32) -> i32 {
+    let base = limit.max(1);
+    (base.saturating_mul(5)).clamp(base, 50)
+}
+
+fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
+    let mut queries = Vec::new();
+
+    for width in (2..=3).rev() {
+        if query_terms.len() < width {
+            continue;
+        }
+        for window in query_terms.windows(width) {
+            let query = window.join(" ");
+            if !queries.contains(&query) {
+                queries.push(query);
+            }
+        }
+    }
+
+    for term in query_terms {
+        if !queries.contains(term) {
+            queries.push(term.clone());
+        }
+    }
+
+    queries
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn scan_fact_records_by_query_terms(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    scope: &str,
+    cutoff_iso: &str,
+    project: Option<&str>,
+    fact_types: &[String],
+    query_terms: &[String],
+    limit: i32,
+) -> Result<Vec<Value>, MemoryError> {
+    let records = service
+        .db_client
+        .select_table("fact", namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    // Apply a quality gate: only accept facts with meaningful FTS scores.
-    let qualified: Vec<_> = initial
+    let mut filtered = records
         .into_iter()
         .filter(|record| {
-            // When no query was provided, all active facts are acceptable.
-            if query_opt.is_none() {
-                return true;
-            }
-            let score = record.get("ft_score").and_then(json_f64).unwrap_or(0.0);
-            score >= MIN_FT_SCORE_THRESHOLD
+            raw_object(record)
+                .and_then(|map| map.get("scope"))
+                .and_then(json_string)
+                .is_some_and(|value| value == scope)
         })
-        .take(limit as usize)
-        .collect();
+        .filter(|record| {
+            raw_object(record)
+                .and_then(|map| map.get("t_valid"))
+                .and_then(json_string)
+                .is_some_and(|value| value <= cutoff_iso)
+        })
+        .filter(|record| {
+            raw_object(record)
+                .and_then(|map| map.get("t_invalid"))
+                .and_then(json_string)
+                .is_none_or(|value| value > cutoff_iso)
+        })
+        .filter(|record| fact_record_matches_project(record, project))
+        .filter(|record| fact_record_matches_type(record, fact_types))
+        .filter(|record| lexical_query_overlap(record, query_terms) > 0)
+        .map(|mut record| {
+            let score = lexical_query_score(&record, query_terms) as f64;
+            if let Some(object) = record.as_object_mut() {
+                object.insert("ft_score".to_string(), json!(score));
+            } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
+                object.insert("ft_score".to_string(), json!(score));
+            }
+            record
+        })
+        .collect::<Vec<_>>();
 
-    if !qualified.is_empty() {
-        return Ok(qualified);
+    filtered = rank_lexical_records(filtered, query_terms);
+    filtered.truncate(limit.max(1) as usize);
+    Ok(filtered)
+}
+
+fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[String]) -> Vec<Value> {
+    if query_terms.is_empty() {
+        return records;
     }
 
-    // Fallback: search by individual terms when the full query yields no
-    // qualified candidates.
+    for record in &mut records {
+        let combined_score =
+            lexical_ft_score(record) + lexical_query_score(record, query_terms) as f64;
+        if let Some(object) = record.as_object_mut() {
+            object.insert("ft_score".to_string(), json!(combined_score));
+        } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
+            object.insert("ft_score".to_string(), json!(combined_score));
+        }
+    }
+
+    records.sort_by(|left, right| {
+        lexical_query_score(right, query_terms)
+            .cmp(&lexical_query_score(left, query_terms))
+            .then_with(|| lexical_ft_score(right).total_cmp(&lexical_ft_score(left)))
+            .then_with(|| lexical_t_valid(right).cmp(&lexical_t_valid(left)))
+            .then_with(|| lexical_fact_id(left).cmp(&lexical_fact_id(right)))
+    });
+
+    records
+}
+
+fn top_query_score(records: &[Value], query_terms: &[String]) -> usize {
+    records
+        .iter()
+        .map(|record| lexical_query_score(record, query_terms))
+        .max()
+        .unwrap_or(0)
+}
+
+fn top_phrase_overlap(records: &[Value], query_terms: &[String]) -> usize {
+    records
+        .iter()
+        .map(|record| lexical_phrase_overlap(record, query_terms))
+        .max()
+        .unwrap_or(0)
+}
+
+fn lexical_query_overlap(record: &Value, query_terms: &[String]) -> usize {
+    if query_terms.is_empty() {
+        return 0;
+    }
+
+    let mut record_terms = std::collections::HashSet::<String>::new();
+    if let Some(content) = raw_object(record)
+        .and_then(|map| map.get("content"))
+        .and_then(json_string)
+    {
+        record_terms.extend(super::query::search_query_terms(content));
+    }
+    if let Some(index_keys) = raw_object(record)
+        .and_then(|map| map.get("index_keys"))
+        .and_then(raw_array)
+    {
+        for value in index_keys {
+            if let Some(index_key) = json_string(value) {
+                record_terms.extend(super::query::search_query_terms(index_key));
+            }
+        }
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| record_terms.contains(term.as_str()))
+        .count()
+}
+
+fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
+    let unigram_overlap = lexical_query_overlap(record, query_terms);
+    let phrase_overlap = lexical_phrase_overlap(record, query_terms);
+    let trigram_overlap = lexical_ngram_overlap(record, query_terms, 3);
+
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+}
+
+fn lexical_phrase_overlap(record: &Value, query_terms: &[String]) -> usize {
+    lexical_ngram_overlap(record, query_terms, 2) + lexical_ngram_overlap(record, query_terms, 3)
+}
+
+fn lexical_ngram_overlap(record: &Value, query_terms: &[String], width: usize) -> usize {
+    if query_terms.len() < width {
+        return 0;
+    }
+
+    let content_terms = lexical_record_terms(record);
+    if content_terms.len() < width {
+        return 0;
+    }
+
+    let record_ngrams = content_terms
+        .windows(width)
+        .map(|window| window.join(" "))
+        .collect::<HashSet<_>>();
+
+    query_terms
+        .windows(width)
+        .filter(|window| record_ngrams.contains(&window.join(" ")))
+        .count()
+}
+
+fn lexical_record_terms(record: &Value) -> Vec<String> {
+    raw_object(record)
+        .and_then(|map| map.get("content"))
+        .and_then(json_string)
+        .map(super::query::search_query_terms)
+        .unwrap_or_default()
+}
+
+fn lexical_ft_score(record: &Value) -> f64 {
+    raw_object(record)
+        .and_then(|map| map.get("ft_score"))
+        .and_then(json_f64)
+        .unwrap_or(0.0)
+}
+
+fn lexical_t_valid(record: &Value) -> String {
+    raw_object(record)
+        .and_then(|map| map.get("t_valid"))
+        .and_then(json_string)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn lexical_fact_id(record: &Value) -> String {
+    raw_object(record)
+        .and_then(|map| map.get("fact_id"))
+        .and_then(super::episode::unwrap_record_string)
+        .unwrap_or_default()
+        .to_string()
+}
+
+async fn select_episode_records_for_query(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    scope: &str,
+    cutoff_iso: &str,
+    query_opt: Option<&str>,
+    limit: i32,
+    project: Option<&str>,
+) -> Result<Vec<Value>, MemoryError> {
+    let initial = service
+        .db_client
+        .select_episodes_by_content_advanced(
+            namespace, scope, cutoff_iso, query_opt, limit, project,
+        )
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+    if !initial.is_empty() || query_opt.is_none() {
+        return Ok(initial);
+    }
+
     let Some(query) = query_opt else {
-        return Ok(Vec::new());
+        return Ok(initial);
     };
 
     let fallback_terms = query
@@ -909,36 +2356,155 @@ async fn select_fact_records_for_query(
         .filter(|term| !term.trim().is_empty())
         .collect::<Vec<_>>();
     if fallback_terms.len() < 2 {
-        return Ok(Vec::new());
+        return Ok(initial);
     }
 
     let mut fallback_records = Vec::new();
     for term in fallback_terms {
         let term_records = service
             .db_client
-            .select_facts_filtered(namespace, scope, cutoff_iso, Some(term), candidate_limit)
+            .select_episodes_by_content_advanced(
+                namespace,
+                scope,
+                cutoff_iso,
+                Some(term),
+                limit,
+                project,
+            )
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
         fallback_records.extend(term_records);
     }
 
-    // Deduplicate and apply quality gate to fallback results
-    let mut seen_fact_ids = std::collections::HashSet::new();
+    let mut seen_episode_ids = HashSet::new();
     fallback_records.retain(|record| {
-        let Some(fact_id) = record
-            .get("fact_id")
-            .and_then(super::episode::unwrap_record_string)
+        let Some(episode_id) = record
+            .get("episode_id")
+            .and_then(json_string)
+            .or_else(|| record.get("id").and_then(json_string))
         else {
             return true;
         };
-        if !seen_fact_ids.insert(fact_id) {
-            return false;
-        }
-        let score = record.get("ft_score").and_then(json_f64).unwrap_or(0.0);
-        score >= MIN_FT_SCORE_THRESHOLD
+        seen_episode_ids.insert(episode_id.to_string())
     });
 
-    Ok(fallback_records.into_iter().take(limit as usize).collect())
+    Ok(fallback_records)
+}
+
+struct CollectTemporalFactsRequest<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff_iso: &'a str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    query: &'a str,
+    access: &'a AccessContext,
+    project: Option<&'a str>,
+    fact_types: &'a [String],
+    budget: i32,
+}
+
+async fn collect_temporal_facts(
+    service: &crate::service::MemoryService,
+    request: CollectTemporalFactsRequest<'_>,
+) -> Result<Vec<crate::models::Fact>, MemoryError> {
+    let Some(expansion) = expand_temporal_synonyms(request.query, request.cutoff) else {
+        return Ok(Vec::new());
+    };
+
+    let search_limit = request.budget.max(1) * 4;
+    let mut matched_facts_by_id = HashMap::<String, crate::models::Fact>::new();
+    let mut eligible_fact_ids: Option<HashSet<String>> = None;
+
+    for temporal_group in expansion.temporal_groups {
+        let mut group_fact_ids = HashSet::new();
+
+        for temporal_query in temporal_group {
+            let records = service
+                .db_client
+                .select_facts_filtered_advanced(
+                    request.namespace,
+                    request.scope,
+                    request.cutoff_iso,
+                    Some(&temporal_query),
+                    search_limit,
+                    request.project,
+                    request.fact_types,
+                )
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+            for fact in filter_facts_by_constraints(
+                records,
+                request.access,
+                request.project,
+                request.fact_types,
+            ) {
+                group_fact_ids.insert(fact.fact_id.clone());
+                matched_facts_by_id
+                    .entry(fact.fact_id.clone())
+                    .or_insert(fact);
+            }
+        }
+
+        if group_fact_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        eligible_fact_ids = Some(match eligible_fact_ids {
+            None => group_fact_ids,
+            Some(mut existing) => {
+                existing.retain(|fact_id| group_fact_ids.contains(fact_id));
+                existing
+            }
+        });
+
+        if eligible_fact_ids.as_ref().is_some_and(HashSet::is_empty) {
+            return Ok(Vec::new());
+        }
+    }
+
+    if let Some(residual_query) = expansion.residual_query.as_deref() {
+        let residual_records = select_fact_records_for_query(
+            service,
+            request.namespace,
+            request.scope,
+            request.cutoff_iso,
+            Some(residual_query),
+            search_limit,
+            request.project,
+            request.fact_types,
+        )
+        .await?;
+
+        let residual_fact_ids = filter_facts_by_constraints(
+            residual_records.records,
+            request.access,
+            request.project,
+            request.fact_types,
+        )
+        .into_iter()
+        .map(|fact| {
+            let fact_id = fact.fact_id.clone();
+            matched_facts_by_id.entry(fact_id.clone()).or_insert(fact);
+            fact_id
+        })
+        .collect::<HashSet<_>>();
+
+        if let Some(eligible_fact_ids) = eligible_fact_ids.as_mut() {
+            eligible_fact_ids.retain(|fact_id| residual_fact_ids.contains(fact_id));
+        } else {
+            eligible_fact_ids = Some(residual_fact_ids);
+        }
+    }
+
+    let mut facts = eligible_fact_ids
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|fact_id| matched_facts_by_id.remove(&fact_id))
+        .collect::<Vec<_>>();
+    facts.sort_by(compare_facts_by_recency);
+    facts.truncate(request.budget.max(1) as usize);
+    Ok(facts)
 }
 
 struct CollectCommunityFactsRequest<'a> {
@@ -947,6 +2513,8 @@ struct CollectCommunityFactsRequest<'a> {
     cutoff_iso: &'a str,
     query: &'a str,
     access: &'a AccessContext,
+    project: Option<&'a str>,
+    fact_types: &'a [String],
     direct_fact_ids: &'a std::collections::HashSet<String>,
     budget: i32,
 }
@@ -957,6 +2525,8 @@ struct CollectSemanticFactsRequest<'a> {
     cutoff: chrono::DateTime<chrono::Utc>,
     query: &'a str,
     access: &'a AccessContext,
+    project: Option<&'a str>,
+    fact_types: &'a [String],
     excluded_fact_ids: &'a HashSet<String>,
     budget: i32,
 }
@@ -971,7 +2541,7 @@ struct CommunityMatch {
 async fn collect_community_facts(
     service: &crate::service::MemoryService,
     request: CollectCommunityFactsRequest<'_>,
-) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
+) -> Result<Vec<(crate::models::Fact, String, f64)>, MemoryError> {
     let matched_communities =
         find_matching_communities(service, request.namespace, request.query).await?;
     if matched_communities.is_empty() {
@@ -1018,15 +2588,20 @@ async fn collect_community_facts(
         })
         .collect::<std::collections::HashMap<_, _>>();
 
-    let mut facts = filter_facts_by_policy(fallback_records, request.access)
-        .into_iter()
-        .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
-        .filter(|fact| {
-            fact.entity_links
-                .iter()
-                .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
-        })
-        .collect::<Vec<_>>();
+    let mut facts = filter_facts_by_constraints(
+        fallback_records,
+        request.access,
+        request.project,
+        request.fact_types,
+    )
+    .into_iter()
+    .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
+    .filter(|fact| {
+        fact.entity_links
+            .iter()
+            .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
+    })
+    .collect::<Vec<_>>();
     facts.sort_by(|left, right| {
         let left_rank = best_community_match(left, &community_summary_by_member)
             .map(|matched| matched.rank)
@@ -1040,22 +2615,32 @@ async fn collect_community_facts(
             .then_with(|| compare_facts_by_recency(left, right))
     });
 
-    Ok(facts
-        .into_iter()
-        .take(request.budget.max(1) as usize)
-        .map(|fact| {
-            let rationale = best_community_match(&fact, &community_summary_by_member).map_or_else(
-                || format!("matched community summary for query=\"{}\"", request.query),
-                |matched| {
-                    format!(
-                        "matched community summary for query=\"{}\" via {}: {}",
-                        request.query, matched.community_id, matched.summary
-                    )
-                },
-            );
-            (fact, rationale)
-        })
-        .collect())
+    let mut entity_origin_factor_cache = HashMap::<String, f64>::new();
+
+    let mut ranked_facts = Vec::new();
+    for fact in facts.into_iter().take(request.budget.max(1) as usize) {
+        let rationale = best_community_match(&fact, &community_summary_by_member).map_or_else(
+            || format!("matched community summary for query=\"{}\"", request.query),
+            |matched| {
+                format!(
+                    "matched community summary for query=\"{}\" via {}: {}",
+                    request.query, matched.community_id, matched.summary
+                )
+            },
+        );
+        let origin_factor = community_origin_factor_for_fact(
+            service,
+            request.namespace,
+            request.cutoff_iso,
+            &fact,
+            &community_summary_by_member,
+            &mut entity_origin_factor_cache,
+        )
+        .await?;
+        ranked_facts.push((fact, rationale, origin_factor));
+    }
+
+    Ok(ranked_facts)
 }
 
 async fn collect_semantic_facts(
@@ -1103,13 +2688,16 @@ async fn collect_semantic_facts(
 
     let mut ranked_facts = Vec::new();
     for record in fact_records {
+        if !fact_record_allowed(&record, request.access, request.project, request.fact_types) {
+            continue;
+        }
+
         let Some(fact) = super::episode::fact_from_record(&record) else {
             continue;
         };
 
         if fact.scope != request.scope
             || request.excluded_fact_ids.contains(&fact.fact_id)
-            || !fact_allowed_by_policy(&fact, request.access)
             || !fact_is_active_at(&fact, request.cutoff)
         {
             continue;
@@ -1159,160 +2747,6 @@ async fn collect_semantic_facts(
                     request.query
                 ),
             )
-        })
-        .collect())
-}
-
-/// Request parameters for entity-graph expansion fact collection.
-struct CollectEntityExpansionFactsRequest<'a> {
-    namespace: &'a str,
-    scope: &'a str,
-    cutoff_iso: &'a str,
-    query: &'a str,
-    access: &'a AccessContext,
-    excluded_fact_ids: &'a HashSet<String>,
-    budget: i32,
-}
-
-/// Detects queries that likely require multi-hop graph traversal.
-fn is_relationship_query(query: &str) -> bool {
-    let q_lower = query.to_lowercase();
-    q_lower.contains("who knows")
-        || q_lower.contains("introduce")
-        || q_lower.contains("connected to")
-        || q_lower.contains("relationship")
-        || q_lower.contains("knows who")
-        || q_lower.contains("mutual")
-        || q_lower.contains("connection")
-}
-
-/// Retrieves facts linked to entities resolved from the query, plus their 1-hop graph neighbors.
-///
-/// Pipeline: NER extract → entity batch lookup → edge neighbor expansion → fact retrieval.
-/// This enables the server to surface facts about related entities that FTS alone would miss.
-/// For relationship-shaped queries, expands to 2-hop neighbors to find indirect connections.
-async fn collect_entity_expansion_facts(
-    service: &crate::service::MemoryService,
-    request: CollectEntityExpansionFactsRequest<'_>,
-) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
-    // Step A: extract candidate entity names from query text via NER
-    let entity_names = service
-        .entity_extractor
-        .extract_candidates(request.query)
-        .await
-        .unwrap_or_default();
-
-    if entity_names.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Step B: resolve names to entity_ids (batch lookup)
-    let normalized: Vec<String> = entity_names
-        .iter()
-        .map(|e| super::normalize_text(&e.canonical_name))
-        .collect();
-
-    let seed_entities = service
-        .db_client
-        .select_entities_batch(request.namespace, &normalized)
-        .await
-        .unwrap_or_default();
-
-    if seed_entities.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Step C: expand to 1-hop neighbors via entity graph edges
-    let mut all_entity_ids: Vec<String> = seed_entities
-        .iter()
-        .filter_map(|v| {
-            v.get("entity_id")
-                .and_then(|id| id.as_str())
-                .map(str::to_string)
-        })
-        .collect();
-
-    for entity in &seed_entities {
-        let Some(entity_id) = entity.get("entity_id").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            let neighbors = service
-                .db_client
-                .select_edge_neighbors(request.namespace, entity_id, request.cutoff_iso, direction)
-                .await
-                .unwrap_or_default();
-
-            for neighbor in neighbors {
-                if let Some(neighbor_id) = neighbor.get("neighbor_id").and_then(|v| v.as_str()) {
-                    let neighbor_str = neighbor_id.to_string();
-                    if !all_entity_ids.contains(&neighbor_str) {
-                        all_entity_ids.push(neighbor_str);
-                    }
-                }
-            }
-        }
-    }
-
-    // 2-hop expansion for relationship queries
-    if is_relationship_query(request.query) {
-        let first_hop_ids: Vec<String> = all_entity_ids.clone();
-        for entity_id in &first_hop_ids {
-            for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-                let neighbors = service
-                    .db_client
-                    .select_edge_neighbors(
-                        request.namespace,
-                        entity_id,
-                        request.cutoff_iso,
-                        direction,
-                    )
-                    .await
-                    .unwrap_or_default();
-
-                for neighbor in neighbors {
-                    if let Some(neighbor_id) = neighbor.get("neighbor_id").and_then(|v| v.as_str())
-                    {
-                        let neighbor_str = neighbor_id.to_string();
-                        if !all_entity_ids.contains(&neighbor_str) {
-                            all_entity_ids.push(neighbor_str);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if all_entity_ids.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Step D: retrieve facts for the full entity set
-    let search_limit = request.budget.max(1) * 3;
-    let fact_records = service
-        .db_client
-        .select_facts_by_entity_links(
-            request.namespace,
-            request.scope,
-            request.cutoff_iso,
-            &all_entity_ids,
-            search_limit,
-        )
-        .await
-        .unwrap_or_default();
-
-    Ok(fact_records
-        .into_iter()
-        .filter_map(|record| {
-            let fact = super::episode::fact_from_record(&record)?;
-            if fact.scope != request.scope
-                || request.excluded_fact_ids.contains(&fact.fact_id)
-                || !fact_allowed_by_policy(&fact, request.access)
-                || !fact_is_active_at(&fact, chrono::Utc::now())
-            {
-                return None;
-            }
-            Some((fact, "matched entity-graph expansion".to_string()))
         })
         .collect())
 }
@@ -1406,13 +2840,96 @@ fn best_community_match<'a>(
         .min_by(|left, right| left.rank.cmp(&right.rank))
 }
 
+async fn community_origin_factor_for_fact(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    cutoff_iso: &str,
+    fact: &crate::models::Fact,
+    matches_by_entity: &std::collections::HashMap<String, CommunityMatch>,
+    entity_origin_factor_cache: &mut HashMap<String, f64>,
+) -> Result<f64, MemoryError> {
+    let mut best_factor: Option<f64> = None;
+
+    for entity_id in fact
+        .entity_links
+        .iter()
+        .filter(|entity_id| matches_by_entity.contains_key(*entity_id))
+    {
+        let factor = entity_origin_factor(
+            service,
+            namespace,
+            cutoff_iso,
+            entity_id,
+            entity_origin_factor_cache,
+        )
+        .await?;
+        best_factor = Some(if let Some(current) = best_factor {
+            current.max(factor)
+        } else {
+            factor
+        });
+    }
+
+    Ok(best_factor.unwrap_or(1.0))
+}
+
+async fn entity_origin_factor(
+    service: &crate::service::MemoryService,
+    namespace: &str,
+    cutoff_iso: &str,
+    entity_id: &str,
+    entity_origin_factor_cache: &mut HashMap<String, f64>,
+) -> Result<f64, MemoryError> {
+    if let Some(cached) = entity_origin_factor_cache.get(entity_id) {
+        return Ok(*cached);
+    }
+
+    let mut best_factor: Option<f64> = None;
+    for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
+        for edge in service
+            .db_client
+            .select_edge_neighbors(namespace, entity_id, cutoff_iso, direction)
+            .await?
+        {
+            let factor = edge_origin_factor(&edge);
+            best_factor = Some(if let Some(current) = best_factor {
+                current.max(factor)
+            } else {
+                factor
+            });
+        }
+    }
+
+    let factor = best_factor.unwrap_or(1.0);
+    entity_origin_factor_cache.insert(entity_id.to_string(), factor);
+    Ok(factor)
+}
+
+fn edge_origin_factor(edge: &Value) -> f64 {
+    let Some(map) = edge.as_object() else {
+        return 1.0;
+    };
+
+    let confidence = map
+        .get("confidence")
+        .and_then(json_f64)
+        .unwrap_or(0.0)
+        .clamp(0.0, 1.0);
+
+    match map.get("origin").and_then(json_string) {
+        Some("extracted") => 1.0,
+        Some("inferred") => confidence,
+        Some("ambiguous") => 0.5,
+        _ => 1.0,
+    }
+}
+
 #[cfg(test)]
-#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::service::EmbeddingProvider;
-    use crate::service::test_support::MockDb;
+    use crate::storage::{DbClient, GraphDirection};
     use async_trait::async_trait;
     use chrono::Utc;
     use serde_json::json;
@@ -1426,7 +2943,6 @@ mod tests {
             content: "Test content".to_string(),
             quote: "Test quote".to_string(),
             source_episode: "episode:123".to_string(),
-            t_ref: Some(t_valid),
             t_valid,
             t_ingested: t_valid,
             t_invalid: None,
@@ -1441,6 +2957,12 @@ mod tests {
             provenance: json!({}),
             ft_score: 0.0,
         }
+    }
+
+    fn fixed_temporal_cutoff() -> chrono::DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-04-08T12:00:00Z")
+            .expect("cutoff")
+            .with_timezone(&Utc)
     }
 
     #[test]
@@ -1479,49 +3001,118 @@ mod tests {
         assert_eq!(facts[2].fact_id, "fact:c");
     }
 
+    #[test]
+    fn rank_lexical_records_promotes_more_specific_query_overlap() {
+        let query_terms = vec![
+            "caroline".to_string(),
+            "lgbtq".to_string(),
+            "support".to_string(),
+            "group".to_string(),
+        ];
+
+        let ranked = rank_lexical_records(
+            vec![
+                json!({
+                    "fact_id": "fact:generic",
+                    "content": "Caroline passed the adoption agency interviews last Friday.",
+                    "t_valid": "2026-01-10T10:30:00Z",
+                    "ft_score": 20.0
+                }),
+                json!({
+                    "fact_id": "fact:support",
+                    "content": "Caroline attended the LGBTQ support group recently.",
+                    "t_valid": "2026-01-09T10:30:00Z",
+                    "ft_score": 5.0
+                }),
+            ],
+            &query_terms,
+        );
+
+        let fact_ids = ranked
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:support", "fact:generic"]);
+    }
+
     #[tokio::test]
     async fn select_fact_records_for_query_deduplicates_term_fallback_records() {
-        let mut db_client = MockDb::default();
-        db_client.select_facts_filtered_fn = Box::new(|_, _, _, query_contains, _| {
-            Ok(match query_contains {
-                Some("atlas launch") => vec![],
-                Some("atlas") => vec![
-                    json!({
-                        "fact_id": "fact:shared",
-                        "fact_type": "note",
-                        "content": "Atlas launch is scheduled.",
-                        "quote": "Atlas launch is scheduled.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 2.5
-                    }),
-                    json!({
-                        "fact_id": "fact:atlas-only",
-                        "fact_type": "note",
-                        "content": "Atlas has a risk review.",
-                        "quote": "Atlas has a risk review.",
-                        "source_episode": "episode:2",
-                        "t_valid": "2026-01-09T10:30:00Z",
-                        "t_ingested": "2026-01-09T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 1.8
-                    }),
-                ],
-                Some("launch") => vec![
-                    json!({
-                        "fact_id": "fact:shared",
-                        "fact_type": "note",
-                        "content": "Atlas launch is scheduled.",
-                        "quote": "Atlas launch is scheduled.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 2.5
-                    }),
-                    json!({
+        struct DedupFallbackDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for DedupFallbackDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("atlas launch checklist") => vec![],
+                    Some("atlas") => vec![
+                        json!({
+                            "fact_id": "fact:shared",
+                            "fact_type": "note",
+                            "content": "Atlas launch is scheduled.",
+                            "quote": "Atlas launch is scheduled.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org"
+                        }),
+                        json!({
+                            "fact_id": "fact:atlas-only",
+                            "fact_type": "note",
+                            "content": "Atlas has a risk review.",
+                            "quote": "Atlas has a risk review.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org"
+                        }),
+                    ],
+                    Some("launch") => vec![
+                        json!({
+                            "fact_id": "fact:shared",
+                            "fact_type": "note",
+                            "content": "Atlas launch is scheduled.",
+                            "quote": "Atlas launch is scheduled.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org"
+                        }),
+                        json!({
+                            "fact_id": "fact:launch-only",
+                            "fact_type": "note",
+                            "content": "Launch checklist is ready.",
+                            "quote": "Launch checklist is ready.",
+                            "source_episode": "episode:3",
+                            "t_valid": "2026-01-08T10:30:00Z",
+                            "t_ingested": "2026-01-08T10:30:00Z",
+                            "scope": "org"
+                        }),
+                    ],
+                    Some("checklist") => vec![json!({
                         "fact_id": "fact:launch-only",
                         "fact_type": "note",
                         "content": "Launch checklist is ready.",
@@ -1529,16 +3120,155 @@ mod tests {
                         "source_episode": "episode:3",
                         "t_valid": "2026-01-08T10:30:00Z",
                         "t_ingested": "2026-01-08T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 1.5
-                    }),
-                ],
-                _ => vec![],
-            })
-        });
+                        "scope": "org"
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(DedupFallbackDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -1546,26 +3276,896 @@ mod tests {
         )
         .expect("service");
 
-        let records = select_fact_records_for_query(
+        let lexical_result = select_fact_records_for_query(
             &service,
             "org",
             "org",
             "2026-01-15T10:30:00Z",
-            Some("atlas launch"),
+            Some("atlas launch checklist"),
             10,
+            None,
+            &[],
         )
         .await
         .expect("fallback records");
 
-        let fact_ids = records
+        let fact_ids = lexical_result
+            .records
             .iter()
             .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
             .collect::<Vec<_>>();
 
         assert_eq!(
-            fact_ids,
-            vec!["fact:shared", "fact:atlas-only", "fact:launch-only"]
+            lexical_result.retrieval_tier,
+            RetrievalTier::EpisodeFallback
         );
+        assert_eq!(
+            fact_ids,
+            vec!["fact:shared", "fact:launch-only", "fact:atlas-only"]
+        );
+    }
+
+    #[tokio::test]
+    async fn select_fact_records_for_query_prefers_term_fallback_with_better_overlap() {
+        struct FallbackPreferenceDbClient;
+
+        #[async_trait]
+        impl DbClient for FallbackPreferenceDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("caroline lgbtq support group") => vec![
+                        json!({
+                            "fact_id": "fact:generic-1",
+                            "fact_type": "note",
+                            "content": "Caroline passed the adoption agency interviews last Friday.",
+                            "quote": "Caroline passed the adoption agency interviews last Friday.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 30.0
+                        }),
+                        json!({
+                            "fact_id": "fact:generic-2",
+                            "fact_type": "note",
+                            "content": "Caroline is excited about building her own family through adoption.",
+                            "quote": "Caroline is excited about building her own family through adoption.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 25.0
+                        }),
+                    ],
+                    Some("caroline") => vec![json!({
+                        "fact_id": "fact:generic-1",
+                        "fact_type": "note",
+                        "content": "Caroline passed the adoption agency interviews last Friday.",
+                        "quote": "Caroline passed the adoption agency interviews last Friday.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "ft_score": 30.0
+                    })],
+                    Some("lgbtq") | Some("support") | Some("group") => vec![json!({
+                        "fact_id": "fact:support-group",
+                        "fact_type": "note",
+                        "content": "Caroline attended the LGBTQ support group recently.",
+                        "quote": "Caroline attended the LGBTQ support group recently.",
+                        "source_episode": "episode:3",
+                        "t_valid": "2026-01-08T10:30:00Z",
+                        "t_ingested": "2026-01-08T10:30:00Z",
+                        "scope": "org",
+                        "ft_score": 5.0
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(FallbackPreferenceDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let lexical_result = select_fact_records_for_query(
+            &service,
+            "org",
+            "org",
+            "2026-01-15T10:30:00Z",
+            Some("caroline lgbtq support group"),
+            5,
+            None,
+            &[],
+        )
+        .await
+        .expect("fallback records");
+
+        let fact_ids = lexical_result
+            .records
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            lexical_result.retrieval_tier,
+            RetrievalTier::EpisodeFallback
+        );
+        assert_eq!(fact_ids.first().copied(), Some("fact:support-group"));
+    }
+
+    #[tokio::test]
+    async fn assemble_context_marks_term_fallback_results_with_fallback_tier() {
+        struct FallbackTierDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for FallbackTierDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("atlas launch checklist") => vec![],
+                    Some("atlas") => vec![json!({
+                        "fact_id": "fact:fallback",
+                        "fact_type": "note",
+                        "content": "Atlas launch is scheduled.",
+                        "quote": "Atlas launch is scheduled.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org"
+                    })],
+                    Some("launch") => vec![json!({
+                        "fact_id": "fact:fallback",
+                        "fact_type": "note",
+                        "content": "Atlas launch is scheduled.",
+                        "quote": "Atlas launch is scheduled.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org"
+                    })],
+                    Some("checklist") => vec![json!({
+                        "fact_id": "fact:fallback",
+                        "fact_type": "note",
+                        "content": "Atlas launch is scheduled.",
+                        "quote": "Atlas launch is scheduled.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org"
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(FallbackTierDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let items = assemble_context(
+            &service,
+            AssembleContextRequest {
+                query: "atlas launch checklist".to_string(),
+                scope: "org".to_string(),
+                as_of: None,
+                budget: 5,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context with fallback result");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].retrieval_tier.as_deref(), Some("fallback"));
+        assert!(items[0].rationale.contains("tier=fallback"));
+    }
+
+    #[tokio::test]
+    async fn assemble_context_falls_back_to_episode_content_when_no_facts_match() {
+        struct EpisodeContentFallbackDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for EpisodeContentFallbackDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_by_content(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("hello world") => vec![json!({
+                        "episode_id": "episode:doc",
+                        "source_type": "document",
+                        "source_id": "fixture:pdf",
+                        "content": "Hello World from episode fallback.",
+                        "t_ref": "2026-04-07T10:00:00Z",
+                        "t_ingested": "2026-04-07T10:00:00Z",
+                        "scope": "org",
+                        "visibility_scope": "org",
+                        "policy_tags": [],
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(EpisodeContentFallbackDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let items = assemble_context(
+            &service,
+            AssembleContextRequest {
+                query: "hello world".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            },
+        )
+        .await
+        .expect("episode fallback context");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].source_episode, "episode:doc");
+        assert_eq!(items[0].retrieval_tier.as_deref(), Some("fallback"));
+        assert!(items[0].content.contains("Hello World"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_extracts_month_year_and_residual_terms() {
+        let cutoff = chrono::DateTime::parse_from_rfc3339("2026-04-07T12:00:00Z")
+            .expect("cutoff")
+            .with_timezone(&Utc);
+
+        let expansion = expand_temporal_synonyms("march 2026 launch review", cutoff)
+            .expect("temporal expansion");
+
+        assert_eq!(
+            expansion.temporal_groups,
+            vec![vec!["march 2026".to_string(), "2026-03".to_string()]]
+        );
+        assert_eq!(expansion.residual_query.as_deref(), Some("launch review"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_weekday_to_date_relative_to_as_of() {
+        let expansion = expand_temporal_synonyms("monday planning", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        assert!(group.contains(&"2026-04-06".to_string()));
+        assert!(group.contains(&"april 2026".to_string()));
+        assert!(group.contains(&"2026-04".to_string()));
+        assert!(group.contains(&"monday".to_string()));
+        assert_eq!(expansion.residual_query.as_deref(), Some("planning"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_this_week_to_current_week_dates() {
+        let expansion = expand_temporal_synonyms("this week launch", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        for date in [
+            "2026-04-06",
+            "2026-04-07",
+            "2026-04-08",
+            "2026-04-09",
+            "2026-04-10",
+            "2026-04-11",
+            "2026-04-12",
+        ] {
+            assert!(
+                group.contains(&date.to_string()),
+                "expected current-week group to include {date}, got {group:?}"
+            );
+        }
+        assert_eq!(expansion.residual_query.as_deref(), Some("launch"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_quarter_to_current_year_month_range() {
+        let expansion = expand_temporal_synonyms("q1 closeout", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        for term in [
+            "q1",
+            "january 2026",
+            "2026-01",
+            "february 2026",
+            "2026-02",
+            "march 2026",
+            "2026-03",
+        ] {
+            assert!(
+                group.contains(&term.to_string()),
+                "expected quarter group to include {term}, got {group:?}"
+            );
+        }
+        assert_eq!(expansion.residual_query.as_deref(), Some("closeout"));
+    }
+
+    #[test]
+    fn build_ranked_context_facts_promotes_temporal_tier_over_direct() {
+        let cutoff = Utc::now();
+        let fact = create_test_fact("fact:temporal", cutoff - chrono::Duration::days(1));
+
+        let ranked = build_ranked_context_facts(
+            vec![
+                (fact.clone(), RetrievalTier::Direct),
+                (fact, RetrievalTier::TemporalExpanded),
+            ],
+            Vec::new(),
+            Vec::new(),
+            Some("march 2026 launch review"),
+            "org",
+            cutoff,
+        );
+
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].retrieval_tier, RetrievalTier::TemporalExpanded);
+        assert!(ranked[0].rationale.contains("tier=temporal"));
+    }
+
+    #[test]
+    fn build_ranked_context_facts_weights_graph_results_by_origin_factor() {
+        let cutoff = Utc::now();
+
+        let inferred = create_test_fact("fact:inferred", cutoff - chrono::Duration::days(1));
+        let extracted = create_test_fact("fact:extracted", cutoff - chrono::Duration::days(1));
+
+        let mut ranked = build_ranked_context_facts(
+            Vec::new(),
+            vec![
+                (
+                    inferred,
+                    "matched community summary via community:beta".to_string(),
+                    0.2,
+                ),
+                (
+                    extracted,
+                    "matched community summary via community:alpha".to_string(),
+                    1.0,
+                ),
+            ],
+            Vec::new(),
+            Some("launch workstream"),
+            "org",
+            cutoff,
+        );
+        sort_ranked_context_facts(&mut ranked);
+
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].fact.fact_id, "fact:extracted");
+        assert_eq!(ranked[1].fact.fact_id, "fact:inferred");
     }
 
     #[test]
@@ -1740,26 +4340,56 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_uses_db_side_community_lookup_for_summary_matches() {
-        let community_lookup_calls = Arc::new(AtomicUsize::new(0));
-        let entity_link_fact_calls = Arc::new(AtomicUsize::new(0));
-        let mut db_client = MockDb::default();
-        db_client.select_table_fn = Box::new(|table, _| {
-            assert_eq!(table, "fact");
-            Ok(vec![])
-        });
-        db_client.select_facts_filtered_fn = Box::new(|_, _, _, query_contains, _| {
-            if query_contains.is_some() {
-                Ok(vec![])
-            } else {
-                panic!(
-                    "community fact expansion should not use unfiltered select_facts_filtered fallback"
-                )
+        struct CommunityLookupDbClient {
+            community_lookup_calls: AtomicUsize,
+            entity_link_fact_calls: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for CommunityLookupDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
             }
-        });
-        db_client.select_facts_by_entity_links_fn = Box::new({
-            let entity_link_fact_calls = Arc::clone(&entity_link_fact_calls);
-            move |_, _, _, entity_links, _| {
-                entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
+
+            async fn select_table(
+                &self,
+                table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(table, "fact");
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                if query_contains.is_some() {
+                    Ok(vec![])
+                } else {
+                    panic!(
+                        "community fact expansion should not use unfiltered select_facts_filtered fallback"
+                    )
+                }
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(entity_links, &["entity:alice".to_string()]);
 
                 Ok(vec![
@@ -1791,11 +4421,66 @@ mod tests {
                     }),
                 ])
             }
-        });
-        db_client.select_communities_matching_summary_fn = Box::new({
-            let community_lookup_calls = Arc::clone(&community_lookup_calls);
-            move |_, query| {
-                community_lookup_calls.fetch_add(1, Ordering::SeqCst);
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.community_lookup_calls.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(query, "alice atlas");
 
                 Ok(vec![json!({
@@ -1804,9 +4489,80 @@ mod tests {
                     "member_entities": ["entity:alice"]
                 })])
             }
-        });
 
-        let db_client = Arc::new(db_client);
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(CommunityLookupDbClient {
+            community_lookup_calls: AtomicUsize::new(0),
+            entity_link_fact_calls: AtomicUsize::new(0),
+        });
         let service = crate::service::MemoryService::new(
             db_client.clone(),
             vec!["org".to_string()],
@@ -1823,6 +4579,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -1832,8 +4590,8 @@ mod tests {
         .await
         .expect("assemble context");
 
-        assert_eq!(community_lookup_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(entity_link_fact_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(db_client.community_lookup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(db_client.entity_link_fact_calls.load(Ordering::SeqCst), 1);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, "fact:community");
         assert!(results[0].rationale.contains("community:atlas"));
@@ -1841,8 +4599,181 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_without_lexical_or_graph_matches_returns_empty() {
+        struct EmptyDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for EmptyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(EmptyDbClient);
         let service = crate::service::MemoryService::new(
-            Arc::new(MockDb::default()),
+            db_client.clone(),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -1857,6 +4788,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -1874,51 +4807,212 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_prefers_direct_lexical_matches_over_newer_community_expansion() {
-        let mut db_client = MockDb::default();
-        db_client.select_facts_filtered_fn = Box::new(|_, _, _, query_contains, _| {
-            assert_eq!(query_contains, Some("atlas launch"));
-            Ok(vec![json!({
-                "fact_id": "fact:direct",
-                "fact_type": "note",
-                "content": "Atlas launch checklist is blocked on DNS cutover.",
-                "quote": "Atlas launch checklist is blocked on DNS cutover.",
-                "source_episode": "episode:direct",
-                "t_valid": "2026-01-10T10:30:00Z",
-                "t_ingested": "2026-01-10T10:30:00Z",
-                "scope": "org",
-                "entity_links": ["entity:atlas"],
-                "policy_tags": [],
-                "provenance": {"source_episode": "episode:direct"},
-                "ft_score": 100.0
-            })])
-        });
-        db_client.select_facts_by_entity_links_fn = Box::new(|_, _, _, entity_links, _| {
-            assert_eq!(entity_links, &["entity:atlas".to_string()]);
-            Ok(vec![json!({
-                "fact_id": "fact:community",
-                "fact_type": "note",
-                "content": "Atlas team sync moved to Friday.",
-                "quote": "Atlas team sync moved to Friday.",
-                "source_episode": "episode:community",
-                "t_valid": "2026-01-15T10:30:00Z",
-                "t_ingested": "2026-01-15T10:30:00Z",
-                "scope": "org",
-                "entity_links": ["entity:atlas"],
-                "policy_tags": [],
-                "provenance": {"source_episode": "episode:community"}
-            })])
-        });
-        db_client.select_communities_matching_summary_fn = Box::new(|_, query| {
-            assert_eq!(query, "atlas launch");
-            Ok(vec![json!({
-                "community_id": "community:atlas",
-                "summary": "Atlas launch workstream",
-                "member_entities": ["entity:atlas"]
-            })])
-        });
+        struct FusionDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for FusionDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query_contains, Some("atlas launch"));
+                Ok(vec![json!({
+                    "fact_id": "fact:direct",
+                    "fact_type": "note",
+                    "content": "Atlas launch checklist is blocked on DNS cutover.",
+                    "quote": "Atlas launch checklist is blocked on DNS cutover.",
+                    "source_episode": "episode:direct",
+                    "t_valid": "2026-01-10T10:30:00Z",
+                    "t_ingested": "2026-01-10T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": ["entity:atlas"],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:direct"},
+                    "ft_score": 100.0
+                })])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(entity_links, &["entity:atlas".to_string()]);
+                Ok(vec![json!({
+                    "fact_id": "fact:community",
+                    "fact_type": "note",
+                    "content": "Atlas team sync moved to Friday.",
+                    "quote": "Atlas team sync moved to Friday.",
+                    "source_episode": "episode:community",
+                    "t_valid": "2026-01-15T10:30:00Z",
+                    "t_ingested": "2026-01-15T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": ["entity:atlas"],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:community"}
+                })])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query, "atlas launch");
+                Ok(vec![json!({
+                    "community_id": "community:atlas",
+                    "summary": "Atlas launch workstream",
+                    "member_entities": ["entity:atlas"]
+                })])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(FusionDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -1933,6 +5027,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -1955,62 +5051,226 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_orders_community_facts_by_matching_summary_relevance() {
-        let mut db_client = MockDb::default();
-        db_client.select_facts_by_entity_links_fn = Box::new(|_, _, _, entity_links, _| {
-            assert_eq!(
-                entity_links,
-                &["entity:alpha".to_string(), "entity:beta".to_string()]
-            );
+        struct CommunityRankingDbClient;
 
-            Ok(vec![
-                json!({
-                    "fact_id": "fact:beta",
-                    "fact_type": "note",
-                    "content": "Beta launch note.",
-                    "quote": "Beta launch note.",
-                    "source_episode": "episode:beta",
-                    "t_valid": "2026-01-20T10:30:00Z",
-                    "t_ingested": "2026-01-20T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": ["entity:beta"],
-                    "policy_tags": [],
-                    "provenance": {"source_episode": "episode:beta"}
-                }),
-                json!({
-                    "fact_id": "fact:alpha",
-                    "fact_type": "note",
-                    "content": "Alpha launch note.",
-                    "quote": "Alpha launch note.",
-                    "source_episode": "episode:alpha",
-                    "t_valid": "2026-01-10T10:30:00Z",
-                    "t_ingested": "2026-01-10T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": ["entity:alpha"],
-                    "policy_tags": [],
-                    "provenance": {"source_episode": "episode:alpha"}
-                }),
-            ])
-        });
-        db_client.select_communities_matching_summary_fn = Box::new(|_, query| {
-            assert_eq!(query, "launch workstream");
-            Ok(vec![
-                json!({
-                    "community_id": "community:alpha",
-                    "summary": "Alpha launch workstream",
-                    "member_entities": ["entity:alpha"],
-                    "ft_score": 20.0
-                }),
-                json!({
-                    "community_id": "community:beta",
-                    "summary": "Beta launch workstream",
-                    "member_entities": ["entity:beta"],
-                    "ft_score": 10.0
-                }),
-            ])
-        });
+        #[async_trait::async_trait]
+        impl DbClient for CommunityRankingDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(
+                    entity_links,
+                    &["entity:alpha".to_string(), "entity:beta".to_string()]
+                );
+
+                Ok(vec![
+                    json!({
+                        "fact_id": "fact:beta",
+                        "fact_type": "note",
+                        "content": "Beta launch note.",
+                        "quote": "Beta launch note.",
+                        "source_episode": "episode:beta",
+                        "t_valid": "2026-01-20T10:30:00Z",
+                        "t_ingested": "2026-01-20T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:beta"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:beta"}
+                    }),
+                    json!({
+                        "fact_id": "fact:alpha",
+                        "fact_type": "note",
+                        "content": "Alpha launch note.",
+                        "quote": "Alpha launch note.",
+                        "source_episode": "episode:alpha",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:alpha"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:alpha"}
+                    }),
+                ])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query, "launch workstream");
+                Ok(vec![
+                    json!({
+                        "community_id": "community:alpha",
+                        "summary": "Alpha launch workstream",
+                        "member_entities": ["entity:alpha"],
+                        "ft_score": 20.0
+                    }),
+                    json!({
+                        "community_id": "community:beta",
+                        "summary": "Beta launch workstream",
+                        "member_entities": ["entity:beta"],
+                        "ft_score": 10.0
+                    }),
+                ])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(CommunityRankingDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2025,6 +5285,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -2041,30 +5303,473 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn assemble_context_prefers_extracted_community_paths_over_higher_ranked_inferred_ones() {
+        struct CommunityOriginWeightDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for CommunityOriginWeightDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(
+                    entity_links,
+                    &["entity:alpha".to_string(), "entity:beta".to_string()]
+                );
+
+                Ok(vec![
+                    json!({
+                        "fact_id": "fact:beta",
+                        "fact_type": "note",
+                        "content": "Beta launch note.",
+                        "quote": "Beta launch note.",
+                        "source_episode": "episode:beta",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:beta"],
+                        "policy_tags": [],
+                        "confidence": 1.0,
+                        "provenance": {"source_episode": "episode:beta"}
+                    }),
+                    json!({
+                        "fact_id": "fact:alpha",
+                        "fact_type": "note",
+                        "content": "Alpha launch note.",
+                        "quote": "Alpha launch note.",
+                        "source_episode": "episode:alpha",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:alpha"],
+                        "policy_tags": [],
+                        "confidence": 1.0,
+                        "provenance": {"source_episode": "episode:alpha"}
+                    }),
+                ])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match node_id {
+                    "entity:alpha" => vec![json!({
+                        "edge_id": "edge:alpha-extracted",
+                        "in": "entity:alpha",
+                        "relation": "knows",
+                        "out": "entity:anchor_alpha",
+                        "origin": "extracted",
+                        "confidence": 0.9,
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z"
+                    })],
+                    "entity:beta" => vec![json!({
+                        "edge_id": "edge:beta-inferred",
+                        "in": "entity:beta",
+                        "relation": "knows",
+                        "out": "entity:anchor_beta",
+                        "origin": "inferred",
+                        "confidence": 0.2,
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z"
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(query, "launch workstream");
+                Ok(vec![
+                    json!({
+                        "community_id": "community:beta",
+                        "summary": "Beta launch workstream",
+                        "member_entities": ["entity:beta"],
+                        "ft_score": 20.0
+                    }),
+                    json!({
+                        "community_id": "community:alpha",
+                        "summary": "Alpha launch workstream",
+                        "member_entities": ["entity:alpha"],
+                        "ft_score": 10.0
+                    }),
+                ])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(CommunityOriginWeightDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "launch workstream".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(Utc::now()),
+                budget: 5,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, "fact:alpha");
+        assert_eq!(results[1].fact_id, "fact:beta");
+    }
+
+    #[tokio::test]
     async fn assemble_context_uses_provider_backed_semantic_similarity() {
-        let mut db_client = MockDb::default();
-        db_client.select_table_fn =
-            Box::new(|_, _| panic!("semantic retrieval should not scan the full fact table"));
-        db_client.select_facts_ann_fn = Box::new(|_, _, _, _, _| {
-            let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
-            embedding[0] = 1.0;
-            Ok(vec![json!({
-                "fact_id": "fact:semantic",
-                "fact_type": "note",
-                "content": "Compensation increase approved for the engineering team",
-                "quote": "Compensation increase approved",
-                "source_episode": "episode:semantic",
-                "t_valid": "2026-01-15T10:30:00Z",
-                "t_ingested": "2026-01-15T10:30:00Z",
-                "scope": "org",
-                "entity_links": [],
-                "policy_tags": [],
-                "confidence": 0.9,
-                "provenance": {},
-                "embedding": embedding,
-                "sem_score": 0.99,
-            })])
-        });
+        struct SemanticDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for SemanticDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("semantic retrieval should not scan the full fact table")
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+                embedding[0] = 1.0;
+                Ok(vec![json!({
+                    "fact_id": "fact:semantic",
+                    "fact_type": "note",
+                    "content": "Compensation increase approved for the engineering team",
+                    "quote": "Compensation increase approved",
+                    "source_episode": "episode:semantic",
+                    "t_valid": "2026-01-15T10:30:00Z",
+                    "t_ingested": "2026-01-15T10:30:00Z",
+                    "scope": "org",
+                    "entity_links": [],
+                    "policy_tags": [],
+                    "confidence": 0.9,
+                    "provenance": {},
+                    "embedding": embedding,
+                    "sem_score": 0.99,
+                })])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         struct SemanticEmbeddingProvider;
 
@@ -2090,14 +5795,13 @@ mod tests {
         }
 
         let service = crate::service::MemoryService::new_with_embedding_provider(
-            Arc::new(db_client),
+            Arc::new(SemanticDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
             100,
             Arc::new(SemanticEmbeddingProvider),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
 
@@ -2108,6 +5812,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -2137,33 +5843,198 @@ mod tests {
 
     #[tokio::test]
     async fn expand_query_with_aliases_supports_multi_word_entities() {
-        let mut db_client = MockDb::default();
-        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
-            if normalized_name == "alice smith" {
-                return Ok(Some(json!({
-                    "entity_id": "entity:alice_smith",
-                    "aliases": ["alice s."]
-                })));
+        struct MultiWordAliasDbClient;
+
+        #[async_trait]
+        impl DbClient for MultiWordAliasDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
             }
 
-            Ok(None)
-        });
-        db_client.select_entities_batch_fn = Box::new(|_, names| {
-            let mut results = Vec::new();
-            for name in names {
-                if name == "alice smith" {
-                    results.push(json!({
-                        "entity_id": "entity:alice_smith",
-                        "canonical_name_normalized": "alice smith",
-                        "aliases": ["alice s."]
-                    }));
-                }
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
             }
-            Ok(results)
-        });
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                if normalized_name == "alice smith" {
+                    return Ok(Some(json!({
+                        "entity_id": "entity:alice_smith",
+                        "aliases": ["alice s."]
+                    })));
+                }
+
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mut results = Vec::new();
+                for name in names {
+                    if name == "alice smith" {
+                        results.push(json!({
+                            "entity_id": "entity:alice_smith",
+                            "canonical_name_normalized": "alice smith",
+                            "aliases": ["alice s."]
+                        }));
+                    }
+                }
+                Ok(results)
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(MultiWordAliasDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2182,18 +6053,189 @@ mod tests {
 
     #[tokio::test]
     async fn community_expansion_returns_empty_when_no_entity_links_match() {
-        let mut db_client = MockDb::default();
-        db_client.select_communities_matching_summary_fn = Box::new(|_, _| {
-            Ok(vec![json!({
-                "community_id": "community:orphan",
-                "summary": "Orphan community with no facts",
-                "member_entities": ["entity:nobody"],
-                "ft_score": 1.0
-            })])
-        });
+        struct EmptyCommunityFactDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for EmptyCommunityFactDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                vec![json!({
+                    "community_id": "community:orphan",
+                    "summary": "Orphan community with no facts",
+                    "member_entities": ["entity:nobody"],
+                    "ft_score": 1.0
+                })]
+                .into_iter()
+                .map(Ok)
+                .collect::<Result<Vec<_>, _>>()
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(EmptyCommunityFactDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2208,6 +6250,8 @@ mod tests {
                 scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
+                project: None,
+                fact_types: vec![],
                 view_mode: None,
                 window_start: None,
                 window_end: None,
@@ -2221,39 +6265,6 @@ mod tests {
             results.is_empty(),
             "community expansion with no matching entity_links should produce no results, got {}",
             results.len()
-        );
-    }
-
-    #[tokio::test]
-    async fn assemble_context_rejects_unknown_scope_instead_of_searching_default_namespace() {
-        let service = crate::service::MemoryService::new(
-            Arc::new(MockDb::default()),
-            vec!["org".to_string(), "personal".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .expect("service");
-
-        let err = assemble_context(
-            &service,
-            crate::models::AssembleContextRequest {
-                query: "catalog entries".to_string(),
-                scope: "team".to_string(),
-                as_of: Some(Utc::now()),
-                budget: 5,
-                view_mode: None,
-                window_start: None,
-                window_end: None,
-                access: None,
-            },
-        )
-        .await
-        .expect_err("unknown scope should be rejected");
-
-        assert!(
-            matches!(err, MemoryError::Validation(ref message) if message.contains("unknown scope")),
-            "expected validation error for unknown scope, got {err:?}"
         );
     }
 }

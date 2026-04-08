@@ -3,31 +3,31 @@
 use super::error::MemoryError;
 use crate::models::{EntityCandidate, IngestRequest};
 
-/// Validates that a string field is non-empty after trimming whitespace.
-///
-/// # Errors
-///
-/// Returns [`MemoryError::Validation`] if the field is empty or whitespace-only.
-fn require_non_empty(value: &str, field_name: &str) -> Result<(), MemoryError> {
-    if value.trim().is_empty() {
-        return Err(MemoryError::Validation(format!("{field_name} is required")));
-    }
-    Ok(())
-}
-
 /// Validate an ingest request.
 pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryError> {
-    require_non_empty(&request.source_type, "source_type")?;
-    require_non_empty(&request.source_id, "source_id")?;
-    require_non_empty(&request.content, "content")?;
-    require_non_empty(&request.scope, "scope")?;
+    if request.source_type.trim().is_empty() {
+        return Err(MemoryError::Validation("source_type is required".into()));
+    }
+    if request.source_id.trim().is_empty() {
+        return Err(MemoryError::Validation("source_id is required".into()));
+    }
+    if request.content.trim().is_empty() {
+        return Err(MemoryError::Validation("content is required".into()));
+    }
+    if request.scope.trim().is_empty() {
+        return Err(MemoryError::Validation("scope is required".into()));
+    }
     Ok(())
 }
 
 /// Validate an entity candidate.
 pub fn validate_entity_candidate(candidate: &EntityCandidate) -> Result<(), MemoryError> {
-    require_non_empty(&candidate.entity_type, "entity_type")?;
-    require_non_empty(&candidate.canonical_name, "canonical_name")?;
+    if candidate.entity_type.trim().is_empty() {
+        return Err(MemoryError::Validation("entity_type is required".into()));
+    }
+    if candidate.canonical_name.trim().is_empty() {
+        return Err(MemoryError::Validation("canonical_name is required".into()));
+    }
     Ok(())
 }
 
@@ -39,11 +39,21 @@ pub fn validate_fact_input(
     source_episode: &str,
     scope: &str,
 ) -> Result<(), MemoryError> {
-    require_non_empty(fact_type, "fact_type")?;
-    require_non_empty(content, "content")?;
-    require_non_empty(quote, "quote")?;
-    require_non_empty(source_episode, "source_episode")?;
-    require_non_empty(scope, "scope")?;
+    if fact_type.trim().is_empty() {
+        return Err(MemoryError::Validation("fact_type is required".into()));
+    }
+    if content.trim().is_empty() {
+        return Err(MemoryError::Validation("content is required".into()));
+    }
+    if quote.trim().is_empty() {
+        return Err(MemoryError::Validation("quote is required".into()));
+    }
+    if source_episode.trim().is_empty() {
+        return Err(MemoryError::Validation("source_episode is required".into()));
+    }
+    if scope.trim().is_empty() {
+        return Err(MemoryError::Validation("scope is required".into()));
+    }
     Ok(())
 }
 
@@ -59,6 +69,7 @@ mod tests {
             content: "Test content".to_string(),
             t_ref: Utc::now(),
             scope: "org".to_string(),
+            project: None,
             t_ingested: None,
             visibility_scope: None,
             policy_tags: vec![],

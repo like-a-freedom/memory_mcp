@@ -82,13 +82,6 @@ Storage layer (`src/storage.rs` + SurrealDB)
 - Rust 1.85+
 - SurrealDB-compatible runtime configuration
 
-By default, the server starts with:
-
-- embedded storage **disabled** (`SURREALDB_EMBEDDED=false` unless set)
-- semantic embeddings **enabled** via the local Candle backend
-- default embedding model `intfloat/multilingual-e5-small`
-- default NER provider `anno`
-
 ### Build
 
 ```bash
@@ -112,12 +105,11 @@ The binary uses stdio transport, which makes it suitable for local MCP client in
 ### Run with environment
 
 ```bash
+SURREALDB_URL=rocksdb://./data/surreal.db \
 SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=org,personal \
 SURREALDB_USERNAME=root \
 SURREALDB_PASSWORD=root \
-SURREALDB_EMBEDDED=true \
-EMBEDDINGS_ENABLED=false \
 RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
@@ -134,12 +126,11 @@ If you run the server directly from this workspace, a stdio host configuration c
             "args": ["run", "--quiet", "--bin", "memory_mcp"],
             "cwd": "/path/to/memory_mcp",
             "env": {
+                "SURREALDB_URL": "rocksdb://./data/surreal.db",
                 "SURREALDB_DB_NAME": "memory",
                 "SURREALDB_NAMESPACES": "org,personal",
                 "SURREALDB_USERNAME": "root",
                 "SURREALDB_PASSWORD": "root",
-                "SURREALDB_EMBEDDED": "true",
-                "EMBEDDINGS_ENABLED": "false",
                 "RUST_LOG": "info"
             }
         }
@@ -151,141 +142,95 @@ After `cargo build --release` or `cargo install --path .`, you can switch `comma
 
 ## Configuration
 
-All configuration is loaded from environment variables at startup.
+Configuration is loaded from environment variables.
 
-### Complete environment variables reference
+### Required variables
 
-| Variable | Required | Type | Allowed Values | Default | Description |
-|----------|----------|------|----------------|---------|-------------|
-| **SurrealDB Connection** |||||
-| `SURREALDB_DB_NAME` | **Yes** | string | Any valid DB name (e.g., `memory`, `testdb`) | — | Database name |
-| `SURREALDB_URL` | Yes when `SURREALDB_EMBEDDED=false` | string | `ws://...`, `wss://...` | — | Remote WebSocket endpoint |
-| `SURREALDB_NAMESPACES` | **Yes** | string | Comma-separated list (e.g., `org,personal`) | — | Namespaces to initialize; request `scope` values must match one of these namespaces, except for the explicit `org` alias when no literal `org` namespace is configured |
-| `SURREALDB_USERNAME` | **Yes** | string | Any string | — | Database username |
-| `SURREALDB_PASSWORD` | **Yes** | string | Any string | — | Database password |
-| `SURREALDB_EMBEDDED` | No | boolean | `true`, `false` | `false` | Use embedded RocksDB instead of remote WebSocket |
-| `SURREALDB_DATA_DIR` | No | string | Filesystem path | `<exe-dir>/data/surrealdb` | Data directory for embedded mode |
-| **Logging** |||||
-| `RUST_LOG` | No | string | `trace`, `debug`, `info`, `warn`, `error` | `info` | Logging level |
-| **Embeddings** |||||
-| `EMBEDDINGS_ENABLED` | No | boolean | `true`, `false` | `true` | Enable semantic embeddings |
-| `SURREALDB_EMBEDDING_DIMENSION` | No | integer | `384`, `768`, `1024`, `1536`, `2048`, `3072` | `384` effective default | Vector dimension override |
-| `EMBEDDINGS_PROVIDER` | No | string | `local-candle`, `openai-compatible`, `ollama` | `local-candle` | Embedding backend |
-| `EMBEDDINGS_MODEL` | Conditional | string | Model or repo ID | `intfloat/multilingual-e5-small` for local-candle | Embedding model name |
-| `EMBEDDINGS_BASE_URL` | Conditional | string | URL | provider-specific | Base URL for `openai-compatible`/`ollama` |
-| `EMBEDDINGS_API_KEY` | Conditional | string | Bearer token | — | API key for `openai-compatible` providers |
-| `EMBEDDINGS_MODEL_DIR` | No | string | Filesystem path | `<data_dir>/models/<model_repo_id>` | Override local embedding model cache directory |
-| `EMBEDDINGS_TIMEOUT_SECS` | No | integer | Positive integer | `15` | Request timeout in seconds |
-| `EMBEDDINGS_SIMILARITY_THRESHOLD` | No | float | `0.0` – `1.0` | `0.7` | Minimum cosine similarity |
-| `EMBEDDINGS_MAX_TOKENS` | No | integer | Positive integer | `384` | Max input tokens for chunking |
-| **Lifecycle (Background Jobs)** |||||
-| `LIFECYCLE_ENABLED` | No | boolean | `true`, `false` | `false` | Enable background workers |
-| `LIFECYCLE_DECAY_INTERVAL_SECS` | No | integer | Positive integer | `3600` | Decay check interval (seconds) |
-| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | No | integer | Positive integer | `86400` | Archival check interval (seconds) |
-| `LIFECYCLE_DECAY_THRESHOLD` | No | float | `0.0` – `1.0` | `0.3` | Confidence threshold for invalidation |
-| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | No | integer | Positive integer | `90` | Days before archiving episodes |
-| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | No | float | Positive number | `365.0` | Half-life used by decay workers |
-| **NER (Named Entity Recognition)** |||||
-| `NER_PROVIDER` | No | string | `regex`, `anno`, `local-gliner` | `anno` | NER backend |
-| `NER_MODEL` | No | string | HuggingFace repo ID | `urchade/gliner_multi-v2.1` | GLiNER model (if local-gliner) |
-| `NER_MODEL_DIR` | No | string | Filesystem path | `<data_dir>/models/ner/<repo_id_with_slashes_replaced_by_double-dashes>` | Override model cache directory |
-| `NER_LABELS` | No | string | Comma-separated | `person,company,location,product,event,technology` | Entity types to extract |
-| `NER_THRESHOLD` | No | float | `0.0` – `1.0` | `0.5` | Confidence threshold for entities |
-| `NER_BATCH_SIZE` | No | integer | Positive integer | `4` | Texts per inference pass (CPU) |
+| Variable | Required | Description |
+| --- | --- | --- |
+| `SURREALDB_DB_NAME` | Yes | Database name |
+| `SURREALDB_NAMESPACES` | Yes | Comma-separated namespace list |
+| `SURREALDB_USERNAME` | Yes | Database username |
+| `SURREALDB_PASSWORD` | Yes | Database password |
+| `SURREALDB_URL` | Yes for remote mode | SurrealDB connection URL |
 
-### Example configuration
+### Optional variables
 
-#### Minimal embedded setup (development)
+| Variable | Description |
+| --- | --- |
+| `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
+| `SURREALDB_DATA_DIR` | Custom embedded data directory |
+| `RUST_LOG` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
+| `QUERY_LOGGING_ENABLED` | Set to `true` to persist `assemble_context` analytics rows into `query_log` (default: `false`) |
+| `QUERY_LOG_RETENTION_DAYS` | Days to retain persisted `query_log` analytics before best-effort pruning (default: `90`) |
+| `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
+| `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
+| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
+| `LIFECYCLE_DECAY_THRESHOLD` | Confidence threshold for fact invalidation (default: `0.3`) |
+| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | Days before archiving episodes (default: `90`) |
+
+### Example
 
 ```bash
 SURREALDB_DB_NAME=memory
 SURREALDB_NAMESPACES=org,personal
 SURREALDB_USERNAME=root
 SURREALDB_PASSWORD=root
-SURREALDB_EMBEDDED=true
-EMBEDDINGS_ENABLED=false
-RUST_LOG=info
-```
-
-#### Remote SurrealDB with embeddings (production)
-
-```bash
-# Database
-SURREALDB_DB_NAME=memory
 SURREALDB_URL=ws://127.0.0.1:8000/rpc
-SURREALDB_NAMESPACES=org,personal,private
-SURREALDB_USERNAME=root
-SURREALDB_PASSWORD=root
+SURREALDB_EMBEDDED=false
+RUST_LOG=info
+QUERY_LOGGING_ENABLED=false
+QUERY_LOG_RETENTION_DAYS=90
 
-# Embeddings (OpenAI)
-EMBEDDINGS_ENABLED=true
-EMBEDDINGS_PROVIDER=openai-compatible
-EMBEDDINGS_MODEL=text-embedding-3-small
-EMBEDDINGS_BASE_URL=https://api.openai.com/v1
-EMBEDDINGS_API_KEY=sk-...
-
-# Lifecycle
+# Lifecycle background jobs (optional)
 LIFECYCLE_ENABLED=true
 LIFECYCLE_DECAY_INTERVAL_SECS=3600
 LIFECYCLE_ARCHIVAL_INTERVAL_SECS=86400
-LIFECYCLE_DECAY_HALF_LIFE_DAYS=365
+LIFECYCLE_DECAY_THRESHOLD=0.3
+LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 ```
 
-#### Default local embeddings via Candle
+### Query analytics logging
 
-```bash
-SURREALDB_DB_NAME=memory
-SURREALDB_NAMESPACES=org
-SURREALDB_USERNAME=root
-SURREALDB_PASSWORD=root
-SURREALDB_EMBEDDED=true
+Persisted query analytics are **optional** and **disabled by default**.
 
-# Default local embedding backend
-EMBEDDINGS_ENABLED=true
-EMBEDDINGS_PROVIDER=local-candle
-EMBEDDINGS_MODEL=intfloat/multilingual-e5-small
-```
+When `QUERY_LOGGING_ENABLED=true`, successful `assemble_context` calls write a row to the `query_log` table with:
 
-#### Ollama embeddings (local)
+- `scope`
+- `query`
+- `project`
+- `view_mode`
+- `result_count`
+- `latency_ms`
+- `retrieval_tier`
+- `cache_hit`
+- `logged_at`
 
-```bash
-SURREALDB_DB_NAME=memory
-SURREALDB_NAMESPACES=org
-SURREALDB_USERNAME=root
-SURREALDB_PASSWORD=root
-SURREALDB_EMBEDDED=true
+Old `query_log` rows are pruned with a best-effort retention pass after successful writes. By default, rows older than `90` days are deleted; override this with `QUERY_LOG_RETENTION_DAYS=<days>`.
 
-# Ollama embeddings
-EMBEDDINGS_ENABLED=true
-EMBEDDINGS_PROVIDER=ollama
-EMBEDDINGS_MODEL=nomic-embed-text
-EMBEDDINGS_BASE_URL=http://127.0.0.1:11434
-```
+This switch only controls database-backed query analytics. Regular runtime logs still follow `RUST_LOG`.
 
-#### Local GLiNER NER (zero-shot entity extraction)
+### Logging levels and what they cover
 
-```bash
-SURREALDB_DB_NAME=memory
-SURREALDB_NAMESPACES=org
-SURREALDB_USERNAME=root
-SURREALDB_PASSWORD=root
-SURREALDB_EMBEDDED=true
+`memory_mcp` emits structured logs across the plan-added functionality using the standard levels below:
 
-# GLiNER NER — downloads model on first run (~200-400MB)
-NER_PROVIDER=local-gliner
-NER_MODEL=urchade/gliner_multi-v2.1
-NER_LABELS=person,company,location,product,event,technology,date
-NER_THRESHOLD=0.5
-NER_BATCH_SIZE=4
-```
+- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, watcher startup, watcher ingest completion, and community rebuild passes
+- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), project/view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, watcher dedup skips, retrieval-tier summaries, appended `experience` facts, and per-namespace community rebuild details
+- `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, and degraded worker passes
+- `error` — terminal failures such as watcher ingest errors or process-level startup/serve failures
 
-The GLiNER provider uses a DeBERTa-v3 model for zero-shot named entity recognition. It runs entirely locally via Candle inference — no external API calls for NER.
+Recommended presets:
+
+- `RUST_LOG=info` for normal local/server usage
+- `RUST_LOG=debug` when validating new ingest/view-mode/graph behavior
+- `RUST_LOG=trace` when debugging retrieval tiers, cache behavior, or watcher dedup decisions
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
 
 ## MCP tools
 
-The public MCP surface is intentionally small and intent-driven. Internal MCP App workflows still exist in the service layer, but the exposed MCP contract is limited to the six canonical memory tools plus one app launcher (`open_app`) and one coarse-grained app mutation bridge (`app_command`). App read-side state is exposed through MCP resources under `ui://memory/app/{app}/{session_id}`.
+The public MCP surface is centered on a small set of high-value operations rather than endpoint-by-endpoint plumbing.
 
 | Tool | Purpose |
 | --- | --- |
@@ -294,15 +239,6 @@ The public MCP surface is intentionally small and intent-driven. Internal MCP Ap
 | `assemble_context` | Return ranked memory context for a query |
 | `explain` | Expand context items with source citations and multi-source provenance |
 | `invalidate` | Mark a fact as no longer valid as of a given time |
-| `resolve` | Canonicalize an entity name and its aliases into a stable entity identifier |
-| `open_app` | Open an app session for inspector, diff, ingestion review, lifecycle, or graph flows and return a session-backed resource URI |
-| `app_command` | Execute session-scoped app actions such as ingestion review mutations, lifecycle operations, diff export, graph exploration, or generic session closing |
-
-### App resources
-
-`open_app` returns a `resource_uri` like `ui://memory/app/ingestion_review/{session_id}` plus an immediate JSON fallback in `result.fallback`. Reading the session resource returns `text/html;profile=mcp-app`, which compliant MCP Apps hosts can render inline while still carrying the current session payload in the document. Mutation-heavy app flows use `app_command`, then re-read the resource to observe refreshed state. For graph sessions, `app_command` also exposes session-scoped exploration actions such as `expand_neighbors`, `open_edge_details`, and `use_path_as_context`.
-
-The server also publishes session URI templates via `resources/templates/list`, so MCP hosts that surface resource templates can discover `ui://memory/app/{app}/{session_id}` without guessing the shape of app session URIs.
 
 ### `explain` Multi-Source Provenance
 
@@ -344,59 +280,9 @@ See `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` for targ
 ```bash
 cargo check
 cargo fmt
-cargo clippy --all-targets -- -D warnings
+cargo clippy -- -D warnings
 cargo doc --no-deps
 ```
-
-Full repository validation:
-
-```bash
-cargo fmt --all && cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo doc --no-deps
-```
-
-### Code Quality & Refactoring
-
-As of 2026-04-01, the refactoring plan is fully implemented and verified in the repository state.
-
-**Completed improvements (13/13 tasks):**
-
-- **DRY violations eliminated**: extracted shared helpers for validation, session handling, lookup, and fact-state derivation
-- **SRP compliance**: `commit_ingestion_review()` now orchestrates focused commit helpers, and APP-specific service methods live in `app_modules.rs`
-- **API ergonomics**: `add_fact()` now uses `AddFactRequest` instead of a 10-parameter signature
-- **Testability**: `MemoryService::new_with_clock()` enables deterministic time-dependent tests, and a shared `MockDb` now backs service unit tests across `core.rs`, `context.rs`, and `episode.rs`
-- **Idiomatic Rust**: scope resolution is now strict and deterministic, and the `RateLimiter` mutex usage is explicitly documented with a `SAFETY` note
-- **Structural reduction**: `core.rs` dropped from 5,069 to 3,413 lines, with 1,331 APP-focused lines extracted into `app_modules.rs`
-
-**Refactoring details:**
-
-| Task | Change | Impact |
-|------|--------|--------|
-| Validation | `require_non_empty` helper | Eliminated 8 duplicates |
-| Core service | `fact_state` helper | Removed t_invalid duplication |
-| Core service | `find_record_in_namespaces` | Deduplicated namespace lookup |
-| Core service | `require_app` / `require_target_str` | ~15 session validation duplicates removed |
-| Core service | `resolve_entity_by_type` | 6 `resolve_*` methods now delegate |
-| Core service | Scope resolution | Exact namespace match or explicit alias only; unknown scopes return a validation error |
-| Core service | `commit_ingestion_review` | Split into `commit_entities`, `commit_facts`, `commit_edges`, `finalize_commit`, and draft commit helpers |
-| Core service | `AddFactRequest` struct | Reduced from 10 params to 1 struct |
-| Service layout | APP module extraction | APP-01..APP-05 moved to `app_modules.rs`; `core.rs` reduced to 3,413 lines |
-| Test support | Unified `MockDb` | Shared configurable mock now backs service unit tests in `core.rs`, `context.rs`, and `episode.rs` |
-| Test support | Injectable clock | Deterministic time-dependent tests; extracted APP methods use `MemoryService::now()` |
-
-**Quality gates:**
-- ✅ `cargo fmt`
-- ✅ `cargo check`
-- ✅ `cargo clippy -- -D warnings`
-- ✅ `cargo test`
-- ✅ `cargo doc --no-deps`
-
-Full repository validation for this refactoring pass:
-
-```bash
-cargo fmt --all && cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo doc --no-deps
-```
-
-See [`docs/superpowers/plans/2026-03-31-code-review-refactoring.md`](docs/superpowers/plans/2026-03-31-code-review-refactoring.md) for the complete refactoring plan and status.
 
 ### Binary entry points
 
@@ -420,52 +306,13 @@ cargo test --test service_acceptance
 cargo test --test tools_e2e
 ```
 
-Verified in this update pass:
+Verified in this remediation pass:
 
-- `cargo fmt --all && cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo doc --no-deps` → passed
+- `cargo test semantic_scaffolding --test service_integration` → `2 passed; 0 failed`
+- `cargo test --test service_acceptance` → `11 passed; 0 failed`
+- `cargo test --test service_integration` → `11 passed; 0 failed`
 
 Coverage output is stored under `coverage/` when generated with Tarpaulin.
-
-### Metric eval suites
-
-The repository includes manual metric eval runners that measure retrieval quality, extraction quality, and latency:
-
-#### Built-in eval suites
-
-```bash
-cargo test --test eval_extraction -- --ignored --nocapture --test-threads=1
-cargo test --test eval_retrieval -- --ignored --nocapture --test-threads=1
-cargo test --test eval_latency -- --ignored --nocapture --test-threads=1
-```
-
-#### External benchmark eval suites
-
-The repository can convert external memory benchmarks into eval fixtures:
-
-```bash
-# Download external datasets first
-mkdir -p data/eval_external
-curl -sL "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json" -o data/eval_external/longmemeval_oracle.json
-
-# Convert to fixtures
-python3 scripts/convert_external_evals.py --all
-
-# Run external eval suites
-cargo test --test eval_external_retrieval run_longmemeval_retrieval -- --ignored --nocapture --test-threads=1
-cargo test --test eval_external_retrieval run_memory_agent_bench_retrieval -- --ignored --nocapture --test-threads=1
-```
-
-Supported external sources:
-- **LongMemEval** (oracle): 500 questions across 5 memory abilities — Information Extraction, Multi-Session Reasoning, Knowledge Updates, Temporal Reasoning, Abstention
-- **MemoryAgentBench**: Accurate Retrieval and Conflict Resolution splits
-
-Important constraints:
-
-- All DB-backed evals run on embedded in-memory SurrealDB only.
-- Eval runs must not persist benchmark state or DB artifacts across sessions.
-- Normal `cargo test` remains the correctness suite; metric evals are opt-in.
-
-See `docs/superpowers/specs/2026-04-01-mcp-evals-system-design.md` for the eval-system design and `docs/superpowers/plans/2026-04-01-mcp-evals-system.md` for the implementation plan.
 
 ## Project layout
 

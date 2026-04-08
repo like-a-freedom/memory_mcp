@@ -3,13 +3,14 @@
 use regex::Regex;
 use serde_json::Value;
 
-use super::EntityExtractor;
-use super::core::AddFactRequest;
 use super::error::MemoryError;
 use super::query::parse_iso;
 use crate::models::Edge;
 use crate::models::Episode;
-use crate::models::{ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink};
+use crate::models::{
+    ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink,
+    FACT_TYPE_EXPERIENCE, FACT_TYPE_METRIC, FACT_TYPE_PROMISE,
+};
 
 fn unwrap_string_value(v: &Value) -> Option<&str> {
     if let Some(s) = v.as_str() {
@@ -102,10 +103,6 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         content,
         quote,
         source_episode,
-        t_ref: map
-            .get("t_ref")
-            .and_then(unwrap_string_value)
-            .and_then(parse_iso),
         t_valid,
         t_ingested,
         t_invalid: map
@@ -201,101 +198,24 @@ pub async fn extract_entities(
     service: &crate::service::MemoryService,
     content: &str,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
-    let timer = crate::timing::OperationTimer::new("ner");
+    let candidates = service.entity_extractor.extract_candidates(content).await?;
 
-    // Log start of NER operation
-    service.logger.log(
-        crate::operation_event!(
-            "ner.start",
-            timer,
-            "success",
-            None::<String>,
-            "provider" => service.entity_extractor.provider_name(),
-            "content_length" => content.len()
-        ),
-        crate::logging::LogLevel::Debug,
-    );
+    let mut entities = Vec::with_capacity(candidates.len());
 
-    let candidates = service.entity_extractor.extract_candidates(content).await;
-    let duration_ms = timer.elapsed_ms();
-
-    match candidates {
-        Ok(candidates) => {
-            let level = crate::logging::level_for_duration(duration_ms);
-            let event = crate::operation_event!(
-                "ner",
-                timer,
-                "success",
-                None::<String>,
-                "provider" => service.entity_extractor.provider_name(),
-                "count" => candidates.len()
-            );
-            service.logger.log(event, level);
-
-            let candidates = enrich_low_recall_candidates(content, candidates).await?;
-
-            let mut entities = Vec::with_capacity(candidates.len());
-            for candidate in candidates {
-                let entity_type = candidate.entity_type.clone();
-                let canonical_name = candidate.canonical_name.clone();
-                let entity_id = service.resolve(candidate, None).await?;
-                entities.push(ExtractedEntity {
-                    entity_id,
-                    entity_type,
-                    canonical_name,
-                });
-            }
-            Ok(entities)
-        }
-        Err(e) => {
-            let event = crate::operation_event!(
-                "ner",
-                timer,
-                "error",
-                Some(e.to_string()),
-                "provider" => service.entity_extractor.provider_name()
-            );
-            service.logger.log(event, crate::logging::LogLevel::Error);
-            Err(e)
-        }
-    }
-}
-
-async fn enrich_low_recall_candidates(
-    content: &str,
-    candidates: Vec<crate::models::EntityCandidate>,
-) -> Result<Vec<crate::models::EntityCandidate>, MemoryError> {
-    let merge_all_regex_candidates = candidates.len() <= 2;
-    let regex_candidates = super::RegexEntityExtractor::new()?
-        .extract_candidates(content)
-        .await?;
-    if regex_candidates.is_empty() {
-        return Ok(candidates);
-    }
-
-    let mut merged = std::collections::BTreeMap::new();
     for candidate in candidates {
-        merged
-            .entry(super::normalize_text(&candidate.canonical_name))
-            .or_insert(candidate);
-    }
-    for candidate in regex_candidates.into_iter().filter(|candidate| {
-        merge_all_regex_candidates || looks_like_acronym_candidate(&candidate.canonical_name)
-    }) {
-        merged
-            .entry(super::normalize_text(&candidate.canonical_name))
-            .or_insert(candidate);
+        let entity_type = candidate.entity_type.clone();
+        let canonical_name = candidate.canonical_name.clone();
+
+        let entity_id = service.resolve(candidate, None).await?;
+
+        entities.push(ExtractedEntity {
+            entity_id,
+            entity_type,
+            canonical_name,
+        });
     }
 
-    Ok(merged.into_values().collect())
-}
-
-fn looks_like_acronym_candidate(name: &str) -> bool {
-    let compact = name.trim();
-    compact.len() >= 3
-        && compact.chars().all(|ch| {
-            ch.is_uppercase() || ch.is_ascii_digit() || matches!(ch, '.' | '-' | '/' | '_')
-        })
+    Ok(entities)
 }
 
 /// Extract facts from an episode.
@@ -312,70 +232,52 @@ pub async fn extract_facts(
         .collect::<Vec<_>>();
 
     if is_metric_statement(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "metric").await?;
+        facts.push(add_extracted_fact(service, episode, FACT_TYPE_METRIC, &entity_links).await?);
     }
 
-    if is_promise_statement(&normalized) {
-        append_fact(service, episode, &entity_links, &mut facts, "promise").await?;
+    if is_promise_statement(&normalized) || is_document_action_item(&episode.content) {
+        facts.push(add_extracted_fact(service, episode, FACT_TYPE_PROMISE, &entity_links).await?);
     }
 
-    if is_decision_statement(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "decision").await?;
-    }
-
-    if is_task_statement(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "task").await?;
-    }
-
-    if is_status_statement(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "status").await?;
-    }
-
-    if is_requirement_statement(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "requirement").await?;
-    }
-
-    if facts.is_empty() && should_emit_observation_fact(&episode.content) {
-        append_fact(service, episode, &entity_links, &mut facts, "observation").await?;
+    if is_experience_statement(&episode.content) {
+        facts
+            .push(add_extracted_fact(service, episode, FACT_TYPE_EXPERIENCE, &entity_links).await?);
     }
 
     Ok(facts)
 }
 
-async fn append_fact(
+async fn add_extracted_fact(
     service: &crate::service::MemoryService,
     episode: &Episode,
+    fact_type: &str,
     entity_links: &[String],
-    facts: &mut Vec<ExtractedFact>,
-    fact_type: &'static str,
-) -> Result<(), MemoryError> {
+) -> Result<ExtractedFact, MemoryError> {
     use serde_json::json;
 
     let fact_id = service
-        .add_fact(AddFactRequest {
+        .add_fact(
             fact_type,
-            content: &episode.content,
-            quote: &episode.content,
-            source_episode: &episode.episode_id,
-            t_valid: episode.t_ref,
-            scope: &episode.scope,
-            confidence: 0.7,
-            entity_links: entity_links.to_vec(),
-            policy_tags: Vec::new(),
-            provenance: json!({
+            &episode.content,
+            &episode.content,
+            &episode.episode_id,
+            episode.t_ref,
+            &episode.scope,
+            0.7,
+            entity_links.to_vec(),
+            Vec::new(),
+            json!({
                 "source_episode": episode.episode_id,
                 "source_type": episode.source_type,
                 "source_id": episode.source_id,
             }),
-        })
+        )
         .await?;
 
-    facts.push(ExtractedFact {
+    Ok(ExtractedFact {
         fact_id,
         fact_type: fact_type.to_string(),
-    });
-
-    Ok(())
+    })
 }
 
 /// Check if content contains a promise statement.
@@ -402,57 +304,36 @@ pub fn is_metric_statement(content: &str) -> bool {
     metric_re.is_match(content)
 }
 
-/// Check if content contains a decision statement.
+/// Detects preference/profile statements that should be stored as experience facts.
 #[must_use]
-pub fn is_decision_statement(content: &str) -> bool {
-    static DECISION_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let decision_re = DECISION_RE.get_or_init(|| {
-        Regex::new(
-            r"(?i)(^|\b)(decision:|решение:|решено:|decided|decision|approved|rejected|agreed|signed|confirmed)\b",
-        )
-        .expect("decision regex is valid")
+pub fn is_experience_statement(content: &str) -> bool {
+    static EXPERIENCE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let normalized = content.to_lowercase();
+    let experience_re = EXPERIENCE_RE.get_or_init(|| {
+        Regex::new(r"\b(prefer|prefers|dislike|dislikes|enjoy|enjoys|love|loves|hate|hates|value|values)\b")
+            .expect("experience regex is valid")
     });
-    decision_re.is_match(content)
+
+    experience_re.is_match(&normalized)
 }
 
-/// Check if content contains a task statement.
+/// Detects document-style action items (for example from emails) as promise-like commitments.
 #[must_use]
-pub fn is_task_statement(content: &str) -> bool {
-    static TASK_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let task_re = TASK_RE.get_or_init(|| {
-        Regex::new(r"(?i)(^|\b)(task:|задача:|todo|action item|assigned to|needs to|must|should)\b")
-            .expect("task regex is valid")
-    });
-    task_re.is_match(content)
-}
+pub fn is_document_action_item(content: &str) -> bool {
+    static ACTION_HEADER_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static ACTION_LINE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 
-/// Check if content contains a status statement.
-#[must_use]
-pub fn is_status_statement(content: &str) -> bool {
-    static STATUS_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let status_re = STATUS_RE.get_or_init(|| {
-        Regex::new(
-            r"(?i)\b(status|update|completed|done|in progress|blocked|stalled|заглохла|готово|подписан)\b",
-        )
-        .expect("status regex is valid")
+    let normalized = content.to_lowercase();
+    let header_re = ACTION_HEADER_RE.get_or_init(|| {
+        Regex::new(r"(?m)^\s*(action items?|next steps|follow-?ups?|todo)\s*:")
+            .expect("action-item header regex is valid")
     });
-    status_re.is_match(content)
-}
-
-/// Check if content contains a requirement-like statement.
-#[must_use]
-pub fn is_requirement_statement(content: &str) -> bool {
-    static REQUIREMENT_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let requirement_re = REQUIREMENT_RE.get_or_init(|| {
-        Regex::new(r"(?i)\b(requirement|requirements|req|issue)\b|\b\d{5,}\b")
-            .expect("requirement regex is valid")
+    let line_re = ACTION_LINE_RE.get_or_init(|| {
+        Regex::new(r"(?m)^\s*(?:[-*]|\d+\.)\s+[a-z]+(?:\s+[a-z]+){0,2}\s*(?::|-)\s*(?:send|review|share|update|prepare|schedule|confirm|draft|deliver|complete|close|fix|follow(?:\s+|-)?up)\b")
+            .expect("action-item line regex is valid")
     });
-    requirement_re.is_match(content)
-}
 
-#[must_use]
-fn should_emit_observation_fact(content: &str) -> bool {
-    content.trim().chars().count() >= 50
+    header_re.is_match(&normalized) && line_re.is_match(&normalized)
 }
 
 /// Extract entities and facts from an episode.
@@ -465,8 +346,11 @@ pub async fn extract_from_episode(
     use serde_json::json;
 
     service.logger.log(
-        crate::log_event!("extract_from_episode.start", "success",
-            "episode_id" => episode_id
+        super::log_event(
+            "extract_from_episode.start",
+            json!({"episode_id": episode_id}),
+            json!({}),
+            None,
         ),
         LogLevel::Info,
     );
@@ -481,6 +365,7 @@ pub async fn extract_from_episode(
 
     let entities = extract_entities(service, &episode.content).await?;
     let facts = extract_facts(service, &episode, &entities).await?;
+    let warnings = detect_contradiction_warnings(service, &episode, &facts, &namespace).await?;
     let mut links = Vec::new();
     let edge_ingested = super::query::now();
 
@@ -494,6 +379,7 @@ pub async fn extract_from_episode(
             in_id: entity.entity_id.clone(),
             relation: "mentioned_in".to_string(),
             out_id: episode_id.to_string(),
+            origin: crate::models::EdgeOrigin::Extracted,
             strength: 1.0,
             confidence: 0.9,
             provenance: json!({"source_episode": episode_id}),
@@ -511,6 +397,7 @@ pub async fn extract_from_episode(
                 in_id: entity.entity_id.clone(),
                 relation: "involved_in".to_string(),
                 out_id: fact.fact_id.clone(),
+                origin: crate::models::EdgeOrigin::Extracted,
                 strength: 0.8,
                 confidence: 0.85,
                 provenance: json!({"source_episode": episode_id}),
@@ -531,10 +418,11 @@ pub async fn extract_from_episode(
     update_communities(service, &entity_ids, &episode.scope).await?;
 
     service.logger.log(
-        crate::log_event!("extract_from_episode.done", "success",
-            "episode_id" => episode_id,
-            "entities" => entities.len(),
-            "facts" => facts.len()
+        super::log_event(
+            "extract_from_episode.done",
+            json!({"episode_id": episode_id}),
+            json!({"entities": entities.len(), "facts": facts.len(), "warnings": warnings.len()}),
+            None,
         ),
         LogLevel::Info,
     );
@@ -544,7 +432,115 @@ pub async fn extract_from_episode(
         entities,
         facts,
         links,
+        warnings,
     })
+}
+
+async fn detect_contradiction_warnings(
+    service: &crate::service::MemoryService,
+    episode: &Episode,
+    facts: &[ExtractedFact],
+    namespace: &str,
+) -> Result<Vec<ContradictionWarning>, MemoryError> {
+    let cutoff = super::query::now();
+    let mut warnings = Vec::new();
+    let mut seen_conflicts = std::collections::HashSet::new();
+    let active_facts = service
+        .db_client
+        .select_active_facts(namespace, 500)
+        .await?
+        .into_iter()
+        .filter_map(|record| fact_from_value_or_wrapper(&record))
+        .filter(|fact| fact.scope == episode.scope)
+        .collect::<Vec<_>>();
+
+    for extracted_fact in facts {
+        let (record, _) = service.find_fact_record(&extracted_fact.fact_id).await?;
+        let Some(record) = record else {
+            continue;
+        };
+        let Some(new_fact) = fact_from_value_or_wrapper(&Value::Object(record)) else {
+            continue;
+        };
+        if new_fact.entity_links.is_empty() {
+            continue;
+        }
+
+        let new_content = super::normalize_text(&new_fact.content);
+
+        for existing_fact in &active_facts {
+            if existing_fact.fact_id == new_fact.fact_id
+                || existing_fact.source_episode == episode.episode_id
+                || existing_fact.fact_type != new_fact.fact_type
+                || !fact_is_active_for_warning(existing_fact, cutoff)
+                || !has_meaningful_entity_overlap(
+                    &existing_fact.entity_links,
+                    &new_fact.entity_links,
+                )
+                || super::normalize_text(&existing_fact.content) == new_content
+            {
+                continue;
+            }
+
+            let conflict_key = format!("{}->{}", new_fact.fact_id, existing_fact.fact_id);
+            if !seen_conflicts.insert(conflict_key) {
+                continue;
+            }
+
+            warnings.push(ContradictionWarning {
+                fact_type: new_fact.fact_type.clone(),
+                new_fact_id: new_fact.fact_id.clone(),
+                conflicting_fact_id: existing_fact.fact_id.clone(),
+                existing_content: existing_fact.content.clone(),
+                new_content: new_fact.content.clone(),
+                entity_ids: new_fact.entity_links.clone(),
+                reason: "active fact with the same fact_type and entity set has different content"
+                    .to_string(),
+            });
+        }
+    }
+
+    Ok(warnings)
+}
+
+fn fact_from_value_or_wrapper(value: &Value) -> Option<crate::models::Fact> {
+    fact_from_record(value).or_else(|| value.get("Object").and_then(fact_from_record))
+}
+
+fn has_meaningful_entity_overlap(lhs: &[String], rhs: &[String]) -> bool {
+    let lhs = lhs
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let rhs = rhs
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    if lhs.is_empty() || rhs.is_empty() {
+        return false;
+    }
+
+    let overlap = lhs.intersection(&rhs).count();
+    let smaller_set = lhs.len().min(rhs.len());
+
+    overlap > 0 && overlap * 2 >= smaller_set
+}
+
+fn fact_is_active_for_warning(
+    fact: &crate::models::Fact,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    if fact.t_valid > cutoff || fact.t_ingested > cutoff {
+        return false;
+    }
+
+    match (fact.t_invalid, fact.t_invalid_ingested) {
+        (None, _) => true,
+        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
+        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
+        _ => false,
+    }
 }
 
 /// Store an edge in the database.
@@ -570,6 +566,7 @@ pub(crate) async fn store_edge(
     payload_map.insert("in".to_string(), Value::String(edge.in_id.clone()));
     payload_map.insert("relation".to_string(), Value::String(edge.relation.clone()));
     payload_map.insert("out".to_string(), Value::String(edge.out_id.clone()));
+    payload_map.insert("origin".to_string(), json!(edge.origin));
     payload_map.insert("strength".to_string(), json!(edge.strength));
     payload_map.insert("confidence".to_string(), json!(edge.confidence));
     payload_map.insert("provenance".to_string(), edge.provenance.clone());
@@ -775,7 +772,7 @@ async fn update_communities(
         return Ok(());
     }
 
-    let namespace = service.resolve_namespace_for_scope(scope)?;
+    let namespace = service.namespace_for_scope(scope);
     let member_entities =
         collect_connected_entity_component(service, entity_ids, &namespace).await?;
     if member_entities.len() < 2 {
@@ -828,105 +825,6 @@ async fn update_communities(
     }
 
     Ok(())
-}
-
-pub(crate) async fn connected_entity_component(
-    service: &crate::service::MemoryService,
-    entity_ids: &[String],
-    scope: &str,
-) -> Result<Vec<String>, MemoryError> {
-    let namespace = service.resolve_namespace_for_scope(scope)?;
-    collect_connected_entity_component(service, entity_ids, &namespace).await
-}
-
-pub(crate) async fn rebuild_all_communities(
-    service: &crate::service::MemoryService,
-    scope: &str,
-) -> Result<usize, MemoryError> {
-    use serde_json::json;
-
-    let namespace = service.resolve_namespace_for_scope(scope)?;
-    let entity_records = service.db_client.select_table("entity", &namespace).await?;
-    let existing_communities = service
-        .db_client
-        .select_table("community", &namespace)
-        .await?;
-
-    let mut entity_ids = entity_records
-        .iter()
-        .filter_map(|record| record.as_object())
-        .filter_map(|map| {
-            map.get("entity_id")
-                .and_then(unwrap_record_string)
-                .or_else(|| map.get("id").and_then(unwrap_record_string))
-        })
-        .collect::<Vec<_>>();
-    entity_ids.sort();
-    entity_ids.dedup();
-
-    let mut rebuilt_community_ids = std::collections::BTreeSet::new();
-    let mut visited_entities = std::collections::BTreeSet::new();
-
-    for entity_id in entity_ids {
-        if visited_entities.contains(&entity_id) {
-            continue;
-        }
-
-        let component =
-            collect_connected_entity_component(service, &[entity_id], &namespace).await?;
-        for member in &component {
-            visited_entities.insert(member.clone());
-        }
-
-        if component.len() < 2 {
-            continue;
-        }
-
-        let community_id = super::ids::deterministic_community_id(&component);
-        let summary = build_community_summary(service, &namespace, &component).await?;
-        let payload = json!({
-            "community_id": community_id,
-            "member_entities": component,
-            "summary": summary,
-            "updated_at": super::normalize_dt(super::query::now()),
-        });
-
-        if service
-            .db_client
-            .select_one(&community_id, &namespace)
-            .await?
-            .is_some()
-        {
-            service
-                .db_client
-                .update(&community_id, payload, &namespace)
-                .await?;
-        } else {
-            service
-                .db_client
-                .create(&community_id, payload, &namespace)
-                .await?;
-        }
-
-        rebuilt_community_ids.insert(community_id);
-    }
-
-    for stale in existing_communities
-        .iter()
-        .filter_map(stored_community_from_record)
-        .filter(|community| !rebuilt_community_ids.contains(&community.community_id))
-    {
-        service
-            .db_client
-            .query(
-                "DELETE type::record($community_id);",
-                Some(json!({"community_id": stale.community_id})),
-                &namespace,
-            )
-            .await?;
-    }
-
-    Ok(rebuilt_community_ids.len())
 }
 
 #[derive(Debug, Clone)]
@@ -996,7 +894,7 @@ async fn collect_connected_entity_component(
     Ok(visited.into_iter().collect())
 }
 
-async fn build_community_summary(
+pub(crate) async fn build_community_summary(
     service: &crate::service::MemoryService,
     namespace: &str,
     member_entities: &[String],
@@ -1024,15 +922,31 @@ async fn build_community_summary(
     names.sort();
     names.dedup();
 
-    if names.is_empty() {
-        Ok(member_entities
-            .iter()
-            .take(3)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", "))
+    let labels = if names.is_empty() {
+        let mut fallback = member_entities.to_vec();
+        fallback.sort();
+        fallback.dedup();
+        fallback
     } else {
-        Ok(names.into_iter().take(3).collect::<Vec<_>>().join(", "))
+        names
+    };
+
+    Ok(condense_community_labels(&labels))
+}
+
+fn condense_community_labels(labels: &[String]) -> String {
+    let preview = labels
+        .iter()
+        .take(3)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let remaining = labels.len().saturating_sub(3);
+
+    if remaining > 0 {
+        format!("{preview} (+{remaining} more)")
+    } else {
+        preview
     }
 }
 
@@ -1103,10 +1017,8 @@ fn is_traversable_context_node(record_id: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
-    use crate::service::test_support::MockDb;
     use serde_json::json;
 
     #[test]
@@ -1275,57 +1187,242 @@ mod tests {
     }
 
     #[test]
-    fn general_business_detectors_match_structured_content() {
-        let content = "DECISION: Product Release 9326394 is SIGNED. TASK: Elena Kondratyeva coordinates rollout. REQUIREMENT 6666474 must be updated. STATUS: blocked on legal review.";
+    fn is_experience_statement_detects_preference_patterns() {
+        assert!(is_experience_statement(
+            "Alice Smith prefers weekly launch updates over ad-hoc pings."
+        ));
+        assert!(is_experience_statement("I enjoy quiet deep-work mornings."));
+    }
 
-        assert!(is_decision_statement(content));
-        assert!(is_task_statement(content));
-        assert!(is_requirement_statement(content));
-        assert!(is_status_statement(content));
-        assert!(should_emit_observation_fact(content));
+    #[test]
+    fn is_experience_statement_rejects_non_preference_patterns() {
+        assert!(!is_experience_statement("Atlas budget is $2M."));
+        assert!(!is_experience_statement("I will send the deck tomorrow."));
+    }
+
+    #[test]
+    fn is_document_action_item_detects_email_style_bullets() {
+        assert!(is_document_action_item(
+            "Subject: Atlas follow-up\n\nAction items:\n- Alice Smith: send revised deck by Friday\n- Bob Jones: review launch checklist by Monday"
+        ));
+    }
+
+    #[test]
+    fn is_document_action_item_rejects_plain_notes() {
+        assert!(!is_document_action_item(
+            "Meeting notes: Alice shared the deck."
+        ));
+        assert!(!is_document_action_item(
+            "Action items: this section is empty for now"
+        ));
     }
 
     #[tokio::test]
     async fn collect_connected_entity_component_uses_neighbor_queries_instead_of_edge_scan() {
-        use crate::storage::GraphDirection;
+        use crate::storage::{DbClient, GraphDirection};
         use std::sync::Arc;
 
-        let mut db_client = MockDb::default();
-        db_client.select_edges_filtered_fn =
-            Box::new(|_, _| panic!("community traversal should not scan the full edge table"));
-        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
-            let mk = |from_id: &str, relation: &str, to_id: &str| {
-                json!({
-                    "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
-                    "in": from_id,
-                    "relation": relation,
-                    "out": to_id,
-                    "t_valid": "2024-01-01T00:00:00Z",
-                    "t_ingested": "2024-01-01T00:00:00Z"
-                })
-            };
+        struct NeighborOnlyDbClient;
 
-            Ok(match (node_id, direction) {
-                ("entity:alice", GraphDirection::Outgoing) => {
-                    vec![mk("entity:alice", "mentioned_in", "episode:shared")]
-                }
-                ("episode:shared", GraphDirection::Incoming) => vec![
-                    mk("entity:alice", "mentioned_in", "episode:shared"),
-                    mk("entity:bob", "mentioned_in", "episode:shared"),
-                ],
-                ("entity:bob", GraphDirection::Outgoing) => {
-                    vec![mk("entity:bob", "involved_in", "fact:joint")]
-                }
-                ("fact:joint", GraphDirection::Incoming) => vec![
-                    mk("entity:bob", "involved_in", "fact:joint"),
-                    mk("entity:carol", "involved_in", "fact:joint"),
-                ],
-                _ => vec![],
-            })
-        });
+        #[async_trait::async_trait]
+        impl DbClient for NeighborOnlyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("community traversal should not scan the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mk = |from_id: &str, relation: &str, to_id: &str| {
+                    json!({
+                        "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
+                        "in": from_id,
+                        "relation": relation,
+                        "out": to_id,
+                        "t_valid": "2024-01-01T00:00:00Z",
+                        "t_ingested": "2024-01-01T00:00:00Z"
+                    })
+                };
+
+                Ok(match (node_id, direction) {
+                    ("entity:alice", GraphDirection::Outgoing) => {
+                        vec![mk("entity:alice", "mentioned_in", "episode:shared")]
+                    }
+                    ("episode:shared", GraphDirection::Incoming) => vec![
+                        mk("entity:alice", "mentioned_in", "episode:shared"),
+                        mk("entity:bob", "mentioned_in", "episode:shared"),
+                    ],
+                    ("entity:bob", GraphDirection::Outgoing) => {
+                        vec![mk("entity:bob", "involved_in", "fact:joint")]
+                    }
+                    ("fact:joint", GraphDirection::Incoming) => vec![
+                        mk("entity:bob", "involved_in", "fact:joint"),
+                        mk("entity:carol", "involved_in", "fact:joint"),
+                    ],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(NeighborOnlyDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -1355,18 +1452,193 @@ mod tests {
 
         static SELECT_COMMUNITIES_BY_MEMBER_CALLED: AtomicBool = AtomicBool::new(false);
         static SELECT_TABLE_CALLED: AtomicBool = AtomicBool::new(false);
-        let mut db_client = MockDb::default();
-        db_client.select_table_fn = Box::new(|_, _| {
-            SELECT_TABLE_CALLED.store(true, Ordering::SeqCst);
-            Ok(vec![])
-        });
-        db_client.select_communities_by_member_entities_fn = Box::new(|_, _| {
-            SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
-            Ok(vec![])
-        });
+
+        #[derive(Clone)]
+        struct IndexLookupDbClient;
+
+        #[async_trait::async_trait]
+        impl crate::storage::DbClient for IndexLookupDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<serde_json::Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                SELECT_TABLE_CALLED.store(true, Ordering::SeqCst);
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: crate::storage::GraphDirection,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<serde_json::Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: serde_json::Value,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: serde_json::Value,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: serde_json::Value,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<serde_json::Value>,
+                _namespace: &str,
+            ) -> Result<serde_json::Value, MemoryError> {
+                Ok(serde_json::Value::Null)
+            }
+
+            async fn select_entities_by_ids(
+                &self,
+                _namespace: &str,
+                _ids: &[String],
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = crate::service::MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(IndexLookupDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,

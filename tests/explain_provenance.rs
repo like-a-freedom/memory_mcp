@@ -28,21 +28,21 @@ async fn explain_returns_direct_provenance_source() {
     let episode_id = "episode:direct_provenance_integration";
     let episode_content = "Integration test: Alice promised to deliver the report";
 
-    common::add_fact(
-        &service,
-        "promise",
-        "Alice will deliver the report",
-        episode_content,
-        episode_id,
-        Utc::now(),
-        "test_provenance_integration",
-        0.9,
-        vec![],
-        vec![],
-        json!({"source_episode": episode_id}),
-    )
-    .await
-    .expect("fact added");
+    service
+        .add_fact(
+            "promise",
+            "Alice will deliver the report",
+            episode_content,
+            episode_id,
+            Utc::now(),
+            "test_provenance_integration",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": episode_id}),
+        )
+        .await
+        .expect("fact added");
 
     // Act: Call explain
     let request = ExplainRequest {
@@ -57,6 +57,7 @@ async fn explain_returns_direct_provenance_source() {
             provenance: json!({"source_episode": episode_id}),
             citation_context: None,
             all_sources: vec![],
+            graph_insights: None,
         }],
     };
 
@@ -93,21 +94,21 @@ async fn explain_backward_compatible_with_empty_all_sources() {
 
     let episode_id = "episode:compat_provenance_test";
 
-    common::add_fact(
-        &service,
-        "metric",
-        "Backward compatibility provenance test",
-        "Backward compatibility provenance test",
-        episode_id,
-        Utc::now(),
-        "test_provenance_compat",
-        0.8,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .expect("fact added");
+    service
+        .add_fact(
+            "metric",
+            "Backward compatibility provenance test",
+            "Backward compatibility provenance test",
+            episode_id,
+            Utc::now(),
+            "test_provenance_compat",
+            0.8,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .expect("fact added");
 
     // Act: Call explain with minimal request (backward compatible)
     let request = ExplainRequest {
@@ -122,6 +123,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             provenance: json!({}),
             citation_context: None,
             all_sources: vec![], // Empty as old code would have
+            graph_insights: None,
         }],
     };
 
@@ -148,21 +150,21 @@ async fn explain_populates_all_sources_field() {
 
     let episode_id = "episode:all_sources_integration";
 
-    common::add_fact(
-        &service,
-        "task",
-        "Task completed for all_sources test",
-        "Task completed",
-        episode_id,
-        Utc::now(),
-        "test_provenance_sources",
-        0.95,
-        vec![],
-        vec![],
-        json!({"source_episode": episode_id}),
-    )
-    .await
-    .expect("fact added");
+    service
+        .add_fact(
+            "task",
+            "Task completed for all_sources test",
+            "Task completed",
+            episode_id,
+            Utc::now(),
+            "test_provenance_sources",
+            0.95,
+            vec![],
+            vec![],
+            json!({"source_episode": episode_id}),
+        )
+        .await
+        .expect("fact added");
 
     // Act
     let request = ExplainRequest {
@@ -177,6 +179,7 @@ async fn explain_populates_all_sources_field() {
             provenance: json!({}),
             citation_context: None,
             all_sources: vec![],
+            graph_insights: None,
         }],
     };
 
@@ -230,6 +233,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
                 content: "Alice Smith closed a deal".into(),
                 t_ref,
                 scope: scope.into(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -240,21 +244,21 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
         .expect("ingest A");
 
     // Fact A: explicitly linked to entity
-    let fact_a_id = common::add_fact(
-        &service,
-        "metric",
-        "Alice Smith closed $5M deal",
-        "Alice Smith closed a $5M deal",
-        &episode_a_id,
-        t_ref,
-        scope,
-        0.9,
-        vec![entity_id.clone()],
-        vec![],
-        json!({"source_episode": episode_a_id}),
-    )
-    .await
-    .expect("add fact A");
+    let fact_a_id = service
+        .add_fact(
+            "metric",
+            "Alice Smith closed $5M deal",
+            "Alice Smith closed a $5M deal",
+            &episode_a_id,
+            t_ref,
+            scope,
+            0.9,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_a_id}),
+        )
+        .await
+        .expect("add fact A");
 
     // Episode B
     let episode_b_id =
@@ -267,6 +271,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
                 content: "Alice Smith presented results".into(),
                 t_ref,
                 scope: scope.into(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -277,21 +282,21 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
         .expect("ingest B");
 
     // Fact B: also linked to same entity
-    let fact_b_id = common::add_fact(
-        &service,
-        "fact",
-        "Alice Smith presented quarterly results",
-        "Alice Smith presented quarterly results",
-        &episode_b_id,
-        t_ref,
-        scope,
-        0.85,
-        vec![entity_id.clone()],
-        vec![],
-        json!({"source_episode": episode_b_id}),
-    )
-    .await
-    .expect("add fact B");
+    let fact_b_id = service
+        .add_fact(
+            "fact",
+            "Alice Smith presented quarterly results",
+            "Alice Smith presented quarterly results",
+            &episode_b_id,
+            t_ref,
+            scope,
+            0.85,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_b_id}),
+        )
+        .await
+        .expect("add fact B");
 
     // Create involved_in edges: entity → fact A, entity → fact B
     let now = memory_mcp::service::now();
@@ -331,6 +336,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             provenance: json!({"source_episode": episode_a_id}),
             citation_context: None,
             all_sources: vec![],
+            graph_insights: None,
         }],
     };
 
@@ -360,21 +366,21 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
 async fn explain_when_fact_is_cited_then_access_count_increases() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Explain access boost note",
-        "Explain access boost note",
-        "episode:explain-boost",
-        Utc::now(),
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({"source_episode": "episode:explain-boost"}),
-    )
-    .await
-    .expect("fact added");
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Explain access boost note",
+            "Explain access boost note",
+            "episode:explain-boost",
+            Utc::now(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:explain-boost"}),
+        )
+        .await
+        .expect("fact added");
 
     let result = service
         .explain(
@@ -390,6 +396,7 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
                     provenance: json!({"source_episode": "episode:explain-boost"}),
                     citation_context: None,
                     all_sources: vec![],
+                    graph_insights: None,
                 }],
             },
             None,

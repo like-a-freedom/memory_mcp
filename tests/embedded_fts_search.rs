@@ -10,23 +10,23 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
     let service = embedded_support::setup_embedded_service().await?;
     let t = Utc::now() - Duration::days(1);
 
-    embedded_support::add_fact(
-        &service,
-        "note",
-        "Survey: Delta site includes enrollment workflow and gateway component on host alpha",
-        "Delta Survey",
-        "episode:fts_test_1",
-        t,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:fts_test_1"}),
-    )
-    .await?;
+    service
+        .add_fact(
+            "note",
+            "Survey: Delta site includes enrollment workflow and gateway component on host alpha",
+            "Delta Survey",
+            "episode:fts_test_1",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:fts_test_1"}),
+        )
+        .await?;
 
-    embedded_support::add_fact(
-        &service,
+    service
+        .add_fact(
             "note",
             "Checklist entry: cert rotation scheduled, token refresh in progress, ports 5223 and 443 open",
             "cert checklist",
@@ -46,6 +46,8 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -69,6 +71,8 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -87,6 +91,8 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -107,20 +113,20 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
     let service = embedded_support::setup_embedded_service().await?;
     let t = Utc::now() - Duration::days(1);
 
-    embedded_support::add_fact(
-        &service,
-        "note",
-        "Deployment note: atlas_launch reached green status after final checklist.",
-        "atlas_launch reached green status",
-        "episode:fts_separator",
-        t,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:fts_separator"}),
-    )
-    .await?;
+    service
+        .add_fact(
+            "note",
+            "Deployment note: atlas_launch reached green status after final checklist.",
+            "atlas_launch reached green status",
+            "episode:fts_separator",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:fts_separator"}),
+        )
+        .await?;
 
     let ctx = service
         .assemble_context(AssembleContextRequest {
@@ -128,6 +134,8 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -150,20 +158,20 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
     let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
     let alice_id = service.resolve_person("Alice Smith").await?;
 
-    embedded_support::add_fact(
-        &service,
-        "note",
-        "Quarterly launch review finalized.",
-        "launch review finalized",
-        "episode:fts_index_keys",
-        t,
-        "org",
-        0.9,
-        vec![alice_id],
-        vec![],
-        serde_json::json!({"source_episode": "episode:fts_index_keys"}),
-    )
-    .await?;
+    service
+        .add_fact(
+            "note",
+            "Quarterly launch review finalized.",
+            "launch review finalized",
+            "episode:fts_index_keys",
+            t,
+            "org",
+            0.9,
+            vec![alice_id],
+            vec![],
+            serde_json::json!({"source_episode": "episode:fts_index_keys"}),
+        )
+        .await?;
 
     let person_ctx = service
         .assemble_context(AssembleContextRequest {
@@ -171,6 +179,8 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -189,6 +199,8 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -305,5 +317,26 @@ fn schema_uses_native_edge_endpoints() {
     assert!(
         !schema.contains("DEFINE FIELD to_id ON edge"),
         "legacy to_id field should be removed from edge schema"
+    );
+}
+
+#[test]
+fn schema_keeps_edge_origin_out_of_initial_migration() {
+    let schema = include_str!("../src/migrations/__Initial.surql");
+
+    assert!(
+        !schema.contains("DEFINE FIELD origin ON edge TYPE string"),
+        "edge origin must be introduced only via a new follow-up migration, not by editing __Initial.surql"
+    );
+}
+
+#[test]
+fn edge_origin_is_introduced_by_followup_migration() {
+    let migration = include_str!("../src/migrations/017_edge_origin.surql");
+
+    assert!(
+        migration
+            .contains("DEFINE FIELD OVERWRITE origin ON edge TYPE string DEFAULT 'extracted';"),
+        "migration 017 should introduce the edge origin field"
     );
 }

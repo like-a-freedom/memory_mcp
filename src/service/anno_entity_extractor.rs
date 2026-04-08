@@ -19,11 +19,8 @@ impl AnnoEntityExtractor {
     pub fn new() -> Result<Self, MemoryError> {
         // In this repository `anno` is built with `default-features = false`, so
         // `StackedNER::default()` stays on the dependency-light rule-based path.
-        // For vanilla GLiNER (uni-encoder), batch custom labels into groups of ~20
-        // when NER_LABELS exceeds this limit. The GLiNER maintainer recommends ~20
-        // labels maximum for optimal performance. For bi-encoder GLiNER/GLiNER2,
-        // this limitation does not apply. See:
-        // https://github.com/urchade/GLiNER/discussions/180
+        // If we later switch to GLiNER/GLiNER2 with custom type labels, batch
+        // labels into groups of ~20-30 per `docs/BACKENDS.md` guidance.
         Ok(Self {
             model: StackedNER::default(),
         })
@@ -38,10 +35,6 @@ impl std::fmt::Debug for AnnoEntityExtractor {
 
 #[async_trait]
 impl EntityExtractor for AnnoEntityExtractor {
-    fn provider_name(&self) -> &'static str {
-        "anno"
-    }
-
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         if content.trim().is_empty() {
             return Ok(Vec::new());

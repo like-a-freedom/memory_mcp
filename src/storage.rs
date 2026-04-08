@@ -4,7 +4,6 @@
 //! abstracting over embedded and remote (WebSocket) engines.
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -56,14 +55,25 @@ pub trait DbClient: Send + Sync {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects episodes by full-text content match for retrieval fallback.
-    async fn select_episodes_by_content(
+    /// Selects facts with optional project and fact-type filters.
+    #[allow(clippy::too_many_arguments)]
+    async fn select_facts_filtered_advanced(
         &self,
         namespace: &str,
         scope: &str,
-        query_contains: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
         limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
+        project: Option<&str>,
+        fact_types: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        let records = self
+            .select_facts_filtered(namespace, scope, cutoff, query_contains, limit)
+            .await?;
+        Ok(filter_records_by_project_and_fact_types(
+            records, project, fact_types,
+        ))
+    }
 
     /// Selects facts that mention any of the supplied entity links using DB-side filtering.
     async fn select_facts_by_entity_links(
@@ -183,13 +193,36 @@ pub trait DbClient: Send + Sync {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects any facts for an episode, including invalidated ones.
-    async fn select_facts_by_episode_any(
+    /// Selects episodes whose raw content matches the supplied query.
+    ///
+    /// Used as a last-resort retrieval fallback for freshly ingested content
+    /// that has not yet produced searchable facts.
+    async fn select_episodes_by_content(
+        &self,
+        _namespace: &str,
+        _scope: &str,
+        _cutoff: &str,
+        _query_contains: Option<&str>,
+        _limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
+
+    /// Selects episodes whose raw content matches the supplied query with an optional project filter.
+    async fn select_episodes_by_content_advanced(
         &self,
         namespace: &str,
-        episode_id: &str,
+        scope: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
         limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
+        project: Option<&str>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let records = self
+            .select_episodes_by_content(namespace, scope, cutoff, query_contains, limit)
+            .await?;
+        Ok(filter_records_by_project(records, project))
+    }
 
     /// Selects communities whose summaries match the supplied query using DB-side search.
     async fn select_communities_matching_summary(
@@ -240,218 +273,15 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
     ) -> Result<Value, MemoryError>;
 
-    /// Selects episodes linked to an entity through active relation edges and facts.
-    ///
-    /// Traverses: entity → edge(involved_in) → fact → source_episode → episode.
-    async fn select_episodes_by_entity(
-        &self,
-        namespace: &str,
-        entity_id: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
-
     /// Applies database migrations for a namespace.
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError>;
-
-    // Embedding migration methods - default implementations for test mocks
-    async fn get_embedding_schema(
-        &self,
-        _namespace: &str,
-    ) -> Result<Option<crate::storage::EmbeddingSchema>, MemoryError> {
-        Err(MemoryError::Storage(
-            "get_embedding_schema not implemented".into(),
-        ))
-    }
-    async fn set_embedding_schema(
-        &self,
-        _schema: &crate::storage::EmbeddingSchema,
-        _namespace: &str,
-    ) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "set_embedding_schema not implemented".into(),
-        ))
-    }
-    async fn create_hnsw_index(
-        &self,
-        _field: &str,
-        _index_name: &str,
-        _dim: usize,
-        _namespace: &str,
-    ) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "create_hnsw_index not implemented".into(),
-        ))
-    }
-    async fn drop_hnsw_index(
-        &self,
-        _index_name: &str,
-        _namespace: &str,
-    ) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "drop_hnsw_index not implemented".into(),
-        ))
-    }
-    async fn get_facts_pending_reembed(
-        &self,
-        _limit: usize,
-        _namespace: &str,
-    ) -> Result<Vec<(String, String)>, MemoryError> {
-        Ok(Vec::new())
-    }
-    async fn set_fact_next_embedding(
-        &self,
-        _id: &str,
-        _vec: Vec<f64>,
-        _namespace: &str,
-    ) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "set_fact_next_embedding not implemented".into(),
-        ))
-    }
-    async fn apply_cutover(&self, _namespace: &str) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage("apply_cutover not implemented".into()))
-    }
-    async fn clear_next_embeddings(&self, _namespace: &str) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "clear_next_embeddings not implemented".into(),
-        ))
-    }
-    async fn count_facts(&self, _namespace: &str) -> Result<usize, MemoryError> {
-        Ok(0)
-    }
-    async fn get_facts_without_embedding(
-        &self,
-        _limit: usize,
-        _namespace: &str,
-    ) -> Result<Vec<(String, String)>, MemoryError> {
-        Ok(Vec::new())
-    }
-    async fn set_fact_embedding(
-        &self,
-        _id: &str,
-        _vec: Vec<f64>,
-        _namespace: &str,
-    ) -> Result<(), MemoryError> {
-        Err(MemoryError::Storage(
-            "set_fact_embedding not implemented".into(),
-        ))
-    }
 }
 
 /// Unified database client that works with both embedded and remote SurrealDB.
 pub struct SurrealDbClient {
     engine: DbEngine,
     logger: StdoutLogger,
-    fact_embedding_dimension: OnceLock<usize>,
-}
-
-// Embedding migration types
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum EmbeddingStatus {
-    Ready,
-    Migrating,
-    Cutover,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct EmbeddingSchema {
-    pub provider: String,
-    pub model: String,
-    pub dimension: usize,
-    pub status: EmbeddingStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_provider: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_dimension: Option<usize>,
-}
-
-impl EmbeddingSchema {
-    pub fn from_config(config: &crate::config::EmbeddingConfig) -> Self {
-        use crate::config::EmbeddingProviderKind;
-        let provider_name = match config.provider {
-            EmbeddingProviderKind::Disabled => "disabled",
-            EmbeddingProviderKind::LocalCandle => "local-candle",
-            EmbeddingProviderKind::OpenAiCompatible => "openai-compatible",
-            EmbeddingProviderKind::Ollama => "ollama",
-        };
-        Self {
-            provider: provider_name.to_string(),
-            model: config.model.clone().unwrap_or_default(),
-            dimension: config
-                .dimension
-                .unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION),
-            status: EmbeddingStatus::Ready,
-            target_provider: None,
-            target_model: None,
-            target_dimension: None,
-        }
-    }
-
-    pub fn active_matches_config(&self, config: &crate::config::EmbeddingConfig) -> bool {
-        use crate::config::EmbeddingProviderKind;
-        let provider_name = match config.provider {
-            EmbeddingProviderKind::Disabled => "disabled",
-            EmbeddingProviderKind::LocalCandle => "local-candle",
-            EmbeddingProviderKind::OpenAiCompatible => "openai-compatible",
-            EmbeddingProviderKind::Ollama => "ollama",
-        };
-        let config_dim = config
-            .dimension
-            .unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
-        self.provider == provider_name
-            && self.model == config.model.as_deref().unwrap_or_default()
-            && self.dimension == config_dim
-    }
-
-    pub fn target_matches_config(&self, config: &crate::config::EmbeddingConfig) -> bool {
-        use crate::config::EmbeddingProviderKind;
-        let provider_name = match config.provider {
-            EmbeddingProviderKind::Disabled => "disabled",
-            EmbeddingProviderKind::LocalCandle => "local-candle",
-            EmbeddingProviderKind::OpenAiCompatible => "openai-compatible",
-            EmbeddingProviderKind::Ollama => "ollama",
-        };
-        let config_dim = config
-            .dimension
-            .unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
-        self.target_provider.as_deref() == Some(provider_name)
-            && self.target_model.as_deref() == Some(config.model.as_deref().unwrap_or_default())
-            && self.target_dimension == Some(config_dim)
-    }
-
-    pub fn with_status(&self, status: EmbeddingStatus) -> Self {
-        Self {
-            status,
-            provider: self.provider.clone(),
-            model: self.model.clone(),
-            dimension: self.dimension,
-            target_provider: self.target_provider.clone(),
-            target_model: self.target_model.clone(),
-            target_dimension: self.target_dimension,
-        }
-    }
-
-    pub fn as_migration_start(&self, config: &crate::config::EmbeddingConfig) -> Self {
-        use crate::config::EmbeddingProviderKind;
-        let provider_name = match config.provider {
-            EmbeddingProviderKind::Disabled => "disabled",
-            EmbeddingProviderKind::LocalCandle => "local-candle",
-            EmbeddingProviderKind::OpenAiCompatible => "openai-compatible",
-            EmbeddingProviderKind::Ollama => "ollama",
-        };
-        Self {
-            provider: self.provider.clone(),
-            model: self.model.clone(),
-            dimension: self.dimension,
-            status: EmbeddingStatus::Migrating,
-            target_provider: Some(provider_name.to_string()),
-            target_model: Some(self.model.clone()),
-            target_dimension: Some(self.dimension),
-        }
-    }
+    fact_embedding_dimension: usize,
 }
 
 /// Internal enum representing the database engine type.
@@ -492,47 +322,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine: DbEngine::Local(clients),
             logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: OnceLock::new(),
-        })
-    }
-
-    /// Connects to an embedded RocksDB SurrealDB instance for multiple namespaces.
-    ///
-    /// Use this for eval tests that need stability beyond what in-memory DB provides.
-    /// The caller is responsible for cleaning up the data directory.
-    pub async fn connect_embedded_with_namespaces(
-        data_dir: &str,
-        namespaces: &[String],
-        log_level: &str,
-    ) -> Result<Self, MemoryError> {
-        use surrealdb::opt::{Config as SurrealOptConfig, capabilities::Capabilities};
-
-        let path = PathBuf::from(data_dir);
-        ensure_dir_exists(path.as_path())?;
-
-        let root = Root {
-            username: "root".to_string(),
-            password: "root".to_string(),
-        };
-
-        let cfg = SurrealOptConfig::new()
-            .user(root.clone())
-            .capabilities(Capabilities::default());
-
-        let db = Surreal::new::<RocksDb>((path, cfg)).await.map_err(|err| {
-            MemoryError::Storage(format!("SurrealDB embedded init failed: {err}"))
-        })?;
-
-        db.signin(root)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
-
-        let clients = build_local_namespace_clients(&db, namespaces, "memory_eval").await?;
-
-        Ok(Self {
-            engine: DbEngine::Local(clients),
-            logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: OnceLock::new(),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
         })
     }
 
@@ -547,16 +337,10 @@ impl SurrealDbClient {
             Self::connect_remote(config, default_namespace).await?
         };
 
-        // Initialize dimension from config if provided, otherwise it will be auto-detected later
-        let dimension_once = OnceLock::new();
-        if let Some(dim) = config.embedding.dimension {
-            let _ = dimension_once.set(dim);
-        }
-
         Ok(Self {
             engine,
             logger: StdoutLogger::new(&config.log_level),
-            fact_embedding_dimension: dimension_once,
+            fact_embedding_dimension: config.embedding.dimension,
         })
     }
 
@@ -674,8 +458,8 @@ impl SurrealDbClient {
 
     /// Logs a database operation event.
     fn log_op(&self, op: &str, details: Vec<(&str, Value)>) {
-        let event = crate::log_event!(op, "success");
-        let mut event = event;
+        let mut event = std::collections::HashMap::new();
+        event.insert("op".to_string(), Value::String(op.to_string()));
         for (key, value) in details {
             event.insert(key.to_string(), value);
         }
@@ -684,15 +468,10 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        // Use default dimension for initial schema if not yet detected
-        let dimension = self
-            .fact_embedding_dimension
-            .get()
-            .copied()
-            .unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
-
-        let initial_schema =
-            render_initial_schema_sql(include_str!("migrations/__Initial.surql"), dimension);
+        let initial_schema = render_initial_schema_sql(
+            include_str!("migrations/__Initial.surql"),
+            self.fact_embedding_dimension,
+        );
 
         self.execute_raw_query(&initial_schema, None, namespace)
             .await?;
@@ -721,13 +500,7 @@ impl SurrealDbClient {
         migration: &MigrationScript,
     ) -> Result<(), MemoryError> {
         let record_id = migration_record_id(migration.file_name);
-        // Use default dimension for migrations if not yet detected
-        let dimension = self
-            .fact_embedding_dimension
-            .get()
-            .copied()
-            .unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
-        let rendered_sql = render_migration_sql(migration.sql, dimension);
+        let rendered_sql = render_migration_sql(migration.sql, self.fact_embedding_dimension);
         let checksum = migration_checksum(&rendered_sql);
 
         if let Some(existing) = self.select_one(&record_id, namespace).await? {
@@ -761,70 +534,30 @@ impl SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<SurrealValue, MemoryError> {
-        self.execute_query_with_retry(sql, vars, namespace, 2).await
-    }
-
-    /// Execute query with retry logic for transient errors (e.g., Session not found).
-    async fn execute_query_with_retry(
-        &self,
-        sql: &str,
-        vars: Option<Value>,
-        namespace: &str,
-        max_retries: u32,
-    ) -> Result<SurrealValue, MemoryError> {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let result = if self.is_local() {
-                let db = self.with_namespace_local(namespace).await?;
-                let mut q = db.query(sql);
-                if let Some(v) = vars.clone() {
-                    q = q.bind(v);
-                }
-                let mut response = q.await.map_err(|err| {
-                    MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-                })?;
-                response
-                    .take::<SurrealValue>(0)
-                    .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
-            } else {
-                let db = self.with_namespace_remote(namespace).await?;
-                let mut q = db.query(sql);
-                if let Some(v) = vars.clone() {
-                    q = q.bind(v);
-                }
-                let mut response = q.await.map_err(|err| {
-                    MemoryError::Storage(format!("SurrealDB query failed: {err}"))
-                })?;
-                response
-                    .take::<SurrealValue>(0)
-                    .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
-            };
-
-            match result {
-                Ok(value) => return Ok(value),
-                Err(MemoryError::Storage(ref msg))
-                    if msg.contains("Session not found") && attempt < max_retries =>
-                {
-                    self.logger.log(
-                        [
-                            (
-                                "op".to_string(),
-                                serde_json::json!("storage.retry.session_not_found"),
-                            ),
-                            ("attempt".to_string(), serde_json::json!(attempt)),
-                            ("max_retries".to_string(), serde_json::json!(max_retries)),
-                        ]
-                        .into_iter()
-                        .collect(),
-                        crate::logging::LogLevel::Warn,
-                    );
-                    tokio::time::sleep(std::time::Duration::from_millis((100 * attempt) as u64))
-                        .await;
-                    continue;
-                }
-                Err(e) => return Err(e),
+        if self.is_local() {
+            let db = self.with_namespace_local(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars.clone() {
+                q = q.bind(v);
             }
+            let mut response = q
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+            response
+                .take::<SurrealValue>(0)
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
+        } else {
+            let db = self.with_namespace_remote(namespace).await?;
+            let mut q = db.query(sql);
+            if let Some(v) = vars {
+                q = q.bind(v);
+            }
+            let mut response = q
+                .await
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+            response
+                .take::<SurrealValue>(0)
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
         }
     }
 
@@ -939,24 +672,16 @@ fn versioned_migrations() -> &'static [MigrationScript] {
             sql: include_str!("migrations/010_coerce_t_ingested_to_datetime.surql"),
         },
         MigrationScript {
-            file_name: "011_ingestion_draft.surql",
-            sql: include_str!("migrations/011_ingestion_draft.surql"),
+            file_name: "016_project_tag.surql",
+            sql: include_str!("migrations/016_project_tag.surql"),
         },
         MigrationScript {
-            file_name: "012_app_sessions.surql",
-            sql: include_str!("migrations/012_app_sessions.surql"),
+            file_name: "017_edge_origin.surql",
+            sql: include_str!("migrations/017_edge_origin.surql"),
         },
         MigrationScript {
-            file_name: "013_fact_index_keys_fts.surql",
-            sql: include_str!("migrations/013_fact_index_keys_fts.surql"),
-        },
-        MigrationScript {
-            file_name: "014_fact_entity_links_typed.surql",
-            sql: include_str!("migrations/014_fact_entity_links_typed.surql"),
-        },
-        MigrationScript {
-            file_name: "015_episode_content_fts.surql",
-            sql: include_str!("migrations/015_episode_content_fts.surql"),
+            file_name: "018_query_log.surql",
+            sql: include_str!("migrations/018_query_log.surql"),
         },
     ]
 }
@@ -1100,18 +825,6 @@ pub(crate) fn json_i64(value: &Value) -> Option<i64> {
         })
 }
 
-impl SurrealDbClient {
-    async fn execute(
-        &self,
-        sql: &str,
-        vars: Option<Value>,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        let result = self.execute_query(sql, vars.clone(), namespace).await?;
-        Ok(surreal_to_json(result))
-    }
-}
-
 #[async_trait]
 impl DbClient for SurrealDbClient {
     async fn select_one(
@@ -1227,24 +940,40 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_episodes_by_content(
+    #[allow(clippy::too_many_arguments)]
+    async fn select_facts_filtered_advanced(
         &self,
         namespace: &str,
         scope: &str,
-        query_contains: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
         limit: i32,
+        project: Option<&str>,
+        fact_types: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         self.log_op(
-            "db.select_episodes_by_content",
+            "db.select_facts_filtered_advanced",
             vec![
                 ("scope", Value::String(scope.to_string())),
-                ("query", Value::String(query_contains.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
                 ("namespace", Value::String(namespace.to_string())),
                 ("limit", Value::Number(serde_json::Number::from(limit))),
+                ("project", json!(project)),
+                (
+                    "fact_type_count",
+                    Value::Number(serde_json::Number::from(fact_types.len())),
+                ),
             ],
         );
 
-        let (sql, vars) = build_select_episodes_by_content_query(scope, query_contains, limit);
+        let (sql, vars) = build_select_facts_filtered_advanced_query(
+            scope,
+            cutoff,
+            query_contains,
+            limit,
+            project,
+            fact_types,
+        );
 
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
@@ -1257,7 +986,7 @@ impl DbClient for SurrealDbClient {
         let results = extract_records(normalized);
 
         self.log_op(
-            "db.select_episodes_by_content.result",
+            "db.select_facts_filtered_advanced.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
@@ -1381,15 +1110,23 @@ impl DbClient for SurrealDbClient {
 
         // Warn if the edge scan hit the limit — community detection will be incomplete
         if results.len() == ACTIVE_EDGE_SCAN_LIMIT as usize {
-            self.logger.log(
-                crate::log_event!(
-                    "db.select_edges_filtered.limit_hit",
-                    "warn",
-                    "warning" => format!("Edge scan hit limit of {} edges; community detection may be incomplete", ACTIVE_EDGE_SCAN_LIMIT),
-                    "count" => results.len()
-                ),
-                LogLevel::Warn,
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                Value::String("db.select_edges_filtered.limit_hit".to_string()),
             );
+            event.insert(
+                "warning".to_string(),
+                Value::String(format!(
+                    "Edge scan hit limit of {} edges; community detection may be incomplete",
+                    ACTIVE_EDGE_SCAN_LIMIT
+                )),
+            );
+            event.insert(
+                "count".to_string(),
+                Value::Number(serde_json::Number::from(results.len())),
+            );
+            self.logger.log(event, LogLevel::Warn);
         }
 
         self.log_op(
@@ -1727,24 +1464,27 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_facts_by_episode_any(
+    async fn select_episodes_by_content(
         &self,
         namespace: &str,
-        episode_id: &str,
+        scope: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         self.log_op(
-            "db.select_facts_by_episode_any",
+            "db.select_episodes_by_content",
             vec![
                 ("namespace", Value::String(namespace.to_string())),
-                ("episode_id", Value::String(episode_id.to_string())),
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
                 ("limit", Value::Number(serde_json::Number::from(limit))),
             ],
         );
 
-        let sql = "SELECT * FROM fact WHERE source_episode = $episode_id ORDER BY t_valid DESC, fact_id ASC LIMIT $limit";
-        let vars = json!({"episode_id": episode_id, "limit": limit});
-        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
+        let (sql, vars) =
+            build_select_episodes_by_content_query(scope, cutoff, query_contains, limit);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
                 return Ok(Vec::new());
@@ -1755,7 +1495,55 @@ impl DbClient for SurrealDbClient {
         let results = extract_records(normalized);
 
         self.log_op(
-            "db.select_facts_by_episode_any.result",
+            "db.select_episodes_by_content.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_episodes_by_content_advanced(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
+        limit: i32,
+        project: Option<&str>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_episodes_by_content_advanced",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("scope", Value::String(scope.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+                ("project", json!(project)),
+            ],
+        );
+
+        let (sql, vars) = build_select_episodes_by_content_advanced_query(
+            scope,
+            cutoff,
+            query_contains,
+            limit,
+            project,
+        );
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_episodes_by_content_advanced.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
@@ -1959,231 +1747,9 @@ impl DbClient for SurrealDbClient {
         Ok(Value::Array(results))
     }
 
-    async fn select_episodes_by_entity(
-        &self,
-        namespace: &str,
-        entity_id: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_episodes_by_entity",
-            vec![
-                ("entity_id", Value::String(entity_id.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-            ],
-        );
-
-        let sql = "SELECT * FROM episode WHERE episode_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE type::string(out) FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT $limit";
-        let vars = serde_json::json!({
-            "entity_id": entity_id,
-            "limit": limit,
-        });
-
-        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-
-        let results = extract_records(surreal_to_json(surreal_val));
-        self.log_op(
-            "db.select_episodes_by_entity.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-        Ok(results)
-    }
-
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
         self.apply_migrations_impl(namespace).await
     }
-
-    async fn get_embedding_schema(
-        &self,
-        namespace: &str,
-    ) -> Result<Option<EmbeddingSchema>, MemoryError> {
-        let result = self
-            .select_one("embedding_schema:embedding", namespace)
-            .await?;
-        match result {
-            Some(Value::Object(obj)) => {
-                let schema: EmbeddingSchema = serde_json::from_value(json!(obj)).map_err(|e| {
-                    MemoryError::Storage(format!("Failed to parse embedding schema: {}", e))
-                })?;
-                Ok(Some(schema))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    async fn set_embedding_schema(
-        &self,
-        schema: &EmbeddingSchema,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
-        let schema_json = serde_json::to_value(schema).map_err(|e| {
-            MemoryError::Storage(format!("Failed to serialize embedding schema: {}", e))
-        })?;
-        self.create("embedding_schema:embedding", schema_json, namespace)
-            .await?;
-        Ok(())
-    }
-
-    async fn create_hnsw_index(
-        &self,
-        field: &str,
-        index_name: &str,
-        dim: usize,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
-        self.execute(
-            &format!("REMOVE INDEX IF EXISTS {} ON TABLE fact", index_name),
-            None,
-            namespace,
-        )
-        .await?;
-        self.execute(
-            &format!(
-                "DEFINE INDEX {} ON TABLE fact FIELDS {} HNSW DIMENSION {}",
-                index_name, field, dim
-            ),
-            None,
-            namespace,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn drop_hnsw_index(&self, index_name: &str, namespace: &str) -> Result<(), MemoryError> {
-        self.execute(
-            &format!("REMOVE INDEX IF EXISTS {} ON TABLE fact", index_name),
-            None,
-            namespace,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn get_facts_pending_reembed(
-        &self,
-        limit: usize,
-        namespace: &str,
-    ) -> Result<Vec<(String, String)>, MemoryError> {
-        let sql =
-            format!("SELECT id, content FROM fact WHERE embedding_next IS NONE LIMIT {limit}");
-        let result = self.execute(&sql, None, namespace).await?;
-        parse_id_content_rows(&result)
-    }
-
-    async fn set_fact_next_embedding(
-        &self,
-        id: &str,
-        vec: Vec<f64>,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
-        let sql = format!("UPDATE {id} SET embedding_next = $vec");
-        let mut vars = serde_json::Map::new();
-        vars.insert("vec".to_string(), json!(vec));
-        self.execute(&sql, Some(Value::Object(vars)), namespace)
-            .await?;
-        Ok(())
-    }
-
-    async fn apply_cutover(&self, namespace: &str) -> Result<(), MemoryError> {
-        // 1. Clear old embeddings for facts that were not re-embedded
-        self.execute(
-            "UPDATE fact SET embedding = NONE WHERE embedding_next IS NONE",
-            None,
-            namespace,
-        )
-        .await?;
-        // 2. Copy new embeddings for re-embedded facts
-        self.execute(
-            "UPDATE fact SET embedding = embedding_next WHERE embedding_next IS NOT NONE",
-            None,
-            namespace,
-        )
-        .await?;
-        // 3. Clear staging field
-        self.execute(
-            "UPDATE fact SET embedding_next = NONE WHERE embedding_next IS NOT NONE",
-            None,
-            namespace,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn clear_next_embeddings(&self, namespace: &str) -> Result<(), MemoryError> {
-        self.execute("UPDATE fact SET embedding_next = NONE", None, namespace)
-            .await?;
-        Ok(())
-    }
-
-    async fn get_facts_without_embedding(
-        &self,
-        limit: usize,
-        namespace: &str,
-    ) -> Result<Vec<(String, String)>, MemoryError> {
-        let sql = format!("SELECT id, content FROM fact WHERE embedding IS NONE LIMIT {limit}");
-        let result = self.execute(&sql, None, namespace).await?;
-        parse_id_content_rows(&result)
-    }
-
-    async fn set_fact_embedding(
-        &self,
-        id: &str,
-        vec: Vec<f64>,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
-        let sql = format!("UPDATE {id} SET embedding = $vec");
-        let mut vars = serde_json::Map::new();
-        vars.insert("vec".to_string(), json!(vec));
-        self.execute(&sql, Some(Value::Object(vars)), namespace)
-            .await?;
-        Ok(())
-    }
-
-    async fn count_facts(&self, namespace: &str) -> Result<usize, MemoryError> {
-        let result = self
-            .execute("SELECT count() FROM fact GROUP ALL", None, namespace)
-            .await?;
-        if let Some(arr) = result.as_array()
-            && let Some(first) = arr.first()
-            && let Some(obj) = first.as_object()
-            && let Some(count) = obj.get("count").and_then(|v: &Value| v.as_u64())
-        {
-            return Ok(count as usize);
-        }
-        Ok(0)
-    }
-}
-
-/// Parses a SurrealDB result array of `{id, content}` objects into a Vec.
-fn parse_id_content_rows(result: &Value) -> Result<Vec<(String, String)>, MemoryError> {
-    let mut facts = Vec::new();
-    if let Some(arr) = result.as_array() {
-        for item in arr {
-            if let Some(obj) = item.as_object() {
-                let id = obj
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                let content = obj
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                facts.push((id, content));
-            }
-        }
-    }
-    Ok(facts)
 }
 
 fn validate_table_name(table: &str) -> Result<(), MemoryError> {
@@ -2194,6 +1760,7 @@ fn validate_table_name(table: &str) -> Result<(), MemoryError> {
         "episode",
         "event_log",
         "fact",
+        "query_log",
         "script_migration",
         "task",
     ];
@@ -2294,16 +1861,39 @@ fn build_select_facts_filtered_query(
     query_contains: Option<&str>,
     limit: i32,
 ) -> (String, Value) {
+    build_select_facts_filtered_advanced_query(scope, cutoff, query_contains, limit, None, &[])
+}
+
+fn build_select_facts_filtered_advanced_query(
+    scope: &str,
+    cutoff: &str,
+    query_contains: Option<&str>,
+    limit: i32,
+    project: Option<&str>,
+    fact_types: &[String],
+) -> (String, Value) {
     let cutoff_expr = "type::datetime($cutoff)";
-    let base_where = format!(
+    let mut where_clauses = vec![format!(
         "scope = $scope AND t_valid <= {cutoff_expr} AND (t_ingested IS NONE OR t_ingested <= {cutoff_expr}) AND (t_invalid IS NONE OR t_invalid > {cutoff_expr} OR t_invalid_ingested > {cutoff_expr})"
-    );
+    )];
 
     let mut vars = serde_json::Map::from_iter([
         ("scope".to_string(), json!(scope)),
         ("cutoff".to_string(), json!(cutoff)),
         ("limit".to_string(), json!(limit)),
     ]);
+
+    if let Some(project) = project.filter(|project| !project.trim().is_empty()) {
+        vars.insert("project".to_string(), json!(project));
+        where_clauses.push("project = $project".to_string());
+    }
+
+    if !fact_types.is_empty() {
+        vars.insert("fact_types".to_string(), json!(fact_types));
+        where_clauses.push("fact_type IN $fact_types".to_string());
+    }
+
+    let base_where = where_clauses.join(" AND ");
 
     let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
         vars.insert("query".to_string(), json!(query));
@@ -2318,17 +1908,6 @@ fn build_select_facts_filtered_query(
     };
 
     (sql, Value::Object(vars))
-}
-
-fn build_select_episodes_by_content_query(scope: &str, query: &str, limit: i32) -> (String, Value) {
-    (
-        "SELECT *, search::score(1) AS ft_score FROM episode WHERE scope = $scope AND content @1@ $query ORDER BY ft_score DESC, t_ref DESC, episode_id ASC LIMIT $limit".to_string(),
-        json!({
-            "scope": scope,
-            "query": query,
-            "limit": limit,
-        }),
-    )
 }
 
 fn build_select_facts_by_entity_links_query(
@@ -2365,7 +1944,7 @@ fn build_select_facts_ann_query(
            AND t_valid <= type::datetime($cutoff) \
            AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
            AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) \
-           AND embedding <|{limit}, {ef_search}|> $query_vec \
+           AND embedding <|${limit}, {ef_search}|> $query_vec \
          ORDER BY sem_score DESC \
          LIMIT $limit"
     );
@@ -2403,6 +1982,102 @@ fn build_select_active_facts_by_episode_query(
         "SELECT * FROM fact WHERE source_episode = $episode_id AND (t_invalid IS NONE OR t_invalid IS NULL OR t_invalid > type::datetime($cutoff)) LIMIT $limit".to_string(),
         json!({"episode_id": episode_id, "cutoff": cutoff, "limit": limit}),
     )
+}
+
+fn build_select_episodes_by_content_query(
+    scope: &str,
+    cutoff: &str,
+    query_contains: Option<&str>,
+    limit: i32,
+) -> (String, Value) {
+    build_select_episodes_by_content_advanced_query(scope, cutoff, query_contains, limit, None)
+}
+
+fn build_select_episodes_by_content_advanced_query(
+    scope: &str,
+    cutoff: &str,
+    query_contains: Option<&str>,
+    limit: i32,
+    project: Option<&str>,
+) -> (String, Value) {
+    let mut where_clauses = vec![
+        "scope = $scope AND t_ref <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff))".to_string(),
+    ];
+
+    let mut vars = serde_json::Map::from_iter([
+        ("scope".to_string(), json!(scope)),
+        ("cutoff".to_string(), json!(cutoff)),
+        ("limit".to_string(), json!(limit)),
+    ]);
+
+    if let Some(project) = project.filter(|project| !project.trim().is_empty()) {
+        vars.insert("project".to_string(), json!(project));
+        where_clauses.push("project = $project".to_string());
+    }
+
+    let base_where = where_clauses.join(" AND ");
+
+    let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
+        vars.insert("query".to_string(), json!(query.to_lowercase()));
+        format!(
+            "SELECT * FROM episode WHERE {base_where} AND string::contains(string::lowercase(content), $query) ORDER BY t_ref DESC, episode_id ASC LIMIT $limit"
+        )
+    } else {
+        format!(
+            "SELECT * FROM episode WHERE {base_where} ORDER BY t_ref DESC, episode_id ASC LIMIT $limit"
+        )
+    };
+
+    (sql, Value::Object(vars))
+}
+
+fn filter_records_by_project_and_fact_types(
+    records: Vec<Value>,
+    project: Option<&str>,
+    fact_types: &[String],
+) -> Vec<Value> {
+    records
+        .into_iter()
+        .filter(|record| record_matches_project(record, project))
+        .filter(|record| record_matches_fact_type(record, fact_types))
+        .collect()
+}
+
+fn filter_records_by_project(records: Vec<Value>, project: Option<&str>) -> Vec<Value> {
+    records
+        .into_iter()
+        .filter(|record| record_matches_project(record, project))
+        .collect()
+}
+
+fn record_matches_project(record: &Value, project: Option<&str>) -> bool {
+    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
+        return true;
+    };
+
+    record_object(record)
+        .and_then(|map| map.get("project"))
+        .and_then(json_string)
+        .is_some_and(|value| value == project)
+}
+
+fn record_matches_fact_type(record: &Value, fact_types: &[String]) -> bool {
+    if fact_types.is_empty() {
+        return true;
+    }
+
+    record_object(record)
+        .and_then(|map| map.get("fact_type"))
+        .and_then(json_string)
+        .is_some_and(|value| fact_types.iter().any(|fact_type| fact_type == value))
+}
+
+fn record_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
+    if let Some(map) = record.as_object() {
+        Some(map)
+    } else {
+        record.get("Object").and_then(Value::as_object)
+    }
 }
 
 fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
@@ -2458,7 +2133,7 @@ fn build_select_edge_neighbors_query(
 
     (
         format!(
-            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND type::datetime(t_valid) <= type::datetime($cutoff) AND (t_ingested IS NONE OR type::datetime(t_ingested) <= type::datetime($cutoff)) AND (t_invalid IS NONE OR type::datetime(t_invalid) > type::datetime($cutoff) OR type::datetime(t_invalid_ingested) > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC"
+            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC"
         ),
         json!({"node_id": node_id, "cutoff": cutoff}),
     )
@@ -2533,7 +2208,6 @@ fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
         "event_log" => &["ts"],
         "task" => &["due_date"],
         "script_migration" => &["executed_at"],
-        "draft_ingestion" => &["created_at", "expires_at"],
         _ => &[],
     }
 }
@@ -2563,13 +2237,8 @@ fn build_set_assignments(
                 }
             }
         } else {
-            match value {
-                Value::Null => assignments.push(format!("{key} = NONE")),
-                other => {
-                    vars.insert(key.clone(), other);
-                    assignments.push(format!("{key} = ${key}"));
-                }
-            }
+            vars.insert(key.clone(), value);
+            assignments.push(format!("{key} = ${key}"));
         }
     }
 
@@ -3260,24 +2929,8 @@ mod tests {
             "startup migration registry should include the datetime coercion follow-up migration"
         );
         assert!(
-            file_names.contains(&"011_ingestion_draft.surql"),
-            "startup migration registry should include the ingestion draft migration"
-        );
-        assert!(
-            file_names.contains(&"012_app_sessions.surql"),
-            "startup migration registry should include the app sessions migration"
-        );
-        assert!(
-            file_names.contains(&"013_fact_index_keys_fts.surql"),
-            "startup migration registry should include the fact index keys FTS migration"
-        );
-        assert!(
-            file_names.contains(&"014_fact_entity_links_typed.surql"),
-            "startup migration registry should include the typed entity links migration"
-        );
-        assert!(
-            file_names.contains(&"015_episode_content_fts.surql"),
-            "startup migration registry should include the episode content FTS fallback migration"
+            file_names.contains(&"017_edge_origin.surql"),
+            "startup migration registry should include the edge-origin follow-up migration"
         );
     }
 
@@ -3287,8 +2940,8 @@ mod tests {
 
         assert_eq!(
             migrations.len(),
-            10,
-            "runtime migration registry should include redesign, archival, semantic embedding, adaptive memory, datetime coercion, ingestion draft, app sessions, fact index keys FTS, typed entity links, and episode content FTS"
+            8,
+            "runtime migration registry should include redesign, archival, semantic embedding, adaptive memory, datetime coercion, project-tag, edge-origin, and query-log upgrades"
         );
         assert_eq!(
             migrations[0].file_name,
@@ -3307,11 +2960,9 @@ mod tests {
             migrations[4].file_name,
             "010_coerce_t_ingested_to_datetime.surql"
         );
-        assert_eq!(migrations[5].file_name, "011_ingestion_draft.surql");
-        assert_eq!(migrations[6].file_name, "012_app_sessions.surql");
-        assert_eq!(migrations[7].file_name, "013_fact_index_keys_fts.surql");
-        assert_eq!(migrations[8].file_name, "014_fact_entity_links_typed.surql");
-        assert_eq!(migrations[9].file_name, "015_episode_content_fts.surql");
+        assert_eq!(migrations[5].file_name, "016_project_tag.surql");
+        assert_eq!(migrations[6].file_name, "017_edge_origin.surql");
+        assert_eq!(migrations[7].file_name, "018_query_log.surql");
     }
 
     #[test]
@@ -3363,6 +3014,19 @@ mod tests {
         assert!(
             migration_has_statements(migration.sql),
             "migration 010 must stay executable for existing databases"
+        );
+    }
+
+    #[test]
+    fn versioned_migration_017_contains_executable_statements() {
+        let migration = versioned_migrations()
+            .iter()
+            .find(|migration| migration.file_name == "017_edge_origin.surql")
+            .expect("migration 017 should be registered");
+
+        assert!(
+            migration_has_statements(migration.sql),
+            "migration 017 must stay executable for existing databases"
         );
     }
 
@@ -3548,8 +3212,7 @@ mod tests {
         );
 
         assert!(sql.contains("out = <record> $node_id"));
-        assert!(sql.contains("type::datetime(t_valid) <= type::datetime($cutoff)"));
-        assert!(sql.contains("type::datetime(t_ingested) <= type::datetime($cutoff)"));
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
         assert!(sql.contains("ORDER BY in ASC, out ASC, t_valid DESC"));
         assert_eq!(
             vars,
@@ -3601,21 +3264,9 @@ mod tests {
             5,
         );
 
-        assert!(sql.contains("search::score(1) AS ft_score"));
+        assert!(sql.contains("search::score("));
         assert!(sql.contains("ORDER BY ft_score DESC, t_valid DESC, fact_id ASC"));
         assert_eq!(vars.get("query"), Some(&json!("atlas launch")));
-    }
-
-    #[test]
-    fn build_select_episodes_by_content_query_uses_fulltext_search() {
-        let (sql, vars) = build_select_episodes_by_content_query("org", "osmp nutanix", 7);
-
-        assert!(sql.contains("FROM episode WHERE scope = $scope AND content @1@ $query"));
-        assert!(sql.contains("search::score(1) AS ft_score"));
-        assert!(sql.contains("ORDER BY ft_score DESC, t_ref DESC, episode_id ASC"));
-        assert_eq!(vars.get("scope"), Some(&json!("org")));
-        assert_eq!(vars.get("query"), Some(&json!("osmp nutanix")));
-        assert_eq!(vars.get("limit"), Some(&json!(7)));
     }
 
     #[test]
@@ -3709,94 +3360,5 @@ mod tests {
         assert_eq!(vars.get("episode_id"), Some(&json!("episode:abc")));
         assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
         assert_eq!(vars.get("limit"), Some(&json!(1)));
-    }
-
-    #[test]
-    fn parse_id_content_rows_parses_array() {
-        let result = json!([
-            {"id": "fact:1", "content": "content 1"},
-            {"id": "fact:2", "content": "content 2"},
-        ]);
-        let rows = parse_id_content_rows(&result).unwrap();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].0, "fact:1");
-        assert_eq!(rows[0].1, "content 1");
-    }
-
-    #[test]
-    fn parse_id_content_rows_handles_empty_array() {
-        let result = json!([]);
-        let rows = parse_id_content_rows(&result).unwrap();
-        assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn parse_id_content_rows_handles_non_array() {
-        let result = json!({"key": "value"});
-        let rows = parse_id_content_rows(&result).unwrap();
-        assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn temporal_field_names_for_table_episode() {
-        let fields = temporal_field_names_for_table("episode");
-        assert!(fields.contains(&"t_ref"));
-        assert!(fields.contains(&"t_ingested"));
-        assert!(fields.contains(&"archived_at"));
-    }
-
-    #[test]
-    fn temporal_field_names_for_table_fact() {
-        let fields = temporal_field_names_for_table("fact");
-        assert!(fields.contains(&"t_valid"));
-        assert!(fields.contains(&"t_ingested"));
-        assert!(fields.contains(&"t_invalid"));
-        assert!(fields.contains(&"t_invalid_ingested"));
-        assert!(fields.contains(&"last_accessed"));
-    }
-
-    #[test]
-    fn temporal_field_names_for_table_unknown() {
-        let fields = temporal_field_names_for_table("unknown_table");
-        assert!(fields.is_empty());
-    }
-
-    #[test]
-    fn temporal_field_names_for_table_community() {
-        let fields = temporal_field_names_for_table("community");
-        assert!(fields.contains(&"updated_at"));
-    }
-
-    #[test]
-    fn build_set_assignments_handles_temporal_fields() {
-        let mut map = serde_json::Map::new();
-        map.insert("content".to_string(), json!("test content"));
-        map.insert("t_valid".to_string(), json!("2025-01-15T00:00:00Z"));
-        map.insert("t_invalid".to_string(), Value::Null);
-
-        let (assignments, vars) = build_set_assignments("fact", map);
-
-        assert!(assignments.iter().any(|a| a.contains("content = $content")));
-        assert!(
-            assignments
-                .iter()
-                .any(|a| a.contains("t_valid = type::datetime($t_valid)"))
-        );
-        assert!(assignments.iter().any(|a| a.contains("t_invalid = NONE")));
-        assert!(vars.contains_key("content"));
-        assert!(vars.contains_key("t_valid"));
-    }
-
-    #[test]
-    fn build_set_assignments_handles_non_temporal_fields() {
-        let mut map = serde_json::Map::new();
-        map.insert("name".to_string(), json!("Alice"));
-        map.insert("age".to_string(), json!(30));
-
-        let (assignments, vars) = build_set_assignments("entity", map);
-
-        assert!(assignments.iter().any(|a| a.contains("name = $name")));
-        assert!(assignments.iter().any(|a| a.contains("age = $age")));
-        assert_eq!(vars.len(), 2);
     }
 }

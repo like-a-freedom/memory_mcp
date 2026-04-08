@@ -37,6 +37,11 @@ pub fn bucket_to_hour(dt: DateTime<Utc>) -> String {
 /// Preprocess a search query by stripping episode references, boolean operators,
 /// quoted phrases, and collapsing whitespace.
 pub fn preprocess_search_query(raw: &str) -> String {
+    search_query_terms(raw).join(" ")
+}
+
+/// Extract normalized search terms from a natural-language query.
+pub fn search_query_terms(raw: &str) -> Vec<String> {
     static EPISODE_REF: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static QUOTED: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
 
@@ -50,17 +55,89 @@ pub fn preprocess_search_query(raw: &str) -> String {
     let s = quoted_re.replace_all(&s, " $1 ");
 
     s.split_whitespace()
-        .filter(|w| {
-            let upper = w.to_uppercase();
-            upper != "OR" && upper != "AND" && upper != "NOT" && w.len() >= 2
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+        .flat_map(|token| token.split(|character: char| !character.is_alphanumeric()))
+        .filter_map(normalize_search_term)
+        .collect()
+}
+
+fn normalize_search_term(raw: &str) -> Option<String> {
+    let token = raw.trim().to_ascii_lowercase();
+    if token.len() < 2 {
+        return None;
+    }
+
+    if matches!(token.as_str(), "or" | "and" | "not") || is_search_stopword(&token) {
+        return None;
+    }
+
+    Some(token)
+}
+
+fn is_search_stopword(token: &str) -> bool {
+    matches!(
+        token,
+        "a" | "an"
+            | "are"
+            | "as"
+            | "at"
+            | "be"
+            | "did"
+            | "do"
+            | "does"
+            | "for"
+            | "from"
+            | "get"
+            | "give"
+            | "given"
+            | "go"
+            | "going"
+            | "gone"
+            | "had"
+            | "has"
+            | "have"
+            | "how"
+            | "in"
+            | "into"
+            | "is"
+            | "it"
+            | "its"
+            | "likely"
+            | "made"
+            | "make"
+            | "of"
+            | "on"
+            | "said"
+            | "say"
+            | "that"
+            | "the"
+            | "their"
+            | "them"
+            | "there"
+            | "these"
+            | "this"
+            | "tell"
+            | "to"
+            | "told"
+            | "took"
+            | "take"
+            | "was"
+            | "were"
+            | "what"
+            | "when"
+            | "where"
+            | "which"
+            | "who"
+            | "why"
+            | "with"
+            | "would"
+    )
 }
 
 /// Calculate decayed confidence based on fact age.
 pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64 {
-    let half_life_days = if fact.fact_type == "metric" || fact.fact_type == "promise" {
+    let half_life_days = if fact.fact_type == crate::models::FACT_TYPE_METRIC
+        || fact.fact_type == crate::models::FACT_TYPE_PROMISE
+    {
         super::METRIC_HALF_LIFE_DAYS
     } else {
         super::DEFAULT_HALF_LIFE_DAYS
@@ -130,20 +207,26 @@ mod tests {
     #[test]
     fn preprocess_search_query_handles_quoted_phrases() {
         let result = preprocess_search_query(r#"search "quoted phrase" terms"#);
-        assert!(result.contains("quoted"));
-        assert!(result.contains("phrase"));
+        assert_eq!(result, "search quoted phrase terms");
     }
 
     #[test]
-    fn preprocess_search_query_drops_short_words() {
-        let result = preprocess_search_query("a an I be to of query");
-        assert_eq!(result, "an be to of query");
+    fn preprocess_search_query_drops_question_stopwords_and_short_words() {
+        let result = preprocess_search_query("What did a user say in the group?");
+        assert_eq!(result, "user group");
     }
 
     #[test]
     fn preprocess_search_query_case_insensitive_episode_ref() {
         let result = preprocess_search_query("test EPISODE:ABC123 query");
         assert_eq!(result, "test query");
+    }
+
+    #[test]
+    fn search_query_terms_normalize_case_and_punctuation() {
+        let result = search_query_terms("When did Caroline go to the LGBTQ support group?");
+
+        assert_eq!(result, vec!["caroline", "lgbtq", "support", "group"]);
     }
 
     #[test]
@@ -154,7 +237,6 @@ mod tests {
             content: "test".to_string(),
             quote: "test".to_string(),
             source_episode: "episode:1".to_string(),
-            t_ref: None,
             t_valid: Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap(),
             t_ingested: Utc::now(),
             t_invalid: None,
@@ -182,7 +264,6 @@ mod tests {
             content: "test".to_string(),
             quote: "test".to_string(),
             source_episode: "episode:1".to_string(),
-            t_ref: None,
             t_valid: Utc.with_ymd_and_hms(2023, 7, 1, 0, 0, 0).unwrap(),
             t_ingested: Utc::now(),
             t_invalid: None,
@@ -210,7 +291,6 @@ mod tests {
             content: "test".to_string(),
             quote: "test".to_string(),
             source_episode: "episode:1".to_string(),
-            t_ref: None,
             t_valid: Utc::now(),
             t_ingested: Utc::now(),
             t_invalid: None,

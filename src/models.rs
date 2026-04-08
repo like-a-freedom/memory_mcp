@@ -95,6 +95,8 @@ pub struct IngestRequest {
     pub t_ref: DateTime<Utc>,
     #[serde(default = "default_scope")]
     pub scope: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
     pub t_ingested: Option<DateTime<Utc>>,
     pub visibility_scope: Option<String>,
     #[serde(default)]
@@ -109,6 +111,7 @@ pub struct EpisodeInput {
     pub content: String,
     pub t_ref: DateTime<Utc>,
     pub scope: String,
+    pub project: Option<String>,
     pub uri: Option<String>,
 }
 
@@ -120,6 +123,7 @@ pub struct ExplainRequest {
 
 /// A single item to explain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_id: Option<String>,
@@ -139,6 +143,8 @@ pub struct ExplainItem {
     /// All provenance sources for this fact (direct + linked episodes).
     #[serde(default)]
     pub all_sources: Vec<ProvenanceSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graph_insights: Option<GraphInsights>,
 }
 
 impl Default for ExplainItem {
@@ -154,12 +160,14 @@ impl Default for ExplainItem {
             provenance: serde_json::Value::Null,
             citation_context: None,
             all_sources: Vec::new(),
+            graph_insights: None,
         }
     }
 }
 
 /// A single provenance source for a fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProvenanceSource {
     /// Source episode ID.
     pub episode_id: String,
@@ -172,6 +180,38 @@ pub struct ProvenanceSource {
     /// Entity link path (if relationship is "linked").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_path: Option<String>,
+}
+
+/// Ranked hub entities and cross-community paths relevant to an explained fact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphInsights {
+    #[serde(default)]
+    pub hub_entities: Vec<GraphHubEntity>,
+    #[serde(default)]
+    pub surprising_connections: Vec<SurprisingConnection>,
+}
+
+/// A high-degree entity in the current graph neighborhood.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphHubEntity {
+    pub entity_id: String,
+    pub canonical_name: String,
+    pub degree: usize,
+}
+
+/// A short cross-community path that may reveal a non-obvious connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SurprisingConnection {
+    pub source_entity_id: String,
+    pub source_entity_name: String,
+    pub target_entity_id: String,
+    pub target_entity_name: String,
+    pub hop_count: usize,
+    #[serde(default)]
+    pub path: Vec<String>,
 }
 
 /// Request to extract entities and facts from an episode.
@@ -202,6 +242,10 @@ pub struct InvalidateRequest {
 pub struct AssembleContextRequest {
     pub query: String,
     pub scope: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+    #[serde(default)]
+    pub fact_types: Vec<String>,
     pub as_of: Option<DateTime<Utc>>,
     #[serde(default = "default_budget")]
     pub budget: i32,
@@ -240,13 +284,27 @@ pub struct ExtractedLink {
     pub episode_id: String,
 }
 
+pub const FACT_TYPE_NOTE: &str = "note";
+pub const FACT_TYPE_METRIC: &str = "metric";
+pub const FACT_TYPE_PROMISE: &str = "promise";
+pub const FACT_TYPE_EXPERIENCE: &str = "experience";
+pub const STANDARD_FACT_TYPES: &[&str] = &[
+    FACT_TYPE_NOTE,
+    FACT_TYPE_METRIC,
+    FACT_TYPE_PROMISE,
+    FACT_TYPE_EXPERIENCE,
+];
+
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExtractResult {
     pub episode_id: String,
     pub entities: Vec<ExtractedEntity>,
     pub facts: Vec<ExtractedFact>,
     pub links: Vec<ExtractedLink>,
+    #[serde(default)]
+    pub warnings: Vec<ContradictionWarning>,
 }
 
 impl ExtractResult {
@@ -257,8 +315,23 @@ impl ExtractResult {
     }
 }
 
+/// A non-blocking warning about a newly extracted fact that may contradict an active fact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ContradictionWarning {
+    pub fact_type: String,
+    pub new_fact_id: String,
+    pub conflicting_fact_id: String,
+    pub existing_content: String,
+    pub new_content: String,
+    #[serde(default)]
+    pub entity_ids: Vec<String>,
+    pub reason: String,
+}
+
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,
@@ -267,12 +340,8 @@ pub struct AssembledContextItem {
     pub confidence: f64,
     pub provenance: serde_json::Value,
     pub rationale: String,
-    /// Temporal anchor of the fact — ISO 8601. Use this to compute date differences.
-    #[serde(default)]
-    pub t_ref: Option<DateTime<Utc>>,
-    /// Validity interval start — ISO 8601. May differ from t_ref for retconned facts.
-    #[serde(default)]
-    pub t_valid: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retrieval_tier: Option<String>,
 }
 
 /// Defines allowed scope transitions.
@@ -360,40 +429,6 @@ pub struct Entity {
     pub aliases: Vec<String>,
 }
 
-/// Deserializes entity_links from either string IDs or SurrealDB record-ref JSON shapes.
-///
-/// SurrealDB may serialize typed record references in several ways when returning
-/// JSON: plain strings, `{"String": "entity:atlas"}`, `{"tb": "entity", "id": "atlas"}`,
-/// or `{"id": "entity:atlas"}`. This deserializer handles all forms.
-fn deserialize_entity_links<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let values = Vec::<serde_json::Value>::deserialize(deserializer)?;
-    Ok(values
-        .into_iter()
-        .filter_map(|value| match value {
-            serde_json::Value::String(s) => Some(s),
-            serde_json::Value::Object(map) => map
-                .get("String")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_string)
-                .or_else(|| {
-                    map.get("tb")
-                        .and_then(serde_json::Value::as_str)
-                        .zip(map.get("id").and_then(serde_json::Value::as_str))
-                        .map(|(tb, id)| format!("{tb}:{id}"))
-                })
-                .or_else(|| {
-                    map.get("id")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_string)
-                }),
-            _ => None,
-        })
-        .collect())
-}
-
 /// A fact represents a piece of knowledge extracted from an episode.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Fact {
@@ -402,10 +437,6 @@ pub struct Fact {
     pub content: String,
     pub quote: String,
     pub source_episode: String,
-    /// Reference timestamp — when the source episode was anchored.
-    /// For facts created before this field was added, falls back to t_valid at deserialization.
-    #[serde(default)]
-    pub t_ref: Option<DateTime<Utc>>,
     pub t_valid: DateTime<Utc>,
     pub t_ingested: DateTime<Utc>,
     pub t_invalid: Option<DateTime<Utc>>,
@@ -417,13 +448,22 @@ pub struct Fact {
     pub access_count: i64,
     #[serde(default)]
     pub last_accessed: Option<DateTime<Utc>>,
-    #[serde(default, deserialize_with = "deserialize_entity_links")]
     pub entity_links: Vec<String>,
     pub scope: String,
     pub policy_tags: Vec<String>,
     pub provenance: serde_json::Value,
     /// Full-text search relevance score (only present for FTS results).
     pub ft_score: f64,
+}
+
+/// An edge represents a relationship between entities or facts.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgeOrigin {
+    #[default]
+    Extracted,
+    Inferred,
+    Ambiguous,
 }
 
 /// An edge represents a relationship between entities or facts.
@@ -434,6 +474,8 @@ pub struct Edge {
     pub relation: String,
     #[serde(rename = "out")]
     pub out_id: String,
+    #[serde(default)]
+    pub origin: EdgeOrigin,
     pub strength: f64,
     pub confidence: f64,
     pub provenance: serde_json::Value,
@@ -450,83 +492,6 @@ pub struct Community {
     pub member_entities: Vec<String>,
     pub summary: String,
     pub updated_at: DateTime<Utc>,
-}
-
-// --- MCP Apps models (§2.4, §4.2, §5.2, §6.2) ---
-
-/// Server-side session for MCP Apps (FR-COM-07, §2.4).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct AppSession {
-    pub session_id: String,
-    pub app_id: String,
-    pub scope: String,
-    pub access: serde_json::Value,
-    pub target: serde_json::Value,
-    pub state: String,
-    pub created_at: DateTime<Utc>,
-    pub last_active: DateTime<Utc>,
-    pub ttl_seconds: i64,
-}
-
-/// Result of an App action (§2.4).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct AppActionResult {
-    pub ok: bool,
-    pub message: String,
-    pub refresh_required: bool,
-    pub updated_targets: Vec<String>,
-    pub task_id: Option<String>,
-}
-
-/// App error for clients (§2.4).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct AppError {
-    pub code: String,
-    pub user_message: String,
-    pub debug_hint: String,
-}
-
-/// Draft ingestion record (§5.2).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct DraftIngestion {
-    pub draft_id: String,
-    pub scope: String,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-    pub access_ctx: serde_json::Value,
-}
-
-/// Draft item record (§5.2).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct DraftItem {
-    pub draft_id: String,
-    pub item_id: String,
-    pub item_type: String,
-    pub status: String,
-    pub payload: serde_json::Value,
-    pub original_payload: Option<serde_json::Value>,
-    pub confidence: f64,
-    pub rationale: Option<String>,
-    pub source_snippet: Option<String>,
-}
-
-/// Lifecycle filters (§6.2).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct LifecycleFilters {
-    pub min_confidence: Option<f64>,
-    pub max_confidence: Option<f64>,
-    pub inactive_days: Option<i32>,
-    pub include_archived: Option<bool>,
-}
-
-/// Diff filters (§4.2).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct DiffFilters {
-    pub only_facts: Option<bool>,
-    pub only_edges: Option<bool>,
-    pub only_active: Option<bool>,
-    pub only_policy_visible: Option<bool>,
 }
 
 #[must_use]

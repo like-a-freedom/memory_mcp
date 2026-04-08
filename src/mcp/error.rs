@@ -31,34 +31,6 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             ErrorCode::INTERNAL_ERROR,
             "Retry the request. If the problem persists, inspect server logs.",
         ),
-        MemoryError::SessionNotFound(_) => (
-            ErrorCode::INVALID_PARAMS,
-            "The session has expired or was not found. Re-open the app to get a new session.",
-        ),
-        MemoryError::SessionExpired(_) => (
-            ErrorCode::INVALID_PARAMS,
-            "The session expired. Re-open the app to get a new session.",
-        ),
-        MemoryError::SessionLimitExceeded => (
-            ErrorCode::INTERNAL_ERROR,
-            "Too many open sessions. Close unused sessions with close_session and retry.",
-        ),
-        MemoryError::DraftExpired(_) => (
-            ErrorCode::INVALID_PARAMS,
-            "The draft expired. Create a new ingestion review to continue.",
-        ),
-        MemoryError::ConfirmationRequired => (
-            ErrorCode::INVALID_PARAMS,
-            "This action requires confirmed: true to proceed.",
-        ),
-        MemoryError::App(_) => (
-            ErrorCode::INTERNAL_ERROR,
-            "An app error occurred. Check the error message and retry.",
-        ),
-        MemoryError::InvalidParameter(_) => (
-            ErrorCode::INVALID_PARAMS,
-            "Fix the input arguments and retry.",
-        ),
     };
     ErrorData::new(code, format!("{} Guidance: {guidance}", err), None)
 }

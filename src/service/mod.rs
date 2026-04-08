@@ -7,16 +7,13 @@
 //! - Context assembly for queries
 
 pub use anno_entity_extractor::AnnoEntityExtractor;
-pub use core::{AddFactRequest, MemoryService};
-pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider, LocalCandleEmbeddingProvider};
-pub use entity_extraction::{
-    EntityExtractor, LlmEntityExtractor, RegexEntityExtractor, create_entity_extractor,
-};
+pub use core::MemoryService;
+pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
+pub use entity_extraction::{EntityExtractor, LlmEntityExtractor, RegexEntityExtractor};
 pub use error::MemoryError;
-pub use gliner_entity_extractor::GlinerEntityExtractor;
 
 mod anno_entity_extractor;
-pub mod apps;
+mod apps;
 mod cache;
 mod context;
 mod core;
@@ -24,18 +21,11 @@ mod embedding;
 mod entity_extraction;
 mod episode;
 mod error;
-mod gliner_entity_extractor;
 mod ids;
+mod ingest;
 pub mod lifecycle;
-mod migration;
-pub mod model_loader;
 mod query;
-#[cfg(test)]
-mod test_support;
 mod validation;
-
-// APP modules extracted from core.rs for SRP compliance
-mod app_modules;
 
 pub use constants::*;
 mod constants {
@@ -58,9 +48,16 @@ pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
     deterministic_episode_id, deterministic_fact_id, hash_prefix,
 };
-pub use lifecycle::{run_archival_pass, run_decay_pass, spawn_archival_worker, spawn_decay_worker};
+#[cfg(feature = "cli-watch")]
+pub use ingest::watcher::FsWatcher;
+pub use lifecycle::{
+    run_archival_pass, run_community_rebuild_pass, run_decay_pass, spawn_archival_worker,
+    spawn_community_worker, spawn_decay_worker,
+};
 pub use query::{
     bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now, parse_iso,
     preprocess_search_query,
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+
+pub(crate) use core::log_event;

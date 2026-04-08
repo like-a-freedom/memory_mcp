@@ -57,26 +57,28 @@ The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
    - **target architecture / roadmap**
 4. The next engineering pass should focus on lifecycle automation, richer extraction quality, client-sharing throughput, and production deployment controls.
 
-## Remaining Work (HEAD-aligned)
+## Remaining Work (P2/P3)
 
-| Item | Status | Notes |
-| --- | --- | --- |
-| Entity → episode traversal bypasses `DbClient` | 📋 Planned (Wave 2) | Helper works, but storage logic still lives in `src/service/core.rs` |
-| `fact.entity_links` still uses string IDs | 📋 Planned (Wave 3) | Migration to typed record refs should preserve compatibility |
-| `embedding.rs` contains test-only dead helpers | 📋 Planned (Wave 4) | Remove only confirmed dead helpers, keep live providers |
-| MCP tool descriptions still have friction points | 📋 Planned (Wave 5) | Improve descriptions and invalid-parameter guidance without breaking schema |
-| Entity-graph expansion in `assemble_context` | 📋 Planned (Wave 6) | Wire NER → entity graph → fact lookup for multi-hop retrieval |
-| `AssembledContextItem` lacks temporal fields | 📋 Planned (Wave 7) | Add `t_ref`/`t_valid` for LLM temporal reasoning |
-| In-memory eval stability | 📋 Planned (Wave 8) | Per-batch recycling for SurrealDB embedded |
+### P2 — Memory Lifecycle (✅ Implemented)
 
-### Excluded from implementation
+| Task | Status | Location |
+|------|--------|----------|
+| Decay background worker | ✅ Implemented | `src/service/lifecycle/decay.rs` |
+| Episode archival worker | ✅ Implemented | `src/service/lifecycle/archival.rs` |
+| Configuration (env vars) | ✅ Implemented | `src/config.rs::LifecycleConfig` |
+| Service integration | ✅ Implemented | `src/service/core.rs::new_from_env()` |
+| Documentation | ✅ Implemented | `.env.example`, `README.md`, `LIFECYCLE_BACKGROUND_JOBS.md` |
 
-- GLiNER sigmoid before threshold — already fixed in `src/service/gliner_entity_extractor.rs`
-- BM25 snowball analyzer — already present in migrations
-- `suggested_next_action` — already covered by `guidance`
-- `find_episodes_via_entity` stub claim — outdated; helper exists in `src/service/core.rs`
-- Multi-hop reasoning chains — LLM-level concern; server provides 1-hop entity expansion (Wave 6)
-- Abstention tuning — LongMemEval oracle has no abstention test cases (dataset artifact)
+### P3 — Enhanced Provenance (✅ Implemented)
+
+| Task | Status | Location |
+|------|--------|----------|
+| Multi-source explain() | ✅ Implemented | `src/models.rs::ProvenanceSource`, `src/service/core.rs::collect_provenance_sources()` |
+| ProvenanceSource model | ✅ Implemented | `src/models.rs:147-161` |
+| Graph traversal for lineage | ✅ Implemented (stub) | `src/service/core.rs:863-882` |
+| Backward compatibility | ✅ Implemented | `ExplainItem.all_sources` with `#[serde(default)]` |
+
+**Note:** Entity-based episode lookup (`find_episodes_via_entity`) is currently a stub that returns empty results. Full implementation requires direct episode table query by entity_links.
 
 ## Execution Options
 

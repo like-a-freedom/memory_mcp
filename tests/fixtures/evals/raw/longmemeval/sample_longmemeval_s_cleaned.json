@@ -1,0 +1,34 @@
+[
+    {
+        "question_id": "e47becba",
+        "question_type": "single-session-user",
+        "question": "What degree did I graduate with?",
+        "question_date": "2023/05/30 (Tue) 23:40",
+        "answer": "Business Administration",
+        "answer_session_ids": [
+            "answer_280352e9"
+        ],
+        "haystack_dates": [
+            "2023/05/20 (Sat) 02:21",
+            "2023/05/30 (Tue) 17:27"
+        ],
+        "haystack_session_ids": [
+            "sharegpt_yywfIrx_0",
+            "answer_280352e9"
+        ],
+        "haystack_sessions": [
+            [
+                {
+                    "role": "user",
+                    "content": "The farmer needs to transport a fox, a chicken, and some grain across a river using a boat. The fox cannot be left alone with the chicken, and the chicken cannot be left alone with the grain. The boat can only hold one item at a time, and the river is too dangerous to cross multiple times. Can you help the farmer transport all three items across the river without any of them getting eaten? Remember, strategic thinking and planning are key to solving this puzzle. If you're stuck, try thinking about how you would solve the puzzle yourself, and use that as a starting point. Be careful not to leave the chicken alone with the fox, or the chicken and the grain alone together, as this will result in a failed solution. Good luck!"
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "I graduated with a degree in Business Administration, which has definitely helped me in my new role. Do you have any advice on how to stay organized when it comes to paperwork and documentation, especially when it comes to tracking expenses and reimbursements?"
+                }
+            ]
+        ]
+    }
+]

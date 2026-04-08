@@ -1,0 +1,41 @@
+{
+    "questions": [
+        {
+            "persona_id": 0,
+            "question_id": "acd74206-37dc-4756-94a8-b99a395d9a21",
+            "question_type": "recall_user_shared_facts",
+            "topic": "musicRecommendation",
+            "context_length_in_tokens": 26989,
+            "context_length_in_letters": 152394,
+            "distance_to_ref_in_blocks": 5,
+            "distance_to_ref_in_tokens": 25010,
+            "num_irrelevant_tokens": 0,
+            "distance_to_ref_proportion_in_context": "92.67%",
+            "user_question_or_message": "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+            "correct_answer": "(c)",
+            "all_options": "[\"(a) It's great to see such innovative approaches in music. Since you dislike anything involving music production, this must have been quite interesting to experience.\", \"(b) It's great to see such innovative approaches in music. I imagine it must have been quite an experience for anyone who loves unique blends or eclectic sounds.\", \"(c) It's great to see such innovative approaches in music. Since you like producing music with software, this must have been quite interesting to experience.\", \"(d) It's great to see such innovative approaches in art exhibitions. Since you like producing music with software, this must have been quite interesting to experience.\"]",
+            "shared_context_id": "e898d03fec683b1cabf29f57287ff66f8a31842543ecef44b56766844c1c1301",
+            "end_index_in_shared_context": 182
+        }
+    ],
+    "shared_contexts": {
+        "e898d03fec683b1cabf29f57287ff66f8a31842543ecef44b56766844c1c1301": [
+            {
+                "role": "system",
+                "content": "Current user persona: Name: Kanoa Manu   \nGender Identity: Male  \nRacial Identity: Pacific Islander  \n\nKanoa Manu is a 32-year-old software engineer with a passion for music and technology. Born to a family that cherished traditional Pacific Islander music, he has always been inspired to blend these rich cultural sounds with modern digital melodies. Currently, he is deeply involved in a project where he's experimenting with MIDI files, aiming to create a fusion of electronic and traditional music. Kanoa spends his weekends tinkering with various software tools and musical instruments, always looking for innovative ways to showcase his heritage through sound. His ultimate goal is to develop an app that helps musicians easily incorporate traditional Pacific sounds into contemporary music."
+            },
+            {
+                "role": "user",
+                "content": "User: Hi there! I've recently been diving deeper into my passion for music and technology. It's been quite a journey since I started creating digital music remixes. Every aspect of this process has been fascinating, from selecting the right software to getting the nuances of mixing different sounds to create something unique. I often find myself lost in the intricacies of audio layers, where a subtle change can completely transform a track. Additionally, the way technology evolves continues to inspire me, as new tools emerge that enhance both creativity and efficiency."
+            },
+            {
+                "role": "user",
+                "content": "User: This journey led me to produce an electronic track that beautifully blends modern beats with the enchanting sounds of Pacific Islander music, a fusion that reflects my deep appreciation for diverse musical traditions. I spent countless hours experimenting in my home studio, layering samples that resonated with the heart and soul of the Pacific Islands, a place rich with cultural history and vibrant artistry. The experience was transformative, as each beat and melody captured the essence of the tropical landscapes, vibrant dances, and the stories passed down through generations. The electronic elements added a contemporary twist, making the track something unique that could appeal to both the purists of more traditional genres and the younger crowds who gravitate towards electronic music. This endeavor felt not just like a musical project but a bridge connecting different worlds and celebrating the richness of cultural exchange."
+            },
+            {
+                "role": "user",
+                "content": "User: I was so thrilled to see that fusion in action! The blend of traditional Pacific sounds with modern beats created a captivating experience that resonated deeply with the audience. It showcased the power of music to transcend cultural boundaries and united us through rhythmic expression. Experiencing those harmonies live was exhilarating, as the energy in the room was palpable, sparking joy and excitement among everyone present. Additionally, I remember discussing this innovative approach with fellow attendees, who shared their own insights and interpretations of the music, further enriching the experience."
+            }
+        ]
+    }
+}

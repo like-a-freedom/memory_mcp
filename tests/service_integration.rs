@@ -5,9 +5,40 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::service::EntityExtractor;
 use memory_mcp::storage::DbClient;
-use serde_json::json;
+use serde_json::{Value, json};
 
 mod common;
+
+fn json_bool(value: &Value) -> Option<bool> {
+    value
+        .as_bool()
+        .or_else(|| value.get("Bool").and_then(|inner| inner.as_bool()))
+}
+
+async fn seed_query_log_row(
+    db_client: &std::sync::Arc<memory_mcp::storage::SurrealDbClient>,
+    namespace: &str,
+    record_id: &str,
+    logged_at: chrono::DateTime<Utc>,
+    query: &str,
+) {
+    db_client
+        .create(
+            record_id,
+            json!({
+                "query_log_id": record_id,
+                "logged_at": memory_mcp::service::normalize_dt(logged_at),
+                "scope": namespace,
+                "query": query,
+                "result_count": 1,
+                "latency_ms": 1.0,
+                "cache_hit": false,
+            }),
+            namespace,
+        )
+        .await
+        .expect("seed query_log row should succeed");
+}
 
 #[tokio::test]
 async fn test_service_ingest_and_extract_flow() {
@@ -19,6 +50,7 @@ async fn test_service_ingest_and_extract_flow() {
         content: "Meeting with Alice Inc and Bob Corp. Discussed ARR growth to $5M. Alice will deliver the prototype by Friday.".to_string(),
         t_ref: Utc::now(),
         scope: "org".to_string(),
+        project: None,
         t_ingested: None,
         visibility_scope: None,
         policy_tags: vec![],
@@ -51,7 +83,7 @@ async fn test_service_resolve_and_relate_entities() {
 }
 
 #[tokio::test]
-async fn test_service_relate_persists_native_edge_endpoints() {
+async fn test_service_relate_persists_native_edge_endpoints_and_inferred_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
     let alice_id = service.resolve_person("Alice Smith").await.unwrap();
@@ -71,6 +103,7 @@ async fn test_service_relate_persists_native_edge_endpoints() {
 
     assert_eq!(edge.get("in"), Some(&to_record_id(&alice_id)));
     assert_eq!(edge.get("out"), Some(&to_record_id(&bob_id)));
+    assert_eq!(edge.get("origin"), Some(&json!("inferred")));
 }
 
 #[tokio::test]
@@ -79,27 +112,29 @@ async fn test_service_add_fact_and_assemble_context() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    let _fact_id = common::add_fact(
-        &service,
-        "metric",
-        "ARR reached $5M in Q4 2023",
-        "ARR reached $5M",
-        "episode:test",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec!["finance".to_string()],
-        json!({"quarter": "Q4", "year": 2023}),
-    )
-    .await
-    .unwrap();
+    let _fact_id = service
+        .add_fact(
+            "metric",
+            "ARR reached $5M in Q4 2023",
+            "ARR reached $5M",
+            "episode:test",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec!["finance".to_string()],
+            json!({"quarter": "Q4", "year": 2023}),
+        )
+        .await
+        .unwrap();
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "ARR metric".to_string(),
         scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,
@@ -122,21 +157,21 @@ async fn test_service_add_fact_persists_provenance() {
         "ingest": {"source_type": "email", "source_id": "prov-1"}
     });
 
-    let fact_id = common::add_fact(
-        &service,
-        "metric",
-        "ARR reached $7M",
-        "ARR reached $7M",
-        "episode:provenance",
-        Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
-        "org",
-        0.95,
-        vec![],
-        vec![],
-        provenance.clone(),
-    )
-    .await
-    .unwrap();
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR reached $7M",
+            "ARR reached $7M",
+            "episode:provenance",
+            Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
+            "org",
+            0.95,
+            vec![],
+            vec![],
+            provenance.clone(),
+        )
+        .await
+        .unwrap();
 
     let stored = db_client
         .select_one(&fact_id, "org")
@@ -147,7 +182,7 @@ async fn test_service_add_fact_persists_provenance() {
 }
 
 #[tokio::test]
-async fn test_service_extract_persists_edge_provenance() {
+async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
     let episode_id = service
@@ -158,6 +193,7 @@ async fn test_service_extract_persists_edge_provenance() {
                 content: "Meeting with Alice Smith about ARR goals".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2024, 3, 2, 12, 0, 0).unwrap(),
                 scope: "org".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -177,6 +213,98 @@ async fn test_service_extract_persists_edge_provenance() {
             .and_then(|value| value.get("source_episode"))
             == Some(&json!(episode_id))
     }));
+    assert!(
+        edges
+            .iter()
+            .all(|edge| edge.get("origin") == Some(&json!("extracted")))
+    );
+}
+
+#[tokio::test]
+async fn test_service_extract_returns_contradiction_warning_for_conflicting_metric_fact() {
+    let service = common::make_service().await;
+
+    let first_episode = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "chat".to_string(),
+                source_id: "contradiction-metric-1".to_string(),
+                content: "Alice Smith reports ARR is $5M.".to_string(),
+                t_ref: "2026-03-01T10:00:00Z"
+                    .parse()
+                    .expect("static timestamp should parse"),
+                scope: "personal".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest first episode");
+    let first_result = service.extract(&first_episode, None).await.unwrap();
+    let first_json = serde_json::to_value(&first_result).expect("serialize first extract result");
+
+    assert_eq!(
+        first_json
+            .get("warnings")
+            .and_then(|value| value.as_array())
+            .map(|warnings| warnings.len())
+            .unwrap_or(0),
+        0
+    );
+
+    let second_episode = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "chat".to_string(),
+                source_id: "contradiction-metric-2".to_string(),
+                content: "Alice Smith reports ARR is $7M.".to_string(),
+                t_ref: "2026-03-01T10:00:00Z"
+                    .parse()
+                    .expect("static timestamp should parse"),
+                scope: "personal".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest second episode");
+    let second_result = service.extract(&second_episode, None).await.unwrap();
+    let second_json =
+        serde_json::to_value(&second_result).expect("serialize second extract result");
+
+    let warnings = second_json
+        .get("warnings")
+        .and_then(|value| value.as_array())
+        .expect("warnings array should exist");
+    assert!(
+        !warnings.is_empty(),
+        "expected contradiction warning after conflicting metric extract, got {second_json}"
+    );
+
+    let warning = &warnings[0];
+    assert_eq!(warning.get("factType"), Some(&json!("metric")));
+    assert_eq!(
+        warning.get("conflictingFactId"),
+        Some(&json!(first_result.facts[0].fact_id.clone()))
+    );
+    assert_eq!(
+        warning.get("newFactId"),
+        Some(&json!(second_result.facts[0].fact_id.clone()))
+    );
+    assert_eq!(
+        warning.get("existingContent"),
+        Some(&json!("Alice Smith reports ARR is $5M."))
+    );
+    assert_eq!(
+        warning.get("newContent"),
+        Some(&json!("Alice Smith reports ARR is $7M."))
+    );
 }
 
 #[tokio::test]
@@ -258,6 +386,7 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
                 content: "Alice Smith reviewed ARR improvements".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
                 scope: "org".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -268,21 +397,21 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
         .unwrap();
 
     let entity_id = service.resolve_person("Alice Smith").await.unwrap();
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Alice Smith reviewed ARR improvements",
-        "Alice Smith reviewed ARR improvements",
-        &episode_id,
-        Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
-        "org",
-        0.8,
-        vec![entity_id.clone()],
-        vec![],
-        json!({"source_episode": episode_id}),
-    )
-    .await
-    .unwrap();
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Alice Smith reviewed ARR improvements",
+            "Alice Smith reviewed ARR improvements",
+            &episode_id,
+            Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
+            "org",
+            0.8,
+            vec![entity_id.clone()],
+            vec![],
+            json!({"source_episode": episode_id}),
+        )
+        .await
+        .unwrap();
 
     let episode = db_client
         .select_one(&episode_id, "org")
@@ -309,21 +438,21 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
 async fn test_service_assemble_context_without_provider_skips_semantic_similarity() {
     let service = common::make_service().await;
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Compensation increase approved for the engineering team",
-        "Compensation increase approved",
-        "episode:semantic-similarity",
-        Utc.with_ymd_and_hms(2024, 4, 3, 10, 0, 0).unwrap(),
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({"source_episode": "episode:semantic-similarity"}),
-    )
-    .await
-    .unwrap();
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Compensation increase approved for the engineering team",
+            "Compensation increase approved",
+            "episode:semantic-similarity",
+            Utc.with_ymd_and_hms(2024, 4, 3, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:semantic-similarity"}),
+        )
+        .await
+        .unwrap();
 
     let context = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
@@ -331,6 +460,8 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             scope: "org".to_string(),
             as_of: Some(Utc::now()),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -364,6 +495,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
                     content: content.to_string(),
                     t_ref: Utc.with_ymd_and_hms(2024, 4, 2, 10, 0, 0).unwrap(),
                     scope: "org".to_string(),
+                    project: None,
                     t_ingested: None,
                     visibility_scope: None,
                     policy_tags: vec![],
@@ -401,27 +533,29 @@ async fn test_service_fact_invalidation() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    let fact_id = common::add_fact(
-        &service,
-        "metric",
-        "ARR $3M",
-        "ARR $3M",
-        "episode:test",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .unwrap();
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR $3M",
+            "ARR $3M",
+            "episode:test",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     let request_before = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
         scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,
@@ -448,6 +582,8 @@ async fn test_service_fact_invalidation() {
         scope: "org".to_string(),
         as_of: Some(Utc.with_ymd_and_hms(2024, 12, 1, 0, 0, 0).unwrap()),
         budget: 10,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,
@@ -463,27 +599,29 @@ async fn test_service_cache_behavior() {
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    common::add_fact(
-        &service,
-        "note",
-        "Test content for caching",
-        "Test quote",
-        "episode:cache-test",
-        t_valid,
-        "org",
-        0.8,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .unwrap();
+    service
+        .add_fact(
+            "note",
+            "Test content for caching",
+            "Test quote",
+            "episode:cache-test",
+            t_valid,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "Test content".to_string(),
         scope: "org".to_string(),
         as_of: None,
         budget: 5,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,
@@ -500,21 +638,21 @@ async fn test_service_cache_behavior() {
 async fn test_service_assemble_context_records_fact_access_heat() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Heat tracking note for retrieval",
-        "Heat tracking note for retrieval",
-        "episode:heat-retrieval",
-        Utc::with_ymd_and_hms(&Utc, 2026, 3, 1, 10, 0, 0).unwrap(),
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({"source_episode": "episode:heat-retrieval"}),
-    )
-    .await
-    .unwrap();
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Heat tracking note for retrieval",
+            "Heat tracking note for retrieval",
+            "episode:heat-retrieval",
+            Utc::with_ymd_and_hms(&Utc, 2026, 3, 1, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:heat-retrieval"}),
+        )
+        .await
+        .unwrap();
 
     let items = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
@@ -522,6 +660,8 @@ async fn test_service_assemble_context_records_fact_access_heat() {
             scope: "org".to_string(),
             as_of: None,
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -546,48 +686,447 @@ async fn test_service_assemble_context_records_fact_access_heat() {
 }
 
 #[tokio::test]
+async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and_fresh() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Heat tracking note for retrieval",
+            "Heat tracking note for retrieval",
+            "episode:heat-cache",
+            Utc::with_ymd_and_hms(&Utc, 2026, 3, 2, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:heat-cache"}),
+        )
+        .await
+        .unwrap();
+
+    let as_of = Utc::now() + chrono::Duration::seconds(1);
+
+    let request = memory_mcp::models::AssembleContextRequest {
+        query: "heat tracking retrieval".to_string(),
+        scope: "org".to_string(),
+        as_of: Some(as_of),
+        budget: 5,
+        project: None,
+        fact_types: vec![],
+        view_mode: None,
+        window_start: None,
+        window_end: None,
+        access: None,
+    };
+
+    let first_items = service.assemble_context(request.clone()).await.unwrap();
+    assert!(first_items.iter().any(|item| item.fact_id == fact_id));
+
+    let stored_after_first = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .unwrap()
+        .expect("stored fact after fresh retrieval");
+
+    assert_eq!(
+        stored_after_first
+            .get("access_count")
+            .and_then(|value| value.as_i64()),
+        Some(1)
+    );
+    assert!(stored_after_first.get("last_accessed").is_some());
+
+    let second_items = service.assemble_context(request).await.unwrap();
+    assert!(second_items.iter().any(|item| item.fact_id == fact_id));
+
+    let stored_after_second = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .unwrap()
+        .expect("stored fact after cache-hit retrieval");
+
+    assert_eq!(
+        stored_after_second
+            .get("access_count")
+            .and_then(|value| value.as_i64()),
+        Some(2)
+    );
+    assert!(stored_after_second.get("last_accessed").is_some());
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_does_not_record_query_log_when_disabled_by_default() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    service
+        .add_fact(
+            "note",
+            "Default disabled query logging note",
+            "Default disabled query logging note",
+            "episode:query-log-default-off",
+            Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:query-log-default-off"}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "default disabled query logging".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(!items.is_empty());
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    assert!(
+        query_logs.is_empty(),
+        "query logging should stay disabled by default, got: {query_logs:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_records_query_log_with_tier_latency_and_result_count() {
+    let (service, db_client) = common::make_service_with_client_and_query_logging(true).await;
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Query analytics retrieval note",
+            "Query analytics retrieval note",
+            "episode:query-log-direct",
+            Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:query-log-direct"}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "query analytics retrieval".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    assert_eq!(
+        query_logs.len(),
+        1,
+        "expected one query_log row after one assemble_context call"
+    );
+
+    let row = query_logs.first().expect("query_log row should exist");
+    assert_eq!(
+        row.get("scope").and_then(|value| value.as_str()),
+        Some("org")
+    );
+    assert_eq!(
+        row.get("query").and_then(|value| value.as_str()),
+        Some("query analytics retrieval")
+    );
+    assert_eq!(
+        row.get("result_count").and_then(|value| value.as_i64()),
+        Some(1)
+    );
+    assert_eq!(
+        row.get("retrieval_tier").and_then(|value| value.as_str()),
+        Some("fallback")
+    );
+    assert_eq!(
+        row.get("cache_hit").and_then(json_bool),
+        Some(false),
+        "expected cache_hit=false in query_log row, got: {row:?}"
+    );
+    assert!(
+        row.get("latency_ms")
+            .and_then(|value| value.as_f64())
+            .is_some_and(|value| value >= 0.0),
+        "expected latency_ms to be recorded as a non-negative float, got: {row:?}"
+    );
+    assert!(row.get("logged_at").is_some());
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_records_query_log_for_cache_hit_queries() {
+    let (service, db_client) = common::make_service_with_client_and_query_logging(true).await;
+
+    service
+        .add_fact(
+            "note",
+            "Cache hit analytics retrieval",
+            "Cache hit analytics retrieval",
+            "episode:query-log-cache",
+            Utc.with_ymd_and_hms(2026, 4, 8, 11, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:query-log-cache"}),
+        )
+        .await
+        .unwrap();
+
+    let request = memory_mcp::models::AssembleContextRequest {
+        query: "cache hit analytics retrieval".to_string(),
+        scope: "org".to_string(),
+        as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+        budget: 5,
+        project: None,
+        fact_types: vec![],
+        view_mode: None,
+        window_start: None,
+        window_end: None,
+        access: None,
+    };
+
+    let first = service.assemble_context(request.clone()).await.unwrap();
+    let second = service.assemble_context(request).await.unwrap();
+
+    assert!(!first.is_empty());
+    assert!(!second.is_empty());
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    assert_eq!(
+        query_logs.len(),
+        2,
+        "expected fresh retrieval and cache hit to each create a query_log row"
+    );
+    assert_eq!(
+        query_logs
+            .iter()
+            .filter(|row| row.get("cache_hit").and_then(json_bool) == Some(false))
+            .count(),
+        1,
+        "expected exactly one fresh query_log row, got: {query_logs:?}"
+    );
+    assert_eq!(
+        query_logs
+            .iter()
+            .filter(|row| row.get("cache_hit").and_then(json_bool) == Some(true))
+            .count(),
+        1,
+        "expected exactly one cache-hit query_log row, got: {query_logs:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_prunes_query_logs_older_than_default_retention() {
+    let (service, db_client) = common::make_service_with_client_and_query_logging(true).await;
+
+    seed_query_log_row(
+        &db_client,
+        "org",
+        "query_log:stale-default-retention",
+        Utc::now() - chrono::Duration::days(91),
+        "stale default retention row",
+    )
+    .await;
+
+    service
+        .add_fact(
+            "note",
+            "Default retention pruning note",
+            "Default retention pruning note",
+            "episode:query-log-retention-default",
+            Utc.with_ymd_and_hms(2026, 4, 8, 13, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:query-log-retention-default"}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "default retention pruning".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 13, 5, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(!items.is_empty());
+    assert!(
+        db_client
+            .select_one("query_log:stale-default-retention", "org")
+            .await
+            .unwrap()
+            .is_none(),
+        "stale query_log row should be pruned by the default 90-day retention"
+    );
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    assert_eq!(
+        query_logs.len(),
+        1,
+        "expected stale row to be pruned and fresh row to remain, got: {query_logs:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_honors_custom_query_log_retention_days() {
+    let (service, db_client) = common::make_service_with_client_and_query_logging(true).await;
+    let service = service.with_query_log_retention_days(7);
+
+    seed_query_log_row(
+        &db_client,
+        "org",
+        "query_log:older-than-custom-retention",
+        Utc::now() - chrono::Duration::days(8),
+        "older than custom retention",
+    )
+    .await;
+    seed_query_log_row(
+        &db_client,
+        "org",
+        "query_log:within-custom-retention",
+        Utc::now() - chrono::Duration::days(6),
+        "within custom retention",
+    )
+    .await;
+
+    service
+        .add_fact(
+            "note",
+            "Custom retention pruning note",
+            "Custom retention pruning note",
+            "episode:query-log-retention-custom",
+            Utc.with_ymd_and_hms(2026, 4, 8, 14, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:query-log-retention-custom"}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "custom retention pruning".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 14, 5, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(!items.is_empty());
+    assert!(
+        db_client
+            .select_one("query_log:older-than-custom-retention", "org")
+            .await
+            .unwrap()
+            .is_none(),
+        "row older than custom retention should be pruned"
+    );
+    assert!(
+        db_client
+            .select_one("query_log:within-custom-retention", "org")
+            .await
+            .unwrap()
+            .is_some(),
+        "row inside custom retention window should be preserved"
+    );
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    assert_eq!(
+        query_logs.len(),
+        2,
+        "expected one preserved historical row plus one fresh row, got: {query_logs:?}"
+    );
+}
+
+#[tokio::test]
 async fn test_service_scope_isolation() {
     let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
-    common::add_fact(
-        &service,
-        "note",
-        "Org scope fact",
-        "Org quote",
-        "episode:org",
-        t_valid,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .unwrap();
+    service
+        .add_fact(
+            "note",
+            "Org scope fact",
+            "Org quote",
+            "episode:org",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
-    common::add_fact(
-        &service,
-        "note",
-        "Personal scope fact",
-        "Personal quote",
-        "episode:personal",
-        t_valid,
-        "personal",
-        0.9,
-        vec![],
-        vec![],
-        json!({}),
-    )
-    .await
-    .unwrap();
+    service
+        .add_fact(
+            "note",
+            "Personal scope fact",
+            "Personal quote",
+            "episode:personal",
+            t_valid,
+            "personal",
+            0.9,
+            vec![],
+            vec![],
+            json!({}),
+        )
+        .await
+        .unwrap();
 
     let request_org = memory_mcp::models::AssembleContextRequest {
         query: "scope fact".to_string(),
         scope: "org".to_string(),
         as_of: None,
         budget: 10,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,
@@ -629,6 +1168,8 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
             scope: "personal".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: Some("timeline".to_string()),
             window_start: Some(Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap()),
             window_end: Some(Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap()),
@@ -645,4 +1186,474 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
         contents,
         vec!["Atlas budget increased", "Atlas launch confirmed"]
     );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_filters_by_project_and_fact_type() {
+    let service = common::make_service().await;
+    let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
+
+    let atlas_episode = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "document".to_string(),
+                source_id: "project-atlas-budget".to_string(),
+                content: "Atlas budget source note".to_string(),
+                t_ref: t_valid,
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+                project: Some("atlas".to_string()),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let beacon_episode = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "document".to_string(),
+                source_id: "project-beacon-budget".to_string(),
+                content: "Beacon budget source note".to_string(),
+                t_ref: t_valid,
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+                project: Some("beacon".to_string()),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "metric",
+            "Atlas budget is $2M",
+            "Atlas budget is $2M",
+            &atlas_episode,
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": atlas_episode}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "promise",
+            "Atlas budget owner will review the plan",
+            "Atlas budget owner will review the plan",
+            &atlas_episode,
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": atlas_episode}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "metric",
+            "Beacon budget is $3M",
+            "Beacon budget is $3M",
+            &beacon_episode,
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": beacon_episode}),
+        )
+        .await
+        .unwrap();
+    let as_of = Utc::now() + chrono::Duration::seconds(1);
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "budget".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(as_of),
+            budget: 10,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            project: Some("atlas".to_string()),
+            fact_types: vec!["metric".to_string()],
+        })
+        .await
+        .unwrap();
+
+    let contents = items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(contents, vec!["Atlas budget is $2M"]);
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_appends_recent_experience_fact_after_primary_matches() {
+    let service = common::make_service().await;
+    let note_time = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
+    let experience_time = Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap();
+
+    let source_episode = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "document".to_string(),
+                source_id: "experience-primary-match".to_string(),
+                content: "Atlas source episode".to_string(),
+                t_ref: note_time,
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+                project: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "Atlas budget is $2M",
+            "Atlas budget is $2M",
+            &source_episode,
+            note_time,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": source_episode}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "experience",
+            "Alice prefers weekly launch updates",
+            "Alice prefers weekly launch updates",
+            &source_episode,
+            experience_time,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            json!({"source_episode": source_episode}),
+        )
+        .await
+        .unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "budget".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            project: None,
+            fact_types: vec![],
+        })
+        .await
+        .unwrap();
+
+    let contents = items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(items[0].content, "Atlas budget is $2M");
+    assert!(
+        contents.contains(&"Alice prefers weekly launch updates"),
+        "expected automatic experience fact inclusion, got {contents:?}"
+    );
+    assert_eq!(
+        items.last().map(|item| item.content.as_str()),
+        Some("Alice prefers weekly launch updates")
+    );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_scope() {
+    let service = common::make_service().await;
+    let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
+
+    for (source_id, content, project, policy_tags, t_ref) in [
+        (
+            "facet-atlas",
+            "Atlas roadmap note",
+            Some("atlas"),
+            Vec::<&str>::new(),
+            t_valid,
+        ),
+        (
+            "facet-persona",
+            "Persona note",
+            None,
+            vec!["persona"],
+            t_valid + chrono::Duration::minutes(1),
+        ),
+        (
+            "facet-org",
+            "Org note",
+            None,
+            Vec::<&str>::new(),
+            t_valid + chrono::Duration::minutes(2),
+        ),
+    ] {
+        service
+            .ingest(
+                memory_mcp::models::IngestRequest {
+                    source_type: "document".to_string(),
+                    source_id: source_id.to_string(),
+                    content: content.to_string(),
+                    t_ref,
+                    scope: "org".to_string(),
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: policy_tags.into_iter().map(str::to_string).collect(),
+                    project: project.map(str::to_string),
+                },
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    let as_of = Utc::now() + chrono::Duration::seconds(1);
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: String::new(),
+            scope: "org".to_string(),
+            as_of: Some(as_of),
+            budget: 10,
+            view_mode: Some("facets".to_string()),
+            window_start: None,
+            window_end: None,
+            access: None,
+            project: None,
+            fact_types: vec![],
+        })
+        .await
+        .unwrap();
+
+    let atlas = items
+        .iter()
+        .find(|item| item.content == "atlas")
+        .expect("atlas facet should exist");
+    let persona = items
+        .iter()
+        .find(|item| item.content == "persona")
+        .expect("persona facet should exist");
+    let org = items
+        .iter()
+        .find(|item| item.content == "org")
+        .expect("scope facet should exist");
+
+    assert_eq!(atlas.provenance.get("count"), Some(&json!(1)));
+    assert_eq!(persona.provenance.get("count"), Some(&json!(1)));
+    assert_eq!(org.provenance.get("count"), Some(&json!(1)));
+    assert!(atlas.rationale.contains("view_mode=facets"));
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent() {
+    let service = common::make_service().await;
+    let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "I prefer concise weekly digests",
+            "I prefer concise weekly digests",
+            "episode:persona",
+            t_valid,
+            "org",
+            0.9,
+            vec![],
+            vec!["persona".to_string()],
+            json!({"source_episode": "episode:persona"}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "Old checklist note",
+            "Old checklist note",
+            "episode:old",
+            t_valid - chrono::Duration::days(2),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:old"}),
+        )
+        .await
+        .unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "Reviewed Atlas risk register yesterday",
+            "Reviewed Atlas risk register yesterday",
+            "episode:recent",
+            t_valid + chrono::Duration::hours(2),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": "episode:recent"}),
+        )
+        .await
+        .unwrap();
+
+    let as_of = Utc::now() + chrono::Duration::seconds(1);
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "ignored".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(as_of),
+            budget: 2,
+            view_mode: Some("wake_up".to_string()),
+            window_start: None,
+            window_end: None,
+            access: None,
+            project: None,
+            fact_types: vec![],
+        })
+        .await
+        .unwrap();
+
+    let contents = items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        contents,
+        vec![
+            "I prefer concise weekly digests",
+            "Reviewed Atlas risk register yesterday"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_degree() {
+    let (service, _db_client) = common::make_service_with_client().await;
+
+    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
+    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+    let carol_id = service.resolve_person("Carol White").await.unwrap();
+    let diana_id = service.resolve_person("Diana Prince").await.unwrap();
+
+    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
+    service.relate(&bob_id, "knows", &carol_id).await.unwrap();
+    service.relate(&bob_id, "knows", &diana_id).await.unwrap();
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: String::new(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 3,
+            project: None,
+            fact_types: vec![],
+            view_mode: Some("map".to_string()),
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(items.len(), 3, "expected top 3 hub entities");
+    assert!(
+        items
+            .iter()
+            .all(|item| { item.provenance.get("kind") == Some(&json!("hub_entity")) })
+    );
+
+    assert_eq!(items[0].content, "Bob Jones");
+    assert_eq!(items[0].provenance.get("degree"), Some(&json!(3)));
+    assert!(items[0].rationale.contains("view_mode=map"));
+
+    let hub_names = items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>();
+    assert!(hub_names.contains(&"Alice Smith"));
+    assert!(hub_names.contains(&"Carol White") || hub_names.contains(&"Diana Prince"));
+}
+
+#[tokio::test]
+async fn test_service_assemble_context_map_view_includes_communities() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
+    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+    let carol_id = service.resolve_person("Carol White").await.unwrap();
+
+    common::seed_community(
+        &db_client,
+        "org",
+        "community:atlas-team",
+        &[alice_id.clone(), bob_id.clone(), carol_id.clone()],
+        "Alice Smith, Bob Jones, Carol White",
+        Utc.with_ymd_and_hms(2026, 4, 7, 12, 0, 0).unwrap(),
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: String::new(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 10,
+            project: None,
+            fact_types: vec![],
+            view_mode: Some("map".to_string()),
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .unwrap();
+
+    let community = items
+        .iter()
+        .find(|item| item.provenance.get("kind") == Some(&json!("community")))
+        .expect("map view should include community items");
+
+    assert_eq!(community.fact_id, "map:community:community:atlas-team");
+    assert_eq!(community.content, "Alice Smith, Bob Jones, Carol White");
+    assert_eq!(community.quote, "3 members");
+    assert_eq!(community.source_episode, "community:atlas-team");
+    assert_eq!(community.provenance.get("member_count"), Some(&json!(3)));
+    assert_eq!(
+        community.provenance.get("member_entities"),
+        Some(&json!([alice_id, bob_id, carol_id]))
+    );
+    assert!(community.rationale.contains("view_mode=map"));
 }

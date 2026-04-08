@@ -6,8 +6,6 @@ use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
-use crate::log_event;
-use crate::logging::LogLevel;
 use crate::service::{MemoryError, MemoryService};
 use crate::storage::{json_f64, json_i64};
 
@@ -21,35 +19,45 @@ pub fn spawn_decay_worker(
     tokio::spawn(async move {
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
 
-        service.logger.log(
-            log_event!(
-                "lifecycle.decay.start",
-                "success",
-                "interval_secs" => interval_secs,
-                "threshold" => threshold,
-                "half_life_days" => half_life_days
-            ),
-            LogLevel::Info,
+        let mut event = std::collections::HashMap::new();
+        event.insert(
+            "op".to_string(),
+            serde_json::Value::String("lifecycle.decay.start".to_string()),
         );
+        event.insert(
+            "interval_secs".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(interval_secs)),
+        );
+        event.insert("threshold".to_string(), json!(threshold));
+        event.insert("half_life_days".to_string(), json!(half_life_days));
+        service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
             interval.tick().await;
             match run_decay_pass(&service, threshold, half_life_days).await {
                 Ok(count) => {
-                    service.logger.log(
-                        log_event!(
-                            "lifecycle.decay.complete",
-                            "success",
-                            "facts_invalidated" => count
-                        ),
-                        LogLevel::Info,
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.decay.complete".to_string()),
                     );
+                    event.insert(
+                        "facts_invalidated".to_string(),
+                        serde_json::Value::Number(serde_json::Number::from(count)),
+                    );
+                    service.logger.log(event, crate::logging::LogLevel::Info);
                 }
                 Err(e) => {
-                    service.logger.log(
-                        log_event!("lifecycle.decay.error", "error", "error" => format!("{e}")),
-                        LogLevel::Warn,
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::Value::String("lifecycle.decay.error".to_string()),
                     );
+                    event.insert(
+                        "error".to_string(),
+                        serde_json::Value::String(format!("{}", e)),
+                    );
+                    service.logger.log(event, crate::logging::LogLevel::Warn);
                 }
             }
         }

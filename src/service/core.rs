@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -11,39 +11,22 @@ use serde_json::{Value, json};
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{
-    AccessContext, AppSession, AssembleContextRequest, AssembledContextItem, EntityCandidate,
-    ExplainItem, ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest, ProvenanceSource,
+    AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
+    ExplainRequest, ExtractResult, GraphHubEntity, GraphInsights, IngestRequest, InvalidateRequest,
+    ProvenanceSource,
 };
+use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
-use crate::storage::{json_f64, json_i64};
 
 use super::AnnoEntityExtractor;
 use super::EntityExtractor;
-use super::apps::AppSessionManager;
 use super::cache::CacheKey;
 use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
-use super::entity_extraction::create_entity_extractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
-use super::lifecycle::{spawn_archival_worker, spawn_decay_worker};
+use super::ingest::prepare_ingest_request;
+use super::lifecycle::{spawn_archival_worker, spawn_community_worker, spawn_decay_worker};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
-
-/// Input request for creating a new fact record.
-///
-/// This struct groups all parameters for [`MemoryService::add_fact`] into a single
-/// type, improving API ergonomics and future extensibility.
-pub struct AddFactRequest<'a> {
-    pub fact_type: &'a str,
-    pub content: &'a str,
-    pub quote: &'a str,
-    pub source_episode: &'a str,
-    pub t_valid: DateTime<Utc>,
-    pub scope: &'a str,
-    pub confidence: f64,
-    pub entity_links: Vec<String>,
-    pub policy_tags: Vec<String>,
-    pub provenance: Value,
-}
 
 /// Core service for memory operations.
 #[derive(Clone)]
@@ -59,10 +42,8 @@ pub struct MemoryService {
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
     pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
     pub(crate) embedding_similarity_threshold: f64,
-    pub(crate) app_session_manager: AppSessionManager,
-    /// Clock function for deterministic testing. Uses Utc::now() in production.
-    #[cfg(test)]
-    pub(crate) clock: Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>,
+    pub(crate) query_logging_enabled: bool,
+    pub(crate) query_log_retention_days: u32,
 }
 
 use lru::LruCache;
@@ -103,60 +84,13 @@ async fn apply_startup_migrations(
     Ok(())
 }
 
-const FACT_ACCESS_RETRY_LIMIT: usize = 3;
-const FACT_ACCESS_RETRY_BASE_DELAY_MS: u64 = 10;
-
 impl MemoryService {
-    /// Determines the state of a fact/episode record based on t_invalid field.
-    pub(crate) fn fact_state(record: &Value) -> &'static str {
-        match record.as_object() {
-            Some(map) => match map.get("t_invalid") {
-                Some(v) if !v.is_null() => "invalidated",
-                _ => "active",
-            },
-            None => "active",
-        }
-    }
-
-    /// Validates that the session belongs to the expected app.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MemoryError::App`] if the session app_id does not match.
-    pub(crate) fn require_app(session: &AppSession, expected_app: &str) -> Result<(), MemoryError> {
-        if session.app_id != expected_app {
-            return Err(MemoryError::App(format!(
-                "session is not a {expected_app} session"
-            )));
-        }
-        Ok(())
-    }
-
-    /// Extracts a required string field from the session target.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MemoryError::App`] if the field is missing or not a string.
-    pub(crate) fn require_target_str<'a>(
-        session: &'a AppSession,
-        key: &str,
-    ) -> Result<&'a str, MemoryError> {
-        session
-            .target
-            .get(key)
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MemoryError::App(format!("{key} not found in session")))
-    }
-
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
         let default_namespace = config
             .default_namespace()
-            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?
-            .to_string();
-        let config_namespaces = config.namespaces.clone();
-        let config_log_level = config.log_level.clone();
+            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?;
 
         let effective_data_dir = config.data_dir_or_default();
         let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
@@ -174,6 +108,14 @@ impl MemoryService {
             "namespaces".to_string(),
             serde_json::json!(config.namespaces.clone()),
         );
+        startup_event.insert(
+            "query_logging_enabled".to_string(),
+            serde_json::json!(config.query_logging_enabled),
+        );
+        startup_event.insert(
+            "query_log_retention_days".to_string(),
+            serde_json::json!(config.query_log_retention_days),
+        );
         if config.embedded {
             startup_event.insert(
                 "data_dir".to_string(),
@@ -184,8 +126,8 @@ impl MemoryService {
         }
         startup_logger.log(startup_event, crate::logging::LogLevel::Info);
 
-        let db_client = SurrealDbClient::connect(&config, &default_namespace).await?;
-        let server_version = match db_client.server_version(&default_namespace).await {
+        let db_client = SurrealDbClient::connect(&config, default_namespace).await?;
+        let server_version = match db_client.server_version(default_namespace).await {
             Ok(version) => version,
             Err(err) => {
                 let mut event = std::collections::HashMap::new();
@@ -204,52 +146,21 @@ impl MemoryService {
             build_startup_versions_event(client_version, server_version.as_deref());
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
-        let embedding_provider =
-            create_embedding_provider(&config.embedding, &config.data_dir_or_default()).await?;
-
-        let entity_extractor =
-            create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
+        let embedding_provider = create_embedding_provider(&config.embedding)?;
 
         let service = Self::new_with_embedding_provider(
             Arc::new(db_client),
-            config_namespaces,
-            config_log_level,
+            config.namespaces,
+            config.log_level,
             50,
             100,
             embedding_provider,
             config.embedding.similarity_threshold,
-            entity_extractor,
-        )?;
+        )?
+        .with_query_logging_enabled(config.query_logging_enabled)
+        .with_query_log_retention_days(config.query_log_retention_days);
         apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
-
-        // Spawn embedding migration if needed
-        {
-            let db = service.db_client.clone();
-            let provider = service.embedding_provider.clone();
-            let config_ns = config.embedding.clone();
-            let ns = default_namespace.to_string();
-            let logger = service.logger.clone();
-            tokio::spawn(async move {
-                if let Err(e) = crate::service::migration::run_if_needed(
-                    db.as_ref(),
-                    provider,
-                    &config_ns,
-                    &ns,
-                    &logger,
-                )
-                .await
-                {
-                    let mut event = std::collections::HashMap::new();
-                    event.insert(
-                        "op".to_string(),
-                        serde_json::json!("embedding.migration.failed"),
-                    );
-                    event.insert("error".to_string(), serde_json::json!(e.to_string()));
-                    logger.log(event, LogLevel::Error);
-                }
-            });
-        }
 
         // Spawn lifecycle workers if enabled
         if config.lifecycle.enabled {
@@ -272,6 +183,12 @@ impl MemoryService {
                 archival_config.archival_age_days,
             );
 
+            let community_service = service.clone();
+            let community_config = config.lifecycle.clone();
+
+            let _community_handle =
+                spawn_community_worker(community_service, community_config.archival_interval_secs);
+
             let mut event = std::collections::HashMap::new();
             event.insert(
                 "op".to_string(),
@@ -283,6 +200,10 @@ impl MemoryService {
             );
             event.insert(
                 "archival_interval".to_string(),
+                serde_json::json!(config.lifecycle.archival_interval_secs),
+            );
+            event.insert(
+                "community_interval".to_string(),
                 serde_json::json!(config.lifecycle.archival_interval_secs),
             );
             service.logger.log(event, crate::logging::LogLevel::Info);
@@ -310,14 +231,12 @@ impl MemoryService {
                 embedding_similarity_threshold:
                     crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             },
-            Arc::new(DisabledEmbeddingProvider::new(Some(
+            Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            ))),
-            Arc::new(AnnoEntityExtractor::new()?),
+            )),
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_with_embedding_provider(
         db_client: Arc<dyn DbClient>,
         namespaces: Vec<String>,
@@ -326,7 +245,6 @@ impl MemoryService {
         rate_limit_burst: i32,
         embedding_provider: Arc<dyn EmbeddingProvider>,
         embedding_similarity_threshold: f64,
-        entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
@@ -339,33 +257,6 @@ impl MemoryService {
                 embedding_similarity_threshold,
             },
             embedding_provider,
-            entity_extractor,
-        )
-    }
-
-    /// Creates a service with custom embedding and entity extraction providers.
-    /// Exposed for integration tests that need the full ML stack.
-    #[doc(hidden)]
-    #[allow(dead_code, clippy::too_many_arguments)]
-    pub fn new_with_providers(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        embedding_provider: Arc<dyn EmbeddingProvider>,
-        embedding_similarity_threshold: f64,
-        entity_extractor: Arc<dyn EntityExtractor>,
-    ) -> Result<Self, MemoryError> {
-        Self::new_with_embedding_provider(
-            db_client,
-            namespaces,
-            log_level,
-            rate_limit_rps,
-            rate_limit_burst,
-            embedding_provider,
-            embedding_similarity_threshold,
-            entity_extractor,
         )
     }
 
@@ -390,10 +281,9 @@ impl MemoryService {
                 embedding_similarity_threshold:
                     crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             },
-            Arc::new(DisabledEmbeddingProvider::new(Some(
+            Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            ))),
-            Arc::new(super::AnnoEntityExtractor::new()?),
+            )),
         )
     }
 
@@ -403,7 +293,6 @@ impl MemoryService {
         log_level: String,
         build_config: ServiceBuildConfig,
         embedding_provider: Arc<dyn EmbeddingProvider>,
-        entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         if namespaces.is_empty() {
             return Err(MemoryError::ConfigInvalid(
@@ -414,7 +303,6 @@ impl MemoryService {
             MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
         })?;
         let logger = StdoutLogger::new(&log_level);
-        let app_session_manager = AppSessionManager::new();
         Ok(Self {
             db_client,
             namespaces: namespaces.clone(),
@@ -425,66 +313,43 @@ impl MemoryService {
                 build_config.rate_limit_burst,
             )),
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor,
+            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
-            app_session_manager,
-            #[cfg(test)]
-            clock: Arc::new(Utc::now),
+            query_logging_enabled: false,
+            query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
         })
     }
 
-    /// Returns the current time. Uses injected clock in tests, Utc::now() in production.
-    #[cfg(test)]
-    pub(crate) fn now(&self) -> DateTime<Utc> {
-        (self.clock)()
+    /// Returns a copy of the service with persisted query analytics enabled or disabled.
+    #[must_use]
+    pub fn with_query_logging_enabled(mut self, enabled: bool) -> Self {
+        self.query_logging_enabled = enabled;
+        self
     }
 
-    /// Returns the current time. Uses injected clock in tests, Utc::now() in production.
-    #[cfg(not(test))]
-    pub(crate) fn now(&self) -> DateTime<Utc> {
-        Utc::now()
+    /// Returns a copy of the service with a custom query-log retention window.
+    #[must_use]
+    pub fn with_query_log_retention_days(mut self, days: u32) -> Self {
+        self.query_log_retention_days = days;
+        self
     }
 
-    /// Creates a new MemoryService with a custom clock function for deterministic testing.
-    #[cfg(test)]
-    pub(crate) fn new_with_clock(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        clock: impl Fn() -> DateTime<Utc> + Send + Sync + 'static,
-    ) -> Result<Self, MemoryError> {
-        let mut service = Self::build(
-            db_client,
-            namespaces,
-            log_level,
-            ServiceBuildConfig {
-                rate_limit_rps,
-                rate_limit_burst,
-                cache_size: super::CONTEXT_CACHE_SIZE,
-                embedding_similarity_threshold:
-                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            },
-            Arc::new(DisabledEmbeddingProvider::new(Some(
-                crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            ))),
-            Arc::new(AnnoEntityExtractor::new()?),
-        )?;
-        service.clock = Arc::new(clock);
-        Ok(service)
+    /// Returns whether persisted query analytics are enabled.
+    #[must_use]
+    pub fn is_query_logging_enabled(&self) -> bool {
+        self.query_logging_enabled
+    }
+
+    /// Returns the query-log retention window in days.
+    #[must_use]
+    pub fn query_log_retention_days(&self) -> u32 {
+        self.query_log_retention_days
     }
 
     /// Public helper for tool-level logging.
     pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
-        self.logger.log(
-            crate::log_event!(op, "success",
-                "args" => args,
-                "result" => result
-            ),
-            level,
-        );
+        self.logger.log(log_event(op, args, result, None), level);
     }
 
     /// Public helper for tool-level logging with duration.
@@ -499,13 +364,8 @@ impl MemoryService {
         let mut args_with_duration = args.clone();
         let duration_ms = duration.as_millis();
         args_with_duration["duration_ms"] = json!(duration_ms);
-        self.logger.log(
-            crate::log_event!(op, "success",
-                "args" => args_with_duration,
-                "result" => result
-            ),
-            level,
-        );
+        self.logger
+            .log(log_event(op, args_with_duration, result, None), level);
     }
 
     /// Returns the total count of episodes.
@@ -532,6 +392,43 @@ impl MemoryService {
         access: Option<AccessContext>,
     ) -> Result<String, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
+        let ingest_transport = super::ingest::detect_ingest_transport(&request.content);
+        let original_source_id = request.source_id.clone();
+        let original_content_len = request.content.len();
+        self.logger.log(
+            log_event(
+                "ingest.prepare",
+                json!({
+                    "source_type": request.source_type,
+                    "source_id": request.source_id,
+                    "scope": request.scope,
+                    "project": request.project,
+                    "transport": ingest_transport,
+                }),
+                json!({}),
+                access.as_ref(),
+            ),
+            LogLevel::Debug,
+        );
+        let request = prepare_ingest_request(request).await?;
+        self.logger.log(
+            log_event(
+                "ingest.prepared",
+                json!({
+                    "scope": request.scope,
+                    "project": request.project,
+                    "transport": ingest_transport,
+                    "source_id_rewritten": request.source_id != original_source_id,
+                }),
+                json!({
+                    "source_id": request.source_id,
+                    "content_len": request.content.len(),
+                    "original_content_len": original_content_len,
+                }),
+                access.as_ref(),
+            ),
+            LogLevel::Trace,
+        );
         validate_ingest_request(&request)?;
 
         let episode_id = deterministic_episode_id(
@@ -540,33 +437,67 @@ impl MemoryService {
             request.t_ref,
             &request.scope,
         );
-        let namespace = self.resolve_namespace_for_scope(&request.scope)?;
+        let namespace = self.namespace_for_scope(&request.scope);
         let existing = self.db_client.select_one(&episode_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = request.t_ingested.unwrap_or_else(super::query::now);
-            let payload = json!({
-                "episode_id": episode_id,
-                "source_type": request.source_type,
-                "source_id": request.source_id,
-                "content": request.content,
-                "t_ref": super::normalize_dt(request.t_ref),
-                "t_ingested": super::normalize_dt(t_ingested),
-                "scope": request.scope,
-                "visibility_scope": request.visibility_scope.unwrap_or_else(|| request.scope.clone()),
-                "policy_tags": request.policy_tags,
-            });
+            let mut payload = serde_json::Map::from_iter([
+                ("episode_id".to_string(), json!(episode_id)),
+                ("source_type".to_string(), json!(request.source_type)),
+                ("source_id".to_string(), json!(request.source_id)),
+                ("content".to_string(), json!(request.content)),
+                (
+                    "t_ref".to_string(),
+                    json!(super::normalize_dt(request.t_ref)),
+                ),
+                (
+                    "t_ingested".to_string(),
+                    json!(super::normalize_dt(t_ingested)),
+                ),
+                ("scope".to_string(), json!(request.scope.clone())),
+                (
+                    "visibility_scope".to_string(),
+                    json!(
+                        request
+                            .visibility_scope
+                            .unwrap_or_else(|| request.scope.clone())
+                    ),
+                ),
+                ("policy_tags".to_string(), json!(request.policy_tags)),
+            ]);
+            if let Some(project) = request.project.clone() {
+                payload.insert("project".to_string(), json!(project));
+            }
             self.db_client
-                .create(&episode_id, payload, &namespace)
+                .create(&episode_id, Value::Object(payload), &namespace)
                 .await?;
+        } else {
+            self.logger.log(
+                log_event(
+                    "ingest.duplicate",
+                    json!({
+                        "episode_id": episode_id,
+                        "source_id": request.source_id,
+                        "scope": request.scope,
+                    }),
+                    json!({"status": "existing_episode_reused"}),
+                    access.as_ref(),
+                ),
+                LogLevel::Debug,
+            );
         }
 
         self.logger.log(
-            crate::log_event!("ingest", "success",
-                "source_type" => &request.source_type,
-                "source_id" => &request.source_id,
-                "t_ref" => super::normalize_dt(request.t_ref),
-                "scope" => &request.scope,
-                "episode_id" => &episode_id
+            log_event(
+                "ingest",
+                json!({
+                    "source_type": request.source_type,
+                    "source_id": request.source_id,
+                    "t_ref": super::normalize_dt(request.t_ref),
+                    "scope": request.scope,
+                }),
+                json!({"episode_id": episode_id}),
+                access.as_ref(),
             ),
             LogLevel::Info,
         );
@@ -588,8 +519,11 @@ impl MemoryService {
                 && let Err(err) = self.record_fact_access(fact_id, 3).await
             {
                 self.logger.log(
-                    crate::log_error!("explain.access_track_error", &err,
-                        "fact_id" => fact_id
+                    log_event(
+                        "explain.access_track_error",
+                        json!({"fact_id": fact_id}),
+                        json!({"error": err.to_string()}),
+                        access.as_ref(),
                     ),
                     LogLevel::Warn,
                 );
@@ -598,8 +532,11 @@ impl MemoryService {
         }
 
         self.logger.log(
-            crate::log_event!("explain", "success",
-                "count" => explanations.len()
+            log_event(
+                "explain",
+                json!({"count": explanations.len()}),
+                json!({"count": explanations.len()}),
+                access.as_ref(),
             ),
             LogLevel::Info,
         );
@@ -622,11 +559,16 @@ impl MemoryService {
         }
         let payload = super::episode::extract_from_episode(self, episode_id).await?;
         self.logger.log(
-            crate::log_event!("extract", "success",
-                "episode_id" => episode_id,
-                "entities" => payload.entities.len(),
-                "facts" => payload.facts.len(),
-                "links" => payload.links.len()
+            log_event(
+                "extract",
+                json!({"episode_id": episode_id}),
+                json!({
+                    "entities": payload.entities.len(),
+                    "facts": payload.facts.len(),
+                    "links": payload.links.len(),
+                    "warnings": payload.warnings.len(),
+                }),
+                access.as_ref(),
             ),
             LogLevel::Info,
         );
@@ -699,56 +641,66 @@ impl MemoryService {
     }
 
     /// Adds a new fact.
-    pub async fn add_fact(&self, req: AddFactRequest<'_>) -> Result<String, MemoryError> {
-        validate_fact_input(
-            req.fact_type,
-            req.content,
-            req.quote,
-            req.source_episode,
-            req.scope,
-        )?;
+    #[allow(clippy::too_many_arguments)]
+    pub async fn add_fact(
+        &self,
+        fact_type: &str,
+        content: &str,
+        quote: &str,
+        source_episode: &str,
+        t_valid: DateTime<Utc>,
+        scope: &str,
+        confidence: f64,
+        entity_links: Vec<String>,
+        policy_tags: Vec<String>,
+        provenance: Value,
+    ) -> Result<String, MemoryError> {
+        validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
-        let fact_id =
-            deterministic_fact_id(req.fact_type, req.content, req.source_episode, req.t_valid);
-        let namespace = self.resolve_namespace_for_scope(req.scope)?;
+        let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
+        let namespace = self.namespace_for_scope(scope);
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
-            let t_ingested = self.now();
+            let t_ingested = super::query::now();
+            let project = self.project_for_source_episode(source_episode).await?;
             let index_keys = self
-                .build_fact_index_keys(req.content, &req.entity_links, req.t_valid)
+                .build_fact_index_keys(content, &entity_links, t_valid)
                 .await?;
             let mut payload = serde_json::Map::from_iter([
                 ("fact_id".to_string(), json!(fact_id.clone())),
-                ("fact_type".to_string(), json!(req.fact_type)),
-                ("content".to_string(), json!(req.content)),
-                ("quote".to_string(), json!(req.quote)),
-                ("source_episode".to_string(), json!(req.source_episode)),
-                (
-                    "t_valid".to_string(),
-                    json!(super::normalize_dt(req.t_valid)),
-                ),
+                ("fact_type".to_string(), json!(fact_type)),
+                ("content".to_string(), json!(content)),
+                ("quote".to_string(), json!(quote)),
+                ("source_episode".to_string(), json!(source_episode)),
+                ("t_valid".to_string(), json!(super::normalize_dt(t_valid))),
                 (
                     "t_ingested".to_string(),
                     json!(super::normalize_dt(t_ingested)),
                 ),
-                ("confidence".to_string(), json!(req.confidence)),
+                ("confidence".to_string(), json!(confidence)),
                 ("index_keys".to_string(), json!(index_keys)),
                 ("access_count".to_string(), json!(0)),
-                ("entity_links".to_string(), json!(req.entity_links)),
-                ("scope".to_string(), json!(req.scope)),
-                ("policy_tags".to_string(), json!(req.policy_tags)),
-                ("provenance".to_string(), req.provenance),
+                ("entity_links".to_string(), json!(entity_links)),
+                ("scope".to_string(), json!(scope)),
+                ("policy_tags".to_string(), json!(policy_tags)),
+                ("provenance".to_string(), provenance),
             ]);
+            if let Some(project) = project {
+                payload.insert("project".to_string(), json!(project));
+            }
 
             match self
-                .generate_embedding(&format!(
-                    "{}\n{}\n{}",
-                    req.fact_type, req.content, req.quote
-                ))
+                .generate_embedding(&format!("{fact_type}\n{content}\n{quote}"))
                 .await
             {
                 Ok(Some(embedding)) => {
-                    // Dimension is validated by the provider, just use the embedding
+                    let expected_dim = self.embedding_provider.dimension();
+                    if embedding.len() != expected_dim {
+                        return Err(MemoryError::Validation(format!(
+                            "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
+                            embedding.len()
+                        )));
+                    }
                     payload.insert("embedding".to_string(), json!(embedding));
                 }
                 Ok(None) => {}
@@ -761,7 +713,7 @@ impl MemoryService {
                                 json!(self.embedding_provider.provider_name()),
                             ),
                             ("error".to_string(), json!(err.to_string())),
-                            ("fact_type".to_string(), json!(req.fact_type)),
+                            ("fact_type".to_string(), json!(fact_type)),
                         ]),
                         LogLevel::Warn,
                     );
@@ -777,7 +729,7 @@ impl MemoryService {
                     "failed to persist fact record".to_string(),
                 ));
             }
-            super::cache::invalidate_cache_by_scope(&self.context_cache, req.scope).await;
+            super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
         }
         Ok(fact_id)
     }
@@ -787,24 +739,6 @@ impl MemoryService {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), MemoryError> {
-        for attempt in 0..=FACT_ACCESS_RETRY_LIMIT {
-            match self.record_fact_access_once(fact_id, boost).await {
-                Ok(()) => return Ok(()),
-                Err(err)
-                    if self.is_retryable_access_tracking_error(&err)
-                        && attempt < FACT_ACCESS_RETRY_LIMIT =>
-                {
-                    let backoff_ms = FACT_ACCESS_RETRY_BASE_DELAY_MS << attempt;
-                    tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                }
-                Err(err) => return Err(err),
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn record_fact_access_once(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
         let (record, namespace) = self.find_fact_record(fact_id).await?;
         let Some(namespace) = namespace else {
             return Ok(());
@@ -821,7 +755,7 @@ impl MemoryService {
         record.insert("access_count".to_string(), json!(access_count));
         record.insert(
             "last_accessed".to_string(),
-            json!(super::normalize_dt(self.now())),
+            json!(super::normalize_dt(super::query::now())),
         );
 
         self.db_client
@@ -829,17 +763,6 @@ impl MemoryService {
             .await?;
 
         Ok(())
-    }
-
-    fn is_retryable_access_tracking_error(&self, err: &MemoryError) -> bool {
-        let MemoryError::Storage(message) = err else {
-            return false;
-        };
-
-        let message = message.to_ascii_lowercase();
-        message.contains("transaction conflict")
-            || message.contains("resource busy")
-            || message.contains("can be retried")
     }
 
     async fn build_fact_index_keys(
@@ -890,50 +813,7 @@ impl MemoryService {
             return Ok(None);
         }
 
-        let timer = crate::timing::OperationTimer::new("embed");
-
-        // Log start of embedding operation
-        self.logger.log(
-            crate::operation_event!(
-                "embed.start",
-                timer,
-                "success",
-                None::<String>,
-                "provider" => self.embedding_provider.provider_name(),
-                "input_length" => input.len()
-            ),
-            crate::logging::LogLevel::Debug,
-        );
-
-        let result = self.embedding_provider.embed(input).await;
-        let duration_ms = timer.elapsed_ms();
-
-        match result {
-            Ok(embedding) => {
-                let level = crate::logging::level_for_duration(duration_ms);
-                let event = crate::operation_event!(
-                    "embed",
-                    timer,
-                    "success",
-                    None::<String>,
-                    "provider" => self.embedding_provider.provider_name(),
-                    "dimension" => embedding.len()
-                );
-                self.logger.log(event, level);
-                Ok(Some(embedding))
-            }
-            Err(e) => {
-                let event = crate::operation_event!(
-                    "embed",
-                    timer,
-                    "error",
-                    Some(e.to_string()),
-                    "provider" => self.embedding_provider.provider_name()
-                );
-                self.logger.log(event, crate::logging::LogLevel::Error);
-                Err(e)
-            }
-        }
+        self.embedding_provider.embed(input).await.map(Some)
     }
 
     /// Invalidates a fact.
@@ -946,25 +826,21 @@ impl MemoryService {
         let (record, namespace) = self.find_fact_record(&request.fact_id).await?;
         let namespace =
             namespace.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
-        let existing = record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+        let mut updated =
+            record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
 
-        if existing.get("t_invalid").is_some() {
-            return Ok("already_invalidated".to_string());
-        }
-
-        let scope = existing
+        let scope = updated
             .get("scope")
             .and_then(string_from_value)
             .unwrap_or_else(|| namespace.clone());
 
-        let mut updated = existing;
         updated.insert(
             "t_invalid".to_string(),
             json!(super::normalize_dt(request.t_invalid)),
         );
         updated.insert(
             "t_invalid_ingested".to_string(),
-            json!(super::normalize_dt(self.now())),
+            json!(super::normalize_dt(super::query::now())),
         );
         self.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
@@ -981,15 +857,11 @@ impl MemoryService {
         super::context::assemble_context(self, request).await
     }
 
-    /// Resolves a named entity of the given type, creating it if absent.
-    pub async fn resolve_entity_by_type(
-        &self,
-        entity_type: &str,
-        name: &str,
-    ) -> Result<String, MemoryError> {
+    /// Resolves a person entity.
+    pub async fn resolve_person(&self, name: &str) -> Result<String, MemoryError> {
         self.resolve(
             EntityCandidate {
-                entity_type: entity_type.to_string(),
+                entity_type: "person".to_string(),
                 canonical_name: name.to_string(),
                 aliases: Vec::new(),
             },
@@ -998,34 +870,69 @@ impl MemoryService {
         .await
     }
 
-    /// Resolves a person entity.
-    pub async fn resolve_person(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("person", name).await
-    }
-
     /// Resolves a company entity.
     pub async fn resolve_company(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("company", name).await
+        self.resolve(
+            EntityCandidate {
+                entity_type: "company".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
     }
 
     /// Resolves a location entity.
     pub async fn resolve_location(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("location", name).await
+        self.resolve(
+            EntityCandidate {
+                entity_type: "location".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
     }
 
     /// Resolves a product entity.
     pub async fn resolve_product(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("product", name).await
+        self.resolve(
+            EntityCandidate {
+                entity_type: "product".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
     }
 
     /// Resolves an event entity.
     pub async fn resolve_event(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("event", name).await
+        self.resolve(
+            EntityCandidate {
+                entity_type: "event".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
     }
 
     /// Resolves a concept entity.
     pub async fn resolve_concept(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("concept", name).await
+        self.resolve(
+            EntityCandidate {
+                entity_type: "concept".to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
     }
 
     /// Creates a relationship edge between two entities.
@@ -1035,16 +942,17 @@ impl MemoryService {
         relation: &str,
         to_id: &str,
     ) -> Result<(), MemoryError> {
-        use crate::models::Edge;
+        use crate::models::{Edge, EdgeOrigin};
         let edge = Edge {
             in_id: from_id.to_string(),
             relation: relation.to_string(),
             out_id: to_id.to_string(),
+            origin: EdgeOrigin::Inferred,
             strength: 1.0,
             confidence: 0.8,
             provenance: json!({"source": "manual"}),
-            t_valid: self.now(),
-            t_ingested: self.now(),
+            t_valid: super::query::now(),
+            t_ingested: super::query::now(),
             t_invalid: None,
             t_invalid_ingested: None,
         };
@@ -1175,80 +1083,56 @@ impl MemoryService {
         Ok(())
     }
 
-    /// Resolves a request scope to a configured namespace.
+    /// Returns the namespace for a given scope.
     ///
-    /// Scope values must match a configured namespace exactly, ignoring case,
-    /// or use an explicit alias recognized by the service.
-    pub(crate) fn resolve_namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
-        let scope_trimmed = scope.trim();
-        if scope_trimmed.is_empty() {
-            return Err(MemoryError::Validation("scope is required".into()));
-        }
+    /// Normalizes scope to lowercase for prefix matching.
+    /// Returns default namespace for unknown scopes with a warning log.
+    #[must_use]
+    pub fn namespace_for_scope(&self, scope: &str) -> String {
+        let scope_lower = scope.to_lowercase();
 
-        if let Some(namespace) = self
-            .namespaces
-            .iter()
-            .find(|namespace| namespace.eq_ignore_ascii_case(scope_trimmed))
+        if self.namespaces.contains(&scope_lower) {
+            return scope_lower;
+        }
+        if scope_lower.starts_with("personal") && self.namespaces.contains(&"personal".to_string())
         {
-            return Ok(namespace.clone());
+            return "personal".to_string();
+        }
+        if scope_lower.starts_with("private") && self.namespaces.contains(&"private".to_string()) {
+            return "private".to_string();
+        }
+        if scope_lower.starts_with("org") && self.namespaces.contains(&"org".to_string()) {
+            return "org".to_string();
         }
 
-        let scope_lower = scope_trimmed.to_lowercase();
-        if self.is_default_scope_alias(&scope_lower) {
-            return Ok(self.default_namespace.clone());
-        }
-
-        let allowed_scopes = self.allowed_scope_values();
+        // Log warning for unknown scope before returning default
         self.logger.log(
             std::collections::HashMap::from([
                 (
                     "op".to_string(),
-                    serde_json::Value::String("scope.namespace_invalid".to_string()),
+                    serde_json::Value::String("scope.namespace_fallback".to_string()),
                 ),
                 (
                     "scope".to_string(),
-                    serde_json::Value::String(scope_trimmed.to_string()),
+                    serde_json::Value::String(scope.to_string()),
                 ),
                 (
-                    "allowed_scopes".to_string(),
-                    serde_json::json!(allowed_scopes),
+                    "resolved_namespace".to_string(),
+                    serde_json::Value::String(self.default_namespace.clone()),
                 ),
             ]),
             crate::logging::LogLevel::Warn,
         );
 
-        Err(MemoryError::Validation(format!(
-            "unknown scope `{}`; allowed scopes: {}",
-            scope_trimmed,
-            allowed_scopes.join(", ")
-        )))
+        self.default_namespace.clone()
     }
 
-    fn is_default_scope_alias(&self, scope_lower: &str) -> bool {
-        scope_lower == "org"
-            && self.default_namespace != "org"
-            && !self.namespaces.iter().any(|ns| ns == "org")
-    }
-
-    fn allowed_scope_values(&self) -> Vec<String> {
-        let mut allowed = self.namespaces.clone();
-        if self.is_default_scope_alias("org") && !allowed.iter().any(|scope| scope == "org") {
-            allowed.push("org".to_string());
-        }
-        allowed.sort();
-        allowed.dedup();
-        allowed
-    }
-
-    /// Searches for a record across all configured namespaces.
-    ///
-    /// Returns `(Some(record_map), Some(namespace))` if found, or `(None, None)` otherwise.
-    async fn find_record_in_namespaces(
+    pub(crate) async fn find_episode_record(
         &self,
-        record_id: &str,
+        episode_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
         for namespace in &self.namespaces {
-            let record = self.db_client.select_one(record_id, namespace).await?;
+            let record = self.db_client.select_one(episode_id, namespace).await?;
             if let Some(Value::Object(map)) = record {
                 return Ok((Some(map), Some(namespace.clone())));
             }
@@ -1256,18 +1140,28 @@ impl MemoryService {
         Ok((None, None))
     }
 
-    pub(crate) async fn find_episode_record(
+    async fn project_for_source_episode(
         &self,
-        episode_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.find_record_in_namespaces(episode_id).await
+        source_episode: &str,
+    ) -> Result<Option<String>, MemoryError> {
+        let (record, _) = self.find_episode_record(source_episode).await?;
+        Ok(record
+            .as_ref()
+            .and_then(|map| map.get("project"))
+            .and_then(string_from_value))
     }
 
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.find_record_in_namespaces(fact_id).await
+        for namespace in &self.namespaces {
+            let record = self.db_client.select_one(fact_id, namespace).await?;
+            if let Some(Value::Object(map)) = record {
+                return Ok((Some(map), Some(namespace.clone())));
+            }
+        }
+        Ok((None, None))
     }
 
     async fn find_entity_record(
@@ -1361,14 +1255,15 @@ impl MemoryService {
             (Vec::new(), None)
         };
 
-        let provenance_namespace = match fact_namespace {
-            Some(namespace) => namespace,
-            None => self.resolve_namespace_for_scope(&episode.scope)?,
-        };
+        let provenance_namespace =
+            fact_namespace.unwrap_or_else(|| self.namespace_for_scope(&episode.scope));
 
         // Collect all provenance sources including linked episodes
         let all_sources = self
             .collect_provenance_sources(&episode, &entity_links, &provenance_namespace)
+            .await?;
+        let graph_insights = self
+            .build_graph_insights(&entity_links, &provenance_namespace)
             .await?;
 
         Ok(ExplainItem {
@@ -1390,7 +1285,106 @@ impl MemoryService {
             }),
             citation_context: Some(episode.content.clone()),
             all_sources,
+            graph_insights,
         })
+    }
+
+    async fn build_graph_insights(
+        &self,
+        entity_links: &[String],
+        namespace: &str,
+    ) -> Result<Option<GraphInsights>, MemoryError> {
+        let linked_entities = entity_links
+            .iter()
+            .filter(|entity_id| entity_id.starts_with("entity:"))
+            .cloned()
+            .collect::<Vec<_>>();
+        if linked_entities.is_empty() {
+            self.logger.log(
+                log_event(
+                    "explain.graph_insights.skipped",
+                    json!({"namespace": namespace}),
+                    json!({"reason": "no_linked_entities"}),
+                    None,
+                ),
+                LogLevel::Trace,
+            );
+            return Ok(None);
+        }
+
+        self.logger.log(
+            log_event(
+                "explain.graph_insights.start",
+                json!({
+                    "namespace": namespace,
+                    "linked_entity_count": linked_entities.len(),
+                }),
+                json!({}),
+                None,
+            ),
+            LogLevel::Debug,
+        );
+
+        let cutoff = super::query::now();
+        let hub_entities = super::apps::graph::find_hub_entities(self, namespace, cutoff, 5)
+            .await?
+            .into_iter()
+            .map(|hub| GraphHubEntity {
+                entity_id: hub.entity_id,
+                canonical_name: hub.canonical_name,
+                degree: hub.degree,
+            })
+            .collect::<Vec<_>>();
+
+        let mut surprising_connections = Vec::new();
+        let mut seen_connections = HashSet::new();
+
+        for entity_id in linked_entities {
+            for connection in
+                super::apps::graph::find_surprising_connections(self, namespace, &entity_id, 3)
+                    .await?
+            {
+                let key = format!(
+                    "{}->{}",
+                    connection.source_entity_id, connection.target_entity_id
+                );
+                if seen_connections.insert(key) {
+                    surprising_connections.push(connection);
+                }
+                if surprising_connections.len() >= 5 {
+                    break;
+                }
+            }
+
+            if surprising_connections.len() >= 5 {
+                break;
+            }
+        }
+
+        surprising_connections.sort_by(|left, right| {
+            left.hop_count
+                .cmp(&right.hop_count)
+                .then_with(|| left.target_entity_name.cmp(&right.target_entity_name))
+                .then_with(|| left.target_entity_id.cmp(&right.target_entity_id))
+        });
+
+        self.logger.log(
+            log_event(
+                "explain.graph_insights.done",
+                json!({"namespace": namespace}),
+                json!({
+                    "hub_entities": hub_entities.len(),
+                    "surprising_connections": surprising_connections.len(),
+                }),
+                None,
+            ),
+            LogLevel::Trace,
+        );
+
+        Ok(Some(GraphInsights {
+            hub_entities,
+            surprising_connections,
+        }))
     }
 
     /// Collects all provenance sources for a fact including linked episodes.
@@ -1451,103 +1445,29 @@ impl MemoryService {
         entity_id: &str,
         namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
-        let rows = self
+        // Traverse: entity -> involved_in edge -> fact -> source_episode -> episode
+        // Note: edge.out is a RecordId, so we cast to string for fact_id comparison.
+        // source_episode stores episode_id values, matched against episode.episode_id.
+        let sql = "SELECT * FROM episode WHERE episode_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE type::string(out) FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
+        let result = self
             .db_client
-            .select_episodes_by_entity(namespace, entity_id, 10)
+            .query(sql, Some(json!({"entity_id": entity_id})), namespace)
             .await?;
 
-        Ok(rows
-            .into_iter()
-            .filter_map(|v| {
-                let obj = v.as_object()?;
-                super::episode::episode_from_record(obj)
+        let episodes: Vec<crate::models::Episode> = result
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| {
+                        let obj = v.as_object()?;
+                        super::episode::episode_from_record(obj)
+                    })
+                    .collect()
             })
-            .collect())
+            .unwrap_or_default();
+
+        Ok(episodes)
     }
-}
-
-pub(crate) fn draft_entity_candidate(
-    item: &crate::models::DraftItem,
-) -> Result<EntityCandidate, MemoryError> {
-    let canonical_name = draft_payload_str(&item.payload, "canonical_name")
-        .or_else(|| draft_payload_str(&item.payload, "name"))
-        .or_else(|| draft_payload_str(&item.payload, "content"))
-        .or_else(|| item.source_snippet.clone())
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| {
-            MemoryError::InvalidParameter(format!(
-                "draft entity {} is missing canonical_name",
-                item.item_id
-            ))
-        })?;
-
-    Ok(EntityCandidate {
-        entity_type: draft_payload_str(&item.payload, "entity_type")
-            .unwrap_or_else(|| "concept".to_string()),
-        canonical_name,
-        aliases: draft_payload_string_array(&item.payload, "aliases"),
-    })
-}
-
-pub(crate) fn draft_payload_str(payload: &Value, key: &str) -> Option<String> {
-    payload
-        .as_object()
-        .and_then(|map| map.get(key))
-        .and_then(string_from_value)
-}
-
-pub(crate) fn draft_payload_string_array(payload: &Value, key: &str) -> Vec<String> {
-    payload
-        .as_object()
-        .and_then(|map| map.get(key))
-        .and_then(|value| {
-            if let Some(array) = value.as_array() {
-                Some(array)
-            } else {
-                value
-                    .as_object()
-                    .and_then(|inner| inner.get("Array")?.as_array())
-            }
-        })
-        .map(|array| {
-            array
-                .iter()
-                .filter_map(string_from_value)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
-}
-
-pub(crate) fn draft_payload_f64(payload: &Value, key: &str) -> Option<f64> {
-    payload
-        .as_object()
-        .and_then(|map| map.get(key))
-        .and_then(json_f64)
-}
-
-pub(crate) fn draft_payload_datetime(payload: &Value, key: &str) -> Option<DateTime<Utc>> {
-    draft_payload_str(payload, key)
-        .as_deref()
-        .and_then(super::parse_iso)
-}
-
-pub(crate) fn resolve_draft_reference(
-    reference: &str,
-    entity_ids_by_item: &HashMap<String, String>,
-    entity_ids_by_name: &HashMap<String, String>,
-) -> Option<String> {
-    if reference.starts_with("entity:")
-        || reference.starts_with("fact:")
-        || reference.starts_with("episode:")
-    {
-        return Some(reference.to_string());
-    }
-
-    entity_ids_by_item.get(reference).cloned().or_else(|| {
-        entity_ids_by_name
-            .get(&super::normalize_text(reference))
-            .cloned()
-    })
 }
 
 /// Trait for safe mutex locking that handles poisoned locks gracefully.
@@ -1561,18 +1481,9 @@ impl<T> SafeMutex<T> for Mutex<T> {
     }
 }
 
-/// Rate limiter using the token bucket algorithm.
-///
-/// # Safety
-///
-/// We use `std::sync::Mutex` instead of `tokio::sync::Mutex` because:
-/// - Guards are always dropped before any `.await` point
-/// - No async operations occur while holding the lock
-/// - This prevents tokio worker thread blocking
 pub(crate) struct RateLimiter {
     rps: f64,
     burst: f64,
-    /// Per-key state for token bucket algorithm.
     tokens: Mutex<HashMap<String, f64>>,
     last: Mutex<HashMap<String, Instant>>,
 }
@@ -1605,7 +1516,63 @@ impl RateLimiter {
     }
 }
 
-pub(crate) fn string_from_value(value: &Value) -> Option<String> {
+/// Builds a structured log event for tool operations.
+///
+/// This helper creates a consistent event structure for logging MCP tool calls,
+/// including the operation name, arguments, result, and optional access context.
+///
+/// # Arguments
+///
+/// * `op` - Operation name (e.g., "ingest", "extract", "context.assemble")
+/// * `args` - Input arguments as JSON value
+/// * `result` - Operation result as JSON value
+/// * `access` - Optional access context for audit logging
+///
+/// # Returns
+///
+/// A HashMap with keys: `op`, `args`, `result`, and optionally `access`
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let event = log_event(
+///     "ingest",
+///     json!({"content": "..."}),
+///     json!({"episode_id": "abc123"}),
+///     Some(&access_context),
+/// );
+/// ```
+pub(crate) fn log_event(
+    op: &str,
+    args: Value,
+    result: Value,
+    access: Option<&AccessContext>,
+) -> HashMap<String, Value> {
+    let mut event = HashMap::new();
+    event.insert("op".to_string(), Value::String(op.to_string()));
+    event.insert("args".to_string(), args);
+    event.insert("result".to_string(), result);
+    if let Some(access) = access {
+        event.insert("access".to_string(), serialize_access(access));
+    }
+    event
+}
+
+/// Serializes access context to a JSON value for logging.
+fn serialize_access(access: &AccessContext) -> Value {
+    json!({
+        "caller_id": access.caller_id,
+        "allowed_scopes": access.allowed_scopes,
+        "allowed_tags": access.allowed_tags,
+        "session_vars": access.session_vars,
+        "transport": access.transport,
+        "content_type": access.content_type,
+        "cross_scope_allow": access.cross_scope_allow,
+    })
+}
+
+#[must_use]
+fn string_from_value(value: &Value) -> Option<String> {
     match value {
         Value::String(s) => Some(s.clone()),
         Value::Object(map) => {
@@ -1725,14 +1692,12 @@ fn bfs_path(
 }
 
 #[cfg(test)]
-#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::EntityCandidate;
     use crate::models::{AccessContext, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
-    use crate::service::test_support::MockDb;
     use crate::storage::SurrealDbClient;
     use async_trait::async_trait;
     use serde_json::json;
@@ -1762,38 +1727,65 @@ mod tests {
     }
 
     #[test]
-    fn log_simple_creates_expected_structure() {
-        let event = crate::log_event!(
+    fn log_event_creates_expected_structure() {
+        let event = log_event(
             "test_op",
-            "success",
-            "key" => "value",
-            "result" => "ok"
+            json!({"key": "value"}),
+            json!({"result": "ok"}),
+            None,
         );
         assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
-        assert_eq!(event.get("status").unwrap().as_str(), Some("success"));
-        assert_eq!(event.get("key").unwrap().as_str(), Some("value"));
-        assert_eq!(event.get("result").unwrap().as_str(), Some("ok"));
+        assert_eq!(
+            event.get("args").unwrap().get("key").unwrap().as_str(),
+            Some("value")
+        );
+        assert_eq!(
+            event.get("result").unwrap().get("result").unwrap().as_str(),
+            Some("ok")
+        );
     }
 
     #[test]
-    fn log_error_creates_expected_structure() {
-        let err = std::io::Error::new(std::io::ErrorKind::NotFound, "test error");
-        let event = crate::log_error!(
-            "test_op",
-            &err,
-            "caller" => "test-caller"
+    fn log_event_includes_access_when_provided() {
+        let access = AccessContext {
+            caller_id: Some("test-caller".to_string()),
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let access_event = event.get("access").unwrap();
+        assert_eq!(
+            access_event.get("caller_id").unwrap().as_str(),
+            Some("test-caller")
         );
-        assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
-        assert_eq!(event.get("status").unwrap().as_str(), Some("error"));
-        assert!(
-            event
-                .get("error")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .contains("test error")
-        );
-        assert_eq!(event.get("caller").unwrap().as_str(), Some("test-caller"));
+    }
+
+    #[test]
+    fn serialize_access_includes_all_fields() {
+        let access = AccessContext {
+            caller_id: Some("caller".to_string()),
+            allowed_scopes: Some(vec!["org".to_string()]),
+            allowed_tags: Some(vec!["tag1".to_string()]),
+            session_vars: Some(json!({"key": "value"})),
+            transport: Some("http".to_string()),
+            content_type: Some("application/json".to_string()),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        let serialized = serialize_access(&access);
+        assert!(serialized.get("caller_id").is_some());
+        assert!(serialized.get("allowed_scopes").is_some());
+        assert!(serialized.get("allowed_tags").is_some());
+        assert!(serialized.get("session_vars").is_some());
+        assert!(serialized.get("transport").is_some());
+        assert!(serialized.get("content_type").is_some());
+        assert!(serialized.get("cross_scope_allow").is_some());
     }
 
     #[test]
@@ -1901,19 +1893,189 @@ mod tests {
         use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
 
-        let calls = Arc::new(Mutex::new(Vec::new()));
-        let apply_count = Arc::new(AtomicUsize::new(0));
-        let mut db_client = MockDb::default();
-        db_client.apply_migrations_fn = Box::new({
-            let calls = Arc::clone(&calls);
-            let apply_count = Arc::clone(&apply_count);
-            move |namespace| {
-                apply_count.fetch_add(1, Ordering::SeqCst);
-                calls.safe_lock().push(namespace.to_string());
+        struct StartupMigrationDbClient {
+            calls: Arc<Mutex<Vec<String>>>,
+            apply_count: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for StartupMigrationDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+                self.apply_count.fetch_add(1, Ordering::SeqCst);
+                self.calls.safe_lock().push(namespace.to_string());
                 Ok(())
             }
+        }
+
+        let db_client = Arc::new(StartupMigrationDbClient {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            apply_count: AtomicUsize::new(0),
         });
-        let db_client_dyn: Arc<dyn DbClient> = Arc::new(db_client);
+        let db_client_dyn: Arc<dyn DbClient> = db_client.clone();
         let namespaces = vec![
             "org".to_string(),
             "personal".to_string(),
@@ -1924,9 +2086,9 @@ mod tests {
             .await
             .expect("startup migrations");
 
-        assert_eq!(apply_count.load(Ordering::SeqCst), 3);
+        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 3);
         assert_eq!(
-            calls.safe_lock().clone(),
+            db_client.calls.safe_lock().clone(),
             vec![
                 "org".to_string(),
                 "personal".to_string(),
@@ -1945,80 +2107,404 @@ mod tests {
     }
 
     #[test]
-    fn resolve_namespace_for_scope_returns_exact_match() {
+    fn namespace_for_scope_returns_exact_match() {
         let service = create_test_service(vec!["org", "personal"]);
-        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "org");
-        assert_eq!(
-            service.resolve_namespace_for_scope("personal").unwrap(),
-            "personal"
-        );
+        assert_eq!(service.namespace_for_scope("org"), "org");
+        assert_eq!(service.namespace_for_scope("personal"), "personal");
     }
 
     #[test]
-    fn resolve_namespace_for_scope_rejects_unknown_scope() {
+    fn namespace_for_scope_returns_default_for_unknown() {
         let service = create_test_service(vec!["org", "personal"]);
-        let err = service.resolve_namespace_for_scope("unknown").unwrap_err();
-        assert!(
-            matches!(err, MemoryError::Validation(message) if message.contains("unknown scope"))
-        );
+        assert_eq!(service.namespace_for_scope("unknown"), "org");
     }
 
     #[test]
-    fn org_scope_is_treated_as_default_namespace_alias_when_org_namespace_missing() {
-        let service = create_test_service(vec!["acme", "personal"]);
-
-        assert!(service.is_default_scope_alias("org"));
-        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "acme");
-        assert_eq!(service.resolve_namespace_for_scope("ORG").unwrap(), "acme");
+    fn namespace_for_scope_handles_personal_prefix() {
+        let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("personal-work"), "personal");
     }
 
-    #[tokio::test]
-    async fn ingest_rejects_unknown_scope_instead_of_falling_back() {
+    #[test]
+    fn namespace_for_scope_handles_org_prefix() {
         let service = create_test_service(vec!["org", "personal"]);
+        assert_eq!(service.namespace_for_scope("org-team"), "org");
+    }
 
-        let err = service
-            .ingest(
-                IngestRequest {
-                    source_type: "document".to_string(),
-                    source_id: "catalog-sheet".to_string(),
-                    content: "item code alpha-42 from pricing catalog".to_string(),
-                    t_ref: chrono::Utc::now(),
-                    scope: "team".to_string(),
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await
-            .expect_err("unknown scope should be rejected");
-
-        assert!(
-            matches!(err, MemoryError::Validation(ref message) if message.contains("unknown scope")),
-            "expected validation error for unknown scope, got {err:?}"
-        );
+    #[test]
+    fn namespace_for_scope_handles_private_prefix() {
+        let service = create_test_service(vec!["org", "private"]);
+        assert_eq!(service.namespace_for_scope("private-notes"), "private");
     }
 
     fn create_test_service(namespaces: Vec<&str>) -> MemoryService {
-        MemoryService::new_with_clock(
-            Arc::new(MockDb::default()),
+        use crate::storage::DbClient;
+        use std::sync::Arc;
+
+        struct MockDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for MockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        MemoryService::new(
+            Arc::new(MockDbClient),
             namespaces.iter().map(|s| s.to_string()).collect(),
             "warn".to_string(),
             50,
             100,
-            chrono::Utc::now,
         )
         .unwrap()
     }
 
     fn create_test_service_with_rate_limit(rps: i32, burst: i32) -> MemoryService {
-        MemoryService::new_with_clock(
-            Arc::new(MockDb::default()),
+        use crate::storage::DbClient;
+        use std::sync::Arc;
+
+        struct MockDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for MockDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        MemoryService::new(
+            Arc::new(MockDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             rps,
             burst,
-            chrono::Utc::now,
         )
         .unwrap()
     }
@@ -2121,33 +2607,192 @@ mod tests {
     async fn resolve_uses_indexed_entity_lookup_instead_of_table_scan() {
         use std::sync::Arc;
 
-        let mut db_client = MockDb::default();
-        db_client.select_table_fn =
-            Box::new(|_, _| panic!("resolve should not scan the entity table"));
-        db_client.select_edges_filtered_fn =
-            Box::new(|_, _| panic!("find_intro_chain should not bulk-load all edges"));
-        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
-            assert_eq!(direction, GraphDirection::Incoming);
+        struct LookupOnlyDbClient;
 
-            Ok(match node_id {
-                "entity:openai" => vec![json!({"in": "entity:bob", "out": "entity:openai"})],
-                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                _ => vec![],
-            })
-        });
-        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
-            Ok(match normalized_name {
-                "dima ivanov" => Some(json!({"entity_id": "entity:existing"})),
-                "openai" => Some(json!({"entity_id": "entity:openai"})),
-                _ => None,
-            })
-        });
-        db_client.create_fn = Box::new(|_, _, _| {
-            panic!("resolve should not create when indexed lookup finds a record")
-        });
+        #[async_trait::async_trait]
+        impl DbClient for LookupOnlyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("resolve should not scan the entity table")
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not bulk-load all edges")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => {
+                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
+                    }
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(match normalized_name {
+                    "dima ivanov" => Some(json!({"entity_id": "entity:existing"})),
+                    "openai" => Some(json!({"entity_id": "entity:openai"})),
+                    _ => None,
+                })
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                panic!("resolve should not create when indexed lookup finds a record")
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(LookupOnlyDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2171,96 +2816,192 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn record_fact_access_retries_retryable_transaction_conflicts() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let select_calls = Arc::new(AtomicUsize::new(0));
-        let update_calls = Arc::new(AtomicUsize::new(0));
-
-        let mut db_client = MockDb::default();
-        db_client.select_one_fn = Box::new({
-            let select_calls = Arc::clone(&select_calls);
-            move |record_id, namespace| {
-                assert_eq!(record_id, "fact:heat");
-                assert_eq!(namespace, "acme");
-                select_calls.fetch_add(1, Ordering::SeqCst);
-                Ok(Some(json!({
-                    "fact_id": "fact:heat",
-                    "scope": "org",
-                    "access_count": 0,
-                    "last_accessed": null,
-                })))
-            }
-        });
-        db_client.update_fn = Box::new({
-            let update_calls = Arc::clone(&update_calls);
-            move |record_id, content, namespace| {
-                assert_eq!(record_id, "fact:heat");
-                assert_eq!(namespace, "acme");
-                let call = update_calls.fetch_add(1, Ordering::SeqCst);
-                assert_eq!(
-                    content.get("access_count").and_then(|v| v.as_i64()),
-                    Some(1)
-                );
-                assert!(content.get("last_accessed").is_some());
-
-                if call == 0 {
-                    Err(MemoryError::Storage(
-                        "SurrealDB take failed: Transaction conflict: Resource busy: . This transaction can be retried".to_string(),
-                    ))
-                } else {
-                    Ok(json!({"fact_id": "fact:heat"}))
-                }
-            }
-        });
-
-        let service = MemoryService::new_with_clock(
-            Arc::new(db_client),
-            vec!["acme".to_string(), "personal".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-            || {
-                chrono::DateTime::parse_from_rfc3339("2026-04-01T08:44:30Z")
-                    .expect("valid timestamp")
-                    .with_timezone(&chrono::Utc)
-            },
-        )
-        .expect("service");
-
-        service
-            .record_fact_access("fact:heat", 1)
-            .await
-            .expect("retryable conflict should succeed after retry");
-
-        assert_eq!(select_calls.load(Ordering::SeqCst), 2);
-        assert_eq!(update_calls.load(Ordering::SeqCst), 2);
-    }
-
-    #[tokio::test]
     async fn find_intro_chain_uses_db_side_neighbor_lookups() {
         use std::sync::Arc;
 
-        let mut db_client = MockDb::default();
-        db_client.select_edges_filtered_fn =
-            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
-        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
-            assert_eq!(direction, GraphDirection::Incoming);
+        struct TraversalDbClient;
 
-            Ok(match node_id {
-                "entity:openai" => vec![json!({"in": "entity:bob", "out": "entity:openai"})],
-                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                _ => vec![],
-            })
-        });
-        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
-            assert_eq!(normalized_name, "openai");
-            Ok(Some(json!({"entity_id": "entity:openai"})))
-        });
+        #[async_trait::async_trait]
+        impl DbClient for TraversalDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => {
+                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
+                    }
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(TraversalDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2284,28 +3025,190 @@ mod tests {
     async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
         use std::sync::Arc;
 
-        let mut db_client = MockDb::default();
-        db_client.select_edges_filtered_fn =
-            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
-        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
-            assert_eq!(direction, GraphDirection::Incoming);
+        struct ShortestPathDbClient;
 
-            Ok(match node_id {
-                "entity:openai" => vec![
-                    json!({"in": "entity:bob", "out": "entity:openai"}),
-                    json!({"in": "entity:carol", "out": "entity:openai"}),
-                ],
-                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                _ => vec![],
-            })
-        });
-        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
-            assert_eq!(normalized_name, "openai");
-            Ok(Some(json!({"entity_id": "entity:openai"})))
-        });
+        #[async_trait::async_trait]
+        impl DbClient for ShortestPathDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => vec![
+                        json!({"in": "entity:bob", "out": "entity:openai"}),
+                        json!({"in": "entity:carol", "out": "entity:openai"}),
+                    ],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(ShortestPathDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2326,30 +3229,193 @@ mod tests {
     async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
         use std::sync::Arc;
 
-        let mut db_client = MockDb::default();
-        db_client.select_edges_filtered_fn =
-            Box::new(|_, _| panic!("find_intro_chain should not materialize the full edge table"));
-        db_client.select_edge_neighbors_fn = Box::new(|_, node_id, _, direction| {
-            assert_eq!(direction, GraphDirection::Incoming);
+        struct DiamondTraversalDbClient;
 
-            Ok(match node_id {
-                "entity:openai" => vec![
-                    json!({"in": "entity:bob", "out": "entity:openai"}),
-                    json!({"in": "entity:carol", "out": "entity:openai"}),
-                ],
-                "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                "entity:carol" => vec![json!({"in": "entity:diana", "out": "entity:carol"})],
-                "entity:alice" => vec![json!({"in": "entity:erin", "out": "entity:alice"})],
-                _ => vec![],
-            })
-        });
-        db_client.select_entity_lookup_fn = Box::new(|_, normalized_name| {
-            assert_eq!(normalized_name, "openai");
-            Ok(Some(json!({"entity_id": "entity:openai"})))
-        });
+        #[async_trait::async_trait]
+        impl DbClient for DiamondTraversalDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                panic!("find_intro_chain should not materialize the full edge table")
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                assert_eq!(direction, GraphDirection::Incoming);
+
+                Ok(match node_id {
+                    "entity:openai" => vec![
+                        json!({"in": "entity:bob", "out": "entity:openai"}),
+                        json!({"in": "entity:carol", "out": "entity:openai"}),
+                    ],
+                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+                    "entity:carol" => vec![json!({"in": "entity:diana", "out": "entity:carol"})],
+                    "entity:alice" => vec![json!({"in": "entity:erin", "out": "entity:alice"})],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                assert_eq!(normalized_name, "openai");
+                Ok(Some(json!({"entity_id": "entity:openai"})))
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
 
         let service = MemoryService::new(
-            Arc::new(db_client),
+            Arc::new(DiamondTraversalDbClient),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2433,23 +3499,22 @@ mod tests {
             100,
             Arc::new(StaticTestEmbeddingProvider::new()),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            Arc::new(super::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
 
         let fact_id = service
-            .add_fact(AddFactRequest {
-                fact_type: "note",
-                content: "Compensation increase approved for engineering",
-                quote: "Compensation increase approved",
-                source_episode: "episode:test",
-                t_valid: Utc::now(),
-                scope: "org",
-                confidence: 0.9,
-                entity_links: vec![],
-                policy_tags: vec![],
-                provenance: json!({"source_episode": "episode:test"}),
-            })
+            .add_fact(
+                "note",
+                "Compensation increase approved for engineering",
+                "Compensation increase approved",
+                "episode:test",
+                Utc::now(),
+                "org",
+                0.9,
+                vec![],
+                vec![],
+                json!({"source_episode": "episode:test"}),
+            )
             .await
             .expect("add fact");
 
@@ -2465,6 +3530,69 @@ mod tests {
                 .map(Vec::len),
             Some(DEFAULT_EMBEDDING_DIMENSION)
         );
+    }
+
+    #[test]
+    fn log_event_with_full_access_context() {
+        let access = AccessContext {
+            caller_id: Some("test-user".to_string()),
+            allowed_scopes: Some(vec!["personal".to_string(), "org".to_string()]),
+            allowed_tags: Some(vec!["tag1".to_string()]),
+            session_vars: Some(json!({"session": "value"})),
+            transport: Some("grpc".to_string()),
+            content_type: Some("application/grpc".to_string()),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "personal".to_string(),
+                to: "org".to_string(),
+            }]),
+        };
+        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let access_val = event.get("access").unwrap();
+        assert_eq!(
+            access_val.get("caller_id").unwrap().as_str(),
+            Some("test-user")
+        );
+        assert_eq!(
+            access_val
+                .get("allowed_scopes")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(access_val.get("transport").unwrap().as_str(), Some("grpc"));
+        assert_eq!(
+            access_val.get("content_type").unwrap().as_str(),
+            Some("application/grpc")
+        );
+    }
+
+    #[test]
+    fn log_event_without_access_context_omits_access_field() {
+        let event = log_event("test_op", json!({}), json!({}), None);
+        assert!(!event.contains_key("access"));
+    }
+
+    #[test]
+    fn serialize_access_with_all_none_fields() {
+        let access = AccessContext {
+            caller_id: None,
+            allowed_scopes: None,
+            allowed_tags: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+        let serialized = serialize_access(&access);
+        assert!(serialized.get("caller_id").is_some());
+        assert!(serialized.get("allowed_scopes").is_some());
+        assert!(serialized.get("allowed_tags").is_some());
+        assert!(serialized.get("session_vars").is_some());
+        assert!(serialized.get("transport").is_some());
+        assert!(serialized.get("content_type").is_some());
+        assert!(serialized.get("cross_scope_allow").is_some());
     }
 
     #[test]
@@ -2507,27 +3635,15 @@ mod tests {
     }
 
     #[test]
-    fn resolve_namespace_for_scope_handles_various_inputs() {
+    fn namespace_for_scope_handles_various_inputs() {
         let service = create_test_service(vec!["org", "personal", "private"]);
 
-        assert_eq!(service.resolve_namespace_for_scope("org").unwrap(), "org");
-        assert_eq!(
-            service.resolve_namespace_for_scope("personal").unwrap(),
-            "personal"
-        );
-        assert_eq!(
-            service.resolve_namespace_for_scope("private").unwrap(),
-            "private"
-        );
-        assert!(matches!(
-            service.resolve_namespace_for_scope("unknown"),
-            Err(MemoryError::Validation(message)) if message.contains("unknown scope")
-        ));
-        assert!(matches!(
-            service.resolve_namespace_for_scope(""),
-            Err(MemoryError::Validation(message)) if message.contains("scope is required")
-        ));
-        assert_eq!(service.resolve_namespace_for_scope("ORG").unwrap(), "org");
+        assert_eq!(service.namespace_for_scope("org"), "org");
+        assert_eq!(service.namespace_for_scope("personal"), "personal");
+        assert_eq!(service.namespace_for_scope("private"), "private");
+        assert_eq!(service.namespace_for_scope("unknown"), "org");
+        assert_eq!(service.namespace_for_scope(""), "org");
+        assert_eq!(service.namespace_for_scope("ORG"), "org");
     }
 
     #[test]

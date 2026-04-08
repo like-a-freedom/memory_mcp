@@ -1,0 +1,87 @@
+[
+    {
+        "sample_id": "conv-26",
+        "conversation": {
+            "speaker_a": "Caroline",
+            "speaker_b": "Melanie",
+            "session_1_date_time": "1:56 pm on 8 May, 2023",
+            "session_1": [
+                {
+                    "speaker": "Caroline",
+                    "dia_id": "D1:1",
+                    "text": "Hey Mel! Good to see you! How have you been?"
+                },
+                {
+                    "speaker": "Melanie",
+                    "dia_id": "D1:2",
+                    "text": "Hey Caroline! Good to see you! I'm swamped with the kids & work. What's up with you? Anything new?"
+                },
+                {
+                    "speaker": "Caroline",
+                    "dia_id": "D1:3",
+                    "text": "I went to a LGBTQ support group yesterday and it was so powerful."
+                }
+            ],
+            "session_2_date_time": "1:14 pm on 25 May, 2023",
+            "session_2": [
+                {
+                    "speaker": "Melanie",
+                    "dia_id": "D2:7",
+                    "text": "Thanks, Caroline. It's still a work in progress, but I'm doing my best. My kids are so excited about summer break! We're thinking about going camping next month. Any fun plans for the summer?"
+                },
+                {
+                    "speaker": "Caroline",
+                    "dia_id": "D2:8",
+                    "text": "Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it."
+                },
+                {
+                    "speaker": "Melanie",
+                    "dia_id": "D2:9",
+                    "text": "Wow, Caroline! That's awesome! Taking in kids in need - you're so kind. Your future family is gonna be so lucky to have you!"
+                }
+            ]
+        },
+        "qa": [
+            {
+                "question": "What did Caroline research?",
+                "answer": "Adoption agencies",
+                "evidence": [
+                    "D2:8"
+                ],
+                "category": 1
+            }
+        ],
+        "session_summary": {
+            "session_1_summary": "Caroline and Melanie had a conversation on 8 May 2023 at 1:56 pm. Caroline mentioned that she attended an LGBTQ support group and was inspired by the transgender stories she heard. The support group made her feel accepted and gave her the courage to embrace herself. Caroline plans to continue her education and explore career options, particularly in counseling or working in mental health. Melanie praised Caroline's empathy and mentioned that she painted a lake sunrise last year as a way of expressing herself. Caroline complimented Melanie's painting and agreed that painting is a great outlet for relaxation and self-expression. They both emphasized the importance of taking care of oneself. Caroline was going to do some research, while Melanie planned to go swimming with her kids.",
+            "session_2_summary": "On May 25, 2023 at 1:14 pm, Melanie tells Caroline about her recent experience running a charity race for mental health. Caroline expresses pride and agrees that taking care of oneself is important. Melanie shares her struggle with self-care but mentions that she is carving out time each day for activities that refresh her. Caroline encourages Melanie and praises her efforts. Melanie then asks Caroline about her plans for the summer, to which Caroline replies that she is researching adoption agencies as she wants to give a loving home to children in need. Melanie praises Caroline's decision and expresses excitement for her future family. Caroline explains that she chose an adoption agency that supports the LGBTQ+ community because of its inclusivity and support. Melanie commends Caroline's choice and asks what she is looking forward to in the adoption process. Caroline says she is thrilled to create a family for kids who need one, despite the challenges of being a single parent. Melanie encourages Caroline and expresses confidence in her ability to provide a safe and loving home. The conversation ends with Melanie expressing her excitement for Caroline's new chapter."
+        },
+        "event_summary": {
+            "events_session_1": {
+                "Caroline": [
+                    "Caroline attends an LGBTQ support group for the first time."
+                ],
+                "Melanie": [],
+                "date": "8 May, 2023"
+            },
+            "events_session_2": {
+                "Caroline": [
+                    "Caroline is inspired by her supportive friends and mentors to start researching adoption agencies."
+                ],
+                "Melanie": [],
+                "date": "25 May, 2023"
+            }
+        },
+        "observation": {
+            "session_1_observation": {
+                "Caroline": [
+                    "Caroline attended an LGBTQ support group recently and found the transgender stories inspiring."
+                ]
+            },
+            "session_2_observation": {
+                "Caroline": [
+                    "Caroline is researching adoption agencies with the dream of having a family and providing a loving home to kids in need."
+                ]
+            }
+        }
+    }
+]

@@ -22,6 +22,8 @@ pub struct CacheKey {
     scope: String,
     cutoff: String,
     budget: i32,
+    project: Option<String>,
+    fact_types: Vec<String>,
     view: CacheView,
     tags: Option<Vec<String>>,
 }
@@ -50,12 +52,15 @@ impl CacheView {
 }
 
 impl CacheKey {
+    #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
         query: &str,
         scope: &str,
         cutoff: DateTime<Utc>,
         budget: i32,
+        project: Option<&str>,
+        fact_types: &[String],
         view: CacheView,
         tags: Option<Vec<String>>,
     ) -> Self {
@@ -63,11 +68,16 @@ impl CacheKey {
         if let Some(ref mut tag_list) = tags {
             tag_list.sort();
         }
+        let mut fact_types = fact_types.to_vec();
+        fact_types.sort();
+        fact_types.dedup();
         Self {
             query: super::normalize_text(query),
             scope: scope.to_string(),
             cutoff: super::bucket_to_hour(cutoff),
             budget,
+            project: project.map(ToString::to_string),
+            fact_types,
             view,
             tags,
         }
@@ -121,6 +131,8 @@ mod tests {
             "org",
             cutoff,
             5,
+            None,
+            &[],
             CacheView::default(),
             None,
         );
@@ -132,7 +144,16 @@ mod tests {
     #[test]
     fn cache_key_new_buckets_cutoff_to_hour() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 45).unwrap();
-        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
+        let key = CacheKey::new(
+            "query",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
         assert_eq!(key.cutoff, "2024-01-01T12:00:00Z");
     }
 
@@ -140,7 +161,16 @@ mod tests {
     fn cache_key_new_sorts_tags() {
         let cutoff = Utc::now();
         let tags = Some(vec!["zebra".to_string(), "apple".to_string()]);
-        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), tags);
+        let key = CacheKey::new(
+            "query",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            tags,
+        );
         assert_eq!(
             key.tags,
             Some(vec!["apple".to_string(), "zebra".to_string()])
@@ -148,16 +178,60 @@ mod tests {
     }
 
     #[test]
+    fn cache_key_new_sorts_and_deduplicates_fact_types() {
+        let cutoff = Utc::now();
+        let fact_types = vec![
+            "promise".to_string(),
+            "metric".to_string(),
+            "promise".to_string(),
+        ];
+        let key = CacheKey::new(
+            "query",
+            "org",
+            cutoff,
+            5,
+            Some("atlas"),
+            &fact_types,
+            CacheView::default(),
+            None,
+        );
+
+        assert_eq!(key.project.as_deref(), Some("atlas"));
+        assert_eq!(
+            key.fact_types,
+            vec!["metric".to_string(), "promise".to_string()]
+        );
+    }
+
+    #[test]
     fn cache_key_matches_scope_returns_true_for_same_scope() {
         let cutoff = Utc::now();
-        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
+        let key = CacheKey::new(
+            "query",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
         assert!(key.matches_scope("org"));
     }
 
     #[test]
     fn cache_key_matches_scope_returns_false_for_different_scope() {
         let cutoff = Utc::now();
-        let key = CacheKey::new("query", "org", cutoff, 5, CacheView::default(), None);
+        let key = CacheKey::new(
+            "query",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
         assert!(!key.matches_scope("personal"));
     }
 
@@ -168,9 +242,36 @@ mod tests {
 
         let cutoff = Utc::now();
 
-        let key1 = CacheKey::new("query1", "org", cutoff, 5, CacheView::default(), None);
-        let key2 = CacheKey::new("query2", "org", cutoff, 5, CacheView::default(), None);
-        let key3 = CacheKey::new("query3", "personal", cutoff, 5, CacheView::default(), None);
+        let key1 = CacheKey::new(
+            "query1",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
+        let key2 = CacheKey::new(
+            "query2",
+            "org",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
+        let key3 = CacheKey::new(
+            "query3",
+            "personal",
+            cutoff,
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
 
         {
             let mut guard = cache.write().await;
@@ -182,8 +283,7 @@ mod tests {
                 confidence: 0.9,
                 provenance: json!({}),
                 rationale: "rationale".to_string(),
-                t_ref: None,
-                t_valid: None,
+                retrieval_tier: None,
             };
             guard.put(key1.clone(), vec![item("fact:1")]);
             guard.put(key2.clone(), vec![item("fact:2")]);

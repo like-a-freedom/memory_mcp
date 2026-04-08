@@ -9,8 +9,7 @@
 ## Document Change History
 
 - **2026-03-27**: Added explicit reference to `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface.
-- **2026-04-02**: Tightened runtime scope handling: request `scope` values must match a configured namespace exactly (case-insensitive) or use an explicit alias, and unknown scopes now return a validation error instead of silently falling back to the default namespace.
-- **2026-03-27**: Fixed critical issues from code review: (1) scope normalization was applied before namespace resolution; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
+- **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
 - **2026-03-25 (embedding follow-up)**: Added configurable `SURREALDB_EMBEDDING_DIMENSION`, DB-side community summary full-text search, and an explicit manual-reindex warning for dimension changes. Verified with strict `cargo clippy --all-targets -- -D warnings` and full `cargo test`.
@@ -486,13 +485,13 @@ All IDs MUST be deterministic to ensure idempotence:
 
 ### 6.3 Scope and Namespace Mapping
 
-- Runtime rule: request `scope` values must resolve to a configured SurrealDB namespace.
-- Accepted values are:
-  - an exact configured namespace name, case-insensitive
-  - the explicit alias `org`, which maps to the default namespace when no literal `org` namespace is configured
-- Unknown scope values MUST be rejected with a validation error; silent fallback to the default namespace is not allowed.
+- **Scope** → **SurrealDB Namespace** mapping:
+  - `personal` → `user_<user_id>`
+  - `team` → `team_<team_id>`
+  - `org` → `org_<org_id>`
+  - `private-domain` (e.g., `hr.salary`) → `private_<domain>`
 
-- All objects within a scope are stored in the resolved namespace
+- All objects within a scope stored in corresponding namespace
 - Cross-scope queries require explicit policy allow-list
 
 ---
@@ -859,26 +858,6 @@ memory_mcp/
 - **Acceptance tests**: High-level scenarios (AT-01..AT-08)
 
 - **Full-run status**: Full test suite (unit + integration + acceptance + embedded FTS + MCP e2e) executed locally after SurrealDB 3 migration fixes; all tests passed and linter (`cargo clippy`) reported no warnings.
-
-### 10.4 Metric eval harness
-
-In addition to correctness tests, the repository provides manual metric eval runners for:
-
-- retrieval quality (`tests/eval_retrieval.rs`),
-- extraction quality (`tests/eval_extraction.rs`),
-- latency (`tests/eval_latency.rs`),
-- external benchmark retrieval (`tests/eval_external_retrieval.rs`).
-
-All DB-backed eval runs must use embedded in-memory SurrealDB. Eval runners are ignored by default and print summaries to stdout without storing cross-session benchmark history.
-
-#### External benchmark integration
-
-The repository includes a Python converter (`scripts/convert_external_evals.py`) that transforms external memory benchmarks into eval fixtures:
-
-- **LongMemEval** (oracle): 500 questions across 5 memory abilities — prioritizes Knowledge Updates, Temporal Reasoning, Multi-Session Reasoning, and Abstention cases
-- **MemoryAgentBench**: Accurate Retrieval and Conflict Resolution splits
-
-The converter produces JSON fixtures under `tests/fixtures/evals/` that are consumed by the same eval harness as built-in fixtures. This allows comparing memory_mcp retrieval quality against published academic benchmarks.
 
 ---
 

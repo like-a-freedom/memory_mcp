@@ -4,10 +4,6 @@ dev/
 .env
 AGENTS.md
 
-# Models
-gliner_multi_v2.1
-multilingual-e5-small
-
 # Cargo build artifacts
 /target/
 **/target/
@@ -32,6 +28,7 @@ multilingual-e5-small
 *.swo
 *~
 .DS_Store
+.worktrees/
 
 # Cargo-specific
 .cargo/
@@ -42,6 +39,7 @@ rust-project.json
 
 # Benchmarking
 /criterion/
+/tests/fixtures/evals/full/
 
 # Code coverage
 tarpaulin-report.html
@@ -54,4 +52,3 @@ flamegraph.svg
 perf.data
 perf.data.old
 lcov.info
-.worktrees/

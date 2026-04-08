@@ -1,64 +1,1581 @@
 [
     {
         "id": "ret-001",
-        "description": "Promise across sessions found without travel noise",
-        "episodes": [
+        "description": "direct lexical retrieval for deployment window",
+        "query": "deployment window thursday",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
             {
-                "source_type": "chat",
-                "source_id": "sess-1",
-                "content": "Alice will send the Atlas deck by Friday.",
-                "t_ref": "2026-03-01T09:00:00Z",
-                "scope": "personal"
-            },
-            {
-                "source_type": "chat",
-                "source_id": "sess-2",
-                "content": "We discussed unrelated travel plans.",
-                "t_ref": "2026-03-01T10:00:00Z",
-                "scope": "personal"
+                "content": "Atlas deployment window is Thursday 10:00 UTC",
+                "t_valid": "2026-03-03T10:00:00Z"
             }
         ],
-        "query": {
-            "query": "alice atlas deck",
-            "scope": "personal",
-            "budget": 5,
-            "as_of": null
-        },
         "expected": {
+            "tier": "direct",
             "must_contain": [
-                "Atlas deck"
+                "Atlas deployment window is Thursday 10:00 UTC"
             ],
-            "must_not_contain": [
-                "travel plans"
-            ],
-            "expect_empty": false,
             "min_recall_at_k": 1.0
         }
     },
     {
         "id": "ret-002",
-        "description": "Unknown passport query should abstain",
-        "episodes": [
+        "description": "direct lexical retrieval for budget update",
+        "query": "atlas budget",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
             {
-                "source_type": "chat",
-                "source_id": "sess-3",
-                "content": "We discussed launch readiness and deployment timing.",
-                "t_ref": "2026-03-01T11:00:00Z",
-                "scope": "personal"
+                "content": "Atlas budget is $2M",
+                "t_valid": "2026-02-09T09:00:00Z"
             }
         ],
-        "query": {
-            "query": "what is Bob's passport number",
-            "scope": "personal",
-            "budget": 5,
-            "as_of": null
-        },
         "expected": {
-            "must_contain": [],
-            "must_not_contain": [
-                "launch readiness"
+            "tier": "direct",
+            "must_contain": [
+                "Atlas budget is $2M"
             ],
-            "expect_empty": true,
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-003",
+        "description": "alias expansion retrieves fact through canonical company name",
+        "query": "orbital labs",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "OL budget is locked",
+                "t_valid": "2026-03-05T09:00:00Z",
+                "entity_links": [
+                    "entity:orbital-labs"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "OL budget is locked"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:orbital-labs",
+                "entity_type": "company",
+                "canonical_name": "Orbital Labs",
+                "aliases": [
+                    "OL"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-004",
+        "description": "graph expansion retrieves fact through matching community summary",
+        "query": "atlas migration risk register",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Deployment checklist owner is Priya",
+                "t_valid": "2026-03-06T12:00:00Z",
+                "entity_links": [
+                    "entity:atlas"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:atlas",
+                "member_entities": [
+                    "entity:atlas"
+                ],
+                "summary": "atlas migration risk register",
+                "updated_at": "2026-03-06T12:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Deployment checklist owner is Priya"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-005",
+        "description": "direct retrieval for incident bridge",
+        "query": "zephyr incident bridge",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Zephyr incident bridge opens at 18:30 UTC",
+                "t_valid": "2026-03-07T18:30:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Zephyr incident bridge opens at 18:30 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-006",
+        "description": "direct retrieval for release cutoff",
+        "query": "orion release cutoff friday",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Orion release cutoff is Friday 16:00 UTC",
+                "t_valid": "2026-03-08T16:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Orion release cutoff is Friday 16:00 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-007",
+        "description": "direct retrieval for vendor renewal",
+        "query": "helios vendor renewal april",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Helios vendor renewal closes on April 30",
+                "t_valid": "2026-03-09T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Helios vendor renewal closes on April 30"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-008",
+        "description": "direct retrieval for staffing review",
+        "query": "mercury staffing review tuesday",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Mercury staffing review is Tuesday morning",
+                "t_valid": "2026-03-10T08:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Mercury staffing review is Tuesday morning"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-009",
+        "description": "direct retrieval for legal memo location",
+        "query": "beacon legal memo beta",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Beacon legal memo is stored in workspace beta",
+                "t_valid": "2026-03-11T11:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Beacon legal memo is stored in workspace beta"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-010",
+        "description": "direct retrieval for budget variance",
+        "query": "lighthouse budget variance",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Lighthouse budget variance is 7 percent",
+                "t_valid": "2026-03-12T13:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Lighthouse budget variance is 7 percent"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-011",
+        "description": "direct retrieval for postmortem start",
+        "query": "juniper outage postmortem 09:15",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Juniper outage postmortem starts at 09:15 UTC",
+                "t_valid": "2026-03-13T09:15:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Juniper outage postmortem starts at 09:15 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-012",
+        "description": "direct retrieval for travel freeze",
+        "query": "summit travel freeze may 12",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Summit travel freeze begins on May 12",
+                "t_valid": "2026-03-14T10:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Summit travel freeze begins on May 12"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-013",
+        "description": "harbor analytics alias retrieval",
+        "query": "harbor analytics incident deck",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Signal Dock incident deck is due Wednesday",
+                "t_valid": "2026-03-15T10:00:00Z",
+                "entity_links": [
+                    "entity:harbor-analytics"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Signal Dock incident deck is due Wednesday"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:harbor-analytics",
+                "entity_type": "system",
+                "canonical_name": "Harbor Analytics",
+                "aliases": [
+                    "Signal Dock"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-014",
+        "description": "northwind systems alias retrieval",
+        "query": "northwind systems compliance memo",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Cedar Falcon compliance memo is signed",
+                "t_valid": "2026-03-16T10:00:00Z",
+                "entity_links": [
+                    "entity:northwind-systems"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Cedar Falcon compliance memo is signed"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:northwind-systems",
+                "entity_type": "system",
+                "canonical_name": "Northwind Systems",
+                "aliases": [
+                    "Cedar Falcon"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-015",
+        "description": "apex finance alias retrieval",
+        "query": "apex finance platform settlement file",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Copper Ledger settlement file ships tonight",
+                "t_valid": "2026-03-17T10:00:00Z",
+                "entity_links": [
+                    "entity:apex-finance-platform"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Copper Ledger settlement file ships tonight"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:apex-finance-platform",
+                "entity_type": "system",
+                "canonical_name": "Apex Finance Platform",
+                "aliases": [
+                    "Copper Ledger"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-016",
+        "description": "meridian support alias retrieval",
+        "query": "meridian support hub escalation board",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Amber Relay escalation board resets daily",
+                "t_valid": "2026-03-18T10:00:00Z",
+                "entity_links": [
+                    "entity:meridian-support-hub"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Amber Relay escalation board resets daily"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:meridian-support-hub",
+                "entity_type": "system",
+                "canonical_name": "Meridian Support Hub",
+                "aliases": [
+                    "Amber Relay"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-017",
+        "description": "skyline commerce alias retrieval",
+        "query": "skyline commerce suite pricing audit",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Velvet Market pricing audit closes Friday",
+                "t_valid": "2026-03-19T10:00:00Z",
+                "entity_links": [
+                    "entity:skyline-commerce-suite"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Velvet Market pricing audit closes Friday"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:skyline-commerce-suite",
+                "entity_type": "system",
+                "canonical_name": "Skyline Commerce Suite",
+                "aliases": [
+                    "Velvet Market"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-018",
+        "description": "delta research alias retrieval",
+        "query": "delta research lab experiment review",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Granite Orchard experiment review starts Monday",
+                "t_valid": "2026-03-20T10:00:00Z",
+                "entity_links": [
+                    "entity:delta-research-lab"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Granite Orchard experiment review starts Monday"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:delta-research-lab",
+                "entity_type": "system",
+                "canonical_name": "Delta Research Lab",
+                "aliases": [
+                    "Granite Orchard"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-019",
+        "description": "blue harbor alias retrieval",
+        "query": "blue harbor warehouse forklift checklist",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Maple Quay forklift checklist is archived",
+                "t_valid": "2026-03-21T10:00:00Z",
+                "entity_links": [
+                    "entity:blue-harbor-warehouse"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Maple Quay forklift checklist is archived"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:blue-harbor-warehouse",
+                "entity_type": "system",
+                "canonical_name": "Blue Harbor Warehouse",
+                "aliases": [
+                    "Maple Quay"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-020",
+        "description": "aurora benefits alias retrieval",
+        "query": "aurora benefits portal enrollment batch",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Silver Lantern enrollment batch resumes tomorrow",
+                "t_valid": "2026-03-22T10:00:00Z",
+                "entity_links": [
+                    "entity:aurora-benefits-portal"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Silver Lantern enrollment batch resumes tomorrow"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:aurora-benefits-portal",
+                "entity_type": "system",
+                "canonical_name": "Aurora Benefits Portal",
+                "aliases": [
+                    "Silver Lantern"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-021",
+        "description": "terra field ops alias retrieval",
+        "query": "terra field ops dispatch rota",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Crimson Meadow dispatch rota changes Thursday",
+                "t_valid": "2026-03-23T10:00:00Z",
+                "entity_links": [
+                    "entity:terra-field-ops"
+                ]
+            }
+        ],
+        "expected": {
+            "tier": "alias",
+            "must_contain": [
+                "Crimson Meadow dispatch rota changes Thursday"
+            ],
+            "min_recall_at_k": 1.0
+        },
+        "entities": [
+            {
+                "entity_id": "entity:terra-field-ops",
+                "entity_type": "system",
+                "canonical_name": "Terra Field Ops",
+                "aliases": [
+                    "Crimson Meadow"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ret-022",
+        "description": "phoenix graph retrieval",
+        "query": "phoenix launch risk ledger",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Rollback owner is Mina",
+                "t_valid": "2026-03-24T09:00:00Z",
+                "entity_links": [
+                    "entity:phoenix"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:phoenix",
+                "member_entities": [
+                    "entity:phoenix"
+                ],
+                "summary": "phoenix launch risk ledger",
+                "updated_at": "2026-03-24T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Rollback owner is Mina"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-023",
+        "description": "cedar graph retrieval",
+        "query": "cedar billing escalation map",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Escalation steward is Omar",
+                "t_valid": "2026-03-25T09:00:00Z",
+                "entity_links": [
+                    "entity:cedar"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:cedar",
+                "member_entities": [
+                    "entity:cedar"
+                ],
+                "summary": "cedar billing escalation map",
+                "updated_at": "2026-03-25T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Escalation steward is Omar"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-024",
+        "description": "lantern graph retrieval",
+        "query": "lantern onboarding dependency chart",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Checklist reviewer is Hana",
+                "t_valid": "2026-03-26T09:00:00Z",
+                "entity_links": [
+                    "entity:lantern"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:lantern",
+                "member_entities": [
+                    "entity:lantern"
+                ],
+                "summary": "lantern onboarding dependency chart",
+                "updated_at": "2026-03-26T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Checklist reviewer is Hana"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-025",
+        "description": "harbor graph retrieval",
+        "query": "harbor export incident notebook",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Mitigation owner is Ilya",
+                "t_valid": "2026-03-27T09:00:00Z",
+                "entity_links": [
+                    "entity:harbor-graph"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:harbor-graph",
+                "member_entities": [
+                    "entity:harbor-graph"
+                ],
+                "summary": "harbor export incident notebook",
+                "updated_at": "2026-03-27T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Mitigation owner is Ilya"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-026",
+        "description": "solstice graph retrieval",
+        "query": "solstice audit exception ledger",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Approver is Nia",
+                "t_valid": "2026-03-28T09:00:00Z",
+                "entity_links": [
+                    "entity:solstice"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:solstice",
+                "member_entities": [
+                    "entity:solstice"
+                ],
+                "summary": "solstice audit exception ledger",
+                "updated_at": "2026-03-28T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Approver is Nia"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-027",
+        "description": "quartz graph retrieval",
+        "query": "quartz migration readiness board",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Coordinator is Pavel",
+                "t_valid": "2026-03-29T09:00:00Z",
+                "entity_links": [
+                    "entity:quartz"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:quartz",
+                "member_entities": [
+                    "entity:quartz"
+                ],
+                "summary": "quartz migration readiness board",
+                "updated_at": "2026-03-29T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Coordinator is Pavel"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-028",
+        "description": "horizon graph retrieval",
+        "query": "horizon partner renewal matrix",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Document owner is Sara",
+                "t_valid": "2026-03-30T09:00:00Z",
+                "entity_links": [
+                    "entity:horizon"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:horizon",
+                "member_entities": [
+                    "entity:horizon"
+                ],
+                "summary": "horizon partner renewal matrix",
+                "updated_at": "2026-03-30T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Document owner is Sara"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-029",
+        "description": "meadow graph retrieval",
+        "query": "meadow support defect ledger",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Hotfix captain is Theo",
+                "t_valid": "2026-03-31T09:00:00Z",
+                "entity_links": [
+                    "entity:meadow"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:meadow",
+                "member_entities": [
+                    "entity:meadow"
+                ],
+                "summary": "meadow support defect ledger",
+                "updated_at": "2026-03-31T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Hotfix captain is Theo"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-030",
+        "description": "ridge graph retrieval",
+        "query": "ridge compliance waiver tracker",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Review chair is Una",
+                "t_valid": "2026-04-01T09:00:00Z",
+                "entity_links": [
+                    "entity:ridge"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:ridge",
+                "member_entities": [
+                    "entity:ridge"
+                ],
+                "summary": "ridge compliance waiver tracker",
+                "updated_at": "2026-04-01T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Review chair is Una"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-031",
+        "description": "temporal retrieval for monday review",
+        "query": "board review monday",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Board review is Monday at 14:00 UTC",
+                "t_valid": "2026-04-02T14:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Board review is Monday at 14:00 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-032",
+        "description": "temporal retrieval for tuesday sync",
+        "query": "tuesday sync 11:30",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Tuesday sync begins at 11:30 UTC",
+                "t_valid": "2026-04-03T11:30:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Tuesday sync begins at 11:30 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-033",
+        "description": "temporal retrieval for wednesday checkpoint",
+        "query": "wednesday checkpoint april 9",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Wednesday checkpoint lands on April 9",
+                "t_valid": "2026-04-04T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Wednesday checkpoint lands on April 9"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-034",
+        "description": "temporal retrieval for thursday maintenance",
+        "query": "thursday maintenance window",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Thursday maintenance window starts after 20:00 UTC",
+                "t_valid": "2026-04-05T20:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Thursday maintenance window starts after 20:00 UTC"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-035",
+        "description": "temporal retrieval for friday cutoff",
+        "query": "friday cutoff payroll",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Friday payroll cutoff is at 17:00 local time",
+                "t_valid": "2026-04-06T17:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Friday payroll cutoff is at 17:00 local time"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-036",
+        "description": "temporal retrieval for weekend freeze",
+        "query": "weekend freeze saturday",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Weekend freeze activates Saturday morning",
+                "t_valid": "2026-04-07T08:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Weekend freeze activates Saturday morning"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-037",
+        "description": "temporal retrieval for q1 memo",
+        "query": "q1 closeout friday",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Q1 closeout memo ships on Friday",
+                "t_valid": "2026-04-08T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Q1 closeout memo ships on Friday"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-038",
+        "description": "temporal retrieval for march filing",
+        "query": "march filing deadline",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "March filing deadline is March 28",
+                "t_valid": "2026-04-09T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "March filing deadline is March 28"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-039",
+        "description": "temporal retrieval for april renewal",
+        "query": "april renewal thursday",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "April renewal checkpoint is Thursday noon",
+                "t_valid": "2026-04-10T12:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "April renewal checkpoint is Thursday noon"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-040",
+        "description": "temporal retrieval for may rehearsal",
+        "query": "may rehearsal monday",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "May rehearsal lock is Monday evening",
+                "t_valid": "2026-04-11T18:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "May rehearsal lock is Monday evening"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-041",
+        "description": "reasoning retrieval for launch delay",
+        "query": "why was phoenix launch delayed",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Phoenix launch was delayed because the fuel valve inspection uncovered residue in the manifold.",
+                "t_valid": "2026-04-12T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Phoenix launch was delayed because the fuel valve inspection uncovered residue in the manifold."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-042",
+        "description": "reasoning retrieval for hiring slowdown",
+        "query": "why did cedar hiring slow down",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Cedar hiring slowed down because the finance team paused backfills until the new forecast was approved.",
+                "t_valid": "2026-04-13T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Cedar hiring slowed down because the finance team paused backfills until the new forecast was approved."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-043",
+        "description": "reasoning retrieval for billing rollback",
+        "query": "why was lantern billing rolled back",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Lantern billing was rolled back because the tax mapping table produced duplicate region codes.",
+                "t_valid": "2026-04-14T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Lantern billing was rolled back because the tax mapping table produced duplicate region codes."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-044",
+        "description": "reasoning retrieval for export delay",
+        "query": "why did harbor export miss the window",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Harbor export missed the window because the signed manifest arrived after customs had already closed intake.",
+                "t_valid": "2026-04-15T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Harbor export missed the window because the signed manifest arrived after customs had already closed intake."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-045",
+        "description": "reasoning retrieval for audit extension",
+        "query": "why did solstice audit get an extension",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Solstice audit got an extension because two vendor attestations were still pending legal review.",
+                "t_valid": "2026-04-16T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Solstice audit got an extension because two vendor attestations were still pending legal review."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-046",
+        "description": "reasoning retrieval for migration pause",
+        "query": "why did quartz migration pause",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Quartz migration paused because the replica lag exceeded the safety threshold during the dry run.",
+                "t_valid": "2026-04-17T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Quartz migration paused because the replica lag exceeded the safety threshold during the dry run."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-047",
+        "description": "reasoning retrieval for partner renewal",
+        "query": "why did horizon partner renewal slip",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Horizon partner renewal slipped because procurement requested a revised security appendix before signature.",
+                "t_valid": "2026-04-18T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Horizon partner renewal slipped because procurement requested a revised security appendix before signature."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-048",
+        "description": "reasoning retrieval for hotfix",
+        "query": "why did meadow ship a hotfix",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Meadow shipped a hotfix because the cache invalidation rule left stale balances visible to support agents.",
+                "t_valid": "2026-04-19T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Meadow shipped a hotfix because the cache invalidation rule left stale balances visible to support agents."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-049",
+        "description": "reasoning retrieval for waiver",
+        "query": "why was ridge waiver escalated",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Ridge waiver was escalated because the original exception touched customer encryption settings.",
+                "t_valid": "2026-04-20T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Ridge waiver was escalated because the original exception touched customer encryption settings."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-050",
+        "description": "reasoning retrieval for support backlog",
+        "query": "why did summit support backlog grow",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Summit support backlog grew because the triage rotation was understaffed during the regional holiday.",
+                "t_valid": "2026-04-21T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Summit support backlog grew because the triage rotation was understaffed during the regional holiday."
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-051",
+        "description": "project filter isolates atlas budget facts from beacon",
+        "query": "budget review",
+        "scope": "org",
+        "project": "atlas",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas budget review closes Friday",
+                "t_valid": "2026-04-22T09:00:00Z",
+                "project": "atlas"
+            },
+            {
+                "content": "Beacon budget review closes Friday",
+                "t_valid": "2026-04-23T09:00:00Z",
+                "project": "beacon"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Atlas budget review closes Friday"
+            ],
+            "must_not_contain": [
+                "Beacon budget review closes Friday"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-052",
+        "description": "project filter isolates beacon launch checklist facts from atlas",
+        "query": "launch checklist",
+        "scope": "org",
+        "project": "beacon",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas launch checklist needs legal signoff",
+                "t_valid": "2026-04-24T10:00:00Z",
+                "project": "atlas"
+            },
+            {
+                "content": "Beacon launch checklist needs legal signoff",
+                "t_valid": "2026-04-25T10:00:00Z",
+                "project": "beacon"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Beacon launch checklist needs legal signoff"
+            ],
+            "must_not_contain": [
+                "Atlas launch checklist needs legal signoff"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-053",
+        "description": "project filter isolates atlas risk ledger facts from beacon",
+        "query": "risk ledger",
+        "scope": "org",
+        "project": "atlas",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas risk ledger requires finance review",
+                "t_valid": "2026-04-26T11:00:00Z",
+                "project": "atlas"
+            },
+            {
+                "content": "Beacon risk ledger requires finance review",
+                "t_valid": "2026-04-27T11:00:00Z",
+                "project": "beacon"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Atlas risk ledger requires finance review"
+            ],
+            "must_not_contain": [
+                "Beacon risk ledger requires finance review"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-054",
+        "description": "project filter isolates beacon vendor memo facts from atlas",
+        "query": "vendor memo",
+        "scope": "org",
+        "project": "beacon",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas vendor memo was shared with procurement",
+                "t_valid": "2026-04-28T12:00:00Z",
+                "project": "atlas"
+            },
+            {
+                "content": "Beacon vendor memo was shared with procurement",
+                "t_valid": "2026-04-29T12:00:00Z",
+                "project": "beacon"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Beacon vendor memo was shared with procurement"
+            ],
+            "must_not_contain": [
+                "Atlas vendor memo was shared with procurement"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-055",
+        "description": "project filter isolates atlas staffing sync facts from beacon",
+        "query": "staffing sync",
+        "scope": "org",
+        "project": "atlas",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas staffing sync moved to Thursday",
+                "t_valid": "2026-04-30T13:00:00Z",
+                "project": "atlas"
+            },
+            {
+                "content": "Beacon staffing sync moved to Thursday",
+                "t_valid": "2026-05-01T13:00:00Z",
+                "project": "beacon"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "Atlas staffing sync moved to Thursday"
+            ],
+            "must_not_contain": [
+                "Beacon staffing sync moved to Thursday"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-056",
+        "description": "graph bridge retrieval via community co-membership for aurora",
+        "query": "aurora board handoff queue",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Escalation owner is Mira",
+                "t_valid": "2026-05-02T09:00:00Z",
+                "entity_links": [
+                    "entity:mira"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:aurora-bridge",
+                "member_entities": [
+                    "entity:aurora",
+                    "entity:mira"
+                ],
+                "summary": "aurora board handoff queue",
+                "updated_at": "2026-05-02T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Escalation owner is Mira"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-057",
+        "description": "graph bridge retrieval via community co-membership for cedar",
+        "query": "cedar reimbursement exception board",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Approvals steward is Nolan",
+                "t_valid": "2026-05-03T09:00:00Z",
+                "entity_links": [
+                    "entity:nolan"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:cedar-bridge",
+                "member_entities": [
+                    "entity:cedar",
+                    "entity:nolan"
+                ],
+                "summary": "cedar reimbursement exception board",
+                "updated_at": "2026-05-03T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Approvals steward is Nolan"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-058",
+        "description": "graph bridge retrieval via community co-membership for delta",
+        "query": "delta partner onboarding mesh",
+        "scope": "private",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Renewal coordinator is Priya",
+                "t_valid": "2026-05-04T09:00:00Z",
+                "entity_links": [
+                    "entity:priya"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:delta-bridge",
+                "member_entities": [
+                    "entity:delta",
+                    "entity:priya"
+                ],
+                "summary": "delta partner onboarding mesh",
+                "updated_at": "2026-05-04T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Renewal coordinator is Priya"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-059",
+        "description": "graph bridge retrieval via community co-membership for ember",
+        "query": "ember release dependency map",
+        "scope": "org",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Rollback captain is Quinn",
+                "t_valid": "2026-05-05T09:00:00Z",
+                "entity_links": [
+                    "entity:quinn"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:ember-bridge",
+                "member_entities": [
+                    "entity:ember",
+                    "entity:quinn"
+                ],
+                "summary": "ember release dependency map",
+                "updated_at": "2026-05-05T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Rollback captain is Quinn"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "ret-060",
+        "description": "graph bridge retrieval via community co-membership for harbor",
+        "query": "harbor audit remediation chain",
+        "scope": "personal",
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Evidence owner is Rina",
+                "t_valid": "2026-05-06T09:00:00Z",
+                "entity_links": [
+                    "entity:rina"
+                ]
+            }
+        ],
+        "communities": [
+            {
+                "community_id": "community:harbor-bridge",
+                "member_entities": [
+                    "entity:harbor",
+                    "entity:rina"
+                ],
+                "summary": "harbor audit remediation chain",
+                "updated_at": "2026-05-06T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Evidence owner is Rina"
+            ],
             "min_recall_at_k": 1.0
         }
     }

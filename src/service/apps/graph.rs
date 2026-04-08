@@ -1,539 +1,425 @@
-use std::collections::{HashSet, VecDeque};
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
-use crate::service::error::MemoryError;
-use crate::storage::{DbClient, GraphDirection};
+use crate::logging::LogLevel;
+use crate::models::SurprisingConnection;
+use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
+use crate::storage::GraphDirection;
 
-/// Budget limit for BFS node exploration (NFR-GRAPH-01).
-const BUDGET_LIMIT: usize = 500;
-/// Default maximum search depth for `find_path`.
-const DEFAULT_MAX_DEPTH: usize = 4;
-/// Maximum neighbor expansion depth for `expand_neighbors`.
-const EXPAND_MAX_DEPTH: usize = 2;
-/// Maximum number of neighbor results (NFR-GRAPH-02).
-const EXPAND_NEIGHBOR_LIMIT: usize = 50;
-
-/// Returns JSON fallback per §2.5 for APP-05.
-#[must_use]
-pub fn graph_fallback(result: &PathResult) -> serde_json::Value {
-    serde_json::json!({
-        "path": result.path.iter().map(|n| serde_json::json!({
-            "node_id": n.node_id,
-            "type": n.node_type,
-            "edges": n.edges.iter().map(|e| serde_json::json!({
-                "relation": e.relation,
-                "target": e.target_id,
-                "confidence": e.confidence,
-            })).collect::<Vec<_>>(),
-        })).collect::<Vec<_>>(),
-        "path_found": result.path_found,
-        "reason_if_empty": result.reason_if_empty,
-    })
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HubEntity {
+    pub entity_id: String,
+    pub canonical_name: String,
+    pub degree: usize,
 }
 
-/// APP-05 Graph Path Explorer.
-///
-/// Provides BFS-based shortest-path search and neighbor expansion over the
-/// temporal knowledge graph.
-pub struct GraphPathExplorer;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PathResult {
-    pub path: Vec<PathNode>,
-    pub path_found: bool,
-    pub reason_if_empty: Option<String>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GraphCommunity {
+    pub community_id: String,
+    pub summary: String,
+    pub member_entities: Vec<String>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PathNode {
-    pub node_id: String,
-    pub node_type: String,
-    pub label: String,
-    pub edges: Vec<PathEdge>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PathEdge {
-    pub edge_id: String,
-    pub relation: String,
-    pub target_id: String,
-    pub confidence: f64,
-    pub strength: f64,
-    pub provenance: serde_json::Value,
-    pub t_valid: DateTime<Utc>,
-    pub t_invalid: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NeighborResult {
-    pub neighbors: Vec<NeighborNode>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NeighborNode {
-    pub node_id: String,
-    pub node_type: String,
-    pub label: String,
-    pub relation: String,
-    pub direction: String,
-    pub confidence: f64,
-}
-
-/// BFS state for a single node in the search frontier.
-struct BfsEntry {
-    node_id: String,
-    depth: usize,
-    path: Vec<PathEdge>,
-}
-
-/// Extract a string field from a JSON map, handling SurrealDB record literal wrappers.
-fn get_json_str(map: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
-    fn value_to_string(value: &Value) -> Option<String> {
-        if let Some(value) = crate::storage::json_string(value) {
-            return Some(value.to_string());
-        }
-
-        let object = value.as_object()?;
-        let record_id = object.get("RecordId")?.as_object()?;
-        let table = record_id
-            .get("table")
-            .and_then(crate::storage::json_string)
-            .unwrap_or_default();
-        let key = record_id
-            .get("key")
-            .and_then(crate::storage::json_string)
-            .unwrap_or_default();
-
-        if table.is_empty() || key.is_empty() {
-            return None;
-        }
-
-        Some(format!("{table}:{key}"))
-    }
-
-    map.get(key).and_then(value_to_string)
-}
-
-/// Extract an f64 field from a JSON map.
-fn get_json_f64(map: &serde_json::Map<String, Value>, key: &str) -> Option<f64> {
-    map.get(key).and_then(crate::storage::json_f64)
-}
-
-/// Build a [`PathEdge`] from a raw edge record map.
-fn edge_from_record(map: &serde_json::Map<String, Value>, target_id: String) -> Option<PathEdge> {
-    let edge_id = get_json_str(map, "edge_id")
-        .or_else(|| get_json_str(map, "id"))
-        .unwrap_or_default();
-    let relation = get_json_str(map, "relation").unwrap_or_default();
-    let confidence = get_json_f64(map, "confidence").unwrap_or(0.0);
-    let strength = get_json_f64(map, "strength").unwrap_or(0.0);
-    let provenance = map.get("provenance").cloned().unwrap_or(Value::Null);
-    let t_valid = get_json_str(map, "t_valid")
-        .as_deref()
-        .and_then(crate::service::parse_iso)
-        .unwrap_or_else(crate::service::now);
-    let t_invalid = get_json_str(map, "t_invalid")
-        .as_deref()
-        .and_then(crate::service::parse_iso);
-
-    Some(PathEdge {
-        edge_id,
-        relation,
-        target_id,
-        confidence,
-        strength,
-        provenance,
-        t_valid,
-        t_invalid,
-    })
-}
-
-/// Look up a node's type and label from the database.
-async fn fetch_node_metadata(
-    db: &dyn DbClient,
+pub(crate) async fn find_hub_entities(
+    service: &MemoryService,
     namespace: &str,
-    node_id: &str,
-) -> (String, String) {
-    #[allow(clippy::collapsible_if)]
-    if let Ok(Some(record)) = db.select_one(node_id, namespace).await {
-        if let Some(map) = record.as_object() {
-            let node_type = get_json_str(map, "entity_type")
-                .or_else(|| get_json_str(map, "fact_type"))
-                .or_else(|| get_json_str(map, "node_type"))
-                .unwrap_or_else(|| node_id.split(':').next().unwrap_or("unknown").to_string());
-            let label = get_json_str(map, "canonical_name")
-                .or_else(|| get_json_str(map, "name"))
-                .or_else(|| get_json_str(map, "content"))
-                .unwrap_or_else(|| node_id.to_string());
-            return (node_type, label);
+    cutoff: DateTime<Utc>,
+    limit: i32,
+) -> Result<Vec<HubEntity>, MemoryError> {
+    let cutoff_iso = normalize_dt(cutoff);
+    service.logger.log(
+        crate::service::log_event(
+            "graph.hubs.start",
+            json!({"namespace": namespace, "cutoff": cutoff_iso, "limit": limit}),
+            json!({}),
+            None,
+        ),
+        LogLevel::Debug,
+    );
+    let entity_records = service.db_client.select_table("entity", namespace).await?;
+    let mut hubs = Vec::new();
+
+    for record in entity_records {
+        let Some(map) = record.as_object() else {
+            continue;
+        };
+        let Some(entity_id) = map
+            .get("entity_id")
+            .and_then(super::super::episode::unwrap_record_string)
+            .or_else(|| {
+                map.get("id")
+                    .and_then(super::super::episode::unwrap_record_string)
+            })
+        else {
+            continue;
+        };
+
+        let canonical_name = map
+            .get("canonical_name")
+            .and_then(super::super::episode::unwrap_record_string)
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| entity_id.clone());
+
+        let mut unique_edges = HashSet::new();
+        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
+            for edge in service
+                .db_client
+                .select_edge_neighbors(namespace, &entity_id, &cutoff_iso, direction)
+                .await?
+            {
+                if let Some(edge_key) = edge_identity(&edge) {
+                    unique_edges.insert(edge_key);
+                }
+            }
         }
-    }
-    let node_type = node_id.split(':').next().unwrap_or("unknown").to_string();
-    (node_type, node_id.to_string())
-}
 
-impl GraphPathExplorer {
-    /// Find the shortest path between two entities using BFS.
-    ///
-    /// Explores up to `BUDGET_LIMIT` nodes (NFR-GRAPH-01) up to `max_depth`
-    /// hops. Returns the path on success, or a reason code on failure:
-    /// `"no_path"` or `"depth_limit_exceeded"` (FR-GRAPH-05).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MemoryError`] on database failures.
-    pub async fn find_path(
-        from_entity_id: &str,
-        to_entity_id: &str,
-        scope: &str,
-        as_of: DateTime<Utc>,
-        max_depth: Option<usize>,
-        db: &Arc<dyn DbClient>,
-    ) -> Result<PathResult, MemoryError> {
-        let depth_limit = max_depth.unwrap_or(DEFAULT_MAX_DEPTH);
-        let cutoff = crate::service::normalize_dt(as_of);
+        if unique_edges.is_empty() {
+            continue;
+        }
 
-        let mut visited: HashSet<String> = HashSet::new();
-        let mut queue: VecDeque<BfsEntry> = VecDeque::new();
-        let mut nodes_explored: usize = 0;
-
-        visited.insert(from_entity_id.to_string());
-        queue.push_back(BfsEntry {
-            node_id: from_entity_id.to_string(),
-            depth: 0,
-            path: Vec::new(),
+        hubs.push(HubEntity {
+            entity_id,
+            canonical_name,
+            degree: unique_edges.len(),
         });
-
-        while let Some(entry) = queue.pop_front() {
-            nodes_explored += 1;
-            if nodes_explored > BUDGET_LIMIT {
-                return Ok(PathResult {
-                    path: Vec::new(),
-                    path_found: false,
-                    reason_if_empty: Some("depth_limit_exceeded".to_string()),
-                });
-            }
-
-            if entry.depth >= depth_limit {
-                continue;
-            }
-
-            for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-                let edge_records = db
-                    .select_edge_neighbors(scope, &entry.node_id, &cutoff, direction)
-                    .await?;
-
-                for record in &edge_records {
-                    let Some(map) = record.as_object() else {
-                        continue;
-                    };
-
-                    let neighbor_id = match direction {
-                        GraphDirection::Incoming => get_json_str(map, "in").unwrap_or_default(),
-                        GraphDirection::Outgoing => get_json_str(map, "out").unwrap_or_default(),
-                    };
-
-                    if neighbor_id.is_empty() || !visited.insert(neighbor_id.clone()) {
-                        continue;
-                    }
-
-                    if neighbor_id == to_entity_id {
-                        let mut final_path = entry.path.clone();
-                        if let Some(edge) = edge_from_record(map, neighbor_id.clone()) {
-                            final_path.push(edge);
-                        }
-                        let (node_type, label) =
-                            fetch_node_metadata(db.as_ref(), scope, to_entity_id).await;
-                        final_path.push(PathEdge {
-                            edge_id: String::new(),
-                            relation: String::new(),
-                            target_id: String::new(),
-                            confidence: 0.0,
-                            strength: 0.0,
-                            provenance: Value::Null,
-                            t_valid: as_of,
-                            t_invalid: None,
-                        });
-                        let mut path_nodes = build_path_nodes(
-                            final_path,
-                            from_entity_id,
-                            to_entity_id,
-                            node_type,
-                            label,
-                            db,
-                            scope,
-                        )
-                        .await;
-                        // Remove the sentinel edge appended as path terminator.
-                        if let Some(last) = path_nodes.last_mut() {
-                            last.edges.pop();
-                        }
-                        return Ok(PathResult {
-                            path: path_nodes,
-                            path_found: true,
-                            reason_if_empty: None,
-                        });
-                    }
-
-                    let mut next_path = entry.path.clone();
-                    if let Some(edge) = edge_from_record(map, neighbor_id.clone()) {
-                        next_path.push(edge);
-                    }
-
-                    queue.push_back(BfsEntry {
-                        node_id: neighbor_id,
-                        depth: entry.depth + 1,
-                        path: next_path,
-                    });
-                }
-            }
-        }
-
-        Ok(PathResult {
-            path: Vec::new(),
-            path_found: false,
-            reason_if_empty: Some("no_path".to_string()),
-        })
     }
 
-    /// Expand neighbors of an entity up to `depth` hops.
-    ///
-    /// `depth` is clamped to a maximum of 2. Results are capped at 50
-    /// neighbors (NFR-GRAPH-02).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MemoryError`] on database failures.
-    pub async fn expand_neighbors(
-        entity_id: &str,
-        scope: &str,
-        direction: GraphDirection,
-        depth: usize,
-        as_of: DateTime<Utc>,
-        db: &Arc<dyn DbClient>,
-    ) -> Result<NeighborResult, MemoryError> {
-        let depth_limit = depth.min(EXPAND_MAX_DEPTH);
-        let cutoff = crate::service::normalize_dt(as_of);
-        let mut neighbors = Vec::new();
-        let mut visited: HashSet<String> = HashSet::new();
-        let mut queue: VecDeque<(String, usize)> = VecDeque::new();
-
-        visited.insert(entity_id.to_string());
-        queue.push_back((entity_id.to_string(), 0));
-
-        while let Some((current, current_depth)) = queue.pop_front() {
-            if neighbors.len() >= EXPAND_NEIGHBOR_LIMIT {
-                break;
-            }
-
-            if current_depth >= depth_limit {
-                continue;
-            }
-
-            let edge_records = db
-                .select_edge_neighbors(scope, &current, &cutoff, direction)
-                .await?;
-
-            for record in &edge_records {
-                if neighbors.len() >= EXPAND_NEIGHBOR_LIMIT {
-                    break;
-                }
-
-                let Some(map) = record.as_object() else {
-                    continue;
-                };
-
-                let neighbor_id = match direction {
-                    GraphDirection::Incoming => get_json_str(map, "in").unwrap_or_default(),
-                    GraphDirection::Outgoing => get_json_str(map, "out").unwrap_or_default(),
-                };
-
-                if neighbor_id.is_empty() || !visited.insert(neighbor_id.clone()) {
-                    continue;
-                }
-
-                let (node_type, label) =
-                    fetch_node_metadata(db.as_ref(), scope, &neighbor_id).await;
-                let relation = get_json_str(map, "relation").unwrap_or_default();
-                let confidence = get_json_f64(map, "confidence").unwrap_or(0.0);
-                let dir_str = match direction {
-                    GraphDirection::Incoming => "incoming",
-                    GraphDirection::Outgoing => "outgoing",
-                };
-
-                neighbors.push(NeighborNode {
-                    node_id: neighbor_id.clone(),
-                    node_type,
-                    label,
-                    relation,
-                    direction: dir_str.to_string(),
-                    confidence,
-                });
-
-                if current_depth + 1 < depth_limit {
-                    queue.push_back((neighbor_id, current_depth + 1));
-                }
-            }
-        }
-
-        Ok(NeighborResult { neighbors })
-    }
-}
-
-/// Convert a sequence of edges into [`PathNode`]s.
-///
-/// Each edge in the sequence connects one node to the next. The `terminator_*`
-/// parameters provide metadata for the final node (the path destination).
-/// Also requires `source_id` to include the starting node of the path.
-/// Fetches metadata from DB for source and intermediate nodes.
-async fn build_path_nodes(
-    edges: Vec<PathEdge>,
-    source_id: &str,
-    terminator_id: &str,
-    terminator_type: String,
-    terminator_label: String,
-    db: &Arc<dyn DbClient>,
-    scope: &str,
-) -> Vec<PathNode> {
-    let mut nodes = Vec::new();
-
-    let (source_type, source_label) = fetch_node_metadata(db.as_ref(), scope, source_id).await;
-    nodes.push(PathNode {
-        node_id: source_id.to_string(),
-        node_type: source_type,
-        label: source_label,
-        edges: if !edges.is_empty() {
-            vec![edges[0].clone()]
-        } else {
-            Vec::new()
-        },
+    hubs.sort_by(|left, right| {
+        right
+            .degree
+            .cmp(&left.degree)
+            .then_with(|| left.canonical_name.cmp(&right.canonical_name))
+            .then_with(|| left.entity_id.cmp(&right.entity_id))
     });
-
-    for (i, edge) in edges.iter().enumerate() {
-        let node_id = edge.target_id.clone();
-
-        let (node_type, node_label) = fetch_node_metadata(db.as_ref(), scope, &node_id).await;
-
-        let has_next_edge = i + 1 < edges.len();
-        let node_edges = if has_next_edge {
-            vec![edges[i + 1].clone()]
-        } else {
-            Vec::new()
-        };
-
-        nodes.push(PathNode {
-            node_id,
-            node_type,
-            label: node_label,
-            edges: node_edges,
-        });
-    }
-
-    if terminator_id != edges.last().map(|e| e.target_id.as_str()).unwrap_or("") {
-        nodes.push(PathNode {
-            node_id: terminator_id.to_string(),
-            node_type: terminator_type,
-            label: terminator_label,
-            edges: Vec::new(),
-        });
-    }
-
-    nodes
+    hubs.truncate(limit.max(1) as usize);
+    service.logger.log(
+        crate::service::log_event(
+            "graph.hubs.done",
+            json!({"namespace": namespace, "limit": limit}),
+            json!({"count": hubs.len()}),
+            None,
+        ),
+        LogLevel::Trace,
+    );
+    Ok(hubs)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
+pub(crate) async fn list_communities(
+    service: &MemoryService,
+    namespace: &str,
+    cutoff: DateTime<Utc>,
+    limit: i32,
+) -> Result<Vec<GraphCommunity>, MemoryError> {
+    service.logger.log(
+        crate::service::log_event(
+            "graph.communities.start",
+            json!({"namespace": namespace, "limit": limit}),
+            json!({}),
+            None,
+        ),
+        LogLevel::Debug,
+    );
+    let mut communities = service
+        .db_client
+        .select_table("community", namespace)
+        .await?
+        .into_iter()
+        .filter_map(|record| graph_community_from_value(&record))
+        .filter(|community| {
+            community
+                .updated_at
+                .is_none_or(|updated_at| updated_at <= cutoff)
+        })
+        .collect::<Vec<_>>();
 
-    #[test]
-    fn graph_fallback_with_path_returns_valid_json() {
-        let result = PathResult {
-            path: vec![PathNode {
-                node_id: "entity:a".to_string(),
-                node_type: "person".to_string(),
-                label: "Alice".to_string(),
-                edges: vec![PathEdge {
-                    edge_id: "edge:1".to_string(),
-                    relation: "knows".to_string(),
-                    target_id: "entity:b".to_string(),
-                    confidence: 0.9,
-                    strength: 0.8,
-                    provenance: json!({"source": "test"}),
-                    t_valid: Utc::now(),
-                    t_invalid: None,
-                }],
-            }],
-            path_found: true,
-            reason_if_empty: None,
-        };
-        let val = graph_fallback(&result);
-        assert!(val["path_found"].as_bool().unwrap());
-        assert_eq!(val["path"].as_array().unwrap().len(), 1);
-        assert_eq!(val["path"][0]["edges"][0]["relation"], "knows");
+    communities.sort_by(|left, right| {
+        right
+            .updated_at
+            .cmp(&left.updated_at)
+            .then_with(|| left.community_id.cmp(&right.community_id))
+    });
+    communities.truncate(limit.max(1) as usize);
+    service.logger.log(
+        crate::service::log_event(
+            "graph.communities.done",
+            json!({"namespace": namespace, "limit": limit}),
+            json!({"count": communities.len()}),
+            None,
+        ),
+        LogLevel::Trace,
+    );
+    Ok(communities)
+}
+
+pub(crate) async fn find_surprising_connections(
+    service: &MemoryService,
+    namespace: &str,
+    source_entity: &str,
+    max_depth: i32,
+) -> Result<Vec<SurprisingConnection>, MemoryError> {
+    if !is_entity_id(source_entity) || max_depth < 2 {
+        service.logger.log(
+            crate::service::log_event(
+                "graph.surprising_connections.skipped",
+                json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
+                json!({"reason": "invalid_source_or_depth"}),
+                None,
+            ),
+            LogLevel::Trace,
+        );
+        return Ok(Vec::new());
     }
 
-    #[test]
-    fn graph_fallback_empty_path_has_reason() {
-        let result = PathResult {
-            path: vec![],
-            path_found: false,
-            reason_if_empty: Some("no_path".to_string()),
-        };
-        let val = graph_fallback(&result);
-        assert!(!val["path_found"].as_bool().unwrap());
-        assert_eq!(val["reason_if_empty"], "no_path");
-    }
+    service.logger.log(
+        crate::service::log_event(
+            "graph.surprising_connections.start",
+            json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
+            json!({}),
+            None,
+        ),
+        LogLevel::Debug,
+    );
 
-    #[test]
-    fn path_edge_serializes() {
-        let edge = PathEdge {
-            edge_id: "e1".to_string(),
-            relation: "related_to".to_string(),
-            target_id: "entity:t".to_string(),
-            confidence: 0.7,
-            strength: 0.6,
-            provenance: json!({}),
-            t_valid: Utc::now(),
-            t_invalid: None,
-        };
-        let val = serde_json::to_value(&edge).unwrap();
-        assert_eq!(val["confidence"], 0.7);
-    }
+    let cutoff_iso = normalize_dt(crate::service::now());
+    let communities = service
+        .db_client
+        .select_table("community", namespace)
+        .await?
+        .into_iter()
+        .filter_map(|record| graph_community_from_value(&record))
+        .collect::<Vec<_>>();
+    let source_community_ids = community_ids_for_member(&communities, source_entity);
+    let mut name_cache = HashMap::new();
+    let source_entity_name =
+        cached_entity_name(service, namespace, source_entity, &mut name_cache).await?;
 
-    #[test]
-    fn neighbor_result_serializes() {
-        let result = NeighborResult {
-            neighbors: vec![NeighborNode {
-                node_id: "entity:x".to_string(),
-                node_type: "org".to_string(),
-                label: "X Corp".to_string(),
-                relation: "works_at".to_string(),
-                direction: "outgoing".to_string(),
-                confidence: 0.95,
-            }],
-        };
-        let val = serde_json::to_value(&result).unwrap();
-        assert_eq!(val["neighbors"].as_array().unwrap().len(), 1);
-        assert_eq!(val["neighbors"][0]["direction"], "outgoing");
-    }
+    let mut visited = HashSet::from([source_entity.to_string()]);
+    let mut frontier = VecDeque::from([(
+        source_entity.to_string(),
+        vec![source_entity.to_string()],
+        0_usize,
+    )]);
+    let mut connections = BTreeMap::new();
 
-    #[test]
-    fn get_json_str_unwraps_record_ids() {
-        let map = serde_json::Map::from_iter([(
-            "out".to_string(),
-            json!({
-                "RecordId": {
-                    "table": "entity",
-                    "key": "bob"
+    while let Some((current, path, depth)) = frontier.pop_front() {
+        if depth >= max_depth as usize {
+            continue;
+        }
+
+        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
+            for edge in service
+                .db_client
+                .select_edge_neighbors(namespace, &current, &cutoff_iso, direction)
+                .await?
+            {
+                let Some(neighbor) = neighbor_node(&edge, direction, &current) else {
+                    continue;
+                };
+                if !is_traversable_graph_node(&neighbor) {
+                    continue;
                 }
-            }),
-        )]);
 
-        assert_eq!(get_json_str(&map, "out").as_deref(), Some("entity:bob"));
+                let next_depth = depth + 1;
+                let mut next_path = path.clone();
+                next_path.push(neighbor.clone());
+
+                if is_entity_id(&neighbor)
+                    && neighbor != source_entity
+                    && next_depth >= 2
+                    && is_surprising_target(
+                        &source_community_ids,
+                        &community_ids_for_member(&communities, &neighbor),
+                    )
+                {
+                    let target_entity_name =
+                        cached_entity_name(service, namespace, &neighbor, &mut name_cache).await?;
+                    connections
+                        .entry(neighbor.clone())
+                        .or_insert_with(|| SurprisingConnection {
+                            source_entity_id: source_entity.to_string(),
+                            source_entity_name: source_entity_name.clone(),
+                            target_entity_id: neighbor.clone(),
+                            target_entity_name,
+                            hop_count: next_depth,
+                            path: next_path.clone(),
+                        });
+                }
+
+                if visited.insert(neighbor.clone()) && next_depth < max_depth as usize {
+                    frontier.push_back((neighbor, next_path, next_depth));
+                }
+            }
+        }
+    }
+
+    let mut surprising_connections = connections.into_values().collect::<Vec<_>>();
+    surprising_connections.sort_by(|left, right| {
+        left.hop_count
+            .cmp(&right.hop_count)
+            .then_with(|| left.target_entity_name.cmp(&right.target_entity_name))
+            .then_with(|| left.target_entity_id.cmp(&right.target_entity_id))
+    });
+    service.logger.log(
+        crate::service::log_event(
+            "graph.surprising_connections.done",
+            json!({"namespace": namespace, "source_entity": source_entity}),
+            json!({"count": surprising_connections.len()}),
+            None,
+        ),
+        LogLevel::Trace,
+    );
+    Ok(surprising_connections)
+}
+
+fn edge_identity(record: &Value) -> Option<String> {
+    let map = record.as_object()?;
+
+    map.get("edge_id")
+        .and_then(super::super::episode::unwrap_record_string)
+        .or_else(|| {
+            let in_id = map
+                .get("in")
+                .and_then(super::super::episode::unwrap_record_string)?;
+            let relation = map
+                .get("relation")
+                .and_then(super::super::episode::unwrap_record_string)?;
+            let out_id = map
+                .get("out")
+                .and_then(super::super::episode::unwrap_record_string)?;
+            Some(format!("{in_id}:{relation}:{out_id}"))
+        })
+}
+
+fn neighbor_node(record: &Value, direction: GraphDirection, current: &str) -> Option<String> {
+    let map = record.as_object()?;
+    let in_id = map
+        .get("in")
+        .and_then(super::super::episode::unwrap_record_string)?;
+    let out_id = map
+        .get("out")
+        .and_then(super::super::episode::unwrap_record_string)?;
+
+    match direction {
+        GraphDirection::Incoming if out_id == current => Some(in_id),
+        GraphDirection::Outgoing if in_id == current => Some(out_id),
+        _ => None,
+    }
+}
+
+fn graph_community_from_value(value: &Value) -> Option<GraphCommunity> {
+    let map = value.as_object()?;
+    let community_id = map
+        .get("community_id")
+        .and_then(super::super::episode::unwrap_record_string)
+        .or_else(|| {
+            map.get("id")
+                .and_then(super::super::episode::unwrap_record_string)
+        })?;
+    let summary = map
+        .get("summary")
+        .and_then(super::super::episode::unwrap_record_string)
+        .unwrap_or_default();
+    let member_entities = map
+        .get("member_entities")
+        .and_then(unwrap_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(super::super::episode::unwrap_record_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let updated_at = map
+        .get("updated_at")
+        .and_then(super::super::episode::unwrap_record_string)
+        .as_deref()
+        .and_then(parse_iso);
+
+    if summary.is_empty() || member_entities.is_empty() {
+        return None;
+    }
+
+    Some(GraphCommunity {
+        community_id,
+        summary,
+        member_entities,
+        updated_at,
+    })
+}
+
+fn community_ids_for_member(communities: &[GraphCommunity], entity_id: &str) -> HashSet<String> {
+    communities
+        .iter()
+        .filter(|community| {
+            community
+                .member_entities
+                .iter()
+                .any(|member| member == entity_id)
+        })
+        .map(|community| community.community_id.clone())
+        .collect()
+}
+
+fn is_surprising_target(
+    source_communities: &HashSet<String>,
+    target_communities: &HashSet<String>,
+) -> bool {
+    !target_communities.is_empty()
+        && (source_communities.is_empty() || source_communities.is_disjoint(target_communities))
+}
+
+async fn cached_entity_name(
+    service: &MemoryService,
+    namespace: &str,
+    entity_id: &str,
+    cache: &mut HashMap<String, String>,
+) -> Result<String, MemoryError> {
+    if let Some(name) = cache.get(entity_id) {
+        return Ok(name.clone());
+    }
+
+    let name = service
+        .db_client
+        .select_one(entity_id, namespace)
+        .await?
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|map| {
+            map.get("canonical_name")
+                .and_then(super::super::episode::unwrap_record_string)
+                .filter(|candidate| !candidate.trim().is_empty())
+                .or_else(|| {
+                    map.get("entity_id")
+                        .and_then(super::super::episode::unwrap_record_string)
+                        .or_else(|| {
+                            map.get("id")
+                                .and_then(super::super::episode::unwrap_record_string)
+                        })
+                })
+        })
+        .unwrap_or_else(|| entity_id.to_string());
+
+    cache.insert(entity_id.to_string(), name.clone());
+    Ok(name)
+}
+
+fn is_entity_id(record_id: &str) -> bool {
+    record_id.starts_with("entity:")
+}
+
+fn is_traversable_graph_node(record_id: &str) -> bool {
+    is_entity_id(record_id) || record_id.starts_with("episode:") || record_id.starts_with("fact:")
+}
+
+fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
+    if let Some(array) = value.as_array() {
+        Some(array)
+    } else if let Some(object) = value.as_object() {
+        object.get("Array").and_then(Value::as_array)
+    } else {
+        None
     }
 }

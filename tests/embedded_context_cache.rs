@@ -8,26 +8,28 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
     let service = embedded_support::setup_embedded_service().await?;
     let now = Utc::now();
 
-    embedded_support::add_fact(
-        &service,
-        "metric",
-        "ARR $5M",
-        "ARR $5M",
-        "episode:cache",
-        now - Duration::days(1),
-        "org",
-        0.8,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:cache"}),
-    )
-    .await?;
+    service
+        .add_fact(
+            "metric",
+            "ARR $5M",
+            "ARR $5M",
+            "episode:cache",
+            now - Duration::days(1),
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:cache"}),
+        )
+        .await?;
 
     let request = AssembleContextRequest {
         query: "ARR".to_string(),
         scope: "org".to_string(),
         as_of: Some(now),
         budget: 5,
+        project: None,
+        fact_types: vec![],
         view_mode: None,
         window_start: None,
         window_end: None,

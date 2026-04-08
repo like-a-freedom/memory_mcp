@@ -33,20 +33,20 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
     let service = embedded_support::setup_embedded_service().await?;
     let now = Utc::now();
 
-    let fact_id = embedded_support::add_fact(
-        &service,
-        "metric",
-        "ARR is $1M",
-        "ARR is $1M",
-        "episode:1",
-        now - Duration::days(1),
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:1"}),
-    )
-    .await?;
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR is $1M",
+            "ARR is $1M",
+            "episode:1",
+            now - Duration::days(1),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:1"}),
+        )
+        .await?;
 
     let as_of_before = Utc::now() + Duration::seconds(1);
 
@@ -56,6 +56,8 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             scope: "org".to_string(),
             as_of: Some(as_of_before),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -82,6 +84,8 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             scope: "org".to_string(),
             as_of: Some(as_of_after),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,

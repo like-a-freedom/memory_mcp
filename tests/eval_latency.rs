@@ -1,114 +1,133 @@
-mod eval_support;
+mod common;
 
-use chrono::{Duration, TimeZone, Utc};
-use eval_support::dataset::parse_latency_cases;
-use eval_support::metrics::LatencySuiteSummary;
-use eval_support::report::print_latency_summary;
-use memory_mcp::models::{AssembleContextRequest, IngestRequest};
 use std::time::Instant;
 
-// Important: this runner must use the existing in-memory test service only.
-// Do not switch to RocksDB, remote SurrealDB, or Criterion baseline storage.
+use chrono::{TimeZone, Utc};
+use memory_mcp::models::{AssembleContextRequest, IngestRequest};
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "eval: manual latency run"]
+const INGEST_P95_TARGET_MS: f64 = 200.0;
+const ASSEMBLE_P95_TARGET_MS: f64 = 50.0;
+
+fn percentile_ms(samples: &[f64], percentile: f64) -> f64 {
+    assert!(!samples.is_empty(), "samples must not be empty");
+    let mut sorted = samples.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let index = (((sorted.len() - 1) as f64) * percentile).ceil() as usize;
+    sorted[index.min(sorted.len() - 1)]
+}
+
+fn assert_latency_targets(ingest_p95_ms: f64, assemble_p95_ms: f64) {
+    assert!(
+        ingest_p95_ms <= INGEST_P95_TARGET_MS,
+        "expected ingest_p95 <= {:.2}ms, got {:.2}ms",
+        INGEST_P95_TARGET_MS,
+        ingest_p95_ms,
+    );
+    assert!(
+        assemble_p95_ms <= ASSEMBLE_P95_TARGET_MS,
+        "expected assemble_p95 <= {:.2}ms, got {:.2}ms",
+        ASSEMBLE_P95_TARGET_MS,
+        assemble_p95_ms,
+    );
+}
+
+#[tokio::test]
+#[ignore]
 async fn run_latency_evals() {
-    let raw = std::fs::read_to_string("tests/fixtures/evals/latency_cases.json").unwrap();
-    let cases = parse_latency_cases(&raw).unwrap();
-    let mut summary = LatencySuiteSummary::default();
+    const SAMPLE_COUNT: usize = 20;
 
-    for case in cases {
-        // Use GLiNER + LocalCandle embeddings for accurate eval
-        let service = eval_support::common::make_service_with_gliner_and_embeddings().await;
+    let service = common::make_service().await;
+    let mut ingest_ms = Vec::with_capacity(SAMPLE_COUNT);
+    let mut assemble_ms = Vec::with_capacity(SAMPLE_COUNT);
 
-        for index in 0..case.episode_count {
-            let t_ref = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap()
-                + Duration::minutes(index as i64);
-            let episode_id = service
-                .ingest(
-                    IngestRequest {
-                        source_type: "eval".to_string(),
-                        source_id: format!("{}-seed-{}", case.id, index),
-                        content: format!("Project Atlas status note {}", index),
-                        t_ref,
-                        scope: case.scope.clone(),
-                        t_ingested: None,
-                        visibility_scope: None,
-                        policy_tags: vec![],
-                    },
-                    None,
-                )
-                .await
-                .unwrap();
-            service.extract(&episode_id, None).await.unwrap();
-        }
-
-        for _ in 0..case.warmup_iterations {
-            let _ = service
-                .assemble_context(AssembleContextRequest {
-                    query: case.query.clone(),
-                    scope: case.scope.clone(),
-                    as_of: None,
-                    budget: 5,
-                    view_mode: None,
-                    window_start: None,
-                    window_end: None,
-                    access: None,
-                })
-                .await
-                .unwrap();
-        }
-
-        for iteration in 0..case.measured_iterations {
-            let ingest_started = Instant::now();
-            let episode_id = service
-                .ingest(
-                    IngestRequest {
-                        source_type: "eval".to_string(),
-                        source_id: format!("{}-measure-{}", case.id, iteration),
-                        content: format!("Measured Atlas event {}", iteration),
-                        t_ref: Utc::now(),
-                        scope: case.scope.clone(),
-                        t_ingested: None,
-                        visibility_scope: None,
-                        policy_tags: vec![],
-                    },
-                    None,
-                )
-                .await
-                .unwrap();
-            summary
-                .ingest_ms
-                .push(ingest_started.elapsed().as_secs_f64() * 1000.0);
-
-            let extract_started = Instant::now();
-            service.extract(&episode_id, None).await.unwrap();
-            summary
-                .extract_ms
-                .push(extract_started.elapsed().as_secs_f64() * 1000.0);
-
-            let assemble_started = Instant::now();
-            let _ = service
-                .assemble_context(AssembleContextRequest {
-                    query: case.query.clone(),
-                    scope: case.scope.clone(),
-                    as_of: None,
-                    budget: 5,
-                    view_mode: None,
-                    window_start: None,
-                    window_end: None,
-                    access: None,
-                })
-                .await
-                .unwrap();
-            summary
-                .assemble_ms
-                .push(assemble_started.elapsed().as_secs_f64() * 1000.0);
-        }
+    for idx in 0..SAMPLE_COUNT {
+        let start = Instant::now();
+        service
+            .ingest(
+                IngestRequest {
+                    source_type: "email".to_string(),
+                    source_id: format!("latency-ingest-{idx}"),
+                    content: format!(
+                        "ARR grew to ${}M. I will send update {} by Friday.",
+                        idx + 1,
+                        idx
+                    ),
+                    t_ref: Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, idx as u32).unwrap(),
+                    scope: "org".to_string(),
+                    project: None,
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await
+            .unwrap_or_else(|err| panic!("latency ingest case {idx} failed: {err}"));
+        ingest_ms.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 
-    print_latency_summary(&summary);
-    assert!(!summary.ingest_ms.is_empty());
-    assert!(!summary.extract_ms.is_empty());
-    assert!(!summary.assemble_ms.is_empty());
+    for idx in 0..SAMPLE_COUNT {
+        common::seed_fact_at(
+            &service,
+            "org",
+            &format!("latency-case-{idx} owner is Alice"),
+            Utc.with_ymd_and_hms(2026, 4, 7, 12, 0, idx as u32).unwrap(),
+        )
+        .await;
+    }
+
+    for idx in 0..SAMPLE_COUNT {
+        let start = Instant::now();
+        let items = service
+            .assemble_context(AssembleContextRequest {
+                query: format!("latency-case-{idx}"),
+                scope: "org".to_string(),
+                as_of: None,
+                budget: 5,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            })
+            .await
+            .unwrap_or_else(|err| panic!("latency assemble case {idx} failed: {err}"));
+        assert!(
+            !items.is_empty(),
+            "expected latency assemble case {idx} to return results"
+        );
+        assemble_ms.push(start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    let ingest_p50 = percentile_ms(&ingest_ms, 0.50);
+    let ingest_p95 = percentile_ms(&ingest_ms, 0.95);
+    let assemble_p50 = percentile_ms(&assemble_ms, 0.50);
+    let assemble_p95 = percentile_ms(&assemble_ms, 0.95);
+
+    println!(
+        "suite=eval_latency ingest_p50_ms={:.2} ingest_p95_ms={:.2} assemble_p50_ms={:.2} assemble_p95_ms={:.2}",
+        ingest_p50, ingest_p95, assemble_p50, assemble_p95,
+    );
+
+    assert_latency_targets(ingest_p95, assemble_p95);
+}
+
+#[test]
+fn percentile_ms_uses_upper_rank_rounding() {
+    let samples = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+
+    assert_eq!(percentile_ms(&samples, 0.50), 3.0);
+    assert_eq!(percentile_ms(&samples, 0.95), 5.0);
+}
+
+#[test]
+fn latency_targets_accept_plan_thresholds() {
+    assert_latency_targets(1.70, 12.41);
+}
+
+#[test]
+#[should_panic(expected = "expected assemble_p95 <= 50.00ms")]
+fn latency_targets_reject_slow_assemble_p95() {
+    assert_latency_targets(10.0, 55.0);
 }

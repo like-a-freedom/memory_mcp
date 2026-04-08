@@ -16,6 +16,7 @@ async fn test_ingest_extract_and_assemble() {
                 content: "ARR grew to $3M. I will send the update by Friday.".to_string(),
                 t_ref: now - chrono::Duration::days(1),
                 scope: "org".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -36,6 +37,8 @@ async fn test_ingest_extract_and_assemble() {
             scope: "org".to_string(),
             as_of: Some(now + chrono::Duration::seconds(1)),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -44,146 +47,6 @@ async fn test_ingest_extract_and_assemble() {
         .await
         .expect("assemble");
     assert!(!context.is_empty());
-}
-
-#[tokio::test]
-async fn test_extract_general_business_content_creates_non_empty_facts() {
-    let service = common::make_service().await;
-    let now = Utc::now();
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: "email".to_string(),
-                source_id: "MSG-GENERAL-1".to_string(),
-                content: "DECISION: Product Release 9326394 is SIGNED and ready for deployment. TASK: Regional team will collect platform version details from regions. REQUIREMENT 6666474 must be aligned with desktop integration.".to_string(),
-                t_ref: now - chrono::Duration::days(1),
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest");
-
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
-    assert!(
-        !extraction.facts.is_empty(),
-        "general business content should produce searchable facts"
-    );
-}
-
-#[tokio::test]
-async fn test_assemble_context_falls_back_to_episode_content_when_no_facts_exist_yet() {
-    let service = common::make_service().await;
-    let now = Utc::now();
-
-    let _episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: "email".to_string(),
-                source_id: "MSG-EPISODE-FTS-1".to_string(),
-                content: "CloudPlatform certification timeline updated for March 2027 and support planning.".to_string(),
-                t_ref: now - chrono::Duration::days(1),
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest");
-
-    let context = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: "CloudPlatform certification".to_string(),
-            scope: "org".to_string(),
-            as_of: Some(now + chrono::Duration::seconds(1)),
-            budget: 5,
-            view_mode: None,
-            window_start: None,
-            window_end: None,
-            access: None,
-        })
-        .await
-        .expect("assemble");
-
-    assert!(
-        !context.is_empty(),
-        "assemble_context should fall back to episode content when facts are absent"
-    );
-}
-
-#[tokio::test]
-async fn test_extract_enriches_person_and_acronym_entities_with_heuristics() {
-    let service = common::make_service().await;
-    let now = Utc::now();
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: "email".to_string(),
-                source_id: "MSG-ENTITY-1".to_string(),
-                content:
-                    "Alice Chen updated CloudPlatform certification guidance for Gateway rollout."
-                        .to_string(),
-                t_ref: now - chrono::Duration::days(1),
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest");
-
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
-    let names = extraction
-        .entities
-        .iter()
-        .map(|entity| entity.canonical_name.as_str())
-        .collect::<Vec<_>>();
-
-    assert!(names.contains(&"Alice Chen"));
-    assert!(names.contains(&"Gateway"));
-}
-
-#[tokio::test]
-async fn test_extract_recovers_acronym_entities_from_mixed_platform_text() {
-    let service = common::make_service().await;
-    let now = Utc::now();
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: "email".to_string(),
-                source_id: "MSG-ENTITY-2".to_string(),
-                content:
-                    "Alice Chen reviewed Gateway documentation for Portal and DataHub alignment."
-                        .to_string(),
-                t_ref: now - chrono::Duration::days(1),
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest");
-
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
-    let names = extraction
-        .entities
-        .iter()
-        .map(|entity| entity.canonical_name.as_str())
-        .collect::<Vec<_>>();
-
-    assert!(names.contains(&"Alice Chen"));
-    assert!(names.contains(&"Gateway"));
-    assert!(names.contains(&"Portal"));
-    assert!(names.contains(&"DataHub"));
 }
 
 #[tokio::test]
@@ -225,6 +88,7 @@ async fn test_invalidate_and_explain() {
                 content: "ARR is $1M".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
                 scope: "org".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -254,6 +118,8 @@ async fn test_invalidate_and_explain() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 20, 0, 0, 0).unwrap()),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -277,6 +143,7 @@ async fn test_invalidate_and_explain() {
                     provenance: serde_json::Value::Null,
                     citation_context: None,
                     all_sources: vec![],
+                    graph_insights: None,
                 }],
             },
             None,
@@ -289,33 +156,35 @@ async fn test_invalidate_and_explain() {
 #[tokio::test]
 async fn test_policy_tag_filtering() {
     let service = common::make_service().await;
-    common::add_fact(
-        &service,
-        "metric",
-        "Salary $100K",
-        "$100K",
-        "episode:hr",
-        Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-        "private",
-        0.9,
-        vec!["entity:a".to_string()],
-        vec!["hr.salary".to_string()],
-        serde_json::json!({"source_episode": "episode:hr"}),
-    )
-    .await
-    .expect("add_fact");
+    service
+        .add_fact(
+            "metric",
+            "Salary $100K",
+            "$100K",
+            "episode:hr",
+            Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
+            "private-hr",
+            0.9,
+            vec!["entity:a".to_string()],
+            vec!["hr.salary".to_string()],
+            serde_json::json!({"source_episode": "episode:hr"}),
+        )
+        .await
+        .expect("add_fact");
 
     let context = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: "Salary".to_string(),
-            scope: "private".to_string(),
+            scope: "private-hr".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
             access: Some(memory_mcp::models::AccessPayload {
-                allowed_scopes: Some(vec!["private".to_string()]),
+                allowed_scopes: Some(vec!["private-hr".to_string()]),
                 allowed_tags: Some(vec!["deal.pipeline".to_string()]),
                 caller_id: None,
                 session_vars: None,
@@ -375,6 +244,124 @@ async fn test_graph_intro_chain_as_of_filters_edges() {
         .await
         .expect("chain future");
     assert_eq!(chain_future, vec![alice, bob, openai]);
+}
+
+#[tokio::test]
+async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
+
+    let alice_id = service.resolve_person("Alice Smith").await.expect("alice");
+    let bob_id = service.resolve_person("Bob Jones").await.expect("bob");
+    let carol_id = service.resolve_person("Carol White").await.expect("carol");
+    let diana_id = service.resolve_person("Diana Prince").await.expect("diana");
+
+    service
+        .relate(&alice_id, "knows", &bob_id)
+        .await
+        .expect("alice->bob");
+    service
+        .relate(&bob_id, "knows", &carol_id)
+        .await
+        .expect("bob->carol");
+
+    common::seed_community(
+        &db_client,
+        "org",
+        "community:alpha",
+        &[alice_id.clone(), bob_id.clone()],
+        "Alice Smith, Bob Jones",
+        t_ref,
+    )
+    .await;
+    common::seed_community(
+        &db_client,
+        "org",
+        "community:beta",
+        &[carol_id.clone(), diana_id.clone()],
+        "Carol White, Diana Prince",
+        t_ref,
+    )
+    .await;
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "graph-insights-1".to_string(),
+                content: "Alice Smith reviewed the partner map".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest");
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Alice Smith reviewed the partner map",
+            "Alice Smith reviewed the partner map",
+            &episode_id,
+            t_ref,
+            "org",
+            0.9,
+            vec![alice_id.clone()],
+            vec![],
+            serde_json::json!({"source_episode": episode_id}),
+        )
+        .await
+        .expect("add fact");
+
+    let explanation = service
+        .explain(
+            memory_mcp::models::ExplainRequest {
+                context_pack: vec![memory_mcp::models::ExplainItem {
+                    fact_id: Some(fact_id),
+                    content: "Alice Smith reviewed the partner map".to_string(),
+                    quote: "Alice Smith reviewed the partner map".to_string(),
+                    source_episode: episode_id.clone(),
+                    scope: None,
+                    t_ref: None,
+                    t_ingested: None,
+                    provenance: serde_json::json!({"source_episode": episode_id}),
+                    citation_context: None,
+                    all_sources: vec![],
+                    graph_insights: None,
+                }],
+            },
+            None,
+        )
+        .await
+        .expect("explain");
+
+    let serialized = serde_json::to_value(&explanation[0]).expect("serialize explain item");
+    let graph_insights = serialized
+        .get("graphInsights")
+        .expect("explain should expose graphInsights");
+    let hub_entities = graph_insights
+        .get("hubEntities")
+        .and_then(serde_json::Value::as_array)
+        .expect("graphInsights.hubEntities should be an array");
+    let surprising_connections = graph_insights
+        .get("surprisingConnections")
+        .and_then(serde_json::Value::as_array)
+        .expect("graphInsights.surprisingConnections should be an array");
+
+    assert!(hub_entities.iter().any(|hub| {
+        hub.get("entityId") == Some(&serde_json::json!(bob_id))
+            && hub.get("degree") == Some(&serde_json::json!(2))
+    }));
+    assert!(surprising_connections.iter().any(|connection| {
+        connection.get("sourceEntityId") == Some(&serde_json::json!(alice_id))
+            && connection.get("targetEntityId") == Some(&serde_json::json!(carol_id))
+            && connection.get("hopCount") == Some(&serde_json::json!(2))
+    }));
 }
 
 #[tokio::test]
@@ -439,6 +426,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
                 content: "Alice Smith met Bob Jones to plan next steps".to_string(),
                 t_ref,
                 scope: "org".to_string(),
+                project: None,
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],
@@ -456,21 +444,21 @@ async fn test_assemble_context_uses_matching_community_summary() {
         .map(|entity| entity.entity_id.clone())
         .expect("alice entity");
 
-    let fact_id = common::add_fact(
-        &service,
-        "note",
-        "Prototype milestone is blocked",
-        "Prototype milestone is blocked",
-        &episode_id,
-        t_ref,
-        "org",
-        0.8,
-        vec![alice_id],
-        vec![],
-        serde_json::json!({"source_episode": episode_id}),
-    )
-    .await
-    .expect("add fact");
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Prototype milestone is blocked",
+            "Prototype milestone is blocked",
+            &episode_id,
+            t_ref,
+            "org",
+            0.8,
+            vec![alice_id],
+            vec![],
+            serde_json::json!({"source_episode": episode_id}),
+        )
+        .await
+        .expect("add fact");
 
     let communities = db_client
         .select_table("community", "org")
@@ -495,6 +483,8 @@ async fn test_assemble_context_uses_matching_community_summary() {
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -527,21 +517,21 @@ async fn test_cbor_round_trip() {
 #[tokio::test]
 async fn test_rate_limit_determinism() {
     let service = common::make_service().await;
-    common::add_fact(
-        &service,
-        "metric",
-        "ARR $1M",
-        "$1M",
-        "episode:vars",
-        Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-        "org",
-        0.8,
-        vec!["entity:a".to_string()],
-        vec![],
-        serde_json::json!({"source_episode": "episode:vars"}),
-    )
-    .await
-    .expect("add_fact");
+    service
+        .add_fact(
+            "metric",
+            "ARR $1M",
+            "$1M",
+            "episode:vars",
+            Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
+            "org",
+            0.8,
+            vec!["entity:a".to_string()],
+            vec![],
+            serde_json::json!({"source_episode": "episode:vars"}),
+        )
+        .await
+        .expect("add_fact");
 
     let access = AccessContext {
         allowed_scopes: Some(vec!["org".to_string()]),
@@ -559,6 +549,8 @@ async fn test_rate_limit_determinism() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -580,6 +572,8 @@ async fn test_rate_limit_determinism() {
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -604,53 +598,53 @@ async fn test_multiword_query_retrieval_quality() {
     let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap();
 
-    common::add_fact(
-        &service,
-        "note",
-        "Project Delta deployment includes a gateway service on port 13000",
-        "Delta Gateway",
-        "episode:035d8d47",
-        t,
-        "org",
-        0.9,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:035d8d47"}),
-    )
-    .await
-    .expect("add fact 1");
+    service
+        .add_fact(
+            "note",
+            "Project Delta deployment includes a gateway service on port 13000",
+            "Delta Gateway",
+            "episode:035d8d47",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:035d8d47"}),
+        )
+        .await
+        .expect("add fact 1");
 
-    common::add_fact(
-        &service,
-        "note",
-        "Fleet checklist: certs required, tokens rotated, ports 5223 and 443 must be open",
-        "fleet checklist certs tokens",
-        "episode:035d8d47",
-        t,
-        "org",
-        0.85,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:035d8d47"}),
-    )
-    .await
-    .expect("add fact 2");
+    service
+        .add_fact(
+            "note",
+            "Fleet checklist: certs required, tokens rotated, ports 5223 and 443 must be open",
+            "fleet checklist certs tokens",
+            "episode:035d8d47",
+            t,
+            "org",
+            0.85,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:035d8d47"}),
+        )
+        .await
+        .expect("add fact 2");
 
-    common::add_fact(
-        &service,
-        "note",
-        "Module v2.2 release notes: feature set updated and component v2.1 improved",
-        "Module v2.2 release",
-        "episode:8de581d5",
-        t,
-        "org",
-        0.8,
-        vec![],
-        vec![],
-        serde_json::json!({"source_episode": "episode:8de581d5"}),
-    )
-    .await
-    .expect("add fact 3");
+    service
+        .add_fact(
+            "note",
+            "Module v2.2 release notes: feature set updated and component v2.1 improved",
+            "Module v2.2 release",
+            "episode:8de581d5",
+            t,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:8de581d5"}),
+        )
+        .await
+        .expect("add fact 3");
 
     let ctx = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
@@ -658,6 +652,8 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -677,6 +673,8 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -695,6 +693,8 @@ async fn test_multiword_query_retrieval_quality() {
             scope: "org".to_string(),
             as_of: None,
             budget: 10,
+            project: None,
+            fact_types: vec![],
             view_mode: None,
             window_start: None,
             window_end: None,
@@ -705,5 +705,114 @@ async fn test_multiword_query_retrieval_quality() {
     assert!(
         !ctx3.is_empty(),
         "Module changelog query with quotes and episode ref: expected matches"
+    );
+}
+
+#[tokio::test]
+async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
+    let service = common::make_service().await;
+    let t = Utc.with_ymd_and_hms(2026, 3, 3, 10, 0, 0).unwrap();
+
+    let fact_id = common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas deployment checklist is approved for rollout.",
+        t,
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "deployment checklist rollout".to_string(),
+            scope: "personal".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context with metadata");
+
+    let item = items
+        .iter()
+        .find(|item| item.fact_id == fact_id)
+        .expect("direct fact should be returned");
+    let serialized = serde_json::to_value(item).expect("serialize assembled item");
+
+    assert_eq!(
+        serialized
+            .get("retrievalTier")
+            .and_then(serde_json::Value::as_str),
+        Some("direct")
+    );
+    assert!(
+        item.rationale.contains("tier=direct"),
+        "rationale should include tier metadata, got: {}",
+        item.rationale
+    );
+    assert!(
+        item.rationale.contains("confidence="),
+        "rationale should include confidence metadata, got: {}",
+        item.rationale
+    );
+}
+
+#[tokio::test]
+async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_tier() {
+    let service = common::make_service().await;
+    let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Quarterly launch review finalized.",
+            "launch review finalized",
+            "episode:temporal-tier",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:temporal-tier"}),
+        )
+        .await
+        .expect("seed temporal fact");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "march 2026 launch review".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble temporal context with metadata");
+
+    let item = items
+        .iter()
+        .find(|item| item.fact_id == fact_id)
+        .expect("temporal fact should be returned");
+    let serialized = serde_json::to_value(item).expect("serialize assembled temporal item");
+
+    assert_eq!(
+        serialized
+            .get("retrievalTier")
+            .and_then(serde_json::Value::as_str),
+        Some("temporal")
+    );
+    assert!(
+        item.rationale.contains("tier=temporal"),
+        "rationale should include temporal tier metadata, got: {}",
+        item.rationale
     );
 }

@@ -1,108 +1,219 @@
 [
     {
         "id": "ext-001",
-        "description": "Metric and promise in one episode",
-        "content": "ARR grew to $3M. I will send the update by Friday.",
+        "description": "metric and promise extraction from update email",
+        "source_type": "email",
+        "source_id": "ext-001",
         "scope": "org",
-        "t_ref": "2026-03-01T09:00:00Z",
+        "content": "ARR grew to $3M. I will send the update by Friday.",
         "expected": {
-            "entities": [],
             "fact_types": [
                 "metric",
                 "promise"
-            ]
+            ],
+            "entities": []
         }
     },
     {
         "id": "ext-002",
-        "description": "Promise-only sentence",
-        "content": "I will finish the integration by next Monday.",
+        "description": "person entities and promise extraction from meeting note",
+        "source_type": "meeting",
+        "source_id": "ext-002",
         "scope": "org",
-        "t_ref": "2026-03-02T09:00:00Z",
+        "content": "Alice Smith will send Bob Jones the prototype by Friday.",
         "expected": {
-            "entities": [],
             "fact_types": [
                 "promise"
+            ],
+            "entities": [
+                "Alice Smith",
+                "Bob Jones"
             ]
         }
     },
     {
         "id": "ext-003",
-        "description": "Metric-only sentence",
-        "content": "Revenue reached $5M in Q4.",
-        "scope": "org",
-        "t_ref": "2026-03-03T09:00:00Z",
+        "description": "metric contradiction warning for updated ARR",
+        "source_type": "chat",
+        "source_id": "ext-003",
+        "scope": "personal",
+        "content": "Alice Smith reports ARR is $7M.",
+        "setup_episodes": [
+            {
+                "source_type": "chat",
+                "source_id": "ext-003-setup",
+                "content": "Alice Smith reports ARR is $5M."
+            }
+        ],
         "expected": {
-            "entities": [],
             "fact_types": [
                 "metric"
+            ],
+            "entities": [
+                "Alice Smith"
+            ],
+            "warnings": [
+                {
+                    "fact_type": "metric",
+                    "existing_content": "Alice Smith reports ARR is $5M.",
+                    "new_content": "Alice Smith reports ARR is $7M."
+                }
             ]
         }
     },
     {
         "id": "ext-004",
-        "description": "Person entity with promise fact",
-        "content": "John Smith promised to deliver the quarterly report by Friday.",
-        "scope": "personal",
-        "t_ref": "2026-03-04T09:00:00Z",
+        "description": "metric contradiction warning for revised MRR",
+        "source_type": "chat",
+        "source_id": "ext-004",
+        "scope": "org",
+        "content": "Bob Jones reports MRR is $140K.",
+        "setup_episodes": [
+            {
+                "source_type": "chat",
+                "source_id": "ext-004-setup",
+                "content": "Bob Jones reports MRR is $120K."
+            }
+        ],
         "expected": {
-            "entities": [
-                {
-                    "entity_type": "person",
-                    "canonical_name": "John Smith"
-                }
-            ],
             "fact_types": [
-                "promise"
+                "metric"
+            ],
+            "entities": [
+                "Bob Jones"
+            ],
+            "warnings": [
+                {
+                    "fact_type": "metric",
+                    "existing_content": "Bob Jones reports MRR is $120K.",
+                    "new_content": "Bob Jones reports MRR is $140K."
+                }
             ]
         }
     },
     {
         "id": "ext-005",
-        "description": "Organization and location entities",
-        "content": "Tim Cook announced that Apple will open a new office in London next year.",
+        "description": "metric contradiction warning for revised budget",
+        "source_type": "chat",
+        "source_id": "ext-005",
         "scope": "org",
-        "t_ref": "2026-03-05T09:00:00Z",
+        "content": "Carla Gomez says the marketing budget is $3M.",
+        "setup_episodes": [
+            {
+                "source_type": "chat",
+                "source_id": "ext-005-setup",
+                "content": "Carla Gomez says the marketing budget is $2M."
+            }
+        ],
         "expected": {
-            "entities": [
-                {
-                    "entity_type": "person",
-                    "canonical_name": "Tim Cook"
-                },
-                {
-                    "entity_type": "organization",
-                    "canonical_name": "Apple"
-                },
-                {
-                    "entity_type": "location",
-                    "canonical_name": "London"
-                }
+            "fact_types": [
+                "metric"
             ],
-            "fact_types": []
+            "entities": [
+                "Carla Gomez"
+            ],
+            "warnings": [
+                {
+                    "fact_type": "metric",
+                    "existing_content": "Carla Gomez says the marketing budget is $2M.",
+                    "new_content": "Carla Gomez says the marketing budget is $3M."
+                }
+            ]
         }
     },
     {
         "id": "ext-006",
-        "description": "Person and organization in business context",
-        "content": "Satya Nadella confirmed that Microsoft acquired Activision Blizzard for sixty-nine billion dollars.",
+        "description": "promise contradiction warning for shifted delivery date",
+        "source_type": "meeting",
+        "source_id": "ext-006",
         "scope": "org",
-        "t_ref": "2026-03-06T09:00:00Z",
+        "content": "Alice Smith will send Bob Jones the prototype by Monday.",
+        "setup_episodes": [
+            {
+                "source_type": "meeting",
+                "source_id": "ext-006-setup",
+                "content": "Alice Smith will send Bob Jones the prototype by Friday."
+            }
+        ],
         "expected": {
-            "entities": [
-                {
-                    "entity_type": "person",
-                    "canonical_name": "Satya Nadella"
-                },
-                {
-                    "entity_type": "organization",
-                    "canonical_name": "Microsoft"
-                },
-                {
-                    "entity_type": "organization",
-                    "canonical_name": "Activision Blizzard"
-                }
+            "fact_types": [
+                "promise"
             ],
-            "fact_types": []
+            "entities": [
+                "Alice Smith",
+                "Bob Jones"
+            ],
+            "warnings": [
+                {
+                    "fact_type": "promise",
+                    "existing_content": "Alice Smith will send Bob Jones the prototype by Friday.",
+                    "new_content": "Alice Smith will send Bob Jones the prototype by Monday."
+                }
+            ]
+        }
+    },
+    {
+        "id": "ext-007",
+        "description": "promise contradiction warning for updated checklist handoff",
+        "source_type": "meeting",
+        "source_id": "ext-007",
+        "scope": "personal",
+        "content": "Mina Patel will send Omar Khan the rollout checklist next week.",
+        "setup_episodes": [
+            {
+                "source_type": "meeting",
+                "source_id": "ext-007-setup",
+                "content": "Mina Patel will send Omar Khan the rollout checklist tomorrow."
+            }
+        ],
+        "expected": {
+            "fact_types": [
+                "promise"
+            ],
+            "entities": [
+                "Mina Patel",
+                "Omar Khan"
+            ],
+            "warnings": [
+                {
+                    "fact_type": "promise",
+                    "existing_content": "Mina Patel will send Omar Khan the rollout checklist tomorrow.",
+                    "new_content": "Mina Patel will send Omar Khan the rollout checklist next week."
+                }
+            ]
+        }
+    },
+    {
+        "id": "ext-008",
+        "description": "experience fact extraction from user preference statement",
+        "source_type": "chat",
+        "source_id": "ext-008",
+        "scope": "org",
+        "content": "Alice Smith prefers weekly launch updates over ad-hoc pings.",
+        "expected": {
+            "fact_types": [
+                "experience"
+            ],
+            "entities": [
+                "Alice Smith"
+            ]
+        }
+    },
+    {
+        "id": "ext-009",
+        "description": "document-style action items from email extract as promise facts",
+        "source_type": "email",
+        "source_id": "ext-009",
+        "scope": "org",
+        "content": "Subject: Atlas follow-up\n\nAction items:\n- Alice Smith: send revised deck by Friday\n- Bob Jones: review launch checklist by Monday",
+        "expected": {
+            "fact_types": [
+                "promise"
+            ],
+            "entities": [
+                "Alice Smith",
+                "Bob Jones"
+            ]
         }
     }
 ]
