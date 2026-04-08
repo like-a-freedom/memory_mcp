@@ -1933,8 +1933,9 @@ fn build_select_facts_ann_query(
     query_vec: &[f64],
     limit: i32,
 ) -> (String, Value) {
+    let ann_limit = limit.max(1);
     // HNSW ef_search defaults to 4 * K for better recall
-    let ef_search = (limit * 4).max(16);
+    let ef_search = (ann_limit * 4).max(16);
     let sql = format!(
         "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
          FROM fact \
@@ -1944,7 +1945,7 @@ fn build_select_facts_ann_query(
            AND t_valid <= type::datetime($cutoff) \
            AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
            AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) \
-           AND embedding <|${limit}, {ef_search}|> $query_vec \
+           AND embedding <|{ann_limit}, {ef_search}|> $query_vec \
          ORDER BY sem_score DESC \
          LIMIT $limit"
     );
@@ -3277,6 +3278,25 @@ mod tests {
         assert!(sql.contains("search::score(1) AS ft_score"));
         assert!(sql.contains("ORDER BY ft_score DESC, summary ASC"));
         assert_eq!(vars.get("query"), Some(&json!("alice project")));
+    }
+
+    #[test]
+    fn build_select_facts_ann_query_inlines_knn_literals() {
+        let (sql, vars) =
+            build_select_facts_ann_query("org", "2026-01-15T00:00:00Z", &[0.1, 0.2, 0.3], 5);
+
+        assert!(
+            sql.contains("embedding <|5, 20|> $query_vec"),
+            "KNN operator should use literal unsigned integers for SurrealDB parsing, got: {sql}"
+        );
+        assert!(
+            !sql.contains("embedding <|$"),
+            "KNN operator must not use bind parameters inside <|...|>, got: {sql}"
+        );
+        assert_eq!(vars.get("scope"), Some(&json!("org")));
+        assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
+        assert_eq!(vars.get("query_vec"), Some(&json!([0.1, 0.2, 0.3])));
+        assert_eq!(vars.get("limit"), Some(&json!(5)));
     }
 
     fn json_contains_text(value: &Value, expected: &str) -> bool {

@@ -1,6 +1,7 @@
 # Stuff
 data/
 dev/
+models/
 .env
 AGENTS.md
 
