@@ -163,7 +163,7 @@ async fn run_dataset_retrieval(
                 }
             }
 
-            if completed_cases == total_cases || completed_cases % 25 == 0 {
+            if completed_cases == total_cases || completed_cases.is_multiple_of(25) {
                 println!(
                     "suite={} progress={}/{} seeded_contexts={}/{}",
                     suite_name,
