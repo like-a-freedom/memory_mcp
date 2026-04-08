@@ -22,6 +22,7 @@ use super::AnnoEntityExtractor;
 use super::EntityExtractor;
 use super::cache::CacheKey;
 use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
+use super::entity_extraction::create_entity_extractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::ingest::prepare_ingest_request;
@@ -146,9 +147,12 @@ impl MemoryService {
             build_startup_versions_event(client_version, server_version.as_deref());
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
-        let embedding_provider = create_embedding_provider(&config.embedding)?;
+        let embedding_provider =
+            create_embedding_provider(&config.embedding, &effective_data_dir).await?;
+        let entity_extractor =
+            create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
 
-        let service = Self::new_with_embedding_provider(
+        let mut service = Self::new_with_embedding_provider(
             Arc::new(db_client),
             config.namespaces,
             config.log_level,
@@ -159,6 +163,7 @@ impl MemoryService {
         )?
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
+        service.entity_extractor = entity_extractor;
         apply_startup_migrations(&service.db_client, &service.namespaces).await?;
         service.check_surrealdb_connection().await?;
 

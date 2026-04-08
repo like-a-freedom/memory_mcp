@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
 use regex::Regex;
@@ -15,6 +15,11 @@ use super::MemoryError;
 /// Extracts entity candidates from text.
 #[async_trait]
 pub trait EntityExtractor: Send + Sync {
+    /// Human-readable provider name.
+    fn provider_name(&self) -> &'static str {
+        "unknown"
+    }
+
     /// Returns normalized entity candidates discovered in the supplied content.
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError>;
 }
@@ -46,6 +51,10 @@ impl RegexEntityExtractor {
 
 #[async_trait]
 impl EntityExtractor for RegexEntityExtractor {
+    fn provider_name(&self) -> &'static str {
+        "regex"
+    }
+
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         let candidates: std::collections::HashSet<_> = self
             .name_regex
@@ -428,8 +437,47 @@ impl LlmEntityExtractor {
 
 #[async_trait]
 impl EntityExtractor for LlmEntityExtractor {
+    fn provider_name(&self) -> &'static str {
+        "llm"
+    }
+
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         (self.extract_fn)(content.to_string()).await
+    }
+}
+
+/// Factory function to create an entity extractor from NER configuration.
+///
+/// # Errors
+///
+/// Returns an error when the selected provider is invalid or model loading fails.
+pub async fn create_entity_extractor(
+    config: &crate::config::NerConfig,
+    data_dir: &str,
+    logger: &crate::logging::StdoutLogger,
+) -> Result<Arc<dyn EntityExtractor>, MemoryError> {
+    use crate::config::NerProviderKind;
+
+    match config.provider {
+        NerProviderKind::Regex => Ok(Arc::new(RegexEntityExtractor::new()?)),
+        NerProviderKind::Anno => Ok(Arc::new(super::AnnoEntityExtractor::new()?)),
+        NerProviderKind::LocalGliner => {
+            let model = config.model.as_ref().ok_or_else(|| {
+                MemoryError::ConfigInvalid(
+                    "NER_MODEL is required for local-gliner provider".to_string(),
+                )
+            })?;
+
+            let model_dir = std::path::PathBuf::from(config.model_dir_or_default(data_dir));
+            let resolved_dir =
+                super::model_loader::ensure_gliner_model_cached(model, &model_dir, logger).await?;
+
+            Ok(Arc::new(super::GlinerEntityExtractor::new(
+                &resolved_dir,
+                config.labels.clone(),
+                config.threshold,
+            )?))
+        }
     }
 }
 
@@ -630,5 +678,19 @@ mod tests {
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].canonical_name, "Alice Smith");
         assert_eq!(candidates[1].entity_type, "company");
+    }
+
+    #[tokio::test]
+    async fn create_entity_extractor_defaults_to_anno() {
+        let logger = crate::logging::StdoutLogger::new("warn");
+        let extractor = create_entity_extractor(
+            &crate::config::NerConfig::default(),
+            "/tmp/memory-mcp-tests",
+            &logger,
+        )
+        .await
+        .expect("default extractor");
+
+        assert_eq!(extractor.provider_name(), "anno");
     }
 }

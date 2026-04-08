@@ -11,6 +11,12 @@ use crate::service::MemoryError;
 /// Default vector dimension used for fact embeddings.
 pub const DEFAULT_EMBEDDING_DIMENSION: usize = 1536;
 
+/// Default vector dimension for the bundled local Candle embedding model.
+pub const DEFAULT_LOCAL_CANDLE_EMBEDDING_DIMENSION: usize = 384;
+
+/// Default max input tokens for chunking local embedding requests.
+pub const DEFAULT_EMBEDDING_MAX_TOKENS: usize = 384;
+
 /// Default timeout for embedding provider HTTP requests.
 pub const DEFAULT_EMBEDDING_TIMEOUT_SECS: u64 = 15;
 
@@ -20,11 +26,147 @@ pub const DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD: f64 = 0.7;
 /// Default retention window for persisted query analytics rows.
 pub const DEFAULT_QUERY_LOG_RETENTION_DAYS: u32 = 90;
 
+/// Default confidence threshold for local NER span acceptance.
+pub const DEFAULT_NER_THRESHOLD: f64 = 0.5;
+
+/// Default batch size for local NER inference.
+pub const DEFAULT_NER_BATCH_SIZE: usize = 4;
+
+/// Supported NER provider kinds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NerProviderKind {
+    /// Regex heuristic fallback.
+    Regex,
+    /// In-process anno-backed NER.
+    Anno,
+    /// Local GLiNER model executed via Candle.
+    LocalGliner,
+}
+
+/// Configuration for NER entity extraction provider selection.
+#[derive(Debug, Clone)]
+pub struct NerConfig {
+    /// Which provider to use.
+    pub provider: NerProviderKind,
+    /// HuggingFace repo ID for the GLiNER model.
+    pub model: Option<String>,
+    /// Optional override for model cache directory.
+    pub model_dir: Option<String>,
+    /// Entity labels to extract.
+    pub labels: Vec<String>,
+    /// Confidence threshold for accepted spans.
+    pub threshold: f64,
+    /// Batch size for inference.
+    pub batch_size: usize,
+}
+
+impl Default for NerConfig {
+    fn default() -> Self {
+        Self {
+            provider: NerProviderKind::Anno,
+            model: None,
+            model_dir: None,
+            labels: default_ner_labels(),
+            threshold: DEFAULT_NER_THRESHOLD,
+            batch_size: DEFAULT_NER_BATCH_SIZE,
+        }
+    }
+}
+
+impl NerConfig {
+    /// Loads NER provider configuration from environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MemoryError::ConfigInvalid`] for unsupported providers or
+    /// malformed numeric settings.
+    pub fn from_env() -> Result<Self, MemoryError> {
+        let provider = match env::var("NER_PROVIDER")
+            .unwrap_or_else(|_| "anno".to_string())
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "regex" => NerProviderKind::Regex,
+            "anno" => NerProviderKind::Anno,
+            "local-gliner" | "local_gliner" | "gliner" => NerProviderKind::LocalGliner,
+            other => {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "unsupported NER_PROVIDER `{other}`"
+                )));
+            }
+        };
+
+        let model = match provider {
+            NerProviderKind::LocalGliner => Some(
+                env::var("NER_MODEL").unwrap_or_else(|_| "urchade/gliner_multi-v2.1".to_string()),
+            ),
+            _ => env::var("NER_MODEL").ok(),
+        };
+
+        let labels = env::var("NER_LABELS")
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|label| !label.is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_else(|_| default_ner_labels());
+
+        let threshold = parse_f64_env("NER_THRESHOLD")?.unwrap_or(DEFAULT_NER_THRESHOLD);
+        let batch_size = parse_usize_env("NER_BATCH_SIZE")?.unwrap_or(DEFAULT_NER_BATCH_SIZE);
+
+        Ok(Self {
+            provider,
+            model,
+            model_dir: env::var("NER_MODEL_DIR").ok(),
+            labels,
+            threshold,
+            batch_size,
+        })
+    }
+
+    /// Resolves the model directory path for local GLiNER providers.
+    ///
+    /// Resolution order:
+    /// 1. `NER_MODEL_DIR` env var
+    /// 2. `<data_dir>/models/ner/<model_name>/`
+    #[must_use]
+    pub fn model_dir_or_default(&self, data_dir: &str) -> String {
+        self.model_dir.clone().unwrap_or_else(|| {
+            let model_name = self.model.as_deref().unwrap_or("urchade/gliner_multi-v2.1");
+            let sanitized = model_name.replace('/', "--");
+
+            PathBuf::from(data_dir)
+                .join("models")
+                .join("ner")
+                .join(sanitized)
+                .to_string_lossy()
+                .to_string()
+        })
+    }
+}
+
+fn default_ner_labels() -> Vec<String> {
+    vec![
+        "person".to_string(),
+        "company".to_string(),
+        "location".to_string(),
+        "product".to_string(),
+        "event".to_string(),
+        "technology".to_string(),
+    ]
+}
+
 /// Supported embedding provider kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmbeddingProviderKind {
     /// Semantic retrieval is disabled.
     Disabled,
+    /// Local Candle-based embedding provider.
+    LocalCandle,
     /// OpenAI-compatible `/embeddings` endpoint.
     OpenAiCompatible,
     /// Ollama `/api/embeddings` endpoint.
@@ -46,8 +188,12 @@ pub struct EmbeddingConfig {
     pub timeout_secs: u64,
     /// Expected embedding vector dimension.
     pub dimension: usize,
+    /// Maximum input tokens for chunking.
+    pub max_tokens: usize,
     /// Minimum cosine similarity required for semantic retrieval.
     pub similarity_threshold: f64,
+    /// Optional override for model directory path (used by local providers).
+    pub model_dir: Option<String>,
 }
 
 impl Default for EmbeddingConfig {
@@ -59,7 +205,9 @@ impl Default for EmbeddingConfig {
             api_key: None,
             timeout_secs: DEFAULT_EMBEDDING_TIMEOUT_SECS,
             dimension: DEFAULT_EMBEDDING_DIMENSION,
+            max_tokens: DEFAULT_EMBEDDING_MAX_TOKENS,
             similarity_threshold: DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            model_dir: None,
         }
     }
 }
@@ -75,29 +223,36 @@ impl EmbeddingConfig {
     /// and [`MemoryError::ConfigMissing`] when a required variable is absent while
     /// embeddings are enabled.
     pub fn from_env() -> Result<Self, MemoryError> {
-        let enabled = parse_bool_env("EMBEDDINGS_ENABLED").unwrap_or(false);
+        let enabled = parse_bool_env("EMBEDDINGS_ENABLED")
+            .or_else(|| env::var("EMBEDDINGS_PROVIDER").ok().map(|_| true))
+            .unwrap_or(false);
         let timeout_secs =
             parse_u64_env("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
-        let dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?
-            .unwrap_or(DEFAULT_EMBEDDING_DIMENSION);
+        let configured_dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?;
+        let max_tokens =
+            parse_usize_env("EMBEDDINGS_MAX_TOKENS")?.unwrap_or(DEFAULT_EMBEDDING_MAX_TOKENS);
         let similarity_threshold = parse_f64_env("EMBEDDINGS_SIMILARITY_THRESHOLD")?
             .unwrap_or(DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD);
+        let model_dir = env::var("EMBEDDINGS_MODEL_DIR").ok();
 
         if !enabled {
             return Ok(Self {
                 timeout_secs,
-                dimension,
+                dimension: configured_dimension.unwrap_or(DEFAULT_EMBEDDING_DIMENSION),
+                max_tokens,
                 similarity_threshold,
+                model_dir,
                 ..Self::default()
             });
         }
 
         let provider = match env::var("EMBEDDINGS_PROVIDER")
-            .map_err(|_| MemoryError::ConfigMissing("EMBEDDINGS_PROVIDER".to_string()))?
+            .unwrap_or_else(|_| "local-candle".to_string())
             .trim()
             .to_ascii_lowercase()
             .as_str()
         {
+            "local-candle" | "local_candle" | "localcandle" => EmbeddingProviderKind::LocalCandle,
             "openai" | "openai-compatible" | "openai_compatible" => {
                 EmbeddingProviderKind::OpenAiCompatible
             }
@@ -109,12 +264,19 @@ impl EmbeddingConfig {
             }
         };
 
-        let model = Some(
-            env::var("EMBEDDINGS_MODEL")
-                .map_err(|_| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
-        );
+        let model = match provider {
+            EmbeddingProviderKind::LocalCandle => Some(
+                env::var("EMBEDDINGS_MODEL")
+                    .unwrap_or_else(|_| "intfloat/multilingual-e5-small".to_string()),
+            ),
+            _ => Some(
+                env::var("EMBEDDINGS_MODEL")
+                    .map_err(|_| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
+            ),
+        };
 
         let base_url = match provider {
+            EmbeddingProviderKind::LocalCandle => None,
             EmbeddingProviderKind::OpenAiCompatible => Some(
                 env::var("EMBEDDINGS_BASE_URL")
                     .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
@@ -126,6 +288,11 @@ impl EmbeddingConfig {
             EmbeddingProviderKind::Disabled => None,
         };
 
+        let dimension = configured_dimension.unwrap_or(match provider {
+            EmbeddingProviderKind::LocalCandle => DEFAULT_LOCAL_CANDLE_EMBEDDING_DIMENSION,
+            _ => DEFAULT_EMBEDDING_DIMENSION,
+        });
+
         Ok(Self {
             provider,
             base_url,
@@ -133,7 +300,9 @@ impl EmbeddingConfig {
             api_key: env::var("EMBEDDINGS_API_KEY").ok(),
             timeout_secs,
             dimension,
+            max_tokens,
             similarity_threshold,
+            model_dir,
         })
     }
 
@@ -141,6 +310,26 @@ impl EmbeddingConfig {
     #[must_use]
     pub fn is_enabled(&self) -> bool {
         !matches!(self.provider, EmbeddingProviderKind::Disabled)
+    }
+
+    /// Resolves the model directory path for local embedding providers.
+    ///
+    /// Resolution order:
+    /// 1. `EMBEDDINGS_MODEL_DIR` env var
+    /// 2. `<data_dir>/models/<model_name>/`
+    #[must_use]
+    pub fn model_dir_or_default(&self, data_dir: &str) -> String {
+        self.model_dir.clone().unwrap_or_else(|| {
+            let model_name = self
+                .model
+                .as_deref()
+                .unwrap_or("intfloat/multilingual-e5-small");
+            PathBuf::from(data_dir)
+                .join("models")
+                .join(model_name)
+                .to_string_lossy()
+                .to_string()
+        })
     }
 }
 
@@ -183,6 +372,8 @@ pub struct SurrealConfig {
     pub query_log_retention_days: u32,
     /// Optional embedding provider configuration.
     pub embedding: EmbeddingConfig,
+    /// NER entity extraction provider configuration.
+    pub ner: NerConfig,
 }
 
 impl SurrealConfig {
@@ -244,6 +435,7 @@ impl SurrealConfig {
 
         let lifecycle = LifecycleConfig::from_env();
         let embedding = EmbeddingConfig::from_env()?;
+        let ner = NerConfig::from_env()?;
 
         Ok(Self {
             db_name,
@@ -258,6 +450,7 @@ impl SurrealConfig {
             query_logging_enabled,
             query_log_retention_days,
             embedding,
+            ner,
         })
     }
 
@@ -436,6 +629,7 @@ pub struct SurrealConfigBuilder {
     query_logging_enabled: bool,
     query_log_retention_days: u32,
     embedding: EmbeddingConfig,
+    ner: NerConfig,
 }
 
 impl Default for SurrealConfigBuilder {
@@ -453,6 +647,7 @@ impl Default for SurrealConfigBuilder {
             query_logging_enabled: false,
             query_log_retention_days: DEFAULT_QUERY_LOG_RETENTION_DAYS,
             embedding: EmbeddingConfig::default(),
+            ner: NerConfig::default(),
         }
     }
 }
@@ -531,6 +726,12 @@ impl SurrealConfigBuilder {
         self
     }
 
+    /// Sets NER entity extraction configuration.
+    pub fn ner_config(mut self, config: NerConfig) -> Self {
+        self.ner = config;
+        self
+    }
+
     /// Builds the configuration.
     ///
     /// # Errors
@@ -567,6 +768,7 @@ impl SurrealConfigBuilder {
             query_logging_enabled: self.query_logging_enabled,
             query_log_retention_days: self.query_log_retention_days,
             embedding: self.embedding,
+            ner: self.ner,
         })
     }
 }
@@ -770,10 +972,37 @@ mod tests {
         assert!(!config.is_enabled());
         assert_eq!(config.provider, EmbeddingProviderKind::Disabled);
         assert_eq!(config.dimension, DEFAULT_EMBEDDING_DIMENSION);
+        assert_eq!(config.max_tokens, DEFAULT_EMBEDDING_MAX_TOKENS);
         assert_eq!(config.timeout_secs, DEFAULT_EMBEDDING_TIMEOUT_SECS);
         assert_eq!(
             config.similarity_threshold,
             DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD
+        );
+    }
+
+    #[test]
+    fn ner_config_from_env_supports_local_gliner_defaults() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("NER_PROVIDER", "local-gliner");
+        }
+
+        let config = NerConfig::from_env().expect("local gliner ner config");
+
+        unsafe {
+            env::remove_var("NER_PROVIDER");
+        }
+
+        assert_eq!(config.provider, NerProviderKind::LocalGliner);
+        assert_eq!(config.model.as_deref(), Some("urchade/gliner_multi-v2.1"));
+        assert_eq!(config.model_dir, None);
+        assert_eq!(config.labels, default_ner_labels());
+        assert_eq!(config.threshold, DEFAULT_NER_THRESHOLD);
+        assert_eq!(config.batch_size, DEFAULT_NER_BATCH_SIZE);
+        assert_eq!(
+            config.model_dir_or_default("/data/surrealdb"),
+            "/data/surrealdb/models/ner/urchade--gliner_multi-v2.1"
         );
     }
 
@@ -854,6 +1083,33 @@ mod tests {
         assert_eq!(config.timeout_secs, 7);
         assert_eq!(config.dimension, 768);
         assert_eq!(config.similarity_threshold, 0.82);
+    }
+
+    #[test]
+    fn embedding_config_from_env_supports_local_candle() {
+        let _guard = env_lock().lock().expect("env lock");
+
+        unsafe {
+            env::set_var("EMBEDDINGS_ENABLED", "true");
+            env::set_var("EMBEDDINGS_PROVIDER", "local-candle");
+        }
+
+        let config = EmbeddingConfig::from_env().expect("local candle embedding config");
+
+        unsafe {
+            env::remove_var("EMBEDDINGS_ENABLED");
+            env::remove_var("EMBEDDINGS_PROVIDER");
+        }
+
+        assert!(config.is_enabled());
+        assert_eq!(config.provider, EmbeddingProviderKind::LocalCandle);
+        assert_eq!(config.base_url, None);
+        assert_eq!(
+            config.model.as_deref(),
+            Some("intfloat/multilingual-e5-small")
+        );
+        assert_eq!(config.dimension, DEFAULT_LOCAL_CANDLE_EMBEDDING_DIMENSION);
+        assert_eq!(config.max_tokens, DEFAULT_EMBEDDING_MAX_TOKENS);
     }
 
     #[test]

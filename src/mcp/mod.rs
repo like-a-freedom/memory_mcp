@@ -11,6 +11,7 @@
 //! - `parsers`: Utility functions for parsing and validation
 //! - `handlers`: Individual tool handler implementations
 //! - `error`: Error conversion utilities
+//! - `resources`: MCP resource catalog and URI helpers for app sessions
 
 pub use handlers::*;
 pub use parsers::*;
@@ -19,6 +20,7 @@ mod error;
 mod handlers;
 mod params;
 mod parsers;
+mod resources;
 
 pub use error::mcp_error;
 pub use params::*;

@@ -35,6 +35,10 @@ impl std::fmt::Debug for AnnoEntityExtractor {
 
 #[async_trait]
 impl EntityExtractor for AnnoEntityExtractor {
+    fn provider_name(&self) -> &'static str {
+        "anno"
+    }
+
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         if content.trim().is_empty() {
             return Ok(Vec::new());

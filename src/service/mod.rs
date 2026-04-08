@@ -9,8 +9,11 @@
 pub use anno_entity_extractor::AnnoEntityExtractor;
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
-pub use entity_extraction::{EntityExtractor, LlmEntityExtractor, RegexEntityExtractor};
+pub use entity_extraction::{
+    EntityExtractor, LlmEntityExtractor, RegexEntityExtractor, create_entity_extractor,
+};
 pub use error::MemoryError;
+pub use gliner_entity_extractor::GlinerEntityExtractor;
 
 mod anno_entity_extractor;
 mod apps;
@@ -21,11 +24,14 @@ mod embedding;
 mod entity_extraction;
 mod episode;
 mod error;
+mod gliner_entity_extractor;
 mod ids;
 mod ingest;
 pub mod lifecycle;
 mod query;
 mod validation;
+
+mod model_loader;
 
 pub use constants::*;
 mod constants {

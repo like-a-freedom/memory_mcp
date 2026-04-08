@@ -32,6 +32,13 @@ reqwest = { version = "0.13.2", default-features = false, features = [
     "json",
     "rustls"
 ] }
+candle-core = { version = "0.9.2", default-features = false }
+candle-nn = { version = "0.9.2", default-features = false }
+candle-transformers = { version = "0.9.2", default-features = false }
+tokenizers = { version = "0.22.2", default-features = false, features = [
+    "fancy-regex"
+] }
+hf-hub = { version = "0.5.0", default-features = false, features = ["tokio"] }
 notify = { version = "8.2.0", optional = true }
 
 [features]
