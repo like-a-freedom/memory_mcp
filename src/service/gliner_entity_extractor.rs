@@ -2,30 +2,28 @@
 //!
 //! This module provides zero-shot NER extraction with local GLiNER weights.
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, sync::LazyLock};
 
 use async_trait::async_trait;
 use candle_core::{Device, IndexOp, Module, Tensor};
 use candle_nn::rnn::Direction;
 use candle_nn::{LSTM, LSTMConfig, RNN, VarBuilder};
 use candle_transformers::models::debertav2::{Config, DTYPE, DebertaV2Model};
-use tokenizers::Tokenizer;
+use tokenizers::{Encoding, Tokenizer};
 
 use crate::models::EntityCandidate;
 
 use super::{EntityExtractor, MemoryError};
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
+const SEP_TOKEN: &str = "<<SEP>>";
 const DEFAULT_MAX_SPAN_WIDTH: usize = 12;
 const DEFAULT_MAX_SEQ_LEN: usize = 384;
 const FALLBACK_BACKBONE_MAX_POSITION_EMBEDDINGS: usize = 512;
 const BACKBONE_PREFIX: &str = "token_rep_layer.bert_layer.model";
 
-#[derive(Debug, Clone)]
-struct PromptEncoding {
-    token_ids: Vec<u32>,
-    entity_token_positions: Vec<usize>,
-}
+static WHITESPACE_WORD_SPLITTER: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S").expect("valid splitter regex"));
 
 #[derive(Debug, Clone)]
 struct ScoredSpan {
@@ -45,7 +43,6 @@ pub struct GlinerEntityExtractor {
     max_span_width: usize,
     max_seq_len: usize,
     ent_token_id: u32,
-    sep_token_id: u32,
     token_projection: TokenProjectionLayer,
     rnn: BiLstmLayer,
     span_rep_layer: SpanRepresentationLayer,
@@ -88,12 +85,6 @@ fn default_dropout() -> f64 {
 
 fn default_max_span_width() -> usize {
     DEFAULT_MAX_SPAN_WIDTH
-}
-
-fn resolve_sep_token(tokenizer: &Tokenizer) -> Result<u32, MemoryError> {
-    tokenizer.token_to_id("<<SEP>>").ok_or_else(|| {
-        MemoryError::Storage("GLiNER tokenizer missing separator token `<<SEP>>`".to_string())
-    })
 }
 
 fn gliner_ffn_hidden_size(hidden_size: usize) -> usize {
@@ -553,8 +544,6 @@ impl GlinerEntityExtractor {
             .map_err(|err| MemoryError::Storage(format!("failed to load safetensors: {err}")))?;
 
             let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
-            let sep_token_id = resolve_sep_token(&tokenizer)?;
-
             let model = DebertaV2Model::load(vb.pp(BACKBONE_PREFIX), &runtime_config.backbone)
                 .map_err(|err| MemoryError::Storage(format!("failed to build model: {err}")))?;
             let token_projection = TokenProjectionLayer::load(
@@ -596,7 +585,6 @@ impl GlinerEntityExtractor {
                 max_span_width: runtime_config.max_span_width,
                 max_seq_len: runtime_config.max_seq_len,
                 ent_token_id,
-                sep_token_id,
                 token_projection,
                 rnn,
                 span_rep_layer,
@@ -604,7 +592,6 @@ impl GlinerEntityExtractor {
             })
         } else if pytorch_path.is_file() {
             let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
-            let sep_token_id = resolve_sep_token(&tokenizer)?;
 
             let vb = VarBuilder::from_pth(pytorch_path.to_str().unwrap_or(""), DTYPE, &device)
                 .map_err(|err| {
@@ -652,7 +639,6 @@ impl GlinerEntityExtractor {
                 max_span_width: runtime_config.max_span_width,
                 max_seq_len: runtime_config.max_seq_len,
                 ent_token_id,
-                sep_token_id,
                 token_projection,
                 rnn,
                 span_rep_layer,
@@ -679,31 +665,136 @@ impl GlinerEntityExtractor {
         )))
     }
 
-    fn encode_prompt(&self, labels: &[String]) -> Result<PromptEncoding, MemoryError> {
-        let mut tokens = Vec::new();
-        let mut entity_token_positions = Vec::with_capacity(labels.len());
-        for label in labels {
-            entity_token_positions.push(tokens.len());
-            tokens.push(self.ent_token_id);
+    fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
+        WHITESPACE_WORD_SPLITTER
+            .find_iter(text)
+            .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
+            .collect()
+    }
+
+    fn build_prompt_words(&self) -> Vec<String> {
+        let ent_token = self
+            .tokenizer
+            .id_to_token(self.ent_token_id)
+            .unwrap_or_else(|| "<<ENT>>".to_string());
+        let mut prompt = Vec::with_capacity(self.labels.len() * 2 + 1);
+        for label in &self.labels {
+            prompt.push(ent_token.clone());
+            prompt.push(label.clone());
+        }
+        prompt.push(SEP_TOKEN.to_string());
+        prompt
+    }
+
+    fn encode_window(
+        &self,
+        prompt_words: &[String],
+        text_words: &[(String, (usize, usize))],
+        window_start: usize,
+    ) -> Result<(Encoding, usize), MemoryError> {
+        let mut last_fit = None;
+
+        for window_end in window_start + 1..=text_words.len() {
+            let mut input_words =
+                Vec::with_capacity(prompt_words.len() + window_end - window_start);
+            input_words.extend(prompt_words.iter().cloned());
+            input_words.extend(
+                text_words[window_start..window_end]
+                    .iter()
+                    .map(|(word, _)| word.clone()),
+            );
 
             let encoding = self
                 .tokenizer
-                .encode(label.as_str(), false)
-                .map_err(|err| MemoryError::Storage(format!("label tokenization failed: {err}")))?;
-            let label_ids = encoding.get_ids().to_vec();
-            if label_ids.is_empty() {
-                return Err(MemoryError::Storage(format!(
-                    "label `{label}` produced no tokens"
-                )));
+                .encode(input_words, true)
+                .map_err(|err| MemoryError::Storage(format!("tokenization failed: {err}")))?;
+
+            if encoding.len() > self.max_seq_len {
+                break;
             }
-            tokens.extend_from_slice(&label_ids);
-            tokens.push(self.sep_token_id);
+
+            last_fit = Some((encoding, window_end));
         }
 
-        Ok(PromptEncoding {
-            token_ids: tokens,
-            entity_token_positions,
+        last_fit.ok_or_else(|| {
+            MemoryError::Storage(format!(
+                "GLiNER input window does not fit into max sequence length {}",
+                self.max_seq_len
+            ))
         })
+    }
+
+    fn collect_prompt_entity_positions(
+        &self,
+        input_ids: &[u32],
+        word_ids: &[Option<u32>],
+        prompt_word_count: usize,
+    ) -> Vec<usize> {
+        input_ids
+            .iter()
+            .enumerate()
+            .filter_map(|(index, token_id)| {
+                (token_id == &self.ent_token_id
+                    && word_ids
+                        .get(index)
+                        .and_then(|word_id| *word_id)
+                        .is_some_and(|word_id| word_id < prompt_word_count as u32))
+                .then_some(index)
+            })
+            .collect()
+    }
+
+    fn extract_word_representations(
+        &self,
+        hidden: &Tensor,
+        word_ids: &[Option<u32>],
+        prompt_word_count: usize,
+        text_offsets: &[(usize, usize)],
+    ) -> Result<(Tensor, Vec<(usize, usize)>), MemoryError> {
+        let mut prev_word_id = None;
+        let mut word_states = Vec::new();
+        let mut word_offsets = Vec::new();
+
+        for (token_index, word_id) in word_ids.iter().enumerate() {
+            let Some(word_id) = *word_id else {
+                prev_word_id = None;
+                continue;
+            };
+
+            if Some(word_id) == prev_word_id {
+                continue;
+            }
+            prev_word_id = Some(word_id);
+
+            if word_id < prompt_word_count as u32 {
+                continue;
+            }
+
+            let text_word_index = (word_id as usize).saturating_sub(prompt_word_count);
+            if text_word_index >= text_offsets.len() {
+                continue;
+            }
+
+            let word_hidden = hidden
+                .narrow(0, token_index, 1)
+                .map_err(|err| MemoryError::Storage(format!("word narrow failed: {err}")))?
+                .squeeze(0)
+                .map_err(|err| MemoryError::Storage(format!("word squeeze failed: {err}")))?;
+            word_states.push(word_hidden);
+            word_offsets.push(text_offsets[text_word_index]);
+        }
+
+        if word_states.is_empty() {
+            return Err(MemoryError::Storage(
+                "GLiNER tokenization produced no word-level text embeddings".to_string(),
+            ));
+        }
+
+        let word_state_refs = word_states.iter().collect::<Vec<_>>();
+        let word_tensor = Tensor::stack(&word_state_refs, 0)
+            .map_err(|err| MemoryError::Storage(format!("word stack failed: {err}")))?;
+
+        Ok((word_tensor, word_offsets))
     }
 
     fn run_forward(&self, input_ids: &[u32]) -> Result<Tensor, MemoryError> {
@@ -734,13 +825,13 @@ impl GlinerEntityExtractor {
 
     fn build_label_representations(
         &self,
-        prompt_hidden: &Tensor,
-        prompt_encoding: &PromptEncoding,
+        hidden: &Tensor,
+        entity_token_positions: &[usize],
     ) -> Result<Tensor, MemoryError> {
-        let mut prompt_labels = Vec::with_capacity(prompt_encoding.entity_token_positions.len());
+        let mut prompt_labels = Vec::with_capacity(entity_token_positions.len());
 
-        for &entity_pos in &prompt_encoding.entity_token_positions {
-            let label_hidden = prompt_hidden
+        for &entity_pos in entity_token_positions {
+            let label_hidden = hidden
                 .narrow(0, entity_pos, 1)
                 .map_err(|err| MemoryError::Storage(format!("label narrow failed: {err}")))?
                 .squeeze(0)
@@ -880,61 +971,60 @@ impl GlinerEntityExtractor {
     }
 
     fn extract_inner(&self, text: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
-        let prompt_encoding = self.encode_prompt(&self.labels)?;
-
-        let max_text_tokens = self
-            .max_seq_len
-            .saturating_sub(prompt_encoding.token_ids.len());
-        if max_text_tokens == 0 {
-            return Err(MemoryError::Storage(
-                "prompt too long for MAX_SEQ_LEN".to_string(),
-            ));
+        let text_words = Self::split_text_words(text);
+        if text_words.is_empty() {
+            return Ok(Vec::new());
         }
 
-        let encoding = self
-            .tokenizer
-            .encode(text, false)
-            .map_err(|err| MemoryError::Storage(format!("tokenization failed: {err}")))?;
-
-        let text_ids = encoding.get_ids().to_vec();
-        let offsets = encoding.get_offsets().to_vec();
+        let prompt_words = self.build_prompt_words();
+        let prompt_word_count = prompt_words.len();
 
         let mut all_spans = Vec::new();
-        let step = max_text_tokens.saturating_sub(1).max(1);
-        for window_start in (0..text_ids.len()).step_by(step) {
-            let window_end = std::cmp::min(window_start + max_text_tokens, text_ids.len());
-            let window_ids = text_ids[window_start..window_end].to_vec();
-            let window_offsets = if window_start < offsets.len() {
-                offsets[window_start..std::cmp::min(window_end, offsets.len())].to_vec()
-            } else {
-                Vec::new()
-            };
 
-            let mut input_ids = prompt_encoding.token_ids.clone();
-            input_ids.extend_from_slice(&window_ids);
-
+        let mut window_start = 0;
+        while window_start < text_words.len() {
+            let (encoding, window_end) =
+                self.encode_window(&prompt_words, &text_words, window_start)?;
+            let input_ids = encoding.get_ids().to_vec();
+            let word_ids = encoding.get_word_ids().to_vec();
             let hidden = self.run_forward(&input_ids)?;
-            let prompt_len = prompt_encoding.token_ids.len();
-            let prompt_hidden = hidden
-                .narrow(0, 0, prompt_len)
-                .map_err(|err| MemoryError::Storage(format!("prompt narrow failed: {err}")))?;
-            let label_representations =
-                self.build_label_representations(&prompt_hidden, &prompt_encoding)?;
 
-            let text_hidden = if !window_ids.is_empty() {
-                let text_hidden = hidden
-                    .narrow(0, prompt_len, window_ids.len())
-                    .map_err(|err| MemoryError::Storage(format!("narrow failed: {err}")))?;
-                self.rnn
-                    .forward(&text_hidden)
-                    .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?
-            } else {
-                continue;
-            };
+            let entity_token_positions =
+                self.collect_prompt_entity_positions(&input_ids, &word_ids, prompt_word_count);
+            if entity_token_positions.len() != self.labels.len() {
+                return Err(MemoryError::Storage(format!(
+                    "GLiNER prompt extraction mismatch: expected {} entity tokens, found {}",
+                    self.labels.len(),
+                    entity_token_positions.len()
+                )));
+            }
+
+            let label_representations =
+                self.build_label_representations(&hidden, &entity_token_positions)?;
+
+            let window_offsets = text_words[window_start..window_end]
+                .iter()
+                .map(|(_, offsets)| *offsets)
+                .collect::<Vec<_>>();
+            let (word_hidden, word_offsets) = self.extract_word_representations(
+                &hidden,
+                &word_ids,
+                prompt_word_count,
+                &window_offsets,
+            )?;
+            let text_hidden = self
+                .rnn
+                .forward(&word_hidden)
+                .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
 
             let spans_data = self.compute_span_scores(&text_hidden, &label_representations)?;
-            let window_spans = self.extract_spans(text, &spans_data, &window_offsets);
+            let window_spans = self.extract_spans(text, &spans_data, &word_offsets);
             all_spans.extend(window_spans);
+
+            if window_end >= text_words.len() {
+                break;
+            }
+            window_start = window_end.saturating_sub(1).max(window_start + 1);
         }
 
         let final_spans = self.apply_nms(all_spans);
