@@ -43,7 +43,10 @@ In practice, that means an agent can ingest content such as emails, notes, or wo
 - **Fact extraction** for metrics, promises, and other structured knowledge
 - **Context assembly** for ranked retrieval by query, scope, and time cutoff
 - **Graph relationships** between episodes, entities, and facts
+- **Optional semantic retrieval providers** including in-process `local-candle`
+- **Optional local GLiNER NER** for zero-shot entity extraction
 - **SurrealDB support** for embedded and remote deployments
+- **Optional watch-mode ingestion** for filesystem-backed auto-ingest workflows
 - **MCP-native interface** for tool-driven agent workflows
 - **Structured logging** with predictable operational behavior
 
@@ -114,6 +117,16 @@ RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
 
+### Watch a directory (optional)
+
+Build or run with the `cli-watch` feature to auto-ingest supported files on create/modify events:
+
+```bash
+cargo run --features cli-watch -- watch /path/to/inbox --project atlas --scope org --interval 2
+```
+
+This reuses the existing ingest pipeline and supported document/email parsers.
+
 ### VS Code MCP host example
 
 If you run the server directly from this workspace, a stdio host configuration can point at Cargo:
@@ -168,6 +181,21 @@ Configuration is loaded from environment variables.
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
 | `LIFECYCLE_DECAY_THRESHOLD` | Confidence threshold for fact invalidation (default: `0.3`) |
 | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | Days before archiving episodes (default: `90`) |
+| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | Half-life in days for decay computation (default: `365`) |
+| `EMBEDDINGS_ENABLED` | Enable semantic retrieval providers (default: `false`) |
+| `EMBEDDINGS_PROVIDER` | Embedding backend: `local-candle`, `openai-compatible`, or `ollama` |
+| `EMBEDDINGS_MODEL` | Model identifier for the selected embedding provider |
+| `EMBEDDINGS_MODEL_DIR` | Optional local cache directory for `local-candle` |
+| `EMBEDDINGS_MAX_TOKENS` | Max token budget before `local-candle` chunks long inputs |
+| `EMBEDDINGS_TIMEOUT_SECS` | Timeout for remote embedding calls |
+| `EMBEDDINGS_SIMILARITY_THRESHOLD` | Minimum cosine similarity for semantic matches |
+| `EMBEDDINGS_API_KEY` | Optional bearer token for OpenAI-compatible providers |
+| `NER_PROVIDER` | Entity extraction backend: `regex`, `anno`, or `local-gliner` |
+| `NER_MODEL` | HuggingFace repo for `local-gliner` |
+| `NER_MODEL_DIR` | Optional local cache directory for `local-gliner` |
+| `NER_LABELS` | Comma-separated runtime labels for `local-gliner` |
+| `NER_THRESHOLD` | Confidence threshold for `local-gliner` acceptance |
+| `NER_BATCH_SIZE` | Batch size for `local-gliner` inference |
 
 ### Example
 
@@ -188,6 +216,15 @@ LIFECYCLE_DECAY_INTERVAL_SECS=3600
 LIFECYCLE_ARCHIVAL_INTERVAL_SECS=86400
 LIFECYCLE_DECAY_THRESHOLD=0.3
 LIFECYCLE_ARCHIVAL_AGE_DAYS=90
+# LIFECYCLE_DECAY_HALF_LIFE_DAYS=365
+
+# Optional local model configuration
+# EMBEDDINGS_ENABLED=true
+# EMBEDDINGS_PROVIDER=local-candle
+# EMBEDDINGS_MODEL=intfloat/multilingual-e5-small
+# EMBEDDINGS_MODEL_DIR=./data/models/intfloat/multilingual-e5-small
+# NER_PROVIDER=local-gliner
+# NER_MODEL=urchade/gliner_multi-v2.1
 ```
 
 ### Query analytics logging
@@ -236,9 +273,14 @@ The public MCP surface is centered on a small set of high-value operations rathe
 | --- | --- |
 | `ingest` | Store an episode with source metadata and timestamps |
 | `extract` | Extract entities, facts, and links from an episode or raw content |
+| `resolve` | Canonicalize an entity name and aliases into a stable entity record |
 | `assemble_context` | Return ranked memory context for a query |
 | `explain` | Expand context items with source citations and multi-source provenance |
 | `invalidate` | Mark a fact as no longer valid as of a given time |
+| `open_app` | Launch an optional MCP app session and return a session-backed resource URI |
+| `app_command` | Execute coarse-grained actions against an open MCP app session |
+
+When the MCP host supports resources, the server also exposes app discovery and session resources such as `ui://memory/apps` and `ui://memory/app/{app}/{session_id}` for inspector, diff, ingestion review, lifecycle, and graph views.
 
 ### `explain` Multi-Source Provenance
 
