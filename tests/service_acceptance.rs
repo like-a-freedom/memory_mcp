@@ -718,6 +718,86 @@ async fn test_multiword_query_retrieval_quality() {
 }
 
 #[tokio::test]
+async fn test_short_natural_language_query_uses_term_fallback() {
+    let service = common::make_service().await;
+    let t = Utc.with_ymd_and_hms(2025, 6, 2, 0, 0, 0).unwrap();
+
+    let answer_fact_id = service
+        .add_fact(
+            "note",
+            "I will graduate with a degree in Business Administration next spring.",
+            "Business Administration degree",
+            "episode:degree-answer",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:degree-answer"}),
+        )
+        .await
+        .expect("add answer fact");
+
+    service
+        .add_fact(
+            "note",
+            "The degree committee meets every Thursday to review curriculum changes.",
+            "degree committee review",
+            "episode:degree-generic",
+            t,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:degree-generic"}),
+        )
+        .await
+        .expect("add generic degree fact");
+
+    service
+        .add_fact(
+            "note",
+            "I will graduate next spring with honors after finishing my final project.",
+            "graduate honors",
+            "episode:graduate-generic",
+            t,
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:graduate-generic"}),
+        )
+        .await
+        .expect("add generic graduate fact");
+
+    let ctx = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "What degree did I graduate with?".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble short natural-language query");
+
+    assert!(
+        !ctx.is_empty(),
+        "expected a short natural-language query to retrieve matching facts"
+    );
+    assert_eq!(
+        ctx.first().map(|item| item.fact_id.as_str()),
+        Some(answer_fact_id.as_str()),
+        "expected the answer fact to rank ahead of partial single-term distractors"
+    );
+}
+
+#[tokio::test]
 async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
     let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2026, 3, 3, 10, 0, 0).unwrap();

@@ -2558,13 +2558,6 @@ async fn select_fact_records_for_query(
         });
     };
 
-    if query_terms.len() < 3 {
-        return Ok(LexicalQueryResult {
-            records: initial,
-            retrieval_tier: RetrievalTier::Direct,
-        });
-    }
-
     let fallback_terms = build_lexical_fallback_queries(&query_terms);
 
     let mut fallback_records = Vec::new();
@@ -2606,7 +2599,7 @@ async fn select_fact_records_for_query(
     let best_phrase_overlap = top_phrase_overlap(&initial, &query_terms)
         .max(top_phrase_overlap(&fallback_records, &query_terms));
 
-    if best_score < query_terms.len().min(4) || (query_terms.len() >= 3 && best_phrase_overlap == 0)
+    if query_terms.len() >= 3 && (best_score < query_terms.len().min(4) || best_phrase_overlap == 0)
     {
         let scanned_records = scan_fact_records_by_query_terms(
             service,
@@ -4203,6 +4196,265 @@ mod tests {
             RetrievalTier::EpisodeFallback
         );
         assert_eq!(fact_ids.first().copied(), Some("fact:support-group"));
+    }
+
+    #[tokio::test]
+    async fn select_fact_records_for_short_query_uses_term_fallback() {
+        struct ShortQueryFallbackDbClient;
+
+        #[async_trait]
+        impl DbClient for ShortQueryFallbackDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("What degree did I graduate with?") => vec![],
+                    Some("degree graduate") => vec![json!({
+                        "fact_id": "fact:answer",
+                        "fact_type": "note",
+                        "content": "I will graduate with a degree in Business Administration.",
+                        "quote": "I will graduate with a degree in Business Administration.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "ft_score": 4.0
+                    })],
+                    Some("degree") => vec![
+                        json!({
+                            "fact_id": "fact:generic",
+                            "fact_type": "note",
+                            "content": "The degree committee met to review course requirements.",
+                            "quote": "The degree committee met to review course requirements.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 8.0
+                        }),
+                        json!({
+                            "fact_id": "fact:answer",
+                            "fact_type": "note",
+                            "content": "I will graduate with a degree in Business Administration.",
+                            "quote": "I will graduate with a degree in Business Administration.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 4.0
+                        }),
+                    ],
+                    Some("graduate") => vec![json!({
+                        "fact_id": "fact:answer",
+                        "fact_type": "note",
+                        "content": "I will graduate with a degree in Business Administration.",
+                        "quote": "I will graduate with a degree in Business Administration.",
+                        "source_episode": "episode:1",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "ft_score": 4.0
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(ShortQueryFallbackDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let lexical_result = select_fact_records_for_query(
+            &service,
+            "org",
+            "org",
+            "2026-01-15T10:30:00Z",
+            Some("What degree did I graduate with?"),
+            5,
+            None,
+            &[],
+        )
+        .await
+        .expect("short-query fallback records");
+
+        let fact_ids = lexical_result
+            .records
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            lexical_result.retrieval_tier,
+            RetrievalTier::EpisodeFallback
+        );
+        assert_eq!(fact_ids.first().copied(), Some("fact:answer"));
     }
 
     #[tokio::test]
@@ -5953,21 +6205,24 @@ mod tests {
                 query_contains: Option<&str>,
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(query_contains, Some("atlas launch"));
-                Ok(vec![json!({
-                    "fact_id": "fact:direct",
-                    "fact_type": "note",
-                    "content": "Atlas launch checklist is blocked on DNS cutover.",
-                    "quote": "Atlas launch checklist is blocked on DNS cutover.",
-                    "source_episode": "episode:direct",
-                    "t_valid": "2026-01-10T10:30:00Z",
-                    "t_ingested": "2026-01-10T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": ["entity:atlas"],
-                    "policy_tags": [],
-                    "provenance": {"source_episode": "episode:direct"},
-                    "ft_score": 100.0
-                })])
+                Ok(match query_contains {
+                    Some("atlas launch") => vec![json!({
+                        "fact_id": "fact:direct",
+                        "fact_type": "note",
+                        "content": "Atlas launch checklist is blocked on DNS cutover.",
+                        "quote": "Atlas launch checklist is blocked on DNS cutover.",
+                        "source_episode": "episode:direct",
+                        "t_valid": "2026-01-10T10:30:00Z",
+                        "t_ingested": "2026-01-10T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:atlas"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:direct"},
+                        "ft_score": 100.0
+                    })],
+                    Some("atlas") | Some("launch") => vec![],
+                    other => panic!("unexpected fallback query: {other:?}"),
+                })
             }
 
             async fn select_facts_by_entity_links(
