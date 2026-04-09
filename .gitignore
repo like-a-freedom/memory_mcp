@@ -42,6 +42,13 @@ rust-project.json
 /criterion/
 /tests/fixtures/evals/full/
 
+# Large raw dataset files (downloaded by scripts/convert_external_evals.py)
+# Keep only the small sample_* fixtures tracked; ignore full upstream copies
+tests/fixtures/evals/raw/longmemeval/longmemeval_s_cleaned.json
+tests/fixtures/evals/raw/locomo/locomo10.json
+tests/fixtures/evals/raw/personamem/questions_32k.csv
+tests/fixtures/evals/raw/prefeval/travel_hotel_overall300_topk_history_persona.json
+
 # Code coverage
 tarpaulin-report.html
 cobertura.xml

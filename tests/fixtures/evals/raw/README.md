@@ -1,45 +1,81 @@
 # External eval raw fixtures
 
-These files are **not vendored full benchmark datasets**.
-They are intentionally small, deterministic **source-derived trimmed excerpts** used for:
+This directory holds **upstream benchmark dataset artifacts** downloaded by
+`scripts/convert_external_evals.py`.
 
-- local normalization tests,
+## Fixture tiers
+
+Two tiers of fixtures coexist:
+
+| Tier | Purpose | File pattern |
+|---|---|---|
+| **Full raw** | Complete upstream datasets for real eval runs | `<dataset>/<primary_file>` |
+| **Sample** | Small 1-record excerpts for smoke tests & normalization unit tests | `<dataset>/sample_*.json` |
+
+### Full raw fixtures
+
+Downloaded from upstream sources and stored verbatim. These are **not** committed
+to git (too large) — regenerate via:
+
+```bash
+python scripts/convert_external_evals.py
+```
+
+### Sample fixtures
+
+Small, deterministic, git-tracked excerpts used for:
+
+- local normalization unit tests,
 - ignored smoke retrieval runs,
-- fast regression checks without downloading multi-megabyte benchmark corpora into the repository.
+- fast regression checks without downloading full corpora.
 
-## Why the files look small
+## Current dataset statistics
 
-That is intentional.
+| Dataset | Full raw file | Source | Samples |
+|---|---|---|---|
+| longmemeval | `longmemeval_s_cleaned.json` (265 MB) | xiaowu0162/longmemeval-cleaned (HF) | 500 records |
+| locomo | `locomo10.json` (3 MB) | snap-research/locomo (GitHub) | 10 convs / 1986 QAs |
+| personamem | `questions_32k.csv` (bundled JSON, 2 MB) | bowen-upenn/PersonaMem (HF) | 589 questions / 37 contexts |
+| prefeval | `travel_hotel_overall300_topk_history_persona.json` (340 KB) | amazon-science/PrefEval (GitHub) | 52 records |
 
-The official upstream datasets are much larger than the local fixture copies:
+## File inventory
 
-- **LongMemEval-cleaned** — the official `longmemeval_s_cleaned.json` release contains 500 evaluation instances; each `LongMemEval_S` instance contains roughly 30–40 sessions / ~115k tokens.
-- **LoCoMo** — the official ACL benchmark release in `data/locomo10.json` contains 10 conversations; each conversation can span many sessions and QA annotations.
-- **PersonaMem** — the official benchmark is split across large `questions_32k.csv` / `shared_contexts_32k.jsonl` artifacts (and larger 128k / 1M variants).
-- **PrefEval** — the official benchmark contains thousands of preference-query pairs across many topics and tracks; our local fixture mirrors one retrieval-track JSON record.
+### Full raw fixtures (git-ignored, generated)
 
-## What is stored locally
-
-Each local fixture keeps only the minimum official excerpt needed for stable retrieval evaluation:
-
-- `longmemeval/sample_longmemeval_s_cleaned.json`
+- `longmemeval/longmemeval_s_cleaned.json`
   - source: `xiaowu0162/longmemeval-cleaned`
-  - locator: `question_id=e47becba`
-- `locomo/sample_locomo10.json`
+  - URL: <https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json>
+  - 500 evaluation instances; each ~30–40 sessions / ~115k tokens
+- `locomo/locomo10.json`
   - source: `snap-research/locomo`
-  - locator: `sample_id=conv-26`
-- `personamem/sample_personamem_32k.json`
+  - URL: <https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json>
+  - 10 conversations with QA annotations
+- `personamem/questions_32k.csv`
   - source: `bowen-upenn/PersonaMem`
-  - locator: `question_id=acd74206-37dc-4756-94a8-b99a395d9a21`
-  - paired context: `shared_context_id=e898d03fec683b1cabf29f57287ff66f8a31842543ecef44b56766844c1c1301`
-- `prefeval/sample_travel_hotel_implicit_persona.json`
+  - URL: <https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/questions_32k.csv>
+  - Bundled JSON: `{questions: [...], shared_contexts: {<id>: [...]}}`
+- `prefeval/travel_hotel_overall300_topk_history_persona.json`
   - source: `amazon-science/PrefEval`
-  - locator: `travel_hotel_overall300_topk_history_persona.json` + Las Vegas hotel preference record
+  - URL: <https://raw.githubusercontent.com/amazon-science/PrefEval/main/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json>
+  - PrefEval retrieval track for travel/hotel queries
+
+### Sample fixtures (git-tracked)
+
+- `longmemeval/sample_longmemeval_s_cleaned.json` — locator: `question_id=e47becba`
+- `locomo/sample_locomo10.json` — locator: `sample_id=conv-26`
+- `personamem/sample_personamem_32k.json` — locator: `question_id=acd74206-...`
+- `prefeval/sample_travel_hotel_implicit_persona.json` — Las Vegas hotel preference record
 
 ## Reproducible verification
 
-The repo now includes an ignored provenance test that checks each local fixture against the official upstream source:
+Provenance test verifies each sample fixture is a real upstream excerpt:
 
-- `cargo test --test eval_external_provenance verify_external_fixtures_against_official_sources -- --ignored --nocapture --test-threads=1`
+```bash
+cargo test --test eval_external_provenance verify_external_fixtures_against_official_sources -- --ignored --nocapture --test-threads=1
+```
 
-This test fetches the official source artifacts and verifies that the local fixture content is a real excerpt rather than a synthetic placeholder.
+## Full dataset cache
+
+Complete upstream artifacts are also cached under `tests/fixtures/evals/full/`
+(git-ignored). The Rust test harness (`tests/eval_support/external_full.rs`) loads
+from this cache when running `ExternalDatasetFlavor::Full` eval suites.
