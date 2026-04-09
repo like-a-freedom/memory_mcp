@@ -5,12 +5,9 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::time::Duration;
 
 use chrono::Utc;
 use serde_json::Value;
-
-use crate::correlation::CorrelationId;
 
 /// Log level for filtering log output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -76,7 +73,6 @@ impl std::fmt::Display for LogLevel {
 #[derive(Clone)]
 pub struct StdoutLogger {
     level: LogLevel,
-    correlation_id: Option<CorrelationId>,
 }
 
 impl StdoutLogger {
@@ -85,25 +81,6 @@ impl StdoutLogger {
     pub fn new(level: &str) -> Self {
         Self {
             level: LogLevel::parse(level),
-            correlation_id: None,
-        }
-    }
-
-    /// Creates a new logger with a correlation ID for tracing.
-    #[must_use]
-    pub fn with_correlation(level: &str, correlation_id: CorrelationId) -> Self {
-        Self {
-            level: LogLevel::parse(level),
-            correlation_id: Some(correlation_id),
-        }
-    }
-
-    /// Returns a new logger with the specified correlation ID.
-    #[must_use]
-    pub fn with_correlation_id(&self, correlation_id: CorrelationId) -> Self {
-        Self {
-            level: self.level,
-            correlation_id: Some(correlation_id),
         }
     }
 
@@ -125,7 +102,7 @@ impl StdoutLogger {
             return;
         }
 
-        let line = self.format_event_line_with_correlation(&event, level);
+        let line = Self::format_event_line(&event, level);
 
         let mut stderr = io::stderr();
         let _ = stderr.write_all(line.as_bytes());
@@ -138,40 +115,6 @@ impl StdoutLogger {
     pub fn format_event_line(event: &HashMap<String, Value>, level: LogLevel) -> String {
         let ts = Utc::now().to_rfc3339();
         Self::format_event_line_with_ts(event, level, &ts)
-    }
-
-    /// Formats an event with correlation ID.
-    #[must_use]
-    fn format_event_line_with_correlation(
-        &self,
-        event: &HashMap<String, Value>,
-        level: LogLevel,
-    ) -> String {
-        let ts = Utc::now().to_rfc3339();
-        let mut parts = Vec::with_capacity(event.len() + 3);
-
-        if let Some(correlation_id) = self.correlation_id {
-            parts.push(format!(
-                "[{}] {} {}",
-                ts,
-                level.as_str().to_uppercase(),
-                correlation_id
-            ));
-        } else {
-            parts.push(format!("[{}] {}", ts, level.as_str().to_uppercase()));
-        }
-
-        let mut keys: Vec<_> = event.keys().cloned().collect();
-        keys.sort();
-
-        for key in keys {
-            if let Some(value) = event.get(&key) {
-                let value_str = value_to_string(value);
-                parts.push(format!("{}={}", key, quote_if_needed(&value_str)));
-            }
-        }
-
-        parts.join(" ")
     }
 
     /// Formats an event with a provided timestamp.
@@ -194,19 +137,6 @@ impl StdoutLogger {
         }
 
         parts.join(" ")
-    }
-
-    /// Formats a duration in human-readable form.
-    #[must_use]
-    pub fn format_duration(duration: Duration) -> String {
-        let secs = duration.as_secs();
-        let millis = duration.subsec_millis();
-
-        if secs >= 1 {
-            format!("{}.{:03}s", secs, millis)
-        } else {
-            format!("{}ms", millis)
-        }
     }
 }
 

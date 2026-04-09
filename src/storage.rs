@@ -20,7 +20,7 @@ use surrealdb::types::Value as SurrealValue;
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
-use crate::timing::OperationTimer;
+use std::time::Instant;
 
 const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
 const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
@@ -537,7 +537,7 @@ impl SurrealDbClient {
         namespace: &str,
     ) -> Result<SurrealValue, MemoryError> {
         let vars_for_log = vars.clone();
-        let timer = OperationTimer::new("db.execute_query");
+        let timer = Instant::now(); // db.execute_query
         self.logger.log(
             build_db_execute_event(
                 "db.execute_query.start",
@@ -617,7 +617,7 @@ impl SurrealDbClient {
         namespace: &str,
     ) -> Result<(), MemoryError> {
         let vars_for_log = vars.clone();
-        let timer = OperationTimer::new("db.execute_raw_query");
+        let timer = Instant::now(); // db.execute_raw_query
         self.logger.log(
             build_db_execute_event(
                 "db.execute_raw_query.start",

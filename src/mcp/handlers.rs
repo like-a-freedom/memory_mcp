@@ -25,7 +25,7 @@ use crate::models::{
 };
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
 use crate::storage::GraphDirection;
-use crate::timing::OperationTimer;
+use std::time::Instant;
 
 use super::error::mcp_error;
 use super::params::*;
@@ -1010,7 +1010,7 @@ impl MemoryMcp {
         let episode_id = normalize_optional_string(episode_id);
         let content = normalize_optional_string(content);
         let text = normalize_optional_string(text);
-        let timer = OperationTimer::new("extract");
+        let timer = Instant::now(); // extract
 
         self.service.log_tool_event(
             "extract.start",
@@ -1239,7 +1239,7 @@ impl MemoryMcp {
             policy_tags: p.policy_tags.clone(),
         };
 
-        let timer = OperationTimer::new("ingest");
+        let timer = Instant::now(); // ingest
         self.service.log_tool_event(
             "ingest.start",
             json!({"source_type": p.source_type, "source_id": p.source_id, "scope": p.scope}),
@@ -1286,7 +1286,7 @@ impl MemoryMcp {
             .map_err(|msg| ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, None))?;
         let request = ExplainRequest { context_pack };
 
-        let timer = OperationTimer::new("explain");
+        let timer = Instant::now(); // explain
         self.service.log_tool_event(
             "explain.start",
             json!({"count": request.context_pack.len()}),
@@ -1361,7 +1361,7 @@ impl MemoryMcp {
             aliases: p.aliases.clone(),
         };
 
-        let timer = OperationTimer::new("resolve");
+        let timer = Instant::now(); // resolve
         self.service.log_tool_event(
             "resolve.start",
             json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
@@ -1418,7 +1418,7 @@ impl MemoryMcp {
             t_invalid,
         };
 
-        let timer = OperationTimer::new("invalidate");
+        let timer = Instant::now(); // invalidate
         self.service.log_tool_event(
             "invalidate.start",
             json!({"fact_id": request.fact_id}),
@@ -1461,7 +1461,7 @@ impl MemoryMcp {
         params: Parameters<OpenAppParams>,
     ) -> Result<Json<ToolResponse<OpenAppResult>>, ErrorData> {
         let p = params.0;
-        let timer = OperationTimer::new("open_app");
+        let timer = Instant::now(); // open_app
         let app = Self::normalize_public_app_name(&p.app)
             .ok_or_else(|| Self::invalid_params(format!("Unknown app: {}", p.app)))?;
 
@@ -1516,7 +1516,7 @@ impl MemoryMcp {
         params: Parameters<AppCommandParams>,
     ) -> Result<Json<ToolResponse<AppCommandResult>>, ErrorData> {
         let p = params.0;
-        let timer = OperationTimer::new("app_command");
+        let timer = Instant::now(); // app_command
         self.service.log_tool_event(
             "app_command.start",
             json!({"session_id": p.session_id, "action": p.action}),
@@ -2229,7 +2229,7 @@ impl MemoryMcp {
             access: None,
         };
 
-        let timer = OperationTimer::new("assemble_context");
+        let timer = Instant::now(); // assemble_context
         self.service.log_tool_event(
             "assemble_context.start",
             json!({"scope": request.scope, "query": request.query}),

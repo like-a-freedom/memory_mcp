@@ -13,7 +13,7 @@ use crate::models::{
     ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink,
     FACT_TYPE_EXPERIENCE, FACT_TYPE_METRIC, FACT_TYPE_PROMISE,
 };
-use crate::timing::OperationTimer;
+use std::time::Instant;
 
 fn unwrap_string_value(v: &Value) -> Option<&str> {
     if let Some(s) = v.as_str() {
@@ -209,7 +209,7 @@ pub async fn extract_entities(
     content: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
-    let timer = OperationTimer::new("ner.extract_candidates");
+    let timer = Instant::now(); // ner.extract_candidates
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
@@ -227,7 +227,7 @@ pub async fn extract_entities(
         Ok(candidates) => candidates,
         Err(err) => {
             let label_count = zero_shot_labels.map(|labels| labels.len());
-            log_ner_error(service, provider, content_chars, label_count, &err, &timer);
+            log_ner_error(service, provider, content_chars, label_count, &err, timer);
             return Err(err);
         }
     };
@@ -408,7 +408,7 @@ pub async fn extract_from_episode(
 ) -> Result<ExtractResult, MemoryError> {
     use crate::models::Edge;
 
-    let timer = OperationTimer::new("extract_from_episode");
+    let timer = Instant::now(); // extract_from_episode
 
     service.logger.log(
         super::log_event(
@@ -529,7 +529,7 @@ fn log_ner_error(
     content_chars: usize,
     zero_shot_label_count: Option<usize>,
     err: &MemoryError,
-    timer: &OperationTimer,
+    timer: Instant,
 ) {
     service.logger.log(
         super::log_event(

@@ -17,7 +17,6 @@ use crate::models::{
 };
 use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
-use crate::timing::OperationTimer;
 
 use super::AnnoEntityExtractor;
 use super::EntityExtractor;
@@ -564,7 +563,7 @@ impl MemoryService {
         zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
-        let timer = OperationTimer::new("extract");
+        let timer = Instant::now(); // extract
         let (record, _) = self.find_episode_record(episode_id).await?;
         if record.is_none() {
             return Err(MemoryError::NotFound(format!(
@@ -824,7 +823,7 @@ impl MemoryService {
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        let timer = OperationTimer::new("embedding.generate");
+        let timer = Instant::now(); // embedding.generate
         let provider = self.embedding_provider.provider_name();
         let args = json!({
             "provider": provider,

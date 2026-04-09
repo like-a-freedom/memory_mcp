@@ -41,39 +41,6 @@ impl fmt::Display for CorrelationId {
     }
 }
 
-/// RAII guard for tracking operation scope with correlation ID.
-pub struct OperationScope {
-    id: CorrelationId,
-    op: String,
-}
-
-impl OperationScope {
-    /// Creates a new operation scope.
-    #[must_use]
-    pub fn new(op: impl Into<String>) -> Self {
-        let id = CorrelationId::new();
-        Self { id, op: op.into() }
-    }
-
-    /// Returns the correlation ID.
-    #[must_use]
-    pub fn id(&self) -> CorrelationId {
-        self.id
-    }
-
-    /// Returns the operation name.
-    #[must_use]
-    pub fn op(&self) -> &str {
-        &self.op
-    }
-}
-
-impl fmt::Display for OperationScope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{}", self.op, self.id)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,12 +56,5 @@ mod tests {
     fn correlation_id_display_format() {
         let id = CorrelationId::from_raw(0x12345);
         assert_eq!(format!("{}", id), "op-00012345");
-    }
-
-    #[test]
-    fn operation_scope_tracks_op() {
-        let scope = OperationScope::new("test_operation");
-        assert_eq!(scope.op(), "test_operation");
-        assert!(scope.id().as_raw() > 0);
     }
 }
