@@ -176,7 +176,7 @@ fn assert_gliner_case_matrix_covers_supported_labels(cases: &[GlinerCoverageCase
     );
 }
 
-fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>) -> EnvGuard {
+fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>, threshold: f64) -> EnvGuard {
     let mut pairs = configure_embedded_env(temp_dir);
     pairs.extend([
         ("NER_PROVIDER", Some("local-gliner".to_string())),
@@ -186,7 +186,7 @@ fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>) -> EnvGuard {
             Some(local_gliner_model_dir().display().to_string()),
         ),
         ("NER_LABELS", labels.map(|labels| labels.join(","))),
-        ("NER_THRESHOLD", Some("0.35".to_string())),
+        ("NER_THRESHOLD", Some(threshold.to_string())),
         ("NER_BATCH_SIZE", Some("4".to_string())),
         ("EMBEDDINGS_ENABLED", Some("false".to_string())),
         ("EMBEDDINGS_PROVIDER", None),
@@ -303,6 +303,75 @@ fn assert_extracted_case_entities(
     }
 }
 
+fn zero_shot_gliner_labels() -> Vec<String> {
+    vec!["project", "deal", "asset"]
+        .into_iter()
+        .map(String::from)
+        .collect()
+}
+
+fn zero_shot_gliner_coverage_cases() -> Vec<GlinerCoverageCase> {
+    vec![(
+        "project deal asset mix",
+        "The Apollo project closed a deal to acquire the asset Orion.",
+        vec![
+            ("project", vec!["Apollo project"]),
+            ("deal", vec!["deal", "closed a deal", "Orion deal"]),
+            ("asset", vec!["asset Orion"]),
+        ],
+    )]
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn local_gliner_extractor_detects_custom_zero_shot_entities() {
+    let model_dir = local_gliner_model_dir();
+    assert_required_files(&model_dir, GLINER_REQUIRED_FILES);
+
+    let extractor = GlinerEntityExtractor::new(&model_dir, zero_shot_gliner_labels(), 0.2)
+        .expect("GLiNER extractor should load the local model for zero-shot labels");
+
+    for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
+        let entities = extractor
+            .extract_candidates(text)
+            .await
+            .unwrap_or_else(|err| {
+                panic!("GLiNER zero-shot extraction should succeed for `{case_name}`: {err}")
+            });
+
+        assert_candidate_case_entities(case_name, &entities, &expected_entities);
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn memory_service_uses_local_gliner_zero_shot_labels() {
+    let _env_lock = ENV_LOCK.lock().await;
+    let temp_dir = TempDir::new().expect("temp dir should be created");
+    let labels = zero_shot_gliner_labels();
+    let _env = local_gliner_env(&temp_dir, Some(&labels), 0.2);
+
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service should bootstrap with local GLiNER zero-shot labels");
+
+    for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
+        let episode_id = ingest_episode(&service, text).await;
+        let extracted = service
+            .extract(&episode_id, None)
+            .await
+            .unwrap_or_else(|err| {
+                panic!("extract should succeed with local GLiNER zero-shot labels for `{case_name}`: {err}")
+            });
+
+        assert_eq!(
+            extracted.episode_id, episode_id,
+            "service extraction should preserve episode id for `{case_name}`"
+        );
+        assert_extracted_case_entities(case_name, &extracted.entities, &expected_entities);
+    }
+}
+
 fn content_source_id(content: &str) -> String {
     let mut hasher = DefaultHasher::new();
     content.hash(&mut hasher);
@@ -399,7 +468,7 @@ async fn local_gliner_extractor_detects_all_default_supported_entities_across_di
 async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
     let _env_lock = ENV_LOCK.lock().await;
     let temp_dir = TempDir::new().expect("temp dir should be created");
-    let _env = local_gliner_env(&temp_dir, None);
+    let _env = local_gliner_env(&temp_dir, None, 0.35);
     let cases = gliner_diverse_coverage_cases();
     assert_gliner_case_matrix_covers_supported_labels(&cases);
 
