@@ -4,6 +4,7 @@
 //! abstracting over embedded and remote (WebSocket) engines.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -19,6 +20,7 @@ use surrealdb::types::Value as SurrealValue;
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
+use crate::timing::OperationTimer;
 
 const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
 const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
@@ -534,7 +536,21 @@ impl SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<SurrealValue, MemoryError> {
-        if self.is_local() {
+        let vars_for_log = vars.clone();
+        let timer = OperationTimer::new("db.execute_query");
+        self.logger.log(
+            build_db_execute_event(
+                "db.execute_query.start",
+                namespace,
+                sql,
+                vars_for_log.as_ref(),
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+
+        let result = if self.is_local() {
             let db = self.with_namespace_local(namespace).await?;
             let mut q = db.query(sql);
             if let Some(v) = vars.clone() {
@@ -558,6 +574,38 @@ impl SurrealDbClient {
             response
                 .take::<SurrealValue>(0)
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
+        };
+
+        match result {
+            Ok(value) => {
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_query.done",
+                        namespace,
+                        sql,
+                        vars_for_log.as_ref(),
+                        Some(timer.elapsed()),
+                        None,
+                    ),
+                    LogLevel::Debug,
+                );
+                Ok(value)
+            }
+            Err(err) => {
+                let error_message = err.to_string();
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_query.error",
+                        namespace,
+                        sql,
+                        vars_for_log.as_ref(),
+                        Some(timer.elapsed()),
+                        Some(&error_message),
+                    ),
+                    LogLevel::Debug,
+                );
+                Err(err)
+            }
         }
     }
 
@@ -568,14 +616,29 @@ impl SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<(), MemoryError> {
-        if self.is_local() {
+        let vars_for_log = vars.clone();
+        let timer = OperationTimer::new("db.execute_raw_query");
+        self.logger.log(
+            build_db_execute_event(
+                "db.execute_raw_query.start",
+                namespace,
+                sql,
+                vars_for_log.as_ref(),
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+
+        let result = if self.is_local() {
             let db = self.with_namespace_local(namespace).await?;
             let mut q = db.query(sql);
             if let Some(v) = vars.clone() {
                 q = q.bind(v);
             }
             q.await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+                .map(|_| ())
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))
         } else {
             let db = self.with_namespace_remote(namespace).await?;
             let mut q = db.query(sql);
@@ -583,10 +646,78 @@ impl SurrealDbClient {
                 q = q.bind(v);
             }
             q.await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+                .map(|_| ())
+                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))
+        };
+
+        match result {
+            Ok(()) => {
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_raw_query.done",
+                        namespace,
+                        sql,
+                        vars_for_log.as_ref(),
+                        Some(timer.elapsed()),
+                        None,
+                    ),
+                    LogLevel::Debug,
+                );
+                Ok(())
+            }
+            Err(err) => {
+                let error_message = err.to_string();
+                self.logger.log(
+                    build_db_execute_event(
+                        "db.execute_raw_query.error",
+                        namespace,
+                        sql,
+                        vars_for_log.as_ref(),
+                        Some(timer.elapsed()),
+                        Some(&error_message),
+                    ),
+                    LogLevel::Debug,
+                );
+                Err(err)
+            }
         }
-        Ok(())
     }
+}
+
+fn duration_ms(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+}
+
+fn bind_var_count(vars: Option<&Value>) -> usize {
+    match vars {
+        Some(Value::Object(map)) => map.len(),
+        Some(Value::Array(values)) => values.len(),
+        Some(Value::Null) | None => 0,
+        Some(_) => 1,
+    }
+}
+
+fn build_db_execute_event(
+    op: &str,
+    namespace: &str,
+    sql: &str,
+    vars: Option<&Value>,
+    duration: Option<Duration>,
+    error: Option<&str>,
+) -> std::collections::HashMap<String, Value> {
+    let mut event = std::collections::HashMap::from([
+        ("op".to_string(), json!(op)),
+        ("namespace".to_string(), json!(namespace)),
+        ("sql".to_string(), json!(sql)),
+        ("vars_count".to_string(), json!(bind_var_count(vars))),
+    ]);
+    if let Some(duration) = duration {
+        event.insert("duration_ms".to_string(), json!(duration_ms(duration)));
+    }
+    if let Some(error) = error {
+        event.insert("error".to_string(), json!(error));
+    }
+    event
 }
 
 async fn build_local_namespace_clients(
@@ -3297,6 +3428,32 @@ mod tests {
         assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
         assert_eq!(vars.get("query_vec"), Some(&json!([0.1, 0.2, 0.3])));
         assert_eq!(vars.get("limit"), Some(&json!(5)));
+    }
+
+    #[test]
+    fn build_db_execute_event_includes_duration_sql_and_var_count() {
+        let event = build_db_execute_event(
+            "db.execute_query.done",
+            "org",
+            "SELECT * FROM fact WHERE scope = $scope",
+            Some(&json!({"scope": "org", "limit": 5})),
+            Some(std::time::Duration::from_millis(17)),
+            None,
+        );
+
+        assert_eq!(
+            event.get("op").and_then(Value::as_str),
+            Some("db.execute_query.done")
+        );
+        assert_eq!(event.get("namespace").and_then(Value::as_str), Some("org"));
+        assert_eq!(event.get("vars_count").and_then(Value::as_u64), Some(2));
+        assert_eq!(event.get("duration_ms").and_then(Value::as_u64), Some(17));
+        assert!(
+            event
+                .get("sql")
+                .and_then(Value::as_str)
+                .is_some_and(|sql| sql.contains("SELECT * FROM fact"))
+        );
     }
 
     fn json_contains_text(value: &Value, expected: &str) -> bool {

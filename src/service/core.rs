@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -17,6 +17,7 @@ use crate::models::{
 };
 use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
+use crate::timing::OperationTimer;
 
 use super::AnnoEntityExtractor;
 use super::EntityExtractor;
@@ -366,11 +367,10 @@ impl MemoryService {
         level: LogLevel,
         duration: std::time::Duration,
     ) {
-        let mut args_with_duration = args.clone();
-        let duration_ms = duration.as_millis();
-        args_with_duration["duration_ms"] = json!(duration_ms);
-        self.logger
-            .log(log_event(op, args_with_duration, result, None), level);
+        self.logger.log(
+            log_event(op, log_args_with_duration(args, duration), result, None),
+            level,
+        );
     }
 
     /// Returns the total count of episodes.
@@ -564,6 +564,7 @@ impl MemoryService {
         zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
+        let timer = OperationTimer::new("extract");
         let (record, _) = self.find_episode_record(episode_id).await?;
         if record.is_none() {
             return Err(MemoryError::NotFound(format!(
@@ -575,7 +576,7 @@ impl MemoryService {
         self.logger.log(
             log_event(
                 "extract",
-                json!({"episode_id": episode_id}),
+                log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
                 json!({
                     "entities": payload.entities.len(),
                     "facts": payload.facts.len(),
@@ -823,11 +824,60 @@ impl MemoryService {
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
+        let timer = OperationTimer::new("embedding.generate");
+        let provider = self.embedding_provider.provider_name();
+        let args = json!({
+            "provider": provider,
+            "input_chars": input.chars().count(),
+        });
+
         if !self.embedding_provider.is_enabled() {
+            let mut result = build_embedding_log_result(0, None);
+            if let Some(map) = result.as_object_mut() {
+                map.insert("status".to_string(), json!("disabled"));
+            }
+            self.logger.log(
+                log_event(
+                    "embedding.generate.skipped",
+                    log_args_with_duration(args, timer.elapsed()),
+                    result,
+                    None,
+                ),
+                LogLevel::Debug,
+            );
             return Ok(None);
         }
 
-        self.embedding_provider.embed(input).await.map(Some)
+        match self.embedding_provider.embed(input).await {
+            Ok(embedding) => {
+                self.logger.log(
+                    log_event(
+                        "embedding.generate.done",
+                        log_args_with_duration(args, timer.elapsed()),
+                        build_embedding_log_result(1, Some(embedding.len())),
+                        None,
+                    ),
+                    LogLevel::Info,
+                );
+                Ok(Some(embedding))
+            }
+            Err(err) => {
+                let mut result = build_embedding_log_result(0, None);
+                if let Some(map) = result.as_object_mut() {
+                    map.insert("error".to_string(), json!(err.to_string()));
+                }
+                self.logger.log(
+                    log_event(
+                        "embedding.generate.error",
+                        log_args_with_duration(args, timer.elapsed()),
+                        result,
+                        None,
+                    ),
+                    LogLevel::Warn,
+                );
+                Err(err)
+            }
+        }
     }
 
     /// Invalidates a fact.
@@ -1570,6 +1620,36 @@ pub(crate) fn log_event(
         event.insert("access".to_string(), serialize_access(access));
     }
     event
+}
+
+#[must_use]
+pub(crate) fn log_args_with_duration(mut args: Value, duration: Duration) -> Value {
+    let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
+    if let Some(map) = args.as_object_mut() {
+        map.insert("duration_ms".to_string(), json!(duration_ms));
+        args
+    } else {
+        json!({
+            "value": args,
+            "duration_ms": duration_ms,
+        })
+    }
+}
+
+#[must_use]
+pub(crate) fn build_embedding_log_result(
+    generated_embeddings: usize,
+    dimension: Option<usize>,
+) -> Value {
+    let mut result = serde_json::Map::new();
+    result.insert(
+        "generated_embeddings".to_string(),
+        json!(generated_embeddings),
+    );
+    if let Some(dimension) = dimension {
+        result.insert("dimension".to_string(), json!(dimension));
+    }
+    Value::Object(result)
 }
 
 /// Serializes access context to a JSON value for logging.
@@ -3586,6 +3666,28 @@ mod tests {
     fn log_event_without_access_context_omits_access_field() {
         let event = log_event("test_op", json!({}), json!({}), None);
         assert!(!event.contains_key("access"));
+    }
+
+    #[test]
+    fn log_args_with_duration_adds_duration_ms_field() {
+        let args = log_args_with_duration(
+            json!({"scope": "org"}),
+            std::time::Duration::from_millis(42),
+        );
+
+        assert_eq!(args.get("scope").and_then(Value::as_str), Some("org"));
+        assert_eq!(args.get("duration_ms").and_then(Value::as_u64), Some(42));
+    }
+
+    #[test]
+    fn build_embedding_log_result_reports_generated_count_and_dimension() {
+        let result = build_embedding_log_result(1, Some(384));
+
+        assert_eq!(
+            result.get("generated_embeddings").and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(result.get("dimension").and_then(Value::as_u64), Some(384));
     }
 
     #[test]

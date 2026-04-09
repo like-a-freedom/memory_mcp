@@ -1,16 +1,19 @@
 //! Episode operations - extraction and record parsing.
 
 use regex::Regex;
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use super::core::log_args_with_duration;
 use super::error::MemoryError;
 use super::query::parse_iso;
+use crate::logging::LogLevel;
 use crate::models::Edge;
 use crate::models::Episode;
 use crate::models::{
     ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink,
     FACT_TYPE_EXPERIENCE, FACT_TYPE_METRIC, FACT_TYPE_PROMISE,
 };
+use crate::timing::OperationTimer;
 
 fn unwrap_string_value(v: &Value) -> Option<&str> {
     if let Some(s) = v.as_str() {
@@ -206,15 +209,77 @@ pub async fn extract_entities(
     content: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
+    let timer = OperationTimer::new("ner.extract");
+    let provider = service.entity_extractor.provider_name();
     let candidates = match zero_shot_labels {
         Some(labels) => {
-            service
+            match service
                 .entity_extractor
                 .extract_candidates_with_labels(content, labels)
-                .await?
+                .await
+            {
+                Ok(candidates) => candidates,
+                Err(err) => {
+                    let mut result = build_ner_log_result(provider, 0, Some(labels.len()));
+                    if let Some(map) = result.as_object_mut() {
+                        map.insert("error".to_string(), json!(err.to_string()));
+                    }
+                    service.logger.log(
+                        super::log_event(
+                            "ner.extract.error",
+                            log_args_with_duration(
+                                json!({"content_chars": content.chars().count()}),
+                                timer.elapsed(),
+                            ),
+                            result,
+                            None,
+                        ),
+                        LogLevel::Warn,
+                    );
+                    return Err(err);
+                }
+            }
         }
-        None => service.entity_extractor.extract_candidates(content).await?,
+        None => match service.entity_extractor.extract_candidates(content).await {
+            Ok(candidates) => candidates,
+            Err(err) => {
+                let mut result = build_ner_log_result(provider, 0, None);
+                if let Some(map) = result.as_object_mut() {
+                    map.insert("error".to_string(), json!(err.to_string()));
+                }
+                service.logger.log(
+                    super::log_event(
+                        "ner.extract.error",
+                        log_args_with_duration(
+                            json!({"content_chars": content.chars().count()}),
+                            timer.elapsed(),
+                        ),
+                        result,
+                        None,
+                    ),
+                    LogLevel::Warn,
+                );
+                return Err(err);
+            }
+        },
     };
+
+    service.logger.log(
+        super::log_event(
+            "ner.extract.done",
+            log_args_with_duration(
+                json!({"content_chars": content.chars().count()}),
+                timer.elapsed(),
+            ),
+            build_ner_log_result(
+                provider,
+                candidates.len(),
+                zero_shot_labels.map(<[String]>::len),
+            ),
+            None,
+        ),
+        LogLevel::Info,
+    );
 
     let mut entities = Vec::with_capacity(candidates.len());
 
@@ -358,9 +423,9 @@ pub async fn extract_from_episode(
     episode_id: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<ExtractResult, MemoryError> {
-    use crate::logging::LogLevel;
     use crate::models::Edge;
-    use serde_json::json;
+
+    let timer = OperationTimer::new("extract_from_episode");
 
     service.logger.log(
         super::log_event(
@@ -437,7 +502,7 @@ pub async fn extract_from_episode(
     service.logger.log(
         super::log_event(
             "extract_from_episode.done",
-            json!({"episode_id": episode_id}),
+            log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
             json!({"entities": entities.len(), "facts": facts.len(), "warnings": warnings.len()}),
             None,
         ),
@@ -451,6 +516,24 @@ pub async fn extract_from_episode(
         links,
         warnings,
     })
+}
+
+#[must_use]
+fn build_ner_log_result(
+    provider: &str,
+    extracted_entities: usize,
+    zero_shot_label_count: Option<usize>,
+) -> Value {
+    let mut result = serde_json::Map::new();
+    result.insert("provider".to_string(), json!(provider));
+    result.insert("extracted_entities".to_string(), json!(extracted_entities));
+    if let Some(zero_shot_label_count) = zero_shot_label_count {
+        result.insert(
+            "zero_shot_label_count".to_string(),
+            json!(zero_shot_label_count),
+        );
+    }
+    Value::Object(result)
 }
 
 async fn detect_contradiction_warnings(
@@ -1232,6 +1315,24 @@ mod tests {
         assert!(!is_document_action_item(
             "Action items: this section is empty for now"
         ));
+    }
+
+    #[test]
+    fn build_ner_log_result_includes_provider_entity_count_and_zero_shot_count() {
+        let result = build_ner_log_result("gliner", 3, Some(6));
+
+        assert_eq!(
+            result.get("provider").and_then(Value::as_str),
+            Some("gliner")
+        );
+        assert_eq!(
+            result.get("extracted_entities").and_then(Value::as_u64),
+            Some(3)
+        );
+        assert_eq!(
+            result.get("zero_shot_label_count").and_then(Value::as_u64),
+            Some(6)
+        );
     }
 
     #[tokio::test]

@@ -1010,6 +1010,7 @@ impl MemoryMcp {
         let episode_id = normalize_optional_string(episode_id);
         let content = normalize_optional_string(content);
         let text = normalize_optional_string(text);
+        let timer = OperationTimer::new("extract");
 
         self.service.log_tool_event(
             "extract.start",
@@ -1025,11 +1026,12 @@ impl MemoryMcp {
                 .await
             {
                 Ok(result) => {
-                    self.service.log_tool_event(
+                    self.service.log_tool_event_with_duration(
                         "extract.done",
                         json!({"episode_id": episode_id}),
                         json!({"entities": result.entities.len(), "facts": result.facts.len()}),
                         LogLevel::Info,
+                        timer.elapsed(),
                     );
                     return Ok(ToolResponse::success_with_guidance(
                         result,
@@ -1037,11 +1039,12 @@ impl MemoryMcp {
                     ));
                 }
                 Err(err) => {
-                    self.service.log_tool_event(
+                    self.service.log_tool_event_with_duration(
                         "extract.error",
                         json!({"episode_id": episode_id}),
                         json!({"error": err.to_string()}),
                         LogLevel::Warn,
+                        timer.elapsed(),
                     );
                     return Err(mcp_error(err));
                 }
@@ -1050,11 +1053,12 @@ impl MemoryMcp {
 
         let content = content.or(text).unwrap_or_default();
         if content.trim().is_empty() {
-            self.service.log_tool_event(
+            self.service.log_tool_event_with_duration(
                 "extract.no_input",
                 json!({"episode_id": &episode_id, "has_content": false}),
                 json!({"status": "no_input"}),
                 LogLevel::Warn,
+                timer.elapsed(),
             );
             return Ok(ToolResponse::partial_with_guidance(
                 ExtractResult::empty(),
@@ -1094,11 +1098,12 @@ impl MemoryMcp {
                 .await
             {
                 Ok(result) => {
-                    self.service.log_tool_event(
+                    self.service.log_tool_event_with_duration(
                         "extract.done",
                         json!({"episode_id": &episode_id}),
                         json!({"entities": result.entities.len(), "facts": result.facts.len()}),
                         LogLevel::Info,
+                        timer.elapsed(),
                     );
                     Ok(ToolResponse::success_with_guidance(
                         result,
@@ -1106,21 +1111,23 @@ impl MemoryMcp {
                     ))
                 }
                 Err(err) => {
-                    self.service.log_tool_event(
+                    self.service.log_tool_event_with_duration(
                         "extract.error",
                         json!({}),
                         json!({"error": err.to_string()}),
                         LogLevel::Warn,
+                        timer.elapsed(),
                     );
                     Err(mcp_error(err))
                 }
             },
             Err(err) => {
-                self.service.log_tool_event(
+                self.service.log_tool_event_with_duration(
                     "extract.error",
                     json!({}),
                     json!({"error": err.to_string()}),
                     LogLevel::Warn,
+                    timer.elapsed(),
                 );
                 Err(mcp_error(err))
             }
