@@ -4,7 +4,10 @@ mod eval_support;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Duration, Utc};
-use eval_support::metrics::{RetrievalSuiteSummary, record_retrieval_case};
+use eval_support::metrics::{
+    RetrievalCaseDiagnostics, RetrievalSuiteSummary, first_relevant_rank, record_retrieval_case,
+    revoke_retrieval_case_pass,
+};
 use eval_support::report::print_retrieval_summary;
 use memory_mcp::models::AssembleContextRequest;
 use serde::Deserialize;
@@ -34,6 +37,8 @@ struct SeedFact {
     #[serde(default)]
     project: Option<String>,
     #[serde(default)]
+    source_id: Option<String>,
+    #[serde(default)]
     entity_links: Vec<String>,
 }
 
@@ -62,6 +67,16 @@ struct RetrievalExpectation {
     must_not_contain: Vec<String>,
     #[serde(default = "default_min_recall_at_k")]
     min_recall_at_k: f64,
+    #[serde(default)]
+    diversity: Option<RetrievalDiversityExpectation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RetrievalDiversityExpectation {
+    #[serde(default)]
+    min_unique_source_episodes: Option<usize>,
+    #[serde(default)]
+    max_source_episode_share: Option<f64>,
 }
 
 fn default_budget() -> i32 {
@@ -107,6 +122,9 @@ fn case_as_of(case: &RetrievalEvalCase) -> DateTime<Utc> {
 }
 
 const GLOBAL_RECALL_AT_5_TARGET: f64 = 0.90;
+const GLOBAL_MRR_TARGET: f64 = 0.85;
+const GLOBAL_TOP_1_HIT_RATE_TARGET: f64 = 0.80;
+const DIVERSITY_PASS_RATE_TARGET: f64 = 0.80;
 const RETRIEVAL_TIER_PASS_RATE_TARGETS: [(&str, f64); 5] = [
     ("direct", 0.95),
     ("alias", 0.85),
@@ -122,6 +140,28 @@ fn assert_retrieval_targets(summary: &RetrievalSuiteSummary) {
         GLOBAL_RECALL_AT_5_TARGET,
         summary.recall_at_5(),
     );
+    assert!(
+        summary.mrr() >= GLOBAL_MRR_TARGET,
+        "expected global mrr >= {:.2}, got {:.2}",
+        GLOBAL_MRR_TARGET,
+        summary.mrr(),
+    );
+    assert!(
+        summary.top_1_hit_rate() >= GLOBAL_TOP_1_HIT_RATE_TARGET,
+        "expected global top1_hit_rate >= {:.2}, got {:.2}",
+        GLOBAL_TOP_1_HIT_RATE_TARGET,
+        summary.top_1_hit_rate(),
+    );
+
+    if summary.diversity_expected_cases > 0 {
+        let diversity_pass_rate = summary.diversity_pass_rate().unwrap_or(0.0);
+        assert!(
+            diversity_pass_rate >= DIVERSITY_PASS_RATE_TARGET,
+            "expected diversity pass_rate >= {:.2}, got {:.2}",
+            DIVERSITY_PASS_RATE_TARGET,
+            diversity_pass_rate,
+        );
+    }
 
     for (tier, target) in RETRIEVAL_TIER_PASS_RATE_TARGETS {
         let total = summary
@@ -189,12 +229,39 @@ fn retrieval_fixture_provides_project_filter_coverage() {
 }
 
 #[test]
+fn retrieval_fixture_provides_diversity_coverage() {
+    let cases = load_cases();
+    let diversity_cases = cases
+        .iter()
+        .filter(|case| case.expected.diversity.is_some())
+        .collect::<Vec<_>>();
+
+    assert!(
+        diversity_cases.len() >= 2,
+        "expected at least 2 diversity-sensitive retrieval cases, got {}",
+        diversity_cases.len()
+    );
+    assert!(
+        diversity_cases
+            .iter()
+            .all(|case| case.expected.must_contain.len() >= 2),
+        "diversity-sensitive retrieval cases should exercise multi-hit coverage"
+    );
+}
+
+#[test]
 fn retrieval_targets_accept_plan_thresholds() {
     let mut summary = RetrievalSuiteSummary {
         total_cases: 60,
         passed_cases: 54,
         expected_hits: 100,
         matched_hits: 90,
+        reciprocal_rank_sum: 54.0,
+        top_1_hits: 48,
+        diversity_expected_cases: 3,
+        diversity_passed_cases: 3,
+        unique_source_episode_ratio_sum: 2.25,
+        max_source_episode_share_sum: 1.50,
         ..RetrievalSuiteSummary::default()
     };
 
@@ -222,6 +289,12 @@ fn retrieval_targets_reject_below_target_tier_pass_rate() {
         passed_cases: 53,
         expected_hits: 100,
         matched_hits: 90,
+        reciprocal_rank_sum: 54.0,
+        top_1_hits: 48,
+        diversity_expected_cases: 3,
+        diversity_passed_cases: 3,
+        unique_source_episode_ratio_sum: 2.25,
+        max_source_episode_share_sum: 1.50,
         ..RetrievalSuiteSummary::default()
     };
 
@@ -229,6 +302,72 @@ fn retrieval_targets_reject_below_target_tier_pass_rate() {
         ("direct", (15, 15)),
         ("alias", (10, 9)),
         ("temporal", (10, 7)),
+        ("graph", (15, 11)),
+        ("reasoning", (10, 6)),
+    ] {
+        summary.expected_tier_totals.insert(tier.to_string(), total);
+        summary
+            .expected_tier_passed_cases
+            .insert(tier.to_string(), passed);
+    }
+
+    assert_retrieval_targets(&summary);
+}
+
+#[test]
+#[should_panic(expected = "expected global mrr >= 0.85")]
+fn retrieval_targets_reject_below_target_mrr() {
+    let mut summary = RetrievalSuiteSummary {
+        total_cases: 60,
+        passed_cases: 54,
+        expected_hits: 100,
+        matched_hits: 90,
+        reciprocal_rank_sum: 48.0,
+        top_1_hits: 48,
+        diversity_expected_cases: 3,
+        diversity_passed_cases: 3,
+        unique_source_episode_ratio_sum: 2.25,
+        max_source_episode_share_sum: 1.50,
+        ..RetrievalSuiteSummary::default()
+    };
+
+    for (tier, (total, passed)) in [
+        ("direct", (15, 15)),
+        ("alias", (10, 9)),
+        ("temporal", (10, 8)),
+        ("graph", (15, 11)),
+        ("reasoning", (10, 6)),
+    ] {
+        summary.expected_tier_totals.insert(tier.to_string(), total);
+        summary
+            .expected_tier_passed_cases
+            .insert(tier.to_string(), passed);
+    }
+
+    assert_retrieval_targets(&summary);
+}
+
+#[test]
+#[should_panic(expected = "expected diversity pass_rate >= 0.80")]
+fn retrieval_targets_reject_below_target_diversity_pass_rate() {
+    let mut summary = RetrievalSuiteSummary {
+        total_cases: 60,
+        passed_cases: 54,
+        expected_hits: 100,
+        matched_hits: 90,
+        reciprocal_rank_sum: 54.0,
+        top_1_hits: 48,
+        diversity_expected_cases: 3,
+        diversity_passed_cases: 2,
+        unique_source_episode_ratio_sum: 2.25,
+        max_source_episode_share_sum: 1.50,
+        ..RetrievalSuiteSummary::default()
+    };
+
+    for (tier, (total, passed)) in [
+        ("direct", (15, 15)),
+        ("alias", (10, 9)),
+        ("temporal", (10, 8)),
         ("graph", (15, 11)),
         ("reasoning", (10, 6)),
     ] {
@@ -288,6 +427,7 @@ async fn run_retrieval_evals() {
                 t_valid,
                 fact.entity_links.clone(),
                 fact.project.as_deref(),
+                fact.source_id.as_deref(),
             )
             .await;
         }
@@ -336,29 +476,51 @@ async fn run_retrieval_evals() {
             .iter()
             .map(|item| item.content.as_str())
             .collect::<Vec<_>>();
+        let source_episode_refs = items
+            .iter()
+            .map(|item| item.source_episode.as_str())
+            .collect::<Vec<_>>();
+        let first_relevant_rank =
+            first_relevant_rank(&retrieved_contents, &case.expected.must_contain);
 
         let recall_passed = record_retrieval_case(
             &mut summary,
             &case.expected.tier,
             matched_hits,
             case.expected.must_contain.len(),
-            &actual_tiers,
             case.expected.min_recall_at_k,
+            RetrievalCaseDiagnostics {
+                actual_tiers: &actual_tiers,
+                first_relevant_rank,
+                source_episodes: &source_episode_refs,
+                min_unique_source_episodes: case
+                    .expected
+                    .diversity
+                    .as_ref()
+                    .and_then(|expectation| expectation.min_unique_source_episodes),
+                max_source_episode_share: case
+                    .expected
+                    .diversity
+                    .as_ref()
+                    .and_then(|expectation| expectation.max_source_episode_share),
+            },
         );
         let passed = recall_passed && unexpected_hits == 0;
         if recall_passed && unexpected_hits > 0 {
-            summary.passed_cases = summary.passed_cases.saturating_sub(1);
+            revoke_retrieval_case_pass(&mut summary, &case.expected.tier);
         }
 
         assert!(
             passed,
-            "case {} ({}) failed: matched_hits={} expected_hits={} unexpected_hits={} actual_tiers={:?} retrieved_contents={:?}",
+            "case {} ({}) failed: matched_hits={} expected_hits={} unexpected_hits={} first_relevant_rank={:?} actual_tiers={:?} source_episodes={:?} retrieved_contents={:?}",
             case.id,
             case.description,
             matched_hits,
             case.expected.must_contain.len(),
             unexpected_hits,
+            first_relevant_rank,
             actual_tiers,
+            source_episode_refs,
             retrieved_contents,
         );
     }

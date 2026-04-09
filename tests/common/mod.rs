@@ -128,12 +128,23 @@ pub async fn seed_fact_with_links_and_project(
     t_valid: DateTime<Utc>,
     entity_links: Vec<String>,
     project: Option<&str>,
+    source_id: Option<&str>,
 ) -> String {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return seed_fact_with_links(service, scope, content, t_valid, entity_links).await;
-    };
+    let normalized_project = project.filter(|project| !project.trim().is_empty());
+    let normalized_source_id = source_id.filter(|source_id| !source_id.trim().is_empty());
 
-    let source_id = format!("seed:{}:{}:{}", scope, project, normalize_text(content));
+    if normalized_project.is_none() && normalized_source_id.is_none() {
+        return seed_fact_with_links(service, scope, content, t_valid, entity_links).await;
+    }
+
+    let source_id = normalized_source_id.map(str::to_string).unwrap_or_else(|| {
+        format!(
+            "seed:{}:{}:{}",
+            scope,
+            normalized_project.unwrap_or("default"),
+            normalize_text(content)
+        )
+    });
 
     let episode_id = service
         .ingest(
@@ -143,7 +154,7 @@ pub async fn seed_fact_with_links_and_project(
                 content: format!("seed source for {content}"),
                 t_ref: t_valid,
                 scope: scope.to_string(),
-                project: Some(project.to_string()),
+                project: normalized_project.map(str::to_string),
                 t_ingested: None,
                 visibility_scope: None,
                 policy_tags: vec![],

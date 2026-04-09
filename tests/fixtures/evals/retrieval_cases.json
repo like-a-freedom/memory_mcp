@@ -1578,5 +1578,176 @@
             ],
             "min_recall_at_k": 1.0
         }
+    },
+    {
+        "id": "ret-061",
+        "description": "breadth query covers march-april product decisions without collapsing to a single source episode",
+        "query": "march april 2026 alpha suite delta control signal monitor orbit portal decisions",
+        "scope": "org",
+        "budget": 6,
+        "facts": [
+            {
+                "content": "March 2026 Alpha Suite decision: the cluster pilot was approved for two early-access tenants.",
+                "t_valid": "2026-03-10T09:00:00Z",
+                "source_id": "alpha-suite-march-2026-decision"
+            },
+            {
+                "content": "March 2026 Delta Control decision: active-active failover was sent to engineering estimation.",
+                "t_valid": "2026-03-11T09:00:00Z",
+                "source_id": "delta-control-march-2026-decision"
+            },
+            {
+                "content": "April 2026 Signal Monitor decision: cluster support is required for the edge collector rollout.",
+                "t_valid": "2026-04-02T09:00:00Z",
+                "source_id": "signal-monitor-april-2026-decision"
+            },
+            {
+                "content": "April 2026 Orbit Portal decision: the platform already supports multi-cluster deployments.",
+                "t_valid": "2026-04-03T09:00:00Z",
+                "source_id": "orbit-portal-april-2026-decision"
+            },
+            {
+                "content": "October 2025 Alpha Suite hotfix summary repeated Delta Control, Signal Monitor, and Orbit Portal keywords but did not contain any March or April 2026 decisions.",
+                "t_valid": "2025-10-13T09:00:00Z",
+                "source_id": "legacy-platform-summary-2025"
+            },
+            {
+                "content": "October 2025 backlog digest mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal in one email thread without new March or April 2026 decisions.",
+                "t_valid": "2025-10-14T09:00:00Z",
+                "source_id": "legacy-platform-summary-2025"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "March 2026 Alpha Suite decision: the cluster pilot was approved for two early-access tenants.",
+                "March 2026 Delta Control decision: active-active failover was sent to engineering estimation.",
+                "April 2026 Signal Monitor decision: cluster support is required for the edge collector rollout.",
+                "April 2026 Orbit Portal decision: the platform already supports multi-cluster deployments."
+            ],
+            "must_not_contain": [
+                "October 2025 Alpha Suite hotfix summary repeated Delta Control, Signal Monitor, and Orbit Portal keywords but did not contain any March or April 2026 decisions.",
+                "October 2025 backlog digest mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal in one email thread without new March or April 2026 decisions."
+            ],
+            "min_recall_at_k": 1.0,
+            "diversity": {
+                "min_unique_source_episodes": 4,
+                "max_source_episode_share": 0.5
+            }
+        }
+    },
+    {
+        "id": "ret-062",
+        "description": "breadth query keeps atlas and beacon blockers spread across source episodes instead of noisy consolidated digests",
+        "query": "march april 2026 atlas beacon blockers decisions",
+        "scope": "org",
+        "budget": 6,
+        "facts": [
+            {
+                "content": "March 2026 Atlas blocker: legal signoff is still missing for the reseller appendix.",
+                "t_valid": "2026-03-15T09:00:00Z",
+                "source_id": "atlas-march-2026-blocker"
+            },
+            {
+                "content": "March 2026 Beacon decision: finance approved the revised launch budget.",
+                "t_valid": "2026-03-16T09:00:00Z",
+                "source_id": "beacon-march-2026-decision"
+            },
+            {
+                "content": "April 2026 Atlas decision: partner onboarding moved to the managed rollout path.",
+                "t_valid": "2026-04-05T09:00:00Z",
+                "source_id": "atlas-april-2026-decision"
+            },
+            {
+                "content": "April 2026 Beacon blocker: the migration depends on the final tax mapping table.",
+                "t_valid": "2026-04-06T09:00:00Z",
+                "source_id": "beacon-april-2026-blocker"
+            },
+            {
+                "content": "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.",
+                "t_valid": "2026-04-07T09:00:00Z",
+                "source_id": "atlas-beacon-quarterly-digest"
+            },
+            {
+                "content": "Another quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.",
+                "t_valid": "2026-04-07T10:00:00Z",
+                "source_id": "atlas-beacon-quarterly-digest"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "March 2026 Atlas blocker: legal signoff is still missing for the reseller appendix.",
+                "March 2026 Beacon decision: finance approved the revised launch budget.",
+                "April 2026 Atlas decision: partner onboarding moved to the managed rollout path.",
+                "April 2026 Beacon blocker: the migration depends on the final tax mapping table."
+            ],
+            "must_not_contain": [
+                "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.",
+                "Another quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item."
+            ],
+            "min_recall_at_k": 1.0,
+            "diversity": {
+                "min_unique_source_episodes": 4,
+                "max_source_episode_share": 0.5
+            }
+        }
+    },
+    {
+        "id": "ret-063",
+        "description": "time-scoped breadth query prefers april 2026 product updates over a dense but stale umbrella summary",
+        "query": "april 2026 alpha suite delta control signal monitor orbit portal updates",
+        "scope": "org",
+        "budget": 6,
+        "facts": [
+            {
+                "content": "April 2026 Alpha Suite update: the validation checklist was approved by support leadership.",
+                "t_valid": "2026-04-08T09:00:00Z",
+                "source_id": "alpha-suite-april-2026-update"
+            },
+            {
+                "content": "April 2026 Delta Control update: active-active failover entered estimation review.",
+                "t_valid": "2026-04-09T09:00:00Z",
+                "source_id": "delta-control-april-2026-update"
+            },
+            {
+                "content": "April 2026 Signal Monitor update: the edge collector scope was confirmed by product operations.",
+                "t_valid": "2026-04-10T09:00:00Z",
+                "source_id": "signal-monitor-april-2026-update"
+            },
+            {
+                "content": "April 2026 Orbit Portal update: embedded cluster support remained generally available.",
+                "t_valid": "2026-04-11T09:00:00Z",
+                "source_id": "orbit-portal-april-2026-update"
+            },
+            {
+                "content": "January 2026 umbrella summary mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal updates in one place but was stale for April 2026 planning.",
+                "t_valid": "2026-01-31T09:00:00Z",
+                "source_id": "umbrella-summary-q1-2026"
+            },
+            {
+                "content": "January 2026 umbrella summary follow-up mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal updates in one place but was stale for April 2026 planning.",
+                "t_valid": "2026-02-01T09:00:00Z",
+                "source_id": "umbrella-summary-q1-2026"
+            }
+        ],
+        "expected": {
+            "tier": "direct",
+            "must_contain": [
+                "April 2026 Alpha Suite update: the validation checklist was approved by support leadership.",
+                "April 2026 Delta Control update: active-active failover entered estimation review.",
+                "April 2026 Signal Monitor update: the edge collector scope was confirmed by product operations.",
+                "April 2026 Orbit Portal update: embedded cluster support remained generally available."
+            ],
+            "must_not_contain": [
+                "January 2026 umbrella summary mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal updates in one place but was stale for April 2026 planning.",
+                "January 2026 umbrella summary follow-up mentioned Alpha Suite, Delta Control, Signal Monitor, and Orbit Portal updates in one place but was stale for April 2026 planning."
+            ],
+            "min_recall_at_k": 1.0,
+            "diversity": {
+                "min_unique_source_episodes": 4,
+                "max_source_episode_share": 0.5
+            }
+        }
     }
 ]

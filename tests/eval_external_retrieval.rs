@@ -11,7 +11,9 @@ use eval_support::external::{
 use eval_support::external_full::{
     ExternalDatasetFlavor, load_external_dataset_cases, sample_fixture_path,
 };
-use eval_support::metrics::{RetrievalSuiteSummary, record_retrieval_case};
+use eval_support::metrics::{
+    RetrievalCaseDiagnostics, RetrievalSuiteSummary, first_relevant_rank, record_retrieval_case,
+};
 use eval_support::report::print_retrieval_summary;
 use memory_mcp::models::AssembleContextRequest;
 
@@ -204,6 +206,7 @@ struct RetrievalCaseOutcome {
     matched_hits: usize,
     expected_hits: usize,
     actual_tiers: Vec<String>,
+    source_episodes: Vec<String>,
     retrieved_contents: Vec<String>,
 }
 
@@ -313,12 +316,17 @@ async fn evaluate_retrieval_case(
         .iter()
         .map(|item| item.content.clone())
         .collect::<Vec<_>>();
+    let source_episodes = items
+        .iter()
+        .map(|item| item.source_episode.clone())
+        .collect::<Vec<_>>();
 
     RetrievalCaseOutcome {
         expected_hits: case.expected.must_contain.len(),
         case,
         matched_hits,
         actual_tiers,
+        source_episodes,
         retrieved_contents,
     }
 }
@@ -333,13 +341,32 @@ fn finalize_retrieval_case(
         .iter()
         .map(String::as_str)
         .collect::<Vec<_>>();
+    let retrieved_content_refs = outcome
+        .retrieved_contents
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let source_episode_refs = outcome
+        .source_episodes
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
     let passed = record_retrieval_case(
         summary,
         &outcome.case.expected.tier,
         outcome.matched_hits,
         outcome.expected_hits,
-        &actual_tier_refs,
         outcome.case.expected.min_recall_at_k,
+        RetrievalCaseDiagnostics {
+            actual_tiers: &actual_tier_refs,
+            first_relevant_rank: first_relevant_rank(
+                &retrieved_content_refs,
+                &outcome.case.expected.must_contain,
+            ),
+            source_episodes: &source_episode_refs,
+            min_unique_source_episodes: None,
+            max_source_episode_share: None,
+        },
     );
 
     if strict_case_asserts {
