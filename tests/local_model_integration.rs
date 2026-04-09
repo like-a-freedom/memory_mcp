@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::env;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -5,6 +6,7 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
+use memory_mcp::config::NerConfig;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest};
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
 use serde_json::{Value, json};
@@ -110,7 +112,71 @@ fn configure_embedded_env(temp_dir: &TempDir) -> Vec<(&'static str, Option<Strin
     ]
 }
 
-fn local_gliner_env(temp_dir: &TempDir) -> EnvGuard {
+fn supported_gliner_labels() -> Vec<String> {
+    NerConfig::default().labels
+}
+
+type GlinerExpectedEntities = Vec<(&'static str, Vec<&'static str>)>;
+type GlinerCoverageCase = (&'static str, &'static str, GlinerExpectedEntities);
+
+fn gliner_diverse_coverage_cases() -> Vec<GlinerCoverageCase> {
+    vec![
+        (
+            "multilingual launch",
+            "Иван Петров from Microsoft unveiled Surface Laptop 6 at Build 2026 in Seattle using Kubernetes.",
+            vec![
+                ("person", vec!["Иван Петров"]),
+                ("company", vec!["Microsoft"]),
+                ("product", vec!["Surface Laptop 6"]),
+                ("event", vec!["Build 2026"]),
+                ("location", vec!["Seattle"]),
+                ("technology", vec!["Kubernetes"]),
+            ],
+        ),
+        (
+            "multi-actor comparison",
+            "At Cloud Summit 2026 in Berlin, Alice Smith and Bob Jones from Google and DeepMind compared Pixel 8 Pro with PostgreSQL.",
+            vec![
+                ("person", vec!["Alice Smith", "Bob Jones"]),
+                ("company", vec!["Google", "DeepMind"]),
+                ("product", vec!["Pixel 8 Pro"]),
+                ("event", vec!["Cloud Summit 2026"]),
+                ("location", vec!["Berlin"]),
+                ("technology", vec!["PostgreSQL"]),
+            ],
+        ),
+        (
+            "newline demo",
+            "During AI Summit 2026 in Madrid,\nMaría García of OpenAI demoed ChatGPT Enterprise built on Rust.",
+            vec![
+                ("person", vec!["María García"]),
+                ("company", vec!["OpenAI"]),
+                ("product", vec!["ChatGPT Enterprise"]),
+                ("event", vec!["AI Summit 2026"]),
+                ("location", vec!["Madrid"]),
+                ("technology", vec!["Rust"]),
+            ],
+        ),
+    ]
+}
+
+fn assert_gliner_case_matrix_covers_supported_labels(cases: &[GlinerCoverageCase]) {
+    let covered_labels = cases
+        .iter()
+        .flat_map(|(_, _, expected_entities)| expected_entities.iter().map(|(label, _)| *label))
+        .map(String::from)
+        .collect::<BTreeSet<_>>();
+    let supported_labels = supported_gliner_labels()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(
+        covered_labels, supported_labels,
+        "GLiNER coverage cases should span every default supported label"
+    );
+}
+
+fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>) -> EnvGuard {
     let mut pairs = configure_embedded_env(temp_dir);
     pairs.extend([
         ("NER_PROVIDER", Some("local-gliner".to_string())),
@@ -119,7 +185,7 @@ fn local_gliner_env(temp_dir: &TempDir) -> EnvGuard {
             "NER_MODEL_DIR",
             Some(local_gliner_model_dir().display().to_string()),
         ),
-        ("NER_LABELS", Some("person,company,location".to_string())),
+        ("NER_LABELS", labels.map(|labels| labels.join(","))),
         ("NER_THRESHOLD", Some("0.35".to_string())),
         ("NER_BATCH_SIZE", Some("4".to_string())),
         ("EMBEDDINGS_ENABLED", Some("false".to_string())),
@@ -174,6 +240,7 @@ fn entity_name_matches(actual: &str, expected: &str) -> bool {
 }
 
 fn assert_extracted_entity(
+    case_name: &str,
     entities: &[ExtractedEntity],
     entity_type: &str,
     expected_names: &[&str],
@@ -185,7 +252,7 @@ fn assert_extracted_entity(
                     .iter()
                     .any(|name| entity_name_matches(&entity.canonical_name, name))
         }),
-        "expected entity type `{entity_type}` with one of {:?}, got {:?}",
+        "case `{case_name}` expected entity type `{entity_type}` with one of {:?}, got {:?}",
         expected_names,
         entities
             .iter()
@@ -195,6 +262,7 @@ fn assert_extracted_entity(
 }
 
 fn assert_candidate_entity(
+    case_name: &str,
     entities: &[memory_mcp::models::EntityCandidate],
     entity_type: &str,
     expected_names: &[&str],
@@ -206,13 +274,33 @@ fn assert_candidate_entity(
                     .iter()
                     .any(|name| entity_name_matches(&entity.canonical_name, name))
         }),
-        "expected candidate type `{entity_type}` with one of {:?}, got {:?}",
+        "case `{case_name}` expected candidate type `{entity_type}` with one of {:?}, got {:?}",
         expected_names,
         entities
             .iter()
             .map(|entity| format!("{}:{}", entity.entity_type, entity.canonical_name))
             .collect::<Vec<_>>()
     );
+}
+
+fn assert_candidate_case_entities(
+    case_name: &str,
+    entities: &[memory_mcp::models::EntityCandidate],
+    expected_entities: &GlinerExpectedEntities,
+) {
+    for (entity_type, expected_names) in expected_entities {
+        assert_candidate_entity(case_name, entities, entity_type, expected_names);
+    }
+}
+
+fn assert_extracted_case_entities(
+    case_name: &str,
+    entities: &[ExtractedEntity],
+    expected_entities: &GlinerExpectedEntities,
+) {
+    for (entity_type, expected_names) in expected_entities {
+        assert_extracted_entity(case_name, entities, entity_type, expected_names);
+    }
 }
 
 fn content_source_id(content: &str) -> String {
@@ -285,56 +373,55 @@ fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
 
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
-async fn local_gliner_extractor_detects_expected_entities() {
+async fn local_gliner_extractor_detects_all_default_supported_entities_across_diverse_texts() {
     let model_dir = local_gliner_model_dir();
     assert_required_files(&model_dir, GLINER_REQUIRED_FILES);
+    let cases = gliner_diverse_coverage_cases();
+    assert_gliner_case_matrix_covers_supported_labels(&cases);
 
-    let extractor = GlinerEntityExtractor::new(
-        &model_dir,
-        vec![
-            "person".to_string(),
-            "company".to_string(),
-            "location".to_string(),
-        ],
-        0.35,
-    )
-    .expect("GLiNER extractor should load the local model");
+    let extractor = GlinerEntityExtractor::new(&model_dir, supported_gliner_labels(), 0.35)
+        .expect("GLiNER extractor should load the local model");
 
-    let entities = extractor
-        .extract_candidates("Alice Smith joined Microsoft in London on 5 March 2026.")
-        .await
-        .expect("GLiNER extraction should succeed");
+    for (case_name, text, expected_entities) in cases {
+        let entities = extractor
+            .extract_candidates(text)
+            .await
+            .unwrap_or_else(|err| {
+                panic!("GLiNER extraction should succeed for `{case_name}`: {err}")
+            });
 
-    assert_candidate_entity(&entities, "person", &["Alice Smith", "Alice"]);
-    assert_candidate_entity(&entities, "company", &["Microsoft"]);
-    assert_candidate_entity(&entities, "location", &["London"]);
+        assert_candidate_case_entities(case_name, &entities, &expected_entities);
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
-async fn memory_service_uses_local_gliner_from_env_for_extract() {
+async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
     let _env_lock = ENV_LOCK.lock().await;
     let temp_dir = TempDir::new().expect("temp dir should be created");
-    let _env = local_gliner_env(&temp_dir);
+    let _env = local_gliner_env(&temp_dir, None);
+    let cases = gliner_diverse_coverage_cases();
+    assert_gliner_case_matrix_covers_supported_labels(&cases);
 
     let service = MemoryService::new_from_env()
         .await
         .expect("service should bootstrap with local GLiNER");
-    let episode_id = ingest_episode(
-        &service,
-        "Alice Smith joined Microsoft in London on 5 March 2026.",
-    )
-    .await;
 
-    let extracted = service
-        .extract(&episode_id, None)
-        .await
-        .expect("extract should succeed with local GLiNER");
+    for (case_name, text, expected_entities) in cases {
+        let episode_id = ingest_episode(&service, text).await;
+        let extracted = service
+            .extract(&episode_id, None)
+            .await
+            .unwrap_or_else(|err| {
+                panic!("extract should succeed with local GLiNER for `{case_name}`: {err}")
+            });
 
-    assert_eq!(extracted.episode_id, episode_id);
-    assert_extracted_entity(&extracted.entities, "person", &["Alice Smith", "Alice"]);
-    assert_extracted_entity(&extracted.entities, "company", &["Microsoft"]);
-    assert_extracted_entity(&extracted.entities, "location", &["London"]);
+        assert_eq!(
+            extracted.episode_id, episode_id,
+            "service extraction should preserve episode id for `{case_name}`"
+        );
+        assert_extracted_case_entities(case_name, &extracted.entities, &expected_entities);
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
