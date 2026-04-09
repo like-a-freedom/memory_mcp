@@ -1002,6 +1002,7 @@ impl MemoryMcp {
         source_id: Option<String>,
         t_ref: Option<String>,
         scope: Option<String>,
+        zero_shot_labels: Option<Vec<String>>,
     ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
         use super::parsers::normalize_optional_string;
 
@@ -1018,7 +1019,11 @@ impl MemoryMcp {
         );
 
         if let Some(ref episode_id) = episode_id {
-            match self.service.extract(episode_id, Some(access)).await {
+            match self
+                .service
+                .extract(episode_id, Some(access), zero_shot_labels.as_deref())
+                .await
+            {
                 Ok(result) => {
                     self.service.log_tool_event(
                         "extract.done",
@@ -1083,7 +1088,11 @@ impl MemoryMcp {
             )
             .await
         {
-            Ok(episode_id) => match self.service.extract(&episode_id, Some(access)).await {
+            Ok(episode_id) => match self
+                .service
+                .extract(&episode_id, Some(access), zero_shot_labels.as_deref())
+                .await
+            {
                 Ok(result) => {
                     self.service.log_tool_event(
                         "extract.done",
@@ -1324,6 +1333,7 @@ impl MemoryMcp {
                 p.source_id,
                 p.t_ref,
                 p.scope,
+                p.zero_shot_labels,
             )
             .await?;
         Ok(Json(response))

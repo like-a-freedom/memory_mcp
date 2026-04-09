@@ -672,20 +672,6 @@ impl GlinerEntityExtractor {
             .collect()
     }
 
-    fn build_prompt_words(&self) -> Vec<String> {
-        let ent_token = self
-            .tokenizer
-            .id_to_token(self.ent_token_id)
-            .unwrap_or_else(|| "<<ENT>>".to_string());
-        let mut prompt = Vec::with_capacity(self.labels.len() * 2 + 1);
-        for label in &self.labels {
-            prompt.push(ent_token.clone());
-            prompt.push(label.clone());
-        }
-        prompt.push(SEP_TOKEN.to_string());
-        prompt
-    }
-
     fn encode_window(
         &self,
         prompt_words: &[String],
@@ -971,12 +957,20 @@ impl GlinerEntityExtractor {
     }
 
     fn extract_inner(&self, text: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        self.extract_inner_with_labels(text, &self.labels)
+    }
+
+    fn extract_inner_with_labels(
+        &self,
+        text: &str,
+        labels: &[String],
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
         let text_words = Self::split_text_words(text);
         if text_words.is_empty() {
             return Ok(Vec::new());
         }
 
-        let prompt_words = self.build_prompt_words();
+        let prompt_words = self.build_prompt_words_for_labels(labels);
         let prompt_word_count = prompt_words.len();
 
         let mut all_spans = Vec::new();
@@ -991,10 +985,10 @@ impl GlinerEntityExtractor {
 
             let entity_token_positions =
                 self.collect_prompt_entity_positions(&input_ids, &word_ids, prompt_word_count);
-            if entity_token_positions.len() != self.labels.len() {
+            if entity_token_positions.len() != labels.len() {
                 return Err(MemoryError::Storage(format!(
                     "GLiNER prompt extraction mismatch: expected {} entity tokens, found {}",
-                    self.labels.len(),
+                    labels.len(),
                     entity_token_positions.len()
                 )));
             }
@@ -1044,6 +1038,20 @@ impl GlinerEntityExtractor {
 
         Ok(candidates)
     }
+
+    fn build_prompt_words_for_labels(&self, labels: &[String]) -> Vec<String> {
+        let ent_token = self
+            .tokenizer
+            .id_to_token(self.ent_token_id)
+            .unwrap_or_else(|| "<<ENT>>".to_string());
+        let mut prompt = Vec::with_capacity(labels.len() * 2 + 1);
+        for label in labels {
+            prompt.push(ent_token.clone());
+            prompt.push(label.clone());
+        }
+        prompt.push(SEP_TOKEN.to_string());
+        prompt
+    }
 }
 
 impl std::fmt::Debug for GlinerEntityExtractor {
@@ -1063,5 +1071,13 @@ impl EntityExtractor for GlinerEntityExtractor {
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         self.extract_inner(content)
+    }
+
+    async fn extract_candidates_with_labels(
+        &self,
+        content: &str,
+        zero_shot_labels: &[String],
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        self.extract_inner_with_labels(content, zero_shot_labels)
     }
 }

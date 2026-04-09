@@ -148,7 +148,7 @@ async fn ingest_and_extract(
         .unwrap_or_else(|err| panic!("source {source_id} failed to ingest: {err}"));
 
     service
-        .extract(&episode_id, None)
+        .extract(&episode_id, None, None)
         .await
         .unwrap_or_else(|err| panic!("source {source_id} failed to extract: {err}"))
 }

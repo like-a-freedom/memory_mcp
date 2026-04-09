@@ -79,7 +79,7 @@ pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &
         .await
         .expect("ingest should succeed");
     service
-        .extract(&episode_id, None)
+        .extract(&episode_id, None, None)
         .await
         .expect("extract should succeed");
     episode_id

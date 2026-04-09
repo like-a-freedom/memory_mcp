@@ -22,7 +22,7 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
     let episode_id_2 = svc.ingest(req, None).await?;
     assert_eq!(episode_id, episode_id_2);
 
-    let payload = svc.extract(&episode_id, None).await?;
+    let payload = svc.extract(&episode_id, None, None).await?;
     assert_eq!(payload.episode_id, episode_id);
     assert!(!payload.entities.is_empty());
     assert!(!payload.facts.is_empty());

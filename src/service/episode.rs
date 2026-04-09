@@ -194,11 +194,27 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
 }
 
 /// Extract entities from content.
+///
+/// # Arguments
+///
+/// * `service` - The memory service containing the entity extractor.
+/// * `content` - The text content to extract entities from.
+/// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
+///   When provided, these labels override the default NER configuration.
 pub async fn extract_entities(
     service: &crate::service::MemoryService,
     content: &str,
+    zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
-    let candidates = service.entity_extractor.extract_candidates(content).await?;
+    let candidates = match zero_shot_labels {
+        Some(labels) => {
+            service
+                .entity_extractor
+                .extract_candidates_with_labels(content, labels)
+                .await?
+        }
+        None => service.entity_extractor.extract_candidates(content).await?,
+    };
 
     let mut entities = Vec::with_capacity(candidates.len());
 
@@ -340,6 +356,7 @@ pub fn is_document_action_item(content: &str) -> bool {
 pub async fn extract_from_episode(
     service: &crate::service::MemoryService,
     episode_id: &str,
+    zero_shot_labels: Option<&[String]>,
 ) -> Result<ExtractResult, MemoryError> {
     use crate::logging::LogLevel;
     use crate::models::Edge;
@@ -363,7 +380,7 @@ pub async fn extract_from_episode(
     let episode = episode_from_record(&record)
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
-    let entities = extract_entities(service, &episode.content).await?;
+    let entities = extract_entities(service, &episode.content, zero_shot_labels).await?;
     let facts = extract_facts(service, &episode, &entities).await?;
     let warnings = detect_contradiction_warnings(service, &episode, &facts, &namespace).await?;
     let mut links = Vec::new();

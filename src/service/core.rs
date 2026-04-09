@@ -550,10 +550,18 @@ impl MemoryService {
     }
 
     /// Extracts entities and facts from an episode.
+    ///
+    /// # Arguments
+    ///
+    /// * `episode_id` - The episode to extract from.
+    /// * `access` - Optional access context for authorization.
+    /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
+    ///   When provided, these labels override the default NER configuration.
     pub async fn extract(
         &self,
         episode_id: &str,
         access: Option<AccessContext>,
+        zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let (record, _) = self.find_episode_record(episode_id).await?;
@@ -562,7 +570,8 @@ impl MemoryService {
                 "episode_id not found: {episode_id}"
             )));
         }
-        let payload = super::episode::extract_from_episode(self, episode_id).await?;
+        let payload =
+            super::episode::extract_from_episode(self, episode_id, zero_shot_labels).await?;
         self.logger.log(
             log_event(
                 "extract",

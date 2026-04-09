@@ -22,6 +22,19 @@ pub trait EntityExtractor: Send + Sync {
 
     /// Returns normalized entity candidates discovered in the supplied content.
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError>;
+
+    /// Returns normalized entity candidates with custom zero-shot labels.
+    ///
+    /// Default implementation falls back to standard `extract_candidates`.
+    /// Override in implementations that support custom label sets (e.g., GLiNER).
+    async fn extract_candidates_with_labels(
+        &self,
+        content: &str,
+        _zero_shot_labels: &[String],
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let _ = _zero_shot_labels;
+        self.extract_candidates(content).await
+    }
 }
 
 /// Regex-based deterministic extractor used as the default fallback implementation.

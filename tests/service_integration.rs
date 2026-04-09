@@ -59,7 +59,7 @@ async fn test_service_ingest_and_extract_flow() {
     let episode_id = service.ingest(request, None).await.unwrap();
     assert!(episode_id.starts_with("episode:"));
 
-    let result = service.extract(&episode_id, None).await.unwrap();
+    let result = service.extract(&episode_id, None, None).await.unwrap();
 
     assert_eq!(result.episode_id, episode_id);
     assert!(!result.entities.is_empty());
@@ -203,7 +203,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
         .await
         .unwrap();
 
-    let extraction = service.extract(&episode_id, None).await.unwrap();
+    let extraction = service.extract(&episode_id, None, None).await.unwrap();
     assert!(!extraction.links.is_empty());
 
     let edges = db_client.select_table("edge", "org").await.unwrap();
@@ -243,7 +243,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
         )
         .await
         .expect("ingest first episode");
-    let first_result = service.extract(&first_episode, None).await.unwrap();
+    let first_result = service.extract(&first_episode, None, None).await.unwrap();
     let first_json = serde_json::to_value(&first_result).expect("serialize first extract result");
 
     assert_eq!(
@@ -274,7 +274,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
         )
         .await
         .expect("ingest second episode");
-    let second_result = service.extract(&second_episode, None).await.unwrap();
+    let second_result = service.extract(&second_episode, None, None).await.unwrap();
     let second_json =
         serde_json::to_value(&second_result).expect("serialize second extract result");
 
@@ -504,7 +504,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
             )
             .await
             .unwrap();
-        service.extract(&episode_id, None).await.unwrap();
+        service.extract(&episode_id, None, None).await.unwrap();
     }
 
     let communities = db_client.select_table("community", "org").await.unwrap();

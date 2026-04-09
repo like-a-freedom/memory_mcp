@@ -63,6 +63,8 @@ pub struct ExtractParams {
     pub t_ref: Option<String>,
     /// Scope (default: "org")
     pub scope: Option<String>,
+    /// Custom zero-shot entity labels for GLiNER (opt-in, overrides default labels)
+    pub zero_shot_labels: Option<Vec<String>>,
 }
 
 /// Parameters for the `resolve` tool.

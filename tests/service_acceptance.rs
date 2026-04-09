@@ -26,7 +26,10 @@ async fn test_ingest_extract_and_assemble() {
         .await
         .expect("ingest");
 
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract");
     let facts = extraction.facts;
     assert!(facts.iter().any(|fact| fact.fact_type == "metric"));
     assert!(facts.iter().any(|fact| fact.fact_type == "promise"));
@@ -97,7 +100,10 @@ async fn test_invalidate_and_explain() {
         )
         .await
         .expect("ingest");
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract");
     let fact_id = extraction.facts[0].fact_id.clone();
 
     service
@@ -436,7 +442,10 @@ async fn test_assemble_context_uses_matching_community_summary() {
         .await
         .expect("ingest");
 
-    let extraction = service.extract(&episode_id, None).await.expect("extract");
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract");
     let alice_id = extraction
         .entities
         .iter()

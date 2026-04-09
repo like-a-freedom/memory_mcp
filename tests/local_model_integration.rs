@@ -345,6 +345,33 @@ async fn local_gliner_extractor_detects_custom_zero_shot_entities() {
 
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn local_gliner_extractor_supports_per_call_custom_labels() {
+    let model_dir = local_gliner_model_dir();
+    assert_required_files(&model_dir, GLINER_REQUIRED_FILES);
+
+    // Load extractor with default labels
+    let default_labels = supported_gliner_labels();
+    let extractor = GlinerEntityExtractor::new(&model_dir, default_labels, 0.2)
+        .expect("GLiNER extractor should load the local model");
+
+    // Test that we can override labels per-call using extract_candidates_with_labels
+    let custom_labels = zero_shot_gliner_labels();
+    for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
+        let entities = extractor
+            .extract_candidates_with_labels(text, &custom_labels)
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "GLiNER per-call custom labels extraction should succeed for `{case_name}`: {err}"
+                )
+            });
+
+        assert_candidate_case_entities(case_name, &entities, &expected_entities);
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
 async fn memory_service_uses_local_gliner_zero_shot_labels() {
     let _env_lock = ENV_LOCK.lock().await;
     let temp_dir = TempDir::new().expect("temp dir should be created");
@@ -358,7 +385,7 @@ async fn memory_service_uses_local_gliner_zero_shot_labels() {
     for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
         let episode_id = ingest_episode(&service, text).await;
         let extracted = service
-            .extract(&episode_id, None)
+            .extract(&episode_id, None, None)
             .await
             .unwrap_or_else(|err| {
                 panic!("extract should succeed with local GLiNER zero-shot labels for `{case_name}`: {err}")
@@ -479,7 +506,7 @@ async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
     for (case_name, text, expected_entities) in cases {
         let episode_id = ingest_episode(&service, text).await;
         let extracted = service
-            .extract(&episode_id, None)
+            .extract(&episode_id, None, None)
             .await
             .unwrap_or_else(|err| {
                 panic!("extract should succeed with local GLiNER for `{case_name}`: {err}")
