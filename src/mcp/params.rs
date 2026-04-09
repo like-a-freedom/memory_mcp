@@ -250,9 +250,23 @@ mod tests {
             "sourceId",
             "tRef",
             "scope",
+            "zeroShotLabels",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
+
+        // Verify zeroShotLabels is an optional array of strings
+        assert_eq!(
+            properties["zeroShotLabels"]["type"],
+            serde_json::json!(["array", "null"])
+        );
+
+        // Verify the items in zeroShotLabels array are strings
+        let zero_shot_labels_schema = &properties["zeroShotLabels"];
+        assert_eq!(
+            zero_shot_labels_schema["items"]["type"], "string",
+            "zeroShotLabels items should be strings"
+        );
     }
 
     #[test]
