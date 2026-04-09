@@ -61,8 +61,8 @@ pub use lifecycle::{
     spawn_community_worker, spawn_decay_worker,
 };
 pub use query::{
-    bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now, parse_iso,
-    preprocess_search_query,
+    bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,
+    parse_iso, preprocess_search_query,
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 

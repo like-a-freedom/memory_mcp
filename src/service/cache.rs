@@ -45,8 +45,8 @@ impl CacheView {
     ) -> Self {
         Self {
             view_mode: view_mode.map(ToString::to_string),
-            window_start: window_start.map(super::bucket_to_hour),
-            window_end: window_end.map(super::bucket_to_hour),
+            window_start: window_start.map(super::query::bucket_to_five_minutes),
+            window_end: window_end.map(super::query::bucket_to_five_minutes),
         }
     }
 }
@@ -74,7 +74,7 @@ impl CacheKey {
         Self {
             query: super::normalize_text(query),
             scope: scope.to_string(),
-            cutoff: super::bucket_to_hour(cutoff),
+            cutoff: super::query::bucket_to_five_minutes(cutoff),
             budget,
             project: project.map(ToString::to_string),
             fact_types,
@@ -142,8 +142,8 @@ mod tests {
     }
 
     #[test]
-    fn cache_key_new_buckets_cutoff_to_hour() {
-        let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 45).unwrap();
+    fn cache_key_new_buckets_cutoff_to_five_minutes() {
+        let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 45).unwrap();
         let key = CacheKey::new(
             "query",
             "org",
@@ -154,7 +154,45 @@ mod tests {
             CacheView::default(),
             None,
         );
-        assert_eq!(key.cutoff, "2024-01-01T12:00:00Z");
+        assert_eq!(key.cutoff, "2024-01-01T12:30:00Z");
+    }
+
+    #[test]
+    fn cache_key_new_distinguishes_adjacent_five_minute_buckets() {
+        let key1 = CacheKey::new(
+            "query",
+            "org",
+            Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 59).unwrap(),
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
+        let key2 = CacheKey::new(
+            "query",
+            "org",
+            Utc.with_ymd_and_hms(2024, 1, 1, 12, 35, 0).unwrap(),
+            5,
+            None,
+            &[],
+            CacheView::default(),
+            None,
+        );
+
+        assert_ne!(key1.cutoff, key2.cutoff);
+    }
+
+    #[test]
+    fn cache_view_new_buckets_window_bounds_to_five_minutes() {
+        let view = CacheView::new(
+            Some("timeline"),
+            Some(Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 59).unwrap()),
+            Some(Utc.with_ymd_and_hms(2024, 1, 1, 13, 2, 1).unwrap()),
+        );
+
+        assert_eq!(view.window_start.as_deref(), Some("2024-01-01T12:30:00Z"));
+        assert_eq!(view.window_end.as_deref(), Some("2024-01-01T13:00:00Z"));
     }
 
     #[test]

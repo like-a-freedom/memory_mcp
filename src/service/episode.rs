@@ -256,7 +256,7 @@ pub async fn extract_entities(
         let entity_id = service
             .resolve(candidate.clone(), None)
             .await
-            .map_err(|err| {
+            .inspect_err(|err| {
                 service.logger.log(
                     super::log_event(
                         "ner.resolve.error",
@@ -270,7 +270,6 @@ pub async fn extract_entities(
                     ),
                     LogLevel::Warn,
                 );
-                err
             })?;
 
         entities.push(ExtractedEntity {

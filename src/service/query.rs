@@ -1,6 +1,6 @@
 //! Query preprocessing and utility functions.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use regex::Regex;
 
 /// Normalize text by lowercasing and collapsing whitespace.
@@ -32,6 +32,12 @@ pub fn now() -> DateTime<Utc> {
 /// Bucket cutoff to the start of the hour for better cache hit rate.
 pub fn bucket_to_hour(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:00:00Z").to_string()
+}
+
+/// Bucket cutoff to the nearest lower five-minute boundary for cache freshness.
+pub fn bucket_to_five_minutes(dt: DateTime<Utc>) -> String {
+    let minute = (dt.minute() / 5) * 5;
+    format!("{}:{minute:02}:00Z", dt.format("%Y-%m-%dT%H"))
 }
 
 /// Preprocess a search query by stripping episode references, boolean operators,
@@ -70,7 +76,26 @@ fn normalize_search_term(raw: &str) -> Option<String> {
         return None;
     }
 
-    Some(token)
+    Some(singularize_search_term(&token))
+}
+
+fn singularize_search_term(token: &str) -> String {
+    if token.len() > 4 && token.ends_with("ies") {
+        let stem = token.trim_end_matches("ies");
+        return format!("{stem}y");
+    }
+
+    if token.len() > 4
+        && token.ends_with('s')
+        && !token.ends_with("ss")
+        && !token.ends_with("us")
+        && !token.ends_with("is")
+        && !token.ends_with("as")
+    {
+        return token[..token.len() - 1].to_string();
+    }
+
+    token.to_string()
 }
 
 fn is_search_stopword(token: &str) -> bool {
@@ -193,6 +218,13 @@ mod tests {
     }
 
     #[test]
+    fn bucket_to_five_minutes_rounds_down_to_five_minute_boundary() {
+        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 10, 47, 30).unwrap();
+        let result = bucket_to_five_minutes(dt);
+        assert_eq!(result, "2024-01-15T10:45:00Z");
+    }
+
+    #[test]
     fn preprocess_search_query_strips_episode_references() {
         let result = preprocess_search_query("query episode:abc123 more");
         assert_eq!(result, "query more");
@@ -207,7 +239,7 @@ mod tests {
     #[test]
     fn preprocess_search_query_handles_quoted_phrases() {
         let result = preprocess_search_query(r#"search "quoted phrase" terms"#);
-        assert_eq!(result, "search quoted phrase terms");
+        assert_eq!(result, "search quoted phrase term");
     }
 
     #[test]
@@ -227,6 +259,20 @@ mod tests {
         let result = search_query_terms("When did Caroline go to the LGBTQ support group?");
 
         assert_eq!(result, vec!["caroline", "lgbtq", "support", "group"]);
+    }
+
+    #[test]
+    fn search_query_terms_normalize_simple_plural_forms() {
+        let result = search_query_terms("blockers decisions updates stories");
+
+        assert_eq!(result, vec!["blocker", "decision", "update", "story"]);
+    }
+
+    #[test]
+    fn search_query_terms_preserve_non_plural_words_ending_with_s() {
+        let result = search_query_terms("atlas analysis status access");
+
+        assert_eq!(result, vec!["atlas", "analysis", "status", "access"]);
     }
 
     #[test]

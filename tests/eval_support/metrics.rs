@@ -89,25 +89,13 @@ impl RetrievalSuiteSummary {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RetrievalCaseDiagnostics<'a> {
     pub actual_tiers: &'a [&'a str],
     pub first_relevant_rank: Option<usize>,
     pub source_episodes: &'a [&'a str],
     pub min_unique_source_episodes: Option<usize>,
     pub max_source_episode_share: Option<f64>,
-}
-
-impl<'a> Default for RetrievalCaseDiagnostics<'a> {
-    fn default() -> Self {
-        Self {
-            actual_tiers: &[],
-            first_relevant_rank: None,
-            source_episodes: &[],
-            min_unique_source_episodes: None,
-            max_source_episode_share: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

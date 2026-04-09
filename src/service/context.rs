@@ -1,5 +1,6 @@
 //! Context assembly operations.
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -16,6 +17,15 @@ use crate::storage::GraphDirection;
 use crate::storage::{json_f64, json_string};
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
+const MAX_ITEMS_PER_SOURCE_EPISODE: usize = 2;
+const ACCESS_COUNT_NOVELTY_WEIGHT: f64 = 0.08;
+const MMR_RELEVANCE_WEIGHT: f64 = 0.80;
+const REDUNDANCY_INDEX_KEY_WEIGHT: f64 = 0.70;
+const REDUNDANCY_TEMPORAL_WEIGHT: f64 = 0.30;
+const TEMPORAL_SIMILARITY_WINDOW_DAYS: f64 = 14.0;
+const TEMPORAL_ALIGNMENT_WINDOW_DAYS: f64 = 30.0;
+const MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET: f64 = 0.50;
+const MIN_RANKED_CONFIDENCE: f64 = 0.01;
 
 /// Assemble context for a query.
 pub async fn assemble_context(
@@ -381,27 +391,51 @@ pub async fn assemble_context(
             apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
             if requested_view_mode == Some("timeline") {
                 sort_ranked_context_facts_for_timeline(&mut ranked_facts);
+                ranked_facts
+                    .into_iter()
+                    .take(request.budget.max(1) as usize)
+                    .map(|ranked| {
+                        let confidence = super::decayed_confidence(&ranked.fact, cutoff);
+                        AssembledContextItem {
+                            fact_id: ranked.fact.fact_id,
+                            content: ranked.fact.content,
+                            quote: ranked.fact.quote,
+                            source_episode: ranked.fact.source_episode,
+                            confidence,
+                            provenance: ranked.fact.provenance,
+                            rationale: ranked.rationale,
+                            retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
+                        }
+                    })
+                    .collect()
             } else {
-                sort_ranked_context_facts(&mut ranked_facts);
+                let temporal_focus =
+                    query_opt.and_then(|query| infer_temporal_window(query, cutoff));
+                let selected_ranked = select_ranked_context_facts(
+                    ranked_facts,
+                    request.budget.max(1) as usize,
+                    temporal_focus,
+                    query_opt
+                        .map(super::query::search_query_terms)
+                        .unwrap_or_default(),
+                );
+                selected_ranked
+                    .into_iter()
+                    .map(|ranked| {
+                        let confidence = super::decayed_confidence(&ranked.fact, cutoff);
+                        AssembledContextItem {
+                            fact_id: ranked.fact.fact_id,
+                            content: ranked.fact.content,
+                            quote: ranked.fact.quote,
+                            source_episode: ranked.fact.source_episode,
+                            confidence,
+                            provenance: ranked.fact.provenance,
+                            rationale: ranked.rationale,
+                            retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
+                        }
+                    })
+                    .collect()
             }
-
-            ranked_facts
-                .into_iter()
-                .take(request.budget.max(1) as usize)
-                .map(|ranked| {
-                    let confidence = super::decayed_confidence(&ranked.fact, cutoff);
-                    AssembledContextItem {
-                        fact_id: ranked.fact.fact_id,
-                        content: ranked.fact.content,
-                        quote: ranked.fact.quote,
-                        source_episode: ranked.fact.source_episode,
-                        confidence,
-                        provenance: ranked.fact.provenance,
-                        rationale: ranked.rationale,
-                        retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
-                    }
-                })
-                .collect()
         }
     };
 
@@ -1520,6 +1554,12 @@ struct TemporalQueryExpansion {
     residual_query: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TemporalWindow {
+    start: chrono::DateTime<chrono::Utc>,
+    end: chrono::DateTime<chrono::Utc>,
+}
+
 fn expand_temporal_synonyms(
     query: &str,
     cutoff: chrono::DateTime<chrono::Utc>,
@@ -1819,18 +1859,528 @@ fn push_temporal_group(groups: &mut Vec<Vec<String>>, queries: Vec<String>) {
     }
 }
 
-fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
-    facts.sort_by(|a, b| {
-        // Composite score: fusion_score weighted by decayed_confidence
-        let score_a = a.fusion_score * a.decayed_confidence.max(0.01);
-        let score_b = b.fusion_score * b.decayed_confidence.max(0.01);
-        score_b
-            .total_cmp(&score_a)
-            .then_with(|| a.source_priority.cmp(&b.source_priority))
-            .then_with(|| b.fact.ft_score.total_cmp(&a.fact.ft_score))
-            .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
-            .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+fn infer_temporal_window(
+    query: &str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> Option<TemporalWindow> {
+    use chrono::Datelike;
+
+    let tokens = query
+        .split_whitespace()
+        .map(normalize_temporal_token)
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let explicit_years = tokens
+        .iter()
+        .filter(|token| is_four_digit_year(token))
+        .filter_map(|token| token.parse::<i32>().ok())
+        .collect::<HashSet<_>>();
+    let shared_year = (explicit_years.len() == 1)
+        .then(|| *explicit_years.iter().next().expect("shared year exists"));
+
+    let mut ranges = Vec::<(chrono::NaiveDate, chrono::NaiveDate)>::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index].as_str();
+
+        if let Some(date) = parse_iso_date(token) {
+            ranges.push((date, date));
+            index += 1;
+            continue;
+        }
+
+        if let Some(month) = month_number(token) {
+            let next_year = tokens
+                .get(index + 1)
+                .filter(|next| is_four_digit_year(next))
+                .and_then(|next| next.parse::<i32>().ok());
+            let year = next_year.or(shared_year).unwrap_or(cutoff.year());
+            ranges.push(month_date_range(year, month));
+            index += usize::from(next_year.is_some()) + 1;
+            continue;
+        }
+
+        if let Some(quarter) = parse_quarter_token(token) {
+            let next_year = tokens
+                .get(index + 1)
+                .filter(|next| is_four_digit_year(next))
+                .and_then(|next| next.parse::<i32>().ok());
+            let year = next_year.or(shared_year).unwrap_or(cutoff.year());
+            ranges.push(quarter_date_range(year, quarter));
+            index += usize::from(next_year.is_some()) + 1;
+            continue;
+        }
+
+        if token == "quarter"
+            && let Some(next) = tokens.get(index + 1)
+            && let Some(quarter) = parse_quarter_token(next)
+        {
+            let next_year = tokens
+                .get(index + 2)
+                .filter(|year| is_four_digit_year(year))
+                .and_then(|year| year.parse::<i32>().ok());
+            let year = next_year.or(shared_year).unwrap_or(cutoff.year());
+            ranges.push(quarter_date_range(year, quarter));
+            index += if next_year.is_some() { 3 } else { 2 };
+            continue;
+        }
+
+        if token == "last" && tokens.get(index + 1).is_some_and(|next| next == "quarter") {
+            ranges.push(previous_quarter_date_range(cutoff));
+            index += 2;
+            continue;
+        }
+
+        if token == "this" && tokens.get(index + 1).is_some_and(|next| next == "week") {
+            let start = start_of_week(cutoff.date_naive());
+            let end = start + chrono::Duration::days(6);
+            ranges.push((start, end));
+            index += 2;
+            continue;
+        }
+
+        if is_weekday_name(token) {
+            let start = start_of_week(cutoff.date_naive());
+            if let Some(target_weekday) = weekday_from_name(token) {
+                let date =
+                    start + chrono::Duration::days(target_weekday.num_days_from_monday() as i64);
+                ranges.push((date, date));
+                index += 1;
+                continue;
+            }
+        }
+
+        if let Some(relative_shift_days) = relative_day_shift(token) {
+            let target_date = cutoff.date_naive() + chrono::Duration::days(relative_shift_days);
+            ranges.push((target_date, target_date));
+            index += 1;
+            continue;
+        }
+
+        index += 1;
+    }
+
+    if ranges.is_empty() {
+        return None;
+    }
+
+    let start_date = ranges.iter().map(|(start, _)| *start).min()?;
+    let end_date = ranges.iter().map(|(_, end)| *end).max()?;
+
+    Some(TemporalWindow {
+        start: start_of_day(start_date),
+        end: end_of_day(end_date),
+    })
+}
+
+fn month_date_range(year: i32, month: u32) -> (chrono::NaiveDate, chrono::NaiveDate) {
+    let start = chrono::NaiveDate::from_ymd_opt(year, month, 1).expect("valid month start");
+    let (next_year, next_month) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
+    let next_start =
+        chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1).expect("valid next month");
+    (start, next_start - chrono::Duration::days(1))
+}
+
+fn quarter_date_range(year: i32, quarter: u32) -> (chrono::NaiveDate, chrono::NaiveDate) {
+    let start_month = ((quarter - 1) * 3) + 1;
+    let end_month = start_month + 2;
+    let (start, _) = month_date_range(year, start_month);
+    let (_, end) = month_date_range(year, end_month);
+    (start, end)
+}
+
+fn previous_quarter_date_range(
+    cutoff: chrono::DateTime<chrono::Utc>,
+) -> (chrono::NaiveDate, chrono::NaiveDate) {
+    use chrono::Datelike;
+
+    let current_quarter = ((cutoff.month() - 1) / 3) + 1;
+    let (year, quarter) = if current_quarter == 1 {
+        (cutoff.year() - 1, 4)
+    } else {
+        (cutoff.year(), current_quarter - 1)
+    };
+    quarter_date_range(year, quarter)
+}
+
+fn start_of_day(date: chrono::NaiveDate) -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::from_naive_utc_and_offset(
+        date.and_hms_opt(0, 0, 0).expect("valid start of day"),
+        chrono::Utc,
+    )
+}
+
+fn end_of_day(date: chrono::NaiveDate) -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::from_naive_utc_and_offset(
+        date.and_hms_opt(23, 59, 59).expect("valid end of day"),
+        chrono::Utc,
+    )
+}
+
+fn novelty_factor(access_count: i64) -> f64 {
+    let access_count = access_count.max(0) as f64;
+    1.0 / (1.0 + access_count.ln_1p() * ACCESS_COUNT_NOVELTY_WEIGHT)
+}
+
+fn ranked_relevance_score(fact: &RankedContextFact) -> f64 {
+    fact.fusion_score
+        * fact.decayed_confidence.max(MIN_RANKED_CONFIDENCE)
+        * novelty_factor(fact.fact.access_count)
+}
+
+fn temporal_alignment_factor(
+    fact_time: chrono::DateTime<chrono::Utc>,
+    temporal_focus: &TemporalWindow,
+) -> f64 {
+    let distance_days = if fact_time < temporal_focus.start {
+        (temporal_focus.start - fact_time).num_seconds().abs() as f64 / 86_400.0
+    } else if fact_time > temporal_focus.end {
+        (fact_time - temporal_focus.end).num_seconds().abs() as f64 / 86_400.0
+    } else {
+        0.0
+    };
+
+    if distance_days <= 0.0 {
+        1.0
+    } else {
+        1.0 / (1.0 + distance_days / TEMPORAL_ALIGNMENT_WINDOW_DAYS)
+    }
+}
+
+fn candidate_temporal_alignment(
+    fact: &RankedContextFact,
+    temporal_focus: Option<&TemporalWindow>,
+) -> f64 {
+    temporal_focus
+        .map(|focus| temporal_alignment_factor(fact.fact.t_valid, focus))
+        .unwrap_or(1.0)
+}
+
+fn focused_ranked_relevance_score(
+    fact: &RankedContextFact,
+    temporal_focus: Option<&TemporalWindow>,
+) -> f64 {
+    let temporal_factor = candidate_temporal_alignment(fact, temporal_focus);
+    ranked_relevance_score(fact) * temporal_factor
+}
+
+fn compare_ranked_context_facts_with_focus(
+    a: &RankedContextFact,
+    b: &RankedContextFact,
+    temporal_focus: Option<&TemporalWindow>,
+) -> Ordering {
+    let score_a = focused_ranked_relevance_score(a, temporal_focus);
+    let score_b = focused_ranked_relevance_score(b, temporal_focus);
+    score_b
+        .total_cmp(&score_a)
+        .then_with(|| a.source_priority.cmp(&b.source_priority))
+        .then_with(|| b.fact.ft_score.total_cmp(&a.fact.ft_score))
+        .then_with(|| b.fact.t_valid.cmp(&a.fact.t_valid))
+        .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn compare_ranked_context_facts(a: &RankedContextFact, b: &RankedContextFact) -> Ordering {
+    compare_ranked_context_facts_with_focus(a, b, None)
+}
+
+fn source_episode_selection_cap(budget: usize) -> usize {
+    MAX_ITEMS_PER_SOURCE_EPISODE.min(budget.max(1))
+}
+
+fn temporal_similarity(
+    left: chrono::DateTime<chrono::Utc>,
+    right: chrono::DateTime<chrono::Utc>,
+) -> f64 {
+    let diff_days = (left - right).num_seconds().abs() as f64 / 86_400.0;
+    1.0 / (1.0 + diff_days / TEMPORAL_SIMILARITY_WINDOW_DAYS)
+}
+
+fn index_key_jaccard_similarity(left: &[String], right: &[String]) -> f64 {
+    let left = left
+        .iter()
+        .map(|key| super::normalize_text(key))
+        .filter(|key| !key.is_empty())
+        .collect::<HashSet<_>>();
+    let right = right
+        .iter()
+        .map(|key| super::normalize_text(key))
+        .filter(|key| !key.is_empty())
+        .collect::<HashSet<_>>();
+
+    if left.is_empty() || right.is_empty() {
+        return 0.0;
+    }
+
+    let intersection = left.intersection(&right).count() as f64;
+    let union = left.union(&right).count() as f64;
+    if union <= 0.0 {
+        0.0
+    } else {
+        intersection / union
+    }
+}
+
+fn matched_query_terms_for_fact(
+    fact: &RankedContextFact,
+    query_terms: &[String],
+) -> HashSet<String> {
+    if query_terms.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut fact_terms = super::query::search_query_terms(&fact.fact.content)
+        .into_iter()
+        .collect::<HashSet<_>>();
+    for index_key in &fact.fact.index_keys {
+        fact_terms.extend(super::query::search_query_terms(index_key));
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| fact_terms.contains(term.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn query_term_set_similarity(left: &HashSet<String>, right: &HashSet<String>) -> f64 {
+    if left.is_empty() || right.is_empty() {
+        return 0.0;
+    }
+
+    let intersection = left.intersection(right).count() as f64;
+    let union = left.union(right).count() as f64;
+    if union <= 0.0 {
+        0.0
+    } else {
+        intersection / union
+    }
+}
+
+fn prune_redundant_selected_facts(
+    mut selected: Vec<RankedContextFact>,
+    query_terms: &[String],
+    temporal_focus: Option<&TemporalWindow>,
+) -> Vec<RankedContextFact> {
+    const REDUNDANT_SUPPORT_SIMILARITY: f64 = 0.40;
+    if selected.len() <= 1 || query_terms.len() < 4 {
+        return selected;
+    }
+
+    loop {
+        let matched_terms = selected
+            .iter()
+            .map(|fact| matched_query_terms_for_fact(fact, query_terms))
+            .collect::<Vec<_>>();
+        let mut term_frequency = HashMap::<String, usize>::new();
+        for terms in &matched_terms {
+            for term in terms {
+                *term_frequency.entry(term.clone()).or_default() += 1;
+            }
+        }
+        let informative_terms = matched_terms
+            .iter()
+            .map(|terms| {
+                terms
+                    .iter()
+                    .filter(|term| {
+                        term_frequency.get(term.as_str()).copied().unwrap_or(0) < selected.len()
+                    })
+                    .cloned()
+                    .collect::<HashSet<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut removal_idx = None;
+        let mut removal_support_count = 0usize;
+        let mut removal_score = f64::INFINITY;
+
+        for idx in 0..selected.len() {
+            if informative_terms[idx].len() < 4 {
+                continue;
+            }
+
+            let mut support_count = 0usize;
+            let mut similarity_count = 0usize;
+
+            for other_idx in 0..selected.len() {
+                if idx == other_idx {
+                    continue;
+                }
+
+                let similarity = query_term_set_similarity(
+                    &informative_terms[idx],
+                    &informative_terms[other_idx],
+                );
+                if similarity >= REDUNDANT_SUPPORT_SIMILARITY {
+                    support_count += 1;
+                }
+                similarity_count += 1;
+            }
+
+            if support_count < 2 || similarity_count == 0 {
+                continue;
+            }
+
+            let score = focused_ranked_relevance_score(&selected[idx], temporal_focus);
+            let should_remove = removal_idx.is_none()
+                || support_count > removal_support_count
+                || (support_count == removal_support_count && score < removal_score);
+            if should_remove {
+                removal_idx = Some(idx);
+                removal_support_count = support_count;
+                removal_score = score;
+            }
+        }
+
+        let Some(removal_idx) = removal_idx else {
+            break;
+        };
+        selected.remove(removal_idx);
+    }
+
+    selected
+}
+
+fn candidate_redundancy(candidate: &RankedContextFact, selected: &RankedContextFact) -> f64 {
+    let index_key_similarity =
+        index_key_jaccard_similarity(&candidate.fact.index_keys, &selected.fact.index_keys);
+    let temporal_overlap = temporal_similarity(candidate.fact.t_valid, selected.fact.t_valid);
+    ((REDUNDANCY_INDEX_KEY_WEIGHT * index_key_similarity)
+        + (REDUNDANCY_TEMPORAL_WEIGHT * temporal_overlap))
+        .clamp(0.0, 1.0)
+}
+
+fn mmr_selection_score(
+    candidate: &RankedContextFact,
+    selected: &[RankedContextFact],
+    max_relevance: f64,
+    temporal_focus: Option<&TemporalWindow>,
+) -> f64 {
+    let relevance = (focused_ranked_relevance_score(candidate, temporal_focus)
+        / max_relevance.max(MIN_RANKED_CONFIDENCE))
+    .clamp(0.0, 1.0);
+    if selected.is_empty() {
+        return relevance;
+    }
+
+    let redundancy = selected
+        .iter()
+        .map(|picked| candidate_redundancy(candidate, picked))
+        .fold(0.0, f64::max);
+
+    (MMR_RELEVANCE_WEIGHT * relevance) - ((1.0 - MMR_RELEVANCE_WEIGHT) * redundancy)
+}
+
+fn select_ranked_context_facts(
+    mut facts: Vec<RankedContextFact>,
+    budget: usize,
+    temporal_focus: Option<TemporalWindow>,
+    query_terms: Vec<String>,
+) -> Vec<RankedContextFact> {
+    if facts.is_empty() || budget == 0 {
+        return Vec::new();
+    }
+
+    let temporal_focus_ref = temporal_focus.as_ref();
+    facts.sort_by(|left, right| {
+        compare_ranked_context_facts_with_focus(left, right, temporal_focus_ref)
     });
+
+    let max_relevance = facts
+        .first()
+        .map(|fact| focused_ranked_relevance_score(fact, temporal_focus_ref))
+        .unwrap_or(1.0)
+        .max(MIN_RANKED_CONFIDENCE);
+    let per_source_episode_cap = source_episode_selection_cap(budget);
+    let mut source_counts = HashMap::<String, usize>::new();
+    let mut selected = Vec::with_capacity(budget.min(facts.len()));
+
+    while selected.len() < budget && !facts.is_empty() {
+        let enforce_temporal_alignment = temporal_focus_ref.is_some()
+            && facts.iter().any(|candidate| {
+                candidate_temporal_alignment(candidate, temporal_focus_ref)
+                    >= MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET
+            });
+        let enforce_cap = facts.iter().any(|candidate| {
+            source_counts
+                .get(candidate.fact.source_episode.as_str())
+                .copied()
+                .unwrap_or(0)
+                < per_source_episode_cap
+        });
+
+        let mut best_idx = None;
+        let mut best_score = f64::NEG_INFINITY;
+        let mut best_alignment = 1.0;
+        for (idx, candidate) in facts.iter().enumerate() {
+            let source_count = source_counts
+                .get(candidate.fact.source_episode.as_str())
+                .copied()
+                .unwrap_or(0);
+            if enforce_cap && source_count >= per_source_episode_cap {
+                continue;
+            }
+
+            let temporal_alignment = candidate_temporal_alignment(candidate, temporal_focus_ref);
+            if enforce_temporal_alignment
+                && temporal_alignment < MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET
+            {
+                continue;
+            }
+
+            let score =
+                mmr_selection_score(candidate, &selected, max_relevance, temporal_focus_ref);
+            let is_better = match best_idx {
+                None => true,
+                Some(_) if score > best_score + 1e-9 => true,
+                Some(current_best_idx)
+                    if (score - best_score).abs() <= 1e-9
+                        && compare_ranked_context_facts_with_focus(
+                            candidate,
+                            &facts[current_best_idx],
+                            temporal_focus_ref,
+                        ) == Ordering::Less =>
+                {
+                    true
+                }
+                _ => false,
+            };
+
+            if is_better {
+                best_idx = Some(idx);
+                best_score = score;
+                best_alignment = temporal_alignment;
+            }
+        }
+
+        let Some(best_idx) = best_idx else {
+            break;
+        };
+        if !selected.is_empty() && best_alignment < MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET {
+            break;
+        }
+        let chosen = facts.remove(best_idx);
+        *source_counts
+            .entry(chosen.fact.source_episode.clone())
+            .or_default() += 1;
+        selected.push(chosen);
+    }
+
+    prune_redundant_selected_facts(selected, &query_terms, temporal_focus_ref)
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
+    facts.sort_by(compare_ranked_context_facts);
 }
 
 fn sort_ranked_context_facts_for_timeline(facts: &mut [RankedContextFact]) {
@@ -2271,6 +2821,34 @@ fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
     unigram_overlap + (phrase_overlap * 2) + trigram_overlap
 }
 
+fn lexical_query_overlap_for_fact(fact: &crate::models::Fact, query_terms: &[String]) -> usize {
+    if query_terms.is_empty() {
+        return 0;
+    }
+
+    let mut fact_terms = super::query::search_query_terms(&fact.content)
+        .into_iter()
+        .collect::<HashSet<_>>();
+    for index_key in &fact.index_keys {
+        fact_terms.extend(super::query::search_query_terms(index_key));
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| fact_terms.contains(term.as_str()))
+        .count()
+}
+
+fn lexical_query_score_for_fact(fact: &crate::models::Fact, query_terms: &[String]) -> usize {
+    let content_terms = super::query::search_query_terms(&fact.content);
+    let unigram_overlap = lexical_query_overlap_for_fact(fact, query_terms);
+    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
+        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+}
+
 fn lexical_phrase_overlap(record: &Value, query_terms: &[String]) -> usize {
     lexical_ngram_overlap(record, query_terms, 2) + lexical_ngram_overlap(record, query_terms, 3)
 }
@@ -2281,6 +2859,14 @@ fn lexical_ngram_overlap(record: &Value, query_terms: &[String], width: usize) -
     }
 
     let content_terms = lexical_record_terms(record);
+    lexical_ngram_overlap_for_terms(&content_terms, query_terms, width)
+}
+
+fn lexical_ngram_overlap_for_terms(
+    content_terms: &[String],
+    query_terms: &[String],
+    width: usize,
+) -> usize {
     if content_terms.len() < width {
         return 0;
     }
@@ -2411,6 +2997,35 @@ async fn collect_temporal_facts(
     let Some(expansion) = expand_temporal_synonyms(request.query, request.cutoff) else {
         return Ok(Vec::new());
     };
+    let residual_query_terms = expansion
+        .residual_query
+        .as_deref()
+        .map(super::query::search_query_terms)
+        .unwrap_or_default();
+
+    if let Some(temporal_window) = infer_temporal_window(request.query, request.cutoff) {
+        let records = service
+            .db_client
+            .select_table("fact", request.namespace)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+
+        let mut facts = filter_facts_by_constraints(
+            records,
+            request.access,
+            request.project,
+            request.fact_types,
+        )
+        .into_iter()
+        .filter(|fact| fact.scope == request.scope)
+        .filter(|fact| fact_is_active_at(fact, request.cutoff))
+        .filter(|fact| fact.t_valid >= temporal_window.start && fact.t_valid <= temporal_window.end)
+        .collect::<Vec<_>>();
+
+        rank_temporal_candidate_facts(&mut facts, &residual_query_terms);
+        facts.truncate(request.budget.max(1) as usize);
+        return Ok(facts);
+    }
 
     let search_limit = request.budget.max(1) * 4;
     let mut matched_facts_by_id = HashMap::<String, crate::models::Fact>::new();
@@ -2464,48 +3079,31 @@ async fn collect_temporal_facts(
         }
     }
 
-    if let Some(residual_query) = expansion.residual_query.as_deref() {
-        let residual_records = select_fact_records_for_query(
-            service,
-            request.namespace,
-            request.scope,
-            request.cutoff_iso,
-            Some(residual_query),
-            search_limit,
-            request.project,
-            request.fact_types,
-        )
-        .await?;
-
-        let residual_fact_ids = filter_facts_by_constraints(
-            residual_records.records,
-            request.access,
-            request.project,
-            request.fact_types,
-        )
-        .into_iter()
-        .map(|fact| {
-            let fact_id = fact.fact_id.clone();
-            matched_facts_by_id.entry(fact_id.clone()).or_insert(fact);
-            fact_id
-        })
-        .collect::<HashSet<_>>();
-
-        if let Some(eligible_fact_ids) = eligible_fact_ids.as_mut() {
-            eligible_fact_ids.retain(|fact_id| residual_fact_ids.contains(fact_id));
-        } else {
-            eligible_fact_ids = Some(residual_fact_ids);
-        }
-    }
-
     let mut facts = eligible_fact_ids
         .unwrap_or_default()
         .into_iter()
         .filter_map(|fact_id| matched_facts_by_id.remove(&fact_id))
         .collect::<Vec<_>>();
-    facts.sort_by(compare_facts_by_recency);
+    rank_temporal_candidate_facts(&mut facts, &residual_query_terms);
     facts.truncate(request.budget.max(1) as usize);
     Ok(facts)
+}
+
+fn rank_temporal_candidate_facts(
+    facts: &mut Vec<crate::models::Fact>,
+    residual_query_terms: &[String],
+) {
+    if residual_query_terms.is_empty() {
+        facts.sort_by(compare_facts_by_recency);
+        return;
+    }
+
+    facts.retain(|fact| lexical_query_overlap_for_fact(fact, residual_query_terms) > 0);
+    facts.sort_by(|left, right| {
+        lexical_query_score_for_fact(right, residual_query_terms)
+            .cmp(&lexical_query_score_for_fact(left, residual_query_terms))
+            .then_with(|| compare_facts_by_recency(left, right))
+    });
 }
 
 struct CollectCommunityFactsRequest<'a> {
@@ -2960,10 +3558,53 @@ mod tests {
         }
     }
 
+    fn create_ranked_test_fact(
+        fact_id: &str,
+        source_episode: &str,
+        t_valid: chrono::DateTime<Utc>,
+        fusion_score: f64,
+        ft_score: f64,
+        access_count: i64,
+        index_keys: &[&str],
+    ) -> RankedContextFact {
+        let mut fact = create_test_fact(fact_id, t_valid);
+        fact.source_episode = source_episode.to_string();
+        fact.ft_score = ft_score;
+        fact.access_count = access_count;
+        fact.index_keys = index_keys.iter().map(|key| (*key).to_string()).collect();
+
+        RankedContextFact {
+            fact,
+            rationale: "test rationale".to_string(),
+            retrieval_tier: RetrievalTier::Direct,
+            fusion_score,
+            source_priority: 0,
+            decayed_confidence: 1.0,
+        }
+    }
+
     fn fixed_temporal_cutoff() -> chrono::DateTime<Utc> {
         chrono::DateTime::parse_from_rfc3339("2026-04-08T12:00:00Z")
             .expect("cutoff")
             .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn infer_temporal_window_reuses_shared_year_for_adjacent_months() {
+        let window = infer_temporal_window(
+            "march april 2026 alpha suite decisions",
+            fixed_temporal_cutoff(),
+        )
+        .expect("temporal window");
+
+        assert_eq!(
+            window.start.date_naive(),
+            chrono::NaiveDate::from_ymd_opt(2026, 3, 1).expect("march start")
+        );
+        assert_eq!(
+            window.end.date_naive(),
+            chrono::NaiveDate::from_ymd_opt(2026, 4, 30).expect("april end")
+        );
     }
 
     #[test]
@@ -4167,6 +4808,482 @@ mod tests {
         assert_eq!(ranked.len(), 2);
         assert_eq!(ranked[0].fact.fact_id, "fact:extracted");
         assert_eq!(ranked[1].fact.fact_id, "fact:inferred");
+    }
+
+    #[test]
+    fn ranked_relevance_score_softly_penalizes_frequently_accessed_facts() {
+        let cutoff = Utc::now();
+        let cold = create_ranked_test_fact(
+            "fact:cold",
+            "episode:cold",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["alpha"],
+        );
+        let hot =
+            create_ranked_test_fact("fact:hot", "episode:hot", cutoff, 10.0, 5.0, 50, &["alpha"]);
+
+        assert!(ranked_relevance_score(&cold) > ranked_relevance_score(&hot));
+    }
+
+    #[test]
+    fn select_ranked_context_facts_caps_source_episode_before_budget_fill() {
+        let cutoff = Utc::now();
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:a1",
+                    "episode:alpha",
+                    cutoff,
+                    12.0,
+                    10.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:a2",
+                    "episode:alpha",
+                    cutoff - chrono::Duration::days(1),
+                    11.0,
+                    9.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:a3",
+                    "episode:alpha",
+                    cutoff - chrono::Duration::days(2),
+                    10.5,
+                    8.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:b1",
+                    "episode:beta",
+                    cutoff - chrono::Duration::days(3),
+                    9.5,
+                    8.0,
+                    0,
+                    &["beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:c1",
+                    "episode:gamma",
+                    cutoff - chrono::Duration::days(4),
+                    9.0,
+                    8.0,
+                    0,
+                    &["gamma"],
+                ),
+            ],
+            4,
+            None,
+            vec![],
+        );
+
+        assert_eq!(selected.len(), 4);
+        assert_eq!(
+            selected
+                .iter()
+                .filter(|item| item.fact.source_episode == "episode:alpha")
+                .count(),
+            2
+        );
+        assert!(
+            selected
+                .iter()
+                .any(|item| item.fact.source_episode == "episode:beta")
+        );
+        assert!(
+            selected
+                .iter()
+                .any(|item| item.fact.source_episode == "episode:gamma")
+        );
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_novel_index_keys_when_scores_are_close() {
+        let cutoff = Utc::now();
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:anchor",
+                    "episode:anchor",
+                    cutoff,
+                    10.0,
+                    10.0,
+                    0,
+                    &["alpha", "beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:redundant",
+                    "episode:redundant",
+                    cutoff - chrono::Duration::days(1),
+                    9.9,
+                    9.0,
+                    0,
+                    &["alpha", "beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:diverse",
+                    "episode:diverse",
+                    cutoff - chrono::Duration::days(1),
+                    9.7,
+                    9.0,
+                    0,
+                    &["gamma", "delta"],
+                ),
+            ],
+            2,
+            None,
+            vec![],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:anchor", "fact:diverse"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_temporal_spread_for_tied_candidates() {
+        let anchor_time = chrono::DateTime::parse_from_rfc3339("2026-01-01T12:00:00Z")
+            .expect("anchor time")
+            .with_timezone(&Utc);
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:anchor",
+                    "episode:anchor",
+                    anchor_time,
+                    10.0,
+                    10.0,
+                    0,
+                    &[],
+                ),
+                create_ranked_test_fact(
+                    "fact:nearby",
+                    "episode:nearby",
+                    anchor_time + chrono::Duration::days(1),
+                    9.5,
+                    9.0,
+                    0,
+                    &[],
+                ),
+                create_ranked_test_fact(
+                    "fact:distant",
+                    "episode:distant",
+                    anchor_time + chrono::Duration::days(60),
+                    9.5,
+                    9.0,
+                    0,
+                    &[],
+                ),
+            ],
+            2,
+            None,
+            vec![],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:anchor", "fact:distant"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_in_window_items_over_stale_out_of_window_digests() {
+        let anchor_time = chrono::DateTime::parse_from_rfc3339("2026-03-10T12:00:00Z")
+            .expect("anchor time")
+            .with_timezone(&Utc);
+        let temporal_focus = infer_temporal_window(
+            "march april 2026 alpha suite decisions",
+            fixed_temporal_cutoff(),
+        );
+
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:stale-digest",
+                    "episode:stale-digest",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-14T09:00:00Z")
+                        .expect("stale time")
+                        .with_timezone(&Utc),
+                    12.0,
+                    11.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:in-window",
+                    "episode:in-window",
+                    anchor_time,
+                    10.5,
+                    9.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+            ],
+            1,
+            temporal_focus,
+            vec![
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "alpha".to_string(),
+                "suite".to_string(),
+                "decision".to_string(),
+            ],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:in-window"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_stops_before_budget_for_far_out_of_window_tail() {
+        let temporal_focus = infer_temporal_window(
+            "march april 2026 alpha suite delta control signal monitor orbit portal decisions",
+            fixed_temporal_cutoff(),
+        );
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:alpha",
+                    "episode:alpha",
+                    chrono::DateTime::parse_from_rfc3339("2026-03-10T09:00:00Z")
+                        .expect("alpha time")
+                        .with_timezone(&Utc),
+                    11.0,
+                    10.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:delta",
+                    "episode:delta",
+                    chrono::DateTime::parse_from_rfc3339("2026-03-11T09:00:00Z")
+                        .expect("delta time")
+                        .with_timezone(&Utc),
+                    10.5,
+                    9.5,
+                    0,
+                    &["delta", "control", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:signal",
+                    "episode:signal",
+                    chrono::DateTime::parse_from_rfc3339("2026-04-02T09:00:00Z")
+                        .expect("signal time")
+                        .with_timezone(&Utc),
+                    10.0,
+                    9.0,
+                    0,
+                    &["signal", "monitor", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:orbit",
+                    "episode:orbit",
+                    chrono::DateTime::parse_from_rfc3339("2026-04-03T09:00:00Z")
+                        .expect("orbit time")
+                        .with_timezone(&Utc),
+                    9.8,
+                    9.0,
+                    0,
+                    &["orbit", "portal", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:stale-1",
+                    "episode:stale-1",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-14T09:00:00Z")
+                        .expect("stale 1 time")
+                        .with_timezone(&Utc),
+                    12.0,
+                    11.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:stale-2",
+                    "episode:stale-2",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-13T09:00:00Z")
+                        .expect("stale 2 time")
+                        .with_timezone(&Utc),
+                    11.5,
+                    10.5,
+                    0,
+                    &["orbit", "portal", "decisions"],
+                ),
+            ],
+            6,
+            temporal_focus,
+            vec![
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "alpha".to_string(),
+                "suite".to_string(),
+                "delta".to_string(),
+                "control".to_string(),
+                "signal".to_string(),
+                "monitor".to_string(),
+                "orbit".to_string(),
+                "portal".to_string(),
+                "decision".to_string(),
+            ],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec!["fact:alpha", "fact:delta", "fact:signal", "fact:orbit"]
+        );
+    }
+
+    #[test]
+    fn prune_redundant_selected_facts_removes_broad_umbrella_summaries() {
+        let selected = prune_redundant_selected_facts(
+            vec![
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-a",
+                        "episode:digest-a",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T09:00:00Z")
+                            .expect("digest a time")
+                            .with_timezone(&Utc),
+                        12.0,
+                        11.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-b",
+                        "episode:digest-b",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T10:00:00Z")
+                            .expect("digest b time")
+                            .with_timezone(&Utc),
+                        11.8,
+                        10.8,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Another quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:atlas",
+                        "episode:atlas",
+                        chrono::DateTime::parse_from_rfc3339("2026-03-15T09:00:00Z")
+                            .expect("atlas time")
+                            .with_timezone(&Utc),
+                        10.0,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "March 2026 Atlas blocker: legal signoff is still missing for the reseller appendix.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:beacon",
+                        "episode:beacon",
+                        chrono::DateTime::parse_from_rfc3339("2026-03-16T09:00:00Z")
+                            .expect("beacon time")
+                            .with_timezone(&Utc),
+                        9.9,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content =
+                        "March 2026 Beacon decision: finance approved the revised launch budget."
+                            .to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:atlas-april",
+                        "episode:atlas-april",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-05T09:00:00Z")
+                            .expect("atlas april time")
+                            .with_timezone(&Utc),
+                        9.8,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "April 2026 Atlas decision: partner onboarding moved to the managed rollout path.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:beacon-april",
+                        "episode:beacon-april",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-06T09:00:00Z")
+                            .expect("beacon april time")
+                            .with_timezone(&Utc),
+                        9.7,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "April 2026 Beacon blocker: the migration depends on the final tax mapping table.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+            ],
+            &[
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "atlas".to_string(),
+                "beacon".to_string(),
+                "blocker".to_string(),
+                "decision".to_string(),
+            ],
+            None,
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec![
+                "fact:atlas",
+                "fact:beacon",
+                "fact:atlas-april",
+                "fact:beacon-april"
+            ]
+        );
     }
 
     #[test]
