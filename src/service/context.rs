@@ -2108,7 +2108,8 @@ async fn select_fact_records_for_query(
 
 fn lexical_candidate_limit(limit: i32) -> i32 {
     let base = limit.max(1);
-    (base.saturating_mul(5)).clamp(base, 50)
+    let cap = base.max(50);
+    (base.saturating_mul(5)).clamp(base, cap)
 }
 
 fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
@@ -6266,5 +6267,12 @@ mod tests {
             "community expansion with no matching entity_links should produce no results, got {}",
             results.len()
         );
+    }
+
+    #[test]
+    fn lexical_candidate_limit_preserves_preexpanded_limits() {
+        assert_eq!(lexical_candidate_limit(5), 25);
+        assert_eq!(lexical_candidate_limit(50), 50);
+        assert_eq!(lexical_candidate_limit(200), 200);
     }
 }
