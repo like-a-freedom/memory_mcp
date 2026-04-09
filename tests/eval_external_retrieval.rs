@@ -1,7 +1,7 @@
 mod common;
 mod eval_support;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use eval_support::external::{
@@ -15,6 +15,8 @@ use eval_support::metrics::{
 };
 use eval_support::report::print_retrieval_summary;
 use memory_mcp::models::AssembleContextRequest;
+use memory_mcp::service::hash_prefix;
+use memory_mcp::storage::DbClient;
 
 fn raw_dataset_raw(kind: DatasetKind) -> String {
     std::fs::read_to_string(raw_fixture_path(kind))
@@ -97,7 +99,20 @@ async fn seed_case_facts(
             .t_valid
             .parse::<DateTime<Utc>>()
             .expect("normalized timestamps should parse");
-        common::seed_fact_at(service, scope, &fact.content, t_valid).await;
+        let source_id = format!(
+            "seed:{}:{}:{}",
+            scope,
+            fact.t_valid,
+            hash_prefix(&fact.content)
+        );
+        common::seed_episode_backed_fact_with_source_id(
+            service,
+            scope,
+            &fact.content,
+            t_valid,
+            &source_id,
+        )
+        .await;
     }
 }
 
@@ -124,6 +139,7 @@ async fn run_dataset_retrieval(suite_name: &str, kind: DatasetKind, strict_case_
     let case_batches = group_cases_by_seed_facts(cases);
     let total_batches = case_batches.len();
     let query_parallelism = eval_query_parallelism(strict_case_asserts);
+    let progress_interval = if total_cases <= 20 { 1 } else { 10 };
     if total_cases > 0 {
         println!(
             "suite={} sample_pct={} grouped {} cases into {} seeded contexts query_concurrency={}",
@@ -160,7 +176,7 @@ async fn run_dataset_retrieval(suite_name: &str, kind: DatasetKind, strict_case_
                 }
             }
 
-            if completed_cases == total_cases || completed_cases.is_multiple_of(25) {
+            if completed_cases == total_cases || completed_cases.is_multiple_of(progress_interval) {
                 println!(
                     "suite={} progress={}/{} seeded_contexts={}/{}",
                     suite_name,
@@ -394,24 +410,26 @@ fn normalizes_longmemeval_fixture_into_canonical_cases() {
     let cases = normalize_external_dataset(DatasetKind::LongMemEvalCleaned, &raw)
         .expect("normalize longmemeval fixture");
 
-    assert_eq!(cases.len(), 1);
-    let case = &cases[0];
+    assert_eq!(cases.len(), 500);
+    let case = cases
+        .iter()
+        .find(|case| case.id == "longmemeval-cleaned:e47becba")
+        .expect("canonical longmemeval case");
     assert_eq!(case.dataset, "longmemeval-cleaned");
     assert_eq!(case.id, "longmemeval-cleaned:e47becba");
     assert_eq!(case.query, "What degree did I graduate with?");
     assert_eq!(case.expected.tier, "direct");
     assert_eq!(case.expected.must_contain, vec!["Business Administration"]);
-    assert_eq!(case.facts.len(), 2);
+    assert_eq!(case.facts.len(), 550);
     assert_eq!(
         case.facts[0].content,
         "The farmer needs to transport a fox, a chicken, and some grain across a river using a boat. The fox cannot be left alone with the chicken, and the chicken cannot be left alone with the grain. The boat can only hold one item at a time, and the river is too dangerous to cross multiple times. Can you help the farmer transport all three items across the river without any of them getting eaten? Remember, strategic thinking and planning are key to solving this puzzle. If you're stuck, try thinking about how you would solve the puzzle yourself, and use that as a starting point. Be careful not to leave the chicken alone with the fox, or the chicken and the grain alone together, as this will result in a failed solution. Good luck!"
     );
     assert_eq!(case.facts[0].t_valid, "2023-05-20T02:21:00+00:00");
-    assert!(
-        case.facts[1]
-            .content
+    assert!(case.facts.iter().any(|fact| {
+        fact.content
             .contains("I graduated with a degree in Business Administration")
-    );
+    }));
     assert_eq!(case.metadata["question_type"], "single-session-user");
 }
 
@@ -422,17 +440,21 @@ fn normalizes_locomo_fixture_into_canonical_cases() {
     let cases =
         normalize_external_dataset(DatasetKind::LoCoMo, &raw).expect("normalize locomo fixture");
 
-    assert_eq!(cases.len(), 1);
-    let case = &cases[0];
+    assert_eq!(cases.len(), 1986);
+    let case = cases
+        .iter()
+        .find(|case| case.id == "locomo:conv-26:0")
+        .expect("canonical locomo case");
     assert_eq!(case.dataset, "locomo");
     assert_eq!(case.id, "locomo:conv-26:0");
-    assert_eq!(case.query, "What did Caroline research?");
-    assert_eq!(case.expected.tier, "direct");
+    assert_eq!(
+        case.query,
+        "When did Caroline go to the LGBTQ support group?"
+    );
+    assert_eq!(case.expected.tier, "temporal");
     assert_eq!(
         case.expected.must_contain,
-        vec![
-            "Caroline is researching adoption agencies with the dream of having a family and providing a loving home to kids in need."
-        ]
+        vec!["Caroline attends an LGBTQ support group for the first time."]
     );
     assert!(case.facts.len() > 6);
     assert_eq!(
@@ -449,8 +471,8 @@ fn normalizes_locomo_fixture_into_canonical_cases() {
         fact.content
             .contains("Caroline is researching adoption agencies")
     }));
-    assert_eq!(case.metadata["category"], 1);
-    assert_eq!(case.metadata["evidence"][0], "D2:8");
+    assert_eq!(case.metadata["category"], 2);
+    assert_eq!(case.metadata["evidence"][0], "D1:3");
 }
 
 #[test]
@@ -460,8 +482,11 @@ fn normalizes_personamem_fixture_into_canonical_cases() {
     let cases = normalize_external_dataset(DatasetKind::PersonaMem, &raw)
         .expect("normalize personamem fixture");
 
-    assert_eq!(cases.len(), 1);
-    let case = &cases[0];
+    assert_eq!(cases.len(), 100);
+    let case = cases
+        .iter()
+        .find(|case| case.id == "personamem:acd74206-37dc-4756-94a8-b99a395d9a21")
+        .expect("canonical personamem case");
     assert_eq!(case.dataset, "personamem");
     assert_eq!(case.id, "personamem:acd74206-37dc-4756-94a8-b99a395d9a21");
     assert_eq!(
@@ -475,7 +500,7 @@ fn normalizes_personamem_fixture_into_canonical_cases() {
             "The blend of traditional Pacific sounds with modern beats created a captivating experience that resonated deeply with the audience"
         ]
     );
-    assert_eq!(case.facts.len(), 4);
+    assert_eq!(case.facts.len(), 182);
     assert!(
         case.facts[0]
             .content
@@ -499,8 +524,11 @@ fn normalizes_prefeval_fixture_into_canonical_cases() {
     let cases = normalize_external_dataset(DatasetKind::PrefEval, &raw)
         .expect("normalize prefeval fixture");
 
-    assert_eq!(cases.len(), 1);
-    let case = &cases[0];
+    assert_eq!(cases.len(), 52);
+    let case = cases
+        .iter()
+        .find(|case| case.id == "prefeval:travel_hotel_overall300_topk_history_persona:0")
+        .expect("canonical prefeval case");
     assert_eq!(case.dataset, "prefeval");
     assert_eq!(
         case.id,
@@ -638,6 +666,75 @@ async fn locomo_retrieval_uses_observation_context_for_identity_question() {
 }
 
 #[tokio::test]
+async fn external_seed_case_facts_use_distinct_source_episodes() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let seeded_facts = vec![
+        NormalizedSeedFact {
+            content: "Alice Smith graduated with a degree in Business Administration.".to_string(),
+            t_valid: "2023-05-20T02:21:00+00:00".to_string(),
+        },
+        NormalizedSeedFact {
+            content: "Alice Smith later moved to Seattle to start a new role.".to_string(),
+            t_valid: "2023-05-21T09:00:00+00:00".to_string(),
+        },
+    ];
+
+    seed_case_facts(&service, "org", &seeded_facts).await;
+
+    let note_facts = db_client
+        .select_table("fact", "org")
+        .await
+        .expect("seeded facts")
+        .into_iter()
+        .filter_map(|record| memory_mcp::service::fact_from_record(&record))
+        .filter(|fact| fact.fact_type == "note")
+        .filter(|fact| {
+            seeded_facts
+                .iter()
+                .any(|seeded| seeded.content == fact.content)
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(note_facts.len(), seeded_facts.len());
+
+    let unique_source_episodes = note_facts
+        .iter()
+        .map(|fact| fact.source_episode.clone())
+        .collect::<HashSet<_>>();
+
+    assert_eq!(
+        unique_source_episodes.len(),
+        seeded_facts.len(),
+        "expected each seeded note fact to keep its own source episode so selection caps do not collapse the batch"
+    );
+}
+
+#[tokio::test]
+async fn external_seed_case_facts_populate_entity_backed_index_keys() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let seeded_fact = NormalizedSeedFact {
+        content: "Alice Smith graduated with a degree in Business Administration.".to_string(),
+        t_valid: "2023-05-20T02:21:00+00:00".to_string(),
+    };
+
+    seed_case_facts(&service, "org", std::slice::from_ref(&seeded_fact)).await;
+
+    let note_fact = db_client
+        .select_table("fact", "org")
+        .await
+        .expect("seeded facts")
+        .into_iter()
+        .filter_map(|record| memory_mcp::service::fact_from_record(&record))
+        .find(|fact| fact.fact_type == "note" && fact.content == seeded_fact.content)
+        .expect("seeded note fact should exist");
+
+    assert!(
+        note_fact.index_keys.iter().any(|key| key == "alice smith"),
+        "expected external eval seeding to preserve canonical entity names in index_keys"
+    );
+}
+
+#[tokio::test]
 #[ignore]
 async fn locomo_full_conv26_first_case_retrieves_expected_context() {
     let case_id =
@@ -649,6 +746,23 @@ async fn locomo_full_conv26_first_case_retrieves_expected_context() {
         .into_iter()
         .find(|case| case.id == case_id)
         .unwrap_or_else(|| panic!("find locomo case {case_id}"));
+
+    let mut summary = RetrievalSuiteSummary::default();
+    run_retrieval_case(case, &mut summary, true).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn longmemeval_case_58bf7951_retrieves_expected_context() {
+    let case_id = std::env::var("MEMORY_MCP_EVAL_CASE_ID")
+        .unwrap_or_else(|_| "longmemeval-cleaned:58bf7951".to_string());
+
+    let case = load_external_dataset_cases(DatasetKind::LongMemEvalCleaned)
+        .await
+        .expect("load longmemeval cases")
+        .into_iter()
+        .find(|case| case.id == case_id)
+        .unwrap_or_else(|| panic!("find longmemeval case {case_id}"));
 
     let mut summary = RetrievalSuiteSummary::default();
     run_retrieval_case(case, &mut summary, true).await;

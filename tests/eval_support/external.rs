@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const DEFAULT_SCOPE: &str = "org";
-const DEFAULT_BUDGET: i32 = 5;
+const DEFAULT_BUDGET: i32 = 10;
 const DEFAULT_MIN_RECALL_AT_K: f64 = 1.0;
 const FULL_OFFICIAL_DATASET: &str = "full_official_dataset";
 

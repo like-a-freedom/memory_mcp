@@ -121,6 +121,63 @@ pub async fn seed_fact_with_links(
 }
 
 #[allow(dead_code)]
+pub async fn seed_episode_backed_fact_with_source_id(
+    service: &MemoryService,
+    scope: &str,
+    content: &str,
+    t_valid: DateTime<Utc>,
+    source_id: &str,
+) -> String {
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "seed".to_string(),
+                source_id: source_id.to_string(),
+                content: content.to_string(),
+                t_ref: t_valid,
+                scope: scope.to_string(),
+                project: None,
+                t_ingested: Some(t_valid),
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("seed episode should succeed");
+
+    let extracted = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("seed extraction should succeed");
+    let entity_links = extracted
+        .entities
+        .into_iter()
+        .map(|entity| entity.entity_id)
+        .collect::<Vec<_>>();
+
+    service
+        .add_fact(
+            "note",
+            content,
+            content,
+            &episode_id,
+            t_valid,
+            scope,
+            0.9,
+            entity_links,
+            vec![],
+            json!({
+                "source_episode": episode_id,
+                "source_type": "seed",
+                "source_id": source_id,
+            }),
+        )
+        .await
+        .expect("seed note fact should succeed")
+}
+
+#[allow(dead_code)]
 pub async fn seed_fact_with_links_and_project(
     service: &MemoryService,
     scope: &str,
