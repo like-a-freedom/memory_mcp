@@ -2,14 +2,13 @@ mod common;
 mod eval_support;
 
 use std::collections::HashMap;
-use std::fs;
 
 use chrono::{DateTime, Utc};
 use eval_support::external::{
     DatasetKind, NormalizedExternalRetrievalCase, NormalizedSeedFact, normalize_external_dataset,
 };
 use eval_support::external_full::{
-    ExternalDatasetFlavor, load_external_dataset_cases, sample_fixture_path,
+    load_external_dataset_cases, raw_fixture_path, sample_pct_from_env,
 };
 use eval_support::metrics::{
     RetrievalCaseDiagnostics, RetrievalSuiteSummary, first_relevant_rank, record_retrieval_case,
@@ -17,9 +16,9 @@ use eval_support::metrics::{
 use eval_support::report::print_retrieval_summary;
 use memory_mcp::models::AssembleContextRequest;
 
-fn sample_dataset_raw(kind: DatasetKind) -> String {
-    fs::read_to_string(sample_fixture_path(kind))
-        .unwrap_or_else(|err| panic!("read sample dataset for {:?}: {err}", kind))
+fn raw_dataset_raw(kind: DatasetKind) -> String {
+    std::fs::read_to_string(raw_fixture_path(kind))
+        .unwrap_or_else(|err| panic!("read raw dataset for {:?}: {err}", kind))
 }
 
 fn case_limit_from_env() -> Option<usize> {
@@ -102,24 +101,20 @@ async fn seed_case_facts(
     }
 }
 
-async fn run_dataset_retrieval(
-    suite_name: &str,
-    kind: DatasetKind,
-    flavor: ExternalDatasetFlavor,
-    strict_case_asserts: bool,
-) {
-    let mut cases = load_external_dataset_cases(kind, flavor)
+async fn run_dataset_retrieval(suite_name: &str, kind: DatasetKind, strict_case_asserts: bool) {
+    let mut cases = load_external_dataset_cases(kind)
         .await
-        .unwrap_or_else(|err| panic!("load {:?} {:?} dataset cases: {err}", flavor, kind));
+        .unwrap_or_else(|err| panic!("load {:?} dataset cases: {err}", kind));
+    let pct = sample_pct_from_env();
     let original_case_count = cases.len();
     if let Some(limit) = case_limit_from_env()
         && cases.len() > limit
     {
         cases.truncate(limit);
         println!(
-            "suite={} mode={:?} limiting cases from {} to {} via MEMORY_MCP_EVAL_MAX_CASES",
+            "suite={} sample_pct={} limiting cases from {} to {} via MEMORY_MCP_EVAL_MAX_CASES",
             suite_name,
-            flavor,
+            pct,
             original_case_count,
             cases.len(),
         );
@@ -131,8 +126,8 @@ async fn run_dataset_retrieval(
     let query_parallelism = eval_query_parallelism(strict_case_asserts);
     if total_cases > 0 {
         println!(
-            "suite={} mode={:?} grouped {} cases into {} seeded contexts query_concurrency={}",
-            suite_name, flavor, total_cases, total_batches, query_parallelism,
+            "suite={} sample_pct={} grouped {} cases into {} seeded contexts query_concurrency={}",
+            suite_name, pct, total_cases, total_batches, query_parallelism,
         );
     }
 
@@ -394,7 +389,7 @@ fn finalize_retrieval_case(
 
 #[test]
 fn normalizes_longmemeval_fixture_into_canonical_cases() {
-    let raw = sample_dataset_raw(DatasetKind::LongMemEvalCleaned);
+    let raw = raw_dataset_raw(DatasetKind::LongMemEvalCleaned);
 
     let cases = normalize_external_dataset(DatasetKind::LongMemEvalCleaned, &raw)
         .expect("normalize longmemeval fixture");
@@ -422,7 +417,7 @@ fn normalizes_longmemeval_fixture_into_canonical_cases() {
 
 #[test]
 fn normalizes_locomo_fixture_into_canonical_cases() {
-    let raw = sample_dataset_raw(DatasetKind::LoCoMo);
+    let raw = raw_dataset_raw(DatasetKind::LoCoMo);
 
     let cases =
         normalize_external_dataset(DatasetKind::LoCoMo, &raw).expect("normalize locomo fixture");
@@ -460,7 +455,7 @@ fn normalizes_locomo_fixture_into_canonical_cases() {
 
 #[test]
 fn normalizes_personamem_fixture_into_canonical_cases() {
-    let raw = sample_dataset_raw(DatasetKind::PersonaMem);
+    let raw = raw_dataset_raw(DatasetKind::PersonaMem);
 
     let cases = normalize_external_dataset(DatasetKind::PersonaMem, &raw)
         .expect("normalize personamem fixture");
@@ -499,7 +494,7 @@ fn normalizes_personamem_fixture_into_canonical_cases() {
 
 #[test]
 fn normalizes_prefeval_fixture_into_canonical_cases() {
-    let raw = sample_dataset_raw(DatasetKind::PrefEval);
+    let raw = raw_dataset_raw(DatasetKind::PrefEval);
 
     let cases = normalize_external_dataset(DatasetKind::PrefEval, &raw)
         .expect("normalize prefeval fixture");
@@ -648,12 +643,12 @@ async fn locomo_full_conv26_first_case_retrieves_expected_context() {
     let case_id =
         std::env::var("MEMORY_MCP_EVAL_CASE_ID").unwrap_or_else(|_| "locomo:conv-26:0".to_string());
 
-    let case = load_external_dataset_cases(DatasetKind::LoCoMo, ExternalDatasetFlavor::Full)
+    let case = load_external_dataset_cases(DatasetKind::LoCoMo)
         .await
-        .expect("load full locomo cases")
+        .expect("load locomo cases")
         .into_iter()
         .find(|case| case.id == case_id)
-        .unwrap_or_else(|| panic!("find full locomo case {case_id}"));
+        .unwrap_or_else(|| panic!("find locomo case {case_id}"));
 
     let mut summary = RetrievalSuiteSummary::default();
     run_retrieval_case(case, &mut summary, true).await;
@@ -662,95 +657,23 @@ async fn locomo_full_conv26_first_case_retrieves_expected_context() {
 #[tokio::test]
 #[ignore]
 async fn run_longmemeval_retrieval() {
-    run_dataset_retrieval(
-        "longmemeval",
-        DatasetKind::LongMemEvalCleaned,
-        ExternalDatasetFlavor::Sample,
-        true,
-    )
-    .await;
+    run_dataset_retrieval("longmemeval", DatasetKind::LongMemEvalCleaned, true).await;
 }
 
 #[tokio::test]
 #[ignore]
 async fn run_locomo_retrieval() {
-    run_dataset_retrieval(
-        "locomo",
-        DatasetKind::LoCoMo,
-        ExternalDatasetFlavor::Sample,
-        true,
-    )
-    .await;
+    run_dataset_retrieval("locomo", DatasetKind::LoCoMo, true).await;
 }
 
 #[tokio::test]
 #[ignore]
 async fn run_personamem_retrieval() {
-    run_dataset_retrieval(
-        "personamem",
-        DatasetKind::PersonaMem,
-        ExternalDatasetFlavor::Sample,
-        true,
-    )
-    .await;
+    run_dataset_retrieval("personamem", DatasetKind::PersonaMem, true).await;
 }
 
 #[tokio::test]
 #[ignore]
 async fn run_prefeval_retrieval() {
-    run_dataset_retrieval(
-        "prefeval",
-        DatasetKind::PrefEval,
-        ExternalDatasetFlavor::Sample,
-        true,
-    )
-    .await;
-}
-
-#[tokio::test]
-#[ignore]
-async fn run_longmemeval_full_retrieval() {
-    run_dataset_retrieval(
-        "longmemeval_full",
-        DatasetKind::LongMemEvalCleaned,
-        ExternalDatasetFlavor::Full,
-        false,
-    )
-    .await;
-}
-
-#[tokio::test]
-#[ignore]
-async fn run_locomo_full_retrieval() {
-    run_dataset_retrieval(
-        "locomo_full",
-        DatasetKind::LoCoMo,
-        ExternalDatasetFlavor::Full,
-        false,
-    )
-    .await;
-}
-
-#[tokio::test]
-#[ignore]
-async fn run_personamem_full_retrieval() {
-    run_dataset_retrieval(
-        "personamem_full",
-        DatasetKind::PersonaMem,
-        ExternalDatasetFlavor::Full,
-        false,
-    )
-    .await;
-}
-
-#[tokio::test]
-#[ignore]
-async fn run_prefeval_full_retrieval() {
-    run_dataset_retrieval(
-        "prefeval_full",
-        DatasetKind::PrefEval,
-        ExternalDatasetFlavor::Full,
-        false,
-    )
-    .await;
+    run_dataset_retrieval("prefeval", DatasetKind::PrefEval, true).await;
 }

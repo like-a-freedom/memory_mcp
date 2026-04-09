@@ -43,11 +43,12 @@ rust-project.json
 /tests/fixtures/evals/full/
 
 # Large raw dataset files (downloaded by scripts/convert_external_evals.py)
-# Keep only the small sample_* fixtures tracked; ignore full upstream copies
+# These are full upstream benchmarks — use MEMORY_MCP_EVAL_SAMPLE_PCT to limit at runtime.
 tests/fixtures/evals/raw/longmemeval/longmemeval_s_cleaned.json
 tests/fixtures/evals/raw/locomo/locomo10.json
 tests/fixtures/evals/raw/personamem/questions_32k.csv
 tests/fixtures/evals/raw/prefeval/travel_hotel_overall300_topk_history_persona.json
+tests/fixtures/evals/raw/personamem/shared_contexts_32k.jsonl
 
 # Code coverage
 tarpaulin-report.html

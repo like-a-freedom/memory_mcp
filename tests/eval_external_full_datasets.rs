@@ -2,8 +2,8 @@ mod eval_support;
 
 use eval_support::external::{DatasetKind, normalize_external_dataset};
 use eval_support::external_full::{
-    ExternalDatasetFlavor, bundle_personamem_official_sources, full_dataset_cache_path,
-    load_external_dataset_cases, wrap_prefeval_full_track,
+    bundle_personamem_official_sources, full_dataset_cache_path, load_external_dataset_cases,
+    wrap_prefeval_full_track,
 };
 
 #[test]
@@ -83,7 +83,7 @@ fn bundles_personamem_python_style_options_into_normalizer_fixture() {
 }
 
 #[test]
-fn full_dataset_cache_path_uses_ignored_full_fixture_directory() {
+fn full_dataset_cache_path_uses_full_fixture_directory() {
     let path = full_dataset_cache_path(DatasetKind::LoCoMo);
     let normalized = path.to_string_lossy().replace('\\', "/");
 
@@ -96,10 +96,9 @@ fn full_dataset_cache_path_uses_ignored_full_fixture_directory() {
 #[tokio::test]
 #[ignore]
 async fn loads_full_longmemeval_cases_from_official_source() {
-    let cases =
-        load_external_dataset_cases(DatasetKind::LongMemEvalCleaned, ExternalDatasetFlavor::Full)
-            .await
-            .expect("load full longmemeval cases");
+    let cases = load_external_dataset_cases(DatasetKind::LongMemEvalCleaned)
+        .await
+        .expect("load full longmemeval cases");
 
     assert!(
         cases.len() >= 100,
@@ -111,7 +110,7 @@ async fn loads_full_longmemeval_cases_from_official_source() {
 #[tokio::test]
 #[ignore]
 async fn loads_full_locomo_cases_from_official_source() {
-    let cases = load_external_dataset_cases(DatasetKind::LoCoMo, ExternalDatasetFlavor::Full)
+    let cases = load_external_dataset_cases(DatasetKind::LoCoMo)
         .await
         .expect("load full locomo cases");
 
@@ -125,7 +124,7 @@ async fn loads_full_locomo_cases_from_official_source() {
 #[tokio::test]
 #[ignore]
 async fn loads_full_prefeval_cases_from_official_source() {
-    let cases = load_external_dataset_cases(DatasetKind::PrefEval, ExternalDatasetFlavor::Full)
+    let cases = load_external_dataset_cases(DatasetKind::PrefEval)
         .await
         .expect("load full prefeval cases");
 
@@ -139,7 +138,7 @@ async fn loads_full_prefeval_cases_from_official_source() {
 #[tokio::test]
 #[ignore]
 async fn loads_full_personamem_cases_from_official_source() {
-    let cases = load_external_dataset_cases(DatasetKind::PersonaMem, ExternalDatasetFlavor::Full)
+    let cases = load_external_dataset_cases(DatasetKind::PersonaMem)
         .await
         .expect("load full personamem cases");
 

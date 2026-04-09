@@ -1,55 +1,12 @@
 mod eval_support;
 
-use std::path::PathBuf;
-
-use eval_support::external::{
-    DatasetKind, fixture_provenance, verify_fixture_provenance_against_source,
-};
-
-fn longmemeval_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("evals")
-        .join("raw")
-        .join("longmemeval")
-        .join("sample_longmemeval_s_cleaned.json")
-}
-
-fn locomo_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("evals")
-        .join("raw")
-        .join("locomo")
-        .join("sample_locomo10.json")
-}
-
-fn personamem_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("evals")
-        .join("raw")
-        .join("personamem")
-        .join("sample_personamem_32k.json")
-}
-
-fn prefeval_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("evals")
-        .join("raw")
-        .join("prefeval")
-        .join("sample_travel_hotel_implicit_persona.json")
-}
+use eval_support::external::{DatasetKind, fixture_provenance, normalize_external_dataset};
+use eval_support::external_full::raw_fixture_path;
 
 #[test]
-fn declares_trimmed_source_metadata_for_external_fixtures() {
+fn declares_full_dataset_metadata_for_external_fixtures() {
     let longmemeval = fixture_provenance(DatasetKind::LongMemEvalCleaned);
-    assert_eq!(longmemeval.fixture_kind, "trimmed_official_excerpt");
+    assert_eq!(longmemeval.fixture_kind, "full_official_dataset");
     assert!(
         longmemeval
             .source_url
@@ -59,7 +16,7 @@ fn declares_trimmed_source_metadata_for_external_fixtures() {
     );
 
     let locomo = fixture_provenance(DatasetKind::LoCoMo);
-    assert_eq!(locomo.fixture_kind, "trimmed_official_excerpt");
+    assert_eq!(locomo.fixture_kind, "full_official_dataset");
     assert!(
         locomo.source_url.ends_with("data/locomo10.json"),
         "unexpected locomo source url: {}",
@@ -67,7 +24,7 @@ fn declares_trimmed_source_metadata_for_external_fixtures() {
     );
 
     let personamem = fixture_provenance(DatasetKind::PersonaMem);
-    assert_eq!(personamem.fixture_kind, "trimmed_official_excerpt");
+    assert_eq!(personamem.fixture_kind, "full_official_dataset");
     assert!(
         personamem.source_url.contains("questions_32k.csv"),
         "unexpected personamem source url: {}",
@@ -82,7 +39,7 @@ fn declares_trimmed_source_metadata_for_external_fixtures() {
     );
 
     let prefeval = fixture_provenance(DatasetKind::PrefEval);
-    assert_eq!(prefeval.fixture_kind, "trimmed_official_excerpt");
+    assert_eq!(prefeval.fixture_kind, "full_official_dataset");
     assert!(
         prefeval
             .source_url
@@ -92,26 +49,64 @@ fn declares_trimmed_source_metadata_for_external_fixtures() {
     );
 }
 
-#[tokio::test]
-#[ignore]
-async fn verify_external_fixtures_against_official_sources() {
-    let checks = [
-        (DatasetKind::LongMemEvalCleaned, longmemeval_fixture_path()),
-        (DatasetKind::LoCoMo, locomo_fixture_path()),
-        (DatasetKind::PersonaMem, personamem_fixture_path()),
-        (DatasetKind::PrefEval, prefeval_fixture_path()),
+#[test]
+fn raw_fixture_files_exist_for_all_datasets() {
+    let kinds = [
+        (
+            DatasetKind::LongMemEvalCleaned,
+            "longmemeval_s_cleaned.json",
+        ),
+        (DatasetKind::LoCoMo, "locomo10.json"),
+        (DatasetKind::PersonaMem, "questions_32k.csv"),
+        (
+            DatasetKind::PrefEval,
+            "travel_hotel_overall300_topk_history_persona.json",
+        ),
     ];
 
-    for (kind, path) in checks {
-        println!(
-            "verifying fixture provenance for {:?} from {}",
+    for (kind, expected_file) in kinds {
+        let path = raw_fixture_path(kind);
+        assert!(
+            path.exists(),
+            "raw fixture for {:?} should exist at {} (expected file: {})",
             kind,
-            path.display()
+            path.display(),
+            expected_file,
         );
-        let raw = std::fs::read_to_string(&path)
-            .unwrap_or_else(|err| panic!("failed to read fixture {}: {err}", path.display()));
-        verify_fixture_provenance_against_source(kind, &raw)
-            .await
-            .unwrap_or_else(|err| panic!("fixture provenance check failed for {:?}: {err}", kind));
+    }
+}
+
+#[test]
+fn raw_fixtures_normalize_into_cases() {
+    let kinds = [
+        DatasetKind::LongMemEvalCleaned,
+        DatasetKind::LoCoMo,
+        DatasetKind::PersonaMem,
+        DatasetKind::PrefEval,
+    ];
+
+    for kind in kinds {
+        let path = raw_fixture_path(kind);
+        let raw = std::fs::read_to_string(&path).unwrap_or_else(|err| {
+            panic!(
+                "read raw fixture for {:?} at {}: {err}",
+                kind,
+                path.display()
+            )
+        });
+
+        // PersonaMem and PrefEval need bundling — skip normalization here
+        // since the external_full module handles bundling.
+        if matches!(kind, DatasetKind::PersonaMem | DatasetKind::PrefEval) {
+            continue;
+        }
+
+        let cases = normalize_external_dataset(kind, &raw)
+            .unwrap_or_else(|err| panic!("normalize raw fixture for {:?}: {err}", kind));
+        assert!(
+            !cases.is_empty(),
+            "raw fixture for {:?} should normalize into at least 1 case",
+            kind
+        );
     }
 }

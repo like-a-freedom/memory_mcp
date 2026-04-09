@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 const DEFAULT_SCOPE: &str = "org";
 const DEFAULT_BUDGET: i32 = 5;
 const DEFAULT_MIN_RECALL_AT_K: f64 = 1.0;
-const TRIMMED_OFFICIAL_EXCERPT: &str = "trimmed_official_excerpt";
+const FULL_OFFICIAL_DATASET: &str = "full_official_dataset";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DatasetKind {
@@ -40,34 +40,34 @@ pub struct FixtureProvenance {
 pub fn fixture_provenance(kind: DatasetKind) -> FixtureProvenance {
     match kind {
         DatasetKind::LongMemEvalCleaned => FixtureProvenance {
-            fixture_kind: TRIMMED_OFFICIAL_EXCERPT,
+            fixture_kind: FULL_OFFICIAL_DATASET,
             source_url: "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json",
             auxiliary_source_url: None,
-            source_locator: "question_id=e47becba",
-            note: "Full upstream artifact contains 500 evaluation instances; local fixture intentionally keeps one official question record for deterministic smoke testing.",
+            source_locator: "500 evaluation instances",
+            note: "Full upstream artifact downloaded by scripts/convert_external_evals.py; sampling controlled via MEMORY_MCP_EVAL_SAMPLE_PCT.",
         },
         DatasetKind::LoCoMo => FixtureProvenance {
-            fixture_kind: TRIMMED_OFFICIAL_EXCERPT,
+            fixture_kind: FULL_OFFICIAL_DATASET,
             source_url: "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json",
             auxiliary_source_url: None,
-            source_locator: "sample_id=conv-26",
-            note: "Official ACL release benchmark contains ten conversations in locomo10.json; local fixture intentionally keeps one official conversation excerpt plus one QA item.",
+            source_locator: "10 conversations / 1986 QA items",
+            note: "Full upstream benchmark downloaded by scripts/convert_external_evals.py; sampling controlled via MEMORY_MCP_EVAL_SAMPLE_PCT.",
         },
         DatasetKind::PersonaMem => FixtureProvenance {
-            fixture_kind: TRIMMED_OFFICIAL_EXCERPT,
+            fixture_kind: FULL_OFFICIAL_DATASET,
             source_url: "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/questions_32k.csv",
             auxiliary_source_url: Some(
                 "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/shared_contexts_32k.jsonl",
             ),
-            source_locator: "question_id=acd74206-37dc-4756-94a8-b99a395d9a21; shared_context_id=e898d03fec683b1cabf29f57287ff66f8a31842543ecef44b56766844c1c1301",
-            note: "Official PersonaMem data is split across questions_32k.csv and shared_contexts_32k.jsonl; local fixture intentionally keeps one official QA row and a trimmed context slice.",
+            source_locator: "589 questions / 37 shared contexts",
+            note: "Full upstream sources bundled by scripts/convert_external_evals.py; sampling controlled via MEMORY_MCP_EVAL_SAMPLE_PCT.",
         },
         DatasetKind::PrefEval => FixtureProvenance {
-            fixture_kind: TRIMMED_OFFICIAL_EXCERPT,
+            fixture_kind: FULL_OFFICIAL_DATASET,
             source_url: "https://raw.githubusercontent.com/amazon-science/PrefEval/main/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json",
             auxiliary_source_url: None,
-            source_locator: "track=travel_hotel_overall300_topk_history_persona; question=Can you suggest some great hotels for my upcoming trip to Las Vegas?",
-            note: "Official PrefEval retrieval track is a full JSON list; local fixture intentionally wraps one official record with a local track label and trims the conversation to the turns needed for retrieval smoke tests.",
+            source_locator: "52 records; track=travel_hotel_overall300_topk_history_persona",
+            note: "Full upstream retrieval track downloaded by scripts/convert_external_evals.py; sampling controlled via MEMORY_MCP_EVAL_SAMPLE_PCT.",
         },
     }
 }
@@ -2162,7 +2162,7 @@ mod tests {
 
         for kind in kinds {
             let provenance = fixture_provenance(kind);
-            assert_eq!(provenance.fixture_kind, TRIMMED_OFFICIAL_EXCERPT);
+            assert_eq!(provenance.fixture_kind, FULL_OFFICIAL_DATASET);
             assert!(!provenance.source_url.is_empty());
             assert!(!provenance.source_locator.is_empty());
         }
