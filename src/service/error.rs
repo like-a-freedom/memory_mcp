@@ -18,3 +18,8 @@ pub enum MemoryError {
     #[error("validation error: {0}")]
     Validation(String),
 }
+
+/// Shared validation error messages.
+pub mod error_messages {
+    pub const SCOPE_REQUIRED: &str = "scope is required";
+}

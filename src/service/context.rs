@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
-use super::error::MemoryError;
+use super::error::{MemoryError, error_messages};
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem, FactType};
 use crate::storage::GraphDirection;
@@ -46,7 +46,7 @@ pub async fn assemble_context(
     service.enforce_rate_limit(access.as_ref())?;
 
     if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation("scope is required".into()));
+        return Err(MemoryError::Validation(error_messages::SCOPE_REQUIRED.into()));
     }
 
     let cutoff = request.as_of.unwrap_or_else(super::query::now);
@@ -212,13 +212,15 @@ pub async fn assemble_context(
     } else {
         let lexical_result = select_fact_records_for_query(
             service,
-            &namespace,
-            &request.scope,
-            &cutoff_iso,
-            query_opt,
-            request.budget,
-            project_opt,
-            &fact_types,
+            FactQueryParams {
+                namespace: &namespace,
+                scope: &request.scope,
+                cutoff_iso: &cutoff_iso,
+                query_opt,
+                limit: request.budget,
+                project: project_opt,
+                fact_types: &fact_types,
+            },
         )
         .await?;
 
@@ -258,13 +260,15 @@ pub async fn assemble_context(
                 }
                 let extra_records = select_fact_records_for_query(
                     service,
-                    &namespace,
-                    &request.scope,
-                    &cutoff_iso,
-                    Some(expanded_query),
-                    request.budget,
-                    project_opt,
-                    &fact_types,
+                    FactQueryParams {
+                        namespace: &namespace,
+                        scope: &request.scope,
+                        cutoff_iso: &cutoff_iso,
+                        query_opt: Some(expanded_query),
+                        limit: request.budget,
+                        project: project_opt,
+                        fact_types: &fact_types,
+                    },
                 )
                 .await?;
                 for fact in filter_facts_by_constraints(
@@ -2518,38 +2522,42 @@ struct LexicalQueryResult {
     retrieval_tier: RetrievalTier,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters for fact retrieval queries shared across lexical search functions.
+struct FactQueryParams<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff_iso: &'a str,
+    query_opt: Option<&'a str>,
+    limit: i32,
+    project: Option<&'a str>,
+    fact_types: &'a [String],
+}
+
 async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
-    namespace: &str,
-    scope: &str,
-    cutoff_iso: &str,
-    query_opt: Option<&str>,
-    limit: i32,
-    project: Option<&str>,
-    fact_types: &[String],
+    params: FactQueryParams<'_>,
 ) -> Result<LexicalQueryResult, MemoryError> {
-    let query_terms = query_opt
+    let query_terms = params.query_opt
         .map(super::query::search_query_terms)
         .unwrap_or_default();
-    let candidate_limit = lexical_candidate_limit(limit);
+    let candidate_limit = lexical_candidate_limit(params.limit);
 
     let initial = service
         .db_client
         .select_facts_filtered_advanced(
-            namespace,
-            scope,
-            cutoff_iso,
-            query_opt,
+            params.namespace,
+            params.scope,
+            params.cutoff_iso,
+            params.query_opt,
             candidate_limit,
-            project,
-            fact_types,
+            params.project,
+            params.fact_types,
         )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let initial = rank_lexical_records(initial, &query_terms);
 
-    let Some(_query) = query_opt else {
+    let Some(_query) = params.query_opt else {
         return Ok(LexicalQueryResult {
             records: initial,
             retrieval_tier: RetrievalTier::Direct,
@@ -2563,13 +2571,13 @@ async fn select_fact_records_for_query(
         let term_records = service
             .db_client
             .select_facts_filtered_advanced(
-                namespace,
-                scope,
-                cutoff_iso,
+                params.namespace,
+                params.scope,
+                params.cutoff_iso,
                 Some(term.as_str()),
                 candidate_limit,
-                project,
-                fact_types,
+                params.project,
+                params.fact_types,
             )
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
@@ -2601,11 +2609,11 @@ async fn select_fact_records_for_query(
     {
         let scanned_records = scan_fact_records_by_query_terms(
             service,
-            namespace,
-            scope,
-            cutoff_iso,
-            project,
-            fact_types,
+            params.namespace,
+            params.scope,
+            params.cutoff_iso,
+            params.project,
+            params.fact_types,
             &query_terms,
             candidate_limit,
         )
@@ -3911,13 +3919,15 @@ mod tests {
 
         let lexical_result = select_fact_records_for_query(
             &service,
-            "org",
-            "org",
-            "2026-01-15T10:30:00Z",
-            Some("atlas launch checklist"),
-            10,
-            None,
-            &[],
+            FactQueryParams {
+                namespace: "org",
+                scope: "org",
+                cutoff_iso: "2026-01-15T10:30:00Z",
+                query_opt: Some("atlas launch checklist"),
+                limit: 10,
+                project: None,
+                fact_types: &[],
+            },
         )
         .await
         .expect("fallback records");
@@ -4172,13 +4182,15 @@ mod tests {
 
         let lexical_result = select_fact_records_for_query(
             &service,
-            "org",
-            "org",
-            "2026-01-15T10:30:00Z",
-            Some("caroline lgbtq support group"),
-            5,
-            None,
-            &[],
+            FactQueryParams {
+                namespace: "org",
+                scope: "org",
+                cutoff_iso: "2026-01-15T10:30:00Z",
+                query_opt: Some("caroline lgbtq support group"),
+                limit: 5,
+                project: None,
+                fact_types: &[],
+            },
         )
         .await
         .expect("fallback records");
@@ -4431,13 +4443,15 @@ mod tests {
 
         let lexical_result = select_fact_records_for_query(
             &service,
-            "org",
-            "org",
-            "2026-01-15T10:30:00Z",
-            Some("What degree did I graduate with?"),
-            5,
-            None,
-            &[],
+            FactQueryParams {
+                namespace: "org",
+                scope: "org",
+                cutoff_iso: "2026-01-15T10:30:00Z",
+                query_opt: Some("What degree did I graduate with?"),
+                limit: 5,
+                project: None,
+                fact_types: &[],
+            },
         )
         .await
         .expect("short-query fallback records");

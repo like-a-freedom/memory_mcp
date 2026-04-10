@@ -929,7 +929,7 @@ impl GlinerEntityExtractor {
     fn apply_nms(&self, mut spans: Vec<ScoredSpan>) -> Vec<ScoredSpan> {
         const IOU_THRESHOLD: f32 = 0.5;
 
-        spans.sort_by(|left, right| right.score.partial_cmp(&left.score).unwrap());
+        spans.sort_by(|left, right| right.score.partial_cmp(&left.score).unwrap_or(std::cmp::Ordering::Equal));
 
         let mut kept = Vec::new();
         for span in spans {

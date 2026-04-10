@@ -25,6 +25,13 @@ use std::time::Instant;
 const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
 const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
 
+/// Bi-temporal visibility filter: selects records visible as of a given cutoff timestamp.
+/// Applied to both `fact` and `edge` tables with the same temporal semantics.
+const BI_TEMPORAL_WHERE: &str =
+    "t_valid <= type::datetime($cutoff) \
+     AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
+     AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
+
 /// Traversal direction for graph neighbor queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraphDirection {
@@ -1981,10 +1988,10 @@ fn build_select_facts_filtered_advanced_query(
     project: Option<&str>,
     fact_types: &[String],
 ) -> (String, Value) {
-    let cutoff_expr = "type::datetime($cutoff)";
-    let mut where_clauses = vec![format!(
-        "scope = $scope AND t_valid <= {cutoff_expr} AND (t_ingested IS NONE OR t_ingested <= {cutoff_expr}) AND (t_invalid IS NONE OR t_invalid > {cutoff_expr} OR t_invalid_ingested > {cutoff_expr})"
-    )];
+    let mut where_clauses = vec![
+        "scope = $scope".to_string(),
+        BI_TEMPORAL_WHERE.to_string(),
+    ];
 
     let mut vars = serde_json::Map::from_iter([
         ("scope".to_string(), json!(scope)),
@@ -2026,7 +2033,7 @@ fn build_select_facts_by_entity_links_query(
     limit: i32,
 ) -> (String, Value) {
     (
-        "SELECT * FROM fact WHERE scope = $scope AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit".to_string(),
+        format!("SELECT * FROM fact WHERE scope = $scope AND {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"),
         json!({
             "scope": scope,
             "cutoff": cutoff,
@@ -2051,9 +2058,7 @@ fn build_select_facts_ann_query(
          WHERE scope = $scope \
            AND embedding IS NOT NONE \
            AND embedding IS NOT NULL \
-           AND t_valid <= type::datetime($cutoff) \
-           AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
-           AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) \
+           AND {BI_TEMPORAL_WHERE} \
            AND embedding <|{ann_limit}, {ef_search}|> $query_vec \
          ORDER BY sem_score DESC \
          LIMIT $limit"
@@ -2192,9 +2197,7 @@ fn record_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
 
 fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
     (
-        format!(
-            "SELECT * FROM edge WHERE t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"
-        ),
+        format!("SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"),
         json!({ "cutoff": cutoff }),
     )
 }
@@ -2242,9 +2245,7 @@ fn build_select_edge_neighbors_query(
     };
 
     (
-        format!(
-            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND t_valid <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff)) ORDER BY in ASC, out ASC, t_valid DESC"
-        ),
+        format!("SELECT * FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"),
         json!({"node_id": node_id, "cutoff": cutoff}),
     )
 }
