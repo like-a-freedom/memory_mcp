@@ -195,3 +195,10 @@ pub(crate) fn fact_record_matches_type(record: &Value, fact_types: &[String]) ->
         .and_then(json_string)
         .is_some_and(|value| fact_types.iter().any(|fact_type| fact_type == value))
 }
+
+pub(crate) fn compare_facts_by_recency(left: &Fact, right: &Fact) -> std::cmp::Ordering {
+    right
+        .t_valid
+        .cmp(&left.t_valid)
+        .then_with(|| left.fact_id.cmp(&right.fact_id))
+}

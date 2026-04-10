@@ -11,14 +11,21 @@ use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::{MemoryError, error_messages};
 use super::value_helpers::{json_f64, json_string};
 use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem, FactType};
+use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
 use crate::storage::GraphDirection;
 
+mod alias_expansion;
+mod experience;
 mod filtering;
+
+use alias_expansion::expand_query_with_aliases;
+use experience::{
+    RecentExperienceRequest, append_recent_experience_items, supplemental_experience_count,
+};
 use filtering::{
-    episode_record_allowed, fact_is_active_at, fact_record_allowed, fact_record_matches_project,
-    fact_record_matches_type, filter_episodes_by_constraints, filter_facts_by_constraints,
-    raw_array, raw_object,
+    compare_facts_by_recency, episode_record_allowed, fact_is_active_at, fact_record_allowed,
+    fact_record_matches_project, fact_record_matches_type, filter_episodes_by_constraints,
+    filter_facts_by_constraints, raw_array, raw_object,
 };
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
@@ -751,94 +758,6 @@ fn summarize_retrieval_tiers(results: &[AssembledContextItem]) -> Value {
     Value::Object(counts)
 }
 
-fn supplemental_experience_count(results: &[AssembledContextItem]) -> usize {
-    results
-        .iter()
-        .filter(|item| item.rationale.starts_with("supplemental experience "))
-        .count()
-}
-
-struct RecentExperienceRequest<'a> {
-    namespace: &'a str,
-    scope: &'a str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    project: Option<&'a str>,
-    access: &'a AccessContext,
-    budget: i32,
-    fact_types: &'a [String],
-}
-
-async fn append_recent_experience_items(
-    results: &mut Vec<AssembledContextItem>,
-    service: &crate::service::MemoryService,
-    request: RecentExperienceRequest<'_>,
-) -> Result<usize, MemoryError> {
-    let budget = request.budget.max(1) as usize;
-    if results.len() >= budget {
-        return Ok(0);
-    }
-
-    if !request.fact_types.is_empty()
-        && !request
-            .fact_types
-            .iter()
-            .any(|fact_type| fact_type == FactType::Experience.as_str())
-    {
-        return Ok(0);
-    }
-
-    let records = service
-        .db_client
-        .select_active_facts(request.namespace, 500)
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let experience_filter = vec![FactType::Experience.as_str().to_string()];
-    let mut facts =
-        filter_facts_by_constraints(records, request.access, request.project, &experience_filter)
-            .into_iter()
-            .filter(|fact| fact.scope == request.scope)
-            .filter(|fact| fact_is_active_at(fact, request.cutoff))
-            .collect::<Vec<_>>();
-
-    facts.sort_by(|left, right| {
-        right
-            .t_ingested
-            .cmp(&left.t_ingested)
-            .then_with(|| compare_facts_by_recency(left, right))
-    });
-
-    let mut seen_fact_ids = results
-        .iter()
-        .map(|item| item.fact_id.clone())
-        .collect::<HashSet<_>>();
-    let mut appended = 0;
-
-    for fact in facts {
-        if results.len() >= budget || !seen_fact_ids.insert(fact.fact_id.clone()) {
-            continue;
-        }
-
-        let confidence = super::decayed_confidence(&fact, request.cutoff);
-
-        results.push(AssembledContextItem {
-            fact_id: fact.fact_id,
-            content: fact.content,
-            quote: fact.quote,
-            source_episode: fact.source_episode,
-            confidence,
-            provenance: fact.provenance,
-            rationale: format!(
-                "supplemental experience recent_t_ingested={}",
-                super::normalize_dt(fact.t_ingested)
-            ),
-            retrieval_tier: None,
-        });
-        appended += 1;
-    }
-
-    Ok(appended)
-}
-
 /// Parameters for building context items from episode fallback records.
 struct EpisodeFallbackParams<'a> {
     episodes: Vec<crate::models::Episode>,
@@ -1146,17 +1065,7 @@ async fn build_map_view(
 /// while tests keep this helper to assert the standalone ordering contract.
 #[cfg(test)]
 fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
-    facts.sort_by(compare_facts_by_recency);
-}
-
-fn compare_facts_by_recency(
-    left: &crate::models::Fact,
-    right: &crate::models::Fact,
-) -> std::cmp::Ordering {
-    right
-        .t_valid
-        .cmp(&left.t_valid)
-        .then_with(|| left.fact_id.cmp(&right.fact_id))
+    facts.sort_by(filtering::compare_facts_by_recency);
 }
 
 #[derive(Debug)]
@@ -2238,113 +2147,6 @@ fn apply_time_window(
     });
 }
 
-/// Expands a search query with entity aliases for broader recall.
-///
-/// Looks up entities whose canonical names appear in the query,
-/// and returns additional query terms derived from their aliases.
-async fn expand_query_with_aliases(
-    service: &crate::service::MemoryService,
-    query: &str,
-    namespace: &str,
-) -> Vec<String> {
-    let terms: Vec<&str> = query.split_whitespace().collect();
-    if terms.is_empty() {
-        return Vec::new();
-    }
-
-    // Collect all n-gram phrases and their positions
-    let mut phrase_entries: Vec<(String, usize, usize)> = Vec::new();
-    for span_len in (1..=terms.len()).rev() {
-        for start in 0..=terms.len().saturating_sub(span_len) {
-            let end = start + span_len;
-            let phrase = terms[start..end].join(" ");
-            if phrase.len() >= 2 {
-                phrase_entries.push((phrase, start, end));
-            }
-        }
-    }
-
-    // Deduplicate normalized names for batch lookup
-    let normalized_names: Vec<String> = phrase_entries
-        .iter()
-        .map(|(phrase, _, _)| super::normalize_text(phrase))
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    // Single batch query instead of O(N²) individual lookups
-    let entities = service
-        .db_client
-        .select_entities_batch(namespace, &normalized_names)
-        .await
-        .unwrap_or_default();
-
-    // Build lookup map: normalized_name → aliases
-    let mut entity_aliases: HashMap<String, Vec<String>> = HashMap::new();
-    for entity in &entities {
-        let obj = match entity.as_object() {
-            Some(obj) => obj,
-            None => continue,
-        };
-        // Use canonical_name_normalized as primary key, fall back to normalizing canonical_name
-        let canonical_norm = obj
-            .get("canonical_name_normalized")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .or_else(|| {
-                obj.get("canonical_name")
-                    .and_then(|v| v.as_str())
-                    .map(super::normalize_text)
-            })
-            .unwrap_or_default();
-        let aliases: Vec<String> = obj
-            .get("aliases")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
-            .unwrap_or_default();
-        if !canonical_norm.is_empty() && !aliases.is_empty() {
-            entity_aliases.entry(canonical_norm).or_insert(aliases);
-        }
-    }
-
-    // Expand queries using matched entities
-    let mut expanded = HashSet::new();
-    for (phrase, start, end) in &phrase_entries {
-        let normalized = super::normalize_text(phrase);
-        if let Some(aliases) = entity_aliases.get(&normalized) {
-            for alias_str in aliases {
-                let mut parts: Vec<String> = terms[..*start]
-                    .iter()
-                    .map(|term| (*term).to_string())
-                    .collect();
-                parts.push(alias_str.clone());
-                parts.extend(terms[*end..].iter().map(|term| (*term).to_string()));
-                let alias_expanded = parts.join(" ");
-
-                if alias_expanded != query {
-                    expanded.insert(alias_expanded);
-                }
-            }
-        }
-    }
-
-    expanded.into_iter().collect()
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-async fn expand_query_with_aliases_for_test(
-    service: &crate::service::MemoryService,
-    query: &str,
-    namespace: &str,
-) -> Vec<String> {
-    expand_query_with_aliases(service, query, namespace).await
-}
-
 struct LexicalQueryResult {
     records: Vec<Value>,
     retrieval_tier: RetrievalTier,
@@ -3349,6 +3151,7 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use super::alias_expansion::expand_query_with_aliases_for_test;
     use super::filtering::filter_facts_by_policy;
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
