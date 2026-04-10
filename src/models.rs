@@ -7,84 +7,38 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Unique identifier for an episode.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
-#[serde(transparent)]
-pub struct EpisodeId(pub String);
+macro_rules! define_id_type {
+    ($name:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+        #[serde(transparent)]
+        pub struct $name(pub String);
 
-impl From<String> for EpisodeId {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
+        impl From<String> for $name {
+            fn from(s: String) -> Self {
+                Self(s)
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(s: &str) -> Self {
+                Self(s.to_string())
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
 }
 
-impl From<&str> for EpisodeId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-
-impl std::fmt::Display for EpisodeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// Unique identifier for an entity.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
-#[serde(transparent)]
-pub struct EntityId(pub String);
-
-impl From<String> for EntityId {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&str> for EntityId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-
-impl std::fmt::Display for EntityId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// Unique identifier for a fact.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
-#[serde(transparent)]
-pub struct FactId(pub String);
-
-impl From<String> for FactId {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&str> for FactId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-
-impl std::fmt::Display for FactId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// Unique identifier for a community.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
-#[serde(transparent)]
-pub struct CommunityId(pub String);
-
-/// Unique identifier for an edge.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
-#[serde(transparent)]
-pub struct EdgeId(pub String);
+define_id_type!(EpisodeId, "Unique identifier for an episode.");
+define_id_type!(EntityId, "Unique identifier for an entity.");
+define_id_type!(FactId, "Unique identifier for a fact.");
+define_id_type!(CommunityId, "Unique identifier for a community.");
+define_id_type!(EdgeId, "Unique identifier for an edge.");
 
 /// Request to ingest a new episode into memory.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -284,16 +238,49 @@ pub struct ExtractedLink {
     pub episode_id: String,
 }
 
+/// Standard fact type classification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FactType {
+    Note,
+    Metric,
+    Promise,
+    Experience,
+}
+
+impl FactType {
+    /// All standard fact types.
+    pub const ALL: &'static [Self] = &[Self::Note, Self::Metric, Self::Promise, Self::Experience];
+
+    /// Returns the string representation for database storage.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Note => "note",
+            Self::Metric => "metric",
+            Self::Promise => "promise",
+            Self::Experience => "experience",
+        }
+    }
+}
+
+impl std::fmt::Display for FactType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Legacy string constants for backward compatibility with raw SQL queries.
+/// Prefer `FactType` enum in new code.
+#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
 pub const FACT_TYPE_NOTE: &str = "note";
+#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
 pub const FACT_TYPE_METRIC: &str = "metric";
+#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
 pub const FACT_TYPE_PROMISE: &str = "promise";
+#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
 pub const FACT_TYPE_EXPERIENCE: &str = "experience";
-pub const STANDARD_FACT_TYPES: &[&str] = &[
-    FACT_TYPE_NOTE,
-    FACT_TYPE_METRIC,
-    FACT_TYPE_PROMISE,
-    FACT_TYPE_EXPERIENCE,
-];
+#[deprecated(since = "1.1.0", note = "use FactType::ALL instead")]
+pub const STANDARD_FACT_TYPES: &[&str] = &["note", "metric", "promise", "experience"];
 
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -363,7 +350,10 @@ pub struct AccessPayload {
     pub cross_scope_allow: Option<Vec<AccessScopeAllow>>,
 }
 
-/// Resolved access context derived from payload.
+/// Resolved access context derived from a payload.
+///
+/// Shares the same fields as `AccessPayload`; this type exists solely to carry
+/// the `is_scope_allowed` behaviour and a `Default` impl.
 #[derive(Debug, Clone, Default)]
 pub struct AccessContext {
     pub allowed_scopes: Option<Vec<String>>,
@@ -379,15 +369,25 @@ impl AccessContext {
     /// Creates an access context from an optional payload.
     #[must_use]
     pub fn from_payload(payload: Option<AccessPayload>) -> Option<Self> {
-        payload.map(|access| Self {
-            allowed_scopes: access.allowed_scopes,
-            allowed_tags: access.allowed_tags,
-            caller_id: access.caller_id,
-            session_vars: access.session_vars,
-            transport: access.transport,
-            content_type: access.content_type,
-            cross_scope_allow: access.cross_scope_allow,
-        })
+        payload.map(
+            |AccessPayload {
+                 allowed_scopes,
+                 allowed_tags,
+                 caller_id,
+                 session_vars,
+                 transport,
+                 content_type,
+                 cross_scope_allow,
+             }| Self {
+                allowed_scopes,
+                allowed_tags,
+                caller_id,
+                session_vars,
+                transport,
+                content_type,
+                cross_scope_allow,
+            },
+        )
     }
 
     /// Checks if a scope is allowed.
@@ -456,7 +456,7 @@ pub struct Fact {
     pub ft_score: f64,
 }
 
-/// An edge represents a relationship between entities or facts.
+/// Origin of an edge (relationship between entities or facts).
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeOrigin {

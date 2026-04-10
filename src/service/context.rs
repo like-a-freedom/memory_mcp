@@ -10,9 +10,7 @@ use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::models::{
-    AccessContext, AssembleContextRequest, AssembledContextItem, FACT_TYPE_EXPERIENCE,
-};
+use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem, FactType};
 use crate::storage::GraphDirection;
 use crate::storage::{json_f64, json_string};
 
@@ -769,7 +767,7 @@ async fn append_recent_experience_items(
         && !request
             .fact_types
             .iter()
-            .any(|fact_type| fact_type == FACT_TYPE_EXPERIENCE)
+            .any(|fact_type| fact_type == FactType::Experience.as_str())
     {
         return Ok(0);
     }
@@ -779,7 +777,7 @@ async fn append_recent_experience_items(
         .select_active_facts(request.namespace, 500)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-    let experience_filter = vec![FACT_TYPE_EXPERIENCE.to_string()];
+    let experience_filter = vec![FactType::Experience.as_str().to_string()];
     let mut facts =
         filter_facts_by_constraints(records, request.access, request.project, &experience_filter)
             .into_iter()

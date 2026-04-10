@@ -10,8 +10,7 @@ use crate::logging::LogLevel;
 use crate::models::Edge;
 use crate::models::Episode;
 use crate::models::{
-    ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink,
-    FACT_TYPE_EXPERIENCE, FACT_TYPE_METRIC, FACT_TYPE_PROMISE,
+    ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink, FactType,
 };
 use std::time::Instant;
 
@@ -296,16 +295,27 @@ pub async fn extract_facts(
         .collect::<Vec<_>>();
 
     if is_metric_statement(&episode.content) {
-        facts.push(add_extracted_fact(service, episode, FACT_TYPE_METRIC, &entity_links).await?);
+        facts.push(
+            add_extracted_fact(service, episode, FactType::Metric.as_str(), &entity_links).await?,
+        );
     }
 
     if is_promise_statement(&normalized) || is_document_action_item(&episode.content) {
-        facts.push(add_extracted_fact(service, episode, FACT_TYPE_PROMISE, &entity_links).await?);
+        facts.push(
+            add_extracted_fact(service, episode, FactType::Promise.as_str(), &entity_links).await?,
+        );
     }
 
     if is_experience_statement(&episode.content) {
-        facts
-            .push(add_extracted_fact(service, episode, FACT_TYPE_EXPERIENCE, &entity_links).await?);
+        facts.push(
+            add_extracted_fact(
+                service,
+                episode,
+                FactType::Experience.as_str(),
+                &entity_links,
+            )
+            .await?,
+        );
     }
 
     Ok(facts)

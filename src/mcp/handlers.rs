@@ -1427,16 +1427,16 @@ impl MemoryMcp {
         );
 
         match self.service.invalidate(request, Some(access)).await {
-            Ok(res) => {
+            Ok(()) => {
                 self.service.log_tool_event_with_duration(
                     "invalidate.done",
                     json!({"fact_id": p.fact_id}),
-                    json!({"result": res}),
+                    json!({"status": "invalidated"}),
                     LogLevel::Info,
                     timer.elapsed(),
                 );
                 Ok(Json(ToolResponse::success_with_guidance(
-                    res,
+                    "invalidated".to_string(),
                     "Re-run assemble_context with a fresh `as_of` timestamp to confirm the fact is no longer active.",
                 )))
             }

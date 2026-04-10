@@ -353,12 +353,12 @@ impl MemoryService {
     }
 
     /// Public helper for tool-level logging.
-    pub fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
+    pub(crate) fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
         self.logger.log(log_event(op, args, result, None), level);
     }
 
     /// Public helper for tool-level logging with duration.
-    pub fn log_tool_event_with_duration(
+    pub(crate) fn log_tool_event_with_duration(
         &self,
         op: &str,
         args: Value,
@@ -884,7 +884,7 @@ impl MemoryService {
         &self,
         request: InvalidateRequest,
         access: Option<AccessContext>,
-    ) -> Result<String, MemoryError> {
+    ) -> Result<(), MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let (record, namespace) = self.find_fact_record(&request.fact_id).await?;
         let namespace =
@@ -909,7 +909,7 @@ impl MemoryService {
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
         super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
-        Ok("ok".to_string())
+        Ok(())
     }
 
     /// Assembles context for a query.
@@ -1152,42 +1152,24 @@ impl MemoryService {
     /// Returns default namespace for unknown scopes with a warning log.
     #[must_use]
     pub fn namespace_for_scope(&self, scope: &str) -> String {
-        let scope_lower = scope.to_lowercase();
-
-        if self.namespaces.contains(&scope_lower) {
-            return scope_lower;
+        let (ns, fell_back) = resolve_namespace(&self.namespaces, &self.default_namespace, scope);
+        if fell_back {
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::Value::String("scope.namespace_fallback".to_string()),
+            );
+            event.insert(
+                "scope".to_string(),
+                serde_json::Value::String(scope.to_string()),
+            );
+            event.insert(
+                "resolved_namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+            self.logger.log(event, crate::logging::LogLevel::Warn);
         }
-        if scope_lower.starts_with("personal") && self.namespaces.contains(&"personal".to_string())
-        {
-            return "personal".to_string();
-        }
-        if scope_lower.starts_with("private") && self.namespaces.contains(&"private".to_string()) {
-            return "private".to_string();
-        }
-        if scope_lower.starts_with("org") && self.namespaces.contains(&"org".to_string()) {
-            return "org".to_string();
-        }
-
-        // Log warning for unknown scope before returning default
-        self.logger.log(
-            std::collections::HashMap::from([
-                (
-                    "op".to_string(),
-                    serde_json::Value::String("scope.namespace_fallback".to_string()),
-                ),
-                (
-                    "scope".to_string(),
-                    serde_json::Value::String(scope.to_string()),
-                ),
-                (
-                    "resolved_namespace".to_string(),
-                    serde_json::Value::String(self.default_namespace.clone()),
-                ),
-            ]),
-            crate::logging::LogLevel::Warn,
-        );
-
-        self.default_namespace.clone()
+        ns
     }
 
     pub(crate) async fn find_episode_record(
@@ -1531,6 +1513,32 @@ impl MemoryService {
 
         Ok(episodes)
     }
+}
+
+/// Resolves a scope string to a namespace, using prefix matching against
+/// available namespaces. Returns `(namespace, fell_back)` where `fell_back`
+/// is true when the default was used for an unknown scope.
+fn resolve_namespace(namespaces: &[String], default: &str, scope: &str) -> (String, bool) {
+    let scope_lower = scope.to_lowercase();
+
+    if namespaces.contains(&scope_lower) {
+        return (scope_lower, false);
+    }
+
+    // Prefix-based matching for known scope families.
+    const SCOPE_PREFIXES: &[(&str, &str)] = &[
+        ("personal", "personal"),
+        ("private", "private"),
+        ("org", "org"),
+    ];
+    for (prefix, ns) in SCOPE_PREFIXES {
+        if scope_lower.starts_with(prefix) && namespaces.iter().any(|n| n == *ns) {
+            return (ns.to_string(), false);
+        }
+    }
+
+    // Unknown scope — fall back to default.
+    (default.to_string(), true)
 }
 
 /// Trait for safe mutex locking that handles poisoned locks gracefully.

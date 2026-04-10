@@ -160,8 +160,8 @@ fn is_search_stopword(token: &str) -> bool {
 
 /// Calculate decayed confidence based on fact age.
 pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64 {
-    let half_life_days = if fact.fact_type == crate::models::FACT_TYPE_METRIC
-        || fact.fact_type == crate::models::FACT_TYPE_PROMISE
+    let half_life_days = if fact.fact_type == crate::models::FactType::Metric.as_str()
+        || fact.fact_type == crate::models::FactType::Promise.as_str()
     {
         super::METRIC_HALF_LIFE_DAYS
     } else {

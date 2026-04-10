@@ -163,7 +163,7 @@ async fn run_watch_mode(
 
     #[cfg(feature = "cli-watch")]
     {
-        return memory_mcp::service::FsWatcher::run_with_interval(
+        memory_mcp::service::FsWatcher::run_with_interval(
             watch.dir,
             watch.project,
             watch.scope,
@@ -171,7 +171,7 @@ async fn run_watch_mode(
             memory_service,
         )
         .await
-        .map_err(|err| Box::new(err) as Box<dyn std::error::Error>);
+        .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
     }
 
     #[cfg(not(feature = "cli-watch"))]
