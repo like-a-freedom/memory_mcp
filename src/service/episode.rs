@@ -2,13 +2,15 @@
 
 use std::sync::LazyLock;
 
-use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde_json::{Value, json};
 
 use super::core::log_args_with_duration;
 use super::error::MemoryError;
 use super::query::parse_iso;
+use super::value_helpers::{
+    dt_field, f64_field, i64_field, json_string, str_array_field, str_field, unwrap_array_value,
+};
 use crate::logging::LogLevel;
 use crate::models::Edge;
 use crate::models::Episode;
@@ -17,53 +19,20 @@ use crate::models::{
 };
 use std::time::Instant;
 
-fn unwrap_string_value(v: &Value) -> Option<&str> {
-    if let Some(s) = v.as_str() {
-        Some(s)
-    } else if let Some(obj) = v.as_object() {
-        obj.get("String")
-            .and_then(Value::as_str)
-            .or_else(|| obj.get("Datetime").and_then(Value::as_str))
-            .or_else(|| obj.get("Strand").and_then(Value::as_str))
-            .or_else(|| {
-                obj.get("Strand")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-            })
-            .or_else(|| {
-                obj.get("Datetime")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-            })
-    } else {
-        None
-    }
-}
-
-fn unwrap_array_value(v: &Value) -> Option<&Vec<Value>> {
-    if let Some(arr) = v.as_array() {
-        Some(arr)
-    } else if let Some(obj) = v.as_object() {
-        obj.get("Array").and_then(Value::as_array)
-    } else {
-        None
-    }
-}
-
 /// Parse an episode from a database record.
 #[must_use]
 pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
     Some(Episode {
-        episode_id: unwrap_string_value(record.get("episode_id")?)?.to_string(),
-        source_type: unwrap_string_value(record.get("source_type")?)?.to_string(),
-        source_id: unwrap_string_value(record.get("source_id")?)?.to_string(),
-        content: unwrap_string_value(record.get("content")?)?.to_string(),
-        t_ref: parse_iso(unwrap_string_value(record.get("t_ref")?)?)?,
-        t_ingested: parse_iso(unwrap_string_value(record.get("t_ingested")?)?)?,
-        scope: unwrap_string_value(record.get("scope")?)?.to_string(),
+        episode_id: json_string(record.get("episode_id")?)?.to_string(),
+        source_type: json_string(record.get("source_type")?)?.to_string(),
+        source_id: json_string(record.get("source_id")?)?.to_string(),
+        content: json_string(record.get("content")?)?.to_string(),
+        t_ref: parse_iso(json_string(record.get("t_ref")?)?)?,
+        t_ingested: parse_iso(json_string(record.get("t_ingested")?)?)?,
+        scope: json_string(record.get("scope")?)?.to_string(),
         visibility_scope: record
             .get("visibility_scope")
-            .and_then(unwrap_string_value)
+            .and_then(json_string)
             .unwrap_or_default()
             .to_string(),
         policy_tags: record
@@ -72,65 +41,12 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
             .map(|values| {
                 values
                     .iter()
-                    .filter_map(unwrap_string_value)
+                    .filter_map(json_string)
                     .map(String::from)
                     .collect()
             })
             .unwrap_or_default(),
     })
-}
-
-/// Extract a string field from a JSON map, handling SurrealDB String wrappers.
-fn str_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
-    map.get(key).and_then(unwrap_string_value).map(String::from)
-}
-
-/// Extract a datetime field from a JSON map.
-fn dt_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<DateTime<Utc>> {
-    map.get(key)
-        .and_then(unwrap_string_value)
-        .and_then(parse_iso)
-}
-
-/// Extract an f64 field, handling SurrealDB Number/Float wrappers.
-fn f64_field(map: &serde_json::Map<String, Value>, key: &str, default: f64) -> f64 {
-    map.get(key)
-        .and_then(|v| {
-            v.as_f64().or_else(|| {
-                v.as_object().and_then(|obj| {
-                    obj.get("Number")
-                        .or_else(|| obj.get("Float"))
-                        .and_then(Value::as_f64)
-                })
-            })
-        })
-        .unwrap_or(default)
-}
-
-/// Extract an i64 field, handling SurrealDB Number wrappers.
-fn i64_field(map: &serde_json::Map<String, Value>, key: &str, default: i64) -> i64 {
-    map.get(key)
-        .and_then(|v| {
-            v.as_i64().or_else(|| {
-                v.as_object()
-                    .and_then(|o| o.get("Number").and_then(Value::as_i64))
-            })
-        })
-        .unwrap_or(default)
-}
-
-/// Extract a string array field from a JSON map.
-fn str_array_field(map: &serde_json::Map<String, Value>, key: &str) -> Vec<String> {
-    map.get(key)
-        .and_then(unwrap_array_value)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(unwrap_string_value)
-                .map(String::from)
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// Parse a fact from a database record.

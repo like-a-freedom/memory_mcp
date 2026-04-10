@@ -15,7 +15,6 @@ use crate::models::{
     ExplainRequest, ExtractResult, GraphHubEntity, GraphInsights, IngestRequest, InvalidateRequest,
     ProvenanceSource,
 };
-use crate::storage::json_i64;
 use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
 
 use super::AnnoEntityExtractor;
@@ -28,6 +27,7 @@ use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministi
 use super::ingest::prepare_ingest_request;
 use super::lifecycle::{spawn_archival_worker, spawn_community_worker, spawn_decay_worker};
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+use super::value_helpers::{json_i64, string_from_value};
 
 /// Core service for memory operations.
 #[derive(Clone)]
@@ -1670,34 +1670,6 @@ fn serialize_access(access: &AccessContext) -> Value {
         "content_type": access.content_type,
         "cross_scope_allow": access.cross_scope_allow,
     })
-}
-
-#[must_use]
-fn string_from_value(value: &Value) -> Option<String> {
-    match value {
-        Value::String(s) => Some(s.clone()),
-        Value::Object(map) => {
-            if let Some(Value::String(s)) = map.get("String") {
-                return Some(s.clone());
-            }
-            if let Some(Value::String(s)) = map.get("Strand") {
-                return Some(s.clone());
-            }
-            if let Some(Value::Object(inner)) = map.get("Strand")
-                && let Some(Value::String(s)) = inner.get("String")
-            {
-                return Some(s.clone());
-            }
-            if let Some(Value::Object(record_id)) = map.get("RecordId")
-                && let (Some(Value::String(table)), Some(Value::String(key))) =
-                    (record_id.get("table"), record_id.get("key"))
-            {
-                return Some(format!("{table}:{key}"));
-            }
-            None
-        }
-        _ => None,
-    }
 }
 
 fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {

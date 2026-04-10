@@ -537,119 +537,75 @@ impl GlinerEntityExtractor {
 
         let device = Device::Cpu;
 
-        if safetensors_path.is_file() {
-            let vb = unsafe {
-                VarBuilder::from_mmaped_safetensors(&[&safetensors_path], DTYPE, &device)
-            }
-            .map_err(|err| MemoryError::Storage(format!("failed to load safetensors: {err}")))?;
-
-            let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
-            let model = DebertaV2Model::load(vb.pp(BACKBONE_PREFIX), &runtime_config.backbone)
-                .map_err(|err| MemoryError::Storage(format!("failed to build model: {err}")))?;
-            let token_projection = TokenProjectionLayer::load(
-                vb.pp("token_rep_layer"),
-                runtime_config.backbone.hidden_size,
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| {
-                MemoryError::Storage(format!("failed to load token projection: {err}"))
-            })?;
-            let rnn = BiLstmLayer::load(
-                vb.pp("rnn"),
-                runtime_config.head_hidden_size,
-                runtime_config.head_hidden_size / 2,
-            )
-            .map_err(|err| MemoryError::Storage(format!("failed to load rnn: {err}")))?;
-            let span_rep_layer = SpanRepresentationLayer::load(
-                vb.pp("span_rep_layer").pp("span_rep_layer"),
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| MemoryError::Storage(format!("failed to load span_rep_layer: {err}")))?;
-            let prompt_hidden = gliner_ffn_hidden_size(runtime_config.head_hidden_size);
-            let prompt_rep_layer = FeedForwardProjection::load(
-                vb.pp("prompt_rep_layer"),
-                runtime_config.head_hidden_size,
-                prompt_hidden,
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| {
-                MemoryError::Storage(format!("failed to load prompt_rep_layer: {err}"))
-            })?;
-
-            Ok(Self {
-                model,
-                tokenizer,
-                device,
-                labels,
-                threshold,
-                max_span_width: runtime_config.max_span_width,
-                max_seq_len: runtime_config.max_seq_len,
-                ent_token_id,
-                token_projection,
-                rnn,
-                span_rep_layer,
-                prompt_rep_layer,
-            })
+        let vb = if safetensors_path.is_file() {
+            unsafe { VarBuilder::from_mmaped_safetensors(&[&safetensors_path], DTYPE, &device) }
+                .map_err(|err| MemoryError::Storage(format!("failed to load safetensors: {err}")))?
         } else if pytorch_path.is_file() {
-            let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
-
-            let vb = VarBuilder::from_pth(pytorch_path.to_str().unwrap_or(""), DTYPE, &device)
-                .map_err(|err| {
-                    MemoryError::Storage(format!("failed to load pytorch weights: {err}"))
-                })?;
-
-            let model = DebertaV2Model::load(vb.pp(BACKBONE_PREFIX), &runtime_config.backbone)
-                .map_err(|err| MemoryError::Storage(format!("failed to build model: {err}")))?;
-            let token_projection = TokenProjectionLayer::load(
-                vb.pp("token_rep_layer"),
-                runtime_config.backbone.hidden_size,
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| {
-                MemoryError::Storage(format!("failed to load token projection: {err}"))
-            })?;
-            let rnn = BiLstmLayer::load(
-                vb.pp("rnn"),
-                runtime_config.head_hidden_size,
-                runtime_config.head_hidden_size / 2,
-            )
-            .map_err(|err| MemoryError::Storage(format!("failed to load rnn: {err}")))?;
-            let span_rep_layer = SpanRepresentationLayer::load(
-                vb.pp("span_rep_layer").pp("span_rep_layer"),
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| MemoryError::Storage(format!("failed to load span_rep_layer: {err}")))?;
-            let prompt_hidden = gliner_ffn_hidden_size(runtime_config.head_hidden_size);
-            let prompt_rep_layer = FeedForwardProjection::load(
-                vb.pp("prompt_rep_layer"),
-                runtime_config.head_hidden_size,
-                prompt_hidden,
-                runtime_config.head_hidden_size,
-            )
-            .map_err(|err| {
-                MemoryError::Storage(format!("failed to load prompt_rep_layer: {err}"))
-            })?;
-
-            Ok(Self {
-                model,
-                tokenizer,
-                device,
-                labels,
-                threshold,
-                max_span_width: runtime_config.max_span_width,
-                max_seq_len: runtime_config.max_seq_len,
-                ent_token_id,
-                token_projection,
-                rnn,
-                span_rep_layer,
-                prompt_rep_layer,
-            })
+            VarBuilder::from_pth(pytorch_path.to_str().unwrap_or(""), DTYPE, &device).map_err(
+                |err| MemoryError::Storage(format!("failed to load pytorch weights: {err}")),
+            )?
         } else {
-            Err(MemoryError::Storage(
+            return Err(MemoryError::Storage(
                 "no model weights found (expected model.safetensors or pytorch_model.bin)"
                     .to_string(),
-            ))
-        }
+            ));
+        };
+
+        Self::build_from_var_builder(tokenizer, vb, &device, runtime_config, labels, threshold)
+    }
+
+    fn build_from_var_builder(
+        tokenizer: Tokenizer,
+        vb: VarBuilder,
+        device: &Device,
+        runtime_config: GlinerRuntimeConfig,
+        labels: Vec<String>,
+        threshold: f64,
+    ) -> Result<Self, MemoryError> {
+        let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
+
+        let model = DebertaV2Model::load(vb.pp(BACKBONE_PREFIX), &runtime_config.backbone)
+            .map_err(|err| MemoryError::Storage(format!("failed to build model: {err}")))?;
+        let token_projection = TokenProjectionLayer::load(
+            vb.pp("token_rep_layer"),
+            runtime_config.backbone.hidden_size,
+            runtime_config.head_hidden_size,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load token projection: {err}")))?;
+        let rnn = BiLstmLayer::load(
+            vb.pp("rnn"),
+            runtime_config.head_hidden_size,
+            runtime_config.head_hidden_size / 2,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load rnn: {err}")))?;
+        let span_rep_layer = SpanRepresentationLayer::load(
+            vb.pp("span_rep_layer").pp("span_rep_layer"),
+            runtime_config.head_hidden_size,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load span_rep_layer: {err}")))?;
+        let prompt_hidden = gliner_ffn_hidden_size(runtime_config.head_hidden_size);
+        let prompt_rep_layer = FeedForwardProjection::load(
+            vb.pp("prompt_rep_layer"),
+            runtime_config.head_hidden_size,
+            prompt_hidden,
+            runtime_config.head_hidden_size,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load prompt_rep_layer: {err}")))?;
+
+        Ok(Self {
+            model,
+            tokenizer,
+            device: device.clone(),
+            labels,
+            threshold,
+            max_span_width: runtime_config.max_span_width,
+            max_seq_len: runtime_config.max_seq_len,
+            ent_token_id,
+            token_projection,
+            rnn,
+            span_rep_layer,
+            prompt_rep_layer,
+        })
     }
 
     fn resolve_ent_token(tokenizer: &Tokenizer) -> Result<u32, MemoryError> {

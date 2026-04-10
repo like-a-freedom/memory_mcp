@@ -23,6 +23,7 @@ use crate::models::{
     AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
+use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
 use crate::storage::GraphDirection;
 use std::time::Instant;
@@ -143,59 +144,12 @@ struct GraphPathSnapshot {
     edges: Vec<Value>,
 }
 
-fn value_string(value: &Value) -> Option<String> {
-    match value {
-        Value::String(s) => Some(s.clone()),
-        Value::Object(map) => {
-            if let Some(Value::String(s)) = map.get("String") {
-                return Some(s.clone());
-            }
-            if let Some(Value::String(s)) = map.get("Strand") {
-                return Some(s.clone());
-            }
-            if let Some(Value::Object(inner)) = map.get("Strand")
-                && let Some(Value::String(s)) = inner.get("String")
-            {
-                return Some(s.clone());
-            }
-            if let Some(Value::Object(record_id)) = map.get("RecordId")
-                && let (Some(Value::String(table)), Some(Value::String(key))) =
-                    (record_id.get("table"), record_id.get("key"))
-            {
-                return Some(format!("{table}:{key}"));
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
 fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String> {
     let map = record.as_object()?;
     match direction {
-        GraphDirection::Incoming => map.get("in").and_then(value_string),
-        GraphDirection::Outgoing => map.get("out").and_then(value_string),
+        GraphDirection::Incoming => map.get("in").and_then(json_string).map(String::from),
+        GraphDirection::Outgoing => map.get("out").and_then(json_string).map(String::from),
     }
-}
-
-fn normalized_edge_record(record: &Value) -> Value {
-    let Some(map) = record.as_object() else {
-        return record.clone();
-    };
-
-    json!({
-        "edge_id": map
-            .get("edge_id")
-            .and_then(value_string)
-            .or_else(|| map.get("id").and_then(value_string)),
-        "in": map.get("in").and_then(value_string),
-        "relation": map.get("relation").and_then(value_string),
-        "out": map.get("out").and_then(value_string),
-        "origin": map.get("origin").cloned().unwrap_or(Value::Null),
-        "confidence": map.get("confidence").cloned().unwrap_or(Value::Null),
-        "t_valid": map.get("t_valid").cloned().unwrap_or(Value::Null),
-        "t_ingested": map.get("t_ingested").cloned().unwrap_or(Value::Null),
-    })
 }
 
 fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
@@ -693,7 +647,7 @@ impl MemoryMcp {
 
         let candidate_ids = archival_candidates
             .iter()
-            .filter_map(|record| record.get("episode_id").and_then(value_string))
+            .filter_map(|record| record.get("episode_id").and_then(json_string))
             .collect::<Vec<_>>();
 
         Ok(json!({

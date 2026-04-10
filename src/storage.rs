@@ -20,6 +20,7 @@ use surrealdb::types::Value as SurrealValue;
 use crate::config::SurrealConfig;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
+use crate::service::value_helpers::json_string;
 use std::time::Instant;
 
 const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
@@ -541,7 +542,7 @@ impl SurrealDbClient {
         namespace: &str,
     ) -> Result<SurrealValue, MemoryError> {
         let vars_for_log = vars.clone();
-        let timer = Instant::now(); // db.execute_query
+        let timer = Instant::now();
         self.logger.log(
             build_db_execute_event(
                 "db.execute_query.start",
@@ -621,7 +622,7 @@ impl SurrealDbClient {
         namespace: &str,
     ) -> Result<(), MemoryError> {
         let vars_for_log = vars.clone();
-        let timer = Instant::now(); // db.execute_raw_query
+        let timer = Instant::now();
         self.logger.log(
             build_db_execute_event(
                 "db.execute_raw_query.start",
@@ -870,74 +871,6 @@ fn validate_applied_migration(
     }
 
     Ok(())
-}
-
-pub(crate) fn json_string(value: &Value) -> Option<&str> {
-    if let Some(value) = value.as_str() {
-        Some(value)
-    } else if let Some(object) = value.as_object() {
-        object
-            .get("String")
-            .and_then(Value::as_str)
-            .or_else(|| object.get("Strand").and_then(Value::as_str))
-            .or_else(|| {
-                object
-                    .get("Strand")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-            })
-            .or_else(|| object.get("Datetime").and_then(Value::as_str))
-            .or_else(|| {
-                object
-                    .get("Datetime")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-            })
-    } else {
-        None
-    }
-}
-
-pub(crate) fn json_f64(value: &Value) -> Option<f64> {
-    if let Some(value) = value.as_f64() {
-        return Some(value);
-    }
-
-    let object = value.as_object()?;
-
-    object
-        .get("Number")
-        .and_then(json_f64)
-        .or_else(|| object.get("Float").and_then(json_f64))
-        .or_else(|| object.get("Int").and_then(json_f64))
-        .or_else(|| object.get("Decimal").and_then(json_f64))
-        .or_else(|| {
-            object
-                .get("String")
-                .and_then(Value::as_str)?
-                .parse::<f64>()
-                .ok()
-        })
-}
-
-pub(crate) fn json_i64(value: &Value) -> Option<i64> {
-    if let Some(value) = value.as_i64() {
-        return Some(value);
-    }
-
-    let object = value.as_object()?;
-
-    object
-        .get("Number")
-        .and_then(json_i64)
-        .or_else(|| object.get("Int").and_then(json_i64))
-        .or_else(|| {
-            object
-                .get("String")
-                .and_then(Value::as_str)?
-                .parse::<i64>()
-                .ok()
-        })
 }
 
 #[async_trait]
@@ -2529,6 +2462,7 @@ fn normalize_surreal_json(v: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::value_helpers::{json_f64, json_i64};
 
     #[test]
     fn normalize_url_upgrades_http_and_appends_rpc() {

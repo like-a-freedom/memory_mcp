@@ -7,10 +7,10 @@ use candle_nn::VarBuilder;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::{Value, json};
 
+use super::value_helpers::json_f64;
 use crate::config::{EmbeddingConfig, EmbeddingProviderKind};
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
-use crate::storage::json_f64;
 
 static EMBEDDING_LOGGER: std::sync::OnceLock<StdoutLogger> = std::sync::OnceLock::new();
 

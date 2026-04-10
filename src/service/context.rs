@@ -9,10 +9,10 @@ use serde_json::{Value, json};
 use super::cache::{CacheKey, CacheView};
 use super::embedding::{cosine_similarity, embedding_from_value};
 use super::error::{MemoryError, error_messages};
+use super::value_helpers::{json_f64, json_string};
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem, FactType};
 use crate::storage::GraphDirection;
-use crate::storage::{json_f64, json_string};
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 const MAX_ITEMS_PER_SOURCE_EPISODE: usize = 2;
