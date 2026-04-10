@@ -198,13 +198,15 @@ pub async fn assemble_context(
     } else if requested_view_mode == Some("wake_up") {
         build_wake_up_view(
             service,
-            &namespace,
-            &request.scope,
-            cutoff,
-            project_opt,
-            &fact_types,
+            FactFilterParams {
+                namespace: &namespace,
+                scope: &request.scope,
+                cutoff,
+                project: project_opt,
+                fact_types: &fact_types,
+                access: &access,
+            },
             request.budget,
-            &access,
         )
         .await?
     } else if requested_view_mode == Some("map") {
@@ -379,16 +381,16 @@ pub async fn assemble_context(
                 project_opt,
             )
             .await?;
-            build_episode_fallback_items(
-                filter_episodes_by_constraints(episode_records, &access, project_opt),
+            build_episode_fallback_items(EpisodeFallbackParams {
+                episodes: filter_episodes_by_constraints(episode_records, &access, project_opt),
                 query_opt,
-                &request.scope,
+                scope: &request.scope,
                 cutoff,
-                request.window_start,
-                request.window_end,
-                requested_view_mode == Some("timeline"),
-                request.budget,
-            )
+                window_start: request.window_start,
+                window_end: request.window_end,
+                timeline_mode: requested_view_mode == Some("timeline"),
+                budget: request.budget,
+            })
         } else {
             apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
             if requested_view_mode == Some("timeline") {
@@ -1000,20 +1002,23 @@ fn raw_array(value: &Value) -> Option<&Vec<Value>> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_episode_fallback_items(
-    mut episodes: Vec<crate::models::Episode>,
-    query_opt: Option<&str>,
-    scope: &str,
+/// Parameters for building context items from episode fallback records.
+struct EpisodeFallbackParams<'a> {
+    episodes: Vec<crate::models::Episode>,
+    query_opt: Option<&'a str>,
+    scope: &'a str,
     cutoff: chrono::DateTime<chrono::Utc>,
     window_start: Option<chrono::DateTime<chrono::Utc>>,
     window_end: Option<chrono::DateTime<chrono::Utc>>,
     timeline_mode: bool,
     budget: i32,
-) -> Vec<AssembledContextItem> {
-    apply_episode_time_window(&mut episodes, window_start, window_end);
+}
 
-    if timeline_mode {
+fn build_episode_fallback_items(params: EpisodeFallbackParams<'_>) -> Vec<AssembledContextItem> {
+    let mut episodes = params.episodes;
+    apply_episode_time_window(&mut episodes, params.window_start, params.window_end);
+
+    if params.timeline_mode {
         episodes.sort_by(|left, right| {
             left.t_ref
                 .cmp(&right.t_ref)
@@ -1030,7 +1035,7 @@ fn build_episode_fallback_items(
 
     episodes
         .into_iter()
-        .take(budget.max(1) as usize)
+        .take(params.budget.max(1) as usize)
         .map(|episode| AssembledContextItem {
             fact_id: format!("episode_fallback:{}", episode.episode_id),
             content: episode.content.clone(),
@@ -1043,7 +1048,7 @@ fn build_episode_fallback_items(
                 "source_id": episode.source_id,
                 "episode_fallback": true,
             }),
-            rationale: default_episode_fallback_rationale(query_opt, scope, cutoff),
+            rationale: default_episode_fallback_rationale(params.query_opt, params.scope, params.cutoff),
             retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
         })
         .collect()
@@ -1155,27 +1160,21 @@ async fn build_facets_view(
     Ok(items)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn build_wake_up_view(
     service: &crate::service::MemoryService,
-    namespace: &str,
-    scope: &str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    project: Option<&str>,
-    fact_types: &[String],
+    params: FactFilterParams<'_>,
     budget: i32,
-    access: &AccessContext,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .db_client
-        .select_table("fact", namespace)
+        .select_table("fact", params.namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    let mut facts = filter_facts_by_constraints(records, access, project, fact_types)
+    let mut facts = filter_facts_by_constraints(records, params.access, params.project, params.fact_types)
         .into_iter()
-        .filter(|fact| fact.scope == scope)
-        .filter(|fact| fact_is_active_at(fact, cutoff))
+        .filter(|fact| fact.scope == params.scope)
+        .filter(|fact| fact_is_active_at(fact, params.cutoff))
         .collect::<Vec<_>>();
 
     facts.sort_by(|left, right| {
@@ -1200,9 +1199,9 @@ async fn build_wake_up_view(
             let persona = fact.policy_tags.iter().any(|tag| tag == "persona");
             let confidence = if persona {
                 fact.confidence
-                    .max(super::decayed_confidence(&fact, cutoff))
+                    .max(super::decayed_confidence(&fact, params.cutoff))
             } else {
-                super::decayed_confidence(&fact, cutoff)
+                super::decayed_confidence(&fact, params.cutoff)
             };
             AssembledContextItem {
                 fact_id: fact.fact_id,
@@ -1224,9 +1223,9 @@ async fn build_wake_up_view(
     service.logger.log(
         super::log_event(
             "assemble_context.wake_up_view",
-            json!({"scope": scope, "project": project, "fact_type_count": fact_types.len()}),
+            json!({"scope": params.scope, "project": params.project, "fact_type_count": params.fact_types.len()}),
             json!({"count": items.len(), "persona_count": persona_count}),
-            Some(access),
+            Some(params.access),
         ),
         LogLevel::Debug,
     );
@@ -2533,6 +2532,17 @@ struct FactQueryParams<'a> {
     fact_types: &'a [String],
 }
 
+/// Parameters for in-memory fact filtering used by wake-up, episode-fallback,
+/// and other views that operate on pre-loaded fact records.
+struct FactFilterParams<'a> {
+    namespace: &'a str,
+    scope: &'a str,
+    cutoff: chrono::DateTime<chrono::Utc>,
+    project: Option<&'a str>,
+    fact_types: &'a [String],
+    access: &'a AccessContext,
+}
+
 async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
     params: FactQueryParams<'_>,
@@ -2609,13 +2619,8 @@ async fn select_fact_records_for_query(
     {
         let scanned_records = scan_fact_records_by_query_terms(
             service,
-            params.namespace,
-            params.scope,
-            params.cutoff_iso,
-            params.project,
-            params.fact_types,
+            params,
             &query_terms,
-            candidate_limit,
         )
         .await?;
         let scanned_score = top_query_score(&scanned_records, &query_terms);
@@ -2685,20 +2690,14 @@ fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
     queries
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn scan_fact_records_by_query_terms(
     service: &crate::service::MemoryService,
-    namespace: &str,
-    scope: &str,
-    cutoff_iso: &str,
-    project: Option<&str>,
-    fact_types: &[String],
+    params: FactQueryParams<'_>,
     query_terms: &[String],
-    limit: i32,
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
         .db_client
-        .select_table("fact", namespace)
+        .select_table("fact", params.namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
@@ -2708,22 +2707,22 @@ async fn scan_fact_records_by_query_terms(
             raw_object(record)
                 .and_then(|map| map.get("scope"))
                 .and_then(json_string)
-                .is_some_and(|value| value == scope)
+                .is_some_and(|value| value == params.scope)
         })
         .filter(|record| {
             raw_object(record)
                 .and_then(|map| map.get("t_valid"))
                 .and_then(json_string)
-                .is_some_and(|value| value <= cutoff_iso)
+                .is_some_and(|value| value <= params.cutoff_iso)
         })
         .filter(|record| {
             raw_object(record)
                 .and_then(|map| map.get("t_invalid"))
                 .and_then(json_string)
-                .is_none_or(|value| value > cutoff_iso)
+                .is_none_or(|value| value > params.cutoff_iso)
         })
-        .filter(|record| fact_record_matches_project(record, project))
-        .filter(|record| fact_record_matches_type(record, fact_types))
+        .filter(|record| fact_record_matches_project(record, params.project))
+        .filter(|record| fact_record_matches_type(record, params.fact_types))
         .filter(|record| lexical_query_overlap(record, query_terms) > 0)
         .map(|mut record| {
             let score = lexical_query_score(&record, query_terms) as f64;
@@ -2737,7 +2736,7 @@ async fn scan_fact_records_by_query_terms(
         .collect::<Vec<_>>();
 
     filtered = rank_lexical_records(filtered, query_terms);
-    filtered.truncate(limit.max(1) as usize);
+    filtered.truncate(params.limit.max(1) as usize);
     Ok(filtered)
 }
 

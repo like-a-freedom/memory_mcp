@@ -363,20 +363,21 @@ impl MemoryMcp {
         session_id: &str,
         scope: &str,
         ttl_seconds: Option<i64>,
-        mut payload: Value,
+        payload: Value,
     ) -> Value {
         let created_at = Utc::now();
         let expires_at = ttl_seconds
             .filter(|ttl| *ttl > 0)
             .map(|ttl| created_at + chrono::Duration::seconds(ttl));
 
-        let payload = payload
-            .as_object_mut()
-            .expect("session payload should be an object");
-        payload.insert("app".to_string(), json!(app));
-        payload.insert("session_id".to_string(), json!(session_id));
-        payload.insert("scope".to_string(), json!(scope));
-        payload.insert(
+        let mut object = payload
+            .as_object()
+            .cloned()
+            .unwrap_or_else(serde_json::Map::new);
+        object.insert("app".to_string(), json!(app));
+        object.insert("session_id".to_string(), json!(session_id));
+        object.insert("scope".to_string(), json!(scope));
+        object.insert(
             "meta".to_string(),
             json!({
                 "created_at": created_at.to_rfc3339(),
@@ -384,7 +385,7 @@ impl MemoryMcp {
                 "expires_at": expires_at.map(|value| value.to_rfc3339()),
             }),
         );
-        Value::Object(payload.clone())
+        Value::Object(object)
     }
 
     async fn insert_session(&self, session_id: String, session: AppSessionState) {
