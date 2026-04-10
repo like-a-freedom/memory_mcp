@@ -319,7 +319,7 @@ impl SurrealDbClient {
         let db = Surreal::new::<Mem>(())
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB memory init failed: {err}")))?;
-        let clients = build_local_namespace_clients(&db, namespaces, database).await?;
+        let clients = build_namespace_clients(&db, namespaces, database).await?;
 
         Ok(Self {
             engine: DbEngine::Local(clients),
@@ -375,8 +375,7 @@ impl SurrealDbClient {
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
 
-        let clients =
-            build_local_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
+        let clients = build_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
 
         Ok(DbEngine::Local(clients))
     }
@@ -398,8 +397,7 @@ impl SurrealDbClient {
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
 
-        let clients =
-            build_remote_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
+        let clients = build_namespace_clients(&db, &config.namespaces, &config.db_name).await?;
 
         Ok(DbEngine::Remote(clients))
     }
@@ -720,31 +718,11 @@ fn build_db_execute_event(
     event
 }
 
-async fn build_local_namespace_clients(
-    base: &Surreal<Db>,
+async fn build_namespace_clients<T: surrealdb::Connection + Clone>(
+    base: &Surreal<T>,
     namespaces: &[String],
     database: &str,
-) -> Result<std::collections::HashMap<String, Surreal<Db>>, MemoryError> {
-    let mut clients = std::collections::HashMap::with_capacity(namespaces.len());
-
-    for namespace in namespaces {
-        let client = base.clone();
-        client
-            .use_ns(namespace)
-            .use_db(database)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-        clients.insert(namespace.clone(), client);
-    }
-
-    Ok(clients)
-}
-
-async fn build_remote_namespace_clients(
-    base: &Surreal<Client>,
-    namespaces: &[String],
-    database: &str,
-) -> Result<std::collections::HashMap<String, Surreal<Client>>, MemoryError> {
+) -> Result<std::collections::HashMap<String, Surreal<T>>, MemoryError> {
     let mut clients = std::collections::HashMap::with_capacity(namespaces.len());
 
     for namespace in namespaces {

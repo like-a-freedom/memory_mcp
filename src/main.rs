@@ -3,11 +3,35 @@ use std::path::PathBuf;
 
 use rmcp::ServiceExt;
 use rmcp::transport::io::stdio;
+use serde_json::json;
 
 use memory_mcp::logging::{LogLevel, StdoutLogger};
 use memory_mcp::{MemoryMcp, MemoryService};
 
 const DEFAULT_WATCH_INTERVAL_SECS: u64 = 2;
+
+/// Builds a structured log event map from key-value pairs.
+macro_rules! event {
+    ($($key:expr => $value:expr),+ $(,)?) => {{
+        let mut m = HashMap::new();
+        $(m.insert($key.to_string(), $value);)+
+        m
+    }};
+}
+
+/// Logs an error event and returns the error wrapped for propagation.
+fn log_and_return_error(
+    logger: &StdoutLogger,
+    op: &str,
+    err: impl std::error::Error + 'static,
+) -> Box<dyn std::error::Error> {
+    let err_msg = err.to_string();
+    logger.log(
+        event!("op" => json!(op), "error" => json!(err_msg)),
+        LogLevel::Error,
+    );
+    Box::new(err) as Box<dyn std::error::Error>
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RunMode {
@@ -86,78 +110,48 @@ where
 async fn build_memory_service(
     logger: &StdoutLogger,
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {
-    match MemoryService::new_from_env().await {
-        Ok(service) => Ok(service),
-        Err(err) => {
-            let mut error_event = HashMap::new();
-            error_event.insert("op".to_string(), serde_json::json!("main.startup_failed"));
-            error_event.insert("error".to_string(), serde_json::json!(err.to_string()));
-            logger.log(error_event, LogLevel::Error);
-            Err(Box::new(err) as Box<dyn std::error::Error>)
-        }
-    }
+    MemoryService::new_from_env()
+        .await
+        .map_err(|err| log_and_return_error(logger, "main.startup_failed", err))
 }
 
 async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
     let memory_service = build_memory_service(logger).await?;
     let server = MemoryMcp::new(memory_service);
 
-    let mut serve_event = HashMap::new();
-    serve_event.insert("op".to_string(), serde_json::json!("main.serve_starting"));
-    logger.log(serve_event, LogLevel::Info);
+    logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
 
     let (stdin, stdout) = stdio();
-    let service = match server.serve((stdin, stdout)).await {
-        Ok(s) => s,
-        Err(err) => {
-            let mut error_event = HashMap::new();
-            error_event.insert("op".to_string(), serde_json::json!("main.serve_failed"));
-            error_event.insert("error".to_string(), serde_json::json!(err.to_string()));
-            logger.log(error_event, LogLevel::Error);
-            return Err(Box::new(err) as Box<dyn std::error::Error>);
-        }
-    };
+    let service = server
+        .serve((stdin, stdout))
+        .await
+        .map_err(|err| log_and_return_error(logger, "main.serve_failed", err))?;
 
-    let mut running_event = HashMap::new();
-    running_event.insert("op".to_string(), serde_json::json!("main.running"));
-    logger.log(running_event, LogLevel::Info);
+    logger.log(event!("op" => json!("main.running")), LogLevel::Info);
 
-    match service.waiting().await {
-        Ok(_quit_reason) => {
-            let mut shutdown_event = HashMap::new();
-            shutdown_event.insert("op".to_string(), serde_json::json!("main.shutdown"));
-            logger.log(shutdown_event, LogLevel::Info);
-            Ok(())
-        }
-        Err(err) => {
-            let mut error_event = HashMap::new();
-            error_event.insert("op".to_string(), serde_json::json!("main.error"));
-            error_event.insert("error".to_string(), serde_json::json!(err.to_string()));
-            logger.log(error_event, LogLevel::Error);
-            Err(Box::new(err) as Box<dyn std::error::Error>)
-        }
-    }
+    service
+        .waiting()
+        .await
+        .map(|_quit_reason| {
+            logger.log(event!("op" => json!("main.shutdown")), LogLevel::Info);
+        })
+        .map_err(|err| log_and_return_error(logger, "main.error", err))
 }
 
 async fn run_watch_mode(
     logger: &StdoutLogger,
     watch: WatchCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut watch_event = HashMap::new();
-    watch_event.insert("op".to_string(), serde_json::json!("main.watch_starting"));
-    watch_event.insert(
-        "dir".to_string(),
-        serde_json::json!(watch.dir.display().to_string()),
+    logger.log(
+        event!(
+            "op" => json!("main.watch_starting"),
+            "dir" => json!(watch.dir.display().to_string()),
+            "scope" => json!(watch.scope),
+            "interval_secs" => json!(watch.interval_secs),
+            "project" => json!(watch.project),
+        ),
+        LogLevel::Info,
     );
-    watch_event.insert("scope".to_string(), serde_json::json!(watch.scope.clone()));
-    watch_event.insert(
-        "interval_secs".to_string(),
-        serde_json::json!(watch.interval_secs),
-    );
-    if let Some(project) = watch.project.clone() {
-        watch_event.insert("project".to_string(), serde_json::json!(project));
-    }
-    logger.log(watch_event, LogLevel::Info);
 
     let memory_service = build_memory_service(logger).await?;
 
@@ -171,7 +165,7 @@ async fn run_watch_mode(
             memory_service,
         )
         .await
-        .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
+        .map_err(|err| log_and_return_error(logger, "main.watch_failed", err))
     }
 
     #[cfg(not(feature = "cli-watch"))]
@@ -190,17 +184,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|err| Box::new(std::io::Error::other(err)) as Box<dyn std::error::Error>)?;
 
     let startup_ts = chrono::Utc::now();
-    let mut startup_event = HashMap::new();
-    startup_event.insert("op".to_string(), serde_json::json!("main.startup"));
-    startup_event.insert("pid".to_string(), serde_json::json!(std::process::id()));
-    startup_event.insert(
-        "mode".to_string(),
-        serde_json::json!(match &run_mode {
-            RunMode::Serve => "serve",
-            RunMode::Watch(_) => "watch",
-        }),
+    let mode_label = match &run_mode {
+        RunMode::Serve => "serve",
+        RunMode::Watch(_) => "watch",
+    };
+    logger.log(
+        event!(
+            "op" => json!("main.startup"),
+            "pid" => json!(std::process::id()),
+            "mode" => json!(mode_label),
+        ),
+        LogLevel::Info,
     );
-    logger.log(startup_event, LogLevel::Info);
 
     match run_mode {
         RunMode::Serve => run_stdio_server(&logger).await?,
@@ -208,13 +203,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let duration = chrono::Utc::now().signed_duration_since(startup_ts);
-    let mut duration_event = HashMap::new();
-    duration_event.insert("op".to_string(), serde_json::json!("main.session_duration"));
-    duration_event.insert(
-        "duration_secs".to_string(),
-        serde_json::json!(duration.num_seconds()),
+    logger.log(
+        event!(
+            "op" => json!("main.session_duration"),
+            "duration_secs" => json!(duration.num_seconds()),
+        ),
+        LogLevel::Info,
     );
-    logger.log(duration_event, LogLevel::Info);
 
     Ok(())
 }

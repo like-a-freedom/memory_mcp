@@ -5,6 +5,7 @@
 
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use crate::service::MemoryError;
 
@@ -115,8 +116,8 @@ impl NerConfig {
             })
             .unwrap_or_else(|_| default_ner_labels());
 
-        let threshold = parse_f64_env("NER_THRESHOLD")?.unwrap_or(DEFAULT_NER_THRESHOLD);
-        let batch_size = parse_usize_env("NER_BATCH_SIZE")?.unwrap_or(DEFAULT_NER_BATCH_SIZE);
+        let threshold = parse_env::<f64>("NER_THRESHOLD")?.unwrap_or(DEFAULT_NER_THRESHOLD);
+        let batch_size = parse_env::<usize>("NER_BATCH_SIZE")?.unwrap_or(DEFAULT_NER_BATCH_SIZE);
 
         Ok(Self {
             provider,
@@ -227,11 +228,11 @@ impl EmbeddingConfig {
             .or_else(|| env::var("EMBEDDINGS_PROVIDER").ok().map(|_| true))
             .unwrap_or(false);
         let timeout_secs =
-            parse_u64_env("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
-        let configured_dimension = parse_usize_env("SURREALDB_EMBEDDING_DIMENSION")?;
+            parse_env::<u64>("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
+        let configured_dimension = parse_env::<usize>("SURREALDB_EMBEDDING_DIMENSION")?;
         let max_tokens =
-            parse_usize_env("EMBEDDINGS_MAX_TOKENS")?.unwrap_or(DEFAULT_EMBEDDING_MAX_TOKENS);
-        let similarity_threshold = parse_f64_env("EMBEDDINGS_SIMILARITY_THRESHOLD")?
+            parse_env::<usize>("EMBEDDINGS_MAX_TOKENS")?.unwrap_or(DEFAULT_EMBEDDING_MAX_TOKENS);
+        let similarity_threshold = parse_env::<f64>("EMBEDDINGS_SIMILARITY_THRESHOLD")?
             .unwrap_or(DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD);
         let model_dir = env::var("EMBEDDINGS_MODEL_DIR").ok();
 
@@ -430,8 +431,8 @@ impl SurrealConfig {
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
         let data_dir = env::var("SURREALDB_DATA_DIR").ok();
         let query_logging_enabled = parse_bool_env("QUERY_LOGGING_ENABLED").unwrap_or(false);
-        let query_log_retention_days =
-            parse_u32_env("QUERY_LOG_RETENTION_DAYS")?.unwrap_or(DEFAULT_QUERY_LOG_RETENTION_DAYS);
+        let query_log_retention_days = parse_env::<u32>("QUERY_LOG_RETENTION_DAYS")?
+            .unwrap_or(DEFAULT_QUERY_LOG_RETENTION_DAYS);
 
         let lifecycle = LifecycleConfig::from_env();
         let embedding = EmbeddingConfig::from_env()?;
@@ -777,51 +778,25 @@ impl SurrealConfigBuilder {
 ///
 /// Recognizes "1", "true", "yes" (case-insensitive) as true.
 fn parse_bool_env(var_name: &str) -> Option<bool> {
-    env::var(var_name)
-        .ok()
-        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
+    env::var(var_name).ok().map(|v| {
+        let v = v.to_lowercase();
+        v == "1" || v == "true" || v == "yes"
+    })
 }
 
-fn parse_u64_env(var_name: &str) -> Result<Option<u64>, MemoryError> {
+/// Parses a typed environment variable, returning `Ok(None)` when unset.
+///
+/// # Errors
+///
+/// Returns [`MemoryError::ConfigInvalid`] when the variable is set but cannot
+/// be parsed as the target type.
+fn parse_env<T: FromStr + 'static>(var_name: &str) -> Result<Option<T>, MemoryError> {
     env::var(var_name)
         .ok()
         .map(|value| {
-            value.parse::<u64>().map_err(|_| {
-                MemoryError::ConfigInvalid(format!("{var_name} must be an unsigned integer"))
-            })
-        })
-        .transpose()
-}
-
-fn parse_u32_env(var_name: &str) -> Result<Option<u32>, MemoryError> {
-    env::var(var_name)
-        .ok()
-        .map(|value| {
-            value.parse::<u32>().map_err(|_| {
-                MemoryError::ConfigInvalid(format!("{var_name} must be an unsigned integer"))
-            })
-        })
-        .transpose()
-}
-
-fn parse_usize_env(var_name: &str) -> Result<Option<usize>, MemoryError> {
-    env::var(var_name)
-        .ok()
-        .map(|value| {
-            value.parse::<usize>().map_err(|_| {
-                MemoryError::ConfigInvalid(format!("{var_name} must be a positive integer"))
-            })
-        })
-        .transpose()
-}
-
-fn parse_f64_env(var_name: &str) -> Result<Option<f64>, MemoryError> {
-    env::var(var_name)
-        .ok()
-        .map(|value| {
-            value.parse::<f64>().map_err(|_| {
-                MemoryError::ConfigInvalid(format!("{var_name} must be a floating-point number"))
-            })
+            value
+                .parse::<T>()
+                .map_err(|_| MemoryError::ConfigInvalid(format!("{var_name} has an invalid value")))
         })
         .transpose()
 }

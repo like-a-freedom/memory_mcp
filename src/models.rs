@@ -31,6 +31,18 @@ macro_rules! define_id_type {
                 write!(f, "{}", self.0)
             }
         }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl std::borrow::Borrow<str> for $name {
+            fn borrow(&self) -> &str {
+                &self.0
+            }
+        }
     };
 }
 
@@ -269,19 +281,6 @@ impl std::fmt::Display for FactType {
     }
 }
 
-/// Legacy string constants for backward compatibility with raw SQL queries.
-/// Prefer `FactType` enum in new code.
-#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
-pub const FACT_TYPE_NOTE: &str = "note";
-#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
-pub const FACT_TYPE_METRIC: &str = "metric";
-#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
-pub const FACT_TYPE_PROMISE: &str = "promise";
-#[deprecated(since = "1.1.0", note = "use FactType enum instead")]
-pub const FACT_TYPE_EXPERIENCE: &str = "experience";
-#[deprecated(since = "1.1.0", note = "use FactType::ALL instead")]
-pub const STANDARD_FACT_TYPES: &[&str] = &["note", "metric", "promise", "experience"];
-
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -365,29 +364,25 @@ pub struct AccessContext {
     pub cross_scope_allow: Option<Vec<AccessScopeAllow>>,
 }
 
+impl From<AccessPayload> for AccessContext {
+    fn from(p: AccessPayload) -> Self {
+        Self {
+            allowed_scopes: p.allowed_scopes,
+            allowed_tags: p.allowed_tags,
+            caller_id: p.caller_id,
+            session_vars: p.session_vars,
+            transport: p.transport,
+            content_type: p.content_type,
+            cross_scope_allow: p.cross_scope_allow,
+        }
+    }
+}
+
 impl AccessContext {
     /// Creates an access context from an optional payload.
     #[must_use]
     pub fn from_payload(payload: Option<AccessPayload>) -> Option<Self> {
-        payload.map(
-            |AccessPayload {
-                 allowed_scopes,
-                 allowed_tags,
-                 caller_id,
-                 session_vars,
-                 transport,
-                 content_type,
-                 cross_scope_allow,
-             }| Self {
-                allowed_scopes,
-                allowed_tags,
-                caller_id,
-                session_vars,
-                transport,
-                content_type,
-                cross_scope_allow,
-            },
-        )
+        payload.map(Self::from)
     }
 
     /// Checks if a scope is allowed.
