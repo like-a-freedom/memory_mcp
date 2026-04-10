@@ -3538,4 +3538,133 @@ mod tests {
         assert_eq!(vars.get("cutoff"), Some(&json!("2026-01-15T00:00:00Z")));
         assert_eq!(vars.get("limit"), Some(&json!(1)));
     }
+
+    #[test]
+    fn normalize_url_converts_http_to_ws() {
+        assert_eq!(
+            normalize_url("http://localhost:8000/rpc"),
+            "ws://localhost:8000/rpc"
+        );
+        assert_eq!(
+            normalize_url("http://localhost:8000"),
+            "ws://localhost:8000/rpc"
+        );
+        assert_eq!(
+            normalize_url("http://localhost:8000/"),
+            "ws://localhost:8000/rpc"
+        );
+    }
+
+    #[test]
+    fn normalize_url_converts_https_to_wss() {
+        assert_eq!(
+            normalize_url("https://db.example.com/rpc"),
+            "wss://db.example.com/rpc"
+        );
+        assert_eq!(
+            normalize_url("https://db.example.com"),
+            "wss://db.example.com/rpc"
+        );
+        assert_eq!(
+            normalize_url("https://db.example.com/"),
+            "wss://db.example.com/rpc"
+        );
+    }
+
+    #[test]
+    fn normalize_url_preserves_ws_and_wss() {
+        assert_eq!(
+            normalize_url("ws://localhost:8000/rpc"),
+            "ws://localhost:8000/rpc"
+        );
+        assert_eq!(
+            normalize_url("wss://localhost:8000/rpc"),
+            "wss://localhost:8000/rpc"
+        );
+    }
+
+    #[test]
+    fn normalize_url_leaves_unknown_scheme_unchanged() {
+        assert_eq!(normalize_url("file:///tmp/db"), "file:///tmp/db");
+    }
+
+    #[test]
+    fn json_i64_extracts_integer_from_value() {
+        assert_eq!(json_i64(&json!(42)), Some(42));
+        assert_eq!(json_i64(&json!(-7)), Some(-7));
+        assert_eq!(json_i64(&json!(3.5)), None);
+        assert_eq!(json_i64(&json!("text")), None);
+    }
+
+    #[test]
+    fn json_f64_extracts_float_from_value() {
+        assert_eq!(json_f64(&json!(2.72)), Some(2.72));
+        assert_eq!(json_f64(&json!(42)), Some(42.0));
+        assert_eq!(json_f64(&json!("text")), None);
+    }
+
+    #[test]
+    fn json_string_extracts_string_from_value() {
+        assert_eq!(json_string(&json!("hello")), Some("hello"));
+        assert_eq!(json_string(&json!(42)), None);
+    }
+
+    #[test]
+    fn filter_records_by_project_returns_empty_for_none() {
+        let records = vec![
+            json!({"fact_id": "f1", "project": "alpha"}),
+            json!({"fact_id": "f2"}),
+        ];
+        let result = filter_records_by_project(records, None);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn filter_records_by_project_matches_exact_project() {
+        let records = vec![
+            json!({"fact_id": "f1", "project": "alpha"}),
+            json!({"fact_id": "f2", "project": "beta"}),
+            json!({"fact_id": "f3"}),
+        ];
+        let project = "alpha".to_string();
+        let result = filter_records_by_project(records, Some(&project));
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("fact_id").and_then(Value::as_str), Some("f1"));
+    }
+
+    #[test]
+    fn filter_records_by_project_and_fact_types_combines_filters() {
+        let records = vec![
+            json!({"fact_id": "f1", "project": "alpha", "fact_type": "note"}),
+            json!({"fact_id": "f2", "project": "alpha", "fact_type": "metric"}),
+            json!({"fact_id": "f3", "project": "beta", "fact_type": "note"}),
+        ];
+        let project = "alpha".to_string();
+        let result = filter_records_by_project_and_fact_types(
+            records,
+            Some(&project),
+            &["note".to_string()],
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("fact_id").and_then(Value::as_str), Some("f1"));
+    }
+
+    #[test]
+    fn filter_records_by_project_and_fact_types_empty_types_returns_all_for_project() {
+        let records = vec![
+            json!({"fact_id": "f1", "project": "alpha", "fact_type": "note"}),
+            json!({"fact_id": "f2", "project": "alpha", "fact_type": "metric"}),
+        ];
+        let project = "alpha".to_string();
+        let result = filter_records_by_project_and_fact_types(records, Some(&project), &[]);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn is_missing_table_error_detects_table_errors() {
+        assert!(is_missing_table_error("Table 'foo' does not exist"));
+        assert!(is_missing_table_error("table does not exist"));
+        assert!(!is_missing_table_error("syntax error"));
+        assert!(!is_missing_table_error("connection refused"));
+    }
 }
