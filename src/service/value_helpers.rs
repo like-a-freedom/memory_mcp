@@ -36,14 +36,12 @@ pub fn string_from_value(value: &Value) -> Option<String> {
         return Some(s.to_string());
     }
     // Handle RecordId which json_string doesn't cover
-    if let Value::Object(map) = value {
-        if let Some(Value::Object(record_id)) = map.get("RecordId") {
-            if let (Some(Value::String(table)), Some(Value::String(key))) =
-                (record_id.get("table"), record_id.get("key"))
-            {
-                return Some(format!("{table}:{key}"));
-            }
-        }
+    if let Value::Object(map) = value
+        && let Some(Value::Object(record_id)) = map.get("RecordId")
+        && let (Some(Value::String(table)), Some(Value::String(key))) =
+            (record_id.get("table"), record_id.get("key"))
+    {
+        return Some(format!("{table}:{key}"));
     }
     None
 }

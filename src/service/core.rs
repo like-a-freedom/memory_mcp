@@ -1,7 +1,9 @@
 //! MemoryService implementation - core service orchestration.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
@@ -26,6 +28,7 @@ use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::ingest::prepare_ingest_request;
 use super::lifecycle::{spawn_archival_worker, spawn_community_worker, spawn_decay_worker};
+use super::rate_limit::RateLimiter;
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 use super::value_helpers::{json_i64, string_from_value};
 
@@ -1541,52 +1544,6 @@ fn resolve_namespace(namespaces: &[String], default: &str, scope: &str) -> (Stri
     (default.to_string(), true)
 }
 
-/// Trait for safe mutex locking that handles poisoned locks gracefully.
-pub(crate) trait SafeMutex<T> {
-    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
-}
-
-impl<T> SafeMutex<T> for Mutex<T> {
-    fn safe_lock(&self) -> std::sync::MutexGuard<'_, T> {
-        self.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-}
-
-pub(crate) struct RateLimiter {
-    rps: f64,
-    burst: f64,
-    tokens: Mutex<HashMap<String, f64>>,
-    last: Mutex<HashMap<String, Instant>>,
-}
-
-impl RateLimiter {
-    pub(crate) fn new(rps: i32, burst: i32) -> Self {
-        Self {
-            rps: (rps.max(1)) as f64,
-            burst: (burst.max(1)) as f64,
-            tokens: Mutex::new(HashMap::new()),
-            last: Mutex::new(HashMap::new()),
-        }
-    }
-
-    fn allow(&self, key: &str) -> bool {
-        let mut tokens = self.tokens.safe_lock();
-        let mut last = self.last.safe_lock();
-        let now = Instant::now();
-        let last_time = last.entry(key.to_string()).or_insert(now);
-        let elapsed = now.duration_since(*last_time).as_secs_f64();
-        *last_time = now;
-        let entry = tokens.entry(key.to_string()).or_insert(self.burst);
-        let refill = elapsed * self.rps;
-        *entry = (*entry + refill).min(self.burst);
-        if *entry < 1.0 {
-            return false;
-        }
-        *entry -= 1.0;
-        true
-    }
-}
-
 /// Builds a structured log event for tool operations.
 ///
 /// This helper creates a consistent event structure for logging MCP tool calls,
@@ -1771,33 +1728,10 @@ mod tests {
     use crate::models::EntityCandidate;
     use crate::models::{AccessContext, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
+    use crate::service::rate_limit::SafeMutex;
     use crate::storage::SurrealDbClient;
     use async_trait::async_trait;
     use serde_json::json;
-
-    #[test]
-    fn rate_limiter_allows_burst() {
-        let limiter = RateLimiter::new(10, 5);
-        for _ in 0..5 {
-            assert!(limiter.allow("test-user"));
-        }
-    }
-
-    #[test]
-    fn rate_limiter_blocks_after_burst() {
-        let limiter = RateLimiter::new(10, 2);
-        assert!(limiter.allow("test-user"));
-        assert!(limiter.allow("test-user"));
-        assert!(!limiter.allow("test-user"));
-    }
-
-    #[test]
-    fn rate_limiter_different_users_independent() {
-        let limiter = RateLimiter::new(10, 1);
-        assert!(limiter.allow("user-1"));
-        assert!(!limiter.allow("user-1"));
-        assert!(limiter.allow("user-2"));
-    }
 
     #[test]
     fn log_event_creates_expected_structure() {
@@ -3700,33 +3634,6 @@ mod tests {
     fn string_from_value_handles_record_id_missing_fields() {
         let value = json!({"RecordId": {"table": "entity"}});
         assert_eq!(string_from_value(&value), None);
-    }
-
-    #[test]
-    fn rate_limiter_new_initializes_correctly() {
-        let limiter = RateLimiter::new(100, 50);
-        let tokens = limiter.tokens.safe_lock();
-        let last = limiter.last.safe_lock();
-        assert!(tokens.is_empty());
-        assert!(last.is_empty());
-        drop(tokens);
-        drop(last);
-    }
-
-    #[test]
-    fn rate_limiter_burst_allows_initial_requests() {
-        let limiter = RateLimiter::new(10, 5);
-        for _ in 0..5 {
-            assert!(limiter.allow("burst-user"));
-        }
-        assert!(!limiter.allow("burst-user"));
-    }
-
-    #[test]
-    fn rate_limiter_empty_string_caller_id() {
-        let limiter = RateLimiter::new(10, 1);
-        assert!(limiter.allow(""));
-        assert!(!limiter.allow(""));
     }
 
     #[test]

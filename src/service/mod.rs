@@ -32,6 +32,7 @@ mod query;
 mod validation;
 
 mod model_loader;
+mod rate_limit;
 pub(crate) mod value_helpers;
 
 pub use constants::*;
