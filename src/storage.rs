@@ -2385,13 +2385,16 @@ fn surreal_to_json(value: SurrealValue) -> Value {
 /// Try to find a version-like field inside arbitrary JSON returned by the
 /// server info query. Searches keys for the substring "version" (case-ins).
 fn find_version_in_json(v: &Value) -> Option<String> {
+    use std::sync::LazyLock;
+
     use regex::Regex;
 
-    let ver_re = Regex::new(r"\d+\.\d+(?:\.\d+)?").unwrap();
+    static VERSION_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\d+\.\d+(?:\.\d+)?").expect("valid version regex"));
 
     match v {
         Value::String(s) => {
-            if ver_re.is_match(s) || s.to_lowercase().contains("surreal") {
+            if VERSION_RE.is_match(s) || s.to_lowercase().contains("surreal") {
                 Some(s.clone())
             } else {
                 None

@@ -33,7 +33,7 @@ use super::validation::{validate_entity_candidate, validate_fact_input, validate
 #[derive(Clone)]
 pub struct MemoryService {
     /// Database client for storage operations.
-    pub db_client: Arc<dyn DbClient>,
+    pub(crate) db_client: Arc<dyn DbClient>,
     pub(crate) namespaces: Vec<String>,
     pub(crate) default_namespace: String,
     pub(crate) logger: StdoutLogger,
@@ -1701,28 +1701,28 @@ fn string_from_value(value: &Value) -> Option<String> {
 }
 
 fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {
-    static MONTH_YEAR_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    static ISO_DATE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    use std::sync::LazyLock;
+
+    static MONTH_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
+        )
+        .expect("month-year regex is valid")
+    });
+    static ISO_DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("iso-date regex is valid")
+    });
 
     let mut keys = HashSet::from([
         super::normalize_text(&t_valid.format("%B %Y").to_string()),
         t_valid.format("%Y-%m").to_string(),
     ]);
 
-    let month_year_re = MONTH_YEAR_RE.get_or_init(|| {
-        Regex::new(
-            r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
-        )
-        .expect("month-year regex is valid")
-    });
-    for capture in month_year_re.find_iter(content) {
+    for capture in MONTH_YEAR_RE.find_iter(content) {
         keys.insert(super::normalize_text(capture.as_str()));
     }
 
-    let iso_date_re = ISO_DATE_RE.get_or_init(|| {
-        Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("iso-date regex is valid")
-    });
-    for capture in iso_date_re.find_iter(content) {
+    for capture in ISO_DATE_RE.find_iter(content) {
         keys.insert(capture.as_str().to_lowercase());
     }
 

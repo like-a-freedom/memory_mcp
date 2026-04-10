@@ -351,18 +351,18 @@ fn looks_like_remote_url(content: &str) -> bool {
 }
 
 fn strip_html_to_text(raw: &str) -> String {
-    static SCRIPT_STYLE_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    static TAG_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    use std::sync::LazyLock;
 
-    let without_scripts = SCRIPT_STYLE_RE
-        .get_or_init(|| {
-            regex::Regex::new(r"(?is)<(script|style)[^>]*>.*?</(script|style)>")
-                .expect("script/style regex should compile")
-        })
-        .replace_all(raw, " ");
-    let without_tags = TAG_RE
-        .get_or_init(|| regex::Regex::new(r"(?is)<[^>]+>").expect("tag regex should compile"))
-        .replace_all(&without_scripts, " ");
+    static SCRIPT_STYLE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"(?is)<(script|style)[^>]*>.*?</(script|style)>")
+            .expect("script/style regex should compile")
+    });
+    static TAG_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"(?is)<[^>]+>").expect("tag regex should compile")
+    });
+
+    let without_scripts = SCRIPT_STYLE_RE.replace_all(raw, " ");
+    let without_tags = TAG_RE.replace_all(&without_scripts, " ");
 
     without_tags
         .replace("&nbsp;", " ")

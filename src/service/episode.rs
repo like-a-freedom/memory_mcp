@@ -1,5 +1,8 @@
 //! Episode operations - extraction and record parsing.
 
+use std::sync::LazyLock;
+
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde_json::{Value, json};
 
@@ -77,121 +80,83 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
     })
 }
 
+/// Extract a string field from a JSON map, handling SurrealDB String wrappers.
+fn str_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
+    map.get(key).and_then(unwrap_string_value).map(String::from)
+}
+
+/// Extract a datetime field from a JSON map.
+fn dt_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<DateTime<Utc>> {
+    map.get(key)
+        .and_then(unwrap_string_value)
+        .and_then(parse_iso)
+}
+
+/// Extract an f64 field, handling SurrealDB Number/Float wrappers.
+fn f64_field(map: &serde_json::Map<String, Value>, key: &str, default: f64) -> f64 {
+    map.get(key)
+        .and_then(|v| {
+            v.as_f64().or_else(|| {
+                v.as_object().and_then(|obj| {
+                    obj.get("Number")
+                        .or_else(|| obj.get("Float"))
+                        .and_then(Value::as_f64)
+                })
+            })
+        })
+        .unwrap_or(default)
+}
+
+/// Extract an i64 field, handling SurrealDB Number wrappers.
+fn i64_field(map: &serde_json::Map<String, Value>, key: &str, default: i64) -> i64 {
+    map.get(key)
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_object().and_then(|o| o.get("Number").and_then(Value::as_i64)))
+        })
+        .unwrap_or(default)
+}
+
+/// Extract a string array field from a JSON map.
+fn str_array_field(map: &serde_json::Map<String, Value>, key: &str) -> Vec<String> {
+    map.get(key)
+        .and_then(unwrap_array_value)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(unwrap_string_value)
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Parse a fact from a database record.
 #[must_use]
 pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
     let map = record.as_object()?;
 
-    let t_valid_str = unwrap_string_value(map.get("t_valid")?)?;
-    let t_valid = parse_iso(t_valid_str)?;
-    let t_ingested = map
-        .get("t_ingested")
-        .and_then(unwrap_string_value)
-        .and_then(parse_iso)
-        .unwrap_or(t_valid);
-
-    let fact_id = unwrap_string_value(map.get("fact_id")?)?.to_string();
-    let fact_type = unwrap_string_value(map.get("fact_type")?)?.to_string();
-    let content = unwrap_string_value(map.get("content")?)?.to_string();
-    let quote = unwrap_string_value(map.get("quote")?)?.to_string();
-    let source_episode = unwrap_string_value(map.get("source_episode")?)?.to_string();
-    let scope = unwrap_string_value(map.get("scope")?)
-        .unwrap_or_default()
-        .to_string();
+    let t_valid = dt_field(map, "t_valid")?;
 
     Some(crate::models::Fact {
-        fact_id,
-        fact_type,
-        content,
-        quote,
-        source_episode,
+        fact_id: str_field(map, "fact_id")?,
+        fact_type: str_field(map, "fact_type")?,
+        content: str_field(map, "content")?,
+        quote: str_field(map, "quote")?,
+        source_episode: str_field(map, "source_episode")?,
         t_valid,
-        t_ingested,
-        t_invalid: map
-            .get("t_invalid")
-            .and_then(unwrap_string_value)
-            .and_then(parse_iso),
-        t_invalid_ingested: map
-            .get("t_invalid_ingested")
-            .and_then(unwrap_string_value)
-            .and_then(parse_iso),
-        confidence: map
-            .get("confidence")
-            .and_then(|v| {
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(obj) = v.as_object() {
-                    obj.get("Number")
-                        .and_then(|n| n.as_f64())
-                        .or_else(|| obj.get("Float").and_then(|n| n.as_f64()))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(0.0),
-        index_keys: map
-            .get("index_keys")
-            .and_then(unwrap_array_value)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(unwrap_string_value)
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default(),
-        access_count: map
-            .get("access_count")
-            .and_then(|v| {
-                v.as_i64().or_else(|| {
-                    v.as_object()
-                        .and_then(|obj| obj.get("Number"))
-                        .and_then(Value::as_i64)
-                })
-            })
-            .unwrap_or(0),
-        last_accessed: map
-            .get("last_accessed")
-            .and_then(unwrap_string_value)
-            .and_then(parse_iso),
-        entity_links: map
-            .get("entity_links")
-            .and_then(unwrap_array_value)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(unwrap_string_value)
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default(),
-        scope,
-        policy_tags: map
-            .get("policy_tags")
-            .and_then(unwrap_array_value)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(unwrap_string_value)
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default(),
+        t_ingested: dt_field(map, "t_ingested").unwrap_or(t_valid),
+        t_invalid: dt_field(map, "t_invalid"),
+        t_invalid_ingested: dt_field(map, "t_invalid_ingested"),
+        confidence: f64_field(map, "confidence", 0.0),
+        index_keys: str_array_field(map, "index_keys"),
+        access_count: i64_field(map, "access_count", 0),
+        last_accessed: dt_field(map, "last_accessed"),
+        entity_links: str_array_field(map, "entity_links"),
+        scope: str_field(map, "scope").unwrap_or_default(),
+        policy_tags: str_array_field(map, "policy_tags"),
         provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
-        ft_score: map
-            .get("ft_score")
-            .and_then(|v| {
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(obj) = v.as_object() {
-                    obj.get("Number")
-                        .and_then(|n| n.as_f64())
-                        .or_else(|| obj.get("Float").and_then(|n| n.as_f64()))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(0.0),
+        ft_score: f64_field(map, "ft_score", 0.0),
     })
 }
 
@@ -357,12 +322,11 @@ async fn add_extracted_fact(
 /// Check if content contains a promise statement.
 #[must_use]
 pub fn is_promise_statement(content: &str) -> bool {
-    static PROMISE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let promise_re = PROMISE_RE.get_or_init(|| {
+    static PROMISE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"\b(i will|i'll|will\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule)|going to\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule))\b")
             .expect("promise regex is valid")
     });
-    promise_re.is_match(content)
+    PROMISE_RE.is_match(content)
 }
 
 /// Detects metric-related content using word-boundary matching.
@@ -370,44 +334,37 @@ pub fn is_promise_statement(content: &str) -> bool {
 /// Matches financial metrics (ARR, MRR, NRR, revenue, churn) and dollar amounts.
 /// Avoids false positives on words like "barrel", "narrative", "arrive".
 pub fn is_metric_statement(content: &str) -> bool {
-    static METRIC_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let metric_re = METRIC_RE.get_or_init(|| {
+    static METRIC_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"\b(ARR|MRR|NRR|revenue|churn|ROI|LTV|CAC|NPS|EBITDA)\b|\$\d")
             .expect("metric regex is valid")
     });
-    metric_re.is_match(content)
+    METRIC_RE.is_match(content)
 }
 
 /// Detects preference/profile statements that should be stored as experience facts.
 #[must_use]
 pub fn is_experience_statement(content: &str) -> bool {
-    static EXPERIENCE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let normalized = content.to_lowercase();
-    let experience_re = EXPERIENCE_RE.get_or_init(|| {
+    static EXPERIENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"\b(prefer|prefers|dislike|dislikes|enjoy|enjoys|love|loves|hate|hates|value|values)\b")
             .expect("experience regex is valid")
     });
-
-    experience_re.is_match(&normalized)
+    let normalized = content.to_lowercase();
+    EXPERIENCE_RE.is_match(&normalized)
 }
 
 /// Detects document-style action items (for example from emails) as promise-like commitments.
 #[must_use]
 pub fn is_document_action_item(content: &str) -> bool {
-    static ACTION_HEADER_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    static ACTION_LINE_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-
-    let normalized = content.to_lowercase();
-    let header_re = ACTION_HEADER_RE.get_or_init(|| {
+    static ACTION_HEADER_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?m)^\s*(action items?|next steps|follow-?ups?|todo)\s*:")
             .expect("action-item header regex is valid")
     });
-    let line_re = ACTION_LINE_RE.get_or_init(|| {
+    static ACTION_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?m)^\s*(?:[-*]|\d+\.)\s+[a-z]+(?:\s+[a-z]+){0,2}\s*(?::|-)\s*(?:send|review|share|update|prepare|schedule|confirm|draft|deliver|complete|close|fix|follow(?:\s+|-)?up)\b")
             .expect("action-item line regex is valid")
     });
-
-    header_re.is_match(&normalized) && line_re.is_match(&normalized)
+    let normalized = content.to_lowercase();
+    ACTION_HEADER_RE.is_match(&normalized) && ACTION_LINE_RE.is_match(&normalized)
 }
 
 /// Extract entities and facts from an episode.
@@ -659,14 +616,46 @@ fn fact_is_active_for_warning(
     }
 }
 
+/// Build a JSON payload map from an edge for database storage.
+fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<String, Value> {
+    let mut m = serde_json::Map::new();
+    m.insert("edge_id".to_string(), Value::String(edge_id.to_string()));
+    m.insert("in".to_string(), Value::String(edge.in_id.clone()));
+    m.insert("relation".to_string(), Value::String(edge.relation.clone()));
+    m.insert("out".to_string(), Value::String(edge.out_id.clone()));
+    m.insert("origin".to_string(), json!(edge.origin));
+    m.insert("strength".to_string(), json!(edge.strength));
+    m.insert("confidence".to_string(), json!(edge.confidence));
+    m.insert("provenance".to_string(), edge.provenance.clone());
+    m.insert(
+        "t_valid".to_string(),
+        Value::String(super::normalize_dt(edge.t_valid)),
+    );
+    m.insert(
+        "t_ingested".to_string(),
+        Value::String(super::normalize_dt(edge.t_ingested)),
+    );
+    if let Some(t_invalid) = edge.t_invalid {
+        m.insert(
+            "t_invalid".to_string(),
+            Value::String(super::normalize_dt(t_invalid)),
+        );
+    }
+    if let Some(t_invalid_ingested) = edge.t_invalid_ingested {
+        m.insert(
+            "t_invalid_ingested".to_string(),
+            Value::String(super::normalize_dt(t_invalid_ingested)),
+        );
+    }
+    m
+}
+
 /// Store an edge in the database.
 pub(crate) async fn store_edge(
     service: &crate::service::MemoryService,
     edge: &Edge,
     namespace: &str,
 ) -> Result<(), MemoryError> {
-    use serde_json::json;
-
     let edge_id =
         super::ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
 
@@ -677,35 +666,7 @@ pub(crate) async fn store_edge(
 
     invalidate_conflicting_edges(service, edge, namespace).await?;
 
-    let mut payload_map = serde_json::Map::new();
-    payload_map.insert("edge_id".to_string(), Value::String(edge_id.clone()));
-    payload_map.insert("in".to_string(), Value::String(edge.in_id.clone()));
-    payload_map.insert("relation".to_string(), Value::String(edge.relation.clone()));
-    payload_map.insert("out".to_string(), Value::String(edge.out_id.clone()));
-    payload_map.insert("origin".to_string(), json!(edge.origin));
-    payload_map.insert("strength".to_string(), json!(edge.strength));
-    payload_map.insert("confidence".to_string(), json!(edge.confidence));
-    payload_map.insert("provenance".to_string(), edge.provenance.clone());
-    payload_map.insert(
-        "t_valid".to_string(),
-        Value::String(super::normalize_dt(edge.t_valid)),
-    );
-    payload_map.insert(
-        "t_ingested".to_string(),
-        Value::String(super::normalize_dt(edge.t_ingested)),
-    );
-    if let Some(t_invalid) = edge.t_invalid {
-        payload_map.insert(
-            "t_invalid".to_string(),
-            Value::String(super::normalize_dt(t_invalid)),
-        );
-    }
-    if let Some(t_invalid_ingested) = edge.t_invalid_ingested {
-        payload_map.insert(
-            "t_invalid_ingested".to_string(),
-            Value::String(super::normalize_dt(t_invalid_ingested)),
-        );
-    }
+    let payload = build_edge_payload(edge, &edge_id);
 
     service
         .db_client
@@ -714,7 +675,7 @@ pub(crate) async fn store_edge(
             &edge_id,
             &edge.in_id,
             &edge.out_id,
-            Value::Object(payload_map),
+            Value::Object(payload),
         )
         .await?;
 

@@ -27,7 +27,7 @@ mod error;
 mod gliner_entity_extractor;
 mod ids;
 mod ingest;
-pub mod lifecycle;
+pub(crate) mod lifecycle;
 mod query;
 mod validation;
 

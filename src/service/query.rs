@@ -1,6 +1,8 @@
 //! Query preprocessing and utility functions.
 
 use chrono::{DateTime, Timelike, Utc};
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 /// Normalize text by lowercasing and collapsing whitespace.
@@ -48,17 +50,13 @@ pub fn preprocess_search_query(raw: &str) -> String {
 
 /// Extract normalized search terms from a natural-language query.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
-    static EPISODE_REF: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    static QUOTED: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static EPISODE_REF: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid"));
+    static QUOTED: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#""([^"]*)""#).expect("quoted regex is valid"));
 
-    let episode_re = EPISODE_REF.get_or_init(|| {
-        Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid")
-    });
-    let quoted_re =
-        QUOTED.get_or_init(|| Regex::new(r#""([^"]*)""#).expect("quoted regex is valid"));
-
-    let s = episode_re.replace_all(raw, " ");
-    let s = quoted_re.replace_all(&s, " $1 ");
+    let s = EPISODE_REF.replace_all(raw, " ");
+    let s = QUOTED.replace_all(&s, " $1 ");
 
     s.split_whitespace()
         .flat_map(|token| token.split(|character: char| !character.is_alphanumeric()))
