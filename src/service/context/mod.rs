@@ -14,6 +14,13 @@ use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem, FactType};
 use crate::storage::GraphDirection;
 
+mod filtering;
+use filtering::{
+    episode_record_allowed, fact_is_active_at, fact_record_allowed, fact_record_matches_project,
+    fact_record_matches_type, filter_episodes_by_constraints, filter_facts_by_constraints,
+    raw_array, raw_object,
+};
+
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 const MAX_ITEMS_PER_SOURCE_EPISODE: usize = 2;
 const ACCESS_COUNT_NOVELTY_WEIGHT: f64 = 0.08;
@@ -832,178 +839,6 @@ async fn append_recent_experience_items(
     Ok(appended)
 }
 
-/// Filter facts by access policy and request-level constraints.
-fn filter_facts_by_constraints(
-    records: Vec<Value>,
-    access: &AccessContext,
-    project: Option<&str>,
-    fact_types: &[String],
-) -> Vec<crate::models::Fact> {
-    let mut facts = Vec::new();
-
-    for record in records {
-        let items: Vec<&Value> = if let Some(arr) = record.get("Array").and_then(|v| v.as_array()) {
-            arr.iter().collect()
-        } else {
-            vec![&record]
-        };
-
-        for item in items {
-            let fact_item = if let Some(obj) = item.get("Object") {
-                obj
-            } else {
-                item
-            };
-
-            if !fact_record_allowed(fact_item, access, project, fact_types) {
-                continue;
-            }
-
-            if let Some(fact) = super::episode::fact_from_record(fact_item) {
-                facts.push(fact);
-            }
-        }
-    }
-
-    facts
-}
-
-#[cfg(test)]
-fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<crate::models::Fact> {
-    filter_facts_by_constraints(records, access, None, &[])
-}
-
-fn fact_record_allowed(
-    record: &Value,
-    access: &AccessContext,
-    project: Option<&str>,
-    fact_types: &[String],
-) -> bool {
-    fact_record_matches_project(record, project)
-        && fact_record_matches_type(record, fact_types)
-        && fact_record_allowed_by_policy(record, access)
-}
-
-fn fact_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
-    let Some(tags) = raw_object(record)
-        .and_then(|map| map.get("policy_tags"))
-        .and_then(raw_array)
-        .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
-    else {
-        return true;
-    };
-
-    if tags.is_empty() {
-        return true;
-    }
-
-    let Some(allowed_tags) = &access.allowed_tags else {
-        return true;
-    };
-
-    let allowed = allowed_tags
-        .iter()
-        .map(String::as_str)
-        .collect::<HashSet<_>>();
-    tags.iter().any(|tag| allowed.contains(tag))
-}
-
-fn filter_episodes_by_constraints(
-    records: Vec<Value>,
-    access: &AccessContext,
-    project: Option<&str>,
-) -> Vec<crate::models::Episode> {
-    records
-        .into_iter()
-        .filter(|record| episode_record_allowed(record, access, project))
-        .filter_map(|record| match record {
-            Value::Object(map) => super::episode::episode_from_record(&map),
-            _ => record
-                .get("Object")
-                .and_then(Value::as_object)
-                .and_then(super::episode::episode_from_record),
-        })
-        .collect()
-}
-
-fn episode_record_allowed(record: &Value, access: &AccessContext, project: Option<&str>) -> bool {
-    episode_record_matches_project(record, project)
-        && episode_record_allowed_by_policy(record, access)
-}
-
-fn episode_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
-    let Some(tags) = raw_object(record)
-        .and_then(|map| map.get("policy_tags"))
-        .and_then(raw_array)
-        .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
-    else {
-        return true;
-    };
-
-    if tags.is_empty() {
-        return true;
-    }
-
-    let Some(allowed_tags) = &access.allowed_tags else {
-        return true;
-    };
-
-    let allowed = allowed_tags
-        .iter()
-        .map(String::as_str)
-        .collect::<HashSet<_>>();
-    tags.iter().any(|tag| allowed.contains(tag))
-}
-
-fn fact_record_matches_project(record: &Value, project: Option<&str>) -> bool {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return true;
-    };
-
-    raw_object(record)
-        .and_then(|map| map.get("project"))
-        .and_then(json_string)
-        .is_some_and(|value| value == project)
-}
-
-fn episode_record_matches_project(record: &Value, project: Option<&str>) -> bool {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return true;
-    };
-
-    raw_object(record)
-        .and_then(|map| map.get("project"))
-        .and_then(json_string)
-        .is_some_and(|value| value == project)
-}
-
-fn fact_record_matches_type(record: &Value, fact_types: &[String]) -> bool {
-    if fact_types.is_empty() {
-        return true;
-    }
-
-    raw_object(record)
-        .and_then(|map| map.get("fact_type"))
-        .and_then(json_string)
-        .is_some_and(|value| fact_types.iter().any(|fact_type| fact_type == value))
-}
-
-fn raw_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
-    if let Some(map) = record.as_object() {
-        Some(map)
-    } else {
-        record.get("Object").and_then(Value::as_object)
-    }
-}
-
-fn raw_array(value: &Value) -> Option<&Vec<Value>> {
-    if let Some(array) = value.as_array() {
-        Some(array)
-    } else {
-        value.get("Array").and_then(Value::as_array)
-    }
-}
-
 /// Parameters for building context items from episode fallback records.
 struct EpisodeFallbackParams<'a> {
     episodes: Vec<crate::models::Episode>,
@@ -1303,19 +1138,6 @@ async fn build_map_view(
 
     items.truncate(budget.max(1) as usize);
     Ok(items)
-}
-
-fn fact_is_active_at(fact: &crate::models::Fact, cutoff: chrono::DateTime<chrono::Utc>) -> bool {
-    if fact.t_valid > cutoff || fact.t_ingested > cutoff {
-        return false;
-    }
-
-    match (fact.t_invalid, fact.t_invalid_ingested) {
-        (None, _) => true,
-        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
-        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
-        _ => false,
-    }
 }
 
 /// Test-only convenience wrapper around the production comparator below.
@@ -2709,19 +2531,19 @@ async fn scan_fact_records_by_query_terms(
         .into_iter()
         .filter(|record| {
             raw_object(record)
-                .and_then(|map| map.get("scope"))
+                .and_then(|map: &serde_json::Map<String, Value>| map.get("scope"))
                 .and_then(json_string)
                 .is_some_and(|value| value == params.scope)
         })
         .filter(|record| {
             raw_object(record)
-                .and_then(|map| map.get("t_valid"))
+                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_valid"))
                 .and_then(json_string)
                 .is_some_and(|value| value <= params.cutoff_iso)
         })
         .filter(|record| {
             raw_object(record)
-                .and_then(|map| map.get("t_invalid"))
+                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_invalid"))
                 .and_then(json_string)
                 .is_none_or(|value| value > params.cutoff_iso)
         })
@@ -2793,13 +2615,13 @@ fn lexical_query_overlap(record: &Value, query_terms: &[String]) -> usize {
 
     let mut record_terms = std::collections::HashSet::<String>::new();
     if let Some(content) = raw_object(record)
-        .and_then(|map| map.get("content"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
         .and_then(json_string)
     {
         record_terms.extend(super::query::search_query_terms(content));
     }
     if let Some(index_keys) = raw_object(record)
-        .and_then(|map| map.get("index_keys"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
         .and_then(raw_array)
     {
         for value in index_keys {
@@ -2886,7 +2708,7 @@ fn lexical_ngram_overlap_for_terms(
 
 fn lexical_record_terms(record: &Value) -> Vec<String> {
     raw_object(record)
-        .and_then(|map| map.get("content"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
         .and_then(json_string)
         .map(super::query::search_query_terms)
         .unwrap_or_default()
@@ -2894,14 +2716,14 @@ fn lexical_record_terms(record: &Value) -> Vec<String> {
 
 fn lexical_ft_score(record: &Value) -> f64 {
     raw_object(record)
-        .and_then(|map| map.get("ft_score"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("ft_score"))
         .and_then(json_f64)
         .unwrap_or(0.0)
 }
 
 fn lexical_t_valid(record: &Value) -> String {
     raw_object(record)
-        .and_then(|map| map.get("t_valid"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("t_valid"))
         .and_then(json_string)
         .unwrap_or_default()
         .to_string()
@@ -2909,7 +2731,7 @@ fn lexical_t_valid(record: &Value) -> String {
 
 fn lexical_fact_id(record: &Value) -> String {
     raw_object(record)
-        .and_then(|map| map.get("fact_id"))
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("fact_id"))
         .and_then(super::episode::unwrap_record_string)
         .unwrap_or_default()
         .to_string()
@@ -3307,12 +3129,12 @@ async fn collect_semantic_facts(
         // Use DB-computed sem_score if available, otherwise compute in Rust
         let similarity = record
             .as_object()
-            .and_then(|map| map.get("sem_score"))
+            .and_then(|map: &serde_json::Map<String, Value>| map.get("sem_score"))
             .and_then(|v| v.as_f64())
             .unwrap_or_else(|| {
                 let embedding = record
                     .as_object()
-                    .and_then(|map| map.get("embedding"))
+                    .and_then(|map: &serde_json::Map<String, Value>| map.get("embedding"))
                     .and_then(embedding_from_value);
                 match embedding {
                     Some(ref emb) if emb.len() == query_embedding.len() => {
@@ -3527,6 +3349,7 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use super::filtering::filter_facts_by_policy;
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::service::EmbeddingProvider;
