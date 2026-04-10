@@ -50,8 +50,9 @@ pub fn preprocess_search_query(raw: &str) -> String {
 
 /// Extract normalized search terms from a natural-language query.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
-    static EPISODE_REF: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid"));
+    static EPISODE_REF: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid")
+    });
     static QUOTED: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r#""([^"]*)""#).expect("quoted regex is valid"));
 

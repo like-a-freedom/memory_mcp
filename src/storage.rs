@@ -27,8 +27,7 @@ const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__
 
 /// Bi-temporal visibility filter: selects records visible as of a given cutoff timestamp.
 /// Applied to both `fact` and `edge` tables with the same temporal semantics.
-const BI_TEMPORAL_WHERE: &str =
-    "t_valid <= type::datetime($cutoff) \
+const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
      AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
      AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
 
@@ -1988,10 +1987,7 @@ fn build_select_facts_filtered_advanced_query(
     project: Option<&str>,
     fact_types: &[String],
 ) -> (String, Value) {
-    let mut where_clauses = vec![
-        "scope = $scope".to_string(),
-        BI_TEMPORAL_WHERE.to_string(),
-    ];
+    let mut where_clauses = vec!["scope = $scope".to_string(), BI_TEMPORAL_WHERE.to_string()];
 
     let mut vars = serde_json::Map::from_iter([
         ("scope".to_string(), json!(scope)),
@@ -2033,7 +2029,9 @@ fn build_select_facts_by_entity_links_query(
     limit: i32,
 ) -> (String, Value) {
     (
-        format!("SELECT * FROM fact WHERE scope = $scope AND {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"),
+        format!(
+            "SELECT * FROM fact WHERE scope = $scope AND {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
+        ),
         json!({
             "scope": scope,
             "cutoff": cutoff,
@@ -2197,7 +2195,9 @@ fn record_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
 
 fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
     (
-        format!("SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"),
+        format!(
+            "SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"
+        ),
         json!({ "cutoff": cutoff }),
     )
 }
@@ -2245,7 +2245,9 @@ fn build_select_edge_neighbors_query(
     };
 
     (
-        format!("SELECT * FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"),
+        format!(
+            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+        ),
         json!({"node_id": node_id, "cutoff": cutoff}),
     )
 }

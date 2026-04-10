@@ -46,7 +46,9 @@ pub async fn assemble_context(
     service.enforce_rate_limit(access.as_ref())?;
 
     if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation(error_messages::SCOPE_REQUIRED.into()));
+        return Err(MemoryError::Validation(
+            error_messages::SCOPE_REQUIRED.into(),
+        ));
     }
 
     let cutoff = request.as_of.unwrap_or_else(super::query::now);
@@ -1048,7 +1050,11 @@ fn build_episode_fallback_items(params: EpisodeFallbackParams<'_>) -> Vec<Assemb
                 "source_id": episode.source_id,
                 "episode_fallback": true,
             }),
-            rationale: default_episode_fallback_rationale(params.query_opt, params.scope, params.cutoff),
+            rationale: default_episode_fallback_rationale(
+                params.query_opt,
+                params.scope,
+                params.cutoff,
+            ),
             retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
         })
         .collect()
@@ -1171,11 +1177,12 @@ async fn build_wake_up_view(
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    let mut facts = filter_facts_by_constraints(records, params.access, params.project, params.fact_types)
-        .into_iter()
-        .filter(|fact| fact.scope == params.scope)
-        .filter(|fact| fact_is_active_at(fact, params.cutoff))
-        .collect::<Vec<_>>();
+    let mut facts =
+        filter_facts_by_constraints(records, params.access, params.project, params.fact_types)
+            .into_iter()
+            .filter(|fact| fact.scope == params.scope)
+            .filter(|fact| fact_is_active_at(fact, params.cutoff))
+            .collect::<Vec<_>>();
 
     facts.sort_by(|left, right| {
         let left_persona = left.policy_tags.iter().any(|tag| tag == "persona");
@@ -2547,7 +2554,8 @@ async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
     params: FactQueryParams<'_>,
 ) -> Result<LexicalQueryResult, MemoryError> {
-    let query_terms = params.query_opt
+    let query_terms = params
+        .query_opt
         .map(super::query::search_query_terms)
         .unwrap_or_default();
     let candidate_limit = lexical_candidate_limit(params.limit);
@@ -2617,12 +2625,8 @@ async fn select_fact_records_for_query(
 
     if query_terms.len() >= 3 && (best_score < query_terms.len().min(4) || best_phrase_overlap == 0)
     {
-        let scanned_records = scan_fact_records_by_query_terms(
-            service,
-            params,
-            &query_terms,
-        )
-        .await?;
+        let scanned_records =
+            scan_fact_records_by_query_terms(service, params, &query_terms).await?;
         let scanned_score = top_query_score(&scanned_records, &query_terms);
         if (query_terms.len() >= 3 && best_phrase_overlap == 0 && !scanned_records.is_empty())
             || scanned_score > best_score

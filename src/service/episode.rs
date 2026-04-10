@@ -111,8 +111,10 @@ fn f64_field(map: &serde_json::Map<String, Value>, key: &str, default: f64) -> f
 fn i64_field(map: &serde_json::Map<String, Value>, key: &str, default: i64) -> i64 {
     map.get(key)
         .and_then(|v| {
-            v.as_i64()
-                .or_else(|| v.as_object().and_then(|o| o.get("Number").and_then(Value::as_i64)))
+            v.as_i64().or_else(|| {
+                v.as_object()
+                    .and_then(|o| o.get("Number").and_then(Value::as_i64))
+            })
         })
         .unwrap_or(default)
 }

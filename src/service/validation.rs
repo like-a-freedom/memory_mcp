@@ -15,7 +15,9 @@ pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryErro
         return Err(MemoryError::Validation("content is required".into()));
     }
     if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation(error_messages::SCOPE_REQUIRED.into()));
+        return Err(MemoryError::Validation(
+            error_messages::SCOPE_REQUIRED.into(),
+        ));
     }
     Ok(())
 }
@@ -52,7 +54,9 @@ pub fn validate_fact_input(
         return Err(MemoryError::Validation("source_episode is required".into()));
     }
     if scope.trim().is_empty() {
-        return Err(MemoryError::Validation(error_messages::SCOPE_REQUIRED.into()));
+        return Err(MemoryError::Validation(
+            error_messages::SCOPE_REQUIRED.into(),
+        ));
     }
     Ok(())
 }

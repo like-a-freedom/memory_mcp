@@ -357,9 +357,8 @@ fn strip_html_to_text(raw: &str) -> String {
         regex::Regex::new(r"(?is)<(script|style)[^>]*>.*?</(script|style)>")
             .expect("script/style regex should compile")
     });
-    static TAG_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
-        regex::Regex::new(r"(?is)<[^>]+>").expect("tag regex should compile")
-    });
+    static TAG_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(?is)<[^>]+>").expect("tag regex should compile"));
 
     let without_scripts = SCRIPT_STYLE_RE.replace_all(raw, " ");
     let without_tags = TAG_RE.replace_all(&without_scripts, " ");
