@@ -90,10 +90,3 @@ pub(crate) async fn append_recent_experience_items(
 
     Ok(appended)
 }
-
-pub(crate) fn supplemental_experience_count(results: &[AssembledContextItem]) -> usize {
-    results
-        .iter()
-        .filter(|item| item.rationale.starts_with("supplemental experience "))
-        .count()
-}
