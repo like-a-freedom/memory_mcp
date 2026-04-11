@@ -1,16 +1,23 @@
 //! Pluggable entity extraction abstractions.
 
-use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use regex::Regex;
 
 use crate::models::EntityCandidate;
 
 use super::MemoryError;
+
+mod anno;
+mod classifier;
+mod gliner;
+mod regex;
+
+pub use anno::AnnoEntityExtractor;
+pub use gliner::GlinerEntityExtractor;
+pub use regex::RegexEntityExtractor;
 
 /// Extracts entity candidates from text.
 #[async_trait]
@@ -35,379 +42,6 @@ pub trait EntityExtractor: Send + Sync {
         let _ = _zero_shot_labels;
         self.extract_candidates(content).await
     }
-}
-
-/// Regex-based deterministic extractor used as the default fallback implementation.
-#[derive(Debug)]
-pub struct RegexEntityExtractor {
-    name_regex: Regex,
-}
-
-impl RegexEntityExtractor {
-    /// Creates a new regex-backed entity extractor.
-    ///
-    /// Supports both ASCII and Unicode letters (Cyrillic, etc.).
-    /// Pattern matches:
-    /// - Multi-word capitalized names: "Alice Smith", "Иван Петров"
-    /// - Single-token CamelCase: "OpenAI", "PostgreSQL"
-    ///
-    /// Minimum 3 characters to avoid noise like "I", "At", "In".
-    pub fn new() -> Result<Self, MemoryError> {
-        Ok(Self {
-            name_regex: Regex::new(
-                r"[\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+)+|[\p{Lu}][\p{L}\p{N}]{2,}",
-            )
-            .map_err(|err| MemoryError::Validation(format!("regex error: {err}")))?,
-        })
-    }
-}
-
-#[async_trait]
-impl EntityExtractor for RegexEntityExtractor {
-    fn provider_name(&self) -> &'static str {
-        "regex"
-    }
-
-    async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
-        let candidates: std::collections::HashSet<_> = self
-            .name_regex
-            .find_iter(content)
-            .map(|mat| mat.as_str().to_string())
-            .collect();
-
-        let mut entities = candidates
-            .into_iter()
-            .map(|candidate| {
-                let entity_type = classify_entity_type(&candidate);
-                EntityCandidate {
-                    entity_type: entity_type.to_string(),
-                    canonical_name: candidate,
-                    aliases: Vec::new(),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        entities.sort_by(|left, right| left.canonical_name.cmp(&right.canonical_name));
-        Ok(entities)
-    }
-}
-
-/// Static gazetteer of well-known toponyms for location classification.
-static KNOWN_LOCATIONS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    HashSet::from([
-        // Major cities
-        "New York",
-        "Los Angeles",
-        "Chicago",
-        "Houston",
-        "Phoenix",
-        "Philadelphia",
-        "San Antonio",
-        "San Diego",
-        "Dallas",
-        "Austin",
-        "San Francisco",
-        "Seattle",
-        "Denver",
-        "Boston",
-        "Nashville",
-        "Portland",
-        "Las Vegas",
-        "Miami",
-        "Atlanta",
-        "Minneapolis",
-        "Detroit",
-        "Tampa",
-        "Orlando",
-        "Sacramento",
-        "Pittsburgh",
-        "Cincinnati",
-        "Cleveland",
-        "Indianapolis",
-        "Milwaukee",
-        "Columbus",
-        "Kansas City",
-        "Raleigh",
-        "Virginia Beach",
-        "Baltimore",
-        "Memphis",
-        "Charlotte",
-        "Jacksonville",
-        "San Jose",
-        "Fort Worth",
-        "El Paso",
-        "London",
-        "Paris",
-        "Berlin",
-        "Madrid",
-        "Rome",
-        "Amsterdam",
-        "Vienna",
-        "Prague",
-        "Warsaw",
-        "Budapest",
-        "Dublin",
-        "Lisbon",
-        "Stockholm",
-        "Oslo",
-        "Helsinki",
-        "Copenhagen",
-        "Brussels",
-        "Zurich",
-        "Geneva",
-        "Munich",
-        "Frankfurt",
-        "Hamburg",
-        "Barcelona",
-        "Milan",
-        "Naples",
-        "Tokyo",
-        "Osaka",
-        "Kyoto",
-        "Seoul",
-        "Beijing",
-        "Shanghai",
-        "Hong Kong",
-        "Singapore",
-        "Taipei",
-        "Bangkok",
-        "Mumbai",
-        "Delhi",
-        "Bangalore",
-        "Hyderabad",
-        "Chennai",
-        "Kolkata",
-        "Jakarta",
-        "Manila",
-        "Hanoi",
-        "Kuala Lumpur",
-        "Sydney",
-        "Melbourne",
-        "Brisbane",
-        "Perth",
-        "Auckland",
-        "Toronto",
-        "Vancouver",
-        "Montreal",
-        "Ottawa",
-        "Calgary",
-        "Mexico City",
-        "Sao Paulo",
-        "Buenos Aires",
-        "Lima",
-        "Bogota",
-        "Santiago",
-        "Rio de Janeiro",
-        "Cairo",
-        "Lagos",
-        "Nairobi",
-        "Johannesburg",
-        "Cape Town",
-        "Dubai",
-        "Riyadh",
-        "Tel Aviv",
-        "Istanbul",
-        "Moscow",
-        "Saint Petersburg",
-        "Kiev",
-        "Bucharest",
-        "Stockholm",
-        "Tallinn",
-        "Riga",
-        "Vilnius",
-        "Belgrade",
-        // Countries
-        "United States",
-        "United Kingdom",
-        "Canada",
-        "Australia",
-        "Germany",
-        "France",
-        "Italy",
-        "Spain",
-        "Japan",
-        "China",
-        "India",
-        "Brazil",
-        "Mexico",
-        "Russia",
-        "South Korea",
-        "Indonesia",
-        "Turkey",
-        "Saudi Arabia",
-        "Argentina",
-        "South Africa",
-        "Nigeria",
-        "Egypt",
-        "Poland",
-        "Netherlands",
-        "Belgium",
-        "Sweden",
-        "Norway",
-        "Finland",
-        "Denmark",
-        "Switzerland",
-        "Austria",
-        "Portugal",
-        "Ireland",
-        "Greece",
-        "Czech Republic",
-        "Romania",
-        "Hungary",
-        "Ukraine",
-        "Israel",
-        "Thailand",
-        "Vietnam",
-        "Philippines",
-        "Malaysia",
-        "Singapore",
-        "New Zealand",
-        "Colombia",
-        "Chile",
-        "Peru",
-        // US states
-        "California",
-        "Texas",
-        "Florida",
-        "New York",
-        "Pennsylvania",
-        "Illinois",
-        "Ohio",
-        "Georgia",
-        "North Carolina",
-        "Michigan",
-        "New Jersey",
-        "Virginia",
-        "Washington",
-        "Arizona",
-        "Massachusetts",
-        "Tennessee",
-        "Indiana",
-        "Maryland",
-        "Missouri",
-        "Wisconsin",
-        "Colorado",
-        "Minnesota",
-        "Oregon",
-        "Alabama",
-        "Louisiana",
-        "Kentucky",
-        "South Carolina",
-        "Iowa",
-        "Nevada",
-        "Arkansas",
-        "Connecticut",
-        "Utah",
-        "Oklahoma",
-        "Hawaii",
-        // Regions / continents
-        "Europe",
-        "Asia",
-        "Africa",
-        "North America",
-        "South America",
-        "Oceania",
-        "Antarctica",
-        "Middle East",
-        "Southeast Asia",
-        "East Asia",
-        "Central America",
-        "Caribbean",
-        "Scandinavia",
-        "Balkans",
-        "Nordic",
-    ])
-});
-
-/// Classifies an entity candidate into a type based on naming patterns.
-fn classify_entity_type(name: &str) -> &'static str {
-    static COMPANY_SUFFIXES: &[&str] = &[
-        "Corp",
-        "Inc",
-        "Ltd",
-        "LLC",
-        "GmbH",
-        "AG",
-        "SA",
-        "PLC",
-        "Company",
-        "Group",
-        "Systems",
-        "Technologies",
-        "Solutions",
-        "Labs",
-        "Studio",
-        "Partners",
-        "Associates",
-        "Holdings",
-        "Foundation",
-        "Institute",
-        "University",
-        "Academy",
-        "Limited",
-    ];
-
-    static EVENT_INDICATORS: &[&str] = &[
-        "Conference",
-        "Summit",
-        "Meetup",
-        "Hackathon",
-        "Workshop",
-        "Festival",
-        "Ceremony",
-        "Award",
-        "Championship",
-        "Olympics",
-    ];
-
-    static LOCATION_INDICATORS: &[&str] = &[
-        "City",
-        "County",
-        "State",
-        "Province",
-        "Country",
-        "District",
-        "Region",
-        "Territory",
-        "Island",
-    ];
-
-    for suffix in COMPANY_SUFFIXES {
-        if name.contains(suffix) {
-            return "company";
-        }
-    }
-    for indicator in EVENT_INDICATORS {
-        if name.contains(indicator) {
-            return "event";
-        }
-    }
-    for indicator in LOCATION_INDICATORS {
-        if name.contains(indicator) {
-            return "location";
-        }
-    }
-
-    if KNOWN_LOCATIONS.contains(name) {
-        return "location";
-    }
-
-    // Multi-word names without company suffixes are likely persons
-    // (e.g., "Alice Smith", "Иван Петров", "Maria Garcia")
-    if name.split_whitespace().count() >= 2 {
-        return "person";
-    }
-
-    // Single-word CamelCase names are likely technologies/products
-    // (e.g., "PostgreSQL", "OpenAI", "Kubernetes", "TensorFlow")
-    if name.chars().next().map(char::is_uppercase).unwrap_or(false)
-        && name.chars().any(|c| c.is_uppercase())
-        && !name.contains(' ')
-    {
-        return "technology";
-    }
-
-    "unknown"
 }
 
 /// Type alias for the pluggable extraction function used by [`LlmEntityExtractor`].
@@ -473,7 +107,7 @@ pub async fn create_entity_extractor(
 
     match config.provider {
         NerProviderKind::Regex => Ok(Arc::new(RegexEntityExtractor::new()?)),
-        NerProviderKind::Anno => Ok(Arc::new(super::AnnoEntityExtractor::new()?)),
+        NerProviderKind::Anno => Ok(Arc::new(AnnoEntityExtractor::new()?)),
         NerProviderKind::LocalGliner => {
             let model = config.model.as_ref().ok_or_else(|| {
                 MemoryError::ConfigInvalid(
@@ -485,7 +119,7 @@ pub async fn create_entity_extractor(
             let resolved_dir =
                 super::model_loader::ensure_gliner_model_cached(model, &model_dir, logger).await?;
 
-            Ok(Arc::new(super::GlinerEntityExtractor::new(
+            Ok(Arc::new(GlinerEntityExtractor::new(
                 &resolved_dir,
                 config.labels.clone(),
                 config.threshold,
