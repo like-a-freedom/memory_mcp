@@ -187,12 +187,12 @@ mod tests {
 
     #[test]
     fn json_f64_handles_plain_number() {
-        assert_eq!(json_f64(&json!(3.14)), Some(3.14));
+        assert_eq!(json_f64(&json!(2.5)), Some(2.5));
     }
 
     #[test]
     fn json_f64_handles_wrapped_number() {
-        assert_eq!(json_f64(&json!({"Number": 3.14})), Some(3.14));
+        assert_eq!(json_f64(&json!({"Number": 2.5})), Some(2.5));
     }
 
     #[test]

@@ -1,6 +1,8 @@
-//! Episode operations - extraction and record parsing.
+// Episode operations - extraction and record parsing.
 
+#[path = "episode/communities.rs"]
 mod communities;
+#[path = "episode/edges.rs"]
 mod edges;
 
 pub(crate) use communities::{build_community_summary, update_communities};
@@ -561,7 +563,7 @@ fn fact_is_active_for_warning(
     }
 }
 
-/// Build a JSON payload map from an edge for database storage.
+// Build a JSON payload map from an edge for database storage.
 
 #[cfg(test)]
 mod tests {

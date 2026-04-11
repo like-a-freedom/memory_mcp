@@ -9,7 +9,7 @@ use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::now;
 use crate::service::parse_iso;
-use crate::service::value_helpers::{json_string, unwrap_array_value};
+use crate::service::value_helpers::{string_from_value, unwrap_array_value};
 use crate::storage::GraphDirection;
 
 use super::edges::StoredEdgeVersion;
@@ -22,7 +22,7 @@ pub(crate) struct StoredCommunity {
 }
 
 fn unwrap_string(value: &Value) -> Option<String> {
-    json_string(value).map(String::from)
+    string_from_value(value)
 }
 
 fn stored_edge_version_for_community(record: &Value) -> Option<StoredEdgeVersion> {
@@ -276,4 +276,27 @@ fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
         community_id,
         member_entities,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stored_edge_version_for_community_handles_record_id_endpoints() {
+        let record = json!({
+            "edge_id": "edge:test",
+            "in": {"RecordId": {"table": "entity", "key": "alice"}},
+            "relation": "met",
+            "out": {"RecordId": {"table": "entity", "key": "bob"}},
+            "t_valid": "2026-04-11T16:00:00Z",
+            "t_ingested": "2026-04-11T16:00:01Z"
+        });
+
+        let stored =
+            stored_edge_version_for_community(&record).expect("stored community edge version");
+
+        assert_eq!(stored.in_id, "entity:alice");
+        assert_eq!(stored.out_id, "entity:bob");
+    }
 }

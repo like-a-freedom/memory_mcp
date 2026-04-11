@@ -6,9 +6,10 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::config::NerConfig;
+use memory_mcp::config::{NerConfig, SurrealConfig};
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest};
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
+use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
@@ -110,6 +111,13 @@ fn configure_embedded_env(temp_dir: &TempDir) -> Vec<(&'static str, Option<Strin
         ("QUERY_LOGGING_ENABLED", Some("false".to_string())),
         ("RUST_LOG", Some("warn".to_string())),
     ]
+}
+
+async fn connect_env_db_client() -> SurrealDbClient {
+    let config = SurrealConfig::from_env().expect("embedded test config should be valid");
+    SurrealDbClient::connect(&config, ORG_SCOPE)
+        .await
+        .expect("embedded test db client should connect")
 }
 
 fn supported_gliner_labels() -> Vec<String> {
@@ -533,6 +541,7 @@ async fn memory_service_persists_real_local_candle_embeddings() {
     let service = MemoryService::new_from_env()
         .await
         .expect("service should bootstrap with local Candle embeddings");
+    let db_client = connect_env_db_client().await;
     let source_episode =
         ingest_episode(&service, "The compensation committee finished its review.").await;
 
@@ -555,20 +564,17 @@ async fn memory_service_persists_real_local_candle_embeddings() {
     )
     .await;
 
-    let compensation_record = service
-        .db_client
+    let compensation_record = db_client
         .select_one(&compensation_fact, ORG_SCOPE)
         .await
         .expect("fact lookup should succeed")
         .expect("fact should exist");
-    let paraphrase_record = service
-        .db_client
+    let paraphrase_record = db_client
         .select_one(&paraphrase_fact, ORG_SCOPE)
         .await
         .expect("fact lookup should succeed")
         .expect("fact should exist");
-    let unrelated_record = service
-        .db_client
+    let unrelated_record = db_client
         .select_one(&unrelated_fact, ORG_SCOPE)
         .await
         .expect("fact lookup should succeed")

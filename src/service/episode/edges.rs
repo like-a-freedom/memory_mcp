@@ -8,7 +8,7 @@ use crate::service::error::MemoryError;
 use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::parse_iso;
-use crate::service::value_helpers::json_string;
+use crate::service::value_helpers::string_from_value;
 
 /// Payload map for edge database records.
 pub(crate) fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<String, Value> {
@@ -139,7 +139,7 @@ pub(crate) fn edge_versions_conflict(existing: &StoredEdgeVersion, new_edge: &Ed
 }
 
 fn unwrap_string(value: &Value) -> Option<String> {
-    json_string(value).map(String::from)
+    string_from_value(value)
 }
 
 fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> {
@@ -176,4 +176,26 @@ fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> 
             .as_deref()
             .and_then(parse_iso),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stored_edge_version_from_record_handles_record_id_endpoints() {
+        let record = json!({
+            "edge_id": "edge:test",
+            "in": {"RecordId": {"table": "entity", "key": "alice"}},
+            "relation": "knows",
+            "out": {"RecordId": {"table": "entity", "key": "bob"}},
+            "t_valid": "2026-04-11T16:00:00Z",
+            "t_ingested": "2026-04-11T16:00:01Z"
+        });
+
+        let stored = stored_edge_version_from_record(&record).expect("stored edge version");
+
+        assert_eq!(stored.in_id, "entity:alice");
+        assert_eq!(stored.out_id, "entity:bob");
+    }
 }

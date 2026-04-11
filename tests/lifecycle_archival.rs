@@ -8,7 +8,7 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
-use memory_mcp::service::lifecycle::run_archival_pass;
+use memory_mcp::service::run_archival_pass;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 

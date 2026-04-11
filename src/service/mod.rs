@@ -19,9 +19,11 @@ mod anno_entity_extractor;
 mod apps;
 mod cache;
 mod context;
+#[path = "core/mod.rs"]
 mod core;
 mod embedding;
 mod entity_extraction;
+#[path = "episode/mod.rs"]
 mod episode;
 mod error;
 mod gliner_entity_extractor;

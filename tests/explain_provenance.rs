@@ -215,7 +215,7 @@ async fn explain_populates_all_sources_field() {
 
 #[tokio::test]
 async fn explain_includes_linked_episodes_via_shared_entity() {
-    let service = common::make_service().await;
+    let (service, db_client) = common::make_service_with_client().await;
     let t_ref = Utc::now();
     let scope = "org";
 
@@ -303,8 +303,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     for (fact_id, _edge_suffix) in [(&fact_a_id, "a"), (&fact_b_id, "b")] {
         let edge_id =
             memory_mcp::service::deterministic_edge_id(&entity_id, "involved_in", fact_id, t_ref);
-        service
-            .db_client
+        db_client
             .relate_edge(
                 scope,
                 &edge_id,

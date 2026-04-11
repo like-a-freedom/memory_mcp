@@ -1,4 +1,4 @@
-//! MemoryService implementation - core service orchestration.
+// MemoryService implementation - core service orchestration.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -50,6 +50,7 @@ pub struct MemoryService {
 }
 
 use lru::LruCache;
+#[path = "core/helpers.rs"]
 mod helpers;
 pub(crate) use helpers::*;
 
