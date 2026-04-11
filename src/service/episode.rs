@@ -1,18 +1,67 @@
 //! Episode operations - extraction and record parsing.
 
-use std::sync::LazyLock;
+mod communities;
+mod edges;
 
-use regex::Regex;
+pub(crate) use communities::{build_community_summary, update_communities};
+#[cfg(test)]
+pub(crate) use communities::{collect_connected_entity_component, find_overlapping_communities};
+pub(crate) use edges::store_edge;
+
+pub(crate) fn unwrap_record_string(value: &serde_json::Value) -> Option<String> {
+    if let Some(s) = value.as_str() {
+        Some(s.to_string())
+    } else if let Some(obj) = value.as_object() {
+        obj.get("String")
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+            .or_else(|| {
+                obj.get("Datetime")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                obj.get("Strand")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                obj.get("Strand")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                obj.get("Datetime")
+                    .and_then(|inner| inner.get("String"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .or_else(|| {
+                obj.get("RecordId").and_then(|record_id| {
+                    let record_id = record_id.as_object()?;
+                    let table = record_id.get("table")?.as_str()?;
+                    let key = record_id.get("key")?.as_str()?;
+                    Some(format!("{table}:{key}"))
+                })
+            })
+    } else {
+        None
+    }
+}
+
 use serde_json::{Value, json};
 
 use super::core::log_args_with_duration;
 use super::error::MemoryError;
 use super::query::parse_iso;
+use super::statement_detection::{
+    is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
+};
 use super::value_helpers::{
     dt_field, f64_field, i64_field, json_string, str_array_field, str_field, unwrap_array_value,
 };
 use crate::logging::LogLevel;
-use crate::models::Edge;
 use crate::models::Episode;
 use crate::models::{
     ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink, FactType,
@@ -261,54 +310,6 @@ async fn add_extracted_fact(
         fact_id,
         fact_type: fact_type.to_string(),
     })
-}
-
-/// Check if content contains a promise statement.
-#[must_use]
-pub fn is_promise_statement(content: &str) -> bool {
-    static PROMISE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b(i will|i'll|will\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule)|going to\s+(?:finish|deliver|do|close|complete|implement|deploy|ship|fix|provide|send|schedule))\b")
-            .expect("promise regex is valid")
-    });
-    PROMISE_RE.is_match(content)
-}
-
-/// Detects metric-related content using word-boundary matching.
-///
-/// Matches financial metrics (ARR, MRR, NRR, revenue, churn) and dollar amounts.
-/// Avoids false positives on words like "barrel", "narrative", "arrive".
-pub fn is_metric_statement(content: &str) -> bool {
-    static METRIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b(ARR|MRR|NRR|revenue|churn|ROI|LTV|CAC|NPS|EBITDA)\b|\$\d")
-            .expect("metric regex is valid")
-    });
-    METRIC_RE.is_match(content)
-}
-
-/// Detects preference/profile statements that should be stored as experience facts.
-#[must_use]
-pub fn is_experience_statement(content: &str) -> bool {
-    static EXPERIENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b(prefer|prefers|dislike|dislikes|enjoy|enjoys|love|loves|hate|hates|value|values)\b")
-            .expect("experience regex is valid")
-    });
-    let normalized = content.to_lowercase();
-    EXPERIENCE_RE.is_match(&normalized)
-}
-
-/// Detects document-style action items (for example from emails) as promise-like commitments.
-#[must_use]
-pub fn is_document_action_item(content: &str) -> bool {
-    static ACTION_HEADER_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?m)^\s*(action items?|next steps|follow-?ups?|todo)\s*:")
-            .expect("action-item header regex is valid")
-    });
-    static ACTION_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?m)^\s*(?:[-*]|\d+\.)\s+[a-z]+(?:\s+[a-z]+){0,2}\s*(?::|-)\s*(?:send|review|share|update|prepare|schedule|confirm|draft|deliver|complete|close|fix|follow(?:\s+|-)?up)\b")
-            .expect("action-item line regex is valid")
-    });
-    let normalized = content.to_lowercase();
-    ACTION_HEADER_RE.is_match(&normalized) && ACTION_LINE_RE.is_match(&normalized)
 }
 
 /// Extract entities and facts from an episode.
@@ -561,481 +562,6 @@ fn fact_is_active_for_warning(
 }
 
 /// Build a JSON payload map from an edge for database storage.
-fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<String, Value> {
-    let mut m = serde_json::Map::new();
-    m.insert("edge_id".to_string(), Value::String(edge_id.to_string()));
-    m.insert("in".to_string(), Value::String(edge.in_id.clone()));
-    m.insert("relation".to_string(), Value::String(edge.relation.clone()));
-    m.insert("out".to_string(), Value::String(edge.out_id.clone()));
-    m.insert("origin".to_string(), json!(edge.origin));
-    m.insert("strength".to_string(), json!(edge.strength));
-    m.insert("confidence".to_string(), json!(edge.confidence));
-    m.insert("provenance".to_string(), edge.provenance.clone());
-    m.insert(
-        "t_valid".to_string(),
-        Value::String(super::normalize_dt(edge.t_valid)),
-    );
-    m.insert(
-        "t_ingested".to_string(),
-        Value::String(super::normalize_dt(edge.t_ingested)),
-    );
-    if let Some(t_invalid) = edge.t_invalid {
-        m.insert(
-            "t_invalid".to_string(),
-            Value::String(super::normalize_dt(t_invalid)),
-        );
-    }
-    if let Some(t_invalid_ingested) = edge.t_invalid_ingested {
-        m.insert(
-            "t_invalid_ingested".to_string(),
-            Value::String(super::normalize_dt(t_invalid_ingested)),
-        );
-    }
-    m
-}
-
-/// Store an edge in the database.
-pub(crate) async fn store_edge(
-    service: &crate::service::MemoryService,
-    edge: &Edge,
-    namespace: &str,
-) -> Result<(), MemoryError> {
-    let edge_id =
-        super::ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
-
-    let existing = service.db_client.select_one(&edge_id, namespace).await?;
-    if existing.is_some() {
-        return Ok(());
-    }
-
-    invalidate_conflicting_edges(service, edge, namespace).await?;
-
-    let payload = build_edge_payload(edge, &edge_id);
-
-    service
-        .db_client
-        .relate_edge(
-            namespace,
-            &edge_id,
-            &edge.in_id,
-            &edge.out_id,
-            Value::Object(payload),
-        )
-        .await?;
-
-    Ok(())
-}
-
-#[derive(Debug)]
-struct StoredEdgeVersion {
-    edge_id: String,
-    in_id: String,
-    relation: String,
-    out_id: String,
-    t_valid: chrono::DateTime<chrono::Utc>,
-    t_ingested: chrono::DateTime<chrono::Utc>,
-    t_invalid: Option<chrono::DateTime<chrono::Utc>>,
-    t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-async fn invalidate_conflicting_edges(
-    service: &crate::service::MemoryService,
-    new_edge: &Edge,
-    namespace: &str,
-) -> Result<(), MemoryError> {
-    let existing_edges = service
-        .db_client
-        .select_edges_for_triple(
-            namespace,
-            &new_edge.in_id,
-            &new_edge.relation,
-            &new_edge.out_id,
-        )
-        .await?;
-
-    for existing in existing_edges
-        .iter()
-        .filter_map(stored_edge_version_from_record)
-        .filter(|existing| edge_versions_conflict(existing, new_edge))
-    {
-        service
-            .db_client
-            .update(
-                &existing.edge_id,
-                serde_json::json!({
-                    "t_invalid": super::normalize_dt(new_edge.t_valid),
-                    "t_invalid_ingested": super::normalize_dt(new_edge.t_ingested),
-                }),
-                namespace,
-            )
-            .await?;
-    }
-
-    Ok(())
-}
-
-/// In the current flat-edge model, only active versions of the same logical
-/// edge triple conflict. Broader semantic contradictions (for example,
-/// relation-specific exclusivity across different targets) are deferred until
-/// Task 5 introduces graph-native relation semantics.
-///
-/// Conflict requires BOTH timestamps to be <=: an existing edge is invalidated
-/// only when the new edge is strictly newer in both t_valid AND t_ingested.
-/// This is intentional: if t_valid is older but t_ingested is newer (retroactive
-/// data entry), the edge should NOT be invalidated. Using OR would incorrectly
-/// invalidate edges in such scenarios.
-fn edge_versions_conflict(existing: &StoredEdgeVersion, new_edge: &Edge) -> bool {
-    existing.in_id == new_edge.in_id
-        && existing.relation == new_edge.relation
-        && existing.out_id == new_edge.out_id
-        && existing.t_valid <= new_edge.t_valid
-        && existing.t_ingested <= new_edge.t_ingested
-        && existing
-            .t_invalid
-            .is_none_or(|t_invalid| t_invalid > new_edge.t_valid)
-        && existing
-            .t_invalid_ingested
-            .is_none_or(|t_invalid_ingested| t_invalid_ingested > new_edge.t_ingested)
-}
-
-fn stored_edge_version_from_record(record: &Value) -> Option<StoredEdgeVersion> {
-    let map = record.as_object()?;
-
-    let edge_id = map
-        .get("edge_id")
-        .and_then(unwrap_record_string)
-        .or_else(|| map.get("id").and_then(unwrap_record_string))?;
-
-    Some(StoredEdgeVersion {
-        edge_id,
-        in_id: map.get("in").and_then(unwrap_record_string)?,
-        relation: map.get("relation").and_then(unwrap_record_string)?,
-        out_id: map.get("out").and_then(unwrap_record_string)?,
-        t_valid: map
-            .get("t_valid")
-            .and_then(unwrap_record_string)
-            .as_deref()
-            .and_then(parse_iso)?,
-        t_ingested: map
-            .get("t_ingested")
-            .and_then(unwrap_record_string)
-            .as_deref()
-            .and_then(parse_iso)?,
-        t_invalid: map
-            .get("t_invalid")
-            .and_then(unwrap_record_string)
-            .as_deref()
-            .and_then(parse_iso),
-        t_invalid_ingested: map
-            .get("t_invalid_ingested")
-            .and_then(unwrap_record_string)
-            .as_deref()
-            .and_then(parse_iso),
-    })
-}
-
-pub(crate) fn unwrap_record_string(value: &Value) -> Option<String> {
-    if let Some(value) = value.as_str() {
-        Some(value.to_string())
-    } else if let Some(object) = value.as_object() {
-        object
-            .get("String")
-            .and_then(Value::as_str)
-            .map(ToString::to_string)
-            .or_else(|| {
-                object
-                    .get("Datetime")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                object
-                    .get("Strand")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                object
-                    .get("Strand")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                object
-                    .get("Datetime")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                object.get("RecordId").and_then(|record_id| {
-                    let record_id = record_id.as_object()?;
-                    let table = record_id.get("table")?.as_str()?;
-                    let key = record_id.get("key")?.as_str()?;
-                    Some(format!("{table}:{key}"))
-                })
-            })
-    } else {
-        None
-    }
-}
-
-/// Update community memberships.
-async fn update_communities(
-    service: &crate::service::MemoryService,
-    entity_ids: &[String],
-    scope: &str,
-) -> Result<(), MemoryError> {
-    use serde_json::json;
-
-    if entity_ids.len() < 2 {
-        return Ok(());
-    }
-
-    let namespace = service.namespace_for_scope(scope);
-    let member_entities =
-        collect_connected_entity_component(service, entity_ids, &namespace).await?;
-    if member_entities.len() < 2 {
-        return Ok(());
-    }
-
-    let summary = build_community_summary(service, &namespace, &member_entities).await?;
-    let overlapping = find_overlapping_communities(service, &namespace, &member_entities).await?;
-    let community_id = overlapping
-        .iter()
-        .map(|community| community.community_id.clone())
-        .min()
-        .unwrap_or_else(|| super::ids::deterministic_community_id(&member_entities));
-
-    let payload = json!({
-        "community_id": community_id,
-        "member_entities": member_entities,
-        "summary": summary,
-        "updated_at": super::normalize_dt(super::query::now()),
-    });
-
-    let existing = service
-        .db_client
-        .select_one(&community_id, &namespace)
-        .await?;
-    if existing.is_some() {
-        service
-            .db_client
-            .update(&community_id, payload, &namespace)
-            .await?;
-    } else {
-        service
-            .db_client
-            .create(&community_id, payload, &namespace)
-            .await?;
-    }
-
-    for stale in overlapping
-        .into_iter()
-        .filter(|community| community.community_id != community_id)
-    {
-        service
-            .db_client
-            .query(
-                "DELETE type::record($community_id);",
-                Some(json!({"community_id": stale.community_id})),
-                &namespace,
-            )
-            .await?;
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Clone)]
-struct StoredCommunity {
-    community_id: String,
-    member_entities: Vec<String>,
-}
-
-/// Collects all entities connected via edges to the given seed entities.
-///
-/// Uses BFS traversal over the active edge set (bounded by `ACTIVE_EDGE_SCAN_LIMIT = 10_000`).
-/// If the edge table exceeds this limit, the traversal will be incomplete.
-/// A warning is logged when the limit is hit (see `db.select_edges_filtered.limit_hit`).
-async fn collect_connected_entity_component(
-    service: &crate::service::MemoryService,
-    entity_ids: &[String],
-    namespace: &str,
-) -> Result<Vec<String>, MemoryError> {
-    let cutoff = super::normalize_dt(super::query::now());
-    let mut visited = std::collections::BTreeSet::new();
-    let mut queue = std::collections::VecDeque::new();
-    let mut traversed_nodes = std::collections::HashSet::new();
-
-    for entity_id in entity_ids
-        .iter()
-        .filter(|entity_id| is_entity_id(entity_id))
-    {
-        if visited.insert(entity_id.clone()) {
-            queue.push_back(entity_id.clone());
-        }
-    }
-
-    while let Some(current) = queue.pop_front() {
-        if !traversed_nodes.insert(current.clone()) {
-            continue;
-        }
-
-        for direction in [
-            crate::storage::GraphDirection::Incoming,
-            crate::storage::GraphDirection::Outgoing,
-        ] {
-            let edges = service
-                .db_client
-                .select_edge_neighbors(namespace, &current, &cutoff, direction)
-                .await?;
-
-            for edge in edges.iter().filter_map(stored_edge_version_from_record) {
-                let neighbor = match direction {
-                    crate::storage::GraphDirection::Incoming => edge.in_id,
-                    crate::storage::GraphDirection::Outgoing => edge.out_id,
-                };
-
-                if is_entity_id(&neighbor) {
-                    if visited.insert(neighbor.clone()) {
-                        queue.push_back(neighbor);
-                    }
-                    continue;
-                }
-
-                if is_traversable_context_node(&neighbor) {
-                    queue.push_back(neighbor);
-                }
-            }
-        }
-    }
-
-    Ok(visited.into_iter().collect())
-}
-
-pub(crate) async fn build_community_summary(
-    service: &crate::service::MemoryService,
-    namespace: &str,
-    member_entities: &[String],
-) -> Result<String, MemoryError> {
-    let records = service
-        .db_client
-        .select_entities_by_ids(namespace, member_entities)
-        .await?;
-    let mut names = records
-        .iter()
-        .filter_map(|record| record.as_object())
-        .filter_map(|record| {
-            record
-                .get("canonical_name")
-                .and_then(unwrap_record_string)
-                .or_else(|| {
-                    record
-                        .get("entity_id")
-                        .and_then(unwrap_record_string)
-                        .or_else(|| record.get("id").and_then(unwrap_record_string))
-                })
-        })
-        .collect::<Vec<_>>();
-
-    names.sort();
-    names.dedup();
-
-    let labels = if names.is_empty() {
-        let mut fallback = member_entities.to_vec();
-        fallback.sort();
-        fallback.dedup();
-        fallback
-    } else {
-        names
-    };
-
-    Ok(condense_community_labels(&labels))
-}
-
-fn condense_community_labels(labels: &[String]) -> String {
-    let preview = labels
-        .iter()
-        .take(3)
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(", ");
-    let remaining = labels.len().saturating_sub(3);
-
-    if remaining > 0 {
-        format!("{preview} (+{remaining} more)")
-    } else {
-        preview
-    }
-}
-
-async fn find_overlapping_communities(
-    service: &crate::service::MemoryService,
-    namespace: &str,
-    member_entities: &[String],
-) -> Result<Vec<StoredCommunity>, MemoryError> {
-    let member_set: std::collections::HashSet<_> = member_entities.iter().cloned().collect();
-
-    // Use index-based lookup via CONTAINSANY instead of full table scan.
-    let communities = service
-        .db_client
-        .select_communities_by_member_entities(namespace, member_entities)
-        .await?;
-
-    Ok(communities
-        .iter()
-        .filter_map(stored_community_from_record)
-        .filter(|community| {
-            community
-                .member_entities
-                .iter()
-                .any(|member| member_set.contains(member))
-        })
-        .collect())
-}
-
-fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
-    let map = record.as_object()?;
-    let community_id = map
-        .get("community_id")
-        .and_then(unwrap_record_string)
-        .or_else(|| map.get("id").and_then(unwrap_record_string))?;
-    let member_entities = map
-        .get("member_entities")
-        .and_then(unwrap_record_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(unwrap_record_string)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    Some(StoredCommunity {
-        community_id,
-        member_entities,
-    })
-}
-
-fn unwrap_record_array(value: &Value) -> Option<&Vec<Value>> {
-    if let Some(array) = value.as_array() {
-        Some(array)
-    } else if let Some(object) = value.as_object() {
-        object.get("Array").and_then(Value::as_array)
-    } else {
-        None
-    }
-}
-
-fn is_entity_id(record_id: &str) -> bool {
-    record_id.starts_with("entity:")
-}
-
-fn is_traversable_context_node(record_id: &str) -> bool {
-    record_id.starts_with("episode:") || record_id.starts_with("fact:")
-}
 
 #[cfg(test)]
 mod tests {
