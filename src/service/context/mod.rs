@@ -1,14 +1,13 @@
 //! Context assembly operations.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Instant;
 
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::cache::{CacheKey, CacheView};
-use super::embedding::{cosine_similarity, embedding_from_value};
+use super::embedding::embedding_from_value;
 use super::error::{MemoryError, error_messages};
-use super::value_helpers::json_string;
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
 
@@ -19,26 +18,26 @@ mod filtering;
 mod lexical;
 mod logging;
 mod ranking;
+mod semantic;
 mod temporal;
+mod views;
 
 use alias_expansion::expand_query_with_aliases;
 use community::{CollectCommunityFactsRequest, collect_community_facts};
 use experience::{RecentExperienceRequest, append_recent_experience_items};
-use filtering::{
-    compare_facts_by_recency, episode_record_allowed, fact_is_active_at, fact_record_allowed,
-    filter_episodes_by_constraints, filter_facts_by_constraints, raw_object,
-};
-use lexical::{
-    FactFilterParams, FactQueryParams, select_episode_records_for_query,
-    select_fact_records_for_query,
-};
+use filtering::filter_facts_by_constraints;
+use lexical::{FactQueryParams, select_episode_records_for_query, select_fact_records_for_query};
 use logging::{summarize_retrieval_tiers, supplemental_experience_count};
 use ranking::{
-    RetrievalTier, apply_time_window, build_ranked_context_facts,
-    default_episode_fallback_rationale, select_ranked_context_facts,
+    RetrievalTier, apply_time_window, build_ranked_context_facts, select_ranked_context_facts,
     sort_ranked_context_facts_for_timeline,
 };
+use semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
 use temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
+use views::{
+    EpisodeFallbackParams, build_episode_fallback_items, build_facets_view, build_map_view,
+    build_wake_up_view,
+};
 
 /// Assemble context for a query.
 pub async fn assemble_context(
@@ -216,7 +215,7 @@ pub async fn assemble_context(
     } else if requested_view_mode == Some("wake_up") {
         build_wake_up_view(
             service,
-            FactFilterParams {
+            views::FactFilterParams {
                 namespace: &namespace,
                 scope: &request.scope,
                 cutoff,
@@ -225,10 +224,19 @@ pub async fn assemble_context(
                 access: &access,
             },
             request.budget,
+            super::decayed_confidence,
+            super::normalize_dt,
         )
         .await?
     } else if requested_view_mode == Some("map") {
-        build_map_view(service, &namespace, cutoff, request.budget).await?
+        build_map_view(
+            service,
+            &namespace,
+            cutoff,
+            request.budget,
+            super::normalize_dt,
+        )
+        .await?
     } else {
         let lexical_result = select_fact_records_for_query(
             service,
@@ -402,7 +410,11 @@ pub async fn assemble_context(
             )
             .await?;
             build_episode_fallback_items(EpisodeFallbackParams {
-                episodes: filter_episodes_by_constraints(episode_records, &access, project_opt),
+                episodes: filtering::filter_episodes_by_constraints(
+                    episode_records,
+                    &access,
+                    project_opt,
+                ),
                 query_opt,
                 scope: &request.scope,
                 cutoff,
@@ -410,6 +422,7 @@ pub async fn assemble_context(
                 window_end: request.window_end,
                 timeline_mode: requested_view_mode == Some("timeline"),
                 budget: request.budget,
+                fallback_rationale_fn: ranking::default_episode_fallback_rationale,
             })
         } else {
             apply_time_window(&mut ranked_facts, request.window_start, request.window_end);
@@ -549,443 +562,12 @@ pub async fn assemble_context(
     Ok(results)
 }
 
-/// Parameters for building context items from episode fallback records.
-struct EpisodeFallbackParams<'a> {
-    episodes: Vec<crate::models::Episode>,
-    query_opt: Option<&'a str>,
-    scope: &'a str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    window_start: Option<chrono::DateTime<chrono::Utc>>,
-    window_end: Option<chrono::DateTime<chrono::Utc>>,
-    timeline_mode: bool,
-    budget: i32,
-}
-
-fn build_episode_fallback_items(params: EpisodeFallbackParams<'_>) -> Vec<AssembledContextItem> {
-    let mut episodes = params.episodes;
-    apply_episode_time_window(&mut episodes, params.window_start, params.window_end);
-
-    if params.timeline_mode {
-        episodes.sort_by(|left, right| {
-            left.t_ref
-                .cmp(&right.t_ref)
-                .then_with(|| left.episode_id.cmp(&right.episode_id))
-        });
-    } else {
-        episodes.sort_by(|left, right| {
-            right
-                .t_ref
-                .cmp(&left.t_ref)
-                .then_with(|| left.episode_id.cmp(&right.episode_id))
-        });
-    }
-
-    episodes
-        .into_iter()
-        .take(params.budget.max(1) as usize)
-        .map(|episode| AssembledContextItem {
-            fact_id: format!("episode_fallback:{}", episode.episode_id),
-            content: episode.content.clone(),
-            quote: episode.content.clone(),
-            source_episode: episode.episode_id.clone(),
-            confidence: 1.0,
-            provenance: json!({
-                "source_episode": episode.episode_id,
-                "source_type": episode.source_type,
-                "source_id": episode.source_id,
-                "episode_fallback": true,
-            }),
-            rationale: default_episode_fallback_rationale(
-                params.query_opt,
-                params.scope,
-                params.cutoff,
-            ),
-            retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
-        })
-        .collect()
-}
-
-fn apply_episode_time_window(
-    episodes: &mut Vec<crate::models::Episode>,
-    window_start: Option<chrono::DateTime<chrono::Utc>>,
-    window_end: Option<chrono::DateTime<chrono::Utc>>,
-) {
-    if window_start.is_none() && window_end.is_none() {
-        return;
-    }
-
-    episodes.retain(|episode| {
-        let after_start = window_start.is_none_or(|start| episode.t_ref >= start);
-        let before_end = window_end.is_none_or(|end| episode.t_ref <= end);
-        after_start && before_end
-    });
-}
-
-async fn build_facets_view(
-    service: &crate::service::MemoryService,
-    namespace: &str,
-    scope: &str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    project: Option<&str>,
-    budget: i32,
-    access: &AccessContext,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let records = service
-        .db_client
-        .select_table("episode", namespace)
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-
-    let mut buckets = HashMap::<String, (usize, chrono::DateTime<chrono::Utc>)>::new();
-
-    for record in records {
-        let Some(map) = raw_object(&record) else {
-            continue;
-        };
-        let Some(episode) = super::episode::episode_from_record(map) else {
-            continue;
-        };
-        if episode.scope != scope
-            || episode.t_ref > cutoff
-            || episode.t_ingested > cutoff
-            || !episode_record_allowed(&record, access, project)
-        {
-            continue;
-        }
-
-        let label = map
-            .get("project")
-            .and_then(json_string)
-            .filter(|value| !value.trim().is_empty())
-            .map(ToString::to_string)
-            .or_else(|| episode.policy_tags.first().cloned())
-            .unwrap_or_else(|| scope.to_string());
-
-        buckets
-            .entry(label)
-            .and_modify(|(count, latest)| {
-                *count += 1;
-                *latest = (*latest).max(episode.t_ingested);
-            })
-            .or_insert((1, episode.t_ingested));
-    }
-
-    let mut buckets = buckets.into_iter().collect::<Vec<_>>();
-    buckets.sort_by(
-        |(left_label, (_, left_latest)), (right_label, (_, right_latest))| {
-            right_latest
-                .cmp(left_latest)
-                .then_with(|| left_label.cmp(right_label))
-        },
-    );
-
-    let items = buckets
-        .into_iter()
-        .take(budget.max(1) as usize)
-        .map(|(label, (count, latest))| AssembledContextItem {
-            fact_id: format!("facet:{label}"),
-            content: label.clone(),
-            quote: format!("{count} episodes"),
-            source_episode: format!("facet:{label}"),
-            confidence: 1.0,
-            provenance: json!({
-                "facet": label,
-                "count": count,
-                "max_t_ingested": super::normalize_dt(latest),
-            }),
-            rationale: "view_mode=facets grouped episodes by project/policy/scope".to_string(),
-            retrieval_tier: None,
-        })
-        .collect::<Vec<_>>();
-
-    service.logger.log(
-        super::log_event(
-            "assemble_context.facets_view",
-            json!({"scope": scope, "project": project}),
-            json!({"count": items.len()}),
-            Some(access),
-        ),
-        LogLevel::Debug,
-    );
-
-    Ok(items)
-}
-
-async fn build_wake_up_view(
-    service: &crate::service::MemoryService,
-    params: FactFilterParams<'_>,
-    budget: i32,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let records = service
-        .db_client
-        .select_table("fact", params.namespace)
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-
-    let mut facts =
-        filter_facts_by_constraints(records, params.access, params.project, params.fact_types)
-            .into_iter()
-            .filter(|fact| fact.scope == params.scope)
-            .filter(|fact| fact_is_active_at(fact, params.cutoff))
-            .collect::<Vec<_>>();
-
-    facts.sort_by(|left, right| {
-        let left_persona = left.policy_tags.iter().any(|tag| tag == "persona");
-        let right_persona = right.policy_tags.iter().any(|tag| tag == "persona");
-        right_persona
-            .cmp(&left_persona)
-            .then_with(|| right.t_ingested.cmp(&left.t_ingested))
-            .then_with(|| right.t_valid.cmp(&left.t_valid))
-            .then_with(|| left.fact_id.cmp(&right.fact_id))
-    });
-
-    let persona_count = facts
-        .iter()
-        .filter(|fact| fact.policy_tags.iter().any(|tag| tag == "persona"))
-        .count();
-
-    let items = facts
-        .into_iter()
-        .take(budget.max(1) as usize)
-        .map(|fact| {
-            let persona = fact.policy_tags.iter().any(|tag| tag == "persona");
-            let confidence = if persona {
-                fact.confidence
-                    .max(super::decayed_confidence(&fact, params.cutoff))
-            } else {
-                super::decayed_confidence(&fact, params.cutoff)
-            };
-            AssembledContextItem {
-                fact_id: fact.fact_id,
-                content: fact.content,
-                quote: fact.quote,
-                source_episode: fact.source_episode,
-                confidence,
-                provenance: fact.provenance,
-                rationale: format!(
-                    "view_mode=wake_up persona={} recent_t_ingested={}",
-                    persona,
-                    super::normalize_dt(fact.t_ingested)
-                ),
-                retrieval_tier: None,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    service.logger.log(
-        super::log_event(
-            "assemble_context.wake_up_view",
-            json!({"scope": params.scope, "project": params.project, "fact_type_count": params.fact_types.len()}),
-            json!({"count": items.len(), "persona_count": persona_count}),
-            Some(params.access),
-        ),
-        LogLevel::Debug,
-    );
-
-    Ok(items)
-}
-
-async fn build_map_view(
-    service: &crate::service::MemoryService,
-    namespace: &str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    budget: i32,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let hub_entities =
-        super::apps::graph::find_hub_entities(service, namespace, cutoff, budget).await?;
-    let communities =
-        super::apps::graph::list_communities(service, namespace, cutoff, budget).await?;
-
-    service.logger.log(
-        super::log_event(
-            "assemble_context.map_view",
-            json!({"namespace": namespace, "budget": budget}),
-            json!({"hub_entities": hub_entities.len(), "communities": communities.len()}),
-            None,
-        ),
-        LogLevel::Debug,
-    );
-
-    let mut items = Vec::with_capacity(hub_entities.len() + communities.len());
-
-    for hub in hub_entities {
-        items.push(AssembledContextItem {
-            fact_id: format!("map:hub:{}", hub.entity_id),
-            content: hub.canonical_name.clone(),
-            quote: format!("{} connections", hub.degree),
-            source_episode: hub.entity_id.clone(),
-            confidence: 1.0,
-            provenance: json!({
-                "kind": "hub_entity",
-                "entity_id": hub.entity_id,
-                "canonical_name": hub.canonical_name,
-                "degree": hub.degree,
-            }),
-            rationale: "view_mode=map ranked hub entities by active graph degree".to_string(),
-            retrieval_tier: None,
-        });
-    }
-
-    for community in communities {
-        let member_count = community.member_entities.len();
-        items.push(AssembledContextItem {
-            fact_id: format!("map:community:{}", community.community_id),
-            content: community.summary.clone(),
-            quote: format!("{member_count} members"),
-            source_episode: community.community_id.clone(),
-            confidence: 1.0,
-            provenance: json!({
-                "kind": "community",
-                "community_id": community.community_id,
-                "member_entities": community.member_entities,
-                "member_count": member_count,
-                "updated_at": community.updated_at.map(super::normalize_dt),
-            }),
-            rationale: "view_mode=map listed active communities from the graph index".to_string(),
-            retrieval_tier: None,
-        });
-    }
-
-    items.truncate(budget.max(1) as usize);
-    Ok(items)
-}
-
-/// Test-only convenience wrapper around the production comparator below.
-///
-/// Production code uses `compare_facts_by_recency` directly in composite sorts,
-/// while tests keep this helper to assert the standalone ordering contract.
 #[cfg(test)]
-fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
-    facts.sort_by(filtering::compare_facts_by_recency);
-}
-
-#[derive(Debug)]
-
-struct CollectSemanticFactsRequest<'a> {
-    namespace: &'a str,
-    scope: &'a str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    query: &'a str,
-    access: &'a AccessContext,
-    project: Option<&'a str>,
-    fact_types: &'a [String],
-    excluded_fact_ids: &'a HashSet<String>,
-    budget: i32,
-}
-
-async fn collect_semantic_facts(
-    service: &crate::service::MemoryService,
-    request: CollectSemanticFactsRequest<'_>,
-) -> Result<Vec<(crate::models::Fact, String)>, MemoryError> {
-    let query_embedding = match service.generate_embedding(request.query).await {
-        Ok(Some(embedding)) => embedding,
-        Ok(None) => return Ok(Vec::new()),
-        Err(err) => {
-            service.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.query_skipped")),
-                    (
-                        "provider".to_string(),
-                        json!(service.embedding_provider.provider_name()),
-                    ),
-                    ("error".to_string(), json!(err.to_string())),
-                ]),
-                LogLevel::Warn,
-            );
-            return Ok(Vec::new());
-        }
-    };
-
-    if query_embedding.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Request more candidates than budget since HNSW results may be filtered
-    // by temporal/scope constraints post-search
-    let search_limit = request.budget.max(1) * 4;
-
-    let fact_records = service
-        .db_client
-        .select_facts_ann(
-            request.namespace,
-            request.scope,
-            &super::normalize_dt(request.cutoff),
-            &query_embedding,
-            search_limit,
-        )
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-
-    let mut ranked_facts = Vec::new();
-    for record in fact_records {
-        if !fact_record_allowed(&record, request.access, request.project, request.fact_types) {
-            continue;
-        }
-
-        let Some(fact) = super::episode::fact_from_record(&record) else {
-            continue;
-        };
-
-        if fact.scope != request.scope
-            || request.excluded_fact_ids.contains(&fact.fact_id)
-            || !fact_is_active_at(&fact, request.cutoff)
-        {
-            continue;
-        }
-
-        // Use DB-computed sem_score if available, otherwise compute in Rust
-        let similarity = record
-            .as_object()
-            .and_then(|map: &serde_json::Map<String, Value>| map.get("sem_score"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or_else(|| {
-                let embedding = record
-                    .as_object()
-                    .and_then(|map: &serde_json::Map<String, Value>| map.get("embedding"))
-                    .and_then(embedding_from_value);
-                match embedding {
-                    Some(ref emb) if emb.len() == query_embedding.len() => {
-                        cosine_similarity(&query_embedding, emb)
-                    }
-                    _ => 0.0,
-                }
-            });
-
-        if similarity < service.embedding_similarity_threshold {
-            continue;
-        }
-
-        ranked_facts.push((similarity, fact));
-    }
-
-    ranked_facts.sort_by(
-        |(left_similarity, left_fact), (right_similarity, right_fact)| {
-            right_similarity
-                .total_cmp(left_similarity)
-                .then_with(|| compare_facts_by_recency(left_fact, right_fact))
-        },
-    );
-
-    Ok(ranked_facts
-        .into_iter()
-        .take(request.budget.max(1) as usize)
-        .map(|(similarity, fact)| {
-            (
-                fact,
-                format!(
-                    "matched semantic similarity={similarity:.3} for query=\"{}\"",
-                    request.query
-                ),
-            )
-        })
-        .collect())
-}
-
-#[cfg(test)]
+#[allow(unused_imports, dead_code)]
 mod tests {
     use super::alias_expansion::expand_query_with_aliases_for_test;
     use super::community::stored_community_summary_from_value;
-    use super::filtering::filter_facts_by_policy;
+    use super::filtering::{compare_facts_by_recency, filter_facts_by_policy};
     use super::lexical::{lexical_candidate_limit, rank_lexical_records};
     use super::ranking::{
         RankedContextFact, prune_redundant_selected_facts, ranked_relevance_score,
@@ -998,9 +580,14 @@ mod tests {
     use crate::storage::{DbClient, GraphDirection};
     use async_trait::async_trait;
     use chrono::Utc;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn sort_facts_by_recency(facts: &mut [crate::models::Fact]) {
+        use super::filtering::compare_facts_by_recency;
+        facts.sort_by(compare_facts_by_recency);
+    }
 
     fn create_test_fact(fact_id: &str, t_valid: chrono::DateTime<Utc>) -> crate::models::Fact {
         crate::models::Fact {

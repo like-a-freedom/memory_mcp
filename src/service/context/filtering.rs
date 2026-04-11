@@ -72,7 +72,7 @@ pub(crate) fn filter_facts_by_constraints(
     facts
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<Fact> {
     filter_facts_by_constraints(records, access, None, &[])
 }

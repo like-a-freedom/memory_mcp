@@ -102,7 +102,6 @@ pub(crate) async fn expand_query_with_aliases(
     expanded.into_iter().collect()
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 pub(crate) async fn expand_query_with_aliases_for_test(
     service: &crate::service::MemoryService,

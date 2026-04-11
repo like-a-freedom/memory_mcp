@@ -30,15 +30,6 @@ pub(crate) struct FactQueryParams<'a> {
     pub(crate) fact_types: &'a [String],
 }
 
-pub(crate) struct FactFilterParams<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
-    pub(crate) cutoff: chrono::DateTime<chrono::Utc>,
-    pub(crate) project: Option<&'a str>,
-    pub(crate) fact_types: &'a [String],
-    pub(crate) access: &'a crate::models::AccessContext,
-}
-
 pub(crate) async fn select_fact_records_for_query(
     service: &crate::service::MemoryService,
     params: FactQueryParams<'_>,
