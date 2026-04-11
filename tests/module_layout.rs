@@ -119,3 +119,79 @@ fn entity_extraction_subsystem_lives_under_a_single_directory_module() {
         "legacy src/service/gliner_entity_extractor.rs should be removed after grouping extractors"
     );
 }
+
+#[test]
+fn embedding_subsystem_lives_under_a_directory_module() {
+    let service_dir = service_dir();
+    let embedding_mod = fs::read_to_string(service_dir.join("embedding/mod.rs"))
+        .expect("embedding mod.rs should be readable");
+
+    assert!(
+        embedding_mod.contains("\nmod local;"),
+        "embedding mod.rs should declare the local provider submodule"
+    );
+    assert!(
+        embedding_mod.contains("\nmod remote;"),
+        "embedding mod.rs should declare the remote provider submodule"
+    );
+    assert!(
+        !service_dir.join("embedding.rs").exists(),
+        "legacy src/service/embedding.rs should be removed after the physical move"
+    );
+}
+
+#[test]
+fn model_loader_subsystem_lives_under_a_directory_module() {
+    let service_dir = service_dir();
+    let model_loader_mod = fs::read_to_string(service_dir.join("model_loader/mod.rs"))
+        .expect("model_loader mod.rs should be readable");
+
+    assert!(
+        model_loader_mod.contains("\nmod download;"),
+        "model_loader mod.rs should declare the download helper submodule"
+    );
+    assert!(
+        !service_dir.join("model_loader.rs").exists(),
+        "legacy src/service/model_loader.rs should be removed after the physical move"
+    );
+}
+
+#[test]
+fn query_subsystem_lives_under_a_directory_module() {
+    let service_dir = service_dir();
+    let query_mod = fs::read_to_string(service_dir.join("query/mod.rs"))
+        .expect("query mod.rs should be readable");
+
+    assert!(
+        query_mod.contains("\nmod search;"),
+        "query mod.rs should declare the search helper submodule"
+    );
+    assert!(
+        query_mod.contains("\nmod time;"),
+        "query mod.rs should declare the time helper submodule"
+    );
+    assert!(
+        !service_dir.join("query.rs").exists(),
+        "legacy src/service/query.rs should be removed after the physical move"
+    );
+}
+
+#[test]
+fn cache_subsystem_lives_under_a_directory_module() {
+    let service_dir = service_dir();
+    let cache_mod = fs::read_to_string(service_dir.join("cache/mod.rs"))
+        .expect("cache mod.rs should be readable");
+
+    assert!(
+        cache_mod.contains("\nmod invalidation;"),
+        "cache mod.rs should declare the invalidation helper submodule"
+    );
+    assert!(
+        cache_mod.contains("\nmod key;"),
+        "cache mod.rs should declare the cache key submodule"
+    );
+    assert!(
+        !service_dir.join("cache.rs").exists(),
+        "legacy src/service/cache.rs should be removed after the physical move"
+    );
+}

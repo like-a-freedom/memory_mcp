@@ -106,8 +106,12 @@ pub async fn create_entity_extractor(
     use crate::config::NerProviderKind;
 
     match config.provider {
-        NerProviderKind::Regex => Ok(Arc::new(RegexEntityExtractor::new()?)),
-        NerProviderKind::Anno => Ok(Arc::new(AnnoEntityExtractor::new()?)),
+        NerProviderKind::Regex => {
+            Ok(Arc::new(RegexEntityExtractor::new()?) as Arc<dyn EntityExtractor>)
+        }
+        NerProviderKind::Anno => {
+            Ok(Arc::new(AnnoEntityExtractor::new()?) as Arc<dyn EntityExtractor>)
+        }
         NerProviderKind::LocalGliner => {
             let model = config.model.as_ref().ok_or_else(|| {
                 MemoryError::ConfigInvalid(
@@ -123,7 +127,7 @@ pub async fn create_entity_extractor(
                 &resolved_dir,
                 config.labels.clone(),
                 config.threshold,
-            )?))
+            )?) as Arc<dyn EntityExtractor>)
         }
     }
 }

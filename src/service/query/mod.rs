@@ -1,0 +1,111 @@
+//! Query preprocessing and utility functions.
+
+use chrono::{DateTime, Utc};
+
+mod search;
+mod time;
+
+pub use search::{normalize_text, preprocess_search_query, search_query_terms};
+pub use time::{bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso};
+
+/// Calculate decayed confidence based on fact age.
+pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64 {
+    let half_life_days = if fact.fact_type == crate::models::FactType::Metric.as_str()
+        || fact.fact_type == crate::models::FactType::Promise.as_str()
+    {
+        super::METRIC_HALF_LIFE_DAYS
+    } else {
+        super::DEFAULT_HALF_LIFE_DAYS
+    };
+    let delta_days = (now - fact.t_valid).num_days().max(0) as f64;
+    let decay = 0.5_f64.powf(delta_days / half_life_days);
+    (fact.confidence * decay * super::CONFIDENCE_SCALE).round() / super::CONFIDENCE_SCALE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Fact;
+    use chrono::{TimeZone, Utc};
+    use serde_json::json;
+
+    #[test]
+    fn decayed_confidence_metric_uses_longer_half_life() {
+        let fact = Fact {
+            fact_id: "fact:1".to_string(),
+            fact_type: "metric".to_string(),
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "episode:1".to_string(),
+            t_valid: Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap(),
+            t_ingested: Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: json!({}),
+            ft_score: 0.0,
+        };
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let confidence = decayed_confidence(&fact, now);
+        assert!(confidence > 0.4 && confidence < 0.6);
+    }
+
+    #[test]
+    fn decayed_confidence_general_uses_shorter_half_life() {
+        let fact = Fact {
+            fact_id: "fact:1".to_string(),
+            fact_type: "note".to_string(),
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "episode:1".to_string(),
+            t_valid: Utc.with_ymd_and_hms(2023, 7, 1, 0, 0, 0).unwrap(),
+            t_ingested: Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: json!({}),
+            ft_score: 0.0,
+        };
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let confidence = decayed_confidence(&fact, now);
+        assert!(confidence > 0.4 && confidence < 0.6);
+    }
+
+    #[test]
+    fn decayed_confidence_fresh_fact_has_high_confidence() {
+        let fact = Fact {
+            fact_id: "fact:1".to_string(),
+            fact_type: "note".to_string(),
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "episode:1".to_string(),
+            t_valid: Utc::now(),
+            t_ingested: Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: json!({}),
+            ft_score: 0.0,
+        };
+        let confidence = decayed_confidence(&fact, Utc::now());
+        assert!(confidence > 0.99);
+    }
+}

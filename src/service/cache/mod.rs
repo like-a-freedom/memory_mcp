@@ -1,127 +1,22 @@
 //! Context cache management.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+pub use invalidation::invalidate_cache_by_scope;
+pub use key::{CacheKey, CacheView};
 
-use chrono::{DateTime, Utc};
-use lru::LruCache;
-use serde_json::json;
-use tokio::sync::RwLock;
-
-use crate::logging::{LogLevel, StdoutLogger};
-use crate::models::AssembledContextItem;
-
-fn cache_logger() -> StdoutLogger {
-    StdoutLogger::new("trace")
-}
-
-/// Cache key for context assembly results.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CacheKey {
-    query: String,
-    scope: String,
-    cutoff: String,
-    budget: i32,
-    project: Option<String>,
-    fact_types: Vec<String>,
-    view: CacheView,
-    tags: Option<Vec<String>>,
-}
-
-/// Timeline-specific cache parameters.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct CacheView {
-    view_mode: Option<String>,
-    window_start: Option<String>,
-    window_end: Option<String>,
-}
-
-impl CacheView {
-    #[must_use]
-    pub fn new(
-        view_mode: Option<&str>,
-        window_start: Option<DateTime<Utc>>,
-        window_end: Option<DateTime<Utc>>,
-    ) -> Self {
-        Self {
-            view_mode: view_mode.map(ToString::to_string),
-            window_start: window_start.map(super::query::bucket_to_five_minutes),
-            window_end: window_end.map(super::query::bucket_to_five_minutes),
-        }
-    }
-}
-
-impl CacheKey {
-    #[allow(clippy::too_many_arguments)]
-    #[must_use]
-    pub fn new(
-        query: &str,
-        scope: &str,
-        cutoff: DateTime<Utc>,
-        budget: i32,
-        project: Option<&str>,
-        fact_types: &[String],
-        view: CacheView,
-        tags: Option<Vec<String>>,
-    ) -> Self {
-        let mut tags = tags;
-        if let Some(ref mut tag_list) = tags {
-            tag_list.sort();
-        }
-        let mut fact_types = fact_types.to_vec();
-        fact_types.sort();
-        fact_types.dedup();
-        Self {
-            query: super::normalize_text(query),
-            scope: scope.to_string(),
-            cutoff: super::query::bucket_to_five_minutes(cutoff),
-            budget,
-            project: project.map(ToString::to_string),
-            fact_types,
-            view,
-            tags,
-        }
-    }
-
-    /// Check if this cache key matches the given scope.
-    #[must_use]
-    pub fn matches_scope(&self, scope: &str) -> bool {
-        self.scope == scope
-    }
-}
-
-/// Invalidate cache entries for a specific scope.
-pub async fn invalidate_cache_by_scope(
-    cache: &Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    scope: &str,
-) {
-    let mut guard = cache.write().await;
-    let keys_to_remove: Vec<CacheKey> = guard
-        .iter()
-        .filter(|(key, _)| key.matches_scope(scope))
-        .map(|(key, _)| key.clone())
-        .collect();
-
-    let count = keys_to_remove.len();
-    if count > 0 {
-        let mut event = HashMap::new();
-        event.insert("op".to_string(), json!("cache.invalidate_by_scope"));
-        event.insert("scope".to_string(), json!(scope));
-        event.insert("invalidated_count".to_string(), json!(count));
-        cache_logger().log(event, LogLevel::Trace);
-    }
-
-    for key in keys_to_remove {
-        guard.pop(&key);
-    }
-}
+mod invalidation;
+mod key;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use chrono::{TimeZone, Utc};
+    use lru::LruCache;
     use serde_json::json;
     use std::num::NonZeroUsize;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    use crate::models::AssembledContextItem;
 
     #[test]
     fn cache_key_new_normalizes_query() {
