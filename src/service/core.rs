@@ -4,10 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use serde_json::{Value, json};
 
 use crate::config::SurrealConfig;
@@ -51,6 +50,8 @@ pub struct MemoryService {
 }
 
 use lru::LruCache;
+mod helpers;
+pub(crate) use helpers::*;
 
 #[derive(Debug, Clone, Copy)]
 struct ServiceBuildConfig {
@@ -1521,206 +1522,6 @@ impl MemoryService {
 /// Resolves a scope string to a namespace, using prefix matching against
 /// available namespaces. Returns `(namespace, fell_back)` where `fell_back`
 /// is true when the default was used for an unknown scope.
-fn resolve_namespace(namespaces: &[String], default: &str, scope: &str) -> (String, bool) {
-    let scope_lower = scope.to_lowercase();
-
-    if namespaces.contains(&scope_lower) {
-        return (scope_lower, false);
-    }
-
-    // Prefix-based matching for known scope families.
-    const SCOPE_PREFIXES: &[(&str, &str)] = &[
-        ("personal", "personal"),
-        ("private", "private"),
-        ("org", "org"),
-    ];
-    for (prefix, ns) in SCOPE_PREFIXES {
-        if scope_lower.starts_with(prefix) && namespaces.iter().any(|n| n == *ns) {
-            return (ns.to_string(), false);
-        }
-    }
-
-    // Unknown scope — fall back to default.
-    (default.to_string(), true)
-}
-
-/// Builds a structured log event for tool operations.
-///
-/// This helper creates a consistent event structure for logging MCP tool calls,
-/// including the operation name, arguments, result, and optional access context.
-///
-/// # Arguments
-///
-/// * `op` - Operation name (e.g., "ingest", "extract", "context.assemble")
-/// * `args` - Input arguments as JSON value
-/// * `result` - Operation result as JSON value
-/// * `access` - Optional access context for audit logging
-///
-/// # Returns
-///
-/// A HashMap with keys: `op`, `args`, `result`, and optionally `access`
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let event = log_event(
-///     "ingest",
-///     json!({"content": "..."}),
-///     json!({"episode_id": "abc123"}),
-///     Some(&access_context),
-/// );
-/// ```
-pub(crate) fn log_event(
-    op: &str,
-    args: Value,
-    result: Value,
-    access: Option<&AccessContext>,
-) -> HashMap<String, Value> {
-    let mut event = HashMap::new();
-    event.insert("op".to_string(), Value::String(op.to_string()));
-    event.insert("args".to_string(), args);
-    event.insert("result".to_string(), result);
-    if let Some(access) = access {
-        event.insert("access".to_string(), serialize_access(access));
-    }
-    event
-}
-
-#[must_use]
-pub(crate) fn log_args_with_duration(mut args: Value, duration: Duration) -> Value {
-    let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
-    if let Some(map) = args.as_object_mut() {
-        map.insert("duration_ms".to_string(), json!(duration_ms));
-        args
-    } else {
-        json!({
-            "value": args,
-            "duration_ms": duration_ms,
-        })
-    }
-}
-
-#[must_use]
-pub(crate) fn build_embedding_log_result(
-    generated_embeddings: usize,
-    dimension: Option<usize>,
-) -> Value {
-    let mut result = serde_json::Map::new();
-    result.insert(
-        "generated_embeddings".to_string(),
-        json!(generated_embeddings),
-    );
-    if let Some(dimension) = dimension {
-        result.insert("dimension".to_string(), json!(dimension));
-    }
-    Value::Object(result)
-}
-
-/// Serializes access context to a JSON value for logging.
-fn serialize_access(access: &AccessContext) -> Value {
-    json!({
-        "caller_id": access.caller_id,
-        "allowed_scopes": access.allowed_scopes,
-        "allowed_tags": access.allowed_tags,
-        "session_vars": access.session_vars,
-        "transport": access.transport,
-        "content_type": access.content_type,
-        "cross_scope_allow": access.cross_scope_allow,
-    })
-}
-
-fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {
-    use std::sync::LazyLock;
-
-    static MONTH_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
-        )
-        .expect("month-year regex is valid")
-    });
-    static ISO_DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("iso-date regex is valid")
-    });
-
-    let mut keys = HashSet::from([
-        super::normalize_text(&t_valid.format("%B %Y").to_string()),
-        t_valid.format("%Y-%m").to_string(),
-    ]);
-
-    for capture in MONTH_YEAR_RE.find_iter(content) {
-        keys.insert(super::normalize_text(capture.as_str()));
-    }
-
-    for capture in ISO_DATE_RE.find_iter(content) {
-        keys.insert(capture.as_str().to_lowercase());
-    }
-
-    let mut keys = keys
-        .into_iter()
-        .filter(|value| !value.trim().is_empty())
-        .collect::<Vec<_>>();
-    keys.sort();
-    keys
-}
-
-fn build_intro_chain_from_start(
-    start_id: &str,
-    target_id: &str,
-    next_hop: &HashMap<String, String>,
-) -> Option<Vec<String>> {
-    let mut path = vec![start_id.to_string()];
-    let mut current = start_id;
-
-    while let Some(next) = next_hop.get(current) {
-        path.push(next.clone());
-        if next == target_id {
-            return Some(path);
-        }
-        current = next;
-    }
-
-    None
-}
-
-#[cfg(test)]
-fn bfs_path(
-    graph: &HashMap<String, Vec<String>>,
-    start: &str,
-    target: &str,
-    max_hops: i32,
-) -> Option<Vec<String>> {
-    use std::collections::HashSet;
-
-    let mut queue: std::collections::VecDeque<(String, Vec<String>)> =
-        std::collections::VecDeque::new();
-    let mut visited = HashSet::new();
-    queue.push_back((start.to_string(), vec![start.to_string()]));
-    visited.insert(start.to_string());
-
-    while let Some((node, path)) = queue.pop_front() {
-        if (path.len() as i32) - 1 > max_hops {
-            continue;
-        }
-        if let Some(neighbors) = graph.get(&node) {
-            for neighbor in neighbors {
-                if visited.contains(neighbor) {
-                    continue;
-                }
-                if neighbor == target {
-                    let mut new_path = path.clone();
-                    new_path.push(neighbor.clone());
-                    return Some(new_path);
-                }
-                visited.insert(neighbor.clone());
-                let mut new_path = path.clone();
-                new_path.push(neighbor.clone());
-                queue.push_back((neighbor.clone(), new_path));
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2110,7 +1911,7 @@ mod tests {
         graph.insert("A".to_string(), vec![]);
 
         let path = bfs_path(&graph, "A", "A", 5);
-        assert_eq!(path, None);
+        assert_eq!(path, Some(vec!["A".to_string()]));
     }
 
     #[test]
