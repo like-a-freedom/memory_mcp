@@ -95,14 +95,36 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let extraction_result = match zero_shot_labels {
-        Some(labels) => {
-            service
-                .entity_extractor
-                .extract_candidates_with_labels(content, labels)
-                .await
+    let extraction_result = if ner_provider_uses_blocking_pool(provider) {
+        let extractor = service.entity_extractor.clone();
+        let content_owned = content.to_string();
+        let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
+        let handle = tokio::runtime::Handle::current();
+
+        tokio::task::spawn_blocking(move || {
+            handle.block_on(async move {
+                match zero_shot_labels {
+                    Some(labels) => {
+                        extractor
+                            .extract_candidates_with_labels(&content_owned, &labels)
+                            .await
+                    }
+                    None => extractor.extract_candidates(&content_owned).await,
+                }
+            })
+        })
+        .await
+        .map_err(|err| MemoryError::Storage(format!("entity extraction task panicked: {err}")))?
+    } else {
+        match zero_shot_labels {
+            Some(labels) => {
+                service
+                    .entity_extractor
+                    .extract_candidates_with_labels(content, labels)
+                    .await
+            }
+            None => service.entity_extractor.extract_candidates(content).await,
         }
-        None => service.entity_extractor.extract_candidates(content).await,
     };
 
     let candidates = match extraction_result {
@@ -162,6 +184,10 @@ pub async fn extract_entities(
     }
 
     Ok(entities)
+}
+
+fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
+    matches!(provider, "anno" | "gliner")
 }
 
 /// Extract facts from an episode.
@@ -1014,7 +1040,12 @@ fn is_traversable_context_node(record_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::EntityCandidate;
+    use crate::service::EntityExtractor;
+    use crate::storage::{DbClient, SurrealDbClient};
     use serde_json::json;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn episode_from_record_parses_full_record() {
@@ -1255,6 +1286,64 @@ mod tests {
             Some("tokenization failed")
         );
         assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn extract_entities_does_not_block_runtime_for_local_gliner_provider() {
+        struct BlockingGlinerExtractor;
+
+        #[async_trait::async_trait]
+        impl EntityExtractor for BlockingGlinerExtractor {
+            fn provider_name(&self) -> &'static str {
+                "gliner"
+            }
+
+            async fn extract_candidates(
+                &self,
+                _content: &str,
+            ) -> Result<Vec<EntityCandidate>, MemoryError> {
+                std::thread::sleep(Duration::from_millis(250));
+                Ok(Vec::new())
+            }
+        }
+
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory("episode-test", "org", "warn")
+                .await
+                .expect("connect in memory"),
+        );
+        db_client
+            .apply_migrations("org")
+            .await
+            .expect("apply migrations");
+
+        let mut service = crate::service::MemoryService::new(
+            db_client,
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("create service");
+        service.entity_extractor = Arc::new(BlockingGlinerExtractor);
+
+        let ticker = tokio::spawn(async move {
+            let start = Instant::now();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+        tokio::task::yield_now().await;
+
+        let _ = extract_entities(&service, "Atlas project status", None)
+            .await
+            .expect("extract entities");
+        let tick_elapsed = ticker.await.expect("join ticker");
+
+        assert!(
+            tick_elapsed < Duration::from_millis(150),
+            "local gliner extraction blocked the runtime for {:?}",
+            tick_elapsed
+        );
     }
 
     #[tokio::test]

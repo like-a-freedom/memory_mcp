@@ -4,6 +4,7 @@
 //! abstracting over embedded and remote (WebSocket) engines.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -295,8 +296,8 @@ pub struct SurrealDbClient {
 
 /// Internal enum representing the database engine type.
 enum DbEngine {
-    Local(std::collections::HashMap<String, Surreal<Db>>),
-    Remote(std::collections::HashMap<String, Surreal<Client>>),
+    Local(std::collections::HashMap<String, Arc<Surreal<Db>>>),
+    Remote(std::collections::HashMap<String, Arc<Surreal<Client>>>),
 }
 
 impl SurrealDbClient {
@@ -410,7 +411,7 @@ impl SurrealDbClient {
     }
 
     /// Gets a database handle with namespace set.
-    async fn with_namespace_local(&self, namespace: &str) -> Result<Surreal<Db>, MemoryError> {
+    async fn with_namespace_local(&self, namespace: &str) -> Result<Arc<Surreal<Db>>, MemoryError> {
         match &self.engine {
             DbEngine::Local(clients) => clients.get(namespace).cloned().ok_or_else(|| {
                 MemoryError::Storage(format!("SurrealDB namespace not initialized: {namespace}"))
@@ -420,7 +421,10 @@ impl SurrealDbClient {
     }
 
     /// Gets a database handle with namespace set.
-    async fn with_namespace_remote(&self, namespace: &str) -> Result<Surreal<Client>, MemoryError> {
+    async fn with_namespace_remote(
+        &self,
+        namespace: &str,
+    ) -> Result<Arc<Surreal<Client>>, MemoryError> {
         match &self.engine {
             DbEngine::Remote(clients) => clients.get(namespace).cloned().ok_or_else(|| {
                 MemoryError::Storage(format!("SurrealDB namespace not initialized: {namespace}"))
@@ -729,7 +733,7 @@ async fn build_namespace_clients<T: surrealdb::Connection + Clone>(
     base: &Surreal<T>,
     namespaces: &[String],
     database: &str,
-) -> Result<std::collections::HashMap<String, Surreal<T>>, MemoryError> {
+) -> Result<std::collections::HashMap<String, Arc<Surreal<T>>>, MemoryError> {
     let mut clients = std::collections::HashMap::with_capacity(namespaces.len());
 
     for namespace in namespaces {
@@ -739,7 +743,7 @@ async fn build_namespace_clients<T: surrealdb::Connection + Clone>(
             .use_db(database)
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB use failed: {err}")))?;
-        clients.insert(namespace.clone(), client);
+        clients.insert(namespace.clone(), Arc::new(client));
     }
 
     Ok(clients)
@@ -2570,6 +2574,39 @@ mod tests {
 
         assert!(primary.is_empty());
         assert!(secondary.is_empty());
+    }
+
+    #[tokio::test]
+    async fn namespace_clients_reuse_shared_session_state_across_queries() {
+        let client = SurrealDbClient::connect_in_memory("testdb", "testns", "warn")
+            .await
+            .expect("connect in memory");
+
+        client
+            .apply_migrations("testns")
+            .await
+            .expect("apply migrations");
+
+        let db = client
+            .with_namespace_local("testns")
+            .await
+            .expect("configured namespace client");
+        db.set("session_probe", 41_i64)
+            .await
+            .expect("set session variable");
+
+        let mut response = client
+            .with_namespace_local("testns")
+            .await
+            .expect("reused namespace client")
+            .query("$session_probe")
+            .await
+            .expect("query session variable");
+        let value = response
+            .take::<SurrealValue>(0)
+            .expect("take session variable result");
+
+        assert_eq!(json_i64(&surreal_to_json(value)), Some(41));
     }
 
     #[tokio::test]
