@@ -27,9 +27,9 @@ the scripts will work with these defaults:
 - start the MCP server with `cargo run --quiet --bin memory_mcp`
 - run that command from the repository root
 - ingest into scope `org`
-- store the entry as `sourceType="session_summary"`
-- auto-generate a deterministic `sourceId`
-- apply sensible default `policyTags` for stop vs precompact events
+- store the entry as `source_type="session_summary"`
+- auto-generate a deterministic `source_id`
+- apply sensible default `policy_tags` for stop vs precompact events
 - fall back to a local embedded SurrealDB if no DB env vars are already configured
 
 That means environment variables are mainly for **power users**: custom binary paths, non-default scopes, project tagging, manual summaries, or debugging.
@@ -38,11 +38,11 @@ That means environment variables are mainly for **power users**: custom binary p
 
 Both scripts call `ingest` with:
 
-- `sourceType = "session_summary"` by default
+- `source_type = "session_summary"` by default
 - `scope = "org"` by default
 - optional `project` tag (unset by default)
-- deterministic `sourceId` based on hook event + session id + content hash
-- default `policyTags`:
+- deterministic `source_id` based on hook event + session id + content hash
+- default `policy_tags`:
   - stop: `hook:stop,session_summary`
   - precompact: `hook:precompact,session_summary,emergency_save`
 
@@ -81,7 +81,7 @@ These knobs are useful for debugging, manual runs, CI, or special classification
 | `MEMORY_HOOK_CONTENT` | unset | Any non-empty text string | Forces the exact content that will be ingested. If set, it wins over transcript extraction and stdin fallback. Best for manual invocations, tests, CI jobs, or “save this exact summary” flows. |
 | `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | `80` | Positive integer such as `20`, `50`, `80`, `200` | Limits how many trailing lines are copied from `transcript_path` / `transcriptPath`. Lower values reduce noise and token volume; higher values preserve more context from long sessions. Only matters when the hook payload includes a transcript file path. |
 | `MEMORY_HOOK_VERBOSE` | unset | `1` to enable, otherwise leave unset | Prints a short success message to stdout after ingest. Useful for manual testing or CI logs. It does **not** change what gets stored. |
-| `MEMORY_HOOK_SOURCE_TYPE` | `session_summary` | Any non-empty semantic source label such as `session_summary`, `document`, `email`, `conversation` | Overrides the `sourceType` sent to `ingest`. In this repository the value is just a semantic label, not an enum hardcoded by the hooks. For normal hook usage, keep `session_summary`. Change it only if you intentionally want these records classified differently. |
+| `MEMORY_HOOK_SOURCE_TYPE` | `session_summary` | Any non-empty semantic source label such as `session_summary`, `document`, `email`, `conversation` | Overrides the `source_type` sent to `ingest`. In this repository the value is just a semantic label, not an enum hardcoded by the hooks. For normal hook usage, keep `session_summary`. Change it only if you intentionally want these records classified differently. |
 | `MEMORY_HOOK_POLICY_TAGS` | Event-specific defaults | Comma-separated tag list such as `hook:stop,session_summary` or `hook:precompact,session_summary,emergency_save,team:core` | Replaces the default policy tags with your own full list. Use this only if you have downstream filtering, compliance, or routing logic that depends on custom tags. |
 
 ### Server / database defaults

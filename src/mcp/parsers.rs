@@ -12,12 +12,9 @@ use crate::models::ExplainItem;
 ///
 /// All inputs must be a JSON array. Supported element types:
 ///
-/// 1. **Strict ExplainItem objects**: `[{"content":"…","quote":"…","source_episode":"episode:xxx"}]`
+/// 1. **Strict snake_case objects**: `[{"content":"…","quote":"…","source_episode":"episode:xxx"}]`
 /// 2. **Array of ID strings**: `["episode:xxx","task:yyy"]`
-/// 3. **Loose objects**: `[{"content":"…","id":"task:xxx","source_type":"task"}]`
-///    - `id` is used as `source_episode` when `source_episode` is absent
-///    - `quote` and `content` default to `""` when absent
-/// 4. **Mixed**: Any combination of strings and objects in one array
+/// 3. **Mixed**: Any combination of strings and strict snake_case objects in one array
 ///
 /// # Examples
 ///
@@ -34,69 +31,100 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
 
     let items = values
         .into_iter()
-        .map(|v| match v {
-            Value::String(s) => ExplainItem {
-                content: String::new(),
-                quote: String::new(),
-                source_episode: s,
-                scope: None,
-                t_ref: None,
-                t_ingested: None,
-                provenance: Value::Null,
-                citation_context: None,
-                ..Default::default()
-            },
-            Value::Object(ref map) => {
-                let fact_id = map
-                    .get("factId")
-                    .or_else(|| map.get("fact_id"))
-                    .and_then(Value::as_str)
-                    .map(String::from);
-                let content = map
-                    .get("content")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
-                let quote = map
-                    .get("quote")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
-                let source_episode = map
-                    .get("sourceEpisode")
-                    .or_else(|| map.get("source_episode"))
-                    .or_else(|| map.get("id"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
-                ExplainItem {
-                    fact_id,
-                    content,
-                    quote,
-                    source_episode,
+        .map(|v| -> Result<ExplainItem, String> {
+            Ok(match v {
+                Value::String(s) => ExplainItem {
+                    content: String::new(),
+                    quote: String::new(),
+                    source_episode: s,
                     scope: None,
                     t_ref: None,
                     t_ingested: None,
                     provenance: Value::Null,
                     citation_context: None,
                     ..Default::default()
+                },
+                Value::Object(ref map) => {
+                    reject_legacy_context_item_aliases(map)?;
+
+                    let fact_id = map.get("fact_id").and_then(Value::as_str).map(String::from);
+                    let content = map
+                        .get("content")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    let quote = map
+                        .get("quote")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    let source_episode = map
+                        .get("source_episode")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    ExplainItem {
+                        fact_id,
+                        content,
+                        quote,
+                        source_episode,
+                        scope: None,
+                        t_ref: None,
+                        t_ingested: None,
+                        provenance: Value::Null,
+                        citation_context: None,
+                        ..Default::default()
+                    }
                 }
-            }
-            _ => ExplainItem {
-                content: String::new(),
-                quote: String::new(),
-                source_episode: String::new(),
-                scope: None,
-                t_ref: None,
-                t_ingested: None,
-                provenance: Value::Null,
-                citation_context: None,
-                ..Default::default()
-            },
+                _ => ExplainItem {
+                    content: String::new(),
+                    quote: String::new(),
+                    source_episode: String::new(),
+                    scope: None,
+                    t_ref: None,
+                    t_ingested: None,
+                    provenance: Value::Null,
+                    citation_context: None,
+                    ..Default::default()
+                },
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(items)
+}
+
+fn reject_legacy_context_item_aliases(map: &serde_json::Map<String, Value>) -> Result<(), String> {
+    for (legacy_key, canonical_key) in [
+        ("factId", "fact_id"),
+        ("sourceEpisode", "source_episode"),
+        ("citationContext", "citation_context"),
+        ("allSources", "all_sources"),
+        ("graphInsights", "graph_insights"),
+        ("tRef", "t_ref"),
+        ("tIngested", "t_ingested"),
+    ] {
+        if map.contains_key(legacy_key) {
+            return Err(format!(
+                "context_items objects must use snake_case keys; use `{canonical_key}` instead of `{legacy_key}`"
+            ));
+        }
+    }
+
+    if map.contains_key("id") {
+        return Err(
+            "context_items objects must use `source_episode` instead of legacy `id`.".to_string(),
+        );
+    }
+
+    if map.contains_key("sourceType") {
+        return Err(
+            "context_items objects must use snake_case keys; `sourceType` is not part of the strict explain-item contract."
+                .to_string(),
+        );
+    }
+
+    Ok(())
 }
 
 /// Parse an ISO 8601 datetime string into `DateTime<Utc>`.
@@ -177,26 +205,23 @@ mod tests {
     }
 
     #[test]
-    fn parse_loose_objects_id_no_quote() {
-        let raw = r#"[{"content":"Follow up on ARR deal","id":"task:e8g","source_type":"task"}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].content, "Follow up on ARR deal");
-        assert_eq!(items[0].quote, "");
-        assert_eq!(items[0].source_episode, "task:e8g");
+    fn parse_context_items_rejects_legacy_id_alias() {
+        let raw = r#"[{"content":"Follow up on ARR deal","id":"task:e8g"}]"#;
+        let err = parse_context_items(raw).expect_err("legacy id alias should be rejected");
+        assert!(err.contains("source_episode"), "unexpected error: {err}");
     }
 
     #[test]
-    fn parse_source_episode_preferred_over_id() {
-        let raw =
-            r#"[{"content":"x","quote":"y","source_episode":"episode:real","id":"task:alt"}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items[0].source_episode, "episode:real");
+    fn parse_context_items_rejects_camel_case_source_episode_alias() {
+        let raw = r#"[{"content":"x","quote":"y","sourceEpisode":"episode:real"}]"#;
+        let err =
+            parse_context_items(raw).expect_err("camelCase sourceEpisode alias should be rejected");
+        assert!(err.contains("source_episode"), "unexpected error: {err}");
     }
 
     #[test]
     fn parse_mixed_array() {
-        let raw = r#"["episode:aaa",{"content":"c","id":"task:bbb"}]"#;
+        let raw = r#"["episode:aaa",{"content":"c","source_episode":"task:bbb"}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].source_episode, "episode:aaa");
@@ -223,7 +248,7 @@ mod tests {
 
     #[test]
     fn parse_real_world_payload() {
-        let raw = r#"[{"content":"Follow up on ARR deal","id":"task:e8gsmlprfchnktf6js0p","source_type":"task"},{"content":"ASSIGNEE: Anton Solovey","id":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}]"#;
+        let raw = r#"[{"content":"Follow up on ARR deal","source_episode":"task:e8gsmlprfchnktf6js0p","source_type":"task"},{"content":"ASSIGNEE: Anton Solovey","source_episode":"task:ha8caz3sb2fxr9ju2sbc","source_type":"task"}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].content, "Follow up on ARR deal");
@@ -334,21 +359,21 @@ mod tests {
 
     #[test]
     fn parse_context_items_prefers_source_episode_over_id() {
-        let raw = r#"[{"content":"Test","id":"episode:123","source_episode":"episode:456"}]"#;
+        let raw = r#"[{"content":"Test","source_episode":"episode:456"}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items[0].source_episode, "episode:456");
     }
 
     #[test]
-    fn parse_context_items_uses_id_when_source_episode_missing() {
-        let raw = r#"[{"content":"Test","id":"episode:123"}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items[0].source_episode, "episode:123");
+    fn parse_context_items_rejects_camel_case_fact_id_alias() {
+        let raw = r#"[{"content":"Test","quote":"Q","source_episode":"episode:123","factId":"fact:123"}]"#;
+        let err = parse_context_items(raw).expect_err("camelCase factId alias should be rejected");
+        assert!(err.contains("fact_id"), "unexpected error: {err}");
     }
 
     #[test]
     fn parse_context_items_handles_empty_quote() {
-        let raw = r#"[{"content":"Test","id":"episode:123","quote":""}]"#;
+        let raw = r#"[{"content":"Test","source_episode":"episode:123","quote":""}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items[0].quote, "");
     }
@@ -364,7 +389,7 @@ mod tests {
 
     #[test]
     fn parse_context_items_preserves_unicode() {
-        let raw = r#"[{"content":"Hello world ✓","id":"episode:123"}]"#;
+        let raw = r#"[{"content":"Hello world ✓","source_episode":"episode:123"}]"#;
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items[0].content, "Hello world ✓");
     }

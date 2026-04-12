@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn correlation_id_clone_preserves_value() {
         let id = CorrelationId::from_raw(123);
-        let cloned = id.clone();
+        let cloned = id;
         assert_eq!(id, cloned);
         assert_eq!(id.as_raw(), cloned.as_raw());
     }

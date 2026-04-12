@@ -635,6 +635,7 @@ fn mmr_selection_score(
     (MMR_RELEVANCE_WEIGHT * relevance) - ((1.0 - MMR_RELEVANCE_WEIGHT) * redundancy)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn seed_direct_recall_head(
     facts: &mut Vec<RankedContextFact>,
     selected: &mut Vec<RankedContextFact>,

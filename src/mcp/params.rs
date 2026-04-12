@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Parameters for the `ingest` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct IngestParams {
     /// Type of source (e.g., "email", "tfs_work_item", "document")
     pub source_type: String,
@@ -34,20 +34,19 @@ pub struct IngestParams {
 
 /// Parameters for the `explain` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ExplainParams {
     /// JSON array string of context items to explain.
     ///
     /// Accepted forms inside the JSON array:
-    /// - objects with `content`, `quote`, `source_episode`
-    /// - objects with `id` instead of `source_episode`
+    /// - objects with snake_case keys such as `content`, `quote`, `fact_id`, and `source_episode`
     /// - plain source ID strings such as `episode:abc123`
     pub context_items: String,
 }
 
 /// Parameters for the `extract` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ExtractParams {
     /// Episode ID to extract from (optional if content provided)
     pub episode_id: Option<String>,
@@ -69,7 +68,7 @@ pub struct ExtractParams {
 
 /// Parameters for the `resolve` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ResolveParams {
     /// Type of entity (e.g., "person", "project", "company")
     pub entity_type: String,
@@ -82,7 +81,7 @@ pub struct ResolveParams {
 
 /// Parameters for the `invalidate` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct InvalidateParams {
     /// ID of the fact to invalidate
     pub fact_id: String,
@@ -94,7 +93,7 @@ pub struct InvalidateParams {
 
 /// Parameters for the `assemble_context` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct AssembleContextParams {
     /// The query to assemble context for
     pub query: String,
@@ -121,6 +120,7 @@ pub struct AssembleContextParams {
 
 /// Parameters for the public `open_app` launcher.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct OpenAppParams {
     /// Public app identifier (for example: inspector, diff, ingestion_review, lifecycle, graph).
     pub app: String,
@@ -160,6 +160,7 @@ pub struct OpenAppParams {
 
 /// Parameters for the public `app_command` bridge.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct AppCommandParams {
     /// Session identifier returned by `open_app`.
     pub session_id: String,
@@ -204,20 +205,51 @@ mod tests {
         let schema = schema_json::<IngestParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
+        // Public MCP tool parameters use snake_case keys only.
+        for key in [
+            "source_type",
+            "source_id",
+            "content",
+            "t_ref",
+            "scope",
+            "project",
+            "t_ingested",
+            "visibility_scope",
+            "policy_tags",
+        ] {
+            assert!(properties.contains_key(key), "missing property {key}");
+        }
+
         for key in [
             "sourceType",
             "sourceId",
-            "content",
             "tRef",
-            "scope",
-            "project",
             "tIngested",
             "visibilityScope",
             "policyTags",
         ] {
-            assert!(properties.contains_key(key), "missing property {key}");
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
         }
+    }
+
+    #[test]
+    fn ingest_params_reject_camel_case_fields() {
+        let err = serde_json::from_value::<IngestParams>(serde_json::json!({
+            "sourceType": "email",
+            "sourceId": "msg-1",
+            "content": "hello",
+            "tRef": "2026-01-01T00:00:00Z",
+            "scope": "org"
+        }))
+        .expect_err("camelCase ingest params should be rejected");
+
+        assert!(
+            err.to_string().contains("sourceType") || err.to_string().contains("sourceId"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -232,8 +264,8 @@ mod tests {
     #[test]
     fn explain_params_schema_requires_json_array_string() {
         let schema = schema_json::<ExplainParams>();
-        // Field is renamed to camelCase for MCP/JSON compatibility
-        assert_eq!(schema["properties"]["contextItems"]["type"], "string");
+        assert_eq!(schema["properties"]["context_items"]["type"], "string");
+        assert!(schema["properties"].get("contextItems").is_none());
     }
 
     #[test]
@@ -241,31 +273,67 @@ mod tests {
         let schema = schema_json::<ExtractParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
+        // Public MCP tool parameters use snake_case keys only.
         for key in [
-            "episodeId",
+            "episode_id",
             "content",
             "text",
-            "sourceType",
-            "sourceId",
-            "tRef",
+            "source_type",
+            "source_id",
+            "t_ref",
             "scope",
-            "zeroShotLabels",
+            "zero_shot_labels",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
 
-        // Verify zeroShotLabels is an optional array of strings
+        for key in [
+            "episodeId",
+            "sourceType",
+            "sourceId",
+            "tRef",
+            "zeroShotLabels",
+        ] {
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
+        }
+
+        // Verify zero_shot_labels is an optional array of strings.
         assert_eq!(
-            properties["zeroShotLabels"]["type"],
+            properties["zero_shot_labels"]["type"],
             serde_json::json!(["array", "null"])
         );
 
-        // Verify the items in zeroShotLabels array are strings
-        let zero_shot_labels_schema = &properties["zeroShotLabels"];
+        // Verify the items in zero_shot_labels array are strings.
+        let zero_shot_labels_schema = &properties["zero_shot_labels"];
         assert_eq!(
             zero_shot_labels_schema["items"]["type"], "string",
-            "zeroShotLabels items should be strings"
+            "zero_shot_labels items should be strings"
+        );
+    }
+
+    #[test]
+    fn extract_params_reject_nested_payload_and_camel_case_fields() {
+        let camel_case_err = serde_json::from_value::<ExtractParams>(serde_json::json!({
+            "episodeId": "episode:123"
+        }))
+        .expect_err("camelCase extract params should be rejected");
+        assert!(
+            camel_case_err.to_string().contains("episodeId"),
+            "unexpected error: {camel_case_err}"
+        );
+
+        let payload_err = serde_json::from_value::<ExtractParams>(serde_json::json!({
+            "payload": {
+                "episode_id": "episode:123"
+            }
+        }))
+        .expect_err("nested payload wrapper should be rejected");
+        assert!(
+            payload_err.to_string().contains("payload"),
+            "unexpected error: {payload_err}"
         );
     }
 
@@ -274,28 +342,35 @@ mod tests {
         let schema = schema_json::<AssembleContextParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
+        // Public MCP tool parameters use snake_case keys only.
         assert_eq!(properties["query"]["type"], "string");
         assert_eq!(properties["scope"]["type"], "string");
         assert_eq!(
             properties["project"]["type"],
             serde_json::json!(["string", "null"])
         );
-        assert_eq!(properties["factTypes"]["type"], "array");
-        assert_eq!(properties["asOf"]["type"], "string");
+        assert_eq!(properties["fact_types"]["type"], "array");
+        assert_eq!(properties["as_of"]["type"], "string");
         assert_eq!(properties["budget"]["type"], "integer");
         assert_eq!(
-            properties["viewMode"]["type"],
+            properties["view_mode"]["type"],
             serde_json::json!(["string", "null"])
         );
         assert_eq!(
-            properties["windowStart"]["type"],
+            properties["window_start"]["type"],
             serde_json::json!(["string", "null"])
         );
         assert_eq!(
-            properties["windowEnd"]["type"],
+            properties["window_end"]["type"],
             serde_json::json!(["string", "null"])
         );
+
+        for key in ["factTypes", "asOf", "viewMode", "windowStart", "windowEnd"] {
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
+        }
     }
 
     #[test]

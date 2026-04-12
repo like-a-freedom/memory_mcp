@@ -348,25 +348,25 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
 
     let serialized = serde_json::to_value(&explanation[0]).expect("serialize explain item");
     let graph_insights = serialized
-        .get("graphInsights")
-        .expect("explain should expose graphInsights");
+        .get("graph_insights")
+        .expect("explain should expose graph_insights");
     let hub_entities = graph_insights
-        .get("hubEntities")
+        .get("hub_entities")
         .and_then(serde_json::Value::as_array)
-        .expect("graphInsights.hubEntities should be an array");
+        .expect("graph_insights.hub_entities should be an array");
     let surprising_connections = graph_insights
-        .get("surprisingConnections")
+        .get("surprising_connections")
         .and_then(serde_json::Value::as_array)
-        .expect("graphInsights.surprisingConnections should be an array");
+        .expect("graph_insights.surprising_connections should be an array");
 
     assert!(hub_entities.iter().any(|hub| {
-        hub.get("entityId") == Some(&serde_json::json!(bob_id))
+        hub.get("entity_id") == Some(&serde_json::json!(bob_id))
             && hub.get("degree") == Some(&serde_json::json!(2))
     }));
     assert!(surprising_connections.iter().any(|connection| {
-        connection.get("sourceEntityId") == Some(&serde_json::json!(alice_id))
-            && connection.get("targetEntityId") == Some(&serde_json::json!(carol_id))
-            && connection.get("hopCount") == Some(&serde_json::json!(2))
+        connection.get("source_entity_id") == Some(&serde_json::json!(alice_id))
+            && connection.get("target_entity_id") == Some(&serde_json::json!(carol_id))
+            && connection.get("hop_count") == Some(&serde_json::json!(2))
     }));
 }
 
@@ -834,7 +834,7 @@ async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
 
     assert_eq!(
         serialized
-            .get("retrievalTier")
+            .get("retrieval_tier")
             .and_then(serde_json::Value::as_str),
         Some("direct")
     );
@@ -895,7 +895,7 @@ async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_t
 
     assert_eq!(
         serialized
-            .get("retrievalTier")
+            .get("retrieval_tier")
             .and_then(serde_json::Value::as_str),
         Some("temporal")
     );

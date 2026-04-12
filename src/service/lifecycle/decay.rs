@@ -138,7 +138,6 @@ pub async fn run_decay_pass(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
 
     #[test]
@@ -187,8 +186,7 @@ mod tests {
         let days_since_valid = 60.0;
         let decay_rate = (2.0_f64).ln() / half_life_days;
         let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
-        let access_count = 0;
-        let is_hot = access_count > 0 && false; // no last_accessed
+        let is_hot = false; // no last_accessed
         assert!(decayed < threshold && !is_hot);
     }
 
@@ -207,7 +205,7 @@ mod tests {
         assert!(decayed < threshold);
         assert!(is_hot);
         // The combined condition: decayed < threshold AND NOT is_hot
-        assert!(!(decayed < threshold && !is_hot));
+        assert!(decayed >= threshold || is_hot);
     }
 
     #[test]

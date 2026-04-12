@@ -39,7 +39,7 @@ use super::resources::{
 
 /// Response wrapper for tool results.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ToolResponse<T> {
     /// Result status for the tool call.
     pub status: String,
@@ -71,6 +71,7 @@ impl<T> ToolResponse<T> {
         }
     }
 
+    #[cfg(test)]
     fn partial_with_guidance(result: T, guidance: impl Into<String>) -> Self {
         Self {
             status: "partial".to_string(),
@@ -263,7 +264,7 @@ pub struct MemoryMcp {
 }
 
 impl MemoryMcp {
-    const SERVER_INSTRUCTIONS: &str = "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context.";
+    const SERVER_INSTRUCTIONS: &str = "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context. All tool arguments and structured results use flat snake_case JSON keys that must match the published schemas exactly. Do not wrap tool arguments in `payload`.";
     const DEFAULT_ARCHIVAL_AGE_DAYS: u32 = 30;
     const DEFAULT_DECAY_THRESHOLD: f64 = 0.35;
     const DEFAULT_DECAY_HALF_LIFE_DAYS: f64 = 180.0;
@@ -1008,6 +1009,44 @@ impl MemoryMcp {
             LogLevel::Info,
         );
 
+        if content.is_some() && text.is_some() {
+            let message = "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.";
+            self.service.log_tool_event_with_duration(
+                "extract.invalid_input",
+                json!({"episode_id": &episode_id, "has_content": true}),
+                json!({"error": message}),
+                LogLevel::Warn,
+                timer.elapsed(),
+            );
+            return Err(Self::invalid_params(message));
+        }
+
+        let inline_content = content.or(text);
+
+        if episode_id.is_some() && inline_content.is_some() {
+            let message = "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.";
+            self.service.log_tool_event_with_duration(
+                "extract.invalid_input",
+                json!({"episode_id": &episode_id, "has_content": true}),
+                json!({"error": message}),
+                LogLevel::Warn,
+                timer.elapsed(),
+            );
+            return Err(Self::invalid_params(message));
+        }
+
+        if episode_id.is_none() && inline_content.is_none() {
+            let message = "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.";
+            self.service.log_tool_event_with_duration(
+                "extract.invalid_input",
+                json!({"episode_id": &episode_id, "has_content": false}),
+                json!({"error": message}),
+                LogLevel::Warn,
+                timer.elapsed(),
+            );
+            return Err(Self::invalid_params(message));
+        }
+
         if let Some(ref episode_id) = episode_id {
             match self
                 .service
@@ -1040,20 +1079,7 @@ impl MemoryMcp {
             }
         }
 
-        let content = content.or(text).unwrap_or_default();
-        if content.trim().is_empty() {
-            self.service.log_tool_event_with_duration(
-                "extract.no_input",
-                json!({"episode_id": &episode_id, "has_content": false}),
-                json!({"status": "no_input"}),
-                LogLevel::Warn,
-                timer.elapsed(),
-            );
-            return Ok(ToolResponse::partial_with_guidance(
-                ExtractResult::empty(),
-                "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
-            ));
-        }
+        let content = inline_content.expect("validated extract inline content");
 
         let source_type = source_type.unwrap_or_else(|| "ad-hoc".to_string());
         let source_id = source_id.unwrap_or_else(|| content_hash(&content));
@@ -1199,7 +1225,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must include ISO 8601 `t_ref` and a memory `scope`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
+        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and `scope` (optional: `project`, `t_ingested`, `visibility_scope`, `policy_tags`). Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
     )]
     pub async fn ingest(
         &self,
@@ -1264,7 +1290,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Explain context items with provenance-ready citations. Use this tool when you already have context items and need source snippets for an answer. Do not use this tool to search memory. Pass `context_items` as a JSON array string of objects or source IDs. Returns citation-ready items. On error, fix the JSON payload shape and retry."
+        description = "Explain context items with provenance-ready citations. Use this tool when you already have context items and need source snippets for an answer. Do not use this tool to search memory. Pass `context_items` as a JSON array string; object entries must use snake_case keys such as `fact_id` and `source_episode`, while plain source ID strings are also accepted. Do not wrap arguments in `payload`. Returns citation-ready items. On error, fix the JSON payload shape and retry."
     )]
     pub async fn explain(
         &self,
@@ -1313,7 +1339,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Do not use this tool for retrieval. If you pass content instead of an `episode_id`, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links. On error, provide either `episode_id` or content/text."
+        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `scope`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
     )]
     pub async fn extract(
         &self,
@@ -1336,7 +1362,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Resolve a canonical entity identifier for a name and its aliases. Use this tool when a person, company, or project may appear under multiple names. Do not use this tool for full-text retrieval. Arguments must include `entity_type`, `canonical_name`, and optional `aliases`. Returns the canonical `entity_id`. On error, fix the entity fields and retry."
+        description = "Resolve a canonical entity identifier for a name and its aliases. Use this tool when a person, company, or project may appear under multiple names. Do not use this tool for full-text retrieval. Arguments must be a flat snake_case object with `entity_type`, `canonical_name`, and optional `aliases`. Do not wrap arguments in `payload`. Returns the canonical `entity_id`. On error, fix the entity fields and retry."
     )]
     pub async fn resolve(
         &self,
@@ -1386,7 +1412,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Invalidate a fact while preserving historical traceability. Use this tool when a fact becomes outdated or superseded. Do not use this tool to delete memory. Arguments require a `fact_id`, `reason`, and ISO 8601 `t_invalid`. Returns confirmation. On error, verify the fact identifier and retry."
+        description = "Invalidate a fact while preserving historical traceability. Use this tool when a fact becomes outdated or superseded. Do not use this tool to delete memory. Arguments must be a flat snake_case object with `fact_id`, `reason`, and ISO 8601 `t_invalid`. Do not wrap arguments in `payload`. Returns confirmation. On error, verify the fact identifier and retry."
     )]
     pub async fn invalidate(
         &self,
@@ -1443,7 +1469,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> `scope` plus optional `source_text` or `draft_episode_id`; lifecycle -> `scope` only. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
+        description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> `scope` plus optional `source_text` or `draft_episode_id`; lifecycle -> `scope` only. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
     )]
     pub async fn open_app(
         &self,
@@ -1498,7 +1524,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Execute a coarse-grained command for an app session opened via open_app. Use this only for session-scoped workflows that are not already covered by canonical memory tools. Supports ingestion review actions (`approve_items`, `reject_items`, `edit_item`, `commit_review`, `cancel_review`), lifecycle actions (`archive_candidates`, `restore_archived`, `recompute_decay`, `rebuild_communities`), diff export (`export_diff`), graph exploration actions (`expand_neighbors`, `open_edge_details`, `use_path_as_context`), and the generic `close_session`. Returns command status and whether the caller should re-read the app resource."
+        description = "Execute a coarse-grained command for an app session opened via open_app. Use this only for session-scoped workflows that are not already covered by canonical memory tools. Arguments must be a flat snake_case object and must not be wrapped in `payload`. Supports ingestion review actions (`approve_items`, `reject_items`, `edit_item`, `commit_review`, `cancel_review`), lifecycle actions (`archive_candidates`, `restore_archived`, `recompute_decay`, `rebuild_communities`), diff export (`export_diff`), graph exploration actions (`expand_neighbors`, `open_edge_details`, `use_path_as_context`), and the generic `close_session`. Returns command status and whether the caller should re-read the app resource."
     )]
     pub async fn app_command(
         &self,
@@ -2168,7 +2194,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments require a natural-language `query`, a `scope`, and optional `as_of` plus `budget`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
+        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments must be a flat snake_case object with `query`, `scope`, and optional `project`, `fact_types`, `as_of`, `budget`, `view_mode`, `window_start`, and `window_end`. Do not wrap arguments in `payload`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
     )]
     pub async fn assemble_context(
         &self,
@@ -2297,7 +2323,7 @@ mod tests {
         assert_eq!(
             info.instructions.as_deref(),
             Some(
-                "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context.",
+                "Memory MCP server: stores facts about entities and relationships, resolves aliases, and assembles long-term context. All tool arguments and structured results use flat snake_case JSON keys that must match the published schemas exactly. Do not wrap tool arguments in `payload`.",
             ),
         );
         assert!(capabilities.get("tools").is_some());
@@ -2375,16 +2401,23 @@ mod tests {
         let schema = schema_json::<ToolResponse<Vec<AssembledContextItem>>>();
         let properties = schema["properties"].as_object().expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
+        // Public MCP structured outputs use snake_case keys only.
         for key in [
             "status",
             "result",
             "guidance",
-            "hasMore",
-            "totalCount",
-            "nextOffset",
+            "has_more",
+            "total_count",
+            "next_offset",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
+        }
+
+        for key in ["hasMore", "totalCount", "nextOffset"] {
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
         }
     }
 
@@ -2413,18 +2446,24 @@ mod tests {
             .as_object()
             .expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
             "content",
             "quote",
-            "sourceEpisode",
+            "source_episode",
             "scope",
-            "tRef",
-            "tIngested",
+            "t_ref",
+            "t_ingested",
             "provenance",
-            "citationContext",
+            "citation_context",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
+        }
+
+        for key in ["sourceEpisode", "tRef", "tIngested", "citationContext"] {
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
         }
     }
 
@@ -2442,9 +2481,10 @@ mod tests {
             .expect("properties object");
 
         assert!(
-            properties.contains_key("graphInsights"),
-            "ExplainItem should expose graphInsights in the MCP schema"
+            properties.contains_key("graph_insights"),
+            "ExplainItem should expose graph_insights in the MCP schema"
         );
+        assert!(!properties.contains_key("graphInsights"));
     }
 
     #[test]
@@ -2462,32 +2502,56 @@ mod tests {
             .as_object()
             .expect("properties object");
 
-        // Fields are renamed to camelCase for MCP/JSON compatibility
         for key in [
-            "factId",
+            "fact_id",
             "content",
             "quote",
-            "sourceEpisode",
+            "source_episode",
             "confidence",
             "provenance",
             "rationale",
+            "retrieval_tier",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
+
+        for key in ["factId", "sourceEpisode", "retrievalTier"] {
+            assert!(
+                !properties.contains_key(key),
+                "unexpected camelCase property {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn extract_params_deserialization_rejects_nested_payload_contract() {
+        let err = serde_json::from_value::<ExtractParams>(json!({
+            "payload": {
+                "episode_id": "episode:abc123"
+            }
+        }))
+        .expect_err("nested payload wrapper should be rejected");
+
+        assert!(
+            err.to_string().contains("payload"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
     fn tool_response_partial_envelope_marks_retryable_state() {
         let response = ToolResponse::partial_with_guidance(
             ExtractResult::empty(),
-            "Provide either `episode_id` or non-empty `content`/`text`, then retry.",
+            "Provide exactly one snake_case input source: `episode_id` or non-empty `content`/`text`, then retry without wrapping arguments in `payload`.",
         );
 
         assert_eq!(response.status, "partial");
         assert!(response.result.entities.is_empty());
         assert_eq!(
             response.guidance.as_deref(),
-            Some("Provide either `episode_id` or non-empty `content`/`text`, then retry."),
+            Some(
+                "Provide exactly one snake_case input source: `episode_id` or non-empty `content`/`text`, then retry without wrapping arguments in `payload`."
+            ),
         );
     }
 

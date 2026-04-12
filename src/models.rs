@@ -89,7 +89,7 @@ pub struct ExplainRequest {
 
 /// A single item to explain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_id: Option<String>,
@@ -133,7 +133,7 @@ impl Default for ExplainItem {
 
 /// A single provenance source for a fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ProvenanceSource {
     /// Source episode ID.
     pub episode_id: String,
@@ -150,7 +150,7 @@ pub struct ProvenanceSource {
 
 /// Ranked hub entities and cross-community paths relevant to an explained fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct GraphInsights {
     #[serde(default)]
     pub hub_entities: Vec<GraphHubEntity>,
@@ -160,7 +160,7 @@ pub struct GraphInsights {
 
 /// A high-degree entity in the current graph neighborhood.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct GraphHubEntity {
     pub entity_id: String,
     pub canonical_name: String,
@@ -169,7 +169,7 @@ pub struct GraphHubEntity {
 
 /// A short cross-community path that may reveal a non-obvious connection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct SurprisingConnection {
     pub source_entity_id: String,
     pub source_entity_name: String,
@@ -283,7 +283,7 @@ impl std::fmt::Display for FactType {
 
 /// Structured result returned by the MCP `extract` tool.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ExtractResult {
     pub episode_id: String,
     pub entities: Vec<ExtractedEntity>,
@@ -303,7 +303,7 @@ impl ExtractResult {
 
 /// A non-blocking warning about a newly extracted fact that may contradict an active fact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ContradictionWarning {
     pub fact_type: String,
     pub new_fact_id: String,
@@ -317,7 +317,7 @@ pub struct ContradictionWarning {
 
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,

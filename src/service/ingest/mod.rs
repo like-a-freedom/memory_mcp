@@ -526,7 +526,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         std::fs::write(&file_path, "content").expect("write file");
         assert_eq!(
-            detect_ingest_transport(&file_path.to_string_lossy().to_string()),
+            detect_ingest_transport(file_path.to_string_lossy().as_ref()),
             "file"
         );
     }
@@ -535,7 +535,7 @@ mod tests {
     fn detect_ingest_transport_identifies_directory() {
         let temp_dir = tempdir().expect("temp dir should exist");
         assert_eq!(
-            detect_ingest_transport(&temp_dir.path().to_string_lossy().to_string()),
+            detect_ingest_transport(temp_dir.path().to_string_lossy().as_ref()),
             "directory"
         );
     }

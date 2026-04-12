@@ -647,7 +647,7 @@ mod tests {
     fn expand_temporal_synonyms_quarter_shorthand() {
         for q in &["q1", "q2", "q3", "q4"] {
             let result = expand_temporal_synonyms(&format!("{q} budget"), test_cutoff())
-                .expect(&format!("should expand {q}"));
+                .unwrap_or_else(|| panic!("should expand {q}"));
             assert!(!result.temporal_groups.is_empty());
         }
     }
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn expand_temporal_synonyms_quarterN_form() {
+    fn expand_temporal_synonyms_quarter_n_form() {
         let result = expand_temporal_synonyms("quarter 2 goals", test_cutoff())
             .expect("should expand quarter N");
         assert!(!result.temporal_groups.is_empty());
@@ -979,7 +979,7 @@ mod tests {
         ] {
             let name = weekday_name(*day);
             assert_eq!(
-                weekday_from_name(&name),
+                weekday_from_name(name),
                 Some(*day),
                 "roundtrip failed for {name}"
             );

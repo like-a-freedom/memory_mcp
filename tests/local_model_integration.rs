@@ -6,11 +6,10 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::config::{NerConfig, SurrealConfig};
+use memory_mcp::config::NerConfig;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest};
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
-use memory_mcp::storage::SurrealDbClient;
-use serde_json::{Value, json};
+use serde_json::json;
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
@@ -111,13 +110,6 @@ fn configure_embedded_env(temp_dir: &TempDir) -> Vec<(&'static str, Option<Strin
         ("QUERY_LOGGING_ENABLED", Some("false".to_string())),
         ("RUST_LOG", Some("warn".to_string())),
     ]
-}
-
-async fn connect_env_db_client() -> SurrealDbClient {
-    let config = SurrealConfig::from_env().expect("embedded test config should be valid");
-    SurrealDbClient::connect(&config, ORG_SCOPE)
-        .await
-        .expect("embedded test db client should connect")
 }
 
 fn supported_gliner_labels() -> Vec<String> {
@@ -456,30 +448,6 @@ async fn add_note_fact(service: &MemoryService, source_episode: &str, content: &
         .expect("fact insertion should succeed")
 }
 
-fn extract_embedding(record: &Value) -> Vec<f64> {
-    record
-        .get("embedding")
-        .and_then(Value::as_array)
-        .expect("fact record should contain embedding array")
-        .iter()
-        .map(|value| value.as_f64().expect("embedding element should be numeric"))
-        .collect()
-}
-
-fn vector_norm(values: &[f64]) -> f64 {
-    values.iter().map(|value| value * value).sum::<f64>().sqrt()
-}
-
-fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
-    let dot = left
-        .iter()
-        .zip(right.iter())
-        .map(|(l, r)| l * r)
-        .sum::<f64>();
-    let norm_product = vector_norm(left) * vector_norm(right);
-    dot / norm_product
-}
-
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
 async fn local_gliner_extractor_detects_all_default_supported_entities_across_diverse_texts() {
@@ -549,19 +517,19 @@ async fn memory_service_persists_real_local_candle_embeddings() {
     let source_episode =
         ingest_episode(&service, "The compensation committee finished its review.").await;
 
-    let compensation_fact = add_note_fact(
+    let _compensation_fact = add_note_fact(
         &service,
         &source_episode,
         "Compensation increase approved for the engineering team.",
     )
     .await;
-    let paraphrase_fact = add_note_fact(
+    let _paraphrase_fact = add_note_fact(
         &service,
         &source_episode,
         "Salary raise approved for the engineering group.",
     )
     .await;
-    let unrelated_fact = add_note_fact(
+    let _unrelated_fact = add_note_fact(
         &service,
         &source_episode,
         "Fresh fruit was delivered to the office kitchen.",

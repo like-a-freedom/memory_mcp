@@ -288,21 +288,21 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
     );
 
     let warning = &warnings[0];
-    assert_eq!(warning.get("factType"), Some(&json!("metric")));
+    assert_eq!(warning.get("fact_type"), Some(&json!("metric")));
     assert_eq!(
-        warning.get("conflictingFactId"),
+        warning.get("conflicting_fact_id"),
         Some(&json!(first_result.facts[0].fact_id.clone()))
     );
     assert_eq!(
-        warning.get("newFactId"),
+        warning.get("new_fact_id"),
         Some(&json!(second_result.facts[0].fact_id.clone()))
     );
     assert_eq!(
-        warning.get("existingContent"),
+        warning.get("existing_content"),
         Some(&json!("Alice Smith reports ARR is $5M."))
     );
     assert_eq!(
-        warning.get("newContent"),
+        warning.get("new_content"),
         Some(&json!("Alice Smith reports ARR is $7M."))
     );
 }
@@ -2108,22 +2108,22 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
 
     let serialized = serde_json::to_value(&explanation[0]).expect("serialize explain item");
     let graph_insights = serialized
-        .get("graphInsights")
-        .expect("explain should expose graphInsights");
+        .get("graph_insights")
+        .expect("explain should expose graph_insights");
 
     let hub_entities = graph_insights
-        .get("hubEntities")
+        .get("hub_entities")
         .and_then(serde_json::Value::as_array)
-        .expect("hubEntities should be an array");
+        .expect("hub_entities should be an array");
     assert!(
         !hub_entities.is_empty(),
         "hub_entities should not be empty when entity is linked"
     );
 
     let surprising_connections = graph_insights
-        .get("surprisingConnections")
+        .get("surprising_connections")
         .and_then(serde_json::Value::as_array)
-        .expect("surprisingConnections should be an array");
+        .expect("surprising_connections should be an array");
     // Bob has edges to Alice and Carol; at least one should surface.
     assert!(
         !surprising_connections.is_empty() || !hub_entities.is_empty(),

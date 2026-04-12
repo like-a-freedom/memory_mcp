@@ -139,12 +139,12 @@ def main() -> int:
     ]
 
     ingest_arguments = {
-        "sourceType": source_type,
-        "sourceId": source_id_for(content, payload, event_name),
+        "source_type": source_type,
+        "source_id": source_id_for(content, payload, event_name),
         "content": content,
-        "tRef": utc_now_rfc3339(),
+        "t_ref": utc_now_rfc3339(),
         "scope": scope,
-        "policyTags": policy_tags,
+        "policy_tags": policy_tags,
     }
     if project:
         ingest_arguments["project"] = project
