@@ -97,10 +97,12 @@ pub(crate) async fn collect_recent_experience_facts(
             .filter(|fact| fact_is_active_at(fact, request.cutoff))
             .filter(|fact| !excluded_fact_ids.contains(&fact.fact_id))
             .filter(|fact| {
+                let topical_overlap = lexical_query_overlap_for_fact(fact, topical_terms);
+                let query_overlap = lexical_query_overlap_for_fact(fact, query_terms);
                 if !topical_terms.is_empty() {
-                    lexical_query_overlap_for_fact(fact, topical_terms) > 0
+                    topical_overlap > 0 || query_overlap > 0
                 } else {
-                    query_terms.is_empty() || lexical_query_overlap_for_fact(fact, query_terms) > 0
+                    query_terms.is_empty() || query_overlap > 0
                 }
             })
             .collect::<Vec<_>>();

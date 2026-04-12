@@ -1,10 +1,11 @@
 //! Ranking and MMR-based selection of context facts.
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use chrono::{DateTime, Utc};
 
+use super::lexical::lexical_query_score_for_fact;
 use crate::models::{Fact, FactType};
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
@@ -13,6 +14,8 @@ const ACCESS_COUNT_NOVELTY_WEIGHT: f64 = 0.08;
 const EXPERIENCE_TYPE_RELEVANCE_BOOST: f64 = 1.12;
 const FIRST_PERSON_USER_MEMORY_BOOST: f64 = 1.50;
 const FIRST_PERSON_ASSISTANT_MEMORY_PENALTY: f64 = 0.65;
+const DIRECT_RECALL_HEAD_LIMIT: usize = 3;
+const DIRECT_RECALL_HEAD_MIN_RELEVANCE_RATIO: f64 = 0.75;
 const MMR_RELEVANCE_WEIGHT: f64 = 0.80;
 const REDUNDANCY_INDEX_KEY_WEIGHT: f64 = 0.70;
 const REDUNDANCY_TEMPORAL_WEIGHT: f64 = 0.30;
@@ -70,6 +73,85 @@ impl RetrievalTier {
     }
 }
 
+fn protected_direct_recall_fact_ids(
+    selected: &[RankedContextFact],
+    query_terms: &[String],
+    temporal_focus: Option<&TemporalWindow>,
+) -> HashSet<String> {
+    if selected.len() <= 1 || query_terms.len() < 4 {
+        return HashSet::new();
+    }
+
+    let max_relevance = selected
+        .iter()
+        .map(|fact| focused_ranked_relevance_score(fact, temporal_focus))
+        .fold(0.0, f64::max);
+    let min_relevance = max_relevance * DIRECT_RECALL_HEAD_MIN_RELEVANCE_RATIO;
+    let mut protected = HashSet::new();
+
+    for fact in selected {
+        if protected.len() >= DIRECT_RECALL_HEAD_LIMIT {
+            break;
+        }
+        if !is_protected_lexical_recall_tier(fact.retrieval_tier) {
+            continue;
+        }
+        if matched_query_terms_for_fact(fact, query_terms).len() < 4 {
+            continue;
+        }
+        if focused_ranked_relevance_score(fact, temporal_focus) + 1e-9 < min_relevance {
+            continue;
+        }
+
+        protected.insert(fact.fact.fact_id.clone());
+    }
+
+    protected
+}
+
+fn is_protected_lexical_recall_tier(retrieval_tier: RetrievalTier) -> bool {
+    matches!(
+        retrieval_tier,
+        RetrievalTier::Direct | RetrievalTier::EpisodeFallback
+    )
+}
+
+fn content_identity_key(fact: &Fact) -> String {
+    format!(
+        "{}\u{001f}{}",
+        fact.source_episode,
+        normalize_text(&fact.content)
+    )
+}
+
+fn should_replace_canonical_fact(existing: &Fact, incoming: &Fact) -> bool {
+    if existing.fact_type != FactType::Experience.as_str()
+        && incoming.fact_type == FactType::Experience.as_str()
+    {
+        return true;
+    }
+
+    incoming.ft_score > existing.ft_score
+        || (incoming.ft_score == existing.ft_score && incoming.t_valid > existing.t_valid)
+}
+
+fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedContextFact) {
+    existing.fusion_score = existing.fusion_score.max(incoming.fusion_score);
+    existing.decayed_confidence = existing.decayed_confidence.max(incoming.decayed_confidence);
+    existing.source_priority = existing.source_priority.min(incoming.source_priority);
+    existing.query_alignment_factor = existing
+        .query_alignment_factor
+        .max(incoming.query_alignment_factor);
+
+    if incoming.retrieval_tier.precedence() > existing.retrieval_tier.precedence() {
+        existing.retrieval_tier = incoming.retrieval_tier;
+        existing.rationale = incoming.rationale.clone();
+    }
+
+    if should_replace_canonical_fact(&existing.fact, &incoming.fact) {
+        existing.fact = incoming.fact;
+    }
+}
 pub(crate) fn build_ranked_context_facts(
     lexical_facts: Vec<(Fact, RetrievalTier)>,
     community_facts: Vec<(Fact, String, f64)>,
@@ -81,11 +163,12 @@ pub(crate) fn build_ranked_context_facts(
 ) -> Vec<RankedContextFact> {
     let mut ranked_by_fact_id = HashMap::<String, RankedContextFact>::new();
     let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, &fact.content);
+    let lexical_query_terms = query_opt.map(search_query_terms).unwrap_or_default();
 
     for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
-        let lexical_score = lexical_fusion_score(rank, &fact);
+        let lexical_score = lexical_fusion_score(rank, &fact, &lexical_query_terms);
         let query_alignment_factor = query_alignment(&fact);
         ranked_by_fact_id
             .entry(fact_id)
@@ -177,11 +260,26 @@ pub(crate) fn build_ranked_context_facts(
         );
     }
 
-    ranked_by_fact_id.into_values().collect()
+    let mut ranked_by_content = HashMap::<String, RankedContextFact>::new();
+    for ranked in ranked_by_fact_id.into_values() {
+        let key = content_identity_key(&ranked.fact);
+        match ranked_by_content.entry(key) {
+            Entry::Occupied(mut existing) => {
+                merge_ranked_duplicate(existing.get_mut(), ranked);
+            }
+            Entry::Vacant(slot) => {
+                slot.insert(ranked);
+            }
+        }
+    }
+
+    ranked_by_content.into_values().collect()
 }
 
-fn lexical_fusion_score(rank: usize, fact: &Fact) -> f64 {
-    reciprocal_rank(rank) * (1.0 + fact.ft_score.max(0.0))
+fn lexical_fusion_score(rank: usize, fact: &Fact, query_terms: &[String]) -> f64 {
+    let dampened_ft_score = fact.ft_score.max(0.0).ln_1p();
+    let lexical_query_score = lexical_query_score_for_fact(fact, query_terms) as f64;
+    reciprocal_rank(rank) * (1.0 + dampened_ft_score + lexical_query_score)
 }
 
 fn reciprocal_rank(rank: usize) -> f64 {
@@ -426,6 +524,9 @@ pub(crate) fn prune_redundant_selected_facts(
         return selected;
     }
 
+    let protected_fact_ids =
+        protected_direct_recall_fact_ids(&selected, query_terms, temporal_focus);
+
     loop {
         let matched_terms = selected
             .iter()
@@ -455,6 +556,9 @@ pub(crate) fn prune_redundant_selected_facts(
         let mut removal_score = f64::INFINITY;
 
         for idx in 0..selected.len() {
+            if protected_fact_ids.contains(selected[idx].fact.fact_id.as_str()) {
+                continue;
+            }
             if informative_terms[idx].len() < 4 {
                 continue;
             }
@@ -531,6 +635,62 @@ fn mmr_selection_score(
     (MMR_RELEVANCE_WEIGHT * relevance) - ((1.0 - MMR_RELEVANCE_WEIGHT) * redundancy)
 }
 
+fn seed_direct_recall_head(
+    facts: &mut Vec<RankedContextFact>,
+    selected: &mut Vec<RankedContextFact>,
+    source_counts: &mut HashMap<String, usize>,
+    budget: usize,
+    per_source_episode_cap: usize,
+    max_relevance: f64,
+    temporal_focus: Option<&TemporalWindow>,
+    query_terms: &[String],
+) {
+    if query_terms.len() < 4 || budget <= 1 {
+        return;
+    }
+
+    let head_limit = DIRECT_RECALL_HEAD_LIMIT.min(budget);
+    let min_relevance = max_relevance * DIRECT_RECALL_HEAD_MIN_RELEVANCE_RATIO;
+    let mut selected_indices = Vec::new();
+
+    for (idx, candidate) in facts.iter().enumerate() {
+        if !is_protected_lexical_recall_tier(candidate.retrieval_tier) {
+            continue;
+        }
+
+        let source_count = source_counts
+            .get(candidate.fact.source_episode.as_str())
+            .copied()
+            .unwrap_or(0);
+        if source_count >= per_source_episode_cap {
+            continue;
+        }
+
+        let relevance = focused_ranked_relevance_score(candidate, temporal_focus);
+        if relevance + 1e-9 < min_relevance {
+            continue;
+        }
+
+        selected_indices.push(idx);
+        if selected_indices.len() >= head_limit {
+            break;
+        }
+    }
+
+    let mut seeded = Vec::with_capacity(selected_indices.len());
+    for idx in selected_indices.into_iter().rev() {
+        seeded.push(facts.remove(idx));
+    }
+    seeded.reverse();
+
+    for chosen in seeded {
+        *source_counts
+            .entry(chosen.fact.source_episode.clone())
+            .or_default() += 1;
+        selected.push(chosen);
+    }
+}
+
 pub(crate) fn select_ranked_context_facts(
     mut facts: Vec<RankedContextFact>,
     budget: usize,
@@ -554,6 +714,17 @@ pub(crate) fn select_ranked_context_facts(
     let per_source_episode_cap = source_episode_selection_cap(budget);
     let mut source_counts = HashMap::<String, usize>::new();
     let mut selected = Vec::with_capacity(budget.min(facts.len()));
+
+    seed_direct_recall_head(
+        &mut facts,
+        &mut selected,
+        &mut source_counts,
+        budget,
+        per_source_episode_cap,
+        max_relevance,
+        temporal_focus_ref,
+        &query_terms,
+    );
 
     while selected.len() < budget && !facts.is_empty() {
         let enforce_temporal_alignment = temporal_focus_ref.is_some()

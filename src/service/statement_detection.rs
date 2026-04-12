@@ -16,7 +16,7 @@ static METRIC_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 static EXPERIENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"\b(prefer|prefers|dislike|dislikes|enjoy|enjoys|love|loves|hate|hates|value|values)\b",
+        r"\b(prefer|prefers|dislike|dislikes|enjoy|enjoys|love|loves|hate|hates|value|values|avoid|avoids|aversion)\b|\b(do not enjoy|don't enjoy|do not like|don't like|not interested)\b",
     )
     .expect("experience regex is valid")
 });

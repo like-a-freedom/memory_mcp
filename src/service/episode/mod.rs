@@ -742,6 +742,15 @@ mod tests {
             "Alice Smith prefers weekly launch updates over ad-hoc pings."
         ));
         assert!(is_experience_statement("I enjoy quiet deep-work mornings."));
+        assert!(is_experience_statement(
+            "I tend to avoid high-rise buildings for accommodations."
+        ));
+        assert!(is_experience_statement(
+            "I have a strong aversion to beachfront resorts."
+        ));
+        assert!(is_experience_statement(
+            "I do not enjoy casinos or gaming environments."
+        ));
     }
 
     #[test]

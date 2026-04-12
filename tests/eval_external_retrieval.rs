@@ -15,7 +15,7 @@ use eval_support::metrics::{
 };
 use eval_support::report::print_retrieval_summary;
 use memory_mcp::models::AssembleContextRequest;
-use memory_mcp::service::hash_prefix;
+use memory_mcp::service::{hash_prefix, preprocess_search_query};
 use memory_mcp::storage::DbClient;
 
 fn raw_dataset_raw(kind: DatasetKind) -> String {
@@ -241,6 +241,356 @@ async fn run_retrieval_case_with_service(
     let outcome = evaluate_retrieval_case(service, case).await;
 
     finalize_retrieval_case(outcome, summary, strict_case_asserts)
+}
+
+#[derive(Debug)]
+struct CandidatePoolSnapshot {
+    initial_has_expected: bool,
+    fallback_has_expected: bool,
+    active_experience_has_expected: bool,
+    reranked_initial_has_expected: bool,
+    reranked_fallback_has_expected: bool,
+    initial_top_contents: Vec<String>,
+    fallback_top_contents: Vec<String>,
+    active_experience_top_contents: Vec<String>,
+    reranked_initial_top_contents: Vec<String>,
+    reranked_fallback_top_contents: Vec<String>,
+}
+
+async fn build_candidate_pool_snapshot(
+    db_client: &dyn DbClient,
+    case: &NormalizedExternalRetrievalCase,
+) -> CandidatePoolSnapshot {
+    let cleaned_query = preprocess_search_query(&case.query);
+    let fallback_queries = build_fallback_queries_from_cleaned_query(&cleaned_query);
+    let candidate_limit = 50;
+    let cutoff = "2100-01-01T00:00:00Z";
+
+    let initial_records = db_client
+        .select_facts_filtered_advanced(
+            "org",
+            &case.scope,
+            cutoff,
+            Some(cleaned_query.as_str()),
+            candidate_limit,
+            None,
+            &[],
+        )
+        .await
+        .expect("initial lexical candidates");
+
+    let mut fallback_records = Vec::new();
+    for query in &fallback_queries {
+        let term_records = db_client
+            .select_facts_filtered_advanced(
+                "org",
+                &case.scope,
+                cutoff,
+                Some(query.as_str()),
+                candidate_limit,
+                None,
+                &[],
+            )
+            .await
+            .expect("fallback lexical candidates");
+        fallback_records.extend(term_records);
+    }
+
+    let expected_needles = &case.expected.must_contain;
+    let active_experience_records = db_client
+        .select_active_facts("org", 500)
+        .await
+        .expect("active facts")
+        .into_iter()
+        .filter(|record| {
+            record.get("fact_type").and_then(serde_json::Value::as_str) == Some("experience")
+        })
+        .collect::<Vec<_>>();
+    let reranked_initial_records =
+        snapshot_rank_lexical_records(&initial_records, cleaned_query.as_str());
+    let reranked_fallback_records =
+        snapshot_rank_lexical_records(&fallback_records, cleaned_query.as_str());
+    let initial_top_contents = initial_records
+        .iter()
+        .take(10)
+        .filter_map(|record| record.get("content").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let fallback_top_contents = fallback_records
+        .iter()
+        .take(10)
+        .filter_map(|record| record.get("content").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let active_experience_top_contents = active_experience_records
+        .iter()
+        .take(10)
+        .filter_map(|record| record.get("content").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let reranked_initial_top_contents = reranked_initial_records
+        .iter()
+        .take(10)
+        .filter_map(|record| record.get("content").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let reranked_fallback_top_contents = reranked_fallback_records
+        .iter()
+        .take(10)
+        .filter_map(|record| record.get("content").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+    CandidatePoolSnapshot {
+        initial_has_expected: record_set_contains_expected(&initial_records, expected_needles),
+        fallback_has_expected: record_set_contains_expected(&fallback_records, expected_needles),
+        active_experience_has_expected: record_set_contains_expected(
+            &active_experience_records,
+            expected_needles,
+        ),
+        reranked_initial_has_expected: record_set_contains_expected(
+            &reranked_initial_records,
+            expected_needles,
+        ),
+        reranked_fallback_has_expected: record_set_contains_expected(
+            &reranked_fallback_records,
+            expected_needles,
+        ),
+        initial_top_contents,
+        fallback_top_contents,
+        active_experience_top_contents,
+        reranked_initial_top_contents,
+        reranked_fallback_top_contents,
+    }
+}
+
+fn snapshot_rank_lexical_records(
+    records: &[serde_json::Value],
+    cleaned_query: &str,
+) -> Vec<serde_json::Value> {
+    let query_terms = cleaned_query
+        .split_whitespace()
+        .filter(|term| !term.trim().is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let mut reranked = records.to_vec();
+
+    reranked.sort_by(|left, right| {
+        snapshot_lexical_query_score(right, &query_terms)
+            .cmp(&snapshot_lexical_query_score(left, &query_terms))
+            .then_with(|| {
+                snapshot_dampened_ft_score(right).total_cmp(&snapshot_dampened_ft_score(left))
+            })
+            .then_with(|| snapshot_t_valid(right).cmp(&snapshot_t_valid(left)))
+            .then_with(|| snapshot_fact_id(left).cmp(&snapshot_fact_id(right)))
+    });
+
+    reranked
+}
+
+fn snapshot_lexical_query_score(record: &serde_json::Value, query_terms: &[String]) -> usize {
+    let content_terms = snapshot_best_matching_content_terms(
+        record
+            .get("content")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default(),
+        query_terms,
+    );
+    let unigram_overlap = snapshot_query_term_overlap_for_terms(&content_terms, query_terms)
+        + snapshot_index_key_overlap(record, query_terms);
+    let phrase_overlap = snapshot_ngram_overlap_for_terms(&content_terms, query_terms, 2)
+        + snapshot_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+    let trigram_overlap = snapshot_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+}
+
+fn snapshot_best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String> {
+    let fallback_terms = preprocess_search_query(text)
+        .split_whitespace()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if fallback_terms.is_empty() || query_terms.is_empty() {
+        return fallback_terms;
+    }
+
+    let spans = snapshot_sentence_segments(text)
+        .into_iter()
+        .map(|segment| {
+            preprocess_search_query(&segment)
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .filter(|terms| !terms.is_empty())
+        .collect::<Vec<_>>();
+    if spans.is_empty() {
+        return fallback_terms;
+    }
+
+    let mut best_terms = spans[0].clone();
+    let mut best_score = snapshot_score_content_terms(&best_terms, query_terms);
+    let mut best_len = best_terms.len();
+
+    for candidate_terms in spans.into_iter().skip(1) {
+        let candidate_score = snapshot_score_content_terms(&candidate_terms, query_terms);
+        let should_replace = candidate_score > best_score
+            || (candidate_score == best_score && candidate_terms.len() < best_len);
+        if should_replace {
+            best_score = candidate_score;
+            best_len = candidate_terms.len();
+            best_terms = candidate_terms;
+        }
+    }
+
+    best_terms
+}
+
+fn snapshot_sentence_segments(text: &str) -> Vec<String> {
+    let mut segments = Vec::new();
+    let mut current = String::new();
+
+    for character in text.trim().chars() {
+        current.push(character);
+        if matches!(character, '.' | '!' | '?' | ';' | '\n') {
+            let segment = current.trim();
+            if !segment.is_empty() {
+                segments.push(segment.to_string());
+            }
+            current.clear();
+        }
+    }
+
+    let trailing = current.trim();
+    if !trailing.is_empty() {
+        segments.push(trailing.to_string());
+    }
+
+    segments
+}
+
+fn snapshot_score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+    let unigram_overlap = snapshot_query_term_overlap_for_terms(content_terms, query_terms);
+    let phrase_overlap = snapshot_ngram_overlap_for_terms(content_terms, query_terms, 2)
+        + snapshot_ngram_overlap_for_terms(content_terms, query_terms, 3);
+    let trigram_overlap = snapshot_ngram_overlap_for_terms(content_terms, query_terms, 3);
+
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+}
+
+fn snapshot_query_term_overlap_for_terms(
+    content_terms: &[String],
+    query_terms: &[String],
+) -> usize {
+    let content_terms = content_terms.iter().collect::<HashSet<_>>();
+    query_terms
+        .iter()
+        .filter(|term| content_terms.contains(term))
+        .count()
+}
+
+fn snapshot_ngram_overlap_for_terms(
+    content_terms: &[String],
+    query_terms: &[String],
+    width: usize,
+) -> usize {
+    if content_terms.len() < width || query_terms.len() < width {
+        return 0;
+    }
+
+    let content_ngrams = content_terms
+        .windows(width)
+        .map(|window| window.join(" "))
+        .collect::<HashSet<_>>();
+    query_terms
+        .windows(width)
+        .filter(|window| content_ngrams.contains(&window.join(" ")))
+        .count()
+}
+
+fn snapshot_index_key_overlap(record: &serde_json::Value, query_terms: &[String]) -> usize {
+    let terms = record
+        .get("index_keys")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .flat_map(|index_key| {
+            preprocess_search_query(index_key)
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    snapshot_query_term_overlap_for_terms(&terms, query_terms)
+}
+
+fn snapshot_dampened_ft_score(record: &serde_json::Value) -> f64 {
+    record
+        .get("ft_score")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0)
+        .ln_1p()
+}
+
+fn snapshot_t_valid(record: &serde_json::Value) -> String {
+    record
+        .get("t_valid")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn snapshot_fact_id(record: &serde_json::Value) -> String {
+    record
+        .get("fact_id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn build_fallback_queries_from_cleaned_query(cleaned_query: &str) -> Vec<String> {
+    let query_terms = cleaned_query
+        .split_whitespace()
+        .filter(|term| !term.trim().is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let mut queries = Vec::new();
+
+    for width in (2..=3).rev() {
+        if query_terms.len() < width {
+            continue;
+        }
+        for window in query_terms.windows(width) {
+            let query = window.join(" ");
+            if !queries.contains(&query) {
+                queries.push(query);
+            }
+        }
+    }
+
+    for term in query_terms {
+        if !queries.contains(&term) {
+            queries.push(term);
+        }
+    }
+
+    queries
+}
+
+fn record_set_contains_expected(
+    records: &[serde_json::Value],
+    expected_needles: &[String],
+) -> bool {
+    expected_needles.iter().any(|needle| {
+        records.iter().any(|record| {
+            record
+                .get("content")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|content| content.contains(needle.as_str()))
+        })
+    })
 }
 
 async fn evaluate_retrieval_batch(
@@ -541,7 +891,9 @@ fn normalizes_prefeval_fixture_into_canonical_cases() {
     assert_eq!(case.expected.tier, "reasoning");
     assert_eq!(
         case.expected.must_contain,
-        vec!["I absolutely avoid hotels with a bustling nightlife atmosphere."]
+        vec![
+            "I usually prefer quieter hotels away from the city center, as I absolutely avoid hotels with a bustling nightlife atmosphere."
+        ]
     );
     assert!(case.facts.len() >= 8);
     assert!(case.facts.iter().any(|fact| {
@@ -555,6 +907,15 @@ fn normalizes_prefeval_fixture_into_canonical_cases() {
     assert_eq!(
         case.metadata["track"],
         "travel_hotel_overall300_topk_history_persona"
+    );
+
+    let paraphrased_case = cases
+        .iter()
+        .find(|case| case.id == "prefeval:travel_hotel_overall300_topk_history_persona:1")
+        .expect("canonical prefeval paraphrased case");
+    assert_eq!(
+        paraphrased_case.expected.must_contain,
+        vec!["I tend to avoid high-rise buildings for accommodations."]
     );
 }
 
@@ -735,6 +1096,224 @@ async fn external_seed_case_facts_populate_entity_backed_index_keys() {
 }
 
 #[tokio::test]
+async fn personamem_music_blend_case_recalls_expected_context() {
+    let case_id = "personamem:acd74206-37dc-4756-94a8-b99a395d9a21";
+    let case = load_external_dataset_cases(DatasetKind::PersonaMem)
+        .await
+        .expect("load personamem cases")
+        .into_iter()
+        .find(|case| case.id == case_id)
+        .unwrap_or_else(|| panic!("find personamem case {case_id}"));
+
+    let (service, db_client) = common::make_service_with_client().await;
+    seed_case_facts(&service, &case.scope, &case.facts).await;
+    let snapshot = build_candidate_pool_snapshot(db_client.as_ref(), &case).await;
+
+    let items = service
+        .assemble_context(AssembleContextRequest {
+            query: case.query.clone(),
+            scope: case.scope.clone(),
+            as_of: None,
+            budget: case.budget,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble personamem case");
+
+    assert!(
+        items.iter().any(|item| {
+            case.expected
+                .must_contain
+                .iter()
+                .any(|needle| item.content.contains(needle.as_str()))
+        }),
+        "expected {case_id} to retrieve the gold memory; initial_has_expected={} fallback_has_expected={} reranked_initial_has_expected={} reranked_fallback_has_expected={} active_experience_has_expected={} initial_top={:?} reranked_initial_top={:?} fallback_top={:?} reranked_fallback_top={:?} active_experience_top={:?} retrieved={:?}",
+        snapshot.initial_has_expected,
+        snapshot.fallback_has_expected,
+        snapshot.reranked_initial_has_expected,
+        snapshot.reranked_fallback_has_expected,
+        snapshot.active_experience_has_expected,
+        snapshot.initial_top_contents,
+        snapshot.reranked_initial_top_contents,
+        snapshot.fallback_top_contents,
+        snapshot.reranked_fallback_top_contents,
+        snapshot.active_experience_top_contents,
+        items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn personamem_fulfilling_music_expression_case_recalls_reflective_context() {
+    let case_id = "personamem:b3588797-acdf-40d3-bcc5-951f81896f95";
+    let case = load_external_dataset_cases(DatasetKind::PersonaMem)
+        .await
+        .expect("load personamem cases")
+        .into_iter()
+        .find(|candidate| candidate.id == case_id)
+        .unwrap_or_else(|| panic!("find personamem case {case_id}"));
+
+    let (service, db_client) = common::make_service_with_client().await;
+    seed_case_facts(&service, &case.scope, &case.facts).await;
+
+    let snapshot = build_candidate_pool_snapshot(db_client.as_ref(), &case).await;
+    let items = service
+        .assemble_context(AssembleContextRequest {
+            query: case.query.clone(),
+            scope: case.scope.clone(),
+            fact_types: vec![],
+            as_of: None,
+            budget: case.budget,
+            project: None,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble personamem case");
+
+    assert!(
+        case.expected.must_contain.iter().all(|needle| {
+            items
+                .iter()
+                .any(|item| item.content.contains(needle.as_str()))
+        }),
+        "expected {case_id} to retrieve the reflective gold memory; initial_has_expected={} fallback_has_expected={} reranked_initial_has_expected={} reranked_fallback_has_expected={} active_experience_has_expected={} initial_top={:?} reranked_initial_top={:?} fallback_top={:?} reranked_fallback_top={:?} active_experience_top={:?} retrieved={:?}",
+        snapshot.initial_has_expected,
+        snapshot.fallback_has_expected,
+        snapshot.reranked_initial_has_expected,
+        snapshot.reranked_fallback_has_expected,
+        snapshot.active_experience_has_expected,
+        snapshot.initial_top_contents,
+        snapshot.reranked_initial_top_contents,
+        snapshot.fallback_top_contents,
+        snapshot.reranked_fallback_top_contents,
+        snapshot.active_experience_top_contents,
+        items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn personamem_podcasting_shift_case_recalls_previous_reason_context() {
+    let case_id = "personamem:a40d5f67-8ec6-480b-a901-9709eecee9b9";
+    let case = load_external_dataset_cases(DatasetKind::PersonaMem)
+        .await
+        .expect("load personamem cases")
+        .into_iter()
+        .find(|candidate| candidate.id == case_id)
+        .unwrap_or_else(|| panic!("find personamem case {case_id}"));
+
+    let (service, db_client) = common::make_service_with_client().await;
+    seed_case_facts(&service, &case.scope, &case.facts).await;
+
+    let snapshot = build_candidate_pool_snapshot(db_client.as_ref(), &case).await;
+    let items = service
+        .assemble_context(AssembleContextRequest {
+            query: case.query.clone(),
+            scope: case.scope.clone(),
+            fact_types: vec![],
+            as_of: None,
+            budget: case.budget,
+            project: None,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble personamem case");
+
+    assert!(
+        case.expected.must_contain.iter().all(|needle| {
+            items
+                .iter()
+                .any(|item| item.content.contains(needle.as_str()))
+        }),
+        "expected {case_id} to retrieve the prior-reason gold memory; initial_has_expected={} fallback_has_expected={} reranked_initial_has_expected={} reranked_fallback_has_expected={} active_experience_has_expected={} initial_top={:?} reranked_initial_top={:?} fallback_top={:?} reranked_fallback_top={:?} active_experience_top={:?} retrieved={:?}",
+        snapshot.initial_has_expected,
+        snapshot.fallback_has_expected,
+        snapshot.reranked_initial_has_expected,
+        snapshot.reranked_fallback_has_expected,
+        snapshot.active_experience_has_expected,
+        snapshot.initial_top_contents,
+        snapshot.reranked_initial_top_contents,
+        snapshot.fallback_top_contents,
+        snapshot.reranked_fallback_top_contents,
+        snapshot.active_experience_top_contents,
+        items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn prefeval_hotel_persona_case_recalls_expected_preference() {
+    let case_id = "prefeval:travel_hotel_overall300_topk_history_persona:1";
+    let case = load_external_dataset_cases(DatasetKind::PrefEval)
+        .await
+        .expect("load prefeval cases")
+        .into_iter()
+        .find(|case| case.id == case_id)
+        .unwrap_or_else(|| panic!("find prefeval case {case_id}"));
+
+    let (service, db_client) = common::make_service_with_client().await;
+    seed_case_facts(&service, &case.scope, &case.facts).await;
+    let snapshot = build_candidate_pool_snapshot(db_client.as_ref(), &case).await;
+
+    let items = service
+        .assemble_context(AssembleContextRequest {
+            query: case.query.clone(),
+            scope: case.scope.clone(),
+            as_of: None,
+            budget: case.budget,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble prefeval case");
+
+    assert!(
+        items.iter().any(|item| {
+            case.expected
+                .must_contain
+                .iter()
+                .any(|needle| item.content.contains(needle.as_str()))
+        }),
+        "expected {case_id} to retrieve the gold preference; initial_has_expected={} fallback_has_expected={} reranked_initial_has_expected={} reranked_fallback_has_expected={} active_experience_has_expected={} initial_top={:?} reranked_initial_top={:?} fallback_top={:?} reranked_fallback_top={:?} active_experience_top={:?} retrieved={:?}",
+        snapshot.initial_has_expected,
+        snapshot.fallback_has_expected,
+        snapshot.reranked_initial_has_expected,
+        snapshot.reranked_fallback_has_expected,
+        snapshot.active_experience_has_expected,
+        snapshot.initial_top_contents,
+        snapshot.reranked_initial_top_contents,
+        snapshot.fallback_top_contents,
+        snapshot.reranked_fallback_top_contents,
+        snapshot.active_experience_top_contents,
+        items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 #[ignore]
 async fn locomo_full_conv26_first_case_retrieves_expected_context() {
     let case_id =
@@ -784,6 +1363,12 @@ async fn run_locomo_retrieval() {
 #[ignore]
 async fn run_personamem_retrieval() {
     run_dataset_retrieval("personamem", DatasetKind::PersonaMem, true).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn report_personamem_retrieval_metrics() {
+    run_dataset_retrieval("personamem", DatasetKind::PersonaMem, false).await;
 }
 
 #[tokio::test]

@@ -714,8 +714,11 @@ fn normalize_personamem_question(
         })
         .collect::<Vec<_>>();
     let selected_option = parse_personamem_selected_option(&all_options, &correct_answer)?;
-    let expected_snippet =
-        derive_personamem_expected_snippet(&user_question_or_message, usable_context)?;
+    let expected_snippet = derive_personamem_expected_snippet(
+        &user_question_or_message,
+        &question_type,
+        usable_context,
+    )?;
     let dataset = DatasetKind::PersonaMem.dataset_name().to_string();
 
     Ok(NormalizedExternalRetrievalCase {
@@ -764,6 +767,7 @@ fn normalize_prefeval_record(
         persona,
         conversation,
     } = record;
+    let expected_snippet = derive_prefeval_expected_snippet(&preference, &question, &conversation)?;
     let facts = normalize_prefeval_facts(&conversation)?;
     let dataset = DatasetKind::PrefEval.dataset_name().to_string();
 
@@ -777,7 +781,7 @@ fn normalize_prefeval_record(
         facts,
         expected: NormalizedRetrievalExpectation {
             tier: map_prefeval_track_to_tier(track).to_string(),
-            must_contain: vec![preference.clone()],
+            must_contain: vec![expected_snippet],
             min_recall_at_k: DEFAULT_MIN_RECALL_AT_K,
         },
         metadata: json!({
@@ -816,6 +820,104 @@ fn normalize_prefeval_facts(
     }
 
     Ok(facts)
+}
+
+fn derive_prefeval_expected_snippet(
+    preference: &str,
+    question: &str,
+    conversation: &BTreeMap<String, PrefEvalConversationTurn>,
+) -> Result<String, String> {
+    let preference_tokens = normalized_overlap_tokens(preference);
+    let question_tokens = normalized_overlap_tokens(question);
+    let normalized_preference = preference.trim().to_ascii_lowercase();
+    let mut best_turn: Option<(usize, String)> = None;
+
+    for turn in conversation.values() {
+        let turn_text = turn.user.trim();
+        let turn_score = (overlap_score(&preference_tokens, turn_text) * 3)
+            + (overlap_score(&question_tokens, turn_text) * 2)
+            + prefeval_preference_cue_score(turn_text) * 4;
+        if turn_score == 0 {
+            continue;
+        }
+
+        let should_replace = match &best_turn {
+            None => true,
+            Some((best_score, best_text)) => {
+                turn_score > *best_score
+                    || (turn_score == *best_score && turn_text.len() > best_text.len())
+            }
+        };
+        if should_replace {
+            best_turn = Some((turn_score, turn_text.to_string()));
+        }
+    }
+
+    let Some((_, best_turn_text)) = best_turn else {
+        return Err(format!(
+            "could not derive prefeval snippet for preference '{preference}'"
+        ));
+    };
+
+    let mut best_match: Option<(usize, usize, String)> = None;
+
+    for sentence in sentence_segments(&best_turn_text) {
+        let overlap = overlap_score(&preference_tokens, &sentence);
+        let contains_preference = !normalized_preference.is_empty()
+            && sentence
+                .to_ascii_lowercase()
+                .contains(&normalized_preference);
+        let cue_score = prefeval_preference_cue_score(&sentence);
+        let question_overlap = overlap_score(&question_tokens, &sentence);
+        if overlap == 0 && !contains_preference && cue_score == 0 {
+            continue;
+        }
+
+        let candidate = sentence.trim().to_string();
+        let score = (overlap * 3)
+            + (question_overlap * 2)
+            + cue_score * 4
+            + usize::from(contains_preference) * 6;
+        let candidate_len = candidate.len();
+        let should_replace = match &best_match {
+            None => true,
+            Some((best_score, best_len, _)) => {
+                score > *best_score || (score == *best_score && candidate_len > *best_len)
+            }
+        };
+
+        if should_replace {
+            best_match = Some((score, candidate_len, candidate));
+        }
+    }
+
+    best_match
+        .map(|(_, _, candidate)| candidate)
+        .ok_or_else(|| format!("could not derive prefeval snippet for preference '{preference}'"))
+}
+
+fn prefeval_preference_cue_score(text: &str) -> usize {
+    let normalized = text.to_ascii_lowercase();
+    [
+        "prefer",
+        "avoid",
+        "dislike",
+        "enjoy",
+        "love",
+        "hate",
+        "value",
+        "aversion",
+        "don't enjoy",
+        "do not enjoy",
+        "don't like",
+        "do not like",
+        "stay away",
+        "not keen",
+        "not interested",
+    ]
+    .into_iter()
+    .filter(|needle| normalized.contains(needle))
+    .count()
 }
 
 fn parse_longmemeval_datetime(raw: &str) -> Result<String, String> {
@@ -1010,12 +1112,40 @@ fn skip_personamem_option_whitespace(characters: &mut std::iter::Peekable<std::s
 
 fn derive_personamem_expected_snippet(
     query: &str,
+    question_type: &str,
     messages: &[PersonaMemContextMessage],
 ) -> Result<String, String> {
+    let prefer_assistant = question_type.contains("assistant_shared");
+    let role_priority = if prefer_assistant {
+        ["assistant", "user", "system"]
+    } else {
+        ["user", "assistant", "system"]
+    };
+
+    for role in role_priority {
+        if let Some(candidate) = derive_personamem_expected_snippet_for_role(query, messages, role)
+        {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "could not derive personamem snippet for query '{query}'"
+    ))
+}
+
+fn derive_personamem_expected_snippet_for_role(
+    query: &str,
+    messages: &[PersonaMemContextMessage],
+    role: &str,
+) -> Option<String> {
     let query_tokens = normalized_overlap_tokens(query);
     let mut best_match: Option<(usize, usize, String)> = None;
 
     for message in messages {
+        if !message._role.eq_ignore_ascii_case(role) {
+            continue;
+        }
         for sentence in sentence_candidates(&message.content) {
             let overlap = overlap_score(&query_tokens, &sentence);
             if overlap == 0 {
@@ -1038,9 +1168,7 @@ fn derive_personamem_expected_snippet(
         }
     }
 
-    best_match
-        .map(|(_, _, candidate)| candidate)
-        .ok_or_else(|| format!("could not derive personamem snippet for query '{query}'"))
+    best_match.map(|(_, _, candidate)| candidate)
 }
 
 fn sentence_candidates(text: &str) -> Vec<String> {
@@ -2041,6 +2169,7 @@ mod tests {
     fn derive_personamem_expected_snippet_prefers_high_overlap_sentence() {
         let snippet = derive_personamem_expected_snippet(
             "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+            "recall_user_shared_facts",
             &[
                 PersonaMemContextMessage {
                     _role: "user".to_string(),
@@ -2096,6 +2225,30 @@ mod tests {
             vec![
                 "Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it."
             ]
+        );
+    }
+
+    #[test]
+    fn derive_personamem_expected_snippet_prefers_user_memory_over_assistant_paraphrase() {
+        let snippet = derive_personamem_expected_snippet(
+            "After several disagreements over the artistic direction, I felt stifled, which really discouraged me from that collaborative process.",
+            "track_full_preference_evolution",
+            &[
+                PersonaMemContextMessage {
+                    _role: "assistant".to_string(),
+                    content: "Assistant: Collaborating can be both rewarding and frustrating. While it might feel disheartening now, this could also be a crucial turning point for you, providing an opportunity to focus on your personal artistry and explore new avenues that align more closely with your vision.".to_string(),
+                },
+                PersonaMemContextMessage {
+                    _role: "user".to_string(),
+                    content: "User: After several disagreements over the artistic direction, I felt stifled, which really discouraged me from that collaborative process. This inner turmoil prompted a desire for more autonomy over my own creative endeavors.".to_string(),
+                },
+            ],
+        )
+        .expect("derive user-grounded personamem snippet");
+
+        assert_eq!(
+            snippet,
+            "After several disagreements over the artistic direction, I felt stifled, which really discouraged me from that collaborative process"
         );
     }
 
