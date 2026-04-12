@@ -955,7 +955,11 @@ impl MemoryService {
     }
 
     /// Internal helper: resolves an entity by its type string and canonical name.
-    async fn resolve_entity_by_type(&self, entity_type: &str, name: &str) -> Result<String, MemoryError> {
+    async fn resolve_entity_by_type(
+        &self,
+        entity_type: &str,
+        name: &str,
+    ) -> Result<String, MemoryError> {
         self.resolve(
             EntityCandidate {
                 entity_type: entity_type.to_string(),

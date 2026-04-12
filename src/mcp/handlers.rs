@@ -170,9 +170,10 @@ async fn update_ingestion_item_statuses(
     let mut payload = session_payload;
     let summary = if let Some(items) = payload.get_mut("items").and_then(Value::as_array_mut) {
         for item in items.iter_mut() {
-            let matches = item.get("item_id").and_then(Value::as_str).is_some_and(|item_id| {
-                item_ids.iter().any(|candidate| candidate == item_id)
-            });
+            let matches = item
+                .get("item_id")
+                .and_then(Value::as_str)
+                .is_some_and(|item_id| item_ids.iter().any(|candidate| candidate == item_id));
             if matches && let Some(object) = item.as_object_mut() {
                 object.insert("status".to_string(), json!(status));
                 if status == "approved" {
@@ -1527,9 +1528,14 @@ impl MemoryMcp {
                     ))
                 } else {
                     let summary = update_ingestion_item_statuses(
-                        self, &p.session_id, &p.item_ids, "approved", None,
+                        self,
+                        &p.session_id,
+                        &p.item_ids,
+                        "approved",
+                        None,
                         session.payload.clone(),
-                    ).await?;
+                    )
+                    .await?;
                     Ok(Self::app_command_result_from_details(
                         &app,
                         &p.session_id,
@@ -1555,11 +1561,19 @@ impl MemoryMcp {
                         "`item_ids` is required for reject_items",
                     ))
                 } else {
-                    let reason = p.reason.clone().or_else(|| Some("Rejected from app review".to_string()));
+                    let reason = p
+                        .reason
+                        .clone()
+                        .or_else(|| Some("Rejected from app review".to_string()));
                     let summary = update_ingestion_item_statuses(
-                        self, &p.session_id, &p.item_ids, "rejected", reason,
+                        self,
+                        &p.session_id,
+                        &p.item_ids,
+                        "rejected",
+                        reason,
                         session.payload.clone(),
-                    ).await?;
+                    )
+                    .await?;
                     Ok(Self::app_command_result_from_details(
                         &app,
                         &p.session_id,

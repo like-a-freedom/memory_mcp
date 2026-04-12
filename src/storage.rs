@@ -558,7 +558,9 @@ impl SurrealDbClient {
             LogLevel::Debug,
         );
 
-        let result = self.execute_sql_with_timing(sql, vars.clone(), namespace).await;
+        let result = self
+            .execute_sql_with_timing(sql, vars.clone(), namespace)
+            .await;
 
         match result {
             Ok(value) => {
@@ -613,7 +615,9 @@ impl SurrealDbClient {
             LogLevel::Debug,
         );
 
-        let result = self.execute_sql_void_with_timing(sql, vars.clone(), namespace).await;
+        let result = self
+            .execute_sql_void_with_timing(sql, vars.clone(), namespace)
+            .await;
 
         match result {
             Ok(()) => {

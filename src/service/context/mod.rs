@@ -121,8 +121,12 @@ async fn assemble_default_context(
     .await?;
 
     let direct_retrieval_tier = lexical_result.retrieval_tier;
-    let mut direct_facts =
-        filter_facts_by_constraints(lexical_result.records, params.access, params.project_opt, params.fact_types);
+    let mut direct_facts = filter_facts_by_constraints(
+        lexical_result.records,
+        params.access,
+        params.project_opt,
+        params.fact_types,
+    );
 
     let mut expanded_facts = Vec::new();
     let mut ranked_facts = if let Some(query) = params.query_opt {
@@ -184,7 +188,8 @@ async fn assemble_default_context(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
-        let experience_query_terms = expand_experience_query_terms(params.query_terms, &direct_facts);
+        let experience_query_terms =
+            expand_experience_query_terms(params.query_terms, &direct_facts);
         let experience_topic_terms = experience_query_terms
             .iter()
             .filter(|term| !params.query_terms.contains(term))
@@ -354,8 +359,9 @@ async fn assemble_default_context(
                 .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
                 .collect())
         } else {
-            let temporal_focus =
-                params.query_opt.and_then(|query| infer_temporal_window(query, params.cutoff));
+            let temporal_focus = params
+                .query_opt
+                .and_then(|query| infer_temporal_window(query, params.cutoff));
             let selected_ranked = select_ranked_context_facts(
                 ranked_facts,
                 params.budget.max(1) as usize,
@@ -581,8 +587,10 @@ pub async fn assemble_context(
         .await?
     };
 
-    if query_opt.is_none()
-        && requested_view_mode != Some("facets")
+    // Append recent experience facts as supplemental context when not using
+    // specialized view modes. Safe to call even when a query was provided —
+    // the helper deduplicates and respects the budget limit.
+    if requested_view_mode != Some("facets")
         && requested_view_mode != Some("wake_up")
         && requested_view_mode != Some("map")
     {
