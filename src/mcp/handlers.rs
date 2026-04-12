@@ -158,6 +158,39 @@ fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     }
 }
 
+/// Updates the status of matching ingestion review items and persists the result.
+async fn update_ingestion_item_statuses(
+    service: &MemoryMcp,
+    session_id: &str,
+    item_ids: &[String],
+    status: &str,
+    reason: Option<String>,
+    session_payload: Value,
+) -> Result<serde_json::Value, ErrorData> {
+    let mut payload = session_payload;
+    let summary = if let Some(items) = payload.get_mut("items").and_then(Value::as_array_mut) {
+        for item in items.iter_mut() {
+            let matches = item.get("item_id").and_then(Value::as_str).is_some_and(|item_id| {
+                item_ids.iter().any(|candidate| candidate == item_id)
+            });
+            if matches && let Some(object) = item.as_object_mut() {
+                object.insert("status".to_string(), json!(status));
+                if status == "approved" {
+                    object.remove("reason");
+                } else if let Some(r) = reason.as_ref() {
+                    object.insert("reason".to_string(), json!(r));
+                }
+            }
+        }
+        summarize_ingestion_review_items(items)
+    } else {
+        summarize_ingestion_review_items(&[])
+    };
+    upsert_json_field(&mut payload, "summary", summary.clone());
+    let updated = service.replace_session_payload(session_id, payload).await?;
+    Ok(updated.payload["summary"].clone())
+}
+
 fn shallow_merge_object(
     target: &mut serde_json::Map<String, Value>,
     patch: &serde_json::Map<String, Value>,
@@ -1493,25 +1526,10 @@ impl MemoryMcp {
                         "`item_ids` is required for approve_items",
                     ))
                 } else {
-                    let mut payload = session.payload.clone();
-                    let summary = if let Some(items) =
-                        payload.get_mut("items").and_then(Value::as_array_mut)
-                    {
-                        for item in items.iter_mut() {
-                            let matches = item.get("item_id").and_then(Value::as_str).is_some_and(
-                                |item_id| p.item_ids.iter().any(|candidate| candidate == item_id),
-                            );
-                            if matches && let Some(object) = item.as_object_mut() {
-                                object.insert("status".to_string(), json!("approved"));
-                                object.remove("reason");
-                            }
-                        }
-                        summarize_ingestion_review_items(items)
-                    } else {
-                        summarize_ingestion_review_items(&[])
-                    };
-                    upsert_json_field(&mut payload, "summary", summary.clone());
-                    let updated = self.replace_session_payload(&p.session_id, payload).await?;
+                    let summary = update_ingestion_item_statuses(
+                        self, &p.session_id, &p.item_ids, "approved", None,
+                        session.payload.clone(),
+                    ).await?;
                     Ok(Self::app_command_result_from_details(
                         &app,
                         &p.session_id,
@@ -1522,7 +1540,7 @@ impl MemoryMcp {
                             "message": format!("Approved {} ingestion review item(s)", p.item_ids.len()),
                             "refresh_required": true,
                             "updated_item_ids": p.item_ids,
-                            "summary": updated.payload["summary"].clone(),
+                            "summary": summary,
                         }),
                     ))
                 }
@@ -1537,30 +1555,11 @@ impl MemoryMcp {
                         "`item_ids` is required for reject_items",
                     ))
                 } else {
-                    let mut payload = session.payload.clone();
-                    let summary = if let Some(items) =
-                        payload.get_mut("items").and_then(Value::as_array_mut)
-                    {
-                        for item in items.iter_mut() {
-                            let matches = item.get("item_id").and_then(Value::as_str).is_some_and(
-                                |item_id| p.item_ids.iter().any(|candidate| candidate == item_id),
-                            );
-                            if matches && let Some(object) = item.as_object_mut() {
-                                object.insert("status".to_string(), json!("rejected"));
-                                object.insert(
-                                    "reason".to_string(),
-                                    json!(p.reason.clone().unwrap_or_else(|| {
-                                        "Rejected from app review".to_string()
-                                    })),
-                                );
-                            }
-                        }
-                        summarize_ingestion_review_items(items)
-                    } else {
-                        summarize_ingestion_review_items(&[])
-                    };
-                    upsert_json_field(&mut payload, "summary", summary.clone());
-                    let updated = self.replace_session_payload(&p.session_id, payload).await?;
+                    let reason = p.reason.clone().or_else(|| Some("Rejected from app review".to_string()));
+                    let summary = update_ingestion_item_statuses(
+                        self, &p.session_id, &p.item_ids, "rejected", reason,
+                        session.payload.clone(),
+                    ).await?;
                     Ok(Self::app_command_result_from_details(
                         &app,
                         &p.session_id,
@@ -1571,7 +1570,7 @@ impl MemoryMcp {
                             "message": format!("Rejected {} ingestion review item(s)", p.item_ids.len()),
                             "refresh_required": true,
                             "updated_item_ids": p.item_ids,
-                            "summary": updated.payload["summary"].clone(),
+                            "summary": summary,
                         }),
                     ))
                 }

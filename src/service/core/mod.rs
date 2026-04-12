@@ -926,74 +926,39 @@ impl MemoryService {
 
     /// Resolves a person entity.
     pub async fn resolve_person(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: "person".to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
+        self.resolve_entity_by_type("person", name).await
     }
 
     /// Resolves a company entity.
     pub async fn resolve_company(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: "company".to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
+        self.resolve_entity_by_type("company", name).await
     }
 
     /// Resolves a location entity.
     pub async fn resolve_location(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: "location".to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
+        self.resolve_entity_by_type("location", name).await
     }
 
     /// Resolves a product entity.
     pub async fn resolve_product(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: "product".to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
+        self.resolve_entity_by_type("product", name).await
     }
 
     /// Resolves an event entity.
     pub async fn resolve_event(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: "event".to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
+        self.resolve_entity_by_type("event", name).await
     }
 
     /// Resolves a concept entity.
     pub async fn resolve_concept(&self, name: &str) -> Result<String, MemoryError> {
+        self.resolve_entity_by_type("concept", name).await
+    }
+
+    /// Internal helper: resolves an entity by its type string and canonical name.
+    async fn resolve_entity_by_type(&self, entity_type: &str, name: &str) -> Result<String, MemoryError> {
         self.resolve(
             EntityCandidate {
-                entity_type: "concept".to_string(),
+                entity_type: entity_type.to_string(),
                 canonical_name: name.to_string(),
                 aliases: Vec::new(),
             },
@@ -1180,13 +1145,7 @@ impl MemoryService {
         &self,
         episode_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(episode_id, namespace).await?;
-            if let Some(Value::Object(map)) = record {
-                return Ok((Some(map), Some(namespace.clone())));
-            }
-        }
-        Ok((None, None))
+        self.find_record_by_id(episode_id).await
     }
 
     async fn project_for_source_episode(
@@ -1204,8 +1163,16 @@ impl MemoryService {
         &self,
         fact_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        self.find_record_by_id(fact_id).await
+    }
+
+    /// Scans all namespaces for a record by its ID, returning the payload and owning namespace.
+    async fn find_record_by_id(
+        &self,
+        record_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
         for namespace in &self.namespaces {
-            let record = self.db_client.select_one(fact_id, namespace).await?;
+            let record = self.db_client.select_one(record_id, namespace).await?;
             if let Some(Value::Object(map)) = record {
                 return Ok((Some(map), Some(namespace.clone())));
             }

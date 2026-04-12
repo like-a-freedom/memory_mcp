@@ -33,6 +33,21 @@ pub const DEFAULT_NER_THRESHOLD: f64 = 0.5;
 /// Default batch size for local NER inference.
 pub const DEFAULT_NER_BATCH_SIZE: usize = 4;
 
+/// Default interval for confidence decay refresh (seconds).
+const DEFAULT_DECAY_INTERVAL_SECS: u64 = 3600;
+
+/// Default interval for episode archival refresh (seconds).
+const DEFAULT_ARCHIVAL_INTERVAL_SECS: u64 = 86400;
+
+/// Default confidence threshold below which facts are considered invalid.
+const DEFAULT_DECAY_THRESHOLD: f64 = 0.3;
+
+/// Default episode age threshold for archival (days).
+const DEFAULT_ARCHIVAL_AGE_DAYS: u32 = 90;
+
+/// Default half-life for confidence decay computation (days).
+const DEFAULT_DECAY_HALF_LIFE_DAYS: f64 = 365.0;
+
 /// Supported NER provider kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NerProviderKind {
@@ -522,11 +537,11 @@ impl Default for LifecycleConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            decay_interval_secs: 3600,
-            archival_interval_secs: 86400,
-            decay_confidence_threshold: 0.3,
-            archival_age_days: 90,
-            decay_half_life_days: 365.0,
+            decay_interval_secs: DEFAULT_DECAY_INTERVAL_SECS,
+            archival_interval_secs: DEFAULT_ARCHIVAL_INTERVAL_SECS,
+            decay_confidence_threshold: DEFAULT_DECAY_THRESHOLD,
+            archival_age_days: DEFAULT_ARCHIVAL_AGE_DAYS,
+            decay_half_life_days: DEFAULT_DECAY_HALF_LIFE_DAYS,
         }
     }
 }
@@ -557,26 +572,26 @@ impl LifecycleConfig {
     pub fn from_env() -> Self {
         Self {
             enabled: parse_bool_env("LIFECYCLE_ENABLED").unwrap_or(false),
-            decay_interval_secs: env::var("LIFECYCLE_DECAY_INTERVAL_SECS")
+            decay_interval_secs: parse_env::<u64>("LIFECYCLE_DECAY_INTERVAL_SECS")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(3600),
-            archival_interval_secs: env::var("LIFECYCLE_ARCHIVAL_INTERVAL_SECS")
+                .flatten()
+                .unwrap_or(DEFAULT_DECAY_INTERVAL_SECS),
+            archival_interval_secs: parse_env::<u64>("LIFECYCLE_ARCHIVAL_INTERVAL_SECS")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(86400),
-            decay_confidence_threshold: env::var("LIFECYCLE_DECAY_THRESHOLD")
+                .flatten()
+                .unwrap_or(DEFAULT_ARCHIVAL_INTERVAL_SECS),
+            decay_confidence_threshold: parse_env::<f64>("LIFECYCLE_DECAY_THRESHOLD")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0.3),
-            archival_age_days: env::var("LIFECYCLE_ARCHIVAL_AGE_DAYS")
+                .flatten()
+                .unwrap_or(DEFAULT_DECAY_THRESHOLD),
+            archival_age_days: parse_env::<u32>("LIFECYCLE_ARCHIVAL_AGE_DAYS")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(90),
-            decay_half_life_days: env::var("LIFECYCLE_DECAY_HALF_LIFE_DAYS")
+                .flatten()
+                .unwrap_or(DEFAULT_ARCHIVAL_AGE_DAYS),
+            decay_half_life_days: parse_env::<f64>("LIFECYCLE_DECAY_HALF_LIFE_DAYS")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(365.0),
+                .flatten()
+                .unwrap_or(DEFAULT_DECAY_HALF_LIFE_DAYS),
         }
     }
 }
