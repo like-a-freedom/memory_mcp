@@ -228,4 +228,126 @@ mod tests {
         let dt = dt_field(&map, "t_valid");
         assert!(dt.is_some());
     }
+
+    #[test]
+    fn dt_field_returns_none_for_invalid() {
+        let map =
+            serde_json::from_str::<serde_json::Map<String, Value>>(r#"{"t_valid": "not-a-date"}"#)
+                .unwrap();
+        assert!(dt_field(&map, "t_valid").is_none());
+    }
+
+    #[test]
+    fn dt_field_returns_none_for_missing() {
+        let map = serde_json::from_str::<serde_json::Map<String, Value>>(r#"{}"#).unwrap();
+        assert!(dt_field(&map, "t_valid").is_none());
+    }
+
+    #[test]
+    fn f64_field_returns_default_for_missing() {
+        let map = serde_json::from_str::<serde_json::Map<String, Value>>(r#"{}"#).unwrap();
+        assert_eq!(f64_field(&map, "confidence", 0.5), 0.5);
+    }
+
+    #[test]
+    fn f64_field_parses_plain_number() {
+        let map = serde_json::from_str::<serde_json::Map<String, Value>>(r#"{"confidence": 0.8}"#)
+            .unwrap();
+        assert_eq!(f64_field(&map, "confidence", 0.5), 0.8);
+    }
+
+    #[test]
+    fn i64_field_returns_default_for_missing() {
+        let map = serde_json::from_str::<serde_json::Map<String, Value>>(r#"{}"#).unwrap();
+        assert_eq!(i64_field(&map, "count", 0), 0);
+    }
+
+    #[test]
+    fn i64_field_parses_plain_int() {
+        let map =
+            serde_json::from_str::<serde_json::Map<String, Value>>(r#"{"count": 42}"#).unwrap();
+        assert_eq!(i64_field(&map, "count", 0), 42);
+    }
+
+    #[test]
+    fn normalized_edge_record_extracts_all_fields() {
+        let record = json!({
+            "edge_id": "edge:1",
+            "id": "edge:alt",
+            "in": "entity:alice",
+            "relation": "knows",
+            "out": "entity:bob",
+            "origin": "extracted",
+            "confidence": 0.9,
+            "t_valid": "2024-01-01T00:00:00Z",
+            "t_ingested": "2024-01-02T00:00:00Z",
+        });
+        let normalized = normalized_edge_record(&record);
+        assert_eq!(normalized["edge_id"], "edge:1");
+        assert_eq!(normalized["in"], "entity:alice");
+        assert_eq!(normalized["relation"], "knows");
+        assert_eq!(normalized["out"], "entity:bob");
+        assert_eq!(normalized["origin"], "extracted");
+        assert_eq!(normalized["confidence"], 0.9);
+    }
+
+    #[test]
+    fn normalized_edge_record_falls_back_to_id() {
+        let record = json!({
+            "id": "edge:fallback",
+            "in": "entity:alice",
+            "relation": "knows",
+            "out": "entity:bob",
+        });
+        let normalized = normalized_edge_record(&record);
+        assert_eq!(normalized["edge_id"], "edge:fallback");
+        assert!(normalized["origin"].is_null());
+        assert!(normalized["confidence"].is_null());
+    }
+
+    #[test]
+    fn normalized_edge_record_clones_non_object() {
+        let record = json!([1, 2, 3]);
+        let normalized = normalized_edge_record(&record);
+        assert_eq!(normalized, json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn json_string_returns_none_for_non_string_object() {
+        assert!(json_string(&json!({"other": "value"})).is_none());
+    }
+
+    #[test]
+    fn json_f64_returns_none_for_non_numeric() {
+        assert!(json_f64(&json!({"Other": 1})).is_none());
+    }
+
+    #[test]
+    fn json_i64_returns_none_for_non_numeric() {
+        assert!(json_i64(&json!({"Other": 1})).is_none());
+    }
+
+    #[test]
+    fn unwrap_array_value_extracts_plain_array() {
+        let v = json!([1, 2, 3]);
+        assert!(unwrap_array_value(&v).is_some());
+    }
+
+    #[test]
+    fn unwrap_array_value_returns_none_for_object() {
+        assert!(unwrap_array_value(&json!({"key": "value"})).is_none());
+    }
+
+    #[test]
+    fn str_field_extracts_string() {
+        let map =
+            serde_json::from_str::<serde_json::Map<String, Value>>(r#"{"name": "Alice"}"#).unwrap();
+        assert_eq!(str_field(&map, "name"), Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn str_field_returns_none_for_missing() {
+        let map = serde_json::from_str::<serde_json::Map<String, Value>>(r#"{}"#).unwrap();
+        assert!(str_field(&map, "name").is_none());
+    }
 }

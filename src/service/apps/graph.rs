@@ -423,3 +423,52 @@ fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_traversable_graph_node_accepts_valid_types() {
+        assert!(is_traversable_graph_node("entity:abc"));
+        assert!(is_traversable_graph_node("episode:123"));
+        assert!(is_traversable_graph_node("fact:456"));
+    }
+
+    #[test]
+    fn is_traversable_graph_node_rejects_other_types() {
+        assert!(!is_traversable_graph_node("community:abc"));
+        assert!(!is_traversable_graph_node("user:123"));
+        assert!(!is_traversable_graph_node("random"));
+    }
+
+    #[test]
+    fn unwrap_array_handles_plain_array() {
+        let v = json!([1, 2, 3]);
+        assert!(unwrap_array(&v).is_some());
+    }
+
+    #[test]
+    fn unwrap_array_handles_wrapped_array() {
+        let v = json!({"Array": [1, 2, 3]});
+        assert!(unwrap_array(&v).is_some());
+    }
+
+    #[test]
+    fn unwrap_array_returns_none_for_object() {
+        let v = json!({"key": "value"});
+        assert!(unwrap_array(&v).is_none());
+    }
+
+    #[test]
+    fn unwrap_array_returns_none_for_scalar() {
+        assert!(unwrap_array(&json!("string")).is_none());
+        assert!(unwrap_array(&json!(42)).is_none());
+    }
+
+    #[test]
+    fn graph_community_from_value_returns_none_for_empty() {
+        let value = json!({});
+        assert!(graph_community_from_value(&value).is_none());
+    }
+}

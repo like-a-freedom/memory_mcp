@@ -2734,4 +2734,43 @@ mod tests {
             "closed sessions should no longer resolve as readable resources"
         );
     }
+
+    #[test]
+    fn normalize_public_app_name_maps_all_known_apps() {
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("inspector"),
+            Some("inspector")
+        );
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("memory_inspector"),
+            Some("inspector")
+        );
+        assert_eq!(MemoryMcp::normalize_public_app_name("diff"), Some("diff"));
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("temporal_diff"),
+            Some("diff")
+        );
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("ingestion_review"),
+            Some("ingestion_review")
+        );
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("ingestion"),
+            Some("ingestion_review")
+        );
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("lifecycle"),
+            Some("lifecycle")
+        );
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("lifecycle_console"),
+            Some("lifecycle")
+        );
+        assert_eq!(MemoryMcp::normalize_public_app_name("graph"), Some("graph"));
+        assert_eq!(
+            MemoryMcp::normalize_public_app_name("graph_path"),
+            Some("graph")
+        );
+        assert_eq!(MemoryMcp::normalize_public_app_name("unknown_app"), None);
+    }
 }

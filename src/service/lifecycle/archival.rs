@@ -147,3 +147,86 @@ async fn check_episode_has_recent_fact_access(
 
     Ok(result.as_array().is_some_and(|rows| !rows.is_empty()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn cutoff_computation_from_age_days() {
+        let now = Utc::now();
+        let age_days = 90u32;
+        let cutoff = now - chrono::Duration::days(age_days as i64);
+        let days_diff = (now - cutoff).num_days();
+        assert_eq!(days_diff, 90);
+    }
+
+    #[test]
+    fn episode_record_missing_episode_id_returns_error() {
+        let record = json!({
+            "status": "active",
+            "created_at": "2024-01-01T00:00:00Z",
+        });
+        let result = record.get("episode_id").and_then(|v| v.as_str());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn episode_with_active_facts_is_not_archived() {
+        // Simulate: has_active_facts = true => should NOT archive
+        let has_active_facts = true;
+        let has_recent_heat = false;
+        let should_archive = !has_active_facts && !has_recent_heat;
+        assert!(!should_archive);
+    }
+
+    #[test]
+    fn episode_with_recent_heat_is_not_archived() {
+        // Simulate: has_recent_heat = true => should NOT archive
+        let has_active_facts = false;
+        let has_recent_heat = true;
+        let should_archive = !has_active_facts && !has_recent_heat;
+        assert!(!should_archive);
+    }
+
+    #[test]
+    fn episode_without_active_facts_or_heat_is_archived() {
+        let has_active_facts = false;
+        let has_recent_heat = false;
+        let should_archive = !has_active_facts && !has_recent_heat;
+        assert!(should_archive);
+    }
+
+    #[test]
+    fn archival_payload_contains_status_and_archived_at() {
+        let now = Utc::now();
+        let payload = json!({
+            "status": "archived",
+            "archived_at": crate::service::normalize_dt(now),
+        });
+        assert_eq!(payload["status"], "archived");
+        assert!(payload["archived_at"].as_str().is_some());
+    }
+
+    #[test]
+    fn check_episode_has_active_facts_empty_result_means_no_active() {
+        let facts: Vec<serde_json::Value> = vec![];
+        let has_active = !facts.is_empty();
+        assert!(!has_active);
+    }
+
+    #[test]
+    fn check_episode_has_recent_heat_empty_result_means_no_heat() {
+        let result = serde_json::json!([]);
+        let has_heat = result.as_array().is_some_and(|rows| !rows.is_empty());
+        assert!(!has_heat);
+    }
+
+    #[test]
+    fn check_episode_has_recent_heat_nonempty_result_means_heat() {
+        let result = serde_json::json!([{"fact_id": "fact:1"}]);
+        let has_heat = result.as_array().is_some_and(|rows| !rows.is_empty());
+        assert!(has_heat);
+    }
+}

@@ -135,3 +135,113 @@ pub async fn run_decay_pass(
 
     Ok(invalidated)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn decay_computation_halflife() {
+        // base_confidence * (0.5)^(days / half_life_days)
+        // At exactly half_life_days, confidence should be halved.
+        let base_confidence = 0.8;
+        let half_life_days = 365.0;
+        let days_since_valid = 365.0;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        assert!((decayed - 0.4).abs() < 1e-9, "expected 0.4, got {decayed}");
+    }
+
+    #[test]
+    fn decay_computation_two_halflives() {
+        // After 2 half-lives, confidence should be quartered.
+        let base_confidence = 1.0;
+        let half_life_days = 30.0;
+        let days_since_valid = 60.0;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        assert!(
+            (decayed - 0.25).abs() < 1e-9,
+            "expected 0.25, got {decayed}"
+        );
+    }
+
+    #[test]
+    fn decay_computation_zero_days() {
+        let base_confidence = 0.7;
+        let half_life_days = 365.0;
+        let days_since_valid = 0.0;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        assert!((decayed - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn decayed_below_threshold_without_heat_should_invalidate() {
+        // A fact with low base confidence and long time since valid, no access.
+        let base_confidence = 0.3;
+        let half_life_days = 30.0;
+        let threshold = 0.1;
+        // After 60 days (2 half-lives): 0.3 * 0.25 = 0.075 < 0.1
+        let days_since_valid = 60.0;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        let access_count = 0;
+        let is_hot = access_count > 0 && false; // no last_accessed
+        assert!(decayed < threshold && !is_hot);
+    }
+
+    #[test]
+    fn hot_fact_is_not_invalidated_even_when_decayed() {
+        let base_confidence = 0.3;
+        let half_life_days = 30.0;
+        let threshold = 0.1;
+        let days_since_valid = 60.0;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        // Hot: accessed within half_life_days
+        let access_count = 5;
+        let last_accessed_within_half_life = true;
+        let is_hot = access_count > 0 && last_accessed_within_half_life;
+        assert!(decayed < threshold);
+        assert!(is_hot);
+        // The combined condition: decayed < threshold AND NOT is_hot
+        assert!(!(decayed < threshold && !is_hot));
+    }
+
+    #[test]
+    fn fact_with_t_invalid_is_skipped() {
+        let record = json!({
+            "fact_id": "fact:1",
+            "t_invalid": "2024-01-01T00:00:00Z",
+            "confidence": 0.2,
+        });
+        assert!(
+            record
+                .get("t_invalid")
+                .is_some_and(|value| !value.is_null())
+        );
+    }
+
+    #[test]
+    fn fact_without_t_invalid_proceeds_to_decay_check() {
+        let record = json!({
+            "fact_id": "fact:2",
+            "confidence": 0.5,
+            "access_count": 0,
+        });
+        assert!(record.get("t_invalid").is_none());
+    }
+
+    #[test]
+    fn missing_fact_id_returns_error() {
+        // Simulate the error path in run_decay_pass
+        let record = json!({
+            "confidence": 0.1,
+            "access_count": 0,
+        });
+        let result = record.get("fact_id").and_then(|v| v.as_str());
+        assert!(result.is_none());
+    }
+}

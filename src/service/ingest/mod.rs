@@ -519,4 +519,66 @@ mod tests {
         assert!(prepared.content.contains("w0351 w0352 w0353"));
         assert!(prepared.content.contains("w0401 w0402 w0403"));
     }
+
+    #[test]
+    fn detect_ingest_transport_identifies_file() {
+        let temp_dir = tempdir().expect("temp dir should exist");
+        let file_path = temp_dir.path().join("test.txt");
+        std::fs::write(&file_path, "content").expect("write file");
+        assert_eq!(
+            detect_ingest_transport(&file_path.to_string_lossy().to_string()),
+            "file"
+        );
+    }
+
+    #[test]
+    fn detect_ingest_transport_identifies_directory() {
+        let temp_dir = tempdir().expect("temp dir should exist");
+        assert_eq!(
+            detect_ingest_transport(&temp_dir.path().to_string_lossy().to_string()),
+            "directory"
+        );
+    }
+
+    #[test]
+    fn detect_ingest_transport_identifies_url() {
+        assert_eq!(detect_ingest_transport("https://example.com/doc"), "url");
+        assert_eq!(detect_ingest_transport("http://localhost:8080/api"), "url");
+    }
+
+    #[test]
+    fn detect_ingest_transport_identifies_inline() {
+        assert_eq!(detect_ingest_transport("plain text content"), "inline");
+        assert_eq!(detect_ingest_transport("just some inline text"), "inline");
+    }
+
+    #[test]
+    fn normalize_extracted_text_trims_and_dedup_empty_lines() {
+        let raw = "  line one  \n\n  line two  \n   \nline three";
+        let result = normalize_extracted_text(raw);
+        assert_eq!(result, "line one\nline two\nline three");
+    }
+
+    #[test]
+    fn normalize_extracted_text_handles_empty_input() {
+        assert_eq!(normalize_extracted_text(""), "");
+        assert_eq!(normalize_extracted_text("   \n\n  "), "");
+    }
+
+    #[test]
+    fn strip_html_to_text_removes_script_and_style() {
+        let html = "<p>Hello</p><script>alert('x')</script><style>.foo{}</style><p>World</p>";
+        let result = strip_html_to_text(html);
+        assert!(result.contains("Hello"));
+        assert!(result.contains("World"));
+        assert!(!result.contains("alert"));
+        assert!(!result.contains(".foo"));
+    }
+
+    #[test]
+    fn strip_html_to_text_decodes_html_entities() {
+        let html = "<p>Tom &amp; Jerry &nbsp; fun</p>";
+        let result = strip_html_to_text(html);
+        assert!(result.contains("Tom & Jerry"));
+    }
 }

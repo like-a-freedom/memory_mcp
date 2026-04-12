@@ -190,3 +190,95 @@ fn normalize_embedding(mut embedding: Vec<f64>) -> Vec<f64> {
 
     embedding
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cosine_similarity_dimension_mismatch_returns_zero() {
+        let a = vec![1.0, 2.0];
+        let b = vec![1.0, 2.0, 3.0];
+        let sim = cosine_similarity(&a, &b);
+        assert_eq!(sim, 0.0);
+    }
+
+    #[test]
+    fn cosine_similarity_single_element() {
+        let a = vec![1.0];
+        let b = vec![1.0];
+        let sim = cosine_similarity(&a, &b);
+        assert_eq!(sim, 1.0);
+    }
+
+    #[test]
+    fn embedding_from_value_parses_plain_array() {
+        let value = json!([0.1, 0.2, 0.3]);
+        let result = embedding_from_value(&value);
+        assert!(result.is_some());
+        let emb = result.unwrap();
+        assert_eq!(emb.len(), 3);
+    }
+
+    #[test]
+    fn embedding_from_value_returns_none_for_non_array() {
+        let value = json!({"embedding": [0.1, 0.2]});
+        assert!(embedding_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn embedding_from_value_handles_wrapped_numbers() {
+        let value = json!([{"Number": 0.5}, {"Number": 0.5}]);
+        let result = embedding_from_value(&value);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn embedding_from_value_returns_none_for_invalid_element() {
+        let value = json!([0.1, "not_a_number", 0.3]);
+        assert!(embedding_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn normalize_embedding_unit_vector() {
+        let v = vec![1.0, 0.0, 0.0];
+        let normalized = normalize_embedding(v.clone());
+        assert!((normalized[0] - 1.0).abs() < 1e-9);
+        assert!((normalized[1] - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalize_embedding_zero_vector_returns_unchanged() {
+        let v = vec![0.0, 0.0, 0.0];
+        let normalized = normalize_embedding(v.clone());
+        assert_eq!(normalized, v);
+    }
+
+    #[test]
+    fn normalize_embedding_produces_unit_length() {
+        let v = vec![3.0, 4.0];
+        let normalized = normalize_embedding(v);
+        let magnitude = normalized.iter().map(|x| x * x).sum::<f64>().sqrt();
+        assert!((magnitude - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn disabled_provider_returns_false_for_is_enabled() {
+        let provider = DisabledEmbeddingProvider::new(1536);
+        assert!(!provider.is_enabled());
+    }
+
+    #[test]
+    fn disabled_provider_returns_correct_dimension() {
+        let provider = DisabledEmbeddingProvider::new(384);
+        assert_eq!(provider.dimension(), 384);
+    }
+
+    #[test]
+    fn disabled_provider_embed_returns_error() {
+        let provider = DisabledEmbeddingProvider::new(1536);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(provider.embed("test"));
+        assert!(result.is_err());
+    }
+}

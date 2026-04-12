@@ -3534,4 +3534,105 @@ mod tests {
         let path = path.unwrap();
         assert!(path.len() <= 4);
     }
+
+    #[tokio::test]
+    async fn resolve_entity_by_type_delegates_to_resolve() {
+        let namespaces = vec!["org".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "resolve_entity_test",
+                &namespaces,
+                "warn",
+            )
+            .await
+            .expect("connect in-memory test db"),
+        );
+        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+            .expect("create test service");
+
+        // Resolve the same entity via different typed methods
+        let id1 = service
+            .resolve_person("Alice Smith")
+            .await
+            .expect("resolve person");
+        let id2 = service
+            .resolve_person("Alice Smith")
+            .await
+            .expect("resolve person again");
+        assert_eq!(id1, id2);
+
+        let id3 = service
+            .resolve_company("Acme Corp")
+            .await
+            .expect("resolve company");
+        assert_ne!(id1, id3);
+    }
+
+    #[tokio::test]
+    async fn relate_creates_edge_between_entities() {
+        let namespaces = vec!["org".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces("relate_test", &namespaces, "warn")
+                .await
+                .expect("connect in-memory test db"),
+        );
+        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+            .expect("create test service");
+
+        let from_id = service
+            .resolve_person("Alice Relate")
+            .await
+            .expect("resolve alice");
+        let to_id = service
+            .resolve_company("Acme Relate")
+            .await
+            .expect("resolve acme");
+
+        service
+            .relate(&from_id, "works_at", &to_id)
+            .await
+            .expect("relate entities");
+    }
+
+    #[tokio::test]
+    async fn get_surrealdb_config_returns_namespaces() {
+        let namespaces = vec!["org".to_string(), "personal".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces("config_test", &namespaces, "warn")
+                .await
+                .expect("connect in-memory test db"),
+        );
+        let service =
+            MemoryService::new(db_client, namespaces.clone(), "warn".to_string(), 50, 100)
+                .expect("create test service");
+
+        let config = service.get_surrealdb_config().await.expect("get config");
+        let config_namespaces = config["namespaces"].as_array().expect("namespaces array");
+        assert_eq!(config_namespaces.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn episode_count_returns_zero_for_empty_db() {
+        let namespaces = vec!["org".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "episode_count_test",
+                &namespaces,
+                "warn",
+            )
+            .await
+            .expect("connect in-memory test db"),
+        );
+        for ns in &namespaces {
+            db_client
+                .apply_migrations(ns)
+                .await
+                .expect("apply migrations");
+        }
+        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+            .expect("create test service");
+
+        let count = service.episode_count().await.expect("count episodes");
+        assert_eq!(count, 0);
+    }
 }

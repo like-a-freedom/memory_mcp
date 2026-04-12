@@ -202,3 +202,288 @@ pub(crate) fn compare_facts_by_recency(left: &Fact, right: &Fact) -> std::cmp::O
         .cmp(&left.t_valid)
         .then_with(|| left.fact_id.cmp(&right.fact_id))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+
+    fn make_access_context(allowed_tags: Option<Vec<String>>) -> AccessContext {
+        AccessContext {
+            caller_id: None,
+            allowed_scopes: None,
+            allowed_tags,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // fact_record_matches_project tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fact_record_matches_project_returns_true_when_no_project_filter() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(fact_record_matches_project(&record, None));
+    }
+
+    #[test]
+    fn fact_record_matches_project_returns_true_when_empty_project_filter() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(fact_record_matches_project(&record, Some("")));
+    }
+
+    #[test]
+    fn fact_record_matches_project_returns_true_when_match() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(fact_record_matches_project(&record, Some("alpha")));
+    }
+
+    #[test]
+    fn fact_record_matches_project_returns_false_when_mismatch() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(!fact_record_matches_project(&record, Some("beta")));
+    }
+
+    #[test]
+    fn fact_record_matches_project_returns_true_when_record_has_no_project() {
+        let record = serde_json::json!({"fact": "test"});
+        assert!(!fact_record_matches_project(&record, Some("alpha")));
+    }
+
+    // -----------------------------------------------------------------------
+    // fact_record_matches_type tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fact_record_matches_type_returns_true_when_no_type_filter() {
+        let record = serde_json::json!({"fact_type": "explicit"});
+        assert!(fact_record_matches_type(&record, &[]));
+    }
+
+    #[test]
+    fn fact_record_matches_type_returns_true_when_match() {
+        let record = serde_json::json!({"fact_type": "explicit"});
+        assert!(fact_record_matches_type(&record, &["explicit".to_string()]));
+    }
+
+    #[test]
+    fn fact_record_matches_type_returns_false_when_mismatch() {
+        let record = serde_json::json!({"fact_type": "explicit"});
+        assert!(!fact_record_matches_type(
+            &record,
+            &["inferred".to_string()]
+        ));
+    }
+
+    #[test]
+    fn fact_record_matches_type_returns_true_for_multiple_types() {
+        let record = serde_json::json!({"fact_type": "inferred"});
+        assert!(fact_record_matches_type(
+            &record,
+            &["explicit".to_string(), "inferred".to_string()]
+        ));
+    }
+
+    // -----------------------------------------------------------------------
+    // fact_record_allowed_by_policy tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fact_record_allowed_by_policy_true_when_no_tags() {
+        let record = serde_json::json!({"fact": "test"});
+        let access = make_access_context(None);
+        assert!(fact_record_allowed_by_policy(&record, &access));
+    }
+
+    #[test]
+    fn fact_record_allowed_by_policy_true_when_empty_tags() {
+        let record = serde_json::json!({"policy_tags": []});
+        let access = make_access_context(None);
+        assert!(fact_record_allowed_by_policy(&record, &access));
+    }
+
+    #[test]
+    fn fact_record_allowed_by_policy_true_when_access_has_no_tag_restriction() {
+        let record = serde_json::json!({"policy_tags": ["secret"]});
+        let access = make_access_context(None);
+        assert!(fact_record_allowed_by_policy(&record, &access));
+    }
+
+    #[test]
+    fn fact_record_allowed_by_policy_true_when_tag_matches() {
+        let record = serde_json::json!({"policy_tags": ["public"]});
+        let access = make_access_context(Some(vec!["public".to_string(), "internal".to_string()]));
+        assert!(fact_record_allowed_by_policy(&record, &access));
+    }
+
+    #[test]
+    fn fact_record_allowed_by_policy_false_when_no_tag_match() {
+        let record = serde_json::json!({"policy_tags": ["secret"]});
+        let access = make_access_context(Some(vec!["public".to_string()]));
+        assert!(!fact_record_allowed_by_policy(&record, &access));
+    }
+
+    // -----------------------------------------------------------------------
+    // episode_record_matches_project tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn episode_record_matches_project_true_when_no_filter() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(episode_record_matches_project(&record, None));
+    }
+
+    #[test]
+    fn episode_record_matches_project_false_when_mismatch() {
+        let record = serde_json::json!({"project": "alpha"});
+        assert!(!episode_record_matches_project(&record, Some("beta")));
+    }
+
+    // -----------------------------------------------------------------------
+    // compare_facts_by_recency tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compare_facts_by_recency_newer_fact_comes_first() {
+        let utc = Utc;
+        let older = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let newer = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+
+        let left = Fact {
+            fact_id: "fact:a".to_string(),
+            t_valid: older,
+            t_ingested: older,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            scope: "org".to_string(),
+            content: String::new(),
+            quote: String::new(),
+            fact_type: String::new(),
+            source_episode: String::new(),
+            confidence: 0.5,
+            access_count: 0,
+            last_accessed: None,
+            policy_tags: Vec::new(),
+            index_keys: Vec::new(),
+            entity_links: Vec::new(),
+            provenance: serde_json::json!({}),
+            ft_score: 0.0,
+        };
+        let right = Fact {
+            fact_id: "fact:b".to_string(),
+            t_valid: newer,
+            t_ingested: newer,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            scope: "org".to_string(),
+            content: String::new(),
+            quote: String::new(),
+            fact_type: String::new(),
+            source_episode: String::new(),
+            confidence: 0.5,
+            access_count: 0,
+            last_accessed: None,
+            policy_tags: Vec::new(),
+            index_keys: Vec::new(),
+            entity_links: Vec::new(),
+            provenance: serde_json::json!({}),
+            ft_score: 0.0,
+        };
+
+        // Function compares right.t_valid vs left.t_valid (reverse order),
+        // so when right is newer it returns Greater (right should sort first).
+        assert_eq!(
+            compare_facts_by_recency(&left, &right),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            compare_facts_by_recency(&right, &left),
+            std::cmp::Ordering::Less
+        );
+    }
+
+    #[test]
+    fn compare_facts_by_recency_tiebreaks_by_fact_id() {
+        let utc = Utc;
+        let dt = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+
+        let left = Fact {
+            fact_id: "fact:b".to_string(),
+            t_valid: dt,
+            t_ingested: dt,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            scope: "org".to_string(),
+            content: String::new(),
+            quote: String::new(),
+            fact_type: String::new(),
+            source_episode: String::new(),
+            confidence: 0.5,
+            access_count: 0,
+            last_accessed: None,
+            policy_tags: Vec::new(),
+            index_keys: Vec::new(),
+            entity_links: Vec::new(),
+            provenance: serde_json::json!({}),
+            ft_score: 0.0,
+        };
+        let right = Fact {
+            fact_id: "fact:a".to_string(),
+            t_valid: dt,
+            t_ingested: dt,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            scope: "org".to_string(),
+            content: String::new(),
+            quote: String::new(),
+            fact_type: String::new(),
+            source_episode: String::new(),
+            confidence: 0.5,
+            access_count: 0,
+            last_accessed: None,
+            policy_tags: Vec::new(),
+            index_keys: Vec::new(),
+            entity_links: Vec::new(),
+            provenance: serde_json::json!({}),
+            ft_score: 0.0,
+        };
+
+        // Same timestamp, should tiebreak by fact_id
+        assert_eq!(
+            compare_facts_by_recency(&left, &right),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // raw_object and raw_array tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn raw_object_returns_map_for_plain_object() {
+        let value = serde_json::json!({"key": "value"});
+        assert!(raw_object(&value).is_some());
+    }
+
+    #[test]
+    fn raw_object_returns_map_for_wrapped_object() {
+        let value = serde_json::json!({"Object": {"key": "value"}});
+        assert!(raw_object(&value).is_some());
+    }
+
+    #[test]
+    fn raw_array_returns_vec_for_plain_array() {
+        let value = serde_json::json!([1, 2, 3]);
+        assert!(raw_array(&value).is_some());
+    }
+
+    #[test]
+    fn raw_array_returns_vec_for_wrapped_array() {
+        let value = serde_json::json!({"Array": [1, 2, 3]});
+        assert!(raw_array(&value).is_some());
+    }
+}

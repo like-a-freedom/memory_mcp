@@ -218,4 +218,88 @@ mod tests {
         assert!(html.contains("<script type=\"application/json\" id=\"app-data\">"));
         assert!(html.contains("\"app\": \"inspector\""));
     }
+
+    #[test]
+    fn parse_app_root_uri_returns_none_for_index_uri() {
+        assert!(parse_app_root_uri(APPS_INDEX_URI).is_none());
+    }
+
+    #[test]
+    fn parse_app_root_uri_returns_none_for_empty_suffix() {
+        assert!(parse_app_root_uri(APPS_ROOT_PREFIX).is_none());
+    }
+
+    #[test]
+    fn parse_app_root_uri_returns_none_for_nested_path() {
+        assert!(parse_app_root_uri("ui://memory/apps/inspector/sub").is_none());
+    }
+
+    #[test]
+    fn parse_app_root_uri_extracts_app_name() {
+        assert_eq!(
+            parse_app_root_uri("ui://memory/apps/inspector"),
+            Some("inspector".to_string())
+        );
+        assert_eq!(
+            parse_app_root_uri("ui://memory/apps/diff"),
+            Some("diff".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_app_session_uri_returns_none_for_empty_parts() {
+        assert!(parse_app_session_uri("ui://memory/app//ses:123").is_none());
+        assert!(parse_app_session_uri("ui://memory/app/inspector/").is_none());
+    }
+
+    #[test]
+    fn parse_app_session_uri_returns_none_for_missing_prefix() {
+        assert!(parse_app_session_uri("ui://memory/apps/inspector/ses:123").is_none());
+    }
+
+    #[test]
+    fn app_root_payload_returns_none_for_unknown_app() {
+        assert!(app_root_payload("nonexistent").is_none());
+    }
+
+    #[test]
+    fn app_root_payload_returns_app_info_for_known_app() {
+        let payload = app_root_payload("inspector");
+        assert!(payload.is_some());
+        let payload = payload.unwrap();
+        assert_eq!(payload["app"], "inspector");
+        assert!(payload["description"].as_str().is_some());
+    }
+
+    #[test]
+    fn apps_index_payload_contains_all_public_apps() {
+        let payload = apps_index_payload();
+        let apps = payload["apps"].as_array().expect("apps should be array");
+        assert_eq!(apps.len(), PUBLIC_APPS.len());
+    }
+
+    #[test]
+    fn app_session_html_document_handles_complex_payload() {
+        let payload = json!({
+            "app": "diff",
+            "timestamps": ["2024-01-01", "2024-01-02"],
+            "metadata": {"key": "value"}
+        });
+        let html = app_session_html_document("diff", &payload);
+        assert!(html.contains("Memory App: diff"));
+        assert!(html.contains("\"timestamps\""));
+        assert!(html.contains("\"metadata\""));
+    }
+
+    #[test]
+    fn app_uri_helpers_consistent() {
+        let app = "lifecycle";
+        let root = app_root_uri(app);
+        let template = app_session_uri_template(app);
+        let session = app_session_uri(app, "abc123");
+
+        assert_eq!(root, "ui://memory/apps/lifecycle");
+        assert_eq!(template, "ui://memory/app/lifecycle/{session_id}");
+        assert_eq!(session, "ui://memory/app/lifecycle/abc123");
+    }
 }

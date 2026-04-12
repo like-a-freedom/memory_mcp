@@ -609,3 +609,437 @@ fn rank_temporal_candidate_facts(
             .then_with(|| compare_recency(left, right))
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn test_cutoff() -> DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-04-12T12:00:00Z")
+            .expect("valid cutoff")
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_empty_query_returns_none() {
+        assert!(expand_temporal_synonyms("", test_cutoff()).is_none());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_no_temporal_tokens_returns_none() {
+        assert!(expand_temporal_synonyms("hello world budget", test_cutoff()).is_none());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_month_alone() {
+        let result =
+            expand_temporal_synonyms("march review", test_cutoff()).expect("should expand");
+        assert!(
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("march")))
+        );
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_quarter_shorthand() {
+        for q in &["q1", "q2", "q3", "q4"] {
+            let result = expand_temporal_synonyms(&format!("{q} budget"), test_cutoff())
+                .expect(&format!("should expand {q}"));
+            assert!(!result.temporal_groups.is_empty());
+        }
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_last_quarter() {
+        let result =
+            expand_temporal_synonyms("last quarter revenue", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_this_week() {
+        let result =
+            expand_temporal_synonyms("this week update", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_yesterday() {
+        let result =
+            expand_temporal_synonyms("yesterday meeting", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_today() {
+        let result =
+            expand_temporal_synonyms("today agenda", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_tomorrow() {
+        let result =
+            expand_temporal_synonyms("tomorrow plan", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_iso_date() {
+        let result =
+            expand_temporal_synonyms("2026-03-15 notes", test_cutoff()).expect("should expand");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_quarterN_form() {
+        let result = expand_temporal_synonyms("quarter 2 goals", test_cutoff())
+            .expect("should expand quarter N");
+        assert!(!result.temporal_groups.is_empty());
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_punctuation_stripping() {
+        let result =
+            expand_temporal_synonyms("(march)", test_cutoff()).expect("should handle punctuation");
+        assert!(
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("march")))
+        );
+    }
+
+    #[test]
+    fn infer_temporal_window_empty_returns_none() {
+        assert!(infer_temporal_window("", test_cutoff()).is_none());
+    }
+
+    #[test]
+    fn infer_temporal_window_no_temporal_tokens_returns_none() {
+        assert!(infer_temporal_window("hello world", test_cutoff()).is_none());
+    }
+
+    #[test]
+    fn infer_temporal_window_single_iso_date() {
+        let window =
+            infer_temporal_window("2026-03-15", test_cutoff()).expect("should return window");
+        assert_eq!(window.start.date_naive().day(), 15);
+        assert_eq!(window.start.date_naive().month(), 3);
+        assert_eq!(window.end.date_naive().day(), 15);
+    }
+
+    #[test]
+    fn infer_temporal_window_shared_year_inference() {
+        let window = infer_temporal_window("march april 2026", test_cutoff())
+            .expect("should infer shared year");
+        assert_eq!(window.start.date_naive().month(), 3);
+        assert_eq!(window.end.date_naive().month(), 4);
+        assert_eq!(window.start.date_naive().year(), 2026);
+    }
+
+    #[test]
+    fn infer_temporal_window_quarter() {
+        let window =
+            infer_temporal_window("q2", test_cutoff()).expect("should return quarter window");
+        assert!(window.start.date_naive().month() >= 4);
+        assert!(window.end.date_naive().month() <= 6);
+    }
+
+    #[test]
+    fn infer_temporal_window_last_quarter() {
+        let window = infer_temporal_window("last quarter", test_cutoff())
+            .expect("should return previous quarter window");
+        assert!(window.start.date_naive().month() > 0);
+    }
+
+    #[test]
+    fn infer_temporal_window_this_week() {
+        let window = infer_temporal_window("this week", test_cutoff())
+            .expect("should return this week window");
+        assert!(window.start.date_naive().weekday() == Weekday::Mon);
+    }
+
+    #[test]
+    fn infer_temporal_window_yesterday() {
+        let window = infer_temporal_window("yesterday", test_cutoff())
+            .expect("should return yesterday window");
+        let expected = test_cutoff().date_naive().pred_opt().unwrap();
+        assert_eq!(window.start.date_naive(), expected);
+        assert_eq!(window.end.date_naive(), expected);
+    }
+
+    #[test]
+    fn infer_temporal_window_weekday_name() {
+        let window =
+            infer_temporal_window("monday", test_cutoff()).expect("should return monday window");
+        assert_eq!(window.start.date_naive().weekday(), Weekday::Mon);
+    }
+
+    #[test]
+    fn infer_temporal_window_multiple_ranges_merge() {
+        let window = infer_temporal_window("january february 2026", test_cutoff())
+            .expect("should merge ranges");
+        assert_eq!(window.start.date_naive().month(), 1);
+        assert_eq!(window.end.date_naive().month(), 2);
+        assert_eq!(window.start.date_naive().year(), 2026);
+    }
+
+    #[test]
+    fn month_number_all_months() {
+        for (name, expected) in [
+            ("january", 1),
+            ("february", 2),
+            ("march", 3),
+            ("april", 4),
+            ("may", 5),
+            ("june", 6),
+            ("july", 7),
+            ("august", 8),
+            ("september", 9),
+            ("october", 10),
+            ("november", 11),
+            ("december", 12),
+        ] {
+            assert_eq!(month_number(name), Some(expected), "failed for {name}");
+        }
+        assert!(month_number("unknown").is_none());
+    }
+
+    #[test]
+    fn parse_quarter_token_all_variants() {
+        for (token, expected) in [
+            ("q1", 1),
+            ("q2", 2),
+            ("q3", 3),
+            ("q4", 4),
+            ("1", 1),
+            ("2", 2),
+            ("3", 3),
+            ("4", 4),
+            ("first", 1),
+            ("second", 2),
+            ("third", 3),
+            ("fourth", 4),
+        ] {
+            assert_eq!(
+                parse_quarter_token(token),
+                Some(expected),
+                "failed for {token}"
+            );
+        }
+        assert!(parse_quarter_token("q5").is_none());
+        assert!(parse_quarter_token("invalid").is_none());
+    }
+
+    #[test]
+    fn relative_day_shift_all_values() {
+        assert_eq!(relative_day_shift("yesterday"), Some(-1));
+        assert_eq!(relative_day_shift("today"), Some(0));
+        assert_eq!(relative_day_shift("tomorrow"), Some(1));
+        assert!(relative_day_shift("invalid").is_none());
+    }
+
+    #[test]
+    fn is_four_digit_year_valid() {
+        assert!(is_four_digit_year("2026"));
+        assert!(is_four_digit_year("1999"));
+        assert!(!is_four_digit_year("26"));
+        assert!(!is_four_digit_year("abc"));
+    }
+
+    #[test]
+    fn is_weekday_name_all_days() {
+        for day in &[
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ] {
+            assert!(is_weekday_name(day), "failed for {day}");
+        }
+        assert!(!is_weekday_name("invalid"));
+    }
+
+    #[test]
+    fn normalize_temporal_token_strips_punctuation() {
+        assert_eq!(normalize_temporal_token("(Q1)"), "q1");
+        assert_eq!(normalize_temporal_token("  March  "), "march");
+        assert_eq!(normalize_temporal_token("q1,"), "q1");
+    }
+
+    #[test]
+    fn start_of_week_monday_stays() {
+        let monday = chrono::NaiveDate::from_ymd_opt(2026, 4, 13).unwrap();
+        let start = start_of_week(monday);
+        assert_eq!(start, monday);
+    }
+
+    #[test]
+    fn start_of_week_sunday_goes_back() {
+        let sunday = chrono::NaiveDate::from_ymd_opt(2026, 4, 12).unwrap();
+        let start = start_of_week(sunday);
+        let expected_monday = chrono::NaiveDate::from_ymd_opt(2026, 4, 6).unwrap();
+        assert_eq!(start, expected_monday);
+    }
+
+    #[test]
+    fn day_group_queries_produces_four_formats() {
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 4, 12).unwrap();
+        let queries = day_group_queries(date);
+        assert_eq!(queries.len(), 4);
+        assert!(queries.iter().any(|q| q.contains("2026-04-12")));
+        assert!(queries.iter().any(|q| q.contains("april")));
+        assert!(queries.iter().any(|q| q.contains("2026-04")));
+    }
+
+    #[test]
+    fn month_date_range_december_rolls_over() {
+        let (start, end) = month_date_range(2026, 12);
+        assert_eq!(start.month(), 12);
+        assert_eq!(start.day(), 1);
+        assert_eq!(end.month(), 12);
+        assert_eq!(end.day(), 31);
+    }
+
+    #[test]
+    fn month_date_range_february_leap_year() {
+        let (_start, end) = month_date_range(2024, 2); // leap year
+        assert_eq!(end.day(), 29);
+    }
+
+    #[test]
+    fn month_date_range_february_non_leap() {
+        let (_start, end) = month_date_range(2026, 2); // non-leap year
+        assert_eq!(end.day(), 28);
+    }
+
+    #[test]
+    fn quarter_date_range_q1() {
+        let (start, end) = quarter_date_range(2026, 1);
+        assert_eq!(start.month(), 1);
+        assert_eq!(start.day(), 1);
+        assert_eq!(end.month(), 3);
+        assert_eq!(end.day(), 31);
+    }
+
+    #[test]
+    fn quarter_date_range_q4() {
+        let (start, end) = quarter_date_range(2026, 4);
+        assert_eq!(start.month(), 10);
+        assert_eq!(start.day(), 1);
+        assert_eq!(end.month(), 12);
+        assert_eq!(end.day(), 31);
+    }
+
+    #[test]
+    fn previous_quarter_date_range_q1_wraps_to_q4_prev_year() {
+        let jan_cutoff = chrono::NaiveDate::from_ymd_opt(2026, 1, 15)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_utc();
+        let (start, end) = previous_quarter_date_range(jan_cutoff);
+        assert_eq!(start.month(), 10);
+        assert_eq!(start.year(), 2025);
+        assert_eq!(end.month(), 12);
+        assert_eq!(end.year(), 2025);
+    }
+
+    #[test]
+    fn start_of_day_and_end_of_day() {
+        use chrono::Timelike;
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 4, 12).unwrap();
+        let start = start_of_day(date);
+        let end = end_of_day(date);
+        assert_eq!(start.time().hour(), 0);
+        assert_eq!(start.time().minute(), 0);
+        assert_eq!(start.time().second(), 0);
+        assert_eq!(end.time().hour(), 23);
+        assert_eq!(end.time().minute(), 59);
+        assert_eq!(end.time().second(), 59);
+    }
+
+    #[test]
+    fn weekday_from_name_roundtrip() {
+        for day in &[
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ] {
+            let name = weekday_name(*day);
+            assert_eq!(
+                weekday_from_name(&name),
+                Some(*day),
+                "roundtrip failed for {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn rank_temporal_candidate_facts_empty_residual_sorts_by_recency() {
+        let t1 = Utc::now() - chrono::Duration::days(5);
+        let t2 = Utc::now() - chrono::Duration::days(1);
+        let mut facts = vec![
+            crate::models::Fact {
+                fact_id: "f1".to_string(),
+                fact_type: "note".to_string(),
+                content: "old fact".to_string(),
+                quote: "".to_string(),
+                source_episode: "".to_string(),
+                t_valid: t1,
+                t_ingested: t1,
+                t_invalid: None,
+                t_invalid_ingested: None,
+                confidence: 1.0,
+                index_keys: vec![],
+                access_count: 0,
+                last_accessed: None,
+                entity_links: vec![],
+                scope: "org".to_string(),
+                policy_tags: vec![],
+                provenance: serde_json::json!({}),
+                ft_score: 0.0,
+            },
+            crate::models::Fact {
+                fact_id: "f2".to_string(),
+                fact_type: "note".to_string(),
+                content: "new fact".to_string(),
+                quote: "".to_string(),
+                source_episode: "".to_string(),
+                t_valid: t2,
+                t_ingested: t2,
+                t_invalid: None,
+                t_invalid_ingested: None,
+                confidence: 1.0,
+                index_keys: vec![],
+                access_count: 0,
+                last_accessed: None,
+                entity_links: vec![],
+                scope: "org".to_string(),
+                policy_tags: vec![],
+                provenance: serde_json::json!({}),
+                ft_score: 0.0,
+            },
+        ];
+        rank_temporal_candidate_facts(
+            &mut facts,
+            &[],
+            |a, b| b.t_valid.cmp(&a.t_valid),
+            |_, _| 0,
+            |_, _| 0,
+        );
+        assert_eq!(facts[0].fact_id, "f2"); // newer first
+        assert_eq!(facts[1].fact_id, "f1");
+    }
+}

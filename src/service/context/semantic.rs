@@ -128,3 +128,116 @@ pub(crate) async fn collect_semantic_facts(
         })
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Fact;
+    use crate::service::context::filtering;
+    use crate::service::embedding::cosine_similarity;
+    use chrono::TimeZone;
+
+    fn make_fact(t_valid: chrono::DateTime<Utc>, t_invalid: Option<chrono::DateTime<Utc>>) -> Fact {
+        Fact {
+            fact_id: "fact:test".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid,
+            t_invalid_ingested: None,
+            scope: "org".to_string(),
+            content: "test".to_string(),
+            quote: String::new(),
+            fact_type: "explicit".to_string(),
+            source_episode: "episode:1".to_string(),
+            confidence: 0.8,
+            access_count: 0,
+            last_accessed: None,
+            policy_tags: Vec::new(),
+            index_keys: Vec::new(),
+            entity_links: Vec::new(),
+            provenance: serde_json::json!({}),
+            ft_score: 0.0,
+        }
+    }
+
+    #[test]
+    fn fact_is_active_at_true_when_not_invalidated() {
+        let utc = Utc;
+        let t_valid = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let cutoff = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+        let fact = make_fact(t_valid, None);
+        assert!(filtering::fact_is_active_at(&fact, cutoff));
+    }
+
+    #[test]
+    fn fact_is_active_at_false_when_invalidated_before_cutoff() {
+        let utc = Utc;
+        let t_valid = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let t_invalid = utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap();
+        let cutoff = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+        let mut fact = make_fact(t_valid, Some(t_invalid));
+        fact.t_invalid_ingested = Some(t_invalid);
+        assert!(!filtering::fact_is_active_at(&fact, cutoff));
+    }
+
+    #[test]
+    fn fact_is_active_at_true_when_invalidated_after_cutoff() {
+        let utc = Utc;
+        let t_valid = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let t_invalid = utc.with_ymd_and_hms(2024, 9, 1, 0, 0, 0).unwrap();
+        let cutoff = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+        let fact = make_fact(t_valid, Some(t_invalid));
+        assert!(filtering::fact_is_active_at(&fact, cutoff));
+    }
+
+    #[test]
+    fn fact_is_active_at_false_when_t_valid_after_cutoff() {
+        let utc = Utc;
+        let t_valid = utc.with_ymd_and_hms(2024, 9, 1, 0, 0, 0).unwrap();
+        let cutoff = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+        let fact = make_fact(t_valid, None);
+        assert!(!filtering::fact_is_active_at(&fact, cutoff));
+    }
+
+    #[test]
+    fn fact_is_active_at_false_when_t_ingested_after_cutoff() {
+        let utc = Utc;
+        let t_valid = utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let cutoff = utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+        let mut fact = make_fact(t_valid, None);
+        fact.t_ingested = utc.with_ymd_and_hms(2024, 9, 1, 0, 0, 0).unwrap();
+        assert!(!filtering::fact_is_active_at(&fact, cutoff));
+    }
+
+    #[test]
+    fn cosine_similarity_identical_vectors_returns_one() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![1.0, 2.0, 3.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim > 0.99, "expected ~1.0, got {sim}");
+    }
+
+    #[test]
+    fn cosine_similarity_orthogonal_vectors_returns_zero() {
+        let a = vec![1.0, 0.0, 0.0];
+        let b = vec![0.0, 1.0, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim.abs() < 1e-10);
+    }
+
+    #[test]
+    fn cosine_similarity_opposite_vectors_returns_minus_one() {
+        let a = vec![1.0, 0.0, 0.0];
+        let b = vec![-1.0, 0.0, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!((sim - (-1.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn cosine_similarity_empty_vectors_returns_zero() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let sim = cosine_similarity(&a, &b);
+        assert_eq!(sim, 0.0);
+    }
+}

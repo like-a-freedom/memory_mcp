@@ -241,6 +241,148 @@ fn is_entity_id(record_id: &str) -> bool {
     record_id.starts_with("entity:")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::episode;
+    use serde_json::json;
+
+    // -----------------------------------------------------------------------
+    // UnionFind tests (pure data structure, no DB needed)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn union_find_singleton_node_returns_itself() {
+        let mut uf = UnionFind::default();
+        let root = uf.find("entity:alice");
+        assert_eq!(root, "entity:alice");
+    }
+
+    #[test]
+    fn union_find_two_nodes_share_root_after_union() {
+        let mut uf = UnionFind::default();
+        uf.union("entity:alice", "entity:bob");
+        let root_alice = uf.find("entity:alice");
+        let root_bob = uf.find("entity:bob");
+        assert_eq!(root_alice, root_bob);
+    }
+
+    #[test]
+    fn union_find_transitive_connectivity() {
+        let mut uf = UnionFind::default();
+        uf.union("entity:alice", "entity:bob");
+        uf.union("entity:bob", "entity:charlie");
+        let root_alice = uf.find("entity:alice");
+        let root_charlie = uf.find("entity:charlie");
+        assert_eq!(root_alice, root_charlie);
+    }
+
+    #[test]
+    fn union_find_disjoint_sets_remain_separate() {
+        let mut uf = UnionFind::default();
+        uf.union("entity:alice", "entity:bob");
+        uf.union("entity:charlie", "entity:dave");
+        let root_ab = uf.find("entity:alice");
+        let root_cd = uf.find("entity:charlie");
+        assert_ne!(root_ab, root_cd);
+    }
+
+    #[test]
+    fn union_find_idempotent_union() {
+        let mut uf = UnionFind::default();
+        uf.union("entity:alice", "entity:bob");
+        uf.union("entity:alice", "entity:bob"); // duplicate union
+        let root_alice = uf.find("entity:alice");
+        let root_bob = uf.find("entity:bob");
+        assert_eq!(root_alice, root_bob);
+    }
+
+    #[test]
+    fn union_find_merges_two_existing_communities() {
+        let mut uf = UnionFind::default();
+        uf.union("entity:alice", "entity:bob");
+        uf.union("entity:charlie", "entity:dave");
+        // Now merge the two communities
+        uf.union("entity:bob", "entity:charlie");
+        let root = uf.find("entity:alice");
+        assert_eq!(root, uf.find("entity:bob"));
+        assert_eq!(root, uf.find("entity:charlie"));
+        assert_eq!(root, uf.find("entity:dave"));
+    }
+
+    // -----------------------------------------------------------------------
+    // edge_endpoints_from_record tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn edge_endpoints_extracts_in_and_out() {
+        let record = json!({
+            "in": "entity:alice",
+            "out": "entity:bob",
+            "relation": "knows",
+        });
+        let result = edge_endpoints_from_record(&record);
+        assert_eq!(
+            result,
+            Some(("entity:alice".to_string(), "entity:bob".to_string()))
+        );
+    }
+
+    #[test]
+    fn edge_endpoints_returns_none_for_non_object() {
+        let record = json!("not an object");
+        assert!(edge_endpoints_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn edge_endpoints_returns_none_when_in_missing() {
+        let record = json!({
+            "out": "entity:bob",
+        });
+        assert!(edge_endpoints_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn edge_endpoints_returns_none_when_out_missing() {
+        let record = json!({
+            "in": "entity:alice",
+        });
+        assert!(edge_endpoints_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn edge_endpoints_handles_wrapped_record_strings() {
+        let record = json!({
+            "in": {"String": "entity:alice"},
+            "out": {"String": "entity:bob"},
+        });
+        // unwrap_record_string handles {"String": ...} wrappers
+        let left = record.get("in").and_then(episode::unwrap_record_string);
+        let right = record.get("out").and_then(episode::unwrap_record_string);
+        assert_eq!(left, Some("entity:alice".to_string()));
+        assert_eq!(right, Some("entity:bob".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // is_entity_id tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_entity_id_true_for_entity_prefix() {
+        assert!(is_entity_id("entity:alice"));
+        assert!(is_entity_id("entity:project-123"));
+    }
+
+    #[test]
+    fn is_entity_id_false_for_non_entity() {
+        assert!(!is_entity_id("episode:abc"));
+        assert!(!is_entity_id("fact:123"));
+        assert!(!is_entity_id("community:xyz"));
+        assert!(!is_entity_id(""));
+        assert!(!is_entity_id("entity")); // no colon
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RebuiltCommunity {
     community_id: String,
