@@ -227,7 +227,7 @@ pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[Strin
 
     for record in &mut records {
         let combined_score =
-            lexical_ft_score(record) + lexical_query_score(record, query_terms) as f64;
+            dampened_lexical_ft_score(record) + lexical_query_score(record, query_terms) as f64;
         if let Some(object) = record.as_object_mut() {
             object.insert("ft_score".to_string(), json!(combined_score));
         } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
@@ -238,7 +238,9 @@ pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[Strin
     records.sort_by(|left, right| {
         lexical_query_score(right, query_terms)
             .cmp(&lexical_query_score(left, query_terms))
-            .then_with(|| lexical_ft_score(right).total_cmp(&lexical_ft_score(left)))
+            .then_with(|| {
+                dampened_lexical_ft_score(right).total_cmp(&dampened_lexical_ft_score(left))
+            })
             .then_with(|| lexical_t_valid(right).cmp(&lexical_t_valid(left)))
             .then_with(|| lexical_fact_id(left).cmp(&lexical_fact_id(right)))
     });
@@ -292,9 +294,18 @@ fn lexical_query_overlap(record: &Value, query_terms: &[String]) -> usize {
 }
 
 fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {
-    let unigram_overlap = lexical_query_overlap(record, query_terms);
-    let phrase_overlap = lexical_phrase_overlap(record, query_terms);
-    let trigram_overlap = lexical_ngram_overlap(record, query_terms, 3);
+    let content_terms = best_matching_content_terms(
+        raw_object(record)
+            .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
+            .and_then(json_string)
+            .unwrap_or_default(),
+        query_terms,
+    );
+    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms)
+        + lexical_index_key_overlap(record, query_terms);
+    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
+        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
 
     unigram_overlap + (phrase_overlap * 2) + trigram_overlap
 }
@@ -318,8 +329,9 @@ pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]
 }
 
 pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
-    let content_terms = search_query_terms(&fact.content);
-    let unigram_overlap = lexical_query_overlap_for_fact(fact, query_terms);
+    let content_terms = best_matching_content_terms(&fact.content, query_terms);
+    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms)
+        + lexical_index_key_overlap_for_fact(fact, query_terms);
     let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
         + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
     let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
@@ -328,16 +340,15 @@ pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) 
 }
 
 fn lexical_phrase_overlap(record: &Value, query_terms: &[String]) -> usize {
-    lexical_ngram_overlap(record, query_terms, 2) + lexical_ngram_overlap(record, query_terms, 3)
-}
-
-fn lexical_ngram_overlap(record: &Value, query_terms: &[String], width: usize) -> usize {
-    if query_terms.len() < width {
-        return 0;
-    }
-
-    let content_terms = lexical_record_terms(record);
-    lexical_ngram_overlap_for_terms(&content_terms, query_terms, width)
+    let content_terms = best_matching_content_terms(
+        raw_object(record)
+            .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
+            .and_then(json_string)
+            .unwrap_or_default(),
+        query_terms,
+    );
+    lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
+        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3)
 }
 
 fn lexical_ngram_overlap_for_terms(
@@ -360,12 +371,132 @@ fn lexical_ngram_overlap_for_terms(
         .count()
 }
 
-fn lexical_record_terms(record: &Value) -> Vec<String> {
+fn best_matching_content_terms(text: &str, query_terms: &[String]) -> Vec<String> {
+    let fallback_terms = search_query_terms(text);
+    if fallback_terms.is_empty() || query_terms.is_empty() {
+        return fallback_terms;
+    }
+
+    let mut spans = local_content_spans(text).into_iter();
+    let Some((mut best_terms, best_span_width)) = spans.next() else {
+        return fallback_terms;
+    };
+    let mut best_score = adjusted_span_score(
+        score_content_terms(&best_terms, query_terms),
+        best_span_width,
+    );
+    let mut best_len = best_terms.len();
+
+    for (candidate_terms, span_width) in spans {
+        if candidate_terms.is_empty() {
+            continue;
+        }
+
+        let candidate_score = adjusted_span_score(
+            score_content_terms(&candidate_terms, query_terms),
+            span_width,
+        );
+        let candidate_len = candidate_terms.len();
+        let should_replace = candidate_score > best_score
+            || (candidate_score == best_score && candidate_len < best_len);
+        if should_replace {
+            best_len = candidate_len;
+            best_score = candidate_score;
+            best_terms = candidate_terms;
+        }
+    }
+
+    best_terms
+}
+
+fn local_content_spans(text: &str) -> Vec<(Vec<String>, usize)> {
+    let sentence_terms = sentence_like_segments(text)
+        .into_iter()
+        .map(|segment| search_query_terms(&segment))
+        .filter(|terms| !terms.is_empty())
+        .collect::<Vec<_>>();
+
+    if sentence_terms.is_empty() {
+        return vec![(search_query_terms(text), 1)];
+    }
+
+    sentence_terms
+        .iter()
+        .cloned()
+        .map(|terms| (terms, 1))
+        .collect::<Vec<_>>()
+}
+
+fn adjusted_span_score(raw_score: usize, span_width: usize) -> usize {
+    raw_score.saturating_sub(span_width.saturating_sub(1) * 2)
+}
+
+fn sentence_like_segments(text: &str) -> Vec<String> {
+    let mut segments = Vec::new();
+    let mut current = String::new();
+
+    for character in text.trim().chars() {
+        current.push(character);
+        if matches!(character, '.' | '!' | '?' | ';' | '\n') {
+            let segment = current.trim();
+            if !segment.is_empty() {
+                segments.push(segment.to_string());
+            }
+            current.clear();
+        }
+    }
+
+    let trailing = current.trim();
+    if !trailing.is_empty() {
+        segments.push(trailing.to_string());
+    }
+
+    segments
+}
+
+fn score_content_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+    let unigram_overlap = query_term_overlap_for_terms(content_terms, query_terms);
+    let phrase_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 2)
+        + lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
+    let trigram_overlap = lexical_ngram_overlap_for_terms(content_terms, query_terms, 3);
+
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
+}
+
+fn query_term_overlap_for_terms(content_terms: &[String], query_terms: &[String]) -> usize {
+    if query_terms.is_empty() || content_terms.is_empty() {
+        return 0;
+    }
+
+    let content_terms = content_terms.iter().collect::<HashSet<_>>();
+    query_terms
+        .iter()
+        .filter(|term| content_terms.contains(term))
+        .count()
+}
+
+fn lexical_index_key_overlap(record: &Value, query_terms: &[String]) -> usize {
     raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
-        .and_then(json_string)
-        .map(search_query_terms)
-        .unwrap_or_default()
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
+        .and_then(raw_array)
+        .map(|index_keys| {
+            let terms = index_keys
+                .iter()
+                .filter_map(json_string)
+                .flat_map(search_query_terms)
+                .collect::<Vec<_>>();
+            query_term_overlap_for_terms(&terms, query_terms)
+        })
+        .unwrap_or(0)
+}
+
+fn lexical_index_key_overlap_for_fact(fact: &Fact, query_terms: &[String]) -> usize {
+    let terms = fact
+        .index_keys
+        .iter()
+        .flat_map(|index_key| search_query_terms(index_key))
+        .collect::<Vec<_>>();
+    query_term_overlap_for_terms(&terms, query_terms)
 }
 
 fn lexical_ft_score(record: &Value) -> f64 {
@@ -373,6 +504,10 @@ fn lexical_ft_score(record: &Value) -> f64 {
         .and_then(|map: &serde_json::Map<String, Value>| map.get("ft_score"))
         .and_then(json_f64)
         .unwrap_or(0.0)
+}
+
+fn dampened_lexical_ft_score(record: &Value) -> f64 {
+    lexical_ft_score(record).max(0.0).ln_1p()
 }
 
 fn lexical_t_valid(record: &Value) -> String {

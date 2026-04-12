@@ -24,7 +24,10 @@ mod views;
 
 use alias_expansion::expand_query_with_aliases;
 use community::{CollectCommunityFactsRequest, collect_community_facts};
-use experience::{RecentExperienceRequest, append_recent_experience_items};
+use experience::{
+    RecentExperienceRequest, append_recent_experience_items, collect_recent_experience_facts,
+    expand_experience_query_terms,
+};
 use filtering::filter_facts_by_constraints;
 use lexical::{FactQueryParams, select_episode_records_for_query, select_fact_records_for_query};
 use logging::{summarize_retrieval_tiers, supplemental_experience_count};
@@ -166,6 +169,9 @@ pub async fn assemble_context(
             (!trimmed.is_empty()).then(|| trimmed.to_string())
         })
         .collect::<Vec<_>>();
+    let query_terms = query_opt
+        .map(super::query::search_query_terms)
+        .unwrap_or_default();
 
     service.logger.log(
         super::log_event(
@@ -253,7 +259,7 @@ pub async fn assemble_context(
         .await?;
 
         let direct_retrieval_tier = lexical_result.retrieval_tier;
-        let direct_facts =
+        let mut direct_facts =
             filter_facts_by_constraints(lexical_result.records, &access, project_opt, &fact_types);
 
         // Alias expansion: search for additional facts using entity aliases
@@ -310,6 +316,55 @@ pub async fn assemble_context(
                     }
                 }
             }
+            let base_direct_ids: HashSet<_> = direct_facts
+                .iter()
+                .chain(temporal_facts.iter())
+                .chain(expanded_facts.iter())
+                .map(|fact| fact.fact_id.clone())
+                .collect();
+
+            let experience_query_terms = expand_experience_query_terms(&query_terms, &direct_facts);
+            let experience_topic_terms = experience_query_terms
+                .iter()
+                .filter(|term| !query_terms.contains(term))
+                .cloned()
+                .collect::<Vec<_>>();
+            let mut experience_facts = collect_recent_experience_facts(
+                service,
+                RecentExperienceRequest {
+                    namespace: &namespace,
+                    scope: &request.scope,
+                    cutoff,
+                    project: project_opt,
+                    access: &access,
+                    budget: request.budget,
+                    fact_types: &fact_types,
+                },
+                &experience_query_terms,
+                &experience_topic_terms,
+                &base_direct_ids,
+            )
+            .await?;
+
+            if !experience_topic_terms.is_empty() {
+                let topical_floor = direct_facts
+                    .first()
+                    .map(|fact| fact.ft_score)
+                    .unwrap_or(0.0);
+                for fact in &mut experience_facts {
+                    fact.ft_score = fact.ft_score.max(topical_floor + 1.0);
+                }
+            }
+
+            direct_facts.extend(experience_facts);
+            direct_facts.sort_by(|left, right| {
+                right
+                    .ft_score
+                    .total_cmp(&left.ft_score)
+                    .then_with(|| right.t_valid.cmp(&left.t_valid))
+                    .then_with(|| left.fact_id.cmp(&right.fact_id))
+            });
+
             let all_direct_ids: HashSet<_> = direct_facts
                 .iter()
                 .chain(temporal_facts.iter())
@@ -452,9 +507,7 @@ pub async fn assemble_context(
                     ranked_facts,
                     request.budget.max(1) as usize,
                     temporal_focus,
-                    query_opt
-                        .map(super::query::search_query_terms)
-                        .unwrap_or_default(),
+                    query_terms.clone(),
                 );
                 selected_ranked
                     .into_iter()
@@ -476,7 +529,8 @@ pub async fn assemble_context(
         }
     };
 
-    if requested_view_mode != Some("facets")
+    if query_opt.is_none()
+        && requested_view_mode != Some("facets")
         && requested_view_mode != Some("wake_up")
         && requested_view_mode != Some("map")
     {
@@ -634,6 +688,7 @@ mod tests {
             fusion_score,
             source_priority: 0,
             decayed_confidence: 1.0,
+            query_alignment_factor: 1.0,
         }
     }
 
@@ -730,6 +785,42 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(fact_ids, vec!["fact:support", "fact:generic"]);
+    }
+
+    #[test]
+    fn rank_lexical_records_prefers_sentence_cohesion_over_cross_sentence_term_soup() {
+        let query_terms = crate::service::query::search_query_terms(
+            "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+        );
+
+        let ranked = rank_lexical_records(
+            vec![
+                json!({
+                    "fact_id": "fact:term-soup",
+                    "content": "I recently updated my studio notes after an event planning session. The next experiment used modern beats in a new mix. A Pacific sound library added a unique texture to the blend.",
+                    "t_valid": "2026-01-10T10:30:00Z",
+                    "ft_score": 18.0
+                }),
+                json!({
+                    "fact_id": "fact:exact-sentence",
+                    "content": "I was so thrilled to see that fusion in action! The blend of traditional Pacific sounds with modern beats created a captivating experience that resonated deeply with the audience.",
+                    "t_valid": "2026-01-09T10:30:00Z",
+                    "ft_score": 8.0
+                }),
+            ],
+            &query_terms,
+        );
+
+        let fact_ids = ranked
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec!["fact:exact-sentence", "fact:term-soup"],
+            "exact sentence matches should outrank cross-sentence term soup even when the soup has a stronger raw ft_score"
+        );
     }
 
     #[tokio::test]
@@ -2147,6 +2238,76 @@ mod tests {
             create_ranked_test_fact("fact:hot", "episode:hot", cutoff, 10.0, 5.0, 50, &["alpha"]);
 
         assert!(ranked_relevance_score(&cold) > ranked_relevance_score(&hot));
+    }
+
+    #[test]
+    fn ranked_relevance_score_prefers_experience_facts_when_other_signals_tie() {
+        let cutoff = Utc::now();
+        let mut note = create_ranked_test_fact(
+            "fact:note",
+            "episode:shared",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["hotel", "quiet"],
+        );
+        note.fact.fact_type = "note".to_string();
+
+        let mut experience = create_ranked_test_fact(
+            "fact:experience",
+            "episode:shared",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["hotel", "quiet"],
+        );
+        experience.fact.fact_type = "experience".to_string();
+
+        assert!(
+            ranked_relevance_score(&experience) > ranked_relevance_score(&note),
+            "experience memories should beat otherwise identical generic notes"
+        );
+    }
+
+    #[test]
+    fn build_ranked_context_facts_prefers_user_memories_for_first_person_queries() {
+        let cutoff = Utc::now();
+
+        let mut user_fact = create_test_fact("fact:user", cutoff);
+        user_fact.content =
+            "User: I was thrilled to hear modern beats blended with Pacific sounds live."
+                .to_string();
+        user_fact.quote = user_fact.content.clone();
+        user_fact.ft_score = 4.0;
+
+        let mut assistant_fact = create_test_fact("fact:assistant", cutoff);
+        assistant_fact.content =
+            "Assistant: It sounds like live music gives you a strong sense of cultural connection."
+                .to_string();
+        assistant_fact.quote = assistant_fact.content.clone();
+        assistant_fact.ft_score = 4.0;
+
+        let mut ranked = build_ranked_context_facts(
+            vec![
+                (assistant_fact, RetrievalTier::Direct),
+                (user_fact, RetrievalTier::Direct),
+            ],
+            Vec::new(),
+            Vec::new(),
+            Some(
+                "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+            ),
+            "org",
+            cutoff,
+            crate::service::decayed_confidence,
+        );
+        sort_ranked_context_facts(&mut ranked);
+
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].fact.fact_id, "fact:user");
+        assert_eq!(ranked[1].fact.fact_id, "fact:assistant");
     }
 
     #[test]
@@ -4708,6 +4869,545 @@ mod tests {
             "community expansion with no matching entity_links should produce no results, got {}",
             results.len()
         );
+    }
+
+    #[tokio::test]
+    async fn assemble_context_promotes_relevant_experience_candidates_into_primary_ranking() {
+        struct ExperiencePrimaryRankingDbClient;
+
+        #[async_trait]
+        impl DbClient for ExperiencePrimaryRankingDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("hotel quieter nightlife") | Some("hotel") => vec![json!({
+                        "fact_id": "fact:generic-note",
+                        "fact_type": "note",
+                        "content": "I need a hotel that can host our annual conference during the trip.",
+                        "quote": "I need a hotel that can host our annual conference during the trip.",
+                        "source_episode": "episode:generic-note",
+                        "t_valid": "2026-02-12T10:00:00Z",
+                        "t_ingested": "2026-02-12T10:00:00Z",
+                        "scope": "org",
+                        "confidence": 0.8,
+                        "ft_score": 12.0,
+                        "index_keys": [],
+                        "entity_links": [],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:generic-note"}
+                    })],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![json!({
+                    "fact_id": "fact:experience",
+                    "fact_type": "experience",
+                    "content": "I usually prefer quieter hotels away from the city center, because I avoid nightlife-heavy properties.",
+                    "quote": "I usually prefer quieter hotels away from the city center, because I avoid nightlife-heavy properties.",
+                    "source_episode": "episode:experience",
+                    "t_valid": "2026-02-13T10:00:00Z",
+                    "t_ingested": "2026-02-13T10:00:00Z",
+                    "scope": "org",
+                    "confidence": 0.9,
+                    "ft_score": 0.0,
+                    "index_keys": ["hotel", "quiet", "nightlife"],
+                    "entity_links": [],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:experience"}
+                })])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(ExperiencePrimaryRankingDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "Which hotel is better if I want somewhere quieter away from nightlife?"
+                    .to_string(),
+                scope: "org".to_string(),
+                as_of: Some(
+                    chrono::DateTime::parse_from_rfc3339("2026-02-14T10:00:00Z")
+                        .expect("timestamp")
+                        .with_timezone(&Utc),
+                ),
+                budget: 1,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context should succeed");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "fact:experience");
+    }
+
+    #[tokio::test]
+    async fn assemble_context_uses_repeated_direct_topics_to_surface_implicit_preferences() {
+        struct ImplicitExperienceTopicDbClient;
+
+        #[async_trait]
+        impl DbClient for ImplicitExperienceTopicDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(match query_contains {
+                    Some("venue work best my conference") => vec![
+                        json!({
+                            "fact_id": "fact:conference-hotel",
+                            "fact_type": "note",
+                            "content": "I'm heading to a conference next month and need to book a hotel.",
+                            "quote": "I'm heading to a conference next month and need to book a hotel.",
+                            "source_episode": "episode:conference-hotel",
+                            "t_valid": "2026-02-12T10:00:00Z",
+                            "t_ingested": "2026-02-12T10:00:00Z",
+                            "scope": "org",
+                            "confidence": 0.8,
+                            "ft_score": 8.0,
+                            "index_keys": [],
+                            "entity_links": [],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:conference-hotel"}
+                        }),
+                        json!({
+                            "fact_id": "fact:conference-hotel-shape",
+                            "fact_type": "note",
+                            "content": "For the conference, I want a hotel that is not too tall.",
+                            "quote": "For the conference, I want a hotel that is not too tall.",
+                            "source_episode": "episode:conference-hotel-shape",
+                            "t_valid": "2026-02-11T10:00:00Z",
+                            "t_ingested": "2026-02-11T10:00:00Z",
+                            "scope": "org",
+                            "confidence": 0.8,
+                            "ft_score": 7.0,
+                            "index_keys": [],
+                            "entity_links": [],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:conference-hotel-shape"}
+                        }),
+                    ],
+                    Some("conference") => vec![
+                        json!({
+                            "fact_id": "fact:conference-hotel",
+                            "fact_type": "note",
+                            "content": "I'm heading to a conference next month and need to book a hotel.",
+                            "quote": "I'm heading to a conference next month and need to book a hotel.",
+                            "source_episode": "episode:conference-hotel",
+                            "t_valid": "2026-02-12T10:00:00Z",
+                            "t_ingested": "2026-02-12T10:00:00Z",
+                            "scope": "org",
+                            "confidence": 0.8,
+                            "ft_score": 8.0,
+                            "index_keys": [],
+                            "entity_links": [],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:conference-hotel"}
+                        }),
+                        json!({
+                            "fact_id": "fact:conference-hotel-shape",
+                            "fact_type": "note",
+                            "content": "For the conference, I want a hotel that is not too tall.",
+                            "quote": "For the conference, I want a hotel that is not too tall.",
+                            "source_episode": "episode:conference-hotel-shape",
+                            "t_valid": "2026-02-11T10:00:00Z",
+                            "t_ingested": "2026-02-11T10:00:00Z",
+                            "scope": "org",
+                            "confidence": 0.8,
+                            "ft_score": 7.0,
+                            "index_keys": [],
+                            "entity_links": [],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:conference-hotel-shape"}
+                        }),
+                    ],
+                    _ => vec![],
+                })
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![json!({
+                    "fact_id": "fact:experience",
+                    "fact_type": "experience",
+                    "content": "I usually prefer quieter hotels away from the city center, because I avoid nightlife-heavy properties.",
+                    "quote": "I usually prefer quieter hotels away from the city center, because I avoid nightlife-heavy properties.",
+                    "source_episode": "episode:experience",
+                    "t_valid": "2026-02-13T10:00:00Z",
+                    "t_ingested": "2026-02-13T10:00:00Z",
+                    "scope": "org",
+                    "confidence": 0.9,
+                    "ft_score": 0.0,
+                    "index_keys": ["hotel", "quiet", "nightlife"],
+                    "entity_links": [],
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:experience"}
+                })])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(ImplicitExperienceTopicDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &service,
+            crate::models::AssembleContextRequest {
+                query: "Which venue would work best for my conference?".to_string(),
+                scope: "org".to_string(),
+                as_of: Some(
+                    chrono::DateTime::parse_from_rfc3339("2026-02-14T10:00:00Z")
+                        .expect("timestamp")
+                        .with_timezone(&Utc),
+                ),
+                budget: 1,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            },
+        )
+        .await
+        .expect("assemble context should succeed");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "fact:experience");
     }
 
     #[test]

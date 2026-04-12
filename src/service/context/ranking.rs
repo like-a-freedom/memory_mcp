@@ -5,11 +5,14 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
-use crate::models::Fact;
+use crate::models::{Fact, FactType};
 
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 const MAX_ITEMS_PER_SOURCE_EPISODE: usize = 2;
 const ACCESS_COUNT_NOVELTY_WEIGHT: f64 = 0.08;
+const EXPERIENCE_TYPE_RELEVANCE_BOOST: f64 = 1.12;
+const FIRST_PERSON_USER_MEMORY_BOOST: f64 = 1.50;
+const FIRST_PERSON_ASSISTANT_MEMORY_PENALTY: f64 = 0.65;
 const MMR_RELEVANCE_WEIGHT: f64 = 0.80;
 const REDUNDANCY_INDEX_KEY_WEIGHT: f64 = 0.70;
 const REDUNDANCY_TEMPORAL_WEIGHT: f64 = 0.30;
@@ -29,6 +32,7 @@ pub(crate) struct RankedContextFact {
     pub(crate) fusion_score: f64,
     pub(crate) source_priority: u8,
     pub(crate) decayed_confidence: f64,
+    pub(crate) query_alignment_factor: f64,
 }
 
 #[allow(dead_code)]
@@ -76,11 +80,13 @@ pub(crate) fn build_ranked_context_facts(
     decayed_fn: impl Fn(&Fact, DateTime<Utc>) -> f64,
 ) -> Vec<RankedContextFact> {
     let mut ranked_by_fact_id = HashMap::<String, RankedContextFact>::new();
+    let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, &fact.content);
 
     for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
         let lexical_score = lexical_fusion_score(rank, &fact);
+        let query_alignment_factor = query_alignment(&fact);
         ranked_by_fact_id
             .entry(fact_id)
             .and_modify(|candidate| {
@@ -109,12 +115,14 @@ pub(crate) fn build_ranked_context_facts(
                 fusion_score: lexical_score,
                 source_priority: 0,
                 decayed_confidence: confidence,
+                query_alignment_factor,
             });
     }
 
     for (rank, (fact, rationale, graph_origin_factor)) in community_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
+        let query_alignment_factor = query_alignment(&fact);
         let weighted_rank = reciprocal_rank(rank) * graph_origin_factor.clamp(0.0, 1.0);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += weighted_rank;
@@ -133,6 +141,7 @@ pub(crate) fn build_ranked_context_facts(
                 fusion_score: weighted_rank,
                 source_priority: 1,
                 decayed_confidence: confidence,
+                query_alignment_factor,
             },
         );
     }
@@ -140,6 +149,7 @@ pub(crate) fn build_ranked_context_facts(
     for (rank, (fact, rationale)) in semantic_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
+        let query_alignment_factor = query_alignment(&fact);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += reciprocal_rank(rank);
             candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
@@ -162,6 +172,7 @@ pub(crate) fn build_ranked_context_facts(
                 fusion_score: reciprocal_rank(rank),
                 source_priority: 2,
                 decayed_confidence: confidence,
+                query_alignment_factor,
             },
         );
     }
@@ -239,10 +250,44 @@ fn novelty_factor(access_count: i64) -> f64 {
     1.0 / (1.0 + access_count.ln_1p() * ACCESS_COUNT_NOVELTY_WEIGHT)
 }
 
+fn fact_type_relevance_factor(fact: &Fact) -> f64 {
+    if fact.fact_type == FactType::Experience.as_str() {
+        EXPERIENCE_TYPE_RELEVANCE_BOOST
+    } else {
+        1.0
+    }
+}
+
 pub(crate) fn ranked_relevance_score(fact: &RankedContextFact) -> f64 {
     fact.fusion_score
         * fact.decayed_confidence.max(MIN_RANKED_CONFIDENCE)
         * novelty_factor(fact.fact.access_count)
+        * fact_type_relevance_factor(&fact.fact)
+        * fact.query_alignment_factor
+}
+
+fn query_alignment_factor(query_opt: Option<&str>, content: &str) -> f64 {
+    let Some(query) = query_opt else {
+        return 1.0;
+    };
+    if !query_is_first_person_memory(query) {
+        return 1.0;
+    }
+
+    let trimmed = content.trim_start();
+    if trimmed.starts_with("User:") {
+        FIRST_PERSON_USER_MEMORY_BOOST
+    } else if trimmed.starts_with("Assistant:") {
+        FIRST_PERSON_ASSISTANT_MEMORY_PENALTY
+    } else {
+        1.0
+    }
+}
+
+fn query_is_first_person_memory(query: &str) -> bool {
+    let normalized = normalize_text(query);
+    let terms = normalized.split_whitespace().collect::<HashSet<_>>();
+    terms.contains("i") || terms.contains("me") || terms.contains("my") || terms.contains("mine")
 }
 
 fn temporal_alignment_factor(fact_time: DateTime<Utc>, temporal_focus: &TemporalWindow) -> f64 {
