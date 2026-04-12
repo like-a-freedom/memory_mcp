@@ -2,9 +2,9 @@
 
 ## Введение: где находится memory_mcp в 2026 году
 
-> **Repository-fit note (2026-03-27):** этот документ остаётся полезным как gap-analysis относительно SOTA, но не является canonical runtime-спецификацией репозитория. Текущее shipped-поведение описано в `docs/MEMORY_SYSTEM_SPEC.md`, retrieval target-state — в `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, а адаптированная под ограничения репозитория целевая архитектура — в `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
+> **Repository-fit note (2026-04-12):** этот документ остаётся полезным как gap-analysis относительно SOTA, но не является canonical runtime-спецификацией репозитория. Текущее shipped-поведение описано в `docs/MEMORY_SYSTEM_SPEC.md`, retrieval target-state — в `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, а адаптированная под ограничения репозитория целевая архитектура — в `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
 
-> **Важно:** часть наблюдений ниже уже частично или полностью закрыта в кодовой базе (например, lifecycle workers, topology-based community maintenance, multi-source provenance), а часть SOTA-подходов требует адаптации. В частности, для `memory_mcp` не следует автоматически трактовать SOTA как аргумент за возврат embedding-heavy runtime search: в репозитории уже принят курс на lexical/BM25 + graph expansion как основной retrieval backbone.
+> **Update (2026-04-12):** значительная часть наблюдений ниже уже закрыта в кодовой базе: lifecycle workers с heat-aware политикой, multi-source provenance, adaptive memory fields (`index_keys`, `access_count`, `last_accessed`), timeline view mode, LongMemEval-style acceptance tests, topology-based community maintenance, bi-temporal facts/edges, provenance-aware explainability. Оставшиеся SOTA-подходы, требующие адаптации, отмечены в таблице разрывов ниже со статусом.
 
 За последние полтора года область AI-памяти пережила качественный сдвиг. Если в 2023–2024 годах стандартом был простой vector store с temporal метками, то в 2025–2026 SOTA — это многоуровневая, рефлексирующая, само-эволюционирующая система. Три независимых бенчмарка — LongMemEval, LoCoMo и DMR — стали стандартом оценки, и разрыв между лучшими системами (Supermemory: 81.6%, Zep: 71.2%) и наивными подходами достигает 30–60 процентных пунктов.[^1][^2][^3][^4]
 
@@ -69,16 +69,16 @@ Supermemory (2025) занял SOTA на LongMemEval-s с 81.6% (vs Zep 71.2%, fu
 | Bi-temporal модель | ✅ Да (t_valid/t_ingested) | — | — |
 | Exponential decay (Ebbinghaus) | ✅ Да | — | — |
 | Alias expansion (batch entity lookup) | ✅ Да | — | — |
-| Heat-based eviction vs age-TTL | ❌ Нет | +15–20% долгосрочный recall | S |
-| Memory evolution (backward update) | ❌ Нет | +10–15% retrieval quality | M |
-| Time-aware query expansion | ❌ Нет | +10% temporal reasoning | S |
-| Prospective reflection (session summarization) | ❌ Нет | +10–20% на длинных сессиях | L |
-| Retrospective reflection (feedback loop) | ❌ Нет | +5–10% long-term | XL |
-| PPR-based graph retrieval | ❌ Нет | +7–20% multi-hop tasks | XL |
-| Community detection по топологии | ❌ Нет | +10–15% associative recall | L |
-| LongMemEval eval integration | ❌ Нет | Observability | M |
-| Fact-augmented key expansion (indexing) | ❌ Нет | +5–10% information extraction | M |
-| Disambiguation (entity coreference) | ❌ Частично | +10% precision | L |
+| Heat-based eviction vs age-TTL | ✅ Да (2026-03-27) | — | — |
+| Memory evolution (backward update) | ❌ Нет (deferred) | +10–15% retrieval quality | M |
+| Time-aware query expansion | ✅ Частично (2026-03-27) — temporal markers в `index_keys` на write time | — | — |
+| Prospective reflection (session summarization) | ❌ Нет (deferred — требует LLM) | +10–20% на длинных сессиях | L |
+| Retrospective reflection (feedback loop) | ✅ Частично (2026-03-27) — `access_count` + `last_accessed` как usage signal | — | — |
+| PPR-based graph retrieval | ❌ Нет (deferred, research-track) | +7–20% multi-hop tasks | XL |
+| Community detection по топологии | ✅ Да (connected components, union-find) | — | — |
+| LongMemEval eval integration | ✅ Да (2026-03-27) — 5 benchmark categories | — | — |
+| Fact-augmented key expansion (indexing) | ✅ Да (2026-03-27) — `index_keys` с entity names, aliases, temporal markers | — | — |
+| Disambiguation (entity coreference) | ❌ Частично — alias matching + normalization, но merge workflows отсутствуют | +10% precision | L |
 
 ***
 

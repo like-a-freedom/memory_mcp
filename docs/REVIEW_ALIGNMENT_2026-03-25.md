@@ -1,7 +1,7 @@
 # Review Alignment — 2026-03-25
 
-**Last Updated:** 2026-03-27
-**Status:** P0/P1 items complete. P2 (lifecycle, multi-source provenance) plans ready for execution.
+**Last Updated:** 2026-04-12
+**Status:** ✅ All P0/P1/P2/P3 items complete.
 
 This document records the line-by-line validation of the external review against the current repository state. It is intentionally implementation-focused: each item is marked as confirmed, partially confirmed, or not confirmed based on code inspection.
 
@@ -68,6 +68,7 @@ The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
 | Configuration (env vars) | ✅ Implemented | `src/config.rs::LifecycleConfig` |
 | Service integration | ✅ Implemented | `src/service/core.rs::new_from_env()` |
 | Documentation | ✅ Implemented | `.env.example`, `README.md`, `LIFECYCLE_BACKGROUND_JOBS.md` |
+| Heat-aware lifecycle | ✅ Implemented | `access_count` + `last_accessed` on fact, decay/archival skip hot facts |
 
 ### P3 — Enhanced Provenance (✅ Implemented)
 
@@ -75,16 +76,10 @@ The main changes now reflected in `docs/MEMORY_SYSTEM_SPEC.md` are:
 |------|--------|----------|
 | Multi-source explain() | ✅ Implemented | `src/models.rs::ProvenanceSource`, `src/service/core.rs::collect_provenance_sources()` |
 | ProvenanceSource model | ✅ Implemented | `src/models.rs:147-161` |
-| Graph traversal for lineage | ✅ Implemented (stub) | `src/service/core.rs:863-882` |
+| Graph traversal for lineage | ✅ Implemented | `src/service/core.rs::find_episodes_via_entity()` — full episode table query by entity_links |
 | Backward compatibility | ✅ Implemented | `ExplainItem.all_sources` with `#[serde(default)]` |
-
-**Note:** Entity-based episode lookup (`find_episodes_via_entity`) is currently a stub that returns empty results. Full implementation requires direct episode table query by entity_links.
+| Integration tests | ✅ Implemented | `tests/explain_provenance.rs` (3 tests) |
 
 ## Execution Options
 
-All P0/P1 items from the independent review are now **complete**.
-
-For future enhancements (P2/P3 follow-ups):
-
-1. **Subagent-Driven** (recommended) — Fresh subagent per task with review checkpoints
-2. **Inline Execution** — Batch execution with checkpoints in current session
+All P0/P1/P2/P3 items from the independent review are now **complete**.

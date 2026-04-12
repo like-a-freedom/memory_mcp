@@ -1,11 +1,23 @@
 # Simplified Search Redesign Specification
 
-**Status:** Proposed target-state specification for the next breaking redesign  
-**Date:** 2026-03-26  
-**Scope:** Search and retrieval only  
+**Status:** Partially implemented — Waves 1-3 complete, Wave 4 partial, Wave 5 mostly complete
+**Date:** 2026-03-26 (updated 2026-04-12)
+**Scope:** Search and retrieval only
 **Precedence:** This document defines the intended target design for the next implementation wave. It does **not** claim that the current runtime already matches this design.
 
 > Companion note: this document covers **retrieval only**. The broader adaptive-memory target state that incorporates SOTA-aligned lifecycle, reflection, and evaluation work is documented separately in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
+
+## Implementation Status (2026-04-12)
+
+| Wave | Status | Summary |
+|------|--------|---------|
+| Wave 1 — Schema contract | ✅ Complete | Breaking migration `006_simplified_search_redesign.surql` applied on startup; embedding fields/indexes removed from fresh schema |
+| Wave 2 — Embedding removal | ✅ Complete | `EmbeddingProvider`, `NullEmbedder`, embedding writes, and config removed from runtime |
+| Wave 3 — Native graph + lexical | ✅ Complete | Native `in`/`out` relation endpoints; stronger lexical FTS ordering |
+| Wave 4 — Context assembly | ⚠️ Partial | Semantic lookup removal, deterministic fusion, and rationale improvements implemented; multilabel query flags and bounded graph expansion pending |
+| Wave 5 — Cleanup | ⚠️ Mostly complete | Obsolete tests/comments/docs cleaned up; verification suite passes |
+
+See `docs/superpowers/plans/2026-03-26-simplified-search-redesign-implementation-plan.md` for detailed task tracking.
 
 ---
 

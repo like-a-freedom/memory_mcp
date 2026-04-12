@@ -1,4 +1,4 @@
-# Eval Baseline — 2026-04-07
+# Eval Baseline — 2026-04-12
 
 ## Retrieval (кастомный)
 
@@ -47,3 +47,4 @@ suite=eval_latency ingest_p50_ms=0.41 ingest_p95_ms=2.90 assemble_p50_ms=4.14 as
 - `run_extraction_evals` now covers contradiction warnings plus preference-style `experience` and email action-item extraction, growing the suite from 2 to 9 fixture cases while keeping `fact_type_accuracy=1.00`.
 - `run_retrieval_evals` now enforces the plan thresholds directly: global `recall_at_5 ≥ 0.90` plus expected-tier pass-rate targets for `direct`, `alias`, `temporal`, `graph`, and `reasoning`.
 - `run_latency_evals` now enforces the in-memory p95 targets directly (`ingest ≤ 200ms`, `assemble ≤ 50ms`) instead of only printing the measured percentiles.
+- **Adaptive memory alignment (2026-03-27)**: `index_keys`, `access_count`, and `last_accessed` fields added to facts. Heat-aware lifecycle workers skip hot facts during decay/archival. Timeline view mode added to `assemble_context`. LongMemEval-style acceptance tests cover 5 benchmark categories.

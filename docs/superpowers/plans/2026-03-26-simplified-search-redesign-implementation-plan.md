@@ -1,6 +1,7 @@
 # Simplified Search Redesign Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** ⚠️ **PARTIALLY COMPLETE** (Waves 1-3 ✅, Wave 4 ⚠️, Wave 5 ⚠️) — verified 2026-04-12
+> See implementation status snapshot below for detailed wave progress.
 
 **Goal:** Remove embedding-based search scaffolding and ship a deterministic BM25-first + graph-expansion retrieval pipeline with native Surreal relation endpoints.
 

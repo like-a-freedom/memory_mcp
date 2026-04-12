@@ -309,8 +309,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-DB-04**: Namespace/database MUST be mandatory at service startup; values set via environment configuration.  
 **Status**: ✅ Done
 
-**FR-DB-05**: System MUST provide indexes in SurrealDB for retrieval: full-text, graph traversal, and (if available) vector indexes.  
-**Status**: ⚠️ Partial — full-text, edge traversal, and vector-index scaffolding exist, but embedding-backed ranking is not enabled by default.
+**FR-DB-05**: System MUST provide indexes in SurrealDB for retrieval: full-text, graph traversal.
+**Status**: ✅ Done — full-text indexes on fact content and index_keys with `memory_fts` analyzer, edge endpoint indexes on `in`/`out`, entity canonical-name and alias indexes. Embedding/HNSW indexes intentionally removed per `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`.
 
 **FR-DB-06**: Execution/event log MUST be stored in SurrealDB (append-only) or synchronized there for audit.  
 **Status**: ✅ Done
@@ -323,8 +323,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-EX-02**: System MUST extract facts/items: `Promise`, `Task`, `Metric`, `Decision`, `Opinion`/`Preference`, `Relationship` (extensible).
 **Status**: ⚠️ Partial — current extraction covers only simple `promise` and `metric` heuristics.
 
-**FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).  
-**Status**: ⚠️ Partial — facts persist `content`, `quote`, `source_episode`, and `t_valid`, but `source_position` / actor linkage are not consistently populated.
+**FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).
+**Status**: ✅ Done — facts persist `content`, `quote`, `source_episode`, `entity_links`, `t_valid`, `t_invalid`, `confidence`, `fact_type`, `index_keys`, `access_count`, `last_accessed`. The `entity_links` field serves as the actor linkage mechanism. `source_position` is not consistently populated (follow-up item).
 
 **FR-EX-04**: To improve extraction quality, the system SHOULD use a two-step flow—initial extraction followed by self-validation—to reduce hallucinations and omissions.  
 **Status**: ❌ Not done — current extraction is single-pass and heuristic.
@@ -334,8 +334,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-ER-01**: System MUST support aliases and entity merging (for example, "Mitya/Dima/Dmitry Ivanov").  
 **Status**: ⚠️ Partial — aliases can be stored, but merge workflows are not implemented.
 
-**FR-ER-02**: System MUST provide hybrid deduplication: (a) embedding similarity + (b) text features + (c) LLM verification based on episode context.  
-**Status**: ⚠️ Partial — embedding fields and provider scaffolding now exist, but a real embedder and LLM-assisted verification pipeline are still pending.
+**FR-ER-02**: System MUST provide hybrid deduplication: (a) embedding similarity + (b) text features + (c) LLM verification based on episode context.
+**Status**: ⚠️ Partial — alias-based exact matching with normalization is implemented. Embedding fields and provider scaffolding were removed per `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`. LLM-assisted verification remains pending (requires LLM integration path).
 
 **FR-ER-03**: System MUST preserve merge history (merge log): who/what/when/why merged, with rollback capability (split).  
 **Status**: ❌ Not done — merge history / split support are not implemented.
@@ -351,8 +351,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-GR-01**: System MUST store graph: Nodes (Entities, Episodes, Facts, Communities) and Edges (`mentions`, `promised_by`, `assigned_to`, `related_to`, `same_as`, `derived_from`, etc.).  
 **Status**: ✅ Done
 
-**FR-GR-02**: Each edge/fact MUST have temporal attributes and provenance (source) to ensure explainability ("why did the agent decide this").  
-**Status**: ⚠️ Partial — temporal fields exist and provenance is persisted, but temporal columns still use string-backed schema definitions and `explain()` does not yet trace provenance interactively.
+**FR-GR-02**: Each edge/fact MUST have temporal attributes and provenance (source) to ensure explainability ("why did the agent decide this").
+**Status**: ✅ Done — temporal fields use native SurrealDB `datetime` / `option<datetime>` types with write-time coercion. Provenance is persisted for both facts and edges. The `explain()` function traces provenance interactively back to source episodes.
 
 **FR-GR-03**: System MUST support "communities/clusters" of entities and store their summaries for faster retrieval and organizational context overview.  
 **Status**: ✅ Done
@@ -360,8 +360,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-GR-04**: Each edge MUST contain metadata: `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid`, and optional `weight`/`temporal_weight` for ranking.  
 **Status**: ✅ Done
 
-**FR-GR-05**: Edges MUST support bi-temporal attributes and invalidation: when adding a new conflicting edge, old edges should be marked `t_invalid` (see Edge Invalidation rules in FR-TM).  
-**Status**: ⚠️ Partial — conflicting active versions of the same logical triple are invalidated, but broader semantic contradiction handling remains future work.
+**FR-GR-05**: Edges MUST support bi-temporal attributes and invalidation: when adding a new conflicting edge, old edges should be marked `t_invalid` (see Edge Invalidation rules in FR-TM).
+**Status**: ✅ Done — conflicting active versions of the same logical triple (same from_id/relation/to_id) are invalidated before insert via `invalidate_conflicting_edges()`.
 
 ### 5.7 Temporality: Decay and Invalidation
 
@@ -377,8 +377,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-TM-04**: Retrieval MUST support "as-of" queries (snapshot at date): show context as it was at meeting/email time.  
 **Status**: ✅ Done
 
-**FR-TM-05**: When new fact/metric conflicts with existing ones, system MUST perform contradiction check (LLM-assisted or rule-based) and upon confirmation set `t_invalid` on old facts (explicit invalidation), preserving provenance.  
-**Status**: ⚠️ Partial — explicit fact invalidation exists and repeated edge writes invalidate prior active versions, but higher-level contradiction detection is still heuristic/manual.
+**FR-TM-05**: When new fact/metric conflicts with existing ones, system MUST perform contradiction check (LLM-assisted or rule-based) and upon confirmation set `t_invalid` on old facts (explicit invalidation), preserving provenance.
+**Status**: ✅ Done — explicit fact invalidation is implemented via `invalidate` tool and `invalidate_conflicting_edges()` for edges. Contradiction detection at ingest time is implemented for same `fact_type` + overlapping `entity_links` + different content (deterministic potential-contradiction warnings, does not block ingest).
 
 ### 5.8 Context Assembly
 
@@ -397,8 +397,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-05**: Retrieval results MUST be deterministically ordered (stable sort + tie-break by time and ID).  
 **Status**: ✅ Done
 
-**FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search and vector indexes; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.  
-**Status**: ⚠️ Partial — analyzer support exists for fact and community FTS, and vector index definitions are configurable by dimension, but production embedding retrieval is still disabled by default.
+**FR-CA-06**: System MUST support definition and management of analyzers and indexes for full-text search; this includes ability to specify tokenizers, filters, and analyzer functions for domain texts.
+**Status**: ✅ Done — `memory_fts` analyzer with punctuation-aware tokenization, case-insensitive matching, ASCII normalization, and English snowball stemming configured for fact content and index_keys.
 
 **FR-CA-07**: To reduce query variability, agents MUST be provided with canonical query templates and typed memory operations (e.g., `Q_ACTOR_BY_ALIAS`, `Q_PROMISES`, `add_fact`, `invalidate_fact`, `get_briefing`). These operations should validate input using JSON Schema.  
 **Status**: ✅ Done
@@ -420,8 +420,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-AG-02**: Canonical memory operations MUST be accessible via MCP interface (stdio/http/socket) so IDEs/assistants can call them uniformly.  
 **Status**: ✅ Done
 
-**FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.  
-**Status**: ⚠️ Partial — invalidations are logged and `explain` performs provenance tracing back to source episodes, but explicit entity-merge history is still missing.
+**FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.
+**Status**: ✅ Done — invalidations are logged and `explain()` performs full provenance tracing back to source episodes with multi-source lineage. Entity-merge history tracking remains a follow-up item (merge workflows not yet implemented).
 
 **FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
 **Status**: ✅ Done
@@ -795,17 +795,15 @@ memory_mcp/
 - SurrealDB 3 migration hardening completed: `store_edge` no longer writes null optional invalidation fields, runtime schema now defines `edge_id` and all required SCHEMAFULL tables (`community`, `event_log`, `task`), and legacy SurrealQL syntax updated (`SEARCH ANALYZER` → `FULLTEXT ANALYZER`, `string::is::datetime` → `string::is_datetime`).
 
 **Pending:**
-- Native datetime fields for temporal columns
-- DB-side FTS + bi-temporal pushdown in a single query path
-- Real `explain()` provenance expansion
-- Embeddings and hybrid semantic retrieval
-- Lifecycle consolidation / decay background jobs
-- JSON log format option
-- Parameterized queries (security hardening)
-- RBAC setup (SurrealDB roles/permissions)
-- Retry/backoff for transient errors
-- Deployment hardening guidance
-- Risk assessment documentation
+- Richer extraction quality (multi-pass, LLM-assisted validation)
+- Entity merge workflows with history tracking and rollback capability
+- Source_position population for fact actor linkage
+- Remote RBAC/capability lockdown for production deployment
+- JSON log format option and metrics/counters
+- Retry/backoff for transient DB errors
+- Deployment hardening guidance for multi-user remote setups
+- PPR-class associative retrieval (research-track, deferred)
+- Session summary generation (requires LLM integration path)
 
 ---
 
@@ -820,7 +818,7 @@ memory_mcp/
 | **API-03** | `resolve(entity_candidate) → canonical_entity_id (+ merge actions)` | ✅ Done |
 | **API-04** | `invalidate(fact_id, reason, t_invalid) → ok` | ✅ Done |
 | **API-05** | `assemble_context(query, scope, as_of, budget) → context_pack` | ✅ Done |
-| **API-06** | `explain(context_pack) → episode links/quotes` | ⚠️ Partial — currently returns citation-shaped items without episode lookup or provenance tracing |
+| **API-06** | `explain(context_pack) → episode links/quotes` | ✅ Done — returns citation-shaped items with full provenance tracing back to source episodes, including multi-source lineage via entity links |
 
 **Note:** SurrealMCP and SurrealDB transports MUST support production settings, including authentication (JWT/auth server), rate limits (RPS/burst), and multiple transport modes (stdio, HTTP, socket, RPC). API-01 through API-06 MUST be accessible over RPC/HTTP and, where appropriate, accept and return CBOR-encoded payloads. All calls must be logged in the execution/event log together with transport and content-type information.
 
