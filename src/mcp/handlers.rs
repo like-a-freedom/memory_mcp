@@ -2773,4 +2773,205 @@ mod tests {
         );
         assert_eq!(MemoryMcp::normalize_public_app_name("unknown_app"), None);
     }
+
+    #[test]
+    fn tool_response_complete_list_sets_all_pagination_fields() {
+        let response = ToolResponse::complete_list(vec!["a", "b"], 42, "guidance text");
+        assert_eq!(response.status, "success");
+        assert_eq!(response.result, vec!["a", "b"]);
+        assert_eq!(response.total_count, Some(42));
+        assert_eq!(response.has_more, Some(false));
+        assert_eq!(response.next_offset, None);
+        assert!(response.guidance.is_some());
+    }
+
+    #[test]
+    fn tool_response_partial_envelope_sets_retryable_state() {
+        let response = ToolResponse::partial_with_guidance("partial result", "try again later");
+        assert_eq!(response.status, "partial");
+        assert!(response.guidance.is_some());
+    }
+
+    #[test]
+    fn tool_response_success_skips_pagination_fields() {
+        let response = ToolResponse::success_with_guidance("result", "done");
+        assert_eq!(response.status, "success");
+        assert!(response.has_more.is_none());
+        assert!(response.total_count.is_none());
+        assert!(response.next_offset.is_none());
+    }
+
+    #[test]
+    fn app_command_result_serializes_all_fields() {
+        let result = AppCommandResult {
+            app: "test_app".to_string(),
+            session_id: "ses:123".to_string(),
+            action: "test_action".to_string(),
+            ok: true,
+            message: "all good".to_string(),
+            refresh_required: false,
+            resource_uri: Some("uri://test".to_string()),
+            details: Some(json!({"key": "value"})),
+        };
+        let serialized = serde_json::to_value(&result).expect("serialize");
+        assert_eq!(serialized["app"], "test_app");
+        assert_eq!(serialized["session_id"], "ses:123");
+        assert_eq!(serialized["action"], "test_action");
+        assert_eq!(serialized["ok"], true);
+        assert_eq!(serialized["message"], "all good");
+        assert_eq!(serialized["refresh_required"], false);
+        assert_eq!(serialized["resource_uri"], "uri://test");
+        assert_eq!(serialized["details"]["key"], "value");
+    }
+
+    #[test]
+    fn app_command_result_omits_null_resource_uri() {
+        let result = AppCommandResult {
+            app: "test".to_string(),
+            session_id: "ses:1".to_string(),
+            action: "act".to_string(),
+            ok: true,
+            message: "msg".to_string(),
+            refresh_required: false,
+            resource_uri: None,
+            details: None,
+        };
+        let serialized = serde_json::to_value(&result).expect("serialize");
+        assert!(serialized.get("resource_uri").is_none());
+        assert!(serialized.get("details").is_none());
+    }
+
+    #[test]
+    fn open_app_result_serializes_correctly() {
+        let result = OpenAppResult {
+            app: "inspector".to_string(),
+            session_id: "ses:abc".to_string(),
+            resource_uri: "ui://memory/app/inspector/ses:abc".to_string(),
+            fallback: json!({"target": {"target_id": "entity:1"}}),
+        };
+        let serialized = serde_json::to_value(&result).expect("serialize");
+        assert_eq!(serialized["app"], "inspector");
+        assert_eq!(serialized["session_id"], "ses:abc");
+        assert_eq!(
+            serialized["resource_uri"],
+            "ui://memory/app/inspector/ses:abc"
+        );
+        assert_eq!(serialized["fallback"]["target"]["target_id"], "entity:1");
+    }
+
+    #[test]
+    fn enrich_session_payload_adds_meta_with_expiry() {
+        let payload = json!({"data": "value"});
+        let enriched =
+            MemoryMcp::enrich_session_payload("inspector", "ses:1", "org", Some(3600), payload);
+        assert_eq!(enriched["app"], "inspector");
+        assert_eq!(enriched["session_id"], "ses:1");
+        assert_eq!(enriched["scope"], "org");
+        assert!(enriched["meta"]["expires_at"].is_string());
+        assert_eq!(enriched["meta"]["ttl_seconds"], 3600);
+        assert_eq!(enriched["data"], "value");
+    }
+
+    #[test]
+    fn enrich_session_payload_handles_no_ttl() {
+        let payload = json!({});
+        let enriched =
+            MemoryMcp::enrich_session_payload("diff", "ses:2", "personal", None, payload);
+        assert_eq!(enriched["app"], "diff");
+        assert_eq!(enriched["meta"]["ttl_seconds"], serde_json::Value::Null);
+        assert!(enriched["meta"]["expires_at"].is_null());
+    }
+
+    #[test]
+    fn shallow_merge_object_combines_keys() {
+        use std::collections::HashMap;
+        let mut target: HashMap<String, Value> = HashMap::new();
+        target.insert("a".to_string(), json!(1));
+        let mut patch: HashMap<String, Value> = HashMap::new();
+        patch.insert("b".to_string(), json!(2));
+        patch.insert("a".to_string(), json!(99));
+
+        // Note: shallow_merge_object works on serde_json::Map, not HashMap
+        let mut target_map = serde_json::Map::new();
+        target_map.insert("a".to_string(), json!(1));
+        let mut patch_map = serde_json::Map::new();
+        patch_map.insert("b".to_string(), json!(2));
+        patch_map.insert("a".to_string(), json!(99));
+        shallow_merge_object(&mut target_map, &patch_map);
+        assert_eq!(target_map["a"], 99); // overwritten
+        assert_eq!(target_map["b"], 2); // added
+    }
+
+    #[test]
+    fn summarize_ingestion_review_items_counts_by_status() {
+        let items = vec![
+            json!({"status": "approved"}),
+            json!({"status": "approved"}),
+            json!({"status": "rejected"}),
+            json!({"status": "pending"}),
+        ];
+        let summary = summarize_ingestion_review_items(&items);
+        assert_eq!(summary["total"], 4);
+        assert_eq!(summary["by_status"]["approved"], 2);
+        assert_eq!(summary["by_status"]["rejected"], 1);
+        assert_eq!(summary["by_status"]["pending"], 1);
+        assert_eq!(summary["committable"], 2);
+    }
+
+    #[test]
+    fn summarize_ingestion_review_items_handles_empty() {
+        let summary = summarize_ingestion_review_items(&[]);
+        assert_eq!(summary["total"], 0);
+        assert_eq!(summary["committable"], 0);
+    }
+
+    #[test]
+    fn edge_neighbor_returns_correct_endpoint_for_incoming() {
+        let record = json!({
+            "in": "entity:alice",
+            "out": "entity:bob",
+            "relation": "knows"
+        });
+        let neighbor = edge_neighbor(&record, crate::storage::GraphDirection::Incoming);
+        assert_eq!(neighbor, Some("entity:alice".to_string()));
+    }
+
+    #[test]
+    fn edge_neighbor_returns_correct_endpoint_for_outgoing() {
+        let record = json!({
+            "in": "entity:alice",
+            "out": "entity:bob",
+            "relation": "knows"
+        });
+        let neighbor = edge_neighbor(&record, crate::storage::GraphDirection::Outgoing);
+        assert_eq!(neighbor, Some("entity:bob".to_string()));
+    }
+
+    #[test]
+    fn edge_neighbor_returns_none_for_missing_field() {
+        let record = json!({"relation": "knows"});
+        assert!(edge_neighbor(&record, crate::storage::GraphDirection::Incoming).is_none());
+    }
+
+    #[test]
+    fn edge_neighbor_returns_none_for_non_string_value() {
+        let record = json!({"in": 123, "out": "entity:bob"});
+        assert!(edge_neighbor(&record, crate::storage::GraphDirection::Incoming).is_none());
+    }
+
+    #[test]
+    fn content_hash_differs_for_different_content() {
+        use super::super::parsers::content_hash;
+        let hash1 = content_hash("content one");
+        let hash2 = content_hash("content two");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn content_hash_is_deterministic() {
+        use super::super::parsers::content_hash;
+        let hash1 = content_hash("same content");
+        let hash2 = content_hash("same content");
+        assert_eq!(hash1, hash2);
+    }
 }

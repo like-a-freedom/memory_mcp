@@ -586,22 +586,32 @@ async fn memory_service_persists_real_local_candle_embeddings() {
         .expect("assemble_context should succeed");
 
     // Both compensation and paraphrase facts should be retrieved (semantic match)
-    let content_set: std::collections::HashSet<_> = context.iter().map(|i| i.content.as_str()).collect();
+    let content_set: std::collections::HashSet<_> =
+        context.iter().map(|i| i.content.as_str()).collect();
     assert!(
-        content_set.iter().any(|c| c.contains("Compensation") || c.contains("compensation")),
+        content_set
+            .iter()
+            .any(|c| c.contains("Compensation") || c.contains("compensation")),
         "semantic retrieval should find compensation fact, got: {:?}",
         content_set
     );
     assert!(
-        content_set.iter().any(|c| c.contains("Salary") || c.contains("raise")),
+        content_set
+            .iter()
+            .any(|c| c.contains("Salary") || c.contains("raise")),
         "semantic retrieval should find paraphrase fact, got: {:?}",
         content_set
     );
     // Compensation fact should rank higher than unrelated (semantic similarity)
-    let compensation_pos = context.iter().position(|i| i.content.contains("Compensation"));
+    let compensation_pos = context
+        .iter()
+        .position(|i| i.content.contains("Compensation"));
     let unrelated_pos = context.iter().position(|i| i.content.contains("fruit"));
     if let (Some(c_pos), Some(u_pos)) = (compensation_pos, unrelated_pos) {
-        assert!(c_pos < u_pos, "compensation fact (pos {c_pos}) should rank above unrelated (pos {u_pos})");
+        assert!(
+            c_pos < u_pos,
+            "compensation fact (pos {c_pos}) should rank above unrelated (pos {u_pos})"
+        );
     }
 }
 

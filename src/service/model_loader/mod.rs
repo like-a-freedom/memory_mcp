@@ -284,4 +284,58 @@ mod tests {
         assert!(GLINER_TOKENIZER_URL.starts_with("https://huggingface.co/"));
         assert!(GLINER_TOKENIZER_URL.contains("tokenizer.json"));
     }
+
+    #[test]
+    fn is_model_cached_with_files_custom_list() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let required = &["a.txt", "b.txt"];
+        std::fs::write(dir.path().join("a.txt"), "test").expect("write a");
+        std::fs::write(dir.path().join("b.txt"), "test").expect("write b");
+        assert!(is_model_cached_with_files(dir.path(), required));
+
+        std::fs::remove_file(dir.path().join("b.txt")).expect("remove b");
+        assert!(!is_model_cached_with_files(dir.path(), required));
+    }
+
+    #[test]
+    fn is_model_cached_with_files_empty_list() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert!(is_model_cached_with_files(dir.path(), &[]));
+    }
+
+    #[test]
+    fn sanitize_model_name_empty() {
+        assert_eq!(sanitize_model_name(""), "");
+    }
+
+    #[test]
+    fn sanitize_model_name_multiple_slashes() {
+        assert_eq!(sanitize_model_name("a/b/c"), "a--b--c");
+    }
+
+    #[test]
+    fn sanitize_model_name_leading_trailing_slash() {
+        assert_eq!(sanitize_model_name("/model/"), "--model--");
+    }
+
+    #[test]
+    fn model_required_files_contains_expected_entries() {
+        assert!(MODEL_REQUIRED_FILES.contains(&"tokenizer.json"));
+        assert!(MODEL_REQUIRED_FILES.contains(&"config.json"));
+        assert!(MODEL_REQUIRED_FILES.contains(&"model.safetensors"));
+        assert_eq!(MODEL_REQUIRED_FILES.len(), 3);
+    }
+
+    #[test]
+    fn is_model_cached_returns_false_for_empty_dir() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert!(!is_model_cached(dir.path()));
+    }
+
+    #[test]
+    fn is_model_cached_returns_false_for_dir_with_subdirs_only() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(dir.path().join("subdir")).expect("create subdir");
+        assert!(!is_model_cached(dir.path()));
+    }
 }

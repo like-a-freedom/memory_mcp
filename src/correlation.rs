@@ -57,4 +57,51 @@ mod tests {
         let id = CorrelationId::from_raw(0x12345);
         assert_eq!(format!("{}", id), "op-00012345");
     }
+
+    #[test]
+    fn correlation_id_from_raw_roundtrip() {
+        let id = CorrelationId::from_raw(42);
+        assert_eq!(id.as_raw(), 42);
+    }
+
+    #[test]
+    fn correlation_id_from_raw_zero() {
+        let id = CorrelationId::from_raw(0);
+        assert_eq!(id.as_raw(), 0);
+        assert_eq!(format!("{}", id), "op-00000000");
+    }
+
+    #[test]
+    fn correlation_id_from_raw_max() {
+        let id = CorrelationId::from_raw(u64::MAX);
+        assert_eq!(id.as_raw(), u64::MAX);
+    }
+
+    #[test]
+    fn correlation_id_default_uses_new() {
+        let id1 = CorrelationId::default();
+        let id2 = CorrelationId::default();
+        assert_ne!(id1, id2); // should be unique like new()
+    }
+
+    #[test]
+    fn correlation_id_clone_preserves_value() {
+        let id = CorrelationId::from_raw(123);
+        let cloned = id.clone();
+        assert_eq!(id, cloned);
+        assert_eq!(id.as_raw(), cloned.as_raw());
+    }
+
+    #[test]
+    fn correlation_id_hash_and_eq() {
+        use std::collections::HashSet;
+        let id1 = CorrelationId::from_raw(1);
+        let id2 = CorrelationId::from_raw(1);
+        let id3 = CorrelationId::from_raw(2);
+
+        let mut set = HashSet::new();
+        set.insert(id1);
+        assert!(set.contains(&id2));
+        assert!(!set.contains(&id3));
+    }
 }
