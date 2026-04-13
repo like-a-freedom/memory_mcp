@@ -413,6 +413,79 @@ fn candidate_temporal_alignment(
         .unwrap_or(1.0)
 }
 
+fn fact_is_within_temporal_focus(
+    fact: &RankedContextFact,
+    temporal_focus: &TemporalWindow,
+) -> bool {
+    fact.fact.t_valid >= temporal_focus.start && fact.fact.t_valid <= temporal_focus.end
+}
+
+fn temporal_query_terms(query_terms: &[String]) -> Vec<String> {
+    query_terms
+        .iter()
+        .filter(|term| is_temporal_query_term(term))
+        .cloned()
+        .collect()
+}
+
+fn is_temporal_query_term(term: &str) -> bool {
+    matches!(
+        term,
+        "january"
+            | "february"
+            | "march"
+            | "april"
+            | "may"
+            | "june"
+            | "july"
+            | "august"
+            | "september"
+            | "october"
+            | "november"
+            | "december"
+            | "monday"
+            | "tuesday"
+            | "wednesday"
+            | "thursday"
+            | "friday"
+            | "saturday"
+            | "sunday"
+            | "today"
+            | "yesterday"
+            | "tomorrow"
+            | "week"
+            | "quarter"
+            | "q1"
+            | "q2"
+            | "q3"
+            | "q4"
+    ) || (term.len() == 4 && term.chars().all(|character| character.is_ascii_digit()))
+}
+
+fn fact_matches_all_query_terms(fact: &RankedContextFact, required_terms: &[String]) -> bool {
+    if required_terms.is_empty() {
+        return false;
+    }
+
+    let matched_terms = matched_query_terms_for_fact(fact, required_terms);
+    required_terms
+        .iter()
+        .all(|term| matched_terms.contains(term.as_str()))
+}
+
+fn supports_explicit_temporal_focus(
+    fact: &RankedContextFact,
+    temporal_focus: &TemporalWindow,
+    query_terms: &[String],
+) -> bool {
+    if fact_is_within_temporal_focus(fact, temporal_focus) {
+        return true;
+    }
+
+    let required_temporal_terms = temporal_query_terms(query_terms);
+    fact_matches_all_query_terms(fact, &required_temporal_terms)
+}
+
 fn focused_ranked_relevance_score(
     fact: &RankedContextFact,
     temporal_focus: Option<&TemporalWindow>,
@@ -703,6 +776,16 @@ pub(crate) fn select_ranked_context_facts(
     }
 
     let temporal_focus_ref = temporal_focus.as_ref();
+    if let Some(temporal_focus) = temporal_focus_ref {
+        facts.retain(|candidate| {
+            supports_explicit_temporal_focus(candidate, temporal_focus, &query_terms)
+        });
+
+        if facts.is_empty() {
+            return Vec::new();
+        }
+    }
+
     facts.sort_by(|left, right| {
         compare_ranked_context_facts_with_focus(left, right, temporal_focus_ref)
     });

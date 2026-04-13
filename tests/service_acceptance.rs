@@ -905,3 +905,132 @@ async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_t
         item.rationale
     );
 }
+
+#[tokio::test]
+async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_temporal_noise() {
+    let service = common::make_service().await;
+
+    let july_fact_id = service
+        .add_fact(
+            "note",
+            "Requirement R-0712 was created in July 2025 for platform asset migration.",
+            "Requirement R-0712 was created in July 2025 for platform asset migration.",
+            "episode:july-requirement",
+            Utc.with_ymd_and_hms(2025, 7, 9, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:july-requirement"}),
+        )
+        .await
+        .expect("seed july requirement fact");
+
+    let august_noise_id = service
+        .add_fact(
+            "note",
+            "Method for collecting observed event throughput from sandbox installations was documented in August 2025.",
+            "Method for collecting observed event throughput from sandbox installations was documented in August 2025.",
+            "episode:august-noise",
+            Utc.with_ymd_and_hms(2025, 8, 19, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:august-noise"}),
+        )
+        .await
+        .expect("seed august noise fact");
+
+    let recent_experience_id = service
+        .add_fact(
+            "experience",
+            "I reviewed sample archive sizing tradeoffs this week.",
+            "I reviewed sample archive sizing tradeoffs this week.",
+            "episode:recent-experience",
+            Utc.with_ymd_and_hms(2026, 4, 10, 11, 0, 0).unwrap(),
+            "org",
+            0.95,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:recent-experience"}),
+        )
+        .await
+        .expect("seed recent experience fact");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "requirements created July 2025".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble temporal requirement query");
+
+    assert!(items.iter().any(|item| item.fact_id == july_fact_id));
+    assert!(
+        !items.iter().any(|item| item.fact_id == august_noise_id),
+        "out-of-window year-only lexical noise should not survive explicit month/year queries"
+    );
+    assert!(
+        !items
+            .iter()
+            .any(|item| item.fact_id == recent_experience_id),
+        "recent experience should not be appended for query-driven retrieval"
+    );
+    assert!(
+        items
+            .iter()
+            .all(|item| !item.rationale.contains("supplemental experience")),
+        "query-driven retrieval should not append supplemental experience items"
+    );
+}
+
+#[tokio::test]
+async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temporal_support() {
+    let service = common::make_service().await;
+
+    service
+        .add_fact(
+            "note",
+            "October 2025 operations summary: Platform 2.3 Patch 4 was approved for rollout.",
+            "October 2025 operations summary: Platform 2.3 Patch 4 was approved for rollout.",
+            "episode:october-summary",
+            Utc.with_ymd_and_hms(2025, 10, 13, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:october-summary"}),
+        )
+        .await
+        .expect("seed october summary fact");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "Platform planning notes July 2025".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble explicit month/year query");
+
+    assert!(
+        items.is_empty(),
+        "when only out-of-window summaries exist without July 2025 support, explicit month/year query should return empty instead of October noise: {items:?}"
+    );
+}

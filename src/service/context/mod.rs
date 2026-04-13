@@ -599,12 +599,13 @@ pub async fn assemble_context(
         .await?
     };
 
-    // Append recent experience facts as supplemental context when not using
-    // specialized view modes. Safe to call even when a query was provided —
-    // the helper deduplicates and respects the budget limit.
+    // Append recent experience facts as supplemental context only for browse-like
+    // calls without a search query. Query-driven retrieval should not mix in
+    // unrelated recent memories purely because they are fresh.
     if requested_view_mode != Some("facets")
         && requested_view_mode != Some("wake_up")
         && requested_view_mode != Some("map")
+        && query_opt.is_none()
     {
         let appended_experience = append_recent_experience_items(
             &mut results,
@@ -887,6 +888,87 @@ mod tests {
             vec!["fact:exact-sentence", "fact:term-soup"],
             "exact sentence matches should outrank cross-sentence term soup even when the soup has a stronger raw ft_score"
         );
+    }
+
+    #[test]
+    fn select_ranked_context_facts_filters_out_of_window_candidates_without_temporal_support() {
+        let temporal_focus =
+            infer_temporal_window("july 2025", fixed_temporal_cutoff()).expect("temporal focus");
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+
+        let july_candidate_time = chrono::DateTime::parse_from_rfc3339("2025-07-10T10:00:00Z")
+            .expect("july candidate timestamp")
+            .with_timezone(&Utc);
+        let october_candidate_time = chrono::DateTime::parse_from_rfc3339("2025-10-13T10:00:00Z")
+            .expect("october candidate timestamp")
+            .with_timezone(&Utc);
+
+        let july_candidate = RankedContextFact {
+            fact: crate::models::Fact {
+                content: "Platform planning notes were finalized in July 2025.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:july",
+                    "episode:july",
+                    july_candidate_time,
+                    2.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::Direct,
+            ..create_ranked_test_fact(
+                "fact:july",
+                "episode:july",
+                july_candidate_time,
+                2.0,
+                6.0,
+                0,
+                &[],
+            )
+        };
+
+        let october_semantic_candidate = RankedContextFact {
+            fact: crate::models::Fact {
+                content: "October 2025 summary: Platform 2.3 patch release updates.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:october",
+                    "episode:october",
+                    october_candidate_time,
+                    1.8,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::SemanticExpanded,
+            ..create_ranked_test_fact(
+                "fact:october",
+                "episode:october",
+                october_candidate_time,
+                1.8,
+                5.0,
+                0,
+                &[],
+            )
+        };
+
+        let selected = select_ranked_context_facts(
+            vec![october_semantic_candidate, july_candidate],
+            5,
+            Some(temporal_focus),
+            query_terms,
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|fact| fact.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:july"]);
     }
 
     #[tokio::test]

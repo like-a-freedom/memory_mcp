@@ -147,6 +147,7 @@ pub(crate) fn lexical_candidate_limit(limit: i32) -> i32 {
 
 fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
     let mut queries = Vec::new();
+    let standalone_temporal_terms = standalone_temporal_fallback_terms(query_terms);
 
     for width in (2..=3).rev() {
         if query_terms.len() < width {
@@ -161,12 +162,56 @@ fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
     }
 
     for term in query_terms {
+        if standalone_temporal_terms.contains(term.as_str()) {
+            continue;
+        }
         if !queries.contains(term) {
             queries.push(term.clone());
         }
     }
 
     queries
+}
+
+fn standalone_temporal_fallback_terms(query_terms: &[String]) -> HashSet<&str> {
+    let mut terms = HashSet::new();
+
+    for window in query_terms.windows(2) {
+        let [left, right] = window else {
+            continue;
+        };
+
+        if (is_calendar_month(left) && is_four_digit_year(right))
+            || (is_four_digit_year(left) && is_calendar_month(right))
+        {
+            terms.insert(left.as_str());
+            terms.insert(right.as_str());
+        }
+    }
+
+    terms
+}
+
+fn is_calendar_month(term: &str) -> bool {
+    matches!(
+        term,
+        "january"
+            | "february"
+            | "march"
+            | "april"
+            | "may"
+            | "june"
+            | "july"
+            | "august"
+            | "september"
+            | "october"
+            | "november"
+            | "december"
+    )
+}
+
+fn is_four_digit_year(term: &str) -> bool {
+    term.len() == 4 && term.chars().all(|character| character.is_ascii_digit())
 }
 
 async fn scan_fact_records_by_query_terms(
@@ -589,4 +634,31 @@ pub(crate) async fn select_episode_records_for_query(
     });
 
     Ok(fallback_records)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_lexical_fallback_queries;
+
+    #[test]
+    fn build_lexical_fallback_queries_skips_standalone_temporal_terms_for_month_year_queries() {
+        let queries = build_lexical_fallback_queries(&[
+            "requirement".to_string(),
+            "created".to_string(),
+            "july".to_string(),
+            "2025".to_string(),
+        ]);
+
+        assert!(queries.contains(&"july 2025".to_string()));
+        assert!(queries.contains(&"requirement".to_string()));
+        assert!(queries.contains(&"created".to_string()));
+        assert!(
+            !queries.contains(&"july".to_string()),
+            "month token should not be used as a standalone fallback when month/year is explicit"
+        );
+        assert!(
+            !queries.contains(&"2025".to_string()),
+            "year token should not be used as a standalone fallback when month/year is explicit"
+        );
+    }
 }
