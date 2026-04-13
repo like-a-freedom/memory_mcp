@@ -44,7 +44,7 @@ where
                 .cmp(&right.t_ref)
                 .then_with(|| left.episode_id.cmp(&right.episode_id))
         });
-    } else {
+    } else if params.query_opt.is_none() {
         episodes.sort_by(|left, right| {
             right
                 .t_ref
@@ -334,4 +334,61 @@ pub(crate) async fn build_map_view(
 
     items.truncate(budget.max(1) as usize);
     Ok(items)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn fallback_rationale(
+        _query_opt: Option<&str>,
+        _scope: &str,
+        _cutoff: DateTime<Utc>,
+    ) -> String {
+        "fallback".to_string()
+    }
+
+    #[test]
+    fn build_episode_fallback_items_preserves_input_order_for_query_mode() {
+        let cutoff = Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap();
+        let items = build_episode_fallback_items(EpisodeFallbackParams {
+            episodes: vec![
+                Episode {
+                    episode_id: "episode:exact".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "fallback-exact".to_string(),
+                    content: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 14, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+                Episode {
+                    episode_id: "episode:generic".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "fallback-generic".to_string(),
+                    content: "Platform notes July 2025 with rollout reminders.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 15, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+            ],
+            query_opt: Some("platform planning notes july 2025"),
+            scope: "org",
+            cutoff,
+            window_start: None,
+            window_end: None,
+            timeline_mode: false,
+            budget: 5,
+            fallback_rationale_fn: fallback_rationale,
+        });
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].source_episode, "episode:exact");
+        assert_eq!(items[1].source_episode, "episode:generic");
+    }
 }

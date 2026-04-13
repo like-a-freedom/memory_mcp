@@ -295,9 +295,58 @@ fn strip_list_marker(line: &str) -> (&str, bool) {
     (trimmed, false)
 }
 
+fn strip_markdown_heading_marker(line: &str) -> (&str, bool) {
+    let trimmed = line.trim_start();
+    let heading_marker_len = trimmed.chars().take_while(|ch| *ch == '#').count();
+    if heading_marker_len == 0 {
+        return (trimmed, false);
+    }
+
+    let rest = trimmed[heading_marker_len..].trim_start();
+    (rest, !rest.is_empty())
+}
+
+fn strip_markdown_inline_formatting(value: &str) -> String {
+    value
+        .replace("**", "")
+        .replace("__", "")
+        .replace('`', "")
+        .trim()
+        .to_string()
+}
+
+fn structured_summary_heading_label(tokens: &[String]) -> Option<StructuredSummaryLabel> {
+    if tokens.iter().any(|token| token == "decision") {
+        return Some(StructuredSummaryLabel::Decision);
+    }
+
+    if tokens.iter().any(|token| token == "fact") {
+        return Some(StructuredSummaryLabel::Fact);
+    }
+
+    let has_pending = tokens
+        .iter()
+        .any(|token| matches!(token.as_str(), "pending" | "open"));
+    let has_item = tokens
+        .iter()
+        .any(|token| matches!(token.as_str(), "item" | "step" | "followup" | "todo"));
+    let has_action = tokens
+        .iter()
+        .any(|token| matches!(token.as_str(), "action" | "todo" | "followup"));
+    let has_next_steps =
+        tokens.iter().any(|token| token == "next") && tokens.iter().any(|token| token == "step");
+
+    if (has_pending && has_item) || has_action || has_next_steps {
+        return Some(StructuredSummaryLabel::Fact);
+    }
+
+    None
+}
+
 fn split_structured_summary_label(line: &str) -> Option<(StructuredSummaryLabel, &str)> {
     let (prefix, remainder) = line.split_once(':')?;
-    let label = StructuredSummaryLabel::from_token(prefix)?;
+    let normalized_prefix = strip_markdown_inline_formatting(prefix);
+    let label = StructuredSummaryLabel::from_token(&normalized_prefix)?;
     let remainder = remainder.trim();
     if remainder.is_empty() {
         return None;
@@ -316,21 +365,26 @@ fn structured_summary_section_label(line: &str) -> Option<StructuredSummaryLabel
         return None;
     }
 
-    let heading = body.strip_suffix(':')?;
-    let normalized = super::normalize_text(heading);
-    let tokens = normalized.split_whitespace().collect::<Vec<_>>();
-    let has_decision = tokens
-        .iter()
-        .any(|token| matches!(*token, "decision" | "decisions"));
-    let has_fact = tokens
-        .iter()
-        .any(|token| matches!(*token, "fact" | "facts"));
-
-    match (has_decision, has_fact) {
-        (true, false) => Some(StructuredSummaryLabel::Decision),
-        (false, true) => Some(StructuredSummaryLabel::Fact),
-        _ => None,
+    let (heading_body, has_markdown_heading) = strip_markdown_heading_marker(body);
+    let heading = heading_body
+        .strip_suffix(':')
+        .unwrap_or(heading_body)
+        .trim();
+    if heading.is_empty() {
+        return None;
     }
+
+    let heading = strip_markdown_inline_formatting(heading);
+    let heading_terms = super::query::search_query_terms(&heading);
+    if heading_terms.is_empty() {
+        return None;
+    }
+
+    if !has_markdown_heading && !body.ends_with(':') && heading_terms.len() > 4 {
+        return None;
+    }
+
+    structured_summary_heading_label(&heading_terms)
 }
 
 fn classify_structured_summary_fact_type(
@@ -382,15 +436,17 @@ fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFac
             continue;
         };
 
+        let fact_content = strip_markdown_inline_formatting(fact_content);
+
         if fact_content.is_empty() {
             continue;
         }
 
-        let fact_type = classify_structured_summary_fact_type(label, fact_content);
+        let fact_type = classify_structured_summary_fact_type(label, &fact_content);
         let dedupe_key = format!(
             "{}\u{001f}{}",
             fact_type,
-            super::normalize_text(fact_content)
+            super::normalize_text(&fact_content)
         );
         if !seen.insert(dedupe_key) {
             continue;
@@ -398,8 +454,8 @@ fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFac
 
         candidates.push(StructuredSummaryFactCandidate {
             fact_type: fact_type.to_string(),
-            content: fact_content.to_string(),
-            quote: fact_content.to_string(),
+            content: fact_content.clone(),
+            quote: fact_content,
         });
     }
 
@@ -447,17 +503,17 @@ fn sanitized_content_for_entity_extraction(content: &str) -> String {
 
         let (body, is_list_item) = strip_list_marker(trimmed);
         if let Some((_, remainder)) = split_structured_summary_label(body) {
-            sanitized_lines.push(remainder.to_string());
+            sanitized_lines.push(strip_markdown_inline_formatting(remainder));
             continue;
         }
 
         if is_list_item && section_label.is_some() {
-            sanitized_lines.push(body.trim().to_string());
+            sanitized_lines.push(strip_markdown_inline_formatting(body));
             continue;
         }
 
         section_label = None;
-        sanitized_lines.push(trimmed.to_string());
+        sanitized_lines.push(strip_markdown_inline_formatting(trimmed));
     }
 
     sanitized_lines.join("\n")
@@ -632,8 +688,9 @@ pub(crate) fn build_extract_log_result(
     });
 
     let structured_line_fact_count = episode
-        .filter(|episode| episode.source_type.ends_with("_summary") && facts.len() > 1)
-        .map_or(0, |_| facts.len());
+        .map(|episode| structured_summary_fact_candidates(&episode.content).len())
+        .filter(|candidate_count| *candidate_count > 0 && *candidate_count == facts.len())
+        .unwrap_or(0);
 
     build_extract_log_result_with_metadata(
         episode,
@@ -1283,6 +1340,29 @@ mod tests {
             candidates[2].content,
             "Docs team needs final terminology for supported languages."
         );
+    }
+
+    #[test]
+    fn structured_summary_fact_candidates_extract_markdown_headings_without_colons() {
+        let candidates = structured_summary_fact_candidates(
+            "# September 2025 program summary\n\n## Decisions Made\n1. Regional launch in South market approved for September 30.\n2. Response logging rollout approved for September 30.\n\n## Pending Items\n1. Complete global launch follow-up.\n2. Continue platform 1.5 development.",
+        );
+
+        assert_eq!(candidates.len(), 4);
+        assert_eq!(candidates[0].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Regional launch in South market approved for September 30."
+        );
+        assert_eq!(candidates[1].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[1].content,
+            "Response logging rollout approved for September 30."
+        );
+        assert_eq!(candidates[2].fact_type, FactType::Note.as_str());
+        assert_eq!(candidates[2].content, "Complete global launch follow-up.");
+        assert_eq!(candidates[3].fact_type, FactType::Note.as_str());
+        assert_eq!(candidates[3].content, "Continue platform 1.5 development.");
     }
 
     #[test]

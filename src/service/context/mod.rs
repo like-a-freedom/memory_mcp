@@ -99,12 +99,25 @@ async fn collect_episode_fallback_items(
     )
     .await?;
 
+    let query_terms = crate::service::query::search_query_terms(query);
+    let mut episodes = filtering::filter_episodes_by_constraints(
+        episode_records,
+        params.access,
+        params.project_opt,
+    );
+
+    episodes.sort_by(|left, right| {
+        lexical::lexical_query_score_for_text(&right.content, &query_terms)
+            .cmp(&lexical::lexical_query_score_for_text(
+                &left.content,
+                &query_terms,
+            ))
+            .then_with(|| right.t_ref.cmp(&left.t_ref))
+            .then_with(|| left.episode_id.cmp(&right.episode_id))
+    });
+
     Ok(build_episode_fallback_items(EpisodeFallbackParams {
-        episodes: filtering::filter_episodes_by_constraints(
-            episode_records,
-            params.access,
-            params.project_opt,
-        ),
+        episodes,
         query_opt: Some(query),
         scope: params.scope,
         cutoff: params.cutoff,
@@ -1189,9 +1202,8 @@ mod tests {
 
     #[test]
     fn should_not_prefer_episode_content_when_fact_captures_best_matching_summary_line() {
-        let query_terms = crate::service::query::search_query_terms(
-            "documentation localization ru en naming screenshot automation",
-        );
+        let query_terms =
+            crate::service::query::search_query_terms("help kickoff naming localization alignment");
         let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
             .expect("fact timestamp")
             .with_timezone(&Utc);

@@ -1051,7 +1051,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
                 t_ref: july,
                 scope: "org".to_string(),
                 project: None,
-                t_ingested: None,
+                t_ingested: Some(july),
                 visibility_scope: None,
                 policy_tags: vec![],
             },
@@ -1176,5 +1176,104 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         first.content.contains("documentation and localization")
             || first.content.contains("final terminology"),
         "expected documentation-specific extracted fact, got {first:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
+    let service = common::make_service().await;
+    let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 10, 0, 0).unwrap();
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "ad-hoc".to_string(),
+                source_id: "summary-archive-2026-04-13-adhoc-01".to_string(),
+                content: "# September 2025 program summary\n\n## Launch Activities\n- Regional launch in South market (September 30)\n- Response logging discussion (September 30)\n\n## Decisions Made\n1. Regional launch in South market approved for September 30.\n2. Response logging rollout approved for September 30.\n\n## Pending Items\n1. Complete global launch follow-up.\n2. Continue platform 1.5 development.".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: Some("program-rollout".to_string()),
+                t_ingested: Some(t_ref),
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest ad-hoc summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract ad-hoc summary episode");
+
+    assert!(
+        extraction
+            .facts
+            .iter()
+            .any(|fact| fact.fact_type == "decision"),
+        "expected decision facts from markdown summary, got {:?}",
+        extraction.facts
+    );
+    assert!(
+        extraction.facts.iter().any(|fact| fact.fact_type == "note"),
+        "expected note facts from pending section, got {:?}",
+        extraction.facts
+    );
+
+    let launch_items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "regional launch approved south market september 30".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: Some("program-rollout".to_string()),
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context for launch query");
+
+    let first_launch = launch_items.first().expect("expected launch result");
+    assert_eq!(first_launch.source_episode, episode_id);
+    assert!(
+        first_launch
+            .content
+            .contains("Regional launch in South market"),
+        "expected launch-relevant context from the imported summary, got {first_launch:?}"
+    );
+
+    let development_items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "continue platform 1.5 development".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: Some("program-rollout".to_string()),
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context for development query");
+
+    let first_development = development_items
+        .first()
+        .expect("expected development result");
+    assert!(
+        !first_development.fact_id.starts_with("episode_fallback:"),
+        "expected extracted fact for development query, got {first_development:?}"
+    );
+    assert_eq!(first_development.source_episode, episode_id);
+    assert!(
+        first_development
+            .content
+            .contains("Continue platform 1.5 development."),
+        "expected pending-item fact, got {first_development:?}"
     );
 }
