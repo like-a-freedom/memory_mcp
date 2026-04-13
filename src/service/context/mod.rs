@@ -1,64 +1,35 @@
 //! Context assembly operations.
 
-use std::collections::HashSet;
 use std::time::Instant;
 
 use serde_json::json;
 
 use super::cache::{CacheKey, CacheView};
-use super::embedding::embedding_from_value;
 use super::error::{MemoryError, error_messages};
 use crate::logging::LogLevel;
 use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
 
 mod alias_expansion;
+mod budget;
 mod community;
 mod experience;
 mod filtering;
 mod lexical;
 mod logging;
+mod params;
+mod pipeline;
 mod ranking;
+mod rescue;
+mod scoring;
 mod semantic;
 mod temporal;
 mod views;
 
-use alias_expansion::expand_query_with_aliases;
-use community::{CollectCommunityFactsRequest, collect_community_facts};
-use experience::{
-    RecentExperienceRequest, append_recent_experience_items, collect_recent_experience_facts,
-    expand_experience_query_terms,
-};
-use filtering::filter_facts_by_constraints;
-use lexical::{FactQueryParams, select_episode_records_for_query, select_fact_records_for_query};
+use experience::{RecentExperienceRequest, append_recent_experience_items};
 use logging::{summarize_retrieval_tiers, supplemental_experience_count};
-use ranking::{
-    RetrievalTier, apply_time_window, build_ranked_context_facts, select_ranked_context_facts,
-    sort_ranked_context_facts_for_timeline,
-};
-use semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
-use temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
-use views::{
-    EpisodeFallbackParams, build_episode_fallback_items, build_facets_view, build_map_view,
-    build_wake_up_view,
-};
-
-/// Converts a ranked fact into an assembled context item with decayed confidence.
-fn ranked_fact_to_item(
-    ranked: ranking::RankedContextFact,
-    cutoff: chrono::DateTime<chrono::Utc>,
-) -> AssembledContextItem {
-    let confidence = super::decayed_confidence(&ranked.fact, cutoff);
-    AssembledContextItem {
-        fact_id: ranked.fact.fact_id,
-        content: ranked.fact.content,
-        quote: ranked.fact.quote,
-        source_episode: ranked.fact.source_episode,
-        confidence,
-        provenance: ranked.fact.provenance,
-        rationale: ranked.rationale,
-        retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
-    }
-}
+use params::DefaultContextParams;
+use pipeline::assemble_default_context;
+use views::{build_facets_view, build_map_view, build_wake_up_view};
 
 /// Records fact access for each item, logging errors without failing the operation.
 async fn track_fact_accesses(
@@ -81,779 +52,6 @@ async fn track_fact_accesses(
             );
         }
     }
-}
-
-async fn collect_episode_fallback_items(
-    service: &crate::service::MemoryService,
-    params: &DefaultContextParams<'_>,
-    query: &str,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let episode_records = select_episode_records_for_query(
-        service,
-        params.namespace,
-        params.scope,
-        params.cutoff_iso,
-        Some(query),
-        params.budget,
-        params.project_opt,
-    )
-    .await?;
-
-    let query_terms = crate::service::query::search_query_terms(query);
-    let mut episodes = filtering::filter_episodes_by_constraints(
-        episode_records,
-        params.access,
-        params.project_opt,
-    );
-
-    episodes.sort_by(|left, right| {
-        lexical::lexical_query_score_for_text(&right.content, &query_terms)
-            .cmp(&lexical::lexical_query_score_for_text(
-                &left.content,
-                &query_terms,
-            ))
-            .then_with(|| right.t_ref.cmp(&left.t_ref))
-            .then_with(|| left.episode_id.cmp(&right.episode_id))
-    });
-
-    Ok(build_episode_fallback_items(EpisodeFallbackParams {
-        episodes,
-        query_opt: Some(query),
-        scope: params.scope,
-        cutoff: params.cutoff,
-        window_start: params.window_start,
-        window_end: params.window_end,
-        timeline_mode: params.view_mode == Some("timeline"),
-        budget: params.budget,
-        fallback_rationale_fn: ranking::default_episode_fallback_rationale,
-    }))
-}
-
-fn should_prefer_episode_content(
-    selected_facts: &[ranking::RankedContextFact],
-    episode_items: &[AssembledContextItem],
-    query_terms: &[String],
-) -> bool {
-    if episode_items.is_empty() {
-        return false;
-    }
-
-    if selected_facts
-        .iter()
-        .any(|fact| fact.retrieval_tier == RetrievalTier::GraphExpanded)
-    {
-        return false;
-    }
-
-    let best_fact_overlap = selected_facts
-        .iter()
-        .map(|fact| lexical::lexical_query_score_for_fact(&fact.fact, query_terms))
-        .max()
-        .unwrap_or(0);
-
-    let Some(best_episode_item) = episode_items
-        .iter()
-        .max_by_key(|item| lexical::lexical_query_score_for_text(&item.content, query_terms))
-    else {
-        return false;
-    };
-
-    let best_episode_overlap =
-        lexical::lexical_query_score_for_text(&best_episode_item.content, query_terms);
-
-    if best_episode_overlap <= best_fact_overlap {
-        return false;
-    }
-
-    let best_episode_term_coverage =
-        matched_query_terms_for_text(&best_episode_item.content, query_terms).len();
-    let selected_fact_term_coverage =
-        selected_fact_query_term_coverage(selected_facts, query_terms);
-
-    best_episode_term_coverage > selected_fact_term_coverage
-}
-
-fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let content_terms = crate::service::query::search_query_terms(text)
-        .into_iter()
-        .collect::<HashSet<_>>();
-
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
-}
-
-fn matched_query_terms_for_fact(
-    fact: &crate::models::Fact,
-    query_terms: &[String],
-) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let mut fact_terms = crate::service::query::search_query_terms(&fact.content)
-        .into_iter()
-        .collect::<HashSet<_>>();
-    for index_key in &fact.index_keys {
-        fact_terms.extend(crate::service::query::search_query_terms(index_key));
-    }
-
-    query_terms
-        .iter()
-        .filter(|term| fact_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
-}
-
-fn selected_fact_matched_terms(
-    selected_facts: &[ranking::RankedContextFact],
-    query_terms: &[String],
-) -> HashSet<String> {
-    let mut matched_terms = HashSet::new();
-
-    for ranked in selected_facts {
-        matched_terms.extend(matched_query_terms_for_fact(&ranked.fact, query_terms));
-    }
-
-    matched_terms
-}
-
-fn selected_fact_query_term_coverage(
-    selected_facts: &[ranking::RankedContextFact],
-    query_terms: &[String],
-) -> usize {
-    selected_fact_matched_terms(selected_facts, query_terms).len()
-}
-
-fn query_is_first_person_memory(query_opt: Option<&str>) -> bool {
-    query_opt.is_some_and(ranking::query_is_first_person_memory)
-}
-
-const FIRST_PERSON_RESCUE_QUERY_TERMS: &[&str] = &[
-    "what",
-    "would",
-    "should",
-    "could",
-    "want",
-    "suggest",
-    "recommend",
-];
-
-fn conversational_overlap_tokens(text: &str) -> Vec<String> {
-    text.split(|character: char| !character.is_alphanumeric())
-        .map(|token| token.trim().to_ascii_lowercase())
-        .filter(|token| token.len() >= 4)
-        .collect()
-}
-
-fn first_person_rescue_query_terms(
-    raw_query_opt: Option<&str>,
-    query_terms: &[String],
-) -> Vec<String> {
-    let Some(raw_query) = raw_query_opt else {
-        return query_terms.to_vec();
-    };
-    if !query_is_first_person_memory(Some(raw_query)) {
-        return query_terms.to_vec();
-    }
-
-    let mut terms = query_terms.to_vec();
-    let mut seen_terms = terms.iter().cloned().collect::<HashSet<_>>();
-    for token in conversational_overlap_tokens(raw_query) {
-        if !FIRST_PERSON_RESCUE_QUERY_TERMS.contains(&token.as_str()) {
-            continue;
-        }
-        if seen_terms.insert(token.clone()) {
-            terms.push(token);
-        }
-    }
-
-    terms
-}
-
-fn matched_first_person_rescue_terms_for_text(
-    text: &str,
-    query_terms: &[String],
-) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let mut content_terms = crate::service::query::search_query_terms(text)
-        .into_iter()
-        .collect::<HashSet<_>>();
-    for token in conversational_overlap_tokens(text) {
-        if FIRST_PERSON_RESCUE_QUERY_TERMS.contains(&token.as_str()) {
-            content_terms.insert(token);
-        }
-    }
-
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
-}
-
-fn selected_item_matched_terms(
-    selected_items: &[AssembledContextItem],
-    query_terms: &[String],
-) -> HashSet<String> {
-    let mut matched_terms = HashSet::new();
-
-    for item in selected_items {
-        matched_terms.extend(matched_first_person_rescue_terms_for_text(
-            &item.content,
-            query_terms,
-        ));
-    }
-
-    matched_terms
-}
-
-fn first_person_episode_grounding_bonus(content: &str) -> isize {
-    let trimmed = content.trim_start();
-
-    if trimmed.starts_with("Current user persona:")
-        || trimmed.starts_with("User profile:")
-        || trimmed.starts_with("Current profile:")
-        || trimmed.starts_with("Profile:")
-    {
-        15
-    } else if trimmed.starts_with("User:") {
-        2
-    } else if trimmed.starts_with("Assistant:") {
-        -2
-    } else {
-        0
-    }
-}
-
-fn first_person_fact_grounding_bonus(content: &str) -> isize {
-    let trimmed = content.trim_start();
-
-    if trimmed.starts_with("User:") {
-        8
-    } else if trimmed.starts_with("Current user persona:")
-        || trimmed.starts_with("User profile:")
-        || trimmed.starts_with("Current profile:")
-        || trimmed.starts_with("Profile:")
-    {
-        2
-    } else if trimmed.starts_with("Assistant:") {
-        -6
-    } else {
-        0
-    }
-}
-
-fn maybe_append_first_person_ranked_fact_item(
-    results: &mut Vec<AssembledContextItem>,
-    ranked_candidates: &[ranking::RankedContextFact],
-    raw_query_opt: Option<&str>,
-    query_terms: &[String],
-    budget: usize,
-    cutoff: chrono::DateTime<chrono::Utc>,
-) {
-    if !query_is_first_person_memory(raw_query_opt) || ranked_candidates.is_empty() {
-        return;
-    }
-
-    let rescue_query_terms = first_person_rescue_query_terms(raw_query_opt, query_terms);
-    if rescue_query_terms.len() <= query_terms.len() || rescue_query_terms.is_empty() {
-        return;
-    }
-
-    let selected_terms = selected_item_matched_terms(results, &rescue_query_terms);
-    let seen_fact_ids = results
-        .iter()
-        .map(|item| item.fact_id.as_str())
-        .collect::<HashSet<_>>();
-    let seen_source_episodes = results
-        .iter()
-        .map(|item| item.source_episode.as_str())
-        .collect::<HashSet<_>>();
-
-    let candidate = ranked_candidates
-        .iter()
-        .filter_map(|ranked| {
-            if seen_fact_ids.contains(ranked.fact.fact_id.as_str())
-                || seen_source_episodes.contains(ranked.fact.source_episode.as_str())
-            {
-                return None;
-            }
-            if !ranked.fact.content.trim_start().starts_with("User:") {
-                return None;
-            }
-
-            let matched_terms = matched_first_person_rescue_terms_for_text(
-                &ranked.fact.content,
-                &rescue_query_terms,
-            );
-            let unique_term_count = matched_terms
-                .iter()
-                .filter(|term| !selected_terms.contains(term.as_str()))
-                .count();
-            if unique_term_count == 0 {
-                return None;
-            }
-
-            let overlap_count = matched_terms.len();
-            let lexical_score =
-                lexical::lexical_query_score_for_text(&ranked.fact.content, &rescue_query_terms);
-            let grounding_bonus = first_person_fact_grounding_bonus(&ranked.fact.content);
-            let priority = (unique_term_count as isize * 8)
-                + (overlap_count as isize * 4)
-                + (lexical_score as isize * 2)
-                + grounding_bonus;
-
-            Some((priority, overlap_count, lexical_score, ranked))
-        })
-        .max_by(
-            |(left_priority, left_overlap, left_lexical, left_ranked),
-             (right_priority, right_overlap, right_lexical, right_ranked)| {
-                left_priority
-                    .cmp(right_priority)
-                    .then_with(|| left_overlap.cmp(right_overlap))
-                    .then_with(|| left_lexical.cmp(right_lexical))
-                    .then_with(|| {
-                        ranking::ranked_relevance_score(left_ranked)
-                            .total_cmp(&ranking::ranked_relevance_score(right_ranked))
-                    })
-            },
-        )
-        .map(|(_, _, _, ranked)| ranked);
-
-    let Some(candidate) = candidate.cloned() else {
-        return;
-    };
-
-    if results.len() >= budget && budget > 0 {
-        results.pop();
-    }
-
-    if results.len() < budget {
-        results.push(ranked_fact_to_item(candidate, cutoff));
-    }
-}
-
-fn maybe_append_first_person_episode_item(
-    results: &mut Vec<AssembledContextItem>,
-    episode_items: &[AssembledContextItem],
-    selected_terms: &HashSet<String>,
-    query_opt: Option<&str>,
-    query_terms: &[String],
-    budget: usize,
-) {
-    if !query_is_first_person_memory(query_opt)
-        || query_terms.is_empty()
-        || episode_items.is_empty()
-    {
-        return;
-    }
-
-    let seen_fact_ids = results
-        .iter()
-        .map(|item| item.fact_id.as_str())
-        .collect::<HashSet<_>>();
-    let seen_source_episodes = results
-        .iter()
-        .map(|item| item.source_episode.as_str())
-        .collect::<HashSet<_>>();
-
-    let candidate = episode_items
-        .iter()
-        .filter_map(|item| {
-            if seen_fact_ids.contains(item.fact_id.as_str())
-                || seen_source_episodes.contains(item.source_episode.as_str())
-            {
-                return None;
-            }
-
-            let matched_terms = matched_query_terms_for_text(&item.content, query_terms);
-            let unique_term_count = matched_terms
-                .iter()
-                .filter(|term| !selected_terms.contains(term.as_str()))
-                .count();
-            if unique_term_count == 0 {
-                return None;
-            }
-
-            let lexical_score = lexical::lexical_query_score_for_text(&item.content, query_terms);
-            let grounding_bonus = first_person_episode_grounding_bonus(&item.content);
-            let priority =
-                (unique_term_count as isize * 6) + (lexical_score as isize * 2) + grounding_bonus;
-
-            Some((priority, lexical_score, item))
-        })
-        .max_by(
-            |(left_priority, left_lexical, left_item),
-             (right_priority, right_lexical, right_item)| {
-                left_priority
-                    .cmp(right_priority)
-                    .then_with(|| left_lexical.cmp(right_lexical))
-                    .then_with(|| right_item.content.len().cmp(&left_item.content.len()))
-            },
-        )
-        .map(|(_, _, item)| item);
-
-    let Some(candidate) = candidate.cloned() else {
-        return;
-    };
-
-    if results.len() >= budget && budget > 0 {
-        results.pop();
-    }
-
-    if results.len() < budget {
-        results.push(candidate);
-    }
-}
-
-fn build_episode_rescue_log_result(
-    episode_candidate_count: usize,
-    selected_fact_count: usize,
-    episode_rescue_used: bool,
-) -> serde_json::Value {
-    json!({
-        "episode_candidate_count": episode_candidate_count,
-        "selected_fact_count": selected_fact_count,
-        "episode_rescue_used": episode_rescue_used,
-    })
-}
-
-/// Parameters for the default context assembly pipeline.
-struct DefaultContextParams<'a> {
-    namespace: &'a str,
-    scope: &'a str,
-    cutoff_iso: &'a str,
-    cutoff: chrono::DateTime<chrono::Utc>,
-    raw_query_opt: Option<&'a str>,
-    query_opt: Option<&'a str>,
-    query_terms: &'a [String],
-    project_opt: Option<&'a str>,
-    fact_types: &'a [String],
-    budget: i32,
-    window_start: Option<chrono::DateTime<chrono::Utc>>,
-    window_end: Option<chrono::DateTime<chrono::Utc>>,
-    view_mode: Option<&'a str>,
-    access: &'a AccessContext,
-}
-
-/// Executes the full multi-tier retrieval pipeline for the default (non-view-mode) path.
-///
-/// Tiers: lexical BM25 → temporal → alias expansion → experience → community → semantic ANN.
-/// Falls back to episode search if no facts match.
-async fn assemble_default_context(
-    service: &crate::service::MemoryService,
-    params: DefaultContextParams<'_>,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let lexical_result = select_fact_records_for_query(
-        service,
-        FactQueryParams {
-            namespace: params.namespace,
-            scope: params.scope,
-            cutoff_iso: params.cutoff_iso,
-            query_opt: params.query_opt,
-            limit: params.budget,
-            project: params.project_opt,
-            fact_types: params.fact_types,
-        },
-    )
-    .await?;
-
-    let direct_retrieval_tier = lexical_result.retrieval_tier;
-    let mut direct_facts = filter_facts_by_constraints(
-        lexical_result.records,
-        params.access,
-        params.project_opt,
-        params.fact_types,
-    );
-
-    let mut expanded_facts = Vec::new();
-    let mut ranked_facts = if let Some(query) = params.query_opt {
-        let temporal_facts = collect_temporal_facts(
-            service,
-            CollectTemporalFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
-                cutoff_iso: params.cutoff_iso,
-                cutoff: params.cutoff,
-                query,
-                access: params.access,
-                project: params.project_opt,
-                fact_types: params.fact_types,
-                budget: params.budget,
-            },
-        )
-        .await?;
-
-        let expanded_queries = expand_query_with_aliases(service, query, params.namespace).await;
-        let direct_fact_ids: HashSet<_> = direct_facts
-            .iter()
-            .chain(temporal_facts.iter())
-            .map(|fact| fact.fact_id.clone())
-            .collect();
-
-        for expanded_query in &expanded_queries {
-            if expanded_query == query {
-                continue;
-            }
-            let extra_records = select_fact_records_for_query(
-                service,
-                FactQueryParams {
-                    namespace: params.namespace,
-                    scope: params.scope,
-                    cutoff_iso: params.cutoff_iso,
-                    query_opt: Some(expanded_query),
-                    limit: params.budget,
-                    project: params.project_opt,
-                    fact_types: params.fact_types,
-                },
-            )
-            .await?;
-            for fact in filter_facts_by_constraints(
-                extra_records.records,
-                params.access,
-                params.project_opt,
-                params.fact_types,
-            ) {
-                if !direct_fact_ids.contains(&fact.fact_id) {
-                    expanded_facts.push(fact);
-                }
-            }
-        }
-        let base_direct_ids: HashSet<_> = direct_facts
-            .iter()
-            .chain(temporal_facts.iter())
-            .chain(expanded_facts.iter())
-            .map(|fact| fact.fact_id.clone())
-            .collect();
-
-        let experience_query_terms =
-            expand_experience_query_terms(params.query_terms, &direct_facts);
-        let experience_topic_terms = experience_query_terms
-            .iter()
-            .filter(|term| !params.query_terms.contains(term))
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut experience_facts = collect_recent_experience_facts(
-            service,
-            RecentExperienceRequest {
-                namespace: params.namespace,
-                scope: params.scope,
-                cutoff: params.cutoff,
-                project: params.project_opt,
-                access: params.access,
-                budget: params.budget,
-                fact_types: params.fact_types,
-            },
-            &experience_query_terms,
-            &experience_topic_terms,
-            &base_direct_ids,
-        )
-        .await?;
-
-        if !experience_topic_terms.is_empty() {
-            let topical_floor = direct_facts
-                .first()
-                .map(|fact| fact.ft_score)
-                .unwrap_or(0.0);
-            for fact in &mut experience_facts {
-                fact.ft_score = fact.ft_score.max(topical_floor + 1.0);
-            }
-        }
-
-        direct_facts.extend(experience_facts);
-        direct_facts.sort_by(|left, right| {
-            right
-                .ft_score
-                .total_cmp(&left.ft_score)
-                .then_with(|| right.t_valid.cmp(&left.t_valid))
-                .then_with(|| left.fact_id.cmp(&right.fact_id))
-        });
-
-        let all_direct_ids: HashSet<_> = direct_facts
-            .iter()
-            .chain(temporal_facts.iter())
-            .chain(expanded_facts.iter())
-            .map(|fact| fact.fact_id.clone())
-            .collect();
-
-        let community_facts = collect_community_facts(
-            service,
-            CollectCommunityFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
-                cutoff_iso: params.cutoff_iso,
-                query,
-                access: params.access,
-                project: params.project_opt,
-                fact_types: params.fact_types,
-                direct_fact_ids: &all_direct_ids,
-                budget: params.budget,
-            },
-        )
-        .await?;
-
-        let excluded_fact_ids = all_direct_ids
-            .iter()
-            .cloned()
-            .chain(
-                community_facts
-                    .iter()
-                    .map(|(fact, _, _)| fact.fact_id.clone()),
-            )
-            .collect::<HashSet<_>>();
-
-        let semantic_facts = collect_semantic_facts(
-            service,
-            CollectSemanticFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
-                cutoff: params.cutoff,
-                query,
-                access: params.access,
-                project: params.project_opt,
-                fact_types: params.fact_types,
-                excluded_fact_ids: &excluded_fact_ids,
-                budget: params.budget,
-            },
-        )
-        .await?;
-
-        let mut lexical_facts = direct_facts
-            .into_iter()
-            .map(|fact| (fact, direct_retrieval_tier))
-            .collect::<Vec<_>>();
-        lexical_facts.extend(
-            temporal_facts
-                .into_iter()
-                .map(|fact| (fact, RetrievalTier::TemporalExpanded)),
-        );
-        lexical_facts.extend(
-            expanded_facts
-                .into_iter()
-                .map(|fact| (fact, RetrievalTier::AliasExpanded)),
-        );
-
-        build_ranked_context_facts(
-            lexical_facts,
-            community_facts,
-            semantic_facts,
-            params.raw_query_opt,
-            params.scope,
-            params.cutoff,
-            super::decayed_confidence,
-        )
-    } else {
-        build_ranked_context_facts(
-            direct_facts
-                .into_iter()
-                .map(|fact| (fact, RetrievalTier::Direct))
-                .collect(),
-            Vec::new(),
-            Vec::new(),
-            params.raw_query_opt,
-            params.scope,
-            params.cutoff,
-            super::decayed_confidence,
-        )
-    };
-
-    let episode_fallback_items = if let Some(query) = params.query_opt {
-        collect_episode_fallback_items(service, &params, query).await?
-    } else {
-        Vec::new()
-    };
-
-    if ranked_facts.is_empty() {
-        if params.query_opt.is_some() {
-            return Ok(episode_fallback_items);
-        }
-
-        unreachable!("ranked_facts is empty but no query provided")
-    }
-
-    apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
-    let ranked_candidates = ranked_facts.clone();
-    let selected_ranked = if params.view_mode == Some("timeline") {
-        sort_ranked_context_facts_for_timeline(&mut ranked_facts);
-        ranked_facts
-            .into_iter()
-            .take(params.budget.max(1) as usize)
-            .collect::<Vec<_>>()
-    } else {
-        let temporal_focus = params
-            .query_opt
-            .and_then(|query| infer_temporal_window(query, params.cutoff));
-        select_ranked_context_facts(
-            ranked_facts,
-            params.budget.max(1) as usize,
-            temporal_focus,
-            params.query_terms.to_vec(),
-        )
-    };
-
-    let prefer_episode_content = should_prefer_episode_content(
-        &selected_ranked,
-        &episode_fallback_items,
-        params.query_terms,
-    );
-
-    if params.query_opt.is_some() {
-        service.logger.log(
-            super::log_event(
-                "assemble_context.episode_rescue",
-                json!({"scope": params.scope, "query": params.query_opt}),
-                build_episode_rescue_log_result(
-                    episode_fallback_items.len(),
-                    selected_ranked.len(),
-                    prefer_episode_content,
-                ),
-                Some(params.access),
-                None,
-                None,
-            ),
-            LogLevel::Debug,
-        );
-    }
-
-    if prefer_episode_content {
-        return Ok(episode_fallback_items);
-    }
-
-    let selected_terms = selected_fact_matched_terms(&selected_ranked, params.query_terms);
-    let mut results = selected_ranked
-        .into_iter()
-        .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
-        .collect::<Vec<_>>();
-
-    maybe_append_first_person_episode_item(
-        &mut results,
-        &episode_fallback_items,
-        &selected_terms,
-        params.raw_query_opt,
-        params.query_terms,
-        params.budget.max(1) as usize,
-    );
-
-    maybe_append_first_person_ranked_fact_item(
-        &mut results,
-        &ranked_candidates,
-        params.raw_query_opt,
-        params.query_terms,
-        params.budget.max(1) as usize,
-        params.cutoff,
-    );
-
-    Ok(results)
 }
 
 /// Assemble context for a query.
@@ -1171,17 +369,28 @@ pub async fn assemble_context(
 #[allow(unused_imports, dead_code)]
 mod tests {
     use super::alias_expansion::expand_query_with_aliases_for_test;
+    use super::budget::should_prefer_episode_content;
     use super::community::stored_community_summary_from_value;
     use super::filtering::{compare_facts_by_recency, filter_facts_by_policy};
-    use super::lexical::{lexical_candidate_limit, rank_lexical_records};
+    use super::lexical::{
+        FactQueryParams, lexical_candidate_limit, rank_lexical_records,
+        select_episode_records_for_query, select_fact_records_for_query,
+    };
     use super::ranking::{
-        RankedContextFact, prune_redundant_selected_facts, ranked_relevance_score,
+        RankedContextFact, RetrievalTier, build_ranked_context_facts,
+        prune_redundant_selected_facts, ranked_relevance_score, select_ranked_context_facts,
         sort_ranked_context_facts,
     };
-    use super::temporal::expand_temporal_synonyms;
+    use super::rescue::{
+        build_episode_rescue_log_result, maybe_append_first_person_episode_item,
+        maybe_append_first_person_ranked_fact_item,
+    };
+    use super::scoring::{ranked_fact_to_item, selected_fact_matched_terms};
+    use super::temporal::{expand_temporal_synonyms, infer_temporal_window};
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::service::EmbeddingProvider;
+    use crate::service::decayed_confidence;
     use crate::storage::{DbClient, GraphDirection};
     use async_trait::async_trait;
     use chrono::Utc;
@@ -1794,7 +1003,7 @@ mod tests {
         let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
         let mut results = selected_facts
             .into_iter()
-            .map(|ranked| ranked_fact_to_item(ranked, fact_time))
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time, decayed_confidence))
             .collect::<Vec<_>>();
 
         let episode_items = vec![AssembledContextItem {
@@ -1876,7 +1085,7 @@ mod tests {
         let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
         let mut results = selected_facts
             .into_iter()
-            .map(|ranked| ranked_fact_to_item(ranked, fact_time))
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time, decayed_confidence))
             .collect::<Vec<_>>();
 
         let episode_items = vec![
@@ -1955,6 +1164,7 @@ mod tests {
                     )
                 },
                 fact_time,
+                decayed_confidence,
             ),
             ranked_fact_to_item(
                 RankedContextFact {
@@ -1983,6 +1193,7 @@ mod tests {
                     )
                 },
                 fact_time,
+                decayed_confidence,
             ),
         ];
 

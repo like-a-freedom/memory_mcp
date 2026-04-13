@@ -9,10 +9,10 @@ use crate::service::error::MemoryError;
 use crate::service::query::search_query_terms;
 use crate::service::value_helpers::{json_f64, json_string};
 
-use super::RetrievalTier;
 use super::filtering::{
     fact_record_matches_project, fact_record_matches_type, raw_array, raw_object,
 };
+use super::ranking::RetrievalTier;
 
 #[derive(Debug)]
 pub(crate) struct LexicalQueryResult {

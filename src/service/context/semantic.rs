@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::models::Fact;
+use crate::service::embedding::embedding_from_value;
 use crate::service::error::MemoryError;
 
-use super::embedding_from_value;
 use super::filtering::{fact_is_active_at, fact_record_allowed};
 
 pub(crate) struct CollectSemanticFactsRequest<'a> {
