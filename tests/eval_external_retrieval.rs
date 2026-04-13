@@ -1205,6 +1205,60 @@ async fn personamem_fulfilling_music_expression_case_recalls_reflective_context(
 }
 
 #[tokio::test]
+async fn personamem_weekend_getaway_case_recalls_creative_preference_context() {
+    let case_id = "personamem:f546a74f-54de-40d0-9d88-8b0e30467d7b";
+    let case = load_external_dataset_cases(DatasetKind::PersonaMem)
+        .await
+        .expect("load personamem cases")
+        .into_iter()
+        .find(|candidate| candidate.id == case_id)
+        .unwrap_or_else(|| panic!("find personamem case {case_id}"));
+
+    let (service, db_client) = common::make_service_with_client().await;
+    seed_case_facts(&service, &case.scope, &case.facts).await;
+
+    let snapshot = build_candidate_pool_snapshot(db_client.as_ref(), &case).await;
+    let items = service
+        .assemble_context(AssembleContextRequest {
+            query: case.query.clone(),
+            scope: case.scope.clone(),
+            fact_types: vec![],
+            as_of: None,
+            budget: case.budget,
+            project: None,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble personamem case");
+
+    assert!(
+        case.expected.must_contain.iter().all(|needle| {
+            items
+                .iter()
+                .any(|item| item.content.contains(needle.as_str()))
+        }),
+        "expected {case_id} to retrieve the creative-preference gold memory; initial_has_expected={} fallback_has_expected={} reranked_initial_has_expected={} reranked_fallback_has_expected={} active_experience_has_expected={} initial_top={:?} reranked_initial_top={:?} fallback_top={:?} reranked_fallback_top={:?} active_experience_top={:?} retrieved={:?}",
+        snapshot.initial_has_expected,
+        snapshot.fallback_has_expected,
+        snapshot.reranked_initial_has_expected,
+        snapshot.reranked_fallback_has_expected,
+        snapshot.active_experience_has_expected,
+        snapshot.initial_top_contents,
+        snapshot.reranked_initial_top_contents,
+        snapshot.fallback_top_contents,
+        snapshot.reranked_fallback_top_contents,
+        snapshot.active_experience_top_contents,
+        items
+            .iter()
+            .map(|item| item.content.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn personamem_podcasting_shift_case_recalls_previous_reason_context() {
     let case_id = "personamem:a40d5f67-8ec6-480b-a901-9709eecee9b9";
     let case = load_external_dataset_cases(DatasetKind::PersonaMem)

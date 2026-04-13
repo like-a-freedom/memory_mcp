@@ -606,11 +606,9 @@ pub(crate) async fn select_episode_records_for_query(
         return Ok(initial);
     };
 
-    let fallback_terms = query
-        .split_whitespace()
-        .filter(|term| !term.trim().is_empty())
-        .collect::<Vec<_>>();
-    if fallback_terms.len() < 2 {
+    let query_terms = search_query_terms(query);
+    let fallback_terms = build_lexical_fallback_queries(&query_terms);
+    if fallback_terms.is_empty() {
         return Ok(initial);
     }
 
@@ -622,7 +620,7 @@ pub(crate) async fn select_episode_records_for_query(
                 namespace,
                 scope,
                 cutoff_iso,
-                Some(term),
+                Some(term.as_str()),
                 limit,
                 project,
             )

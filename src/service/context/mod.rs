@@ -211,17 +211,309 @@ fn matched_query_terms_for_fact(
         .collect()
 }
 
-fn selected_fact_query_term_coverage(
+fn selected_fact_matched_terms(
     selected_facts: &[ranking::RankedContextFact],
     query_terms: &[String],
-) -> usize {
+) -> HashSet<String> {
     let mut matched_terms = HashSet::new();
 
     for ranked in selected_facts {
         matched_terms.extend(matched_query_terms_for_fact(&ranked.fact, query_terms));
     }
 
-    matched_terms.len()
+    matched_terms
+}
+
+fn selected_fact_query_term_coverage(
+    selected_facts: &[ranking::RankedContextFact],
+    query_terms: &[String],
+) -> usize {
+    selected_fact_matched_terms(selected_facts, query_terms).len()
+}
+
+fn query_is_first_person_memory(query_opt: Option<&str>) -> bool {
+    query_opt.is_some_and(ranking::query_is_first_person_memory)
+}
+
+const FIRST_PERSON_RESCUE_QUERY_TERMS: &[&str] = &[
+    "what",
+    "would",
+    "should",
+    "could",
+    "want",
+    "suggest",
+    "recommend",
+];
+
+fn conversational_overlap_tokens(text: &str) -> Vec<String> {
+    text.split(|character: char| !character.is_alphanumeric())
+        .map(|token| token.trim().to_ascii_lowercase())
+        .filter(|token| token.len() >= 4)
+        .collect()
+}
+
+fn first_person_rescue_query_terms(
+    raw_query_opt: Option<&str>,
+    query_terms: &[String],
+) -> Vec<String> {
+    let Some(raw_query) = raw_query_opt else {
+        return query_terms.to_vec();
+    };
+    if !query_is_first_person_memory(Some(raw_query)) {
+        return query_terms.to_vec();
+    }
+
+    let mut terms = query_terms.to_vec();
+    let mut seen_terms = terms.iter().cloned().collect::<HashSet<_>>();
+    for token in conversational_overlap_tokens(raw_query) {
+        if !FIRST_PERSON_RESCUE_QUERY_TERMS.contains(&token.as_str()) {
+            continue;
+        }
+        if seen_terms.insert(token.clone()) {
+            terms.push(token);
+        }
+    }
+
+    terms
+}
+
+fn matched_first_person_rescue_terms_for_text(
+    text: &str,
+    query_terms: &[String],
+) -> HashSet<String> {
+    if query_terms.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut content_terms = crate::service::query::search_query_terms(text)
+        .into_iter()
+        .collect::<HashSet<_>>();
+    for token in conversational_overlap_tokens(text) {
+        if FIRST_PERSON_RESCUE_QUERY_TERMS.contains(&token.as_str()) {
+            content_terms.insert(token);
+        }
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| content_terms.contains(term.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn selected_item_matched_terms(
+    selected_items: &[AssembledContextItem],
+    query_terms: &[String],
+) -> HashSet<String> {
+    let mut matched_terms = HashSet::new();
+
+    for item in selected_items {
+        matched_terms.extend(matched_first_person_rescue_terms_for_text(
+            &item.content,
+            query_terms,
+        ));
+    }
+
+    matched_terms
+}
+
+fn first_person_episode_grounding_bonus(content: &str) -> isize {
+    let trimmed = content.trim_start();
+
+    if trimmed.starts_with("Current user persona:")
+        || trimmed.starts_with("User profile:")
+        || trimmed.starts_with("Current profile:")
+        || trimmed.starts_with("Profile:")
+    {
+        15
+    } else if trimmed.starts_with("User:") {
+        2
+    } else if trimmed.starts_with("Assistant:") {
+        -2
+    } else {
+        0
+    }
+}
+
+fn first_person_fact_grounding_bonus(content: &str) -> isize {
+    let trimmed = content.trim_start();
+
+    if trimmed.starts_with("User:") {
+        8
+    } else if trimmed.starts_with("Current user persona:")
+        || trimmed.starts_with("User profile:")
+        || trimmed.starts_with("Current profile:")
+        || trimmed.starts_with("Profile:")
+    {
+        2
+    } else if trimmed.starts_with("Assistant:") {
+        -6
+    } else {
+        0
+    }
+}
+
+fn maybe_append_first_person_ranked_fact_item(
+    results: &mut Vec<AssembledContextItem>,
+    ranked_candidates: &[ranking::RankedContextFact],
+    raw_query_opt: Option<&str>,
+    query_terms: &[String],
+    budget: usize,
+    cutoff: chrono::DateTime<chrono::Utc>,
+) {
+    if !query_is_first_person_memory(raw_query_opt) || ranked_candidates.is_empty() {
+        return;
+    }
+
+    let rescue_query_terms = first_person_rescue_query_terms(raw_query_opt, query_terms);
+    if rescue_query_terms.len() <= query_terms.len() || rescue_query_terms.is_empty() {
+        return;
+    }
+
+    let selected_terms = selected_item_matched_terms(results, &rescue_query_terms);
+    let seen_fact_ids = results
+        .iter()
+        .map(|item| item.fact_id.as_str())
+        .collect::<HashSet<_>>();
+    let seen_source_episodes = results
+        .iter()
+        .map(|item| item.source_episode.as_str())
+        .collect::<HashSet<_>>();
+
+    let candidate = ranked_candidates
+        .iter()
+        .filter_map(|ranked| {
+            if seen_fact_ids.contains(ranked.fact.fact_id.as_str())
+                || seen_source_episodes.contains(ranked.fact.source_episode.as_str())
+            {
+                return None;
+            }
+            if !ranked.fact.content.trim_start().starts_with("User:") {
+                return None;
+            }
+
+            let matched_terms = matched_first_person_rescue_terms_for_text(
+                &ranked.fact.content,
+                &rescue_query_terms,
+            );
+            let unique_term_count = matched_terms
+                .iter()
+                .filter(|term| !selected_terms.contains(term.as_str()))
+                .count();
+            if unique_term_count == 0 {
+                return None;
+            }
+
+            let overlap_count = matched_terms.len();
+            let lexical_score =
+                lexical::lexical_query_score_for_text(&ranked.fact.content, &rescue_query_terms);
+            let grounding_bonus = first_person_fact_grounding_bonus(&ranked.fact.content);
+            let priority = (unique_term_count as isize * 8)
+                + (overlap_count as isize * 4)
+                + (lexical_score as isize * 2)
+                + grounding_bonus;
+
+            Some((priority, overlap_count, lexical_score, ranked))
+        })
+        .max_by(
+            |(left_priority, left_overlap, left_lexical, left_ranked),
+             (right_priority, right_overlap, right_lexical, right_ranked)| {
+                left_priority
+                    .cmp(right_priority)
+                    .then_with(|| left_overlap.cmp(right_overlap))
+                    .then_with(|| left_lexical.cmp(right_lexical))
+                    .then_with(|| {
+                        ranking::ranked_relevance_score(left_ranked)
+                            .total_cmp(&ranking::ranked_relevance_score(right_ranked))
+                    })
+            },
+        )
+        .map(|(_, _, _, ranked)| ranked);
+
+    let Some(candidate) = candidate.cloned() else {
+        return;
+    };
+
+    if results.len() >= budget && budget > 0 {
+        results.pop();
+    }
+
+    if results.len() < budget {
+        results.push(ranked_fact_to_item(candidate, cutoff));
+    }
+}
+
+fn maybe_append_first_person_episode_item(
+    results: &mut Vec<AssembledContextItem>,
+    episode_items: &[AssembledContextItem],
+    selected_terms: &HashSet<String>,
+    query_opt: Option<&str>,
+    query_terms: &[String],
+    budget: usize,
+) {
+    if !query_is_first_person_memory(query_opt)
+        || query_terms.is_empty()
+        || episode_items.is_empty()
+    {
+        return;
+    }
+
+    let seen_fact_ids = results
+        .iter()
+        .map(|item| item.fact_id.as_str())
+        .collect::<HashSet<_>>();
+    let seen_source_episodes = results
+        .iter()
+        .map(|item| item.source_episode.as_str())
+        .collect::<HashSet<_>>();
+
+    let candidate = episode_items
+        .iter()
+        .filter_map(|item| {
+            if seen_fact_ids.contains(item.fact_id.as_str())
+                || seen_source_episodes.contains(item.source_episode.as_str())
+            {
+                return None;
+            }
+
+            let matched_terms = matched_query_terms_for_text(&item.content, query_terms);
+            let unique_term_count = matched_terms
+                .iter()
+                .filter(|term| !selected_terms.contains(term.as_str()))
+                .count();
+            if unique_term_count == 0 {
+                return None;
+            }
+
+            let lexical_score = lexical::lexical_query_score_for_text(&item.content, query_terms);
+            let grounding_bonus = first_person_episode_grounding_bonus(&item.content);
+            let priority =
+                (unique_term_count as isize * 6) + (lexical_score as isize * 2) + grounding_bonus;
+
+            Some((priority, lexical_score, item))
+        })
+        .max_by(
+            |(left_priority, left_lexical, left_item),
+             (right_priority, right_lexical, right_item)| {
+                left_priority
+                    .cmp(right_priority)
+                    .then_with(|| left_lexical.cmp(right_lexical))
+                    .then_with(|| right_item.content.len().cmp(&left_item.content.len()))
+            },
+        )
+        .map(|(_, _, item)| item);
+
+    let Some(candidate) = candidate.cloned() else {
+        return;
+    };
+
+    if results.len() >= budget && budget > 0 {
+        results.pop();
+    }
+
+    if results.len() < budget {
+        results.push(candidate);
+    }
 }
 
 fn build_episode_rescue_log_result(
@@ -242,6 +534,7 @@ struct DefaultContextParams<'a> {
     scope: &'a str,
     cutoff_iso: &'a str,
     cutoff: chrono::DateTime<chrono::Utc>,
+    raw_query_opt: Option<&'a str>,
     query_opt: Option<&'a str>,
     query_terms: &'a [String],
     project_opt: Option<&'a str>,
@@ -454,7 +747,7 @@ async fn assemble_default_context(
             lexical_facts,
             community_facts,
             semantic_facts,
-            params.query_opt,
+            params.raw_query_opt,
             params.scope,
             params.cutoff,
             super::decayed_confidence,
@@ -467,7 +760,7 @@ async fn assemble_default_context(
                 .collect(),
             Vec::new(),
             Vec::new(),
-            params.query_opt,
+            params.raw_query_opt,
             params.scope,
             params.cutoff,
             super::decayed_confidence,
@@ -489,6 +782,7 @@ async fn assemble_default_context(
     }
 
     apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
+    let ranked_candidates = ranked_facts.clone();
     let selected_ranked = if params.view_mode == Some("timeline") {
         sort_ranked_context_facts_for_timeline(&mut ranked_facts);
         ranked_facts
@@ -535,10 +829,31 @@ async fn assemble_default_context(
         return Ok(episode_fallback_items);
     }
 
-    Ok(selected_ranked
+    let selected_terms = selected_fact_matched_terms(&selected_ranked, params.query_terms);
+    let mut results = selected_ranked
         .into_iter()
         .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
-        .collect())
+        .collect::<Vec<_>>();
+
+    maybe_append_first_person_episode_item(
+        &mut results,
+        &episode_fallback_items,
+        &selected_terms,
+        params.raw_query_opt,
+        params.query_terms,
+        params.budget.max(1) as usize,
+    );
+
+    maybe_append_first_person_ranked_fact_item(
+        &mut results,
+        &ranked_candidates,
+        params.raw_query_opt,
+        params.query_terms,
+        params.budget.max(1) as usize,
+        params.cutoff,
+    );
+
+    Ok(results)
 }
 
 /// Assemble context for a query.
@@ -645,6 +960,11 @@ pub async fn assemble_context(
     } else {
         Some(cleaned_query.as_str())
     };
+    let raw_query_opt = if request.query.trim().is_empty() {
+        None
+    } else {
+        Some(request.query.as_str())
+    };
     let project_opt = request
         .project
         .as_deref()
@@ -748,6 +1068,7 @@ pub async fn assemble_context(
                 scope: &request.scope,
                 cutoff_iso: &cutoff_iso,
                 cutoff,
+                raw_query_opt,
                 query_opt,
                 query_terms: &query_terms,
                 project_opt,
@@ -1407,6 +1728,322 @@ mod tests {
             &episode_items,
             &query_terms,
         ));
+    }
+
+    #[test]
+    fn first_person_episode_item_supplements_selected_results_when_it_adds_unique_query_terms() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "I am committing more time to original music so my creative work feels fulfilling."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:creative",
+                        "episode:creative",
+                        fact_time,
+                        1.0,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:creative",
+                    "episode:creative",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "I am exploring new artistic projects that feel more authentic."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:projects",
+                        "episode:projects",
+                        fact_time,
+                        0.9,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:projects",
+                    "episode:projects",
+                    fact_time,
+                    0.9,
+                    4.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
+        let mut results = selected_facts
+            .into_iter()
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time))
+            .collect::<Vec<_>>();
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:profile".to_string(),
+            content: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                .to_string(),
+            quote: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                .to_string(),
+            source_episode: "episode:profile".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        maybe_append_first_person_episode_item(
+            &mut results,
+            &episode_items,
+            &selected_terms,
+            Some(query),
+            &query_terms,
+            2,
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].fact_id, "episode_fallback:episode:profile");
+    }
+
+    #[test]
+    fn query_is_first_person_memory_recognizes_contractions() {
+        assert!(ranking::query_is_first_person_memory(
+            "I'm planning a weekend getaway and want something creatively fulfilling"
+        ));
+        assert!(ranking::query_is_first_person_memory(
+            "I've decided to focus on original music projects"
+        ));
+        assert!(ranking::query_is_first_person_memory(
+            "My reviews felt less authentic over time"
+        ));
+        assert!(!ranking::query_is_first_person_memory(
+            "What activities feel creatively fulfilling for a music lover?"
+        ));
+    }
+
+    #[test]
+    fn first_person_episode_item_prefers_profile_summary_over_generic_reflection() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: crate::models::Fact {
+                content: "I am committing more time to original music so my creative work feels fulfilling."
+                    .to_string(),
+                ..create_ranked_test_fact(
+                    "fact:creative",
+                    "episode:creative",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact(
+                "fact:creative",
+                "episode:creative",
+                fact_time,
+                1.0,
+                5.0,
+                0,
+                &[],
+            )
+        }];
+
+        let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
+        let mut results = selected_facts
+            .into_iter()
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time))
+            .collect::<Vec<_>>();
+
+        let episode_items = vec![
+            AssembledContextItem {
+                fact_id: "episode_fallback:episode:reflection".to_string(),
+                content: "User: Every new activity helps me understand what feels creatively fulfilling."
+                    .to_string(),
+                quote: "User: Every new activity helps me understand what feels creatively fulfilling."
+                    .to_string(),
+                source_episode: "episode:reflection".to_string(),
+                confidence: 1.0,
+                provenance: json!({"episode_fallback": true}),
+                rationale: "fallback".to_string(),
+                retrieval_tier: Some("fallback".to_string()),
+            },
+            AssembledContextItem {
+                fact_id: "episode_fallback:episode:profile".to_string(),
+                content: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                    .to_string(),
+                quote: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                    .to_string(),
+                source_episode: "episode:profile".to_string(),
+                confidence: 1.0,
+                provenance: json!({"episode_fallback": true}),
+                rationale: "fallback".to_string(),
+                retrieval_tier: Some("fallback".to_string()),
+            },
+        ];
+
+        maybe_append_first_person_episode_item(
+            &mut results,
+            &episode_items,
+            &selected_terms,
+            Some(query),
+            &query_terms,
+            1,
+        );
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "episode_fallback:episode:profile");
+    }
+
+    #[test]
+    fn first_person_ranked_fact_rescue_uses_soft_question_terms() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling. What would you suggest?";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_results = vec![
+            ranked_fact_to_item(
+                RankedContextFact {
+                    fact: crate::models::Fact {
+                        content: "User: I am exploring new artistic projects that feel authentic."
+                            .to_string(),
+                        ..create_ranked_test_fact(
+                            "fact:creative",
+                            "episode:creative",
+                            fact_time,
+                            1.0,
+                            5.0,
+                            0,
+                            &[],
+                        )
+                        .fact
+                    },
+                    ..create_ranked_test_fact(
+                        "fact:creative",
+                        "episode:creative",
+                        fact_time,
+                        1.0,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                },
+                fact_time,
+            ),
+            ranked_fact_to_item(
+                RankedContextFact {
+                    fact: crate::models::Fact {
+                        content: "User: Music production keeps me grounded in creativity."
+                            .to_string(),
+                        ..create_ranked_test_fact(
+                            "fact:music",
+                            "episode:music",
+                            fact_time,
+                            0.9,
+                            4.0,
+                            0,
+                            &[],
+                        )
+                        .fact
+                    },
+                    ..create_ranked_test_fact(
+                        "fact:music",
+                        "episode:music",
+                        fact_time,
+                        0.9,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                },
+                fact_time,
+            ),
+        ];
+
+        let ranked_candidates = vec![
+            create_ranked_test_fact(
+                "fact:creative",
+                "episode:creative",
+                fact_time,
+                1.0,
+                5.0,
+                0,
+                &[],
+            ),
+            create_ranked_test_fact(
+                "fact:music",
+                "episode:music",
+                fact_time,
+                0.9,
+                4.0,
+                0,
+                &[],
+            ),
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "User: It provided practical exercises and reflection prompts that encouraged me to think deeply about what I truly want in a romantic relationship."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:soft-overlap",
+                        "episode:soft-overlap",
+                        fact_time,
+                        0.2,
+                        1.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:soft-overlap",
+                    "episode:soft-overlap",
+                    fact_time,
+                    0.2,
+                    1.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let mut results = selected_results;
+        maybe_append_first_person_ranked_fact_item(
+            &mut results,
+            &ranked_candidates,
+            Some(query),
+            &query_terms,
+            2,
+            fact_time,
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].fact_id, "fact:soft-overlap");
     }
 
     #[test]

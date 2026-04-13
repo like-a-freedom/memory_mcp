@@ -27,7 +27,7 @@ use super::temporal::TemporalWindow;
 use crate::service::normalize_text;
 use crate::service::query::search_query_terms;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RankedContextFact {
     pub(crate) fact: Fact,
     pub(crate) rationale: String,
@@ -382,9 +382,13 @@ fn query_alignment_factor(query_opt: Option<&str>, content: &str) -> f64 {
     }
 }
 
-fn query_is_first_person_memory(query: &str) -> bool {
+pub(crate) fn query_is_first_person_memory(query: &str) -> bool {
     let normalized = normalize_text(query);
-    let terms = normalized.split_whitespace().collect::<HashSet<_>>();
+    let terms = normalized
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|term| !term.trim().is_empty())
+        .collect::<HashSet<_>>();
+
     terms.contains("i") || terms.contains("me") || terms.contains("my") || terms.contains("mine")
 }
 
