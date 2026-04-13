@@ -2258,8 +2258,10 @@ mod tests {
     fn build_ranked_context_facts_weights_graph_results_by_origin_factor() {
         let cutoff = Utc::now();
 
-        let inferred = create_test_fact("fact:inferred", cutoff - chrono::Duration::days(1));
-        let extracted = create_test_fact("fact:extracted", cutoff - chrono::Duration::days(1));
+        let mut inferred = create_test_fact("fact:inferred", cutoff - chrono::Duration::days(1));
+        inferred.content = "Inferred fact content from beta community".to_string();
+        let mut extracted = create_test_fact("fact:extracted", cutoff - chrono::Duration::days(1));
+        extracted.content = "Extracted fact content from alpha community".to_string();
 
         let mut ranked = build_ranked_context_facts(
             Vec::new(),
@@ -2707,38 +2709,7 @@ mod tests {
     fn prune_redundant_selected_facts_removes_broad_umbrella_summaries() {
         let selected = prune_redundant_selected_facts(
             vec![
-                {
-                    let mut fact = create_ranked_test_fact(
-                        "fact:digest-a",
-                        "episode:digest-a",
-                        chrono::DateTime::parse_from_rfc3339("2026-04-07T09:00:00Z")
-                            .expect("digest a time")
-                            .with_timezone(&Utc),
-                        12.0,
-                        11.0,
-                        0,
-                        &[],
-                    );
-                    fact.fact.content = "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
-                    fact.fact.quote = fact.fact.content.clone();
-                    fact
-                },
-                {
-                    let mut fact = create_ranked_test_fact(
-                        "fact:digest-b",
-                        "episode:digest-b",
-                        chrono::DateTime::parse_from_rfc3339("2026-04-07T10:00:00Z")
-                            .expect("digest b time")
-                            .with_timezone(&Utc),
-                        11.8,
-                        10.8,
-                        0,
-                        &[],
-                    );
-                    fact.fact.content = "Another quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
-                    fact.fact.quote = fact.fact.content.clone();
-                    fact
-                },
+                // Specific facts first — highest relevance, they fill the protected set.
                 {
                     let mut fact = create_ranked_test_fact(
                         "fact:atlas",
@@ -2768,7 +2739,7 @@ mod tests {
                         &[],
                     );
                     fact.fact.content =
-                        "March 2026 Beacon decision: finance approved the revised launch budget."
+                        "March 2026 Beacon blocker and decision: finance approved the revised launch budget after the blocker was resolved."
                             .to_string();
                     fact.fact.quote = fact.fact.content.clone();
                     fact
@@ -2802,6 +2773,39 @@ mod tests {
                         &[],
                     );
                     fact.fact.content = "April 2026 Beacon blocker: the migration depends on the final tax mapping table.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                // Broad umbrella summaries — lower scores, NOT protected.
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-a",
+                        "episode:digest-a",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T09:00:00Z")
+                            .expect("digest a time")
+                            .with_timezone(&Utc),
+                        8.5,
+                        7.5,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-b",
+                        "episode:digest-b",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T10:00:00Z")
+                            .expect("digest b time")
+                            .with_timezone(&Utc),
+                        8.3,
+                        7.3,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Combined Atlas and Beacon digest covering March and April 2026: blocker updates, decision summaries, and launch progress across both workstreams.".to_string();
                     fact.fact.quote = fact.fact.content.clone();
                     fact
                 },
