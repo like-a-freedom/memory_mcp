@@ -227,6 +227,75 @@ LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 # NER_MODEL=urchade/gliner_multi-v2.1
 ```
 
+### Embedding providers and switching
+
+The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER`:
+
+| Provider | What it is | Default dimension | Requires network? |
+| --- | --- | --- | --- |
+| `local-candle` | In-process BERT model via Candle (Rust ML) | 384 | Only for first download |
+| `openai-compatible` | External OpenAI-compatible HTTP API | 1536 (configurable) | Yes, every call |
+| `ollama` | External Ollama HTTP API | 1536 (configurable) | Yes, every call |
+
+#### How it works at startup
+
+1. The server reads `EMBEDDINGS_PROVIDER` and related variables **once** at startup.
+2. A single embedding provider is created and stored as `Arc<dyn EmbeddingProvider>`.
+3. **The provider cannot be changed without restarting** — there is no runtime hot-swap.
+4. For `local-candle`, the model files are downloaded from HuggingFace Hub on first use and cached locally (default: `<data_dir>/models/<model_name>/`). Subsequent restarts reuse the cached files.
+
+#### What happens when you switch providers
+
+To switch, you change the environment variables and **restart the server**. There is no automatic data migration. Here is what to expect:
+
+**Existing embeddings stay in the database.** Previously stored embedding vectors are never deleted, re-generated, or converted. They remain as-is in the `fact.embedding` column.
+
+**The HNSW index is rebuilt with the new dimension.** On startup, the schema migration applies the current `dimension` value to `DEFINE INDEX ... HNSW DIMENSION N`. The index structure is re-created to match the new provider's output.
+
+**Semantic retrieval will return poor results until facts are re-extracted.** Embedding vectors from different models live in different semantic spaces — even if two models produce the same dimension (e.g., both 384), their cosine similarity scores are not comparable. After a switch, old vectors and new query embeddings are computed by different models, so similarity scores are essentially meaningless.
+
+#### Scenario: `local-candle` → `openai-compatible`
+
+| Step | What happens |
+| --- | --- |
+| 1. Change `EMBEDDINGS_PROVIDER=openai-compatible`, set `EMBEDDINGS_BASE_URL`, restart | New HTTP-based provider created; BERT model released from memory |
+| 2. HNSW index re-created with new dimension (e.g., 1536) | Old 384-dim vectors still in DB but incompatible with new index |
+| 3. New `extract` calls embed facts with the OpenAI model | New 1536-dim vectors stored alongside old 384-dim ones |
+| 4. `assemble_context` semantic search | Only newly embedded facts will produce meaningful similarity scores; old facts will be filtered out by the similarity threshold |
+
+#### Scenario: `openai-compatible` → `local-candle`
+
+| Step | What happens |
+| --- | --- |
+| 1. Change `EMBEDDINGS_PROVIDER=local-candle`, restart | BERT model loaded from local cache (no re-download if already cached) |
+| 2. HNSW index re-created with dimension 384 | Old 1536-dim vectors remain in DB but are incompatible |
+| 3. New `extract` calls embed facts with BERT | New 384-dim vectors stored |
+| 4. `assemble_context` semantic search | Only newly embedded facts produce meaningful results |
+
+#### Scenario: `local-candle` → external → `local-candle`
+
+Each restart creates a completely fresh provider instance:
+
+1. **Start with `local-candle`** → model cached, 384-dim vectors stored.
+2. **Restart with `openai-compatible`** → BERT released, 1536-dim vectors stored. Old 384-dim vectors orphaned.
+3. **Restart with `local-candle` again** → model re-loaded from cache (fast, no re-download), 384-dim HNSW index re-created. New facts get fresh 384-dim vectors. The 1536-dim vectors from step 2 are now orphaned.
+
+**Nothing is lost** — old vectors remain in the database. But they are **not usable** for semantic search with the current provider.
+
+#### Similarity threshold
+
+The `EMBEDDINGS_SIMILARITY_THRESHOLD` (default `0.7`) filters semantic search results: only facts with cosine similarity ≥ threshold are returned. After a provider switch, this threshold effectively filters out **all** old facts because cross-provider similarity scores are meaningless.
+
+#### Recommended procedure after switching
+
+To restore full semantic retrieval quality after a provider change:
+
+1. Switch the environment variables and restart.
+2. Re-run `extract` on all episodes whose facts you want to search semantically. This re-embeds facts with the new provider.
+3. Optionally, invalidate old facts that were embedded with the previous provider to avoid mixing incompatible vectors.
+
+If you only use **lexical** (BM25/FTS) retrieval and **graph-expanded** context assembly, the provider switch has **no impact** on those retrieval tiers — they do not use embeddings.
+
 ### Query analytics logging
 
 Persisted query analytics are **optional** and **disabled by default**.
