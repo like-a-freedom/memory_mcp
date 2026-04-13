@@ -117,15 +117,182 @@ RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
 
-### Watch a directory (optional)
+### Filesystem watch mode (optional)
 
-Build or run with the `cli-watch` feature to auto-ingest supported files on create/modify events:
+The watch mode turns a directory into a **passive memory intake pipe**: drop or save files and the server auto-ingests them into memory without any manual tool calls.
+
+**Why this exists.** In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
+
+**What it does.**
+
+- Recursively watches a directory for file **create** and **modify** events
+- Filters to supported file types only; unsupported files are silently skipped
+- Deduplicates rapid successive events per file (coalescing)
+- Dispatches qualifying files through the same `ingest` → `extract` pipeline used by MCP tool calls
+- Logs every step with structured events (visible at `RUST_LOG=info`/`debug`/`trace`)
+
+**Supported file types.**
+
+| Extension | Format | Extracted content |
+|-----------|--------|-------------------|
+| `.pdf` | PDF | Text content (pages, paragraphs) |
+| `.docx` | Word document | Body text, headings, tables |
+| `.xlsx` | Spreadsheet | Cell values, sheet structure |
+| `.pptx` | Presentation | Slide text, speaker notes |
+| `.md`, `.markdown` | Markdown | Headings, lists, code blocks |
+| `.txt` | Plain text | Raw text content |
+| `.eml` | Email message | Subject, sender, recipients, body, date |
+
+Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipped**.
+
+**User scenario.**
+
+<details>
+<summary><strong>Example: auto-ingest a project inbox</strong></summary>
 
 ```bash
-cargo run --features cli-watch -- watch /path/to/inbox --project atlas --scope org --interval 2
+# Terminal 1 — start the MCP server (stdio, for VS Code / Copilot)
+SURREALDB_URL=rocksdb://./data/surreal.db \
+SURREALDB_NAMESPACES=org \
+SURREALDB_USERNAME=root \
+SURREALDB_PASSWORD=root \
+RUST_LOG=info \
+cargo run --quiet --bin memory_mcp
+
+# Terminal 2 — start the watcher on a project inbox
+cargo run --features cli-watch --quiet -- \
+  watch ~/projects/atlas/inbox \
+  --project atlas \
+  --scope org \
+  --interval 5
 ```
 
-This reuses the existing ingest pipeline and supported document/email parsers.
+Now any file dropped or saved in `~/projects/atlas/inbox/` is automatically ingested:
+
+```bash
+# Drop an email export
+cp ~/Downloads/kaspersky_july_2025.eml ~/projects/atlas/inbox/
+
+# Save a requirements spec
+echo "# Air-gapped deployment requirement..." > ~/projects/atlas/inbox/airgap_req.md
+
+# Drop a sizing document
+cp ~/Documents/hw_sizing.xlsx ~/projects/atlas/inbox/
+```
+
+Within `--interval` seconds, each file is:
+1. Detected by the watcher
+2. Parsed (format-specific extraction)
+3. Ingested as an episode with `source_id = "watch:<path>"`
+4. Available for `extract` and `assemble_context` queries
+
+No manual `ingest` tool call needed.
+</details>
+
+**How it works internally.**
+
+<details>
+<summary><strong>Architecture flow</strong></summary>
+
+```
+CLI: memory_mcp watch <dir> [--project X] [--scope Y] [--interval Z]
+  │
+  ▼
+FsWatcher::run_with_interval(dir, project, scope, interval, service)
+  │
+  ├─ Validate: directory must exist and be readable
+  ├─ Initialize: notify::RecommendedWatcher (polling mode)
+  ├─ Watch: dir recursively for filesystem events
+  │
+  └─ EVENT LOOP (blocks on rx.recv())
+       │
+       ├─ Event arrives (Create / Modify / Remove / Access / …)
+       │
+       ├─ Filter: keep only Create + Modify events
+       ├─ Filter: keep only supported file types (7 formats)
+       │
+       ├─ Dedup: if same file triggered an ingest within
+       │         --interval seconds → skip (logged at trace)
+       │
+       ├─ Determine metadata:
+       │   • source_id = "watch:<file_path>"
+       │   • source_type = "email" (.eml) or "document" (all others)
+       │   • project = CLI flag value
+       │   • scope = CLI flag value
+       │
+       ├─ Dispatch: service.ingest(IngestRequest { content: <file_path> })
+       │   └─ Internally: read file → detect format → extract text → chunk
+       │
+       ├─ Log: watcher.ingest_complete (with episode_id) at Info
+       │
+       └─ On error: log at Error and TERMINATE the watcher (fail-fast)
+```
+</details>
+
+**Deduplication behavior.**
+
+<details>
+<summary><strong>How rapid saves are handled</strong></summary>
+
+When you save a file, editors often fire multiple filesystem events in quick succession (write + metadata + timestamp). The watcher prevents duplicate ingests:
+
+- Each file's **canonical path** (symlinks resolved, `..` normalized) is tracked in a `HashMap`
+- If the same file triggers another event **within `--interval` seconds** of its last ingest, the new event is **skipped**
+- Skipped events are logged at `trace` level with reason `interval_dedup`
+
+Example with `--interval 5`:
+```
+12:00:00 — note.md modified → ingested ✓
+12:00:01 — note.md modified again → skipped (dedup, 1s < 5s)
+12:00:02 — note.md modified again → skipped (dedup, 2s < 5s)
+12:00:06 — note.md modified again → ingested ✓ (6s ≥ 5s)
+```
+
+The `--interval` flag serves **dual purposes**: it controls both the poll frequency (how often notify scans the directory) **and** the dedup window (minimum time between ingests of the same file).
+</details>
+
+**Command-line reference.**
+
+<details>
+<summary><strong>Flags and defaults</strong></summary>
+
+```
+memory_mcp watch <dir> [OPTIONS]
+
+Required:
+  <dir>              Directory to watch (must exist and be readable)
+
+Optional:
+  --project <name>   Attach ingested episodes to a project (default: none)
+  --scope <scope>    Scope for namespace resolution (default: "org")
+  --interval <secs>  Poll interval + dedup window in seconds (default: 2, min: 1)
+```
+
+Important notes:
+- The `watch` subcommand requires the `cli-watch` feature. Without it, the binary returns an error.
+- The watcher is **fail-fast**: any ingest error terminates the entire watch loop.
+- The watcher **does not diff content** — every qualifying event triggers a full re-ingest of the file.
+- `Remove`, `Access`, and `Metadata` change events are ignored.
+</details>
+
+**Logging during watch.**
+
+<details>
+<summary><strong>What to expect at each log level</strong></summary>
+
+| Level | Watch events you'll see |
+|-------|------------------------|
+| `info` | `watcher.ready` (startup), `watcher.ingest_complete` (with `episode_id`) |
+| `debug` | `watcher.ingest_dispatch` (file path, source_type, project, scope) |
+| `trace` | `watcher.event_skipped` (dedup reason, elapsed vs interval) |
+| `warn` | — (none specific to watch) |
+| `error` | `watcher.ingest_error` (fatal — watcher terminates) |
+
+Example info-level output for a successful ingest:
+```
+[2026-04-13T12:00:00.123Z] INFO  req=-       op=watcher.ingest_complete  episode_id=episode:abc123  path=watch:/inbox/note.md  source_type=document
+```
+</details>
 
 ### VS Code MCP host example
 
