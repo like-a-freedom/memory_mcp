@@ -315,13 +315,13 @@ pub(crate) fn default_episode_fallback_rationale(
     query_opt.map_or_else(
         || {
             format!(
-                "tier=fallback fts=0.00 access_count=0 confidence=1.00 matched episode content in scope={scope} and active at {}",
+                "matched episode content in scope={scope} and active at {}",
                 cutoff.date_naive()
             )
         },
         |query| {
             format!(
-                "tier=fallback fts=0.00 access_count=0 confidence=1.00 matched episode content query=\"{query}\" in scope={scope} and active at {}",
+                "matched episode content query=\"{query}\" in scope={scope} and active at {}",
                 cutoff.date_naive()
             )
         },

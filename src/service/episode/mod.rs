@@ -65,9 +65,10 @@ use super::value_helpers::{
 use crate::logging::LogLevel;
 use crate::models::Episode;
 use crate::models::{
-    ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink, FactType,
+    ContradictionWarning, EntityCandidate, ExtractResult, ExtractedEntity, ExtractedFact,
+    ExtractedLink, FactType,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 /// Parse an episode from a database record.
@@ -204,7 +205,9 @@ pub async fn extract_entities(
         LogLevel::Info,
     );
 
+    let candidates = dedupe_entity_candidates(candidates);
     let mut entities = Vec::with_capacity(candidates.len());
+    let mut seen_entity_ids = HashSet::new();
 
     for candidate in candidates {
         let entity_type = candidate.entity_type.clone();
@@ -231,14 +234,138 @@ pub async fn extract_entities(
                 );
             })?;
 
-        entities.push(ExtractedEntity {
-            entity_id,
-            entity_type,
-            canonical_name,
-        });
+        if seen_entity_ids.insert(entity_id.clone()) {
+            entities.push(ExtractedEntity {
+                entity_id,
+                entity_type,
+                canonical_name,
+            });
+        }
     }
 
     Ok(entities)
+}
+
+fn dedupe_entity_candidates(candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {
+    #[derive(Debug, Default)]
+    struct CandidateGroup {
+        canonical_name: String,
+        type_counts: HashMap<String, usize>,
+        type_first_seen: HashMap<String, usize>,
+        type_display_names: HashMap<String, String>,
+        aliases: HashMap<String, String>,
+    }
+
+    let mut order = Vec::new();
+    let mut groups = HashMap::<String, CandidateGroup>::new();
+
+    for (index, candidate) in candidates.into_iter().enumerate() {
+        let canonical_name = candidate.canonical_name.trim();
+        let entity_type = candidate.entity_type.trim();
+        if canonical_name.is_empty() || entity_type.is_empty() {
+            continue;
+        }
+
+        let name_key = super::normalize_text(canonical_name);
+        if name_key.is_empty() {
+            continue;
+        }
+
+        let group = groups.entry(name_key.clone()).or_insert_with(|| {
+            order.push(name_key.clone());
+            CandidateGroup {
+                canonical_name: canonical_name.to_string(),
+                ..CandidateGroup::default()
+            }
+        });
+
+        if canonical_name.len() > group.canonical_name.len() {
+            group.canonical_name = canonical_name.to_string();
+        }
+
+        let entity_type_key = super::normalize_text(entity_type);
+        *group
+            .type_counts
+            .entry(entity_type_key.clone())
+            .or_default() += 1;
+        group
+            .type_first_seen
+            .entry(entity_type_key.clone())
+            .or_insert(index);
+        group
+            .type_display_names
+            .entry(entity_type_key)
+            .or_insert_with(|| entity_type.to_string());
+
+        for alias in candidate.aliases {
+            let alias = alias.trim();
+            if alias.is_empty() {
+                continue;
+            }
+
+            let alias_key = super::normalize_text(alias);
+            if alias_key.is_empty() || alias_key == name_key {
+                continue;
+            }
+
+            group
+                .aliases
+                .entry(alias_key)
+                .or_insert_with(|| alias.to_string());
+        }
+    }
+
+    let mut deduped = Vec::with_capacity(order.len());
+
+    for key in order {
+        let Some(mut group) = groups.remove(&key) else {
+            continue;
+        };
+
+        let mut entity_types = group
+            .type_counts
+            .into_iter()
+            .collect::<Vec<(String, usize)>>();
+        entity_types.sort_by(|(left_key, left_count), (right_key, right_count)| {
+            right_count
+                .cmp(left_count)
+                .then_with(|| {
+                    group
+                        .type_first_seen
+                        .get(left_key)
+                        .copied()
+                        .unwrap_or(usize::MAX)
+                        .cmp(
+                            &group
+                                .type_first_seen
+                                .get(right_key)
+                                .copied()
+                                .unwrap_or(usize::MAX),
+                        )
+                })
+                .then_with(|| left_key.cmp(right_key))
+        });
+
+        let Some((entity_type_key, _)) = entity_types.into_iter().next() else {
+            continue;
+        };
+
+        let entity_type = group
+            .type_display_names
+            .remove(&entity_type_key)
+            .unwrap_or(entity_type_key);
+
+        let mut aliases = group.aliases.into_values().collect::<Vec<_>>();
+        aliases.sort();
+
+        deduped.push(EntityCandidate {
+            entity_type,
+            canonical_name: group.canonical_name,
+            aliases,
+        });
+    }
+
+    deduped
 }
 
 fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
@@ -249,6 +376,12 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
 enum StructuredSummaryLabel {
     Decision,
     Fact,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum StructuredSummarySection {
+    Labeled(StructuredSummaryLabel),
+    Thematic(String),
 }
 
 impl StructuredSummaryLabel {
@@ -343,18 +476,7 @@ fn structured_summary_heading_label(tokens: &[String]) -> Option<StructuredSumma
     None
 }
 
-fn split_structured_summary_label(line: &str) -> Option<(StructuredSummaryLabel, &str)> {
-    let (prefix, remainder) = line.split_once(':')?;
-    let normalized_prefix = strip_markdown_inline_formatting(prefix);
-    let label = StructuredSummaryLabel::from_token(&normalized_prefix)?;
-    let remainder = remainder.trim();
-    if remainder.is_empty() {
-        return None;
-    }
-    Some((label, remainder))
-}
-
-fn structured_summary_section_label(line: &str) -> Option<StructuredSummaryLabel> {
+fn structured_summary_section_heading(line: &str) -> Option<StructuredSummarySection> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return None;
@@ -366,6 +488,7 @@ fn structured_summary_section_label(line: &str) -> Option<StructuredSummaryLabel
     }
 
     let (heading_body, has_markdown_heading) = strip_markdown_heading_marker(body);
+    let has_trailing_colon = body.ends_with(':');
     let heading = heading_body
         .strip_suffix(':')
         .unwrap_or(heading_body)
@@ -380,20 +503,61 @@ fn structured_summary_section_label(line: &str) -> Option<StructuredSummaryLabel
         return None;
     }
 
-    if !has_markdown_heading && !body.ends_with(':') && heading_terms.len() > 4 {
+    if !has_markdown_heading && !has_trailing_colon && heading_terms.len() > 4 {
         return None;
     }
 
-    structured_summary_heading_label(&heading_terms)
+    if let Some(label) = structured_summary_heading_label(&heading_terms) {
+        return Some(StructuredSummarySection::Labeled(label));
+    }
+
+    if has_markdown_heading || has_trailing_colon {
+        return Some(StructuredSummarySection::Thematic(heading));
+    }
+
+    None
+}
+
+fn split_structured_summary_label(line: &str) -> Option<(StructuredSummaryLabel, &str)> {
+    let (prefix, remainder) = line.split_once(':')?;
+    let normalized_prefix = strip_markdown_inline_formatting(prefix);
+    let label = StructuredSummaryLabel::from_token(&normalized_prefix)?;
+    let remainder = remainder.trim();
+    if remainder.is_empty() {
+        return None;
+    }
+    Some((label, remainder))
+}
+
+fn contextualize_structured_summary_fact_content(
+    section: &StructuredSummarySection,
+    fact_content: &str,
+) -> String {
+    match section {
+        StructuredSummarySection::Labeled(_) => fact_content.to_string(),
+        StructuredSummarySection::Thematic(heading) => {
+            let normalized_heading = super::normalize_text(heading);
+            let normalized_content = super::normalize_text(fact_content);
+            if !normalized_heading.is_empty() && normalized_content.starts_with(&normalized_heading)
+            {
+                fact_content.to_string()
+            } else {
+                format!("{heading}: {fact_content}")
+            }
+        }
+    }
 }
 
 fn classify_structured_summary_fact_type(
-    label: StructuredSummaryLabel,
+    section: &StructuredSummarySection,
     content: &str,
 ) -> &'static str {
-    match label {
-        StructuredSummaryLabel::Decision => FactType::Decision.as_str(),
-        StructuredSummaryLabel::Fact => {
+    match section {
+        StructuredSummarySection::Labeled(StructuredSummaryLabel::Decision) => {
+            FactType::Decision.as_str()
+        }
+        StructuredSummarySection::Labeled(StructuredSummaryLabel::Fact)
+        | StructuredSummarySection::Thematic(_) => {
             let normalized = content.to_lowercase();
             if is_metric_statement(content) {
                 FactType::Metric.as_str()
@@ -409,7 +573,7 @@ fn classify_structured_summary_fact_type(
 }
 
 fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFactCandidate> {
-    let mut section_label = None;
+    let mut section = None;
     let mut seen = HashSet::new();
     let mut candidates = Vec::new();
 
@@ -419,20 +583,28 @@ fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFac
             continue;
         }
 
-        if let Some(label) = structured_summary_section_label(trimmed) {
-            section_label = Some(label);
+        if let Some(next_section) = structured_summary_section_heading(trimmed) {
+            section = Some(next_section);
             continue;
         }
 
         let (body, is_list_item) = strip_list_marker(trimmed);
-        let parsed = split_structured_summary_label(body).or_else(|| {
-            section_label
-                .filter(|_| is_list_item)
-                .map(|label| (label, body.trim()))
-        });
+        let parsed = split_structured_summary_label(body)
+            .map(|(label, fact_content)| {
+                (
+                    StructuredSummarySection::Labeled(label),
+                    fact_content.trim(),
+                )
+            })
+            .or_else(|| {
+                section
+                    .clone()
+                    .filter(|_| is_list_item)
+                    .map(|active_section| (active_section, body.trim()))
+            });
 
-        let Some((label, fact_content)) = parsed else {
-            section_label = None;
+        let Some((active_section, fact_content)) = parsed else {
+            section = None;
             continue;
         };
 
@@ -442,19 +614,16 @@ fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFac
             continue;
         }
 
-        let fact_type = classify_structured_summary_fact_type(label, &fact_content);
-        let dedupe_key = format!(
-            "{}\u{001f}{}",
-            fact_type,
-            super::normalize_text(&fact_content)
-        );
+        let fact_type = classify_structured_summary_fact_type(&active_section, &fact_content);
+        let content = contextualize_structured_summary_fact_content(&active_section, &fact_content);
+        let dedupe_key = format!("{}\u{001f}{}", fact_type, super::normalize_text(&content));
         if !seen.insert(dedupe_key) {
             continue;
         }
 
         candidates.push(StructuredSummaryFactCandidate {
             fact_type: fact_type.to_string(),
-            content: fact_content.clone(),
+            content,
             quote: fact_content,
         });
     }
@@ -486,7 +655,7 @@ fn entity_links_for_fact_content(content: &str, entities: &[ExtractedEntity]) ->
 }
 
 fn sanitized_content_for_entity_extraction(content: &str) -> String {
-    let mut section_label = None;
+    let mut section = None;
     let mut sanitized_lines = Vec::new();
 
     for raw_line in content.lines() {
@@ -496,8 +665,8 @@ fn sanitized_content_for_entity_extraction(content: &str) -> String {
             continue;
         }
 
-        if let Some(label) = structured_summary_section_label(trimmed) {
-            section_label = Some(label);
+        if let Some(next_section) = structured_summary_section_heading(trimmed) {
+            section = Some(next_section);
             continue;
         }
 
@@ -507,12 +676,12 @@ fn sanitized_content_for_entity_extraction(content: &str) -> String {
             continue;
         }
 
-        if is_list_item && section_label.is_some() {
+        if is_list_item && section.is_some() {
             sanitized_lines.push(strip_markdown_inline_formatting(body));
             continue;
         }
 
-        section_label = None;
+        section = None;
         sanitized_lines.push(strip_markdown_inline_formatting(trimmed));
     }
 
@@ -1366,6 +1535,29 @@ mod tests {
     }
 
     #[test]
+    fn structured_summary_fact_candidates_extract_thematic_heading_lines_with_heading_context() {
+        let candidates = structured_summary_fact_candidates(
+            "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.",
+        );
+
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].fact_type, FactType::Note.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Release Activities: Finalize phased rollout checklist."
+        );
+        assert_eq!(candidates[0].quote, "Finalize phased rollout checklist.");
+        assert_eq!(
+            candidates[1].content,
+            "Release Activities: Publish support handoff notes."
+        );
+        assert_eq!(
+            candidates[2].content,
+            "Capacity Planning: Prepare archive review for next quarter."
+        );
+    }
+
+    #[test]
     fn sanitized_content_for_entity_extraction_strips_structural_labels() {
         let sanitized = sanitized_content_for_entity_extraction(
             "Architecture decisions:\n- Decision: Platform becomes the umbrella product name.\n- Fact: Legacy bridge remains active during rollout.",
@@ -1376,6 +1568,62 @@ mod tests {
         assert!(!sanitized.contains("Architecture decisions:"));
         assert!(sanitized.contains("Platform becomes the umbrella product name."));
         assert!(sanitized.contains("Legacy bridge remains active during rollout."));
+    }
+
+    #[test]
+    fn sanitized_content_for_entity_extraction_strips_thematic_section_headings() {
+        let sanitized = sanitized_content_for_entity_extraction(
+            "Release Activities:\n- Finalize phased rollout checklist.\n- Publish support handoff notes.",
+        );
+
+        assert!(!sanitized.contains("Release Activities:"));
+        assert!(sanitized.contains("Finalize phased rollout checklist."));
+        assert!(sanitized.contains("Publish support handoff notes."));
+    }
+
+    #[test]
+    fn dedupe_entity_candidates_merges_duplicate_names_and_aliases() {
+        use crate::models::EntityCandidate;
+        use std::collections::BTreeSet;
+
+        let candidates = dedupe_entity_candidates(vec![
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["A. Stone".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "company".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Stone Group".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Avery S.".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "organization".to_string(),
+                canonical_name: "Operations Forum".to_string(),
+                aliases: vec![],
+            },
+        ]);
+
+        assert_eq!(candidates.len(), 2);
+
+        let avery = candidates
+            .iter()
+            .find(|candidate| candidate.canonical_name == "Avery Stone")
+            .expect("deduped person candidate");
+        assert_eq!(avery.entity_type, "person");
+        assert_eq!(
+            avery.aliases.iter().cloned().collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "A. Stone".to_string(),
+                "Avery S.".to_string(),
+                "Stone Group".to_string(),
+            ])
+        );
     }
 
     #[test]

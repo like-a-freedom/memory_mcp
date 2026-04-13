@@ -1277,3 +1277,65 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         "expected pending-item fact, got {first_development:?}"
     );
 }
+
+#[tokio::test]
+async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_summary() {
+    let service = common::make_service().await;
+    let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 10, 30, 0).unwrap();
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "ad-hoc".to_string(),
+                source_id: "summary-archive-2026-04-13-adhoc-02".to_string(),
+                content: "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: Some("general-ops".to_string()),
+                t_ingested: Some(t_ref),
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest thematic ad-hoc summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract thematic ad-hoc summary episode");
+
+    assert!(
+        extraction.facts.len() >= 3,
+        "expected thematic markdown summary to produce line-level facts, got {extraction:?}"
+    );
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "finalize phased rollout checklist".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: Some("general-ops".to_string()),
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context for thematic summary query");
+
+    let first = items.first().expect("expected thematic summary result");
+    assert!(
+        !first.fact_id.starts_with("episode_fallback:"),
+        "expected extracted fact to outrank raw episode fallback, got {first:?}"
+    );
+    assert_eq!(first.source_episode, episode_id);
+    assert!(
+        first.content.contains("Release Activities")
+            && first.content.contains("Finalize phased rollout checklist"),
+        "expected contextualized thematic section fact, got {first:?}"
+    );
+}

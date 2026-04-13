@@ -1,7 +1,7 @@
 //! View builders and episode fallback helpers.
 
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
@@ -53,27 +53,115 @@ where
         });
     }
 
-    let rationale = (params.fallback_rationale_fn)(params.query_opt, params.scope, params.cutoff);
+    episodes = dedupe_episode_fallbacks(episodes);
+
+    let rationale_detail =
+        (params.fallback_rationale_fn)(params.query_opt, params.scope, params.cutoff);
+    let query_terms = params
+        .query_opt
+        .map(crate::service::query::search_query_terms)
+        .unwrap_or_default();
 
     episodes
         .into_iter()
         .take(params.budget.max(1) as usize)
-        .map(|episode| AssembledContextItem {
-            fact_id: format!("episode_fallback:{}", episode.episode_id),
-            content: episode.content.clone(),
-            quote: episode.content.clone(),
-            source_episode: episode.episode_id.clone(),
-            confidence: 1.0,
-            provenance: json!({
-                "source_episode": episode.episode_id,
-                "source_type": episode.source_type,
-                "source_id": episode.source_id,
-                "episode_fallback": true,
-            }),
-            rationale: rationale.clone(),
-            retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
+        .map(|episode| {
+            let lexical_score = fallback_lexical_score(&episode.content, &query_terms);
+            let confidence = episode_fallback_confidence(&episode, &query_terms, params.cutoff);
+
+            AssembledContextItem {
+                fact_id: format!("episode_fallback:{}", episode.episode_id),
+                content: episode.content.clone(),
+                quote: episode.content.clone(),
+                source_episode: episode.episode_id.clone(),
+                confidence,
+                provenance: json!({
+                    "source_episode": episode.episode_id,
+                    "source_type": episode.source_type,
+                    "source_id": episode.source_id,
+                    "episode_fallback": true,
+                }),
+                rationale: format!(
+                    "tier={} fts={:.2} access_count=0 confidence={:.2} {}",
+                    RetrievalTier::EpisodeFallback.as_str(),
+                    lexical_score,
+                    confidence,
+                    rationale_detail
+                ),
+                retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
+            }
         })
         .collect()
+}
+
+fn dedupe_episode_fallbacks(episodes: Vec<Episode>) -> Vec<Episode> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::with_capacity(episodes.len());
+
+    for episode in episodes {
+        let keys = episode_fallback_identity_keys(&episode);
+        if keys.iter().any(|key| seen.contains(key)) {
+            continue;
+        }
+        for key in keys {
+            seen.insert(key);
+        }
+        deduped.push(episode);
+    }
+
+    deduped
+}
+
+fn episode_fallback_identity_keys(episode: &Episode) -> Vec<String> {
+    let mut keys = Vec::new();
+
+    let normalized_source_id = crate::service::normalize_text(&episode.source_id);
+    if !normalized_source_id.is_empty() {
+        keys.push(format!("source_id:{normalized_source_id}"));
+    }
+
+    let normalized_content = crate::service::normalize_text(&episode.content);
+    if !normalized_content.is_empty() {
+        keys.push(format!("content:{normalized_content}"));
+    }
+
+    if keys.is_empty() {
+        keys.push(format!("episode:{}", episode.episode_id));
+    }
+
+    keys
+}
+
+fn fallback_lexical_score(content: &str, query_terms: &[String]) -> f64 {
+    if query_terms.is_empty() {
+        0.0
+    } else {
+        super::lexical::lexical_query_score_for_text(content, query_terms) as f64
+    }
+}
+
+fn episode_fallback_confidence(
+    episode: &Episode,
+    query_terms: &[String],
+    cutoff: DateTime<Utc>,
+) -> f64 {
+    let lexical_score = fallback_lexical_score(&episode.content, query_terms);
+    let lexical_coverage = if query_terms.is_empty() {
+        0.0
+    } else {
+        (lexical_score / query_terms.len() as f64).clamp(0.0, 1.0)
+    };
+
+    let age_days = (cutoff - episode.t_ref).num_seconds().abs() as f64 / 86_400.0;
+    let recency_factor = (1.0 / (1.0 + age_days / 180.0)).clamp(0.0, 1.0);
+
+    let confidence = if query_terms.is_empty() {
+        0.25 + (0.25 * recency_factor)
+    } else {
+        0.15 + (0.50 * lexical_coverage) + (0.20 * recency_factor)
+    };
+
+    confidence.clamp(0.15, 0.85)
 }
 
 fn apply_episode_time_window(
@@ -390,5 +478,123 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].source_episode, "episode:exact");
         assert_eq!(items[1].source_episode, "episode:generic");
+    }
+
+    #[test]
+    fn build_episode_fallback_items_deduplicates_by_source_id_and_content() {
+        let cutoff = Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap();
+        let items = build_episode_fallback_items(EpisodeFallbackParams {
+            episodes: vec![
+                Episode {
+                    episode_id: "episode:source-first".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "duplicate-source".to_string(),
+                    content: "Release checklist summary with archive review notes.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 14, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+                Episode {
+                    episode_id: "episode:source-second".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "duplicate-source".to_string(),
+                    content: "Release checklist summary with revised archive review notes."
+                        .to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 14, 11, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+                Episode {
+                    episode_id: "episode:content-first".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "content-a".to_string(),
+                    content: "Shared duplicate summary body for archive review.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 15, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+                Episode {
+                    episode_id: "episode:content-second".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "content-b".to_string(),
+                    content: "Shared duplicate summary body for archive review.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 15, 11, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+            ],
+            query_opt: Some("release checklist archive review"),
+            scope: "org",
+            cutoff,
+            window_start: None,
+            window_end: None,
+            timeline_mode: false,
+            budget: 10,
+            fallback_rationale_fn: fallback_rationale,
+        });
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].source_episode, "episode:source-first");
+        assert_eq!(items[1].source_episode, "episode:content-first");
+    }
+
+    #[test]
+    fn build_episode_fallback_items_assigns_bounded_confidence_from_query_overlap() {
+        let cutoff = Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap();
+        let items = build_episode_fallback_items(EpisodeFallbackParams {
+            episodes: vec![
+                Episode {
+                    episode_id: "episode:strong".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "strong-match".to_string(),
+                    content: "Release checklist and archive review planning notes.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 14, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+                Episode {
+                    episode_id: "episode:weak".to_string(),
+                    source_type: "meeting".to_string(),
+                    source_id: "weak-match".to_string(),
+                    content: "Planning notes with one checklist mention.".to_string(),
+                    t_ref: Utc.with_ymd_and_hms(2025, 7, 10, 10, 0, 0).unwrap(),
+                    t_ingested: cutoff,
+                    scope: "org".to_string(),
+                    visibility_scope: String::new(),
+                    policy_tags: Vec::new(),
+                },
+            ],
+            query_opt: Some("release checklist archive review"),
+            scope: "org",
+            cutoff,
+            window_start: None,
+            window_end: None,
+            timeline_mode: false,
+            budget: 10,
+            fallback_rationale_fn: fallback_rationale,
+        });
+
+        assert_eq!(items.len(), 2);
+        assert!(items[0].confidence > items[1].confidence);
+        assert!(items.iter().all(|item| item.confidence > 0.0));
+        assert!(items.iter().all(|item| item.confidence < 1.0));
+        assert!(items[0].rationale.contains("tier=fallback"));
+        assert!(
+            items[0]
+                .rationale
+                .contains(&format!("confidence={:.2}", items[0].confidence)),
+            "expected rationale to reflect fallback confidence, got {}",
+            items[0].rationale
+        );
     }
 }

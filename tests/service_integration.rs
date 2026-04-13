@@ -2620,3 +2620,73 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         "line-level extraction should not fall back to storing the whole episode blob when structured lines exist: {stored_contents:?}"
     );
 }
+
+#[tokio::test]
+async fn test_extract_summary_with_thematic_sections_generates_line_level_note_records() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting_summary".to_string(),
+                source_id: "meeting-summary-thematic-sections-1".to_string(),
+                content: "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2026, 4, 13, 11, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: Some("general-ops".to_string()),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest thematic summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract thematic summary episode");
+
+    assert!(
+        extraction.facts.len() >= 3,
+        "expected thematic sections to produce multiple line-level facts, got {extraction:?}"
+    );
+    assert!(
+        extraction.facts.iter().all(|fact| fact.fact_type == "note"),
+        "expected thematic section lines to become note facts, got {extraction:?}"
+    );
+
+    let stored_facts = db_client
+        .select_active_facts_by_episode(
+            "org",
+            &episode_id,
+            &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),
+            20,
+        )
+        .await
+        .expect("select stored thematic section facts");
+
+    let stored_contents = stored_facts
+        .iter()
+        .filter_map(|record| record.get("content").and_then(Value::as_str))
+        .collect::<Vec<_>>();
+
+    assert!(
+        stored_contents.contains(&"Release Activities: Finalize phased rollout checklist."),
+        "expected release section bullet to be stored as its own contextualized fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents.contains(&"Release Activities: Publish support handoff notes."),
+        "expected second release section bullet to be stored as its own contextualized fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents.contains(&"Capacity Planning: Prepare archive review for next quarter."),
+        "expected capacity section bullet to be stored as its own contextualized fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents
+            .iter()
+            .all(|content| *content != "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter."),
+        "line-level extraction should not store the whole thematic summary blob when section bullets exist: {stored_contents:?}"
+    );
+}
