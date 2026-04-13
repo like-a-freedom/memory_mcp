@@ -151,13 +151,77 @@ fn should_prefer_episode_content(
         .max()
         .unwrap_or(0);
 
-    let best_episode_overlap = episode_items
+    let Some(best_episode_item) = episode_items
         .iter()
-        .map(|item| lexical::lexical_query_score_for_text(&item.content, query_terms))
-        .max()
-        .unwrap_or(0);
+        .max_by_key(|item| lexical::lexical_query_score_for_text(&item.content, query_terms))
+    else {
+        return false;
+    };
 
-    best_episode_overlap > best_fact_overlap
+    let best_episode_overlap =
+        lexical::lexical_query_score_for_text(&best_episode_item.content, query_terms);
+
+    if best_episode_overlap <= best_fact_overlap {
+        return false;
+    }
+
+    let best_episode_term_coverage =
+        matched_query_terms_for_text(&best_episode_item.content, query_terms).len();
+    let selected_fact_term_coverage =
+        selected_fact_query_term_coverage(selected_facts, query_terms);
+
+    best_episode_term_coverage > selected_fact_term_coverage
+}
+
+fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashSet<String> {
+    if query_terms.is_empty() {
+        return HashSet::new();
+    }
+
+    let content_terms = crate::service::query::search_query_terms(text)
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+    query_terms
+        .iter()
+        .filter(|term| content_terms.contains(term.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn matched_query_terms_for_fact(
+    fact: &crate::models::Fact,
+    query_terms: &[String],
+) -> HashSet<String> {
+    if query_terms.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut fact_terms = crate::service::query::search_query_terms(&fact.content)
+        .into_iter()
+        .collect::<HashSet<_>>();
+    for index_key in &fact.index_keys {
+        fact_terms.extend(crate::service::query::search_query_terms(index_key));
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| fact_terms.contains(term.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn selected_fact_query_term_coverage(
+    selected_facts: &[ranking::RankedContextFact],
+    query_terms: &[String],
+) -> usize {
+    let mut matched_terms = HashSet::new();
+
+    for ranked in selected_facts {
+        matched_terms.extend(matched_query_terms_for_fact(&ranked.fact, query_terms));
+    }
+
+    matched_terms.len()
 }
 
 fn build_episode_rescue_log_result(
@@ -1230,6 +1294,108 @@ mod tests {
             content: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
             quote: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
             source_episode: "episode:docs".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_selected_facts_collectively_cover_query() {
+        let query_terms = crate::service::query::search_query_terms(
+            "suite alpha beta gamma shared platform q3 2026 roadmap rollout controls versioning graphical rules",
+        );
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:launch",
+                        "episode:launch-summary",
+                        fact_time,
+                        1.0,
+                        6.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:launch",
+                    "episode:launch-summary",
+                    fact_time,
+                    1.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "Roadmap adds staged rollout controls and export automation in Q4 2026.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:roadmap",
+                        "episode:launch-summary",
+                        fact_time,
+                        0.9,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:roadmap",
+                    "episode:launch-summary",
+                    fact_time,
+                    0.9,
+                    5.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: crate::models::Fact {
+                    content: "Following wave adds workflow versioning and graphical rules.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:followup",
+                        "episode:launch-summary",
+                        fact_time,
+                        0.8,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:followup",
+                    "episode:launch-summary",
+                    fact_time,
+                    0.8,
+                    4.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:launch-summary".to_string(),
+            content: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds staged rollout controls and export automation in Q4 2026.\n- Following wave adds workflow versioning and graphical rules.".to_string(),
+            quote: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds staged rollout controls and export automation in Q4 2026.\n- Following wave adds workflow versioning and graphical rules.".to_string(),
+            source_episode: "episode:launch-summary".to_string(),
             confidence: 1.0,
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),

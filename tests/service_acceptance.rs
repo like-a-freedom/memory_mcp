@@ -1339,3 +1339,64 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
         "expected contextualized thematic section fact, got {first:?}"
     );
 }
+
+#[tokio::test]
+async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_broad_query() {
+    let service = common::make_service().await;
+    let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 11, 0, 0).unwrap();
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "presentation_summary".to_string(),
+                source_id: "launch-brief-summary-2026-04-13".to_string(),
+                content: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds external connectors, export automation, and staged rollout controls in Q4 2026.\n- Following wave adds desktop agent support, workflow versioning, and graphical rules in H1 2027.\n- Licensing uses pooled capacity units and unified product identification.".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: Some("launch-program".to_string()),
+                t_ingested: Some(t_ref),
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest presentation summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract presentation summary episode");
+
+    assert!(
+        extraction.facts.len() >= 5,
+        "expected line-level facts from presentation summary, got {extraction:?}"
+    );
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "suite alpha beta gamma shared platform q3 2026 roadmap rollout controls versioning graphical rules".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: Some("launch-program".to_string()),
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context for broad presentation summary query");
+
+    let first = items.first().expect("expected presentation summary result");
+    assert!(
+        !first.fact_id.starts_with("episode_fallback:"),
+        "expected extracted facts to remain ahead of raw summary fallback for broad query, got {first:?}"
+    );
+    assert_eq!(first.source_episode, episode_id);
+    assert!(
+        items.iter().all(|item| item.source_episode == episode_id),
+        "expected returned items to stay anchored to the same extracted summary episode, got {items:?}"
+    );
+}
