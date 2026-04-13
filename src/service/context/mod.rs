@@ -134,13 +134,13 @@ fn should_prefer_episode_content(
 
     let best_fact_overlap = selected_facts
         .iter()
-        .map(|fact| lexical::lexical_query_overlap_for_fact(&fact.fact, query_terms))
+        .map(|fact| lexical::lexical_query_score_for_fact(&fact.fact, query_terms))
         .max()
         .unwrap_or(0);
 
     let best_episode_overlap = episode_items
         .iter()
-        .map(|item| lexical::lexical_query_overlap_for_text(&item.content, query_terms))
+        .map(|item| lexical::lexical_query_score_for_text(&item.content, query_terms))
         .max()
         .unwrap_or(0);
 
@@ -1174,6 +1174,50 @@ mod tests {
             content: "Alice Smith met Bob Jones to plan next steps.".to_string(),
             quote: "Alice Smith met Bob Jones to plan next steps.".to_string(),
             source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_fact_captures_best_matching_summary_line() {
+        let query_terms = crate::service::query::search_query_terms(
+            "documentation localization ru en naming screenshot automation",
+        );
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: crate::models::Fact {
+                content: "Help kickoff is open; naming and localization details need alignment across products.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:docs",
+                    "episode:docs",
+                    fact_time,
+                    1.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:docs", "episode:docs", fact_time, 1.0, 6.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:docs".to_string(),
+            content: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
+            quote: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
+            source_episode: "episode:docs".to_string(),
             confidence: 1.0,
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),

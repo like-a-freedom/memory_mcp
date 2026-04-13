@@ -373,17 +373,14 @@ pub(crate) fn lexical_query_overlap_for_fact(fact: &Fact, query_terms: &[String]
         .count()
 }
 
-pub(crate) fn lexical_query_overlap_for_text(text: &str, query_terms: &[String]) -> usize {
-    if query_terms.is_empty() {
-        return 0;
-    }
+pub(crate) fn lexical_query_score_for_text(text: &str, query_terms: &[String]) -> usize {
+    let content_terms = best_matching_content_terms(text, query_terms);
+    let unigram_overlap = query_term_overlap_for_terms(&content_terms, query_terms);
+    let phrase_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 2)
+        + lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
+    let trigram_overlap = lexical_ngram_overlap_for_terms(&content_terms, query_terms, 3);
 
-    let content_terms = search_query_terms(text).into_iter().collect::<HashSet<_>>();
-
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term.as_str()))
-        .count()
+    unigram_overlap + (phrase_overlap * 2) + trigram_overlap
 }
 
 pub(crate) fn lexical_query_score_for_fact(fact: &Fact, query_terms: &[String]) -> usize {

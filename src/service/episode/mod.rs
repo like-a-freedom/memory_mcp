@@ -67,6 +67,7 @@ use crate::models::Episode;
 use crate::models::{
     ContradictionWarning, ExtractResult, ExtractedEntity, ExtractedFact, ExtractedLink, FactType,
 };
+use std::collections::HashSet;
 use std::time::Instant;
 
 /// Parse an episode from a database record.
@@ -244,12 +245,274 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
     matches!(provider, "anno" | "gliner")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StructuredSummaryLabel {
+    Decision,
+    Fact,
+}
+
+impl StructuredSummaryLabel {
+    fn from_token(token: &str) -> Option<Self> {
+        match super::normalize_text(token).as_str() {
+            "decision" | "decisions" => Some(Self::Decision),
+            "fact" | "facts" => Some(Self::Fact),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StructuredSummaryFactCandidate {
+    fact_type: String,
+    content: String,
+    quote: String,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct FactExtractionOutcome {
+    pub(crate) facts: Vec<ExtractedFact>,
+    pub(crate) note_fallback_used: bool,
+    pub(crate) structured_line_fact_count: usize,
+}
+
+fn strip_list_marker(line: &str) -> (&str, bool) {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed
+        .strip_prefix("- ")
+        .or_else(|| trimmed.strip_prefix("* "))
+    {
+        return (rest.trim_start(), true);
+    }
+
+    let digit_count = trimmed.chars().take_while(|ch| ch.is_ascii_digit()).count();
+    if digit_count > 0 {
+        let rest = &trimmed[digit_count..];
+        if let Some(rest) = rest.strip_prefix(". ") {
+            return (rest.trim_start(), true);
+        }
+    }
+
+    (trimmed, false)
+}
+
+fn split_structured_summary_label(line: &str) -> Option<(StructuredSummaryLabel, &str)> {
+    let (prefix, remainder) = line.split_once(':')?;
+    let label = StructuredSummaryLabel::from_token(prefix)?;
+    let remainder = remainder.trim();
+    if remainder.is_empty() {
+        return None;
+    }
+    Some((label, remainder))
+}
+
+fn structured_summary_section_label(line: &str) -> Option<StructuredSummaryLabel> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let (body, is_list_item) = strip_list_marker(trimmed);
+    if is_list_item || split_structured_summary_label(body).is_some() {
+        return None;
+    }
+
+    let heading = body.strip_suffix(':')?;
+    let normalized = super::normalize_text(heading);
+    let tokens = normalized.split_whitespace().collect::<Vec<_>>();
+    let has_decision = tokens
+        .iter()
+        .any(|token| matches!(*token, "decision" | "decisions"));
+    let has_fact = tokens
+        .iter()
+        .any(|token| matches!(*token, "fact" | "facts"));
+
+    match (has_decision, has_fact) {
+        (true, false) => Some(StructuredSummaryLabel::Decision),
+        (false, true) => Some(StructuredSummaryLabel::Fact),
+        _ => None,
+    }
+}
+
+fn classify_structured_summary_fact_type(
+    label: StructuredSummaryLabel,
+    content: &str,
+) -> &'static str {
+    match label {
+        StructuredSummaryLabel::Decision => FactType::Decision.as_str(),
+        StructuredSummaryLabel::Fact => {
+            let normalized = content.to_lowercase();
+            if is_metric_statement(content) {
+                FactType::Metric.as_str()
+            } else if is_promise_statement(&normalized) || is_document_action_item(content) {
+                FactType::Promise.as_str()
+            } else if is_experience_statement(content) {
+                FactType::Experience.as_str()
+            } else {
+                FactType::Note.as_str()
+            }
+        }
+    }
+}
+
+fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFactCandidate> {
+    let mut section_label = None;
+    let mut seen = HashSet::new();
+    let mut candidates = Vec::new();
+
+    for raw_line in content.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(label) = structured_summary_section_label(trimmed) {
+            section_label = Some(label);
+            continue;
+        }
+
+        let (body, is_list_item) = strip_list_marker(trimmed);
+        let parsed = split_structured_summary_label(body).or_else(|| {
+            section_label
+                .filter(|_| is_list_item)
+                .map(|label| (label, body.trim()))
+        });
+
+        let Some((label, fact_content)) = parsed else {
+            section_label = None;
+            continue;
+        };
+
+        if fact_content.is_empty() {
+            continue;
+        }
+
+        let fact_type = classify_structured_summary_fact_type(label, fact_content);
+        let dedupe_key = format!(
+            "{}\u{001f}{}",
+            fact_type,
+            super::normalize_text(fact_content)
+        );
+        if !seen.insert(dedupe_key) {
+            continue;
+        }
+
+        candidates.push(StructuredSummaryFactCandidate {
+            fact_type: fact_type.to_string(),
+            content: fact_content.to_string(),
+            quote: fact_content.to_string(),
+        });
+    }
+
+    candidates
+}
+
+fn entity_links_for_fact_content(content: &str, entities: &[ExtractedEntity]) -> Vec<String> {
+    let normalized_content = super::normalize_text(content);
+    if normalized_content.is_empty() {
+        return Vec::new();
+    }
+
+    let mut seen = HashSet::new();
+    let mut entity_links = Vec::new();
+
+    for entity in entities {
+        let normalized_name = super::normalize_text(&entity.canonical_name);
+        if normalized_name.is_empty()
+            || !normalized_content.contains(&normalized_name)
+            || !seen.insert(entity.entity_id.clone())
+        {
+            continue;
+        }
+        entity_links.push(entity.entity_id.clone());
+    }
+
+    entity_links
+}
+
+fn sanitized_content_for_entity_extraction(content: &str) -> String {
+    let mut section_label = None;
+    let mut sanitized_lines = Vec::new();
+
+    for raw_line in content.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() {
+            sanitized_lines.push(String::new());
+            continue;
+        }
+
+        if let Some(label) = structured_summary_section_label(trimmed) {
+            section_label = Some(label);
+            continue;
+        }
+
+        let (body, is_list_item) = strip_list_marker(trimmed);
+        if let Some((_, remainder)) = split_structured_summary_label(body) {
+            sanitized_lines.push(remainder.to_string());
+            continue;
+        }
+
+        if is_list_item && section_label.is_some() {
+            sanitized_lines.push(body.trim().to_string());
+            continue;
+        }
+
+        section_label = None;
+        sanitized_lines.push(trimmed.to_string());
+    }
+
+    sanitized_lines.join("\n")
+}
+
 /// Extract facts from an episode.
 pub async fn extract_facts(
     service: &crate::service::MemoryService,
     episode: &Episode,
     entities: &[ExtractedEntity],
-) -> Result<Vec<ExtractedFact>, MemoryError> {
+) -> Result<FactExtractionOutcome, MemoryError> {
+    let structured_candidates = structured_summary_fact_candidates(&episode.content);
+    if !structured_candidates.is_empty() {
+        service.logger.log(
+            super::log_event(
+                "extract.structured_summary",
+                json!({
+                    "episode_id": episode.episode_id,
+                    "source_type": episode.source_type,
+                    "structured_line_fact_count": structured_candidates.len(),
+                }),
+                json!({
+                    "content_chars": episode.content.chars().count(),
+                }),
+                None,
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+
+        let mut facts = Vec::with_capacity(structured_candidates.len());
+        for candidate in structured_candidates {
+            let entity_links = entity_links_for_fact_content(&candidate.content, entities);
+            facts.push(
+                add_extracted_fact(
+                    service,
+                    episode,
+                    &candidate.fact_type,
+                    &candidate.content,
+                    &candidate.quote,
+                    &entity_links,
+                    "structured_summary_line",
+                )
+                .await?,
+            );
+        }
+
+        return Ok(FactExtractionOutcome {
+            structured_line_fact_count: facts.len(),
+            facts,
+            note_fallback_used: false,
+        });
+    }
+
     let mut facts = Vec::new();
     let normalized = episode.content.to_lowercase();
     let entity_links = entities
@@ -259,13 +522,31 @@ pub async fn extract_facts(
 
     if is_metric_statement(&episode.content) {
         facts.push(
-            add_extracted_fact(service, episode, FactType::Metric.as_str(), &entity_links).await?,
+            add_extracted_fact(
+                service,
+                episode,
+                FactType::Metric.as_str(),
+                &episode.content,
+                &episode.content,
+                &entity_links,
+                "episode_heuristic",
+            )
+            .await?,
         );
     }
 
     if is_promise_statement(&normalized) || is_document_action_item(&episode.content) {
         facts.push(
-            add_extracted_fact(service, episode, FactType::Promise.as_str(), &entity_links).await?,
+            add_extracted_fact(
+                service,
+                episode,
+                FactType::Promise.as_str(),
+                &episode.content,
+                &episode.content,
+                &entity_links,
+                "episode_heuristic",
+            )
+            .await?,
         );
     }
 
@@ -275,13 +556,17 @@ pub async fn extract_facts(
                 service,
                 episode,
                 FactType::Experience.as_str(),
+                &episode.content,
+                &episode.content,
                 &entity_links,
+                "episode_heuristic",
             )
             .await?,
         );
     }
 
-    if should_extract_note_fact(episode, &facts) {
+    let note_fallback_used = should_extract_note_fact(episode, &facts);
+    if note_fallback_used {
         service.logger.log(
             super::log_event(
                 "extract.note_fallback",
@@ -300,11 +585,24 @@ pub async fn extract_facts(
         );
 
         facts.push(
-            add_extracted_fact(service, episode, FactType::Note.as_str(), &entity_links).await?,
+            add_extracted_fact(
+                service,
+                episode,
+                FactType::Note.as_str(),
+                &episode.content,
+                &episode.content,
+                &entity_links,
+                "summary_note_fallback",
+            )
+            .await?,
         );
     }
 
-    Ok(facts)
+    Ok(FactExtractionOutcome {
+        facts,
+        note_fallback_used,
+        structured_line_fact_count: 0,
+    })
 }
 
 fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact]) -> bool {
@@ -312,10 +610,7 @@ fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact]) -> bool 
         return false;
     }
 
-    let supported_source_type = matches!(
-        episode.source_type.as_str(),
-        "requirement" | "task_tracking" | "stakeholder_mapping" | "customer_engagement" | "email"
-    );
+    let supported_source_type = source_type_supports_summary_fallback(&episode.source_type);
 
     supported_source_type && is_summary_like_note_candidate(&episode.content)
 }
@@ -327,18 +622,48 @@ pub(crate) fn build_extract_log_result(
     links_len: usize,
     warnings_len: usize,
 ) -> Value {
+    let note_fallback_used = episode.is_some_and(|episode| {
+        facts.len() == 1
+            && facts
+                .iter()
+                .all(|fact| fact.fact_type == FactType::Note.as_str())
+            && source_type_supports_summary_fallback(&episode.source_type)
+            && is_summary_like_note_candidate(&episode.content)
+    });
+
+    let structured_line_fact_count = episode
+        .filter(|episode| episode.source_type.ends_with("_summary") && facts.len() > 1)
+        .map_or(0, |_| facts.len());
+
+    build_extract_log_result_with_metadata(
+        episode,
+        entities_len,
+        facts,
+        links_len,
+        warnings_len,
+        note_fallback_used,
+        structured_line_fact_count,
+    )
+}
+
+pub(crate) fn build_extract_log_result_with_metadata(
+    episode: Option<&Episode>,
+    entities_len: usize,
+    facts: &[ExtractedFact],
+    links_len: usize,
+    warnings_len: usize,
+    note_fallback_used: bool,
+    structured_line_fact_count: usize,
+) -> Value {
     let mut result = serde_json::Map::from_iter([
         ("entities".to_string(), json!(entities_len)),
         ("facts".to_string(), json!(facts.len())),
         ("links".to_string(), json!(links_len)),
         ("warnings".to_string(), json!(warnings_len)),
+        ("note_fallback_used".to_string(), json!(note_fallback_used)),
         (
-            "note_fallback_used".to_string(),
-            json!(
-                facts
-                    .iter()
-                    .any(|fact| fact.fact_type == FactType::Note.as_str())
-            ),
+            "structured_line_fact_count".to_string(),
+            json!(structured_line_fact_count),
         ),
     ]);
 
@@ -353,19 +678,29 @@ pub(crate) fn build_extract_log_result(
     Value::Object(result)
 }
 
+fn source_type_supports_summary_fallback(source_type: &str) -> bool {
+    matches!(
+        source_type,
+        "requirement" | "task_tracking" | "stakeholder_mapping" | "customer_engagement" | "email"
+    ) || source_type.ends_with("_summary")
+}
+
 async fn add_extracted_fact(
     service: &crate::service::MemoryService,
     episode: &Episode,
     fact_type: &str,
+    content: &str,
+    quote: &str,
     entity_links: &[String],
+    extraction_strategy: &str,
 ) -> Result<ExtractedFact, MemoryError> {
     use serde_json::json;
 
     let fact_id = service
         .add_fact(
             fact_type,
-            &episode.content,
-            &episode.content,
+            content,
+            quote,
             &episode.episode_id,
             episode.t_ref,
             &episode.scope,
@@ -376,6 +711,7 @@ async fn add_extracted_fact(
                 "source_episode": episode.episode_id,
                 "source_type": episode.source_type,
                 "source_id": episode.source_id,
+                "extraction_strategy": extraction_strategy,
             }),
         )
         .await?;
@@ -416,8 +752,10 @@ pub async fn extract_from_episode(
     let episode = episode_from_record(&record)
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
-    let entities = extract_entities(service, &episode.content, zero_shot_labels).await?;
-    let facts = extract_facts(service, &episode, &entities).await?;
+    let entity_extraction_content = sanitized_content_for_entity_extraction(&episode.content);
+    let entities = extract_entities(service, &entity_extraction_content, zero_shot_labels).await?;
+    let fact_outcome = extract_facts(service, &episode, &entities).await?;
+    let facts = fact_outcome.facts;
     let warnings = detect_contradiction_warnings(service, &episode, &facts, &namespace).await?;
     let mut links = Vec::new();
     let edge_ingested = super::query::now();
@@ -445,9 +783,17 @@ pub async fn extract_from_episode(
     }
 
     for fact in &facts {
-        for entity in &entities {
+        let (fact_record, _) = service.find_fact_record(&fact.fact_id).await?;
+        let Some(fact_record) = fact_record else {
+            continue;
+        };
+        let Some(stored_fact) = fact_from_value_or_wrapper(&Value::Object(fact_record)) else {
+            continue;
+        };
+
+        for entity_id in &stored_fact.entity_links {
             let edge = Edge {
-                in_id: entity.entity_id.clone(),
+                in_id: entity_id.clone(),
                 relation: "involved_in".to_string(),
                 out_id: fact.fact_id.clone(),
                 origin: crate::models::EdgeOrigin::Extracted,
@@ -474,12 +820,14 @@ pub async fn extract_from_episode(
         super::log_event(
             "extract_from_episode.done",
             log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
-            build_extract_log_result(
+            build_extract_log_result_with_metadata(
                 Some(&episode),
                 entities.len(),
                 &facts,
                 links.len(),
                 warnings.len(),
+                fact_outcome.note_fallback_used,
+                fact_outcome.structured_line_fact_count,
             ),
             None,
             None,
@@ -897,6 +1245,13 @@ mod tests {
             },
             &[]
         ));
+        assert!(should_extract_note_fact(
+            &Episode {
+                source_type: "meeting_summary".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
         assert!(!should_extract_note_fact(
             &episode,
             &[ExtractedFact {
@@ -904,6 +1259,43 @@ mod tests {
                 fact_type: "promise".to_string(),
             }]
         ));
+    }
+
+    #[test]
+    fn structured_summary_fact_candidates_extract_labeled_and_heading_scoped_lines() {
+        let candidates = structured_summary_fact_candidates(
+            "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n\nDocumentation facts:\n- Fact: Docs team needs final terminology for supported languages.",
+        );
+
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Approve the cross-platform activation policy."
+        );
+        assert_eq!(candidates[1].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[1].content,
+            "Keep legacy on-premise licenses separate."
+        );
+        assert_eq!(candidates[2].fact_type, FactType::Note.as_str());
+        assert_eq!(
+            candidates[2].content,
+            "Docs team needs final terminology for supported languages."
+        );
+    }
+
+    #[test]
+    fn sanitized_content_for_entity_extraction_strips_structural_labels() {
+        let sanitized = sanitized_content_for_entity_extraction(
+            "Architecture decisions:\n- Decision: Platform becomes the umbrella product name.\n- Fact: Legacy bridge remains active during rollout.",
+        );
+
+        assert!(!sanitized.contains("Decision:"));
+        assert!(!sanitized.contains("Fact:"));
+        assert!(!sanitized.contains("Architecture decisions:"));
+        assert!(sanitized.contains("Platform becomes the umbrella product name."));
+        assert!(sanitized.contains("Legacy bridge remains active during rollout."));
     }
 
     #[test]
@@ -965,7 +1357,7 @@ mod tests {
             policy_tags: Vec::new(),
         };
 
-        let result = build_extract_log_result(
+        let result = build_extract_log_result_with_metadata(
             Some(&episode),
             2,
             &[ExtractedFact {
@@ -974,6 +1366,8 @@ mod tests {
             }],
             3,
             1,
+            true,
+            0,
         );
 
         assert_eq!(result.get("entities").and_then(Value::as_u64), Some(2));
@@ -991,6 +1385,12 @@ mod tests {
         assert_eq!(
             result.get("note_fallback_used").and_then(Value::as_bool),
             Some(true)
+        );
+        assert_eq!(
+            result
+                .get("structured_line_fact_count")
+                .and_then(Value::as_u64),
+            Some(0)
         );
     }
 

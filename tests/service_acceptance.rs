@@ -1100,3 +1100,81 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
     assert_eq!(first.source_episode, episode_id);
     assert_eq!(first.retrieval_tier.as_deref(), Some("fallback"));
 }
+
+#[tokio::test]
+async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matching_query() {
+    let service = common::make_service().await;
+    let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 9, 0, 0).unwrap();
+
+    let architecture_episode = service
+        .ingest(
+            IngestRequest {
+                source_type: "meeting_summary".to_string(),
+                source_id: "meeting-archive-scan-2026-04-13-01-architecture".to_string(),
+                content: "Product architecture and deployment decisions:\n\n- Decision: Use a single umbrella product identifier for the product suite.\n- Decision: Keep legacy on-premise identifier only temporarily.\n- Decision: Standardize release timelines across channels.".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: Some("cloud-products".to_string()),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest architecture episode");
+    service
+        .extract(&architecture_episode, None, None)
+        .await
+        .expect("extract architecture episode");
+
+    let documentation_episode = service
+        .ingest(
+            IngestRequest {
+                source_type: "meeting_summary".to_string(),
+                source_id: "meeting-archive-scan-2026-04-13-10-documentation".to_string(),
+                content: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open for documentation and localization work; naming details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                project: Some("cloud-products".to_string()),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest documentation episode");
+    service
+        .extract(&documentation_episode, None, None)
+        .await
+        .expect("extract documentation episode");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "help kickoff documentation localization terminology".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 10,
+            project: Some("cloud-products".to_string()),
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context for documentation query");
+
+    let first = items.first().expect("expected at least one result");
+    assert!(
+        !first.fact_id.starts_with("episode_fallback:"),
+        "expected an extracted fact to outrank raw episode fallback, got {first:?}"
+    );
+    assert_eq!(first.source_episode, documentation_episode);
+    assert!(
+        first.content.contains("documentation and localization")
+            || first.content.contains("final terminology"),
+        "expected documentation-specific extracted fact, got {first:?}"
+    );
+}

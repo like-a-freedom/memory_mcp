@@ -197,7 +197,7 @@ This IETF draft maps MCP roles to the network management domain:[^18]
 - the interaction model is intent-first, for example: “verify reachability between Site-A and Site-B” instead of issuing CLI commands
 - all interactions use JSON-RPC 2.0 with an auditable trail, such as syslog
 
-It is particularly relevant to security and XDR thinking because the same pattern can be adapted to intent-based threat investigation.
+It is particularly relevant to security operations thinking because the same pattern can be adapted to intent-based threat investigation.
 
 📎 https://www.ietf.org/archive/id/draft-zeng-mcp-troubleshooting-00.html
 

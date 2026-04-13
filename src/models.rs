@@ -255,6 +255,7 @@ pub struct ExtractedLink {
 #[serde(rename_all = "snake_case")]
 pub enum FactType {
     Note,
+    Decision,
     Metric,
     Promise,
     Experience,
@@ -262,12 +263,19 @@ pub enum FactType {
 
 impl FactType {
     /// All standard fact types.
-    pub const ALL: &'static [Self] = &[Self::Note, Self::Metric, Self::Promise, Self::Experience];
+    pub const ALL: &'static [Self] = &[
+        Self::Note,
+        Self::Decision,
+        Self::Metric,
+        Self::Promise,
+        Self::Experience,
+    ];
 
     /// Returns the string representation for database storage.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Note => "note",
+            Self::Decision => "decision",
             Self::Metric => "metric",
             Self::Promise => "promise",
             Self::Experience => "experience",

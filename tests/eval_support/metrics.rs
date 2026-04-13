@@ -362,12 +362,12 @@ mod tests {
         let rank = first_relevant_rank(
             &[
                 "noise result",
-                "April 2026 XDR Expert decision is approved",
+                "April 2026 Security Expert decision is approved",
                 "another relevant result",
             ],
             &[
-                "XDR Expert decision".to_string(),
-                "KEDR Expert decision".to_string(),
+                "Security Expert decision".to_string(),
+                "Policy Expert decision".to_string(),
             ],
         );
 

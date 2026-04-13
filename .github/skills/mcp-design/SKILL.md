@@ -224,11 +224,11 @@ Before finalising any design, verify:
 
 ## Example
 
-**Input:** "Design an MCP server for a SIEM/XDR alert triage workflow"
+**Input:** "Design an MCP server for a security alert triage workflow"
 
 **Output (abbreviated):**
 
-### Server: `xdr-triage`
+### Server: `alert-triage`
 
 **Domain:** Alert investigation and triage for security operations
 **Persona:** SOC analyst agent, automated triage pipeline
@@ -236,7 +236,7 @@ Before finalising any design, verify:
 
 ---
 
-#### Tool: `xdr_triage_alert`
+#### Tool: `alert_triage_alert`
 
 **Intent:** Get everything an agent needs to assess and triage a single alert in one call.
 
@@ -247,7 +247,7 @@ related events, MITRE ATT&CK mapping, and recommended next action.
 
 Use this tool when: you need to assess whether an alert requires escalation,
 suppression, or investigation.
-Do NOT use this tool when: you need bulk alert statistics — use xdr_list_alerts instead.
+Do NOT use this tool when: you need bulk alert statistics — use alert_list_alerts instead.
 
 Arguments:
 - `alert_id` (string): Unique alert identifier from the alert feed.
@@ -256,14 +256,14 @@ Arguments:
 
 Returns: Triage bundle with severity, confidence, affected_hosts, mitre_techniques,
   recommended_action, and analyst_notes.
-On error: {"status": "not_found", "guidance": "Call xdr_search_alerts(query=<host or rule name>) to locate the correct alert_id."}
+On error: {"status": "not_found", "guidance": "Call alert_search_alerts(query=<host or rule name>) to locate the correct alert_id."}
 ```
 
 #### Intent Coverage Matrix
 
 | Intent | Tool | Calls | Verdict |
 |---|---|---|---|
-| Triage a single alert | `xdr_triage_alert` | 1 | ✅ |
-| Find alerts by host | `xdr_search_alerts` | 1 | ✅ |
-| Escalate to ticket | `xdr_escalate_alert` | 1 | ✅ |
-| Get alert timeline + triage | `xdr_search_alerts` → `xdr_triage_alert` | 2 | ⚠️ consider composite |
+| Triage a single alert | `alert_triage_alert` | 1 | ✅ |
+| Find alerts by host | `alert_search_alerts` | 1 | ✅ |
+| Escalate to ticket | `alert_escalate_alert` | 1 | ✅ |
+| Get alert timeline + triage | `alert_search_alerts` → `alert_triage_alert` | 2 | ⚠️ consider composite |

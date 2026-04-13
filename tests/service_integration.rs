@@ -2543,3 +2543,80 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
         "expected summary-like requirement episode to produce a note fact, got {extraction:?}"
     );
 }
+
+#[tokio::test]
+async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_records() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting_summary".to_string(),
+                source_id: "meeting-summary-line-facts-1".to_string(),
+                content: "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n- Fact: Working release milestone targeted for early May.".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2026, 4, 13, 9, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: Some("cloud-products".to_string()),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest meeting summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract meeting summary episode");
+
+    assert!(
+        extraction.facts.len() >= 3,
+        "expected line-level extraction to produce multiple facts, got {extraction:?}"
+    );
+    assert!(
+        extraction
+            .facts
+            .iter()
+            .any(|fact| fact.fact_type == "decision"),
+        "expected at least one decision fact, got {extraction:?}"
+    );
+    assert!(
+        extraction.facts.iter().any(|fact| fact.fact_type == "note"),
+        "expected at least one fact/note record, got {extraction:?}"
+    );
+
+    let stored_facts = db_client
+        .select_active_facts_by_episode(
+            "org",
+            &episode_id,
+            &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),
+            20,
+        )
+        .await
+        .expect("select stored extracted facts");
+
+    let stored_contents = stored_facts
+        .iter()
+        .filter_map(|record| record.get("content").and_then(Value::as_str))
+        .collect::<Vec<_>>();
+
+    assert!(
+        stored_contents.contains(&"Approve the cross-platform activation policy."),
+        "expected explicit decision line to be stored as its own fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents.contains(&"Keep legacy on-premise licenses separate."),
+        "expected unlabeled bullet in a decisions section to become its own fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents.contains(&"Working release milestone targeted for early May."),
+        "expected explicit fact line to be stored as its own fact, got {stored_contents:?}"
+    );
+    assert!(
+        stored_contents
+            .iter()
+            .all(|content| *content != "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n- Fact: Working release milestone targeted for early May."),
+        "line-level extraction should not fall back to storing the whole episode blob when structured lines exist: {stored_contents:?}"
+    );
+}
