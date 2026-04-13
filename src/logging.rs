@@ -166,7 +166,7 @@ impl StdoutLogger {
         ));
 
         // Build remaining keys, excluding special fields we already rendered
-        let special_keys = ["request_id"];
+        let special_keys = ["request_id", "duration_ms"];
         let mut keys: Vec<_> = event
             .keys()
             .filter(|k| !special_keys.contains(&k.as_str()))

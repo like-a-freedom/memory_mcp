@@ -381,14 +381,7 @@ impl MemoryService {
     ) {
         let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
         self.logger.log(
-            log_event(
-                op,
-                log_args_with_duration(args, duration),
-                result,
-                None,
-                request_id,
-                Some(duration_ms),
-            ),
+            log_event(op, args, result, None, request_id, Some(duration_ms)),
             level,
         );
     }
