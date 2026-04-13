@@ -81,12 +81,7 @@ impl StdoutLogger {
     /// repeated occurrences. The first occurrence is always logged.
     /// Subsequent occurrences are logged only at every Nth repetition
     /// (controlled by `every_nth`, default 10).
-    pub fn log_warn_dedup(
-        &self,
-        event: HashMap<String, Value>,
-        dedup_key: &str,
-        every_nth: u64,
-    ) {
+    pub fn log_warn_dedup(&self, event: HashMap<String, Value>, dedup_key: &str, every_nth: u64) {
         let count = {
             let mut counts = self.warn_tracker.counts.lock().expect("warn tracker lock");
             let c = counts.entry(dedup_key.to_string()).or_insert(0);
@@ -97,10 +92,7 @@ impl StdoutLogger {
         if count == 1 || count % every_nth == 0 {
             let mut event = event;
             if count > 1 {
-                event.insert(
-                    "repeat_count".to_string(),
-                    Value::Number(count.into()),
-                );
+                event.insert("repeat_count".to_string(), Value::Number(count.into()));
             }
             self.log(event, LogLevel::Warn);
         }
@@ -166,7 +158,12 @@ impl StdoutLogger {
 
         let mut parts = Vec::with_capacity(event.len() + 4);
         // Header: [ts] LEVEL  req=XXXX
-        parts.push(format!("[{}] {:<5} req={:<6}", ts_short, level.as_str().to_uppercase(), request_id));
+        parts.push(format!(
+            "[{}] {:<5} req={:<6}",
+            ts_short,
+            level.as_str().to_uppercase(),
+            request_id
+        ));
 
         // Build remaining keys, excluding special fields we already rendered
         let special_keys = ["request_id"];
