@@ -57,6 +57,7 @@ use super::error::MemoryError;
 use super::query::parse_iso;
 use super::statement_detection::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
+    is_summary_like_note_candidate,
 };
 use super::value_helpers::{
     dt_field, f64_field, i64_field, json_string, str_array_field, str_field, unwrap_array_value,
@@ -280,7 +281,76 @@ pub async fn extract_facts(
         );
     }
 
+    if should_extract_note_fact(episode, &facts) {
+        service.logger.log(
+            super::log_event(
+                "extract.note_fallback",
+                json!({
+                    "episode_id": episode.episode_id,
+                    "source_type": episode.source_type,
+                }),
+                json!({
+                    "content_chars": episode.content.chars().count(),
+                }),
+                None,
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+
+        facts.push(
+            add_extracted_fact(service, episode, FactType::Note.as_str(), &entity_links).await?,
+        );
+    }
+
     Ok(facts)
+}
+
+fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact]) -> bool {
+    if !facts.is_empty() {
+        return false;
+    }
+
+    let supported_source_type = matches!(
+        episode.source_type.as_str(),
+        "requirement" | "task_tracking" | "stakeholder_mapping" | "customer_engagement" | "email"
+    );
+
+    supported_source_type && is_summary_like_note_candidate(&episode.content)
+}
+
+pub(crate) fn build_extract_log_result(
+    episode: Option<&Episode>,
+    entities_len: usize,
+    facts: &[ExtractedFact],
+    links_len: usize,
+    warnings_len: usize,
+) -> Value {
+    let mut result = serde_json::Map::from_iter([
+        ("entities".to_string(), json!(entities_len)),
+        ("facts".to_string(), json!(facts.len())),
+        ("links".to_string(), json!(links_len)),
+        ("warnings".to_string(), json!(warnings_len)),
+        (
+            "note_fallback_used".to_string(),
+            json!(
+                facts
+                    .iter()
+                    .any(|fact| fact.fact_type == FactType::Note.as_str())
+            ),
+        ),
+    ]);
+
+    if let Some(episode) = episode {
+        result.insert("source_type".to_string(), json!(episode.source_type));
+        result.insert(
+            "content_chars".to_string(),
+            json!(episode.content.chars().count()),
+        );
+    }
+
+    Value::Object(result)
 }
 
 async fn add_extracted_fact(
@@ -404,7 +474,13 @@ pub async fn extract_from_episode(
         super::log_event(
             "extract_from_episode.done",
             log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
-            json!({"entities": entities.len(), "facts": facts.len(), "warnings": warnings.len()}),
+            build_extract_log_result(
+                Some(&episode),
+                entities.len(),
+                &facts,
+                links.len(),
+                warnings.len(),
+            ),
             None,
             None,
             None,
@@ -577,6 +653,7 @@ mod tests {
     use crate::models::EntityCandidate;
     use crate::service::EntityExtractor;
     use crate::storage::{DbClient, SurrealDbClient};
+    use chrono::Utc;
     use serde_json::json;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
@@ -787,6 +864,49 @@ mod tests {
     }
 
     #[test]
+    fn is_summary_like_note_candidate_detects_dense_summary_content() {
+        assert!(is_summary_like_note_candidate(
+            "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped."
+        ));
+    }
+
+    #[test]
+    fn is_summary_like_note_candidate_rejects_short_content() {
+        assert!(!is_summary_like_note_candidate("Short note only"));
+    }
+
+    #[test]
+    fn should_extract_note_fact_requires_supported_source_type_and_no_existing_facts() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+        };
+
+        assert!(should_extract_note_fact(&episode, &[]));
+        assert!(!should_extract_note_fact(
+            &Episode {
+                source_type: "meeting".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
+        assert!(!should_extract_note_fact(
+            &episode,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "promise".to_string(),
+            }]
+        ));
+    }
+
+    #[test]
     fn build_ner_log_result_includes_provider_entity_count_and_zero_shot_count() {
         let result = build_ner_log_result("gliner", 3, Some(6), None);
 
@@ -829,6 +949,49 @@ mod tests {
             Some("tokenization failed")
         );
         assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+    }
+
+    #[test]
+    fn build_extract_log_result_includes_episode_metadata_and_note_fallback_usage() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+        };
+
+        let result = build_extract_log_result(
+            Some(&episode),
+            2,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "note".to_string(),
+            }],
+            3,
+            1,
+        );
+
+        assert_eq!(result.get("entities").and_then(Value::as_u64), Some(2));
+        assert_eq!(result.get("facts").and_then(Value::as_u64), Some(1));
+        assert_eq!(result.get("links").and_then(Value::as_u64), Some(3));
+        assert_eq!(result.get("warnings").and_then(Value::as_u64), Some(1));
+        assert_eq!(
+            result.get("source_type").and_then(Value::as_str),
+            Some("requirement")
+        );
+        assert_eq!(
+            result.get("content_chars").and_then(Value::as_u64),
+            Some(56)
+        );
+        assert_eq!(
+            result.get("note_fallback_used").and_then(Value::as_bool),
+            Some(true)
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]

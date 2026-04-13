@@ -1034,3 +1034,69 @@ async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temp
         "when only out-of-window summaries exist without July 2025 support, explicit month/year query should return empty instead of October noise: {items:?}"
     );
 }
+
+#[tokio::test]
+async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallback() {
+    use memory_mcp::models::IngestRequest;
+
+    let service = common::make_service().await;
+    let july = Utc.with_ymd_and_hms(2025, 7, 14, 10, 0, 0).unwrap();
+
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "requirement".to_string(),
+                source_id: "july-platform-planning".to_string(),
+                content: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+                t_ref: july,
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest July episode");
+
+    service
+        .add_fact(
+            "note",
+            "July 2025 platform licensing notes for renewal workflow.",
+            "July 2025 platform licensing notes for renewal workflow.",
+            "episode:july-licensing-noise",
+            Utc.with_ymd_and_hms(2025, 7, 13, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:july-licensing-noise"}),
+        )
+        .await
+        .expect("seed unrelated fact noise");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "Platform planning notes July 2025".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context");
+
+    let first = items.first().expect("expected at least one result");
+    assert!(
+        first.fact_id.starts_with("episode_fallback:"),
+        "expected episode fallback item, got {first:?}"
+    );
+    assert_eq!(first.source_episode, episode_id);
+    assert_eq!(first.retrieval_tier.as_deref(), Some("fallback"));
+}

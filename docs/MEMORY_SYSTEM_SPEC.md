@@ -321,7 +321,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **Status**: ✅ Implemented (2026-03-26) — Unicode-aware regex extractor using `[\p{Lu}][\p{Ll}]+` pattern for Cyrillic/Latin support. Classifies multi-word names as `person`, CamelCase single tokens as `technology`, and recognizes `company`/`event`/`location` via suffix indicators and gazetteer.
 
 **FR-EX-02**: System MUST extract facts/items: `Promise`, `Task`, `Metric`, `Decision`, `Opinion`/`Preference`, `Relationship` (extensible).
-**Status**: ⚠️ Partial — current extraction covers only simple `promise` and `metric` heuristics.
+**Status**: ⚠️ Partial — current extraction covers `metric`, `promise`, `experience`, and a conservative `note` fallback for summary-like episodes. Dedicated `task`, `decision`, and `relationship` extraction remain future work.
 
 **FR-EX-03**: Each fact MUST contain: `content` (normalized statement), `quote` (verbatim quote), `source_pointer` (to episode and position), `actors_involved`, `t_valid` (when stated/true).
 **Status**: ✅ Done — facts persist `content`, `quote`, `source_episode`, `entity_links`, `t_valid`, `t_invalid`, `confidence`, `fact_type`, `index_keys`, `access_count`, `last_accessed`. The `entity_links` field serves as the actor linkage mechanism. `source_position` is not consistently populated (follow-up item).

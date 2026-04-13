@@ -1303,7 +1303,8 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
 }
 
 #[tokio::test]
-async fn test_service_assemble_context_appends_recent_experience_fact_after_primary_matches() {
+async fn test_service_assemble_context_does_not_append_recent_experience_for_query_driven_retrieval()
+ {
     let service = common::make_service().await;
     let note_time = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
     let experience_time = Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap();
@@ -1374,19 +1375,26 @@ async fn test_service_assemble_context_appends_recent_experience_fact_after_prim
         .await
         .unwrap();
 
-    let contents = items
-        .iter()
-        .map(|item| item.content.as_str())
-        .collect::<Vec<_>>();
-
     assert_eq!(items[0].content, "Atlas budget is $2M");
     assert!(
-        contents.contains(&"Alice prefers weekly launch updates"),
-        "expected automatic experience fact inclusion, got {contents:?}"
+        !items
+            .iter()
+            .any(|item| item.content == "Alice prefers weekly launch updates"),
+        "query-driven retrieval should not append recent experience items: {items:?}"
     );
     assert_eq!(
-        items.last().map(|item| item.content.as_str()),
-        Some("Alice prefers weekly launch updates")
+        items
+            .iter()
+            .filter(|item| item.content == "Atlas budget is $2M")
+            .count(),
+        1,
+        "primary matching fact should still be returned exactly once"
+    );
+    assert!(
+        items
+            .iter()
+            .all(|item| !item.rationale.contains("supplemental experience")),
+        "query-driven retrieval should not include supplemental experience rationale"
     );
 }
 
@@ -1771,35 +1779,16 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
 }
 
 #[tokio::test]
-async fn test_service_assemble_context_appends_recent_experience_supplemental() {
+async fn test_service_assemble_context_appends_recent_experience_for_browse_like_requests() {
     let (service, _db_client) = common::make_service_with_client().await;
 
-    // Seed a fact that matches the query via lexical BM25.
-    let fact_id = service
-        .add_fact(
-            "note",
-            "budget allocation for Q4 infrastructure spend",
-            "budget allocation for Q4",
-            "episode:exp-match",
-            Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
-            0.9,
-            vec![],
-            vec![],
-            json!({"source_episode": "episode:exp-match"}),
-        )
-        .await
-        .unwrap();
-
-    // Seed a recent episode and extract it — this exercises the experience
-    // append path in assemble_context.
-    let episode_id = service
+    let source_episode = service
         .ingest(
             memory_mcp::models::IngestRequest {
-                source_type: "chat".to_string(),
-                source_id: "exp-supplemental-1".to_string(),
-                content: "Alice Smith noted that the CI pipeline is slow".to_string(),
-                t_ref: Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 0).unwrap(),
+                source_type: "document".to_string(),
+                source_id: "experience-browse-base".to_string(),
+                content: "Atlas source episode".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
                 scope: "org".to_string(),
                 project: None,
                 t_ingested: None,
@@ -1810,13 +1799,42 @@ async fn test_service_assemble_context_appends_recent_experience_supplemental() 
         )
         .await
         .unwrap();
-    service.extract(&episode_id, None, None).await.unwrap();
 
-    // Query — the experience append path should be exercised without errors.
-    // The direct BM25 match should return the seeded fact.
+    let fact_id = service
+        .add_fact(
+            "note",
+            "budget allocation for Q4 infrastructure spend",
+            "budget allocation for Q4",
+            &source_episode,
+            Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            json!({"source_episode": source_episode}),
+        )
+        .await
+        .unwrap();
+
+    let recent_experience_id = service
+        .add_fact(
+            "experience",
+            "Alice prefers weekly launch updates",
+            "Alice prefers weekly launch updates",
+            &source_episode,
+            Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 0).unwrap(),
+            "org",
+            0.8,
+            vec![],
+            vec![],
+            json!({"source_episode": source_episode}),
+        )
+        .await
+        .unwrap();
+
     let items = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
-            query: "budget allocation".to_string(),
+            query: String::new(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
@@ -1830,17 +1848,15 @@ async fn test_service_assemble_context_appends_recent_experience_supplemental() 
         .await
         .unwrap();
 
-    // The seeded BM25-matching fact should be present.
     assert!(
         items.iter().any(|item| item.fact_id == fact_id),
-        "BM25-matching fact should be returned"
+        "browse-like retrieval should still include active base facts"
     );
-
-    // The experience append path was exercised (no panic/error).
-    // Check that we got at least one result.
     assert!(
-        !items.is_empty(),
-        "assemble_context should return results when BM25 fact matches"
+        items
+            .iter()
+            .any(|item| item.fact_id == recent_experience_id),
+        "browse-like retrieval should append recent experience facts: {items:?}"
     );
 }
 
@@ -2493,5 +2509,37 @@ async fn test_service_archival_pass_skips_recent_episodes() {
         stored.get("status"),
         Some(&json!("archived")),
         "recent episode should not have status=archived"
+    );
+}
+
+#[tokio::test]
+async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
+    let service = common::make_service().await;
+    let episode_id = service
+        .ingest(
+            memory_mcp::models::IngestRequest {
+                source_type: "requirement".to_string(),
+                source_id: "summary-requirement-1".to_string(),
+                content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2025, 7, 10, 9, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest summary episode");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract summary episode");
+
+    assert!(
+        extraction.facts.iter().any(|fact| fact.fact_type == "note"),
+        "expected summary-like requirement episode to produce a note fact, got {extraction:?}"
     );
 }

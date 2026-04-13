@@ -49,6 +49,7 @@ mod constants {
 }
 
 pub use cache::{CacheKey, invalidate_cache_by_scope};
+pub(crate) use episode::build_extract_log_result;
 pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
 pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,

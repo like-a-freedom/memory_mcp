@@ -596,18 +596,20 @@ impl MemoryService {
                 "episode_id not found: {episode_id}"
             )));
         }
+        let episode = record.as_ref().and_then(super::episode_from_record);
         let payload =
             super::episode::extract_from_episode(self, episode_id, zero_shot_labels).await?;
         self.logger.log(
             log_event(
                 "extract",
                 log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
-                json!({
-                    "entities": payload.entities.len(),
-                    "facts": payload.facts.len(),
-                    "links": payload.links.len(),
-                    "warnings": payload.warnings.len(),
-                }),
+                super::episode::build_extract_log_result(
+                    episode.as_ref(),
+                    payload.entities.len(),
+                    &payload.facts,
+                    payload.links.len(),
+                    payload.warnings.len(),
+                ),
                 access.as_ref(),
                 None,
                 None,

@@ -1067,10 +1067,32 @@ impl MemoryMcp {
                 .await
             {
                 Ok(result) => {
+                    let log_result = match self.service.find_episode_record(episode_id).await {
+                        Ok((record, _)) => {
+                            let episode = record
+                                .as_ref()
+                                .and_then(crate::service::episode_from_record);
+                            crate::service::build_extract_log_result(
+                                episode.as_ref(),
+                                result.entities.len(),
+                                &result.facts,
+                                result.links.len(),
+                                result.warnings.len(),
+                            )
+                        }
+                        Err(_) => crate::service::build_extract_log_result(
+                            None,
+                            result.entities.len(),
+                            &result.facts,
+                            result.links.len(),
+                            result.warnings.len(),
+                        ),
+                    };
+
                     self.service.log_tool_event_with_duration(
                         "extract.done",
                         json!({"episode_id": episode_id}),
-                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        log_result,
                         LogLevel::Info,
                         timer.elapsed(),
                         Some(&request_id),
@@ -1128,10 +1150,32 @@ impl MemoryMcp {
                 .await
             {
                 Ok(result) => {
+                    let log_result = match self.service.find_episode_record(&episode_id).await {
+                        Ok((record, _)) => {
+                            let episode = record
+                                .as_ref()
+                                .and_then(crate::service::episode_from_record);
+                            crate::service::build_extract_log_result(
+                                episode.as_ref(),
+                                result.entities.len(),
+                                &result.facts,
+                                result.links.len(),
+                                result.warnings.len(),
+                            )
+                        }
+                        Err(_) => crate::service::build_extract_log_result(
+                            None,
+                            result.entities.len(),
+                            &result.facts,
+                            result.links.len(),
+                            result.warnings.len(),
+                        ),
+                    };
+
                     self.service.log_tool_event_with_duration(
                         "extract.done",
                         json!({"episode_id": &episode_id}),
-                        json!({"entities": result.entities.len(), "facts": result.facts.len()}),
+                        log_result,
                         LogLevel::Info,
                         timer.elapsed(),
                         Some(&request_id),

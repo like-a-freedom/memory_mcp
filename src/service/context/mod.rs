@@ -83,6 +83,82 @@ async fn track_fact_accesses(
     }
 }
 
+async fn collect_episode_fallback_items(
+    service: &crate::service::MemoryService,
+    params: &DefaultContextParams<'_>,
+    query: &str,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let episode_records = select_episode_records_for_query(
+        service,
+        params.namespace,
+        params.scope,
+        params.cutoff_iso,
+        Some(query),
+        params.budget,
+        params.project_opt,
+    )
+    .await?;
+
+    Ok(build_episode_fallback_items(EpisodeFallbackParams {
+        episodes: filtering::filter_episodes_by_constraints(
+            episode_records,
+            params.access,
+            params.project_opt,
+        ),
+        query_opt: Some(query),
+        scope: params.scope,
+        cutoff: params.cutoff,
+        window_start: params.window_start,
+        window_end: params.window_end,
+        timeline_mode: params.view_mode == Some("timeline"),
+        budget: params.budget,
+        fallback_rationale_fn: ranking::default_episode_fallback_rationale,
+    }))
+}
+
+fn should_prefer_episode_content(
+    selected_facts: &[ranking::RankedContextFact],
+    episode_items: &[AssembledContextItem],
+    query_terms: &[String],
+) -> bool {
+    if episode_items.is_empty() {
+        return false;
+    }
+
+    if selected_facts
+        .iter()
+        .any(|fact| fact.retrieval_tier == RetrievalTier::GraphExpanded)
+    {
+        return false;
+    }
+
+    let best_fact_overlap = selected_facts
+        .iter()
+        .map(|fact| lexical::lexical_query_overlap_for_fact(&fact.fact, query_terms))
+        .max()
+        .unwrap_or(0);
+
+    let best_episode_overlap = episode_items
+        .iter()
+        .map(|item| lexical::lexical_query_overlap_for_text(&item.content, query_terms))
+        .max()
+        .unwrap_or(0);
+
+    best_episode_overlap > best_fact_overlap
+}
+
+fn build_episode_rescue_log_result(
+    episode_candidate_count: usize,
+    selected_fact_count: usize,
+    episode_rescue_used: bool,
+) -> serde_json::Value {
+    json!({
+        "episode_candidate_count": episode_candidate_count,
+        "selected_fact_count": selected_fact_count,
+        "episode_rescue_used": episode_rescue_used,
+    })
+}
+
 /// Parameters for the default context assembly pipeline.
 struct DefaultContextParams<'a> {
     namespace: &'a str,
@@ -321,61 +397,71 @@ async fn assemble_default_context(
         )
     };
 
-    if ranked_facts.is_empty() {
-        if let Some(query) = params.query_opt {
-            let episode_records = select_episode_records_for_query(
-                service,
-                params.namespace,
-                params.scope,
-                params.cutoff_iso,
-                Some(query),
-                params.budget,
-                params.project_opt,
-            )
-            .await?;
-            Ok(build_episode_fallback_items(EpisodeFallbackParams {
-                episodes: filtering::filter_episodes_by_constraints(
-                    episode_records,
-                    params.access,
-                    params.project_opt,
-                ),
-                query_opt: Some(query),
-                scope: params.scope,
-                cutoff: params.cutoff,
-                window_start: params.window_start,
-                window_end: params.window_end,
-                timeline_mode: params.view_mode == Some("timeline"),
-                budget: params.budget,
-                fallback_rationale_fn: ranking::default_episode_fallback_rationale,
-            }))
-        } else {
-            unreachable!("ranked_facts is empty but no query provided")
-        }
+    let episode_fallback_items = if let Some(query) = params.query_opt {
+        collect_episode_fallback_items(service, &params, query).await?
     } else {
-        apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
-        if params.view_mode == Some("timeline") {
-            sort_ranked_context_facts_for_timeline(&mut ranked_facts);
-            Ok(ranked_facts
-                .into_iter()
-                .take(params.budget.max(1) as usize)
-                .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
-                .collect())
-        } else {
-            let temporal_focus = params
-                .query_opt
-                .and_then(|query| infer_temporal_window(query, params.cutoff));
-            let selected_ranked = select_ranked_context_facts(
-                ranked_facts,
-                params.budget.max(1) as usize,
-                temporal_focus,
-                params.query_terms.to_vec(),
-            );
-            Ok(selected_ranked
-                .into_iter()
-                .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
-                .collect())
+        Vec::new()
+    };
+
+    if ranked_facts.is_empty() {
+        if params.query_opt.is_some() {
+            return Ok(episode_fallback_items);
         }
+
+        unreachable!("ranked_facts is empty but no query provided")
     }
+
+    apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
+    let selected_ranked = if params.view_mode == Some("timeline") {
+        sort_ranked_context_facts_for_timeline(&mut ranked_facts);
+        ranked_facts
+            .into_iter()
+            .take(params.budget.max(1) as usize)
+            .collect::<Vec<_>>()
+    } else {
+        let temporal_focus = params
+            .query_opt
+            .and_then(|query| infer_temporal_window(query, params.cutoff));
+        select_ranked_context_facts(
+            ranked_facts,
+            params.budget.max(1) as usize,
+            temporal_focus,
+            params.query_terms.to_vec(),
+        )
+    };
+
+    let prefer_episode_content = should_prefer_episode_content(
+        &selected_ranked,
+        &episode_fallback_items,
+        params.query_terms,
+    );
+
+    if params.query_opt.is_some() {
+        service.logger.log(
+            super::log_event(
+                "assemble_context.episode_rescue",
+                json!({"scope": params.scope, "query": params.query_opt}),
+                build_episode_rescue_log_result(
+                    episode_fallback_items.len(),
+                    selected_ranked.len(),
+                    prefer_episode_content,
+                ),
+                Some(params.access),
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+    }
+
+    if prefer_episode_content {
+        return Ok(episode_fallback_items);
+    }
+
+    Ok(selected_ranked
+        .into_iter()
+        .map(|ranked| ranked_fact_to_item(ranked, params.cutoff))
+        .collect())
 }
 
 /// Assemble context for a query.
@@ -969,6 +1055,156 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(fact_ids, vec!["fact:july"]);
+    }
+
+    #[test]
+    fn should_prefer_episode_content_when_episode_overlap_is_stronger() {
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: crate::models::Fact {
+                content: "July 2025 platform licensing notes for renewal workflow.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:noise",
+                    "episode:noise",
+                    fact_time,
+                    1.0,
+                    4.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:noise", "episode:noise", fact_time, 1.0, 4.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+            quote: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        assert!(should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_fact_overlap_is_equal_or_better() {
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: crate::models::Fact {
+                content: "Platform planning notes July 2025 for release scope and integrations."
+                    .to_string(),
+                ..create_ranked_test_fact(
+                    "fact:strong",
+                    "episode:strong",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:strong", "episode:strong", fact_time, 1.0, 5.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Platform notes July 2025 with rollout reminders.".to_string(),
+            quote: "Platform notes July 2025 with rollout reminders.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_over_graph_expanded_matches() {
+        let query_terms = crate::service::query::search_query_terms("bob jones");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: crate::models::Fact {
+                content: "Prototype milestone is blocked.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:graph",
+                    "episode:graph",
+                    fact_time,
+                    1.0,
+                    0.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::GraphExpanded,
+            ..create_ranked_test_fact("fact:graph", "episode:graph", fact_time, 1.0, 0.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Alice Smith met Bob Jones to plan next steps.".to_string(),
+            quote: "Alice Smith met Bob Jones to plan next steps.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn build_episode_rescue_log_result_reports_candidate_and_decision_counts() {
+        let result = build_episode_rescue_log_result(3, 2, true);
+
+        assert_eq!(
+            result
+                .get("episode_candidate_count")
+                .and_then(Value::as_u64),
+            Some(3)
+        );
+        assert_eq!(
+            result.get("selected_fact_count").and_then(Value::as_u64),
+            Some(2)
+        );
+        assert_eq!(
+            result.get("episode_rescue_used").and_then(Value::as_bool),
+            Some(true)
+        );
     }
 
     #[tokio::test]
