@@ -357,8 +357,16 @@ impl MemoryService {
     }
 
     /// Public helper for tool-level logging.
-    pub(crate) fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
-        self.logger.log(log_event(op, args, result, None), level);
+    pub(crate) fn log_tool_event(
+        &self,
+        op: &str,
+        args: Value,
+        result: Value,
+        level: LogLevel,
+        request_id: Option<&str>,
+    ) {
+        self.logger
+            .log(log_event(op, args, result, None, request_id, None), level);
     }
 
     /// Public helper for tool-level logging with duration.
@@ -369,9 +377,18 @@ impl MemoryService {
         result: Value,
         level: LogLevel,
         duration: std::time::Duration,
+        request_id: Option<&str>,
     ) {
+        let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
         self.logger.log(
-            log_event(op, log_args_with_duration(args, duration), result, None),
+            log_event(
+                op,
+                log_args_with_duration(args, duration),
+                result,
+                None,
+                request_id,
+                Some(duration_ms),
+            ),
             level,
         );
     }
@@ -415,6 +432,8 @@ impl MemoryService {
                 }),
                 json!({}),
                 access.as_ref(),
+                None,
+                None,
             ),
             LogLevel::Debug,
         );
@@ -434,6 +453,8 @@ impl MemoryService {
                     "original_content_len": original_content_len,
                 }),
                 access.as_ref(),
+                None,
+                None,
             ),
             LogLevel::Trace,
         );
@@ -490,6 +511,8 @@ impl MemoryService {
                     }),
                     json!({"status": "existing_episode_reused"}),
                     access.as_ref(),
+                    None,
+                    None,
                 ),
                 LogLevel::Debug,
             );
@@ -506,6 +529,8 @@ impl MemoryService {
                 }),
                 json!({"episode_id": episode_id}),
                 access.as_ref(),
+                None,
+                None,
             ),
             LogLevel::Info,
         );
@@ -532,6 +557,8 @@ impl MemoryService {
                         json!({"fact_id": fact_id}),
                         json!({"error": err.to_string()}),
                         access.as_ref(),
+                        None,
+                        None,
                     ),
                     LogLevel::Warn,
                 );
@@ -545,6 +572,8 @@ impl MemoryService {
                 json!({"count": explanations.len()}),
                 json!({"count": explanations.len()}),
                 access.as_ref(),
+                None,
+                None,
             ),
             LogLevel::Info,
         );
@@ -587,6 +616,8 @@ impl MemoryService {
                     "warnings": payload.warnings.len(),
                 }),
                 access.as_ref(),
+                None,
+                None,
             ),
             LogLevel::Info,
         );
@@ -845,6 +876,8 @@ impl MemoryService {
                     log_args_with_duration(args, timer.elapsed()),
                     result,
                     None,
+                    None,
+                    None,
                 ),
                 LogLevel::Debug,
             );
@@ -858,6 +891,8 @@ impl MemoryService {
                         "embedding.generate.done",
                         log_args_with_duration(args, timer.elapsed()),
                         build_embedding_log_result(1, Some(embedding.len())),
+                        None,
+                        None,
                         None,
                     ),
                     LogLevel::Info,
@@ -874,6 +909,8 @@ impl MemoryService {
                         "embedding.generate.error",
                         log_args_with_duration(args, timer.elapsed()),
                         result,
+                        None,
+                        None,
                         None,
                     ),
                     LogLevel::Warn,
@@ -1140,7 +1177,8 @@ impl MemoryService {
                 "resolved_namespace".to_string(),
                 serde_json::Value::String(ns.clone()),
             );
-            self.logger.log(event, crate::logging::LogLevel::Warn);
+            let dedup_key = format!("scope.namespace_fallback:{}", ns);
+            self.logger.log_warn_dedup(event, &dedup_key, 10);
         }
         ns
     }
@@ -1326,6 +1364,8 @@ impl MemoryService {
                     json!({"namespace": namespace}),
                     json!({"reason": "no_linked_entities"}),
                     None,
+                    None,
+                    None,
                 ),
                 LogLevel::Trace,
             );
@@ -1340,6 +1380,8 @@ impl MemoryService {
                     "linked_entity_count": linked_entities.len(),
                 }),
                 json!({}),
+                None,
+                None,
                 None,
             ),
             LogLevel::Debug,
@@ -1396,6 +1438,8 @@ impl MemoryService {
                     "hub_entities": hub_entities.len(),
                     "surprising_connections": surprising_connections.len(),
                 }),
+                None,
+                None,
                 None,
             ),
             LogLevel::Trace,
@@ -1512,6 +1556,8 @@ mod tests {
             json!({"key": "value"}),
             json!({"result": "ok"}),
             None,
+            None,
+            None,
         );
         assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
         assert_eq!(
@@ -1535,7 +1581,7 @@ mod tests {
             content_type: None,
             cross_scope_allow: None,
         };
-        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
         let access_event = event.get("access").unwrap();
         assert_eq!(
             access_event.get("caller_id").unwrap().as_str(),
@@ -3325,7 +3371,7 @@ mod tests {
                 to: "org".to_string(),
             }]),
         };
-        let event = log_event("test_op", json!({}), json!({}), Some(&access));
+        let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
         let access_val = event.get("access").unwrap();
         assert_eq!(
             access_val.get("caller_id").unwrap().as_str(),
@@ -3349,7 +3395,7 @@ mod tests {
 
     #[test]
     fn log_event_without_access_context_omits_access_field() {
-        let event = log_event("test_op", json!({}), json!({}), None);
+        let event = log_event("test_op", json!({}), json!({}), None, None, None);
         assert!(!event.contains_key("access"));
     }
 

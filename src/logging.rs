@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::sync::Mutex;
 
 use chrono::Utc;
 use serde_json::Value;
@@ -53,26 +54,17 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
+/// Tracks repeated warning occurrences for deduplication.
+#[derive(Default)]
+struct WarnTracker {
+    counts: Mutex<HashMap<String, u64>>,
+}
+
 /// Logger that writes structured events to stderr.
-///
-/// Events are formatted as key-value pairs on a single line.
-/// Long values are truncated to avoid excessive output.
-///
-/// # Examples
-///
-/// ```rust
-/// use memory_mcp::logging::{StdoutLogger, LogLevel};
-/// use std::collections::HashMap;
-/// use serde_json::json;
-///
-/// let logger = StdoutLogger::new("info");
-/// let mut event = HashMap::new();
-/// event.insert("op".to_string(), json!("test"));
-/// logger.log(event, LogLevel::Info);
-/// ```
 #[derive(Clone)]
 pub struct StdoutLogger {
     level: LogLevel,
+    warn_tracker: std::sync::Arc<WarnTracker>,
 }
 
 impl StdoutLogger {
@@ -81,6 +73,36 @@ impl StdoutLogger {
     pub fn new(level: &str) -> Self {
         Self {
             level: LogLevel::parse(level),
+            warn_tracker: std::sync::Arc::new(WarnTracker::default()),
+        }
+    }
+
+    /// Logs a warning with deduplication. The `dedup_key` identifies
+    /// repeated occurrences. The first occurrence is always logged.
+    /// Subsequent occurrences are logged only at every Nth repetition
+    /// (controlled by `every_nth`, default 10).
+    pub fn log_warn_dedup(
+        &self,
+        event: HashMap<String, Value>,
+        dedup_key: &str,
+        every_nth: u64,
+    ) {
+        let count = {
+            let mut counts = self.warn_tracker.counts.lock().expect("warn tracker lock");
+            let c = counts.entry(dedup_key.to_string()).or_insert(0);
+            *c += 1;
+            *c
+        };
+
+        if count == 1 || count % every_nth == 0 {
+            let mut event = event;
+            if count > 1 {
+                event.insert(
+                    "repeat_count".to_string(),
+                    Value::Number(count.into()),
+                );
+            }
+            self.log(event, LogLevel::Warn);
         }
     }
 
@@ -123,11 +145,49 @@ impl StdoutLogger {
         level: LogLevel,
         ts: &str,
     ) -> String {
-        let mut parts = Vec::with_capacity(event.len() + 2);
-        parts.push(format!("[{}] {}", ts, level.as_str().to_uppercase()));
+        // Truncate timestamp to milliseconds for readability: ...608.123456Z -> ...608Z
+        let ts_short = if ts.len() > 23 {
+            // RFC3339: "2026-04-12T20:03:59.608616+00:00" → find '.' then keep 3 digits then 'Z'
+            if let Some(dot) = ts.find('.') {
+                format!("{}Z", &ts[..dot + 4])
+            } else {
+                ts.to_string()
+            }
+        } else {
+            ts.to_string()
+        };
 
-        let mut keys: Vec<_> = event.keys().cloned().collect();
+        // Extract special fields for prominent placement
+        let request_id = event
+            .get("request_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        let duration_ms = event.get("duration_ms").and_then(|v| v.as_u64());
+
+        let mut parts = Vec::with_capacity(event.len() + 4);
+        // Header: [ts] LEVEL  req=XXXX
+        parts.push(format!("[{}] {:<5} req={:<6}", ts_short, level.as_str().to_uppercase(), request_id));
+
+        // Build remaining keys, excluding special fields we already rendered
+        let special_keys = ["request_id"];
+        let mut keys: Vec<_> = event
+            .keys()
+            .filter(|k| !special_keys.contains(&k.as_str()))
+            .cloned()
+            .collect();
         keys.sort();
+
+        // Render: op first, then duration_ms (if present), then the rest
+        if let Some(pos) = keys.iter().position(|k| k == "op") {
+            let op = keys.remove(pos);
+            if let Some(value) = event.get(&op) {
+                parts.push(format!("{}={}", op, value_to_string(value)));
+            }
+        }
+
+        if let Some(ms) = duration_ms {
+            parts.push(format!("duration_ms={}", ms));
+        }
 
         for key in keys {
             if let Some(value) = event.get(&key) {
@@ -136,7 +196,7 @@ impl StdoutLogger {
             }
         }
 
-        parts.join(" ")
+        parts.join("  ")
     }
 }
 
@@ -254,10 +314,11 @@ mod tests {
         let line = StdoutLogger::format_event_line_with_ts(
             &event,
             LogLevel::Info,
-            "2026-01-01T00:00:00+00:00",
+            "2026-01-01T00:00:00.000+00:00",
         );
 
-        assert!(line.contains("[2026-01-01T00:00:00+00:00] INFO"));
+        assert!(line.contains("[2026-01-01T00:00:00.000Z] INFO "));
+        assert!(line.contains("req=-"));
         assert!(line.contains("op=migrations"));
         assert!(line.contains("stage=start"));
         assert!(line.contains("source=filesystem"));
@@ -311,6 +372,45 @@ mod tests {
         let event = HashMap::new();
         let line = StdoutLogger::format_event_line(&event, LogLevel::Info);
         assert!(line.contains("] INFO"));
+    }
+
+    #[test]
+    fn format_with_request_id_and_duration() {
+        let mut event = HashMap::new();
+        event.insert("op".to_string(), json!("extract.done"));
+        event.insert("request_id".to_string(), json!("req_0042"));
+        event.insert("duration_ms".to_string(), json!(152u64));
+        event.insert("entities".to_string(), json!(3u64));
+
+        let line = StdoutLogger::format_event_line_with_ts(
+            &event,
+            LogLevel::Info,
+            "2026-04-12T20:03:59.608616+00:00",
+        );
+
+        assert!(line.contains("[2026-04-12T20:03:59.608Z]"));
+        assert!(line.contains("INFO "));
+        assert!(line.contains("req=req_0042"));
+        assert!(line.contains("op=extract.done"));
+        assert!(line.contains("duration_ms=152"));
+        assert!(line.contains("entities=3"));
+        // request_id should NOT appear again in the key-value section
+        let after_op = line.split("op=extract.done").nth(1).unwrap_or("");
+        assert!(!after_op.contains("request_id="));
+    }
+
+    #[test]
+    fn format_without_request_id_shows_dash() {
+        let mut event = HashMap::new();
+        event.insert("op".to_string(), json!("main.startup"));
+
+        let line = StdoutLogger::format_event_line_with_ts(
+            &event,
+            LogLevel::Info,
+            "2026-04-12T20:03:59.608616+00:00",
+        );
+
+        assert!(line.contains("req=-"));
     }
 
     #[test]

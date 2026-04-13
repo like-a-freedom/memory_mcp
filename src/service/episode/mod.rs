@@ -195,7 +195,7 @@ pub async fn extract_entities(
                 zero_shot_labels.map(|labels| labels.len()),
                 None,
             ),
-            None,
+            None, None, None,
         ),
         LogLevel::Info,
     );
@@ -219,7 +219,7 @@ pub async fn extract_entities(
                             "error": err.to_string(),
                         }),
                         json!({"provider": provider}),
-                        None,
+                        None, None, None,
                     ),
                     LogLevel::Warn,
                 );
@@ -327,7 +327,7 @@ pub async fn extract_from_episode(
             "extract_from_episode.start",
             json!({"episode_id": episode_id}),
             json!({}),
-            None,
+            None, None, None,
         ),
         LogLevel::Info,
     );
@@ -399,7 +399,7 @@ pub async fn extract_from_episode(
             "extract_from_episode.done",
             log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
             json!({"entities": entities.len(), "facts": facts.len(), "warnings": warnings.len()}),
-            None,
+            None, None, None,
         ),
         LogLevel::Info,
     );
@@ -448,7 +448,7 @@ fn log_ner_error(
             "ner.extract.error",
             log_args_with_duration(json!({"content_chars": content_chars}), timer.elapsed()),
             build_ner_log_result(provider, 0, zero_shot_label_count, Some(&err.to_string())),
-            None,
+            None, None, None,
         ),
         LogLevel::Warn,
     );

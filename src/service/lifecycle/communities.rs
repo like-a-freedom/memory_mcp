@@ -79,6 +79,8 @@ pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize
                 json!({"namespace": namespace, "cutoff": cutoff}),
                 json!({}),
                 None,
+                None,
+                None,
             ),
             crate::logging::LogLevel::Debug,
         );
@@ -171,6 +173,8 @@ async fn rebuild_namespace_communities(
                 "communities_rebuilt": rebuilt.len(),
                 "stale_deleted": stale_deleted,
             }),
+            None,
+            None,
             None,
         ),
         crate::logging::LogLevel::Trace,

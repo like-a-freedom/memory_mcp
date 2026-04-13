@@ -174,7 +174,7 @@ pub(crate) async fn build_facets_view(
             "assemble_context.facets_view",
             json!({"scope": scope, "project": project}),
             json!({"count": items.len()}),
-            Some(access),
+            Some(access), None, None,
         ),
         LogLevel::Debug,
     );
@@ -258,7 +258,7 @@ pub(crate) async fn build_wake_up_view(
             "assemble_context.wake_up_view",
             json!({"scope": params.scope, "project": params.project, "fact_type_count": params.fact_types.len()}),
             json!({"count": items.len(), "persona_count": persona_count}),
-            Some(params.access),
+            Some(params.access), None, None,
         ),
         LogLevel::Debug,
     );
@@ -283,7 +283,7 @@ pub(crate) async fn build_map_view(
             "assemble_context.map_view",
             json!({"namespace": namespace, "budget": budget}),
             json!({"hub_entities": hub_entities.len(), "communities": communities.len()}),
-            None,
+            None, None, None,
         ),
         LogLevel::Debug,
     );

@@ -35,7 +35,7 @@ pub(crate) async fn find_hub_entities(
             "graph.hubs.start",
             json!({"namespace": namespace, "cutoff": cutoff_iso, "limit": limit}),
             json!({}),
-            None,
+            None, None, None,
         ),
         LogLevel::Debug,
     );
@@ -100,7 +100,7 @@ pub(crate) async fn find_hub_entities(
             "graph.hubs.done",
             json!({"namespace": namespace, "limit": limit}),
             json!({"count": hubs.len()}),
-            None,
+            None, None, None,
         ),
         LogLevel::Trace,
     );
@@ -118,7 +118,7 @@ pub(crate) async fn list_communities(
             "graph.communities.start",
             json!({"namespace": namespace, "limit": limit}),
             json!({}),
-            None,
+            None, None, None,
         ),
         LogLevel::Debug,
     );
@@ -147,7 +147,7 @@ pub(crate) async fn list_communities(
             "graph.communities.done",
             json!({"namespace": namespace, "limit": limit}),
             json!({"count": communities.len()}),
-            None,
+            None, None, None,
         ),
         LogLevel::Trace,
     );
@@ -166,7 +166,7 @@ pub(crate) async fn find_surprising_connections(
                 "graph.surprising_connections.skipped",
                 json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
                 json!({"reason": "invalid_source_or_depth"}),
-                None,
+                None, None, None,
             ),
             LogLevel::Trace,
         );
@@ -178,7 +178,7 @@ pub(crate) async fn find_surprising_connections(
             "graph.surprising_connections.start",
             json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
             json!({}),
-            None,
+            None, None, None,
         ),
         LogLevel::Debug,
     );
@@ -267,7 +267,7 @@ pub(crate) async fn find_surprising_connections(
             "graph.surprising_connections.done",
             json!({"namespace": namespace, "source_entity": source_entity}),
             json!({"count": surprising_connections.len()}),
-            None,
+            None, None, None,
         ),
         LogLevel::Trace,
     );

@@ -132,6 +132,8 @@ pub(crate) async fn maybe_record_query_log(
                 }),
                 json!({"reason": "disabled"}),
                 Some(access),
+                None,
+                None,
             ),
             LogLevel::Trace,
         );
@@ -154,6 +156,8 @@ pub(crate) async fn maybe_record_query_log(
                         "retrieval_tier": primary_retrieval_tier(results),
                     }),
                     Some(access),
+                    None,
+                    None,
                 ),
                 LogLevel::Debug,
             );
@@ -169,6 +173,8 @@ pub(crate) async fn maybe_record_query_log(
                             }),
                             json!({"count": pruned_count}),
                             Some(access),
+                            None,
+                            None,
                         ),
                         LogLevel::Trace,
                     );
@@ -184,6 +190,8 @@ pub(crate) async fn maybe_record_query_log(
                             }),
                             json!({"error": err.to_string()}),
                             Some(access),
+                            None,
+                            None,
                         ),
                         LogLevel::Warn,
                     );
@@ -201,6 +209,8 @@ pub(crate) async fn maybe_record_query_log(
                     }),
                     json!({"error": err.to_string()}),
                     Some(access),
+                    None,
+                    None,
                 ),
                 LogLevel::Warn,
             );

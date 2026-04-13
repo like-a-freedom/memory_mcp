@@ -68,7 +68,7 @@ impl FsWatcher {
                     "interval_secs": interval_secs.max(1),
                 }),
                 json!({"status": "listening"}),
-                None,
+                None, None, None,
             ),
             LogLevel::Info,
         );
@@ -95,7 +95,7 @@ impl FsWatcher {
                             "watcher.event_skipped",
                             json!({"path": path.display().to_string()}),
                             json!({"reason": "interval_dedup"}),
-                            None,
+                            None, None, None,
                         ),
                         LogLevel::Trace,
                     );
@@ -113,7 +113,7 @@ impl FsWatcher {
                             "project": project,
                         }),
                         json!({}),
-                        None,
+                        None, None, None,
                     ),
                     LogLevel::Debug,
                 );
@@ -145,7 +145,7 @@ impl FsWatcher {
                                     "source_type": source_type,
                                 }),
                                 json!({"episode_id": episode_id}),
-                                None,
+                                None, None, None,
                             ),
                             LogLevel::Info,
                         );
@@ -161,7 +161,7 @@ impl FsWatcher {
                                     "project": project,
                                 }),
                                 json!({"error": err.to_string()}),
-                                None,
+                                None, None, None,
                             ),
                             LogLevel::Error,
                         );

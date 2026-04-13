@@ -179,7 +179,8 @@ async fn run_watch_mode(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let logger = StdoutLogger::new("info");
+    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into());
+    let logger = StdoutLogger::new(&log_level);
     let run_mode = parse_cli_args(std::env::args())
         .map_err(|err| Box::new(std::io::Error::other(err)) as Box<dyn std::error::Error>)?;
 

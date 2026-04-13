@@ -44,6 +44,8 @@ pub(crate) fn log_event(
     args: Value,
     result: Value,
     access: Option<&AccessContext>,
+    request_id: Option<&str>,
+    duration_ms: Option<u64>,
 ) -> HashMap<String, Value> {
     let mut event = HashMap::new();
     event.insert("op".to_string(), Value::String(op.to_string()));
@@ -51,6 +53,12 @@ pub(crate) fn log_event(
     event.insert("result".to_string(), result);
     if let Some(access) = access {
         event.insert("access".to_string(), serialize_access(access));
+    }
+    if let Some(rid) = request_id {
+        event.insert("request_id".to_string(), Value::String(rid.to_string()));
+    }
+    if let Some(ms) = duration_ms {
+        event.insert("duration_ms".to_string(), Value::Number(ms.into()));
     }
     event
 }

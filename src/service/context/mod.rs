@@ -73,7 +73,7 @@ async fn track_fact_accesses(
                     "assemble_context.access_track_error",
                     json!({"fact_id": item.fact_id}),
                     json!({"error": err.to_string()}),
-                    Some(access),
+                    Some(access), None, None,
                 ),
                 LogLevel::Warn,
             );
@@ -389,7 +389,7 @@ pub async fn assemble_context(
             "assemble_context.start",
             json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({}),
-            access.as_ref(),
+            access.as_ref(), None, None,
         ),
         LogLevel::Info,
     );
@@ -445,7 +445,7 @@ pub async fn assemble_context(
                 "assemble_context.cache_hit",
                 json!({"scope": request.scope, "query": request.query}),
                 json!({"count": cached.len()}),
-                Some(&access),
+                Some(&access), None, None,
             ),
             LogLevel::Info,
         );
@@ -461,7 +461,7 @@ pub async fn assemble_context(
             "assemble_context.cache_miss",
             json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"status": "computing"}),
-            Some(&access),
+            Some(&access), None, None,
         ),
         LogLevel::Trace,
     );
@@ -510,7 +510,7 @@ pub async fn assemble_context(
                 "query_logging_enabled": service.is_query_logging_enabled(),
             }),
             json!({}),
-            Some(&access),
+            Some(&access), None, None,
         ),
         LogLevel::Debug,
     );
@@ -523,7 +523,7 @@ pub async fn assemble_context(
                 "assemble_context.view_mode_unknown",
                 json!({"scope": request.scope, "query": request.query, "view_mode": view_mode}),
                 json!({"fallback": "default_ranked_retrieval"}),
-                Some(&access),
+                Some(&access), None, None,
             ),
             LogLevel::Warn,
         );
@@ -615,7 +615,7 @@ pub async fn assemble_context(
                     "assemble_context.experience_appended",
                     json!({"scope": request.scope, "query": request.query}),
                     json!({"count": appended_experience}),
-                    Some(&access),
+                    Some(&access), None, None,
                 ),
                 LogLevel::Trace,
             );
@@ -636,7 +636,7 @@ pub async fn assemble_context(
                 "retrieval_tiers": summarize_retrieval_tiers(&results),
                 "supplemental_experience": supplemental_experience_count(&results),
             }),
-            Some(&access),
+            Some(&access), None, None,
         ),
         LogLevel::Trace,
     );
@@ -653,7 +653,7 @@ pub async fn assemble_context(
             "assemble_context.cache_set",
             json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"count": results.len()}),
-            Some(&access),
+            Some(&access), None, None,
         ),
         LogLevel::Trace,
     );
