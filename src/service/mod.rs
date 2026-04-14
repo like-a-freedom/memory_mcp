@@ -51,7 +51,8 @@ mod constants {
 
 pub use cache::{CacheKey, invalidate_cache_by_scope};
 pub(crate) use episode::build_extract_log_result;
-pub use episode::{episode_from_record, extract_from_episode, fact_from_record};
+pub(crate) use episode::extract_from_episode;
+pub use episode::{episode_from_record, fact_from_record};
 pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
     deterministic_episode_id, deterministic_fact_id, hash_prefix,
@@ -68,4 +69,4 @@ pub use query::{
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
-pub(crate) use core::log_event;
+pub(crate) use core::{log_args_with_duration, log_event};
