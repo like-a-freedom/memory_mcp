@@ -954,6 +954,11 @@ impl MemoryService {
     }
 
     async fn build_explain_item(&self, item: ExplainItem) -> Result<ExplainItem, MemoryError> {
+        if item.source_episode.is_empty() {
+            return Err(MemoryError::Validation(
+                "source_episode is required for explain items".into(),
+            ));
+        }
         let (record, _) = self.find_episode_record(&item.source_episode).await?;
         let Some(record) = record else {
             return Ok(item);

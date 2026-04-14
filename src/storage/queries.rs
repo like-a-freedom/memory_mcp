@@ -23,6 +23,9 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
 
 /// Build SQL query for selecting a single record.
 pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
+    if record_id.is_empty() {
+        return ("SELECT * FROM none WHERE false".to_string(), None);
+    }
     if let Some(idx) = record_id.find(':') {
         let table = &record_id[..idx];
         let id = &record_id[idx + 1..];
@@ -535,5 +538,46 @@ fn normalize_surreal_json(v: &Value) -> Value {
         J::Null => J::Null,
         J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
         _ => v.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_select_one_query_empty_string_returns_safe_noop() {
+        let (sql, bind) = build_select_one_query("");
+        assert_eq!(sql, "SELECT * FROM none WHERE false");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_table_with_id() {
+        let (sql, bind) = build_select_one_query("episode:abc123");
+        assert_eq!(sql, "SELECT * FROM episode:⟨abc123⟩");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_table_only_produces_invalid_sql() {
+        // "table:" has empty id part → falls through to format!("SELECT * FROM {record_id}")
+        let (sql, bind) = build_select_one_query("episode:");
+        assert_eq!(sql, "SELECT * FROM episode:");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_plain_table() {
+        let (sql, bind) = build_select_one_query("episode");
+        assert_eq!(sql, "SELECT * FROM episode");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_fact_with_id() {
+        let (sql, bind) = build_select_one_query("fact:52f9d92d20d829840f24294f");
+        assert_eq!(sql, "SELECT * FROM fact:⟨52f9d92d20d829840f24294f⟩");
+        assert!(bind.is_none());
     }
 }

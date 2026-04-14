@@ -417,3 +417,89 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
     );
     assert!(stored.get("last_accessed").is_some());
 }
+
+#[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
+async fn explain_with_empty_source_episode_returns_validation_error() {
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service created");
+
+    // Act: Call explain with empty source_episode (the bug scenario)
+    let request = ExplainRequest {
+        context_pack: vec![ExplainItem {
+            fact_id: Some("fact:52f9d92d20d829840f24294f".to_string()),
+            content: "Some content".to_string(),
+            quote: "Some quote".to_string(),
+            source_episode: String::new(), // empty — triggers the bug
+            scope: None,
+            t_ref: None,
+            t_ingested: None,
+            provenance: serde_json::Value::Null,
+            citation_context: None,
+            all_sources: vec![],
+            graph_insights: None,
+        }],
+    };
+
+    let result = service.explain(request, None).await;
+
+    // Assert: Should return a validation error, not a SurrealDB parse error
+    assert!(result.is_err(), "Expected error for empty source_episode");
+    let err = result.unwrap_err();
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("source_episode is required"),
+        "Unexpected error message: {err_msg}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
+async fn explain_with_context_items_missing_source_episode_returns_validation_error() {
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service created");
+
+    // Simulates the exact bug payload: objects with fact_id but no source_episode
+    let request = ExplainRequest {
+        context_pack: vec![
+            ExplainItem {
+                fact_id: Some("fact:52f9d92d20d829840f24294f".to_string()),
+                content: String::new(),
+                quote: String::new(),
+                source_episode: String::new(), // missing from original JSON
+                scope: None,
+                t_ref: None,
+                t_ingested: None,
+                provenance: serde_json::Value::Null,
+                citation_context: None,
+                all_sources: vec![],
+                graph_insights: None,
+            },
+            ExplainItem {
+                fact_id: Some("fact:3440abb2c00eb317567d3148".to_string()),
+                content: String::new(),
+                quote: String::new(),
+                source_episode: String::new(), // missing from original JSON
+                scope: None,
+                t_ref: None,
+                t_ingested: None,
+                provenance: serde_json::Value::Null,
+                citation_context: None,
+                all_sources: vec![],
+                graph_insights: None,
+            },
+        ],
+    };
+
+    let result = service.explain(request, None).await;
+
+    assert!(result.is_err(), "Expected error for empty source_episode");
+    let err = result.unwrap_err();
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("source_episode is required"),
+        "Unexpected error message: {err_msg}"
+    );
+}

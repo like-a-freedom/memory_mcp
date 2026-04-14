@@ -393,4 +393,32 @@ mod tests {
         let items = parse_context_items(raw).unwrap();
         assert_eq!(items[0].content, "Hello world ✓");
     }
+
+    #[test]
+    fn parse_context_items_empty_string_element_produces_empty_source_episode() {
+        let raw = r#"[""]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].source_episode, "");
+        assert_eq!(items[0].content, "");
+    }
+
+    #[test]
+    fn parse_context_items_object_with_only_source_episode() {
+        let raw = r#"[{"source_episode":"episode:xyz"}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].source_episode, "episode:xyz");
+        assert_eq!(items[0].content, "");
+        assert_eq!(items[0].quote, "");
+    }
+
+    #[test]
+    fn parse_context_items_object_with_fact_id_and_empty_source_episode() {
+        let raw = r#"[{"fact_id":"fact:abc","source_episode":""}]"#;
+        let items = parse_context_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].fact_id, Some("fact:abc".to_string()));
+        assert_eq!(items[0].source_episode, "");
+    }
 }
