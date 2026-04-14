@@ -2,65 +2,27 @@
 
 mod communities;
 mod edges;
+mod record_parsing;
+mod summary_parser;
 
 pub(crate) use communities::{build_community_summary, update_communities};
 #[cfg(test)]
 pub(crate) use communities::{collect_connected_entity_component, find_overlapping_communities};
 pub(crate) use edges::store_edge;
-
-pub(crate) fn unwrap_record_string(value: &serde_json::Value) -> Option<String> {
-    if let Some(s) = value.as_str() {
-        Some(s.to_string())
-    } else if let Some(obj) = value.as_object() {
-        obj.get("String")
-            .and_then(Value::as_str)
-            .map(ToString::to_string)
-            .or_else(|| {
-                obj.get("Datetime")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                obj.get("Strand")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                obj.get("Strand")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                obj.get("Datetime")
-                    .and_then(|inner| inner.get("String"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .or_else(|| {
-                obj.get("RecordId").and_then(|record_id| {
-                    let record_id = record_id.as_object()?;
-                    let table = record_id.get("table")?.as_str()?;
-                    let key = record_id.get("key")?.as_str()?;
-                    Some(format!("{table}:{key}"))
-                })
-            })
-    } else {
-        None
-    }
-}
+pub use record_parsing::{episode_from_record, fact_from_record};
+pub(crate) use record_parsing::{fact_from_value_or_wrapper, fact_is_active, unwrap_record_string};
+use summary_parser::{
+    entity_links_for_fact_content, sanitized_content_for_entity_extraction,
+    structured_summary_fact_candidates,
+};
 
 use serde_json::{Value, json};
 
 use super::core::log_args_with_duration;
 use super::error::MemoryError;
-use super::query::parse_iso;
 use super::statement_detection::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
     is_summary_like_note_candidate,
-};
-use super::value_helpers::{
-    dt_field, f64_field, i64_field, json_string, str_array_field, str_field, unwrap_array_value,
 };
 use crate::logging::LogLevel;
 use crate::models::Episode;
@@ -70,65 +32,6 @@ use crate::models::{
 };
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
-
-/// Parse an episode from a database record.
-#[must_use]
-pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
-    Some(Episode {
-        episode_id: json_string(record.get("episode_id")?)?.to_string(),
-        source_type: json_string(record.get("source_type")?)?.to_string(),
-        source_id: json_string(record.get("source_id")?)?.to_string(),
-        content: json_string(record.get("content")?)?.to_string(),
-        t_ref: parse_iso(json_string(record.get("t_ref")?)?)?,
-        t_ingested: parse_iso(json_string(record.get("t_ingested")?)?)?,
-        scope: json_string(record.get("scope")?)?.to_string(),
-        visibility_scope: record
-            .get("visibility_scope")
-            .and_then(json_string)
-            .unwrap_or_default()
-            .to_string(),
-        policy_tags: record
-            .get("policy_tags")
-            .and_then(unwrap_array_value)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(json_string)
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default(),
-    })
-}
-
-/// Parse a fact from a database record.
-#[must_use]
-pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
-    let map = record.as_object()?;
-
-    let t_valid = dt_field(map, "t_valid")?;
-
-    Some(crate::models::Fact {
-        fact_id: str_field(map, "fact_id")?,
-        fact_type: str_field(map, "fact_type")?,
-        content: str_field(map, "content")?,
-        quote: str_field(map, "quote")?,
-        source_episode: str_field(map, "source_episode")?,
-        t_valid,
-        t_ingested: dt_field(map, "t_ingested").unwrap_or(t_valid),
-        t_invalid: dt_field(map, "t_invalid"),
-        t_invalid_ingested: dt_field(map, "t_invalid_ingested"),
-        confidence: f64_field(map, "confidence", 0.0),
-        index_keys: str_array_field(map, "index_keys"),
-        access_count: i64_field(map, "access_count", 0),
-        last_accessed: dt_field(map, "last_accessed"),
-        entity_links: str_array_field(map, "entity_links"),
-        scope: str_field(map, "scope").unwrap_or_default(),
-        policy_tags: str_array_field(map, "policy_tags"),
-        provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
-        ft_score: f64_field(map, "ft_score", 0.0),
-    })
-}
 
 /// Extract entities from content.
 ///
@@ -372,320 +275,11 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
     matches!(provider, "anno" | "gliner")
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StructuredSummaryLabel {
-    Decision,
-    Fact,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum StructuredSummarySection {
-    Labeled(StructuredSummaryLabel),
-    Thematic(String),
-}
-
-impl StructuredSummaryLabel {
-    fn from_token(token: &str) -> Option<Self> {
-        match super::normalize_text(token).as_str() {
-            "decision" | "decisions" => Some(Self::Decision),
-            "fact" | "facts" => Some(Self::Fact),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct StructuredSummaryFactCandidate {
-    fact_type: String,
-    content: String,
-    quote: String,
-}
-
 #[derive(Debug, Default)]
 pub(crate) struct FactExtractionOutcome {
     pub(crate) facts: Vec<ExtractedFact>,
     pub(crate) note_fallback_used: bool,
     pub(crate) structured_line_fact_count: usize,
-}
-
-fn strip_list_marker(line: &str) -> (&str, bool) {
-    let trimmed = line.trim_start();
-    if let Some(rest) = trimmed
-        .strip_prefix("- ")
-        .or_else(|| trimmed.strip_prefix("* "))
-    {
-        return (rest.trim_start(), true);
-    }
-
-    let digit_count = trimmed.chars().take_while(|ch| ch.is_ascii_digit()).count();
-    if digit_count > 0 {
-        let rest = &trimmed[digit_count..];
-        if let Some(rest) = rest.strip_prefix(". ") {
-            return (rest.trim_start(), true);
-        }
-    }
-
-    (trimmed, false)
-}
-
-fn strip_markdown_heading_marker(line: &str) -> (&str, bool) {
-    let trimmed = line.trim_start();
-    let heading_marker_len = trimmed.chars().take_while(|ch| *ch == '#').count();
-    if heading_marker_len == 0 {
-        return (trimmed, false);
-    }
-
-    let rest = trimmed[heading_marker_len..].trim_start();
-    (rest, !rest.is_empty())
-}
-
-fn strip_markdown_inline_formatting(value: &str) -> String {
-    value
-        .replace("**", "")
-        .replace("__", "")
-        .replace('`', "")
-        .trim()
-        .to_string()
-}
-
-fn structured_summary_heading_label(tokens: &[String]) -> Option<StructuredSummaryLabel> {
-    if tokens.iter().any(|token| token == "decision") {
-        return Some(StructuredSummaryLabel::Decision);
-    }
-
-    if tokens.iter().any(|token| token == "fact") {
-        return Some(StructuredSummaryLabel::Fact);
-    }
-
-    let has_pending = tokens
-        .iter()
-        .any(|token| matches!(token.as_str(), "pending" | "open"));
-    let has_item = tokens
-        .iter()
-        .any(|token| matches!(token.as_str(), "item" | "step" | "followup" | "todo"));
-    let has_action = tokens
-        .iter()
-        .any(|token| matches!(token.as_str(), "action" | "todo" | "followup"));
-    let has_next_steps =
-        tokens.iter().any(|token| token == "next") && tokens.iter().any(|token| token == "step");
-
-    if (has_pending && has_item) || has_action || has_next_steps {
-        return Some(StructuredSummaryLabel::Fact);
-    }
-
-    None
-}
-
-fn structured_summary_section_heading(line: &str) -> Option<StructuredSummarySection> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let (body, is_list_item) = strip_list_marker(trimmed);
-    if is_list_item || split_structured_summary_label(body).is_some() {
-        return None;
-    }
-
-    let (heading_body, has_markdown_heading) = strip_markdown_heading_marker(body);
-    let has_trailing_colon = body.ends_with(':');
-    let heading = heading_body
-        .strip_suffix(':')
-        .unwrap_or(heading_body)
-        .trim();
-    if heading.is_empty() {
-        return None;
-    }
-
-    let heading = strip_markdown_inline_formatting(heading);
-    let heading_terms = super::query::search_query_terms(&heading);
-    if heading_terms.is_empty() {
-        return None;
-    }
-
-    if !has_markdown_heading && !has_trailing_colon && heading_terms.len() > 4 {
-        return None;
-    }
-
-    if let Some(label) = structured_summary_heading_label(&heading_terms) {
-        return Some(StructuredSummarySection::Labeled(label));
-    }
-
-    if has_markdown_heading || has_trailing_colon {
-        return Some(StructuredSummarySection::Thematic(heading));
-    }
-
-    None
-}
-
-fn split_structured_summary_label(line: &str) -> Option<(StructuredSummaryLabel, &str)> {
-    let (prefix, remainder) = line.split_once(':')?;
-    let normalized_prefix = strip_markdown_inline_formatting(prefix);
-    let label = StructuredSummaryLabel::from_token(&normalized_prefix)?;
-    let remainder = remainder.trim();
-    if remainder.is_empty() {
-        return None;
-    }
-    Some((label, remainder))
-}
-
-fn contextualize_structured_summary_fact_content(
-    section: &StructuredSummarySection,
-    fact_content: &str,
-) -> String {
-    match section {
-        StructuredSummarySection::Labeled(_) => fact_content.to_string(),
-        StructuredSummarySection::Thematic(heading) => {
-            let normalized_heading = super::normalize_text(heading);
-            let normalized_content = super::normalize_text(fact_content);
-            if !normalized_heading.is_empty() && normalized_content.starts_with(&normalized_heading)
-            {
-                fact_content.to_string()
-            } else {
-                format!("{heading}: {fact_content}")
-            }
-        }
-    }
-}
-
-fn classify_structured_summary_fact_type(
-    section: &StructuredSummarySection,
-    content: &str,
-) -> &'static str {
-    match section {
-        StructuredSummarySection::Labeled(StructuredSummaryLabel::Decision) => {
-            FactType::Decision.as_str()
-        }
-        StructuredSummarySection::Labeled(StructuredSummaryLabel::Fact)
-        | StructuredSummarySection::Thematic(_) => {
-            let normalized = content.to_lowercase();
-            if is_metric_statement(content) {
-                FactType::Metric.as_str()
-            } else if is_promise_statement(&normalized) || is_document_action_item(content) {
-                FactType::Promise.as_str()
-            } else if is_experience_statement(content) {
-                FactType::Experience.as_str()
-            } else {
-                FactType::Note.as_str()
-            }
-        }
-    }
-}
-
-fn structured_summary_fact_candidates(content: &str) -> Vec<StructuredSummaryFactCandidate> {
-    let mut section = None;
-    let mut seen = HashSet::new();
-    let mut candidates = Vec::new();
-
-    for raw_line in content.lines() {
-        let trimmed = raw_line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if let Some(next_section) = structured_summary_section_heading(trimmed) {
-            section = Some(next_section);
-            continue;
-        }
-
-        let (body, is_list_item) = strip_list_marker(trimmed);
-        let parsed = split_structured_summary_label(body)
-            .map(|(label, fact_content)| {
-                (
-                    StructuredSummarySection::Labeled(label),
-                    fact_content.trim(),
-                )
-            })
-            .or_else(|| {
-                section
-                    .clone()
-                    .filter(|_| is_list_item)
-                    .map(|active_section| (active_section, body.trim()))
-            });
-
-        let Some((active_section, fact_content)) = parsed else {
-            section = None;
-            continue;
-        };
-
-        let fact_content = strip_markdown_inline_formatting(fact_content);
-
-        if fact_content.is_empty() {
-            continue;
-        }
-
-        let fact_type = classify_structured_summary_fact_type(&active_section, &fact_content);
-        let content = contextualize_structured_summary_fact_content(&active_section, &fact_content);
-        let dedupe_key = format!("{}\u{001f}{}", fact_type, super::normalize_text(&content));
-        if !seen.insert(dedupe_key) {
-            continue;
-        }
-
-        candidates.push(StructuredSummaryFactCandidate {
-            fact_type: fact_type.to_string(),
-            content,
-            quote: fact_content,
-        });
-    }
-
-    candidates
-}
-
-fn entity_links_for_fact_content(content: &str, entities: &[ExtractedEntity]) -> Vec<String> {
-    let normalized_content = super::normalize_text(content);
-    if normalized_content.is_empty() {
-        return Vec::new();
-    }
-
-    let mut seen = HashSet::new();
-    let mut entity_links = Vec::new();
-
-    for entity in entities {
-        let normalized_name = super::normalize_text(&entity.canonical_name);
-        if normalized_name.is_empty()
-            || !normalized_content.contains(&normalized_name)
-            || !seen.insert(entity.entity_id.clone())
-        {
-            continue;
-        }
-        entity_links.push(entity.entity_id.clone());
-    }
-
-    entity_links
-}
-
-fn sanitized_content_for_entity_extraction(content: &str) -> String {
-    let mut section = None;
-    let mut sanitized_lines = Vec::new();
-
-    for raw_line in content.lines() {
-        let trimmed = raw_line.trim();
-        if trimmed.is_empty() {
-            sanitized_lines.push(String::new());
-            continue;
-        }
-
-        if let Some(next_section) = structured_summary_section_heading(trimmed) {
-            section = Some(next_section);
-            continue;
-        }
-
-        let (body, is_list_item) = strip_list_marker(trimmed);
-        if let Some((_, remainder)) = split_structured_summary_label(body) {
-            sanitized_lines.push(strip_markdown_inline_formatting(remainder));
-            continue;
-        }
-
-        if is_list_item && section.is_some() {
-            sanitized_lines.push(strip_markdown_inline_formatting(body));
-            continue;
-        }
-
-        section = None;
-        sanitized_lines.push(strip_markdown_inline_formatting(trimmed));
-    }
-
-    sanitized_lines.join("\n")
 }
 
 /// Extract facts from an episode.
@@ -1150,7 +744,7 @@ async fn detect_contradiction_warnings(
             if existing_fact.fact_id == new_fact.fact_id
                 || existing_fact.source_episode == episode.episode_id
                 || existing_fact.fact_type != new_fact.fact_type
-                || !fact_is_active_for_warning(existing_fact, cutoff)
+                || !fact_is_active(existing_fact, cutoff)
                 || !has_meaningful_entity_overlap(
                     &existing_fact.entity_links,
                     &new_fact.entity_links,
@@ -1181,10 +775,6 @@ async fn detect_contradiction_warnings(
     Ok(warnings)
 }
 
-fn fact_from_value_or_wrapper(value: &Value) -> Option<crate::models::Fact> {
-    fact_from_record(value).or_else(|| value.get("Object").and_then(fact_from_record))
-}
-
 fn has_meaningful_entity_overlap(lhs: &[String], rhs: &[String]) -> bool {
     let lhs = lhs
         .iter()
@@ -1203,22 +793,6 @@ fn has_meaningful_entity_overlap(lhs: &[String], rhs: &[String]) -> bool {
     let smaller_set = lhs.len().min(rhs.len());
 
     overlap > 0 && overlap * 2 >= smaller_set
-}
-
-fn fact_is_active_for_warning(
-    fact: &crate::models::Fact,
-    cutoff: chrono::DateTime<chrono::Utc>,
-) -> bool {
-    if fact.t_valid > cutoff || fact.t_ingested > cutoff {
-        return false;
-    }
-
-    match (fact.t_invalid, fact.t_invalid_ingested) {
-        (None, _) => true,
-        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
-        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
-        _ => false,
-    }
 }
 
 #[cfg(test)]
