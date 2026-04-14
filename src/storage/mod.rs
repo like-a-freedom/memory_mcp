@@ -480,7 +480,7 @@ impl SurrealDbClient {
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
         let initial_schema = render_initial_schema_sql(
-            include_str!("migrations/__Initial.surql"),
+            include_str!("../migrations/__Initial.surql"),
             self.fact_embedding_dimension,
         );
 
@@ -795,35 +795,35 @@ fn versioned_migrations() -> &'static [MigrationScript] {
     &[
         MigrationScript {
             file_name: "006_simplified_search_redesign.surql",
-            sql: include_str!("migrations/006_simplified_search_redesign.surql"),
+            sql: include_str!("../migrations/006_simplified_search_redesign.surql"),
         },
         MigrationScript {
             file_name: "007_episode_archival_fields.surql",
-            sql: include_str!("migrations/007_episode_archival_fields.surql"),
+            sql: include_str!("../migrations/007_episode_archival_fields.surql"),
         },
         MigrationScript {
             file_name: "008_fact_semantic_embeddings.surql",
-            sql: include_str!("migrations/008_fact_semantic_embeddings.surql"),
+            sql: include_str!("../migrations/008_fact_semantic_embeddings.surql"),
         },
         MigrationScript {
             file_name: "009_adaptive_memory_alignment.surql",
-            sql: include_str!("migrations/009_adaptive_memory_alignment.surql"),
+            sql: include_str!("../migrations/009_adaptive_memory_alignment.surql"),
         },
         MigrationScript {
             file_name: "010_coerce_t_ingested_to_datetime.surql",
-            sql: include_str!("migrations/010_coerce_t_ingested_to_datetime.surql"),
+            sql: include_str!("../migrations/010_coerce_t_ingested_to_datetime.surql"),
         },
         MigrationScript {
             file_name: "016_project_tag.surql",
-            sql: include_str!("migrations/016_project_tag.surql"),
+            sql: include_str!("../migrations/016_project_tag.surql"),
         },
         MigrationScript {
             file_name: "017_edge_origin.surql",
-            sql: include_str!("migrations/017_edge_origin.surql"),
+            sql: include_str!("../migrations/017_edge_origin.surql"),
         },
         MigrationScript {
             file_name: "018_query_log.surql",
-            sql: include_str!("migrations/018_query_log.surql"),
+            sql: include_str!("../migrations/018_query_log.surql"),
         },
     ]
 }
@@ -2730,7 +2730,7 @@ mod tests {
             .expect("select migration record")
             .expect("stored migration record");
         let expected_checksum = migration_checksum(include_str!(
-            "migrations/006_simplified_search_redesign.surql"
+            "../migrations/006_simplified_search_redesign.surql"
         ));
 
         assert_eq!(

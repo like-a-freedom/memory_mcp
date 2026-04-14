@@ -3,8 +3,6 @@
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::sync::Arc;
-#[cfg(test)]
-use std::sync::Mutex;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};

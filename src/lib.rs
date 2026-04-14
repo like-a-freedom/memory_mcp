@@ -33,7 +33,6 @@
 //! ```
 
 pub mod config;
-pub mod correlation;
 pub mod logging;
 pub mod mcp;
 pub mod models;
