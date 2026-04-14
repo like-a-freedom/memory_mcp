@@ -1,6 +1,7 @@
 //! MemoryService implementation - core service orchestration.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::Mutex;
@@ -9,353 +10,26 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
-use crate::config::SurrealConfig;
-use crate::logging::{LogLevel, StdoutLogger};
+use crate::logging::LogLevel;
 use crate::models::{
     AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, GraphHubEntity, GraphInsights, IngestRequest, InvalidateRequest,
     ProvenanceSource,
 };
-use crate::storage::{DbClient, GraphDirection, SurrealDbClient};
+use crate::storage::GraphDirection;
 
-use super::AnnoEntityExtractor;
-use super::EntityExtractor;
-use super::cache::CacheKey;
-use super::embedding::{DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider};
-use super::entity_extraction::create_entity_extractor;
 use super::error::MemoryError;
 use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::ingest::prepare_ingest_request;
-use super::lifecycle::{spawn_archival_worker, spawn_community_worker, spawn_decay_worker};
-use super::rate_limit::RateLimiter;
 use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 use super::value_helpers::{json_i64, string_from_value};
 
-/// Core service for memory operations.
-#[derive(Clone)]
-pub struct MemoryService {
-    /// Database client for storage operations.
-    pub(crate) db_client: Arc<dyn DbClient>,
-    pub(crate) namespaces: Vec<String>,
-    pub(crate) default_namespace: String,
-    pub(crate) logger: StdoutLogger,
-    pub(crate) rate_limiter: Arc<RateLimiter>,
-    pub(crate) context_cache:
-        Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
-    pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
-    pub(crate) embedding_similarity_threshold: f64,
-    pub(crate) query_logging_enabled: bool,
-    pub(crate) query_log_retention_days: u32,
-}
-
-use lru::LruCache;
+mod builder;
 mod helpers;
+pub use builder::MemoryService;
 pub(crate) use helpers::*;
 
-#[derive(Debug, Clone, Copy)]
-struct ServiceBuildConfig {
-    rate_limit_rps: i32,
-    rate_limit_burst: i32,
-    cache_size: usize,
-    embedding_similarity_threshold: f64,
-}
-
-/// Build a startup versions event payload used for diagnostic logging.
-/// Extracted to a helper so it can be unit-tested independently of logger I/O.
-fn build_startup_versions_event(
-    client_version: &str,
-    server_version: Option<&str>,
-) -> std::collections::HashMap<String, serde_json::Value> {
-    let mut m = std::collections::HashMap::new();
-    m.insert("op".to_string(), json!("startup.versions"));
-    m.insert("client_version".to_string(), json!(client_version));
-    if let Some(sv) = server_version {
-        m.insert("surrealdb_server_version".to_string(), json!(sv));
-    }
-    m
-}
-
-async fn apply_startup_migrations(
-    db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
-) -> Result<(), MemoryError> {
-    // SurrealDB namespaces are isolated schema domains, so startup must
-    // apply the embedded schema contract to each configured namespace.
-    for namespace in namespaces {
-        db_client.apply_migrations(namespace).await?;
-    }
-
-    Ok(())
-}
-
 impl MemoryService {
-    /// Creates a new `MemoryService` from environment variables.
-    pub async fn new_from_env() -> Result<Self, MemoryError> {
-        let config = SurrealConfig::from_env()?;
-        let default_namespace = config
-            .default_namespace()
-            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?;
-
-        let effective_data_dir = config.data_dir_or_default();
-        let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
-        let mut startup_event = std::collections::HashMap::new();
-        startup_event.insert("op".to_string(), serde_json::json!("startup"));
-        startup_event.insert(
-            "db_mode".to_string(),
-            serde_json::json!(if config.embedded {
-                "embedded"
-            } else {
-                "remote"
-            }),
-        );
-        startup_event.insert(
-            "namespaces".to_string(),
-            serde_json::json!(config.namespaces.clone()),
-        );
-        startup_event.insert(
-            "query_logging_enabled".to_string(),
-            serde_json::json!(config.query_logging_enabled),
-        );
-        startup_event.insert(
-            "query_log_retention_days".to_string(),
-            serde_json::json!(config.query_log_retention_days),
-        );
-        if config.embedded {
-            startup_event.insert(
-                "data_dir".to_string(),
-                serde_json::json!(effective_data_dir),
-            );
-        } else if let Some(url) = &config.url {
-            startup_event.insert("url".to_string(), serde_json::json!(url));
-        }
-        startup_logger.log(startup_event, crate::logging::LogLevel::Info);
-
-        let db_client = SurrealDbClient::connect(&config, default_namespace).await?;
-        let server_version = match db_client.server_version(default_namespace).await {
-            Ok(version) => version,
-            Err(err) => {
-                let mut event = std::collections::HashMap::new();
-                event.insert(
-                    "op".to_string(),
-                    serde_json::json!("startup.version_probe_failed"),
-                );
-                event.insert("error".to_string(), serde_json::json!(err.to_string()));
-                startup_logger.log(event, crate::logging::LogLevel::Warn);
-                None
-            }
-        };
-
-        let client_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
-        let versions_event =
-            build_startup_versions_event(client_version, server_version.as_deref());
-        startup_logger.log(versions_event, crate::logging::LogLevel::Info);
-
-        let embedding_provider =
-            create_embedding_provider(&config.embedding, &effective_data_dir).await?;
-        let entity_extractor =
-            create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
-
-        let mut service = Self::new_with_embedding_provider(
-            Arc::new(db_client),
-            config.namespaces,
-            config.log_level,
-            50,
-            100,
-            embedding_provider,
-            config.embedding.similarity_threshold,
-        )?
-        .with_query_logging_enabled(config.query_logging_enabled)
-        .with_query_log_retention_days(config.query_log_retention_days);
-        service.entity_extractor = entity_extractor;
-        apply_startup_migrations(&service.db_client, &service.namespaces).await?;
-        service.check_surrealdb_connection().await?;
-
-        // Spawn lifecycle workers if enabled
-        if config.lifecycle.enabled {
-            let decay_service = service.clone();
-            let decay_config = config.lifecycle.clone();
-
-            let _decay_handle = spawn_decay_worker(
-                decay_service,
-                decay_config.decay_interval_secs,
-                decay_config.decay_confidence_threshold,
-                decay_config.decay_half_life_days,
-            );
-
-            let archival_service = service.clone();
-            let archival_config = config.lifecycle.clone();
-
-            let _archival_handle = spawn_archival_worker(
-                archival_service,
-                archival_config.archival_interval_secs,
-                archival_config.archival_age_days,
-            );
-
-            let community_service = service.clone();
-            let community_config = config.lifecycle.clone();
-
-            let _community_handle =
-                spawn_community_worker(community_service, community_config.archival_interval_secs);
-
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::json!("lifecycle.workers.started"),
-            );
-            event.insert(
-                "decay_interval".to_string(),
-                serde_json::json!(config.lifecycle.decay_interval_secs),
-            );
-            event.insert(
-                "archival_interval".to_string(),
-                serde_json::json!(config.lifecycle.archival_interval_secs),
-            );
-            event.insert(
-                "community_interval".to_string(),
-                serde_json::json!(config.lifecycle.archival_interval_secs),
-            );
-            service.logger.log(event, crate::logging::LogLevel::Info);
-        }
-
-        Ok(service)
-    }
-
-    /// Creates a new service instance.
-    pub fn new(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-    ) -> Result<Self, MemoryError> {
-        Self::build(
-            db_client,
-            namespaces,
-            log_level,
-            ServiceBuildConfig {
-                rate_limit_rps,
-                rate_limit_burst,
-                cache_size: super::CONTEXT_CACHE_SIZE,
-                embedding_similarity_threshold:
-                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            },
-            Arc::new(DisabledEmbeddingProvider::new(
-                crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            )),
-        )
-    }
-
-    pub(crate) fn new_with_embedding_provider(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        embedding_provider: Arc<dyn EmbeddingProvider>,
-        embedding_similarity_threshold: f64,
-    ) -> Result<Self, MemoryError> {
-        Self::build(
-            db_client,
-            namespaces,
-            log_level,
-            ServiceBuildConfig {
-                rate_limit_rps,
-                rate_limit_burst,
-                cache_size: super::CONTEXT_CACHE_SIZE,
-                embedding_similarity_threshold,
-            },
-            embedding_provider,
-        )
-    }
-
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(crate) fn new_with_cache_size(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        cache_size: usize,
-    ) -> Result<Self, MemoryError> {
-        Self::build(
-            db_client,
-            namespaces,
-            log_level,
-            ServiceBuildConfig {
-                rate_limit_rps,
-                rate_limit_burst,
-                cache_size,
-                embedding_similarity_threshold:
-                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            },
-            Arc::new(DisabledEmbeddingProvider::new(
-                crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            )),
-        )
-    }
-
-    fn build(
-        db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
-        log_level: String,
-        build_config: ServiceBuildConfig,
-        embedding_provider: Arc<dyn EmbeddingProvider>,
-    ) -> Result<Self, MemoryError> {
-        if namespaces.is_empty() {
-            return Err(MemoryError::ConfigInvalid(
-                "namespaces cannot be empty".to_string(),
-            ));
-        }
-        let cache_size = std::num::NonZeroUsize::new(build_config.cache_size).ok_or_else(|| {
-            MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
-        })?;
-        let logger = StdoutLogger::new(&log_level);
-        Ok(Self {
-            db_client,
-            namespaces: namespaces.clone(),
-            default_namespace: namespaces[0].clone(),
-            logger,
-            rate_limiter: Arc::new(RateLimiter::new(
-                build_config.rate_limit_rps,
-                build_config.rate_limit_burst,
-            )),
-            context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
-            embedding_provider,
-            embedding_similarity_threshold: build_config.embedding_similarity_threshold,
-            query_logging_enabled: false,
-            query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
-        })
-    }
-
-    /// Returns a copy of the service with persisted query analytics enabled or disabled.
-    #[must_use]
-    pub fn with_query_logging_enabled(mut self, enabled: bool) -> Self {
-        self.query_logging_enabled = enabled;
-        self
-    }
-
-    /// Returns a copy of the service with a custom query-log retention window.
-    #[must_use]
-    pub fn with_query_log_retention_days(mut self, days: u32) -> Self {
-        self.query_log_retention_days = days;
-        self
-    }
-
-    /// Returns whether persisted query analytics are enabled.
-    #[must_use]
-    pub fn is_query_logging_enabled(&self) -> bool {
-        self.query_logging_enabled
-    }
-
-    /// Returns the query-log retention window in days.
-    #[must_use]
-    pub fn query_log_retention_days(&self) -> u32 {
-        self.query_log_retention_days
-    }
-
     /// Public helper for tool-level logging.
     pub(crate) fn log_tool_event(
         &self,
@@ -1540,9 +1214,11 @@ mod tests {
     use crate::models::{AccessContext, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
     use crate::service::rate_limit::SafeMutex;
-    use crate::storage::SurrealDbClient;
+    use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
+    use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;
+    use std::sync::Mutex;
 
     #[test]
     fn log_event_creates_expected_structure() {

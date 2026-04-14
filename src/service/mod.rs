@@ -26,6 +26,7 @@ mod ids;
 mod ingest;
 pub(crate) mod lifecycle;
 mod query;
+mod startup;
 mod statement_detection;
 mod validation;
 
