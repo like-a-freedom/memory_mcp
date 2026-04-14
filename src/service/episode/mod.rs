@@ -7,45 +7,37 @@ mod fact_extraction;
 mod record_parsing;
 mod summary_parser;
 
-pub(crate) use communities::{build_community_summary, update_communities};
+pub(crate) use communities::build_community_summary;
 #[cfg(test)]
 pub(crate) use communities::{collect_connected_entity_component, find_overlapping_communities};
 pub(crate) use edges::store_edge;
-pub(crate) use fact_extraction::{
-    FactExtractionOutcome, build_extract_log_result, build_extract_log_result_with_metadata,
-    extract_facts, extract_from_episode,
-};
+pub(crate) use fact_extraction::{build_extract_log_result, extract_from_episode};
+pub(crate) use record_parsing::unwrap_record_string;
 pub use record_parsing::{episode_from_record, fact_from_record};
-pub(crate) use record_parsing::{fact_from_value_or_wrapper, fact_is_active, unwrap_record_string};
 
 #[cfg(test)]
 mod tests {
     use super::communities::{collect_connected_entity_component, find_overlapping_communities};
-    use super::edges::store_edge;
     use super::entity_extraction::{
         build_ner_log_result, dedupe_entity_candidates, extract_entities,
     };
     use super::fact_extraction::{
-        FactExtractionOutcome, build_extract_log_result, build_extract_log_result_with_metadata,
-        extract_facts, extract_from_episode, should_extract_note_fact,
+        build_extract_log_result_with_metadata, should_extract_note_fact,
     };
+    use super::record_parsing::{fact_from_value_or_wrapper, fact_is_active};
     use super::summary_parser::{
         sanitized_content_for_entity_extraction, structured_summary_fact_candidates,
     };
-    use super::{
-        episode_from_record, fact_from_record, fact_from_value_or_wrapper, fact_is_active,
-        unwrap_record_string,
-    };
+    use super::{episode_from_record, fact_from_record, unwrap_record_string};
     use crate::models::EntityCandidate;
     use crate::models::Episode;
     use crate::models::ExtractedFact;
     use crate::models::FactType;
     use crate::service::EntityExtractor;
-    use crate::service::MemoryService;
     use crate::service::error::MemoryError;
     use crate::service::statement_detection::{
-        is_document_action_item, is_experience_statement, is_metric_statement,
-        is_promise_statement, is_summary_like_note_candidate,
+        is_document_action_item, is_experience_statement, is_promise_statement,
+        is_summary_like_note_candidate,
     };
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Utc;

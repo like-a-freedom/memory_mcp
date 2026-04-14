@@ -5,7 +5,6 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{EntityCandidate, ExtractedEntity};
-use crate::service::EntityExtractor;
 use crate::service::MemoryService;
 use crate::service::error::MemoryError;
 use crate::service::normalize_text;
