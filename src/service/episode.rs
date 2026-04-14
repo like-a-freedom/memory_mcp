@@ -8,14 +8,10 @@ mod record_parsing;
 mod summary_parser;
 
 pub(crate) use communities::build_community_summary;
-#[cfg(test)]
-pub(crate) use communities::{collect_connected_entity_component, find_overlapping_communities};
 pub(crate) use edges::store_edge;
 pub(crate) use fact_extraction::{build_extract_log_result, extract_from_episode};
 pub(crate) use record_parsing::unwrap_record_string;
 pub use record_parsing::{episode_from_record, fact_from_record};
-#[cfg(test)]
-pub(crate) use record_parsing::{fact_from_value_or_wrapper, fact_is_active};
 
 #[cfg(test)]
 mod tests {
@@ -26,7 +22,6 @@ mod tests {
     use super::fact_extraction::{
         build_extract_log_result_with_metadata, should_extract_note_fact,
     };
-    use super::record_parsing::{fact_from_value_or_wrapper, fact_is_active};
     use super::summary_parser::{
         sanitized_content_for_entity_extraction, structured_summary_fact_candidates,
     };
