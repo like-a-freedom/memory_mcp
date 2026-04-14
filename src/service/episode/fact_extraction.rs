@@ -21,7 +21,7 @@ use crate::service::episode::summary_parser::{
 use crate::service::error::MemoryError;
 use crate::service::normalize_text;
 use crate::service::query::now;
-use crate::service::statement_detection::{
+use crate::service::util::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
     is_summary_like_note_candidate,
 };

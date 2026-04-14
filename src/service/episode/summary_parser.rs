@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::models::{ExtractedEntity, FactType};
-use crate::service::statement_detection::{
+use crate::service::util::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
 };
 

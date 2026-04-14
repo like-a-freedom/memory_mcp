@@ -17,9 +17,9 @@ use crate::models::{
 use crate::storage::GraphDirection;
 
 use super::error::MemoryError;
-use super::ids::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
 use super::ingest::prepare_ingest_request;
-use super::validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+use super::util::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
+use super::util::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 use super::value_helpers::{json_i64, string_from_value};
 
 mod builder;
@@ -1211,8 +1211,8 @@ mod tests {
     use crate::models::EntityCandidate;
     use crate::models::{AccessContext, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
-    use crate::service::rate_limit::SafeMutex;
     use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
+    use crate::service::util::rate_limit::SafeMutex;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;

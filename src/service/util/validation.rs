@@ -1,7 +1,8 @@
 //! Validation helpers for service operations.
 
-use super::error::{MemoryError, error_messages};
-use crate::models::{EntityCandidate, IngestRequest};
+use crate::models::EntityCandidate;
+use crate::models::IngestRequest;
+use crate::service::error::{MemoryError, error_messages};
 
 /// Validate an ingest request.
 pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryError> {

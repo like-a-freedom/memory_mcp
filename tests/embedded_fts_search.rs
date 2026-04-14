@@ -218,7 +218,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
 
 #[test]
 fn schema_uses_datetime_for_fact_temporal_fields() {
-    let schema = include_str!("../src/migrations/__Initial.surql");
+    let schema = include_str!("../migrations/__Initial.surql");
 
     assert!(
         schema.contains("DEFINE FIELD t_valid ON fact TYPE datetime;"),
@@ -240,7 +240,7 @@ fn schema_uses_datetime_for_fact_temporal_fields() {
 
 #[test]
 fn schema_defines_fact_embedding_field_and_hnsw_index_only() {
-    let schema = include_str!("../src/migrations/__Initial.surql");
+    let schema = include_str!("../migrations/__Initial.surql");
 
     assert!(
         !schema.contains("DEFINE FIELD embedding ON episode"),
@@ -270,7 +270,7 @@ fn schema_defines_fact_embedding_field_and_hnsw_index_only() {
 
 #[test]
 fn schema_uses_memory_fts_analyzer() {
-    let schema = include_str!("../src/migrations/__Initial.surql");
+    let schema = include_str!("../migrations/__Initial.surql");
 
     assert!(
         schema.contains("DEFINE ANALYZER memory_fts"),
@@ -292,7 +292,7 @@ fn schema_uses_memory_fts_analyzer() {
 
 #[test]
 fn schema_uses_native_edge_endpoints() {
-    let schema = include_str!("../src/migrations/__Initial.surql");
+    let schema = include_str!("../migrations/__Initial.surql");
 
     assert!(
         schema.contains("DEFINE FIELD in ON edge"),
@@ -322,7 +322,7 @@ fn schema_uses_native_edge_endpoints() {
 
 #[test]
 fn schema_keeps_edge_origin_out_of_initial_migration() {
-    let schema = include_str!("../src/migrations/__Initial.surql");
+    let schema = include_str!("../migrations/__Initial.surql");
 
     assert!(
         !schema.contains("DEFINE FIELD origin ON edge TYPE string"),
@@ -332,7 +332,7 @@ fn schema_keeps_edge_origin_out_of_initial_migration() {
 
 #[test]
 fn edge_origin_is_introduced_by_followup_migration() {
-    let migration = include_str!("../src/migrations/017_edge_origin.surql");
+    let migration = include_str!("../migrations/017_edge_origin.surql");
 
     assert!(
         migration

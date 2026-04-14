@@ -8,7 +8,7 @@ use std::time::Instant;
 // SafeMutex — handles poisoned locks gracefully.
 // ---------------------------------------------------------------------------
 
-pub(crate) trait SafeMutex<T> {
+pub trait SafeMutex<T> {
     fn safe_lock(&self) -> std::sync::MutexGuard<'_, T>;
 }
 

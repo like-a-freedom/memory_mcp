@@ -22,16 +22,13 @@ mod embedding;
 mod entity_extraction;
 mod episode;
 mod error;
-mod ids;
 mod ingest;
 pub(crate) mod lifecycle;
 mod query;
 mod startup;
-mod statement_detection;
-mod validation;
+mod util;
 
 mod model_loader;
-mod rate_limit;
 pub(crate) mod value_helpers;
 
 pub use constants::*;
@@ -52,10 +49,6 @@ mod constants {
 pub use cache::{CacheKey, invalidate_cache_by_scope};
 pub(crate) use episode::build_extract_log_result;
 pub use episode::{episode_from_record, fact_from_record};
-pub use ids::{
-    deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_fact_id, hash_prefix,
-};
 #[cfg(feature = "cli-watch")]
 pub use ingest::watcher::FsWatcher;
 pub use lifecycle::{
@@ -66,6 +59,14 @@ pub use query::{
     bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,
     parse_iso, preprocess_search_query,
 };
-pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+/// Re-export ids module for direct access.
+pub use util::ids;
+pub use util::{
+    deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
+    deterministic_episode_id, deterministic_fact_id, hash_prefix, is_document_action_item,
+    is_experience_statement, is_metric_statement, is_promise_statement,
+    is_summary_like_note_candidate, validate_entity_candidate, validate_fact_input,
+    validate_ingest_request,
+};
 
 pub(crate) use core::{log_args_with_duration, log_event};

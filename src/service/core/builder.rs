@@ -16,8 +16,8 @@ use crate::service::error::MemoryError;
 use crate::service::lifecycle::{
     spawn_archival_worker, spawn_community_worker, spawn_decay_worker,
 };
-use crate::service::rate_limit::RateLimiter;
 use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
+use crate::service::util::RateLimiter;
 use crate::storage::{DbClient, SurrealDbClient};
 
 /// Core service for memory operations.

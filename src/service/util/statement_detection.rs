@@ -60,6 +60,6 @@ pub fn is_document_action_item(content: &str) -> bool {
 /// it does not match any richer structured-fact heuristic.
 #[must_use]
 pub fn is_summary_like_note_candidate(content: &str) -> bool {
-    let normalized_terms = super::query::search_query_terms(content);
+    let normalized_terms = crate::service::query::search_query_terms(content);
     normalized_terms.len() >= 6
 }

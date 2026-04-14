@@ -2,6 +2,8 @@
 
 use sha2::{Digest, Sha256};
 
+use crate::service::{normalize_dt, normalize_text};
+
 /// Generate a 24-character hex hash prefix.
 #[must_use]
 pub fn hash_prefix(payload: &str) -> String {
@@ -21,10 +23,10 @@ pub fn deterministic_episode_id(
 ) -> String {
     let payload = format!(
         "{}|{}|{}|{}",
-        super::normalize_text(source_type),
-        super::normalize_text(source_id),
-        super::normalize_dt(t_ref),
-        super::normalize_text(scope),
+        normalize_text(source_type),
+        normalize_text(source_id),
+        normalize_dt(t_ref),
+        normalize_text(scope),
     );
     format!("episode:{}", hash_prefix(&payload))
 }
@@ -34,8 +36,8 @@ pub fn deterministic_episode_id(
 pub fn deterministic_entity_id(entity_type: &str, canonical_name: &str) -> String {
     let payload = format!(
         "{}|{}",
-        super::normalize_text(entity_type),
-        super::normalize_text(canonical_name)
+        normalize_text(entity_type),
+        normalize_text(canonical_name)
     );
     format!("entity:{}", hash_prefix(&payload))
 }
@@ -50,10 +52,10 @@ pub fn deterministic_fact_id(
 ) -> String {
     let payload = format!(
         "{}|{}|{}|{}",
-        super::normalize_text(fact_type),
-        super::normalize_text(content),
-        super::normalize_text(source_episode),
-        super::normalize_dt(t_valid),
+        normalize_text(fact_type),
+        normalize_text(content),
+        normalize_text(source_episode),
+        normalize_dt(t_valid),
     );
     format!("fact:{}", hash_prefix(&payload))
 }
@@ -76,10 +78,10 @@ pub fn deterministic_edge_id(
 ) -> String {
     let payload = format!(
         "{}|{}|{}|{}",
-        super::normalize_text(from_id),
-        super::normalize_text(relation),
-        super::normalize_text(to_id),
-        super::normalize_dt(t_valid),
+        normalize_text(from_id),
+        normalize_text(relation),
+        normalize_text(to_id),
+        normalize_dt(t_valid),
     );
     format!("edge:{}", hash_prefix(&payload))
 }

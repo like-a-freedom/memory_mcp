@@ -217,7 +217,7 @@ async fn build_communities_from_active_edges(
         let summary =
             super::super::episode::build_community_summary(service, namespace, &member_entities)
                 .await?;
-        let community_id = super::super::ids::deterministic_community_id(&member_entities);
+        let community_id = crate::service::deterministic_community_id(&member_entities);
 
         rebuilt.push(RebuiltCommunity {
             community_id,
