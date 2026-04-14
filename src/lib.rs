@@ -41,4 +41,4 @@ pub mod storage;
 pub mod timing;
 
 pub use mcp::MemoryMcp;
-pub use service::MemoryService;
+pub use service::{MemoryError, MemoryService};
