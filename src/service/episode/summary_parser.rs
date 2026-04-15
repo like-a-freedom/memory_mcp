@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use crate::models::{ExtractedEntity, FactType};
 use crate::service::util::{
-    is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
+    is_document_action_item, is_experience_statement, is_low_value_summary_candidate,
+    is_metric_statement, is_promise_statement,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -238,7 +239,7 @@ pub(super) fn structured_summary_fact_candidates(
 
         let fact_content = strip_markdown_inline_formatting(fact_content);
 
-        if fact_content.is_empty() {
+        if fact_content.is_empty() || is_low_value_summary_candidate(&fact_content) {
             continue;
         }
 

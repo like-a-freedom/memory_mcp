@@ -27,6 +27,10 @@ mod helpers;
 pub use builder::MemoryService;
 pub(crate) use helpers::*;
 
+const MAX_GRAPH_INSIGHT_LINKED_ENTITIES: usize = 3;
+const MAX_GRAPH_INSIGHT_HUBS: i32 = 3;
+const MAX_GRAPH_INSIGHT_CONNECTIONS: usize = 5;
+
 impl MemoryService {
     /// Public helper for tool-level logging.
     pub(crate) fn log_tool_event(
@@ -380,7 +384,7 @@ impl MemoryService {
             let t_ingested = super::query::now();
             let project = self.project_for_source_episode(source_episode).await?;
             let index_keys = self
-                .build_fact_index_keys(content, &entity_links, t_valid)
+                .build_fact_index_keys(content, source_episode, &provenance, &entity_links, t_valid)
                 .await?;
             let mut payload = serde_json::Map::from_iter([
                 ("fact_id".to_string(), json!(fact_id.clone())),
@@ -484,6 +488,8 @@ impl MemoryService {
     async fn build_fact_index_keys(
         &self,
         content: &str,
+        source_episode: &str,
+        provenance: &Value,
         entity_links: &[String],
         t_valid: DateTime<Utc>,
     ) -> Result<Vec<String>, MemoryError> {
@@ -515,10 +521,47 @@ impl MemoryService {
         }
 
         keys.extend(extract_temporal_index_keys(content, t_valid));
+        keys.extend(reference_index_terms(content));
+        for source_reference in self
+            .collect_fact_source_references(source_episode, provenance)
+            .await?
+        {
+            keys.extend(reference_index_terms(&source_reference));
+        }
 
         let mut keys = keys.into_iter().collect::<Vec<_>>();
         keys.sort();
         Ok(keys)
+    }
+
+    async fn collect_fact_source_references(
+        &self,
+        source_episode: &str,
+        provenance: &Value,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut references = Vec::new();
+        let mut seen = HashSet::new();
+
+        if let Some(source_id) = provenance_source_id(provenance) {
+            let normalized = super::normalize_text(&source_id);
+            if !normalized.is_empty() && seen.insert(normalized) {
+                references.push(source_id);
+            }
+        }
+
+        let (episode_record, _) = self.find_episode_record(source_episode).await?;
+        if let Some(source_id) = episode_record
+            .as_ref()
+            .and_then(|map| map.get("source_id"))
+            .and_then(string_from_value)
+        {
+            let normalized = super::normalize_text(&source_id);
+            if !normalized.is_empty() && seen.insert(normalized) {
+                references.push(source_id);
+            }
+        }
+
+        Ok(references)
     }
 
     pub(crate) async fn generate_embedding(
@@ -1024,9 +1067,12 @@ impl MemoryService {
         entity_links: &[String],
         namespace: &str,
     ) -> Result<Option<GraphInsights>, MemoryError> {
+        let mut seen_linked_entities = HashSet::new();
         let linked_entities = entity_links
             .iter()
             .filter(|entity_id| entity_id.starts_with("entity:"))
+            .filter(|entity_id| seen_linked_entities.insert((**entity_id).clone()))
+            .take(MAX_GRAPH_INSIGHT_LINKED_ENTITIES)
             .cloned()
             .collect::<Vec<_>>();
         if linked_entities.is_empty() {
@@ -1060,15 +1106,16 @@ impl MemoryService {
         );
 
         let cutoff = super::query::now();
-        let hub_entities = super::apps::graph::find_hub_entities(self, namespace, cutoff, 5)
-            .await?
-            .into_iter()
-            .map(|hub| GraphHubEntity {
-                entity_id: hub.entity_id,
-                canonical_name: hub.canonical_name,
-                degree: hub.degree,
-            })
-            .collect::<Vec<_>>();
+        let hub_entities =
+            super::apps::graph::find_hub_entities(self, namespace, cutoff, MAX_GRAPH_INSIGHT_HUBS)
+                .await?
+                .into_iter()
+                .map(|hub| GraphHubEntity {
+                    entity_id: hub.entity_id,
+                    canonical_name: hub.canonical_name,
+                    degree: hub.degree,
+                })
+                .collect::<Vec<_>>();
 
         let mut surprising_connections = Vec::new();
         let mut seen_connections = HashSet::new();
@@ -1085,12 +1132,12 @@ impl MemoryService {
                 if seen_connections.insert(key) {
                     surprising_connections.push(connection);
                 }
-                if surprising_connections.len() >= 5 {
+                if surprising_connections.len() >= MAX_GRAPH_INSIGHT_CONNECTIONS {
                     break;
                 }
             }
 
-            if surprising_connections.len() >= 5 {
+            if surprising_connections.len() >= MAX_GRAPH_INSIGHT_CONNECTIONS {
                 break;
             }
         }
@@ -1204,6 +1251,22 @@ impl MemoryService {
 
         Ok(episodes)
     }
+}
+
+fn provenance_source_id(provenance: &Value) -> Option<String> {
+    provenance
+        .as_object()
+        .and_then(|map| map.get("source_id"))
+        .and_then(string_from_value)
+}
+
+fn reference_index_terms(raw: &str) -> Vec<String> {
+    let query_terms = crate::service::query::search_query_terms(raw);
+    let mut keys = crate::service::query::query_hard_anchor_terms(&query_terms)
+        .into_iter()
+        .collect::<Vec<_>>();
+    keys.sort();
+    keys
 }
 
 /// Resolves a scope string to a namespace, using prefix matching against

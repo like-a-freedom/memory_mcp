@@ -20,6 +20,7 @@ use super::ranking::RetrievalTier;
 pub(crate) struct EpisodeFallbackParams<'a, F> {
     pub(crate) episodes: Vec<Episode>,
     pub(crate) query_opt: Option<&'a str>,
+    pub(crate) semantic_available: bool,
     pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) window_start: Option<DateTime<Utc>>,
@@ -68,6 +69,7 @@ where
         .map(|episode| {
             let lexical_score = fallback_lexical_score(&episode.content, &query_terms);
             let confidence = episode_fallback_confidence(&episode, &query_terms, params.cutoff);
+            let grounding = episode_fallback_grounding(&episode.content, &query_terms);
 
             AssembledContextItem {
                 fact_id: format!("episode_fallback:{}", episode.episode_id),
@@ -75,6 +77,9 @@ where
                 quote: episode.content.clone(),
                 source_episode: episode.episode_id.clone(),
                 confidence,
+                relevance: grounding,
+                grounding,
+                semantic_available: Some(params.semantic_available),
                 provenance: json!({
                     "source_episode": episode.episode_id,
                     "source_type": episode.source_type,
@@ -82,10 +87,16 @@ where
                     "episode_fallback": true,
                 }),
                 rationale: format!(
-                    "tier={} fts={:.2} access_count=0 confidence={:.2} {}",
+                    "tier={} fts={:.2} access_count=0 confidence={:.2} grounding={:.2} semantic={} {}",
                     RetrievalTier::EpisodeFallback.as_str(),
                     lexical_score,
                     confidence,
+                    grounding.unwrap_or(0.0),
+                    if params.semantic_available {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    },
                     rationale_detail
                 ),
                 retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
@@ -137,6 +148,17 @@ fn fallback_lexical_score(content: &str, query_terms: &[String]) -> f64 {
         0.0
     } else {
         super::lexical::lexical_query_score_for_text(content, query_terms) as f64
+    }
+}
+
+fn episode_fallback_grounding(content: &str, query_terms: &[String]) -> Option<f64> {
+    if query_terms.is_empty() {
+        None
+    } else {
+        Some(
+            (fallback_lexical_score(content, query_terms) / query_terms.len() as f64)
+                .clamp(0.0, 1.0),
+        )
     }
 }
 
@@ -247,13 +269,16 @@ pub(crate) async fn build_facets_view(
             quote: format!("{count} episodes"),
             source_episode: format!("facet:{label}"),
             confidence: 1.0,
-            provenance: json!({
-                "facet": label,
-                "count": count,
-                "max_t_ingested": crate::service::normalize_dt(latest),
-            }),
-            rationale: "view_mode=facets grouped episodes by project/policy/scope".to_string(),
-            retrieval_tier: None,
+            ..AssembledContextItem {
+                provenance: json!({
+                    "facet": label,
+                    "count": count,
+                    "max_t_ingested": crate::service::normalize_dt(latest),
+                }),
+                rationale: "view_mode=facets grouped episodes by project/policy/scope".to_string(),
+                retrieval_tier: None,
+                ..Default::default()
+            }
         })
         .collect::<Vec<_>>();
 
@@ -332,13 +357,16 @@ pub(crate) async fn build_wake_up_view(
                 quote: fact.quote,
                 source_episode: fact.source_episode,
                 confidence,
-                provenance: fact.provenance,
-                rationale: format!(
-                    "view_mode=wake_up persona={} recent_t_ingested={}",
-                    persona,
-                    normalize_dt_fn(fact.t_ingested)
-                ),
-                retrieval_tier: None,
+                ..AssembledContextItem {
+                    provenance: fact.provenance,
+                    rationale: format!(
+                        "view_mode=wake_up persona={} recent_t_ingested={}",
+                        persona,
+                        normalize_dt_fn(fact.t_ingested)
+                    ),
+                    retrieval_tier: None,
+                    ..Default::default()
+                }
             }
         })
         .collect::<Vec<_>>();
@@ -389,14 +417,17 @@ pub(crate) async fn build_map_view(
             quote: format!("{} connections", hub.degree),
             source_episode: hub.entity_id.clone(),
             confidence: 1.0,
-            provenance: json!({
-                "kind": "hub_entity",
-                "entity_id": hub.entity_id,
-                "canonical_name": hub.canonical_name,
-                "degree": hub.degree,
-            }),
-            rationale: "view_mode=map ranked hub entities by active graph degree".to_string(),
-            retrieval_tier: None,
+            ..AssembledContextItem {
+                provenance: json!({
+                    "kind": "hub_entity",
+                    "entity_id": hub.entity_id,
+                    "canonical_name": hub.canonical_name,
+                    "degree": hub.degree,
+                }),
+                rationale: "view_mode=map ranked hub entities by active graph degree".to_string(),
+                retrieval_tier: None,
+                ..Default::default()
+            }
         });
     }
 
@@ -408,15 +439,19 @@ pub(crate) async fn build_map_view(
             quote: format!("{member_count} members"),
             source_episode: community.community_id.clone(),
             confidence: 1.0,
-            provenance: json!({
-                "kind": "community",
-                "community_id": community.community_id,
-                "member_entities": community.member_entities,
-                "member_count": member_count,
-                "updated_at": community.updated_at.map(&normalize_dt_fn),
-            }),
-            rationale: "view_mode=map listed active communities from the graph index".to_string(),
-            retrieval_tier: None,
+            ..AssembledContextItem {
+                provenance: json!({
+                    "kind": "community",
+                    "community_id": community.community_id,
+                    "member_entities": community.member_entities,
+                    "member_count": member_count,
+                    "updated_at": community.updated_at.map(&normalize_dt_fn),
+                }),
+                rationale: "view_mode=map listed active communities from the graph index"
+                    .to_string(),
+                retrieval_tier: None,
+                ..Default::default()
+            }
         });
     }
 
@@ -466,6 +501,7 @@ mod tests {
                 },
             ],
             query_opt: Some("platform planning notes july 2025"),
+            semantic_available: false,
             scope: "org",
             cutoff,
             window_start: None,
@@ -532,6 +568,7 @@ mod tests {
                 },
             ],
             query_opt: Some("release checklist archive review"),
+            semantic_available: false,
             scope: "org",
             cutoff,
             window_start: None,
@@ -575,6 +612,7 @@ mod tests {
                 },
             ],
             query_opt: Some("release checklist archive review"),
+            semantic_available: false,
             scope: "org",
             cutoff,
             window_start: None,

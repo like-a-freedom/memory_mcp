@@ -27,6 +27,7 @@ const TEMPORAL_SIMILARITY_WINDOW_DAYS: f64 = 14.0;
 const TEMPORAL_ALIGNMENT_WINDOW_DAYS: f64 = 30.0;
 const MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET: f64 = 0.50;
 const MIN_RANKED_CONFIDENCE: f64 = 0.01;
+const MIN_QUERY_GROUNDING_RATIO: f64 = 0.25;
 use super::temporal::TemporalWindow;
 use crate::service::normalize_text;
 
@@ -39,6 +40,8 @@ pub(crate) struct RankedContextFact {
     pub(crate) source_priority: u8,
     pub(crate) decayed_confidence: f64,
     pub(crate) query_alignment_factor: f64,
+    pub(crate) grounding_score: f64,
+    pub(crate) semantic_available: bool,
 }
 
 #[allow(dead_code)]
@@ -145,6 +148,8 @@ fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedCont
     existing.query_alignment_factor = existing
         .query_alignment_factor
         .max(incoming.query_alignment_factor);
+    existing.grounding_score = existing.grounding_score.max(incoming.grounding_score);
+    existing.semantic_available = existing.semantic_available || incoming.semantic_available;
 
     if incoming.retrieval_tier.precedence() > existing.retrieval_tier.precedence() {
         existing.retrieval_tier = incoming.retrieval_tier;
@@ -160,12 +165,14 @@ pub(crate) fn build_ranked_context_facts(
     community_facts: Vec<(Fact, String, f64)>,
     semantic_facts: Vec<(Fact, String)>,
     query_opt: Option<&str>,
+    semantic_available: bool,
     scope: &str,
     cutoff: DateTime<Utc>,
     decayed_fn: impl Fn(&Fact, DateTime<Utc>) -> f64,
 ) -> Vec<RankedContextFact> {
     let mut ranked_by_fact_id = HashMap::<String, RankedContextFact>::new();
     let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, fact);
+    let grounding = |fact: &Fact| query_grounding_score(query_opt, fact);
     let lexical_query_terms = query_opt.map(search_query_terms).unwrap_or_default();
 
     for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
@@ -173,6 +180,7 @@ pub(crate) fn build_ranked_context_facts(
         let confidence = decayed_fn(&fact, cutoff);
         let lexical_score = lexical_fusion_score(rank, &fact, &lexical_query_terms);
         let query_alignment_factor = query_alignment(&fact);
+        let grounding_score = grounding(&fact);
         ranked_by_fact_id
             .entry(fact_id)
             .and_modify(|candidate| {
@@ -181,6 +189,7 @@ pub(crate) fn build_ranked_context_facts(
                 candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
                 candidate.query_alignment_factor =
                     candidate.query_alignment_factor.max(query_alignment_factor);
+                candidate.grounding_score = candidate.grounding_score.max(grounding_score);
                 if retrieval_tier.precedence() > candidate.retrieval_tier.precedence() {
                     candidate.retrieval_tier = retrieval_tier;
                     candidate.rationale = build_rationale(
@@ -188,6 +197,8 @@ pub(crate) fn build_ranked_context_facts(
                         &fact,
                         candidate.decayed_confidence,
                         candidate.query_alignment_factor,
+                        candidate.grounding_score,
+                        semantic_available,
                         default_direct_rationale(query_opt, scope, cutoff),
                     );
                 }
@@ -198,6 +209,8 @@ pub(crate) fn build_ranked_context_facts(
                     &fact,
                     confidence,
                     query_alignment_factor,
+                    grounding_score,
+                    semantic_available,
                     default_direct_rationale(query_opt, scope, cutoff),
                 ),
                 fact,
@@ -206,6 +219,8 @@ pub(crate) fn build_ranked_context_facts(
                 source_priority: 0,
                 decayed_confidence: confidence,
                 query_alignment_factor,
+                grounding_score,
+                semantic_available,
             });
     }
 
@@ -213,12 +228,14 @@ pub(crate) fn build_ranked_context_facts(
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
         let query_alignment_factor = query_alignment(&fact);
+        let grounding_score = grounding(&fact);
         let weighted_rank = reciprocal_rank(rank) * graph_origin_factor.clamp(0.0, 1.0);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += weighted_rank;
             candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             candidate.query_alignment_factor =
                 candidate.query_alignment_factor.max(query_alignment_factor);
+            candidate.grounding_score = candidate.grounding_score.max(grounding_score);
             continue;
         }
 
@@ -227,6 +244,8 @@ pub(crate) fn build_ranked_context_facts(
             &fact,
             confidence,
             query_alignment_factor,
+            grounding_score,
+            semantic_available,
             rationale,
         );
 
@@ -240,6 +259,8 @@ pub(crate) fn build_ranked_context_facts(
                 source_priority: 1,
                 decayed_confidence: confidence,
                 query_alignment_factor,
+                grounding_score,
+                semantic_available,
             },
         );
     }
@@ -248,11 +269,13 @@ pub(crate) fn build_ranked_context_facts(
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
         let query_alignment_factor = query_alignment(&fact);
+        let grounding_score = grounding(&fact);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += reciprocal_rank(rank);
             candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
             candidate.query_alignment_factor =
                 candidate.query_alignment_factor.max(query_alignment_factor);
+            candidate.grounding_score = candidate.grounding_score.max(grounding_score);
             continue;
         }
 
@@ -261,6 +284,8 @@ pub(crate) fn build_ranked_context_facts(
             &fact,
             confidence,
             query_alignment_factor,
+            grounding_score,
+            semantic_available,
             rationale,
         );
 
@@ -274,6 +299,8 @@ pub(crate) fn build_ranked_context_facts(
                 source_priority: 2,
                 decayed_confidence: confidence,
                 query_alignment_factor,
+                grounding_score,
+                semantic_available,
             },
         );
     }
@@ -351,15 +378,24 @@ fn build_rationale(
     fact: &Fact,
     confidence: f64,
     query_alignment_factor: f64,
+    grounding_score: f64,
+    semantic_available: bool,
     detail: String,
 ) -> String {
     format!(
-        "tier={} fts={:.2} access_count={} confidence={:.2} alignment={:.2} {detail}",
+        "tier={} fts={:.2} access_count={} confidence={:.2} relevance={:.2} grounding={:.2} alignment={:.2} semantic={} {detail}",
         retrieval_tier.as_str(),
         fact.ft_score.max(0.0),
         fact.access_count,
         confidence,
+        confidence,
+        grounding_score,
         query_alignment_factor,
+        if semantic_available {
+            "enabled"
+        } else {
+            "disabled"
+        },
     )
 }
 
@@ -384,12 +420,21 @@ pub(crate) fn ranked_relevance_score(fact: &RankedContextFact) -> f64 {
         * fact.query_alignment_factor
 }
 
+pub(crate) fn normalized_relevance_score(fact: &RankedContextFact) -> f64 {
+    let raw = ranked_relevance_score(fact).max(0.0);
+    (raw / (1.0 + raw)).clamp(0.0, 1.0)
+}
+
 fn query_alignment_factor(query_opt: Option<&str>, fact: &Fact) -> f64 {
     lexical_query_alignment_factor(query_opt, fact)
         * first_person_memory_alignment_factor(query_opt, &fact.content)
 }
 
 fn lexical_query_alignment_factor(query_opt: Option<&str>, fact: &Fact) -> f64 {
+    0.85 + (0.30 * query_grounding_score(query_opt, fact))
+}
+
+pub(crate) fn query_grounding_score(query_opt: Option<&str>, fact: &Fact) -> f64 {
     let Some(query) = query_opt else {
         return 1.0;
     };
@@ -399,9 +444,25 @@ fn lexical_query_alignment_factor(query_opt: Option<&str>, fact: &Fact) -> f64 {
         return 1.0;
     }
 
-    let matched = lexical_query_overlap_for_fact(fact, &query_terms);
-    let coverage = (matched as f64 / query_terms.len() as f64).clamp(0.0, 1.0);
-    0.90 + (0.20 * coverage)
+    let lexical_matches = lexical_query_overlap_for_fact(fact, &query_terms) as f64;
+    let coverage = (lexical_matches / query_terms.len() as f64).clamp(0.0, 1.0);
+    let lexical_score = lexical_query_score_for_fact(fact, &query_terms) as f64;
+    let phrase_support =
+        ((lexical_score - lexical_matches).max(0.0) / query_terms.len() as f64).clamp(0.0, 1.0);
+    let anchor_terms = query_hard_anchor_terms(&query_terms);
+    let anchor_hits = if anchor_terms.is_empty() {
+        0.0
+    } else {
+        let fact_terms = fact_term_set(fact);
+        (anchor_terms
+            .iter()
+            .filter(|term| fact_terms.contains(term.as_str()))
+            .count() as f64
+            / anchor_terms.len() as f64)
+            .clamp(0.0, 1.0)
+    };
+
+    (0.55 * coverage + 0.20 * phrase_support + 0.25 * anchor_hits).clamp(0.0, 1.0)
 }
 
 fn first_person_memory_alignment_factor(query_opt: Option<&str>, content: &str) -> f64 {
@@ -1010,7 +1071,59 @@ pub(crate) fn select_ranked_context_facts(
         selected.push(chosen);
     }
 
-    prune_redundant_selected_facts(selected, &query_terms, temporal_focus_ref)
+    let selected = prune_redundant_selected_facts(selected, &query_terms, temporal_focus_ref);
+    if !selected_results_meet_grounding_floor(&selected, &query_terms, &anchor_terms) {
+        return Vec::new();
+    }
+
+    selected
+}
+
+fn selected_results_meet_grounding_floor(
+    selected: &[RankedContextFact],
+    query_terms: &[String],
+    anchor_terms: &HashSet<String>,
+) -> bool {
+    if selected.is_empty() || query_terms.len() < 4 {
+        return !selected.is_empty();
+    }
+
+    if selected.iter().any(|fact| {
+        matches!(
+            fact.retrieval_tier,
+            RetrievalTier::GraphExpanded | RetrievalTier::SemanticExpanded
+        )
+    }) {
+        return true;
+    }
+
+    let first_person_query = query_terms
+        .iter()
+        .any(|term| matches!(term.as_str(), "i" | "me" | "my" | "mine"));
+    if first_person_query
+        && selected
+            .iter()
+            .any(|fact| fact.fact.fact_type == FactType::Experience.as_str())
+    {
+        return true;
+    }
+
+    let mut matched_terms = HashSet::new();
+    for fact in selected {
+        matched_terms.extend(matched_query_terms_for_fact(fact, query_terms));
+    }
+
+    let coverage = matched_terms.len() as f64 / query_terms.len() as f64;
+    if !anchor_terms.is_empty()
+        && selected
+            .iter()
+            .any(|fact| anchor_term_hits_for_fact(fact, anchor_terms) > 0)
+    {
+        return true;
+    }
+
+    let min_terms = if query_terms.len() >= 8 { 3 } else { 2 };
+    matched_terms.len() >= min_terms && coverage >= MIN_QUERY_GROUNDING_RATIO
 }
 
 #[cfg_attr(not(test), allow(dead_code))]

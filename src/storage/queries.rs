@@ -23,16 +23,17 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
 
 /// Build SQL query for selecting a single record.
 pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
+    let record_id = record_id.trim();
     if record_id.is_empty() {
         return ("SELECT * FROM none WHERE false".to_string(), None);
     }
     if let Some(idx) = record_id.find(':') {
         let table = &record_id[..idx];
         let id = &record_id[idx + 1..];
-        if !id.is_empty() {
+        if !table.trim().is_empty() && !id.trim().is_empty() {
             (format!("SELECT * FROM {table}:⟨{id}⟩"), None)
         } else {
-            (format!("SELECT * FROM {record_id}"), None)
+            ("SELECT * FROM none WHERE false".to_string(), None)
         }
     } else {
         (format!("SELECT * FROM {record_id}"), None)
@@ -560,10 +561,9 @@ mod tests {
     }
 
     #[test]
-    fn build_select_one_query_table_only_produces_invalid_sql() {
-        // "table:" has empty id part → falls through to format!("SELECT * FROM {record_id}")
+    fn build_select_one_query_table_only_returns_safe_noop() {
         let (sql, bind) = build_select_one_query("episode:");
-        assert_eq!(sql, "SELECT * FROM episode:");
+        assert_eq!(sql, "SELECT * FROM none WHERE false");
         assert!(bind.is_none());
     }
 

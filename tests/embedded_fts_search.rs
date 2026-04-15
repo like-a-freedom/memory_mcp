@@ -216,6 +216,52 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+#[tokio::test]
+async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc.with_ymd_and_hms(2026, 3, 16, 9, 0, 0).unwrap();
+
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Launch exception approved after architecture review.",
+            "Launch exception approved",
+            "episode:fts_reference_keys",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({
+                "source_episode": "episode:fts_reference_keys",
+                "source_id": "work-item-9794206"
+            }),
+        )
+        .await?;
+
+    let ctx = service
+        .assemble_context(AssembleContextRequest {
+            query: "9794206".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        ctx.iter().any(|item| item.fact_id == fact_id),
+        "query should match source_id-derived reference keys through fact.index_keys"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn schema_uses_datetime_for_fact_temporal_fields() {
     let schema = include_str!("../migrations/__Initial.surql");

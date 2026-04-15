@@ -10,6 +10,9 @@ pub(super) fn ranked_fact_to_item(
     cutoff: chrono::DateTime<chrono::Utc>,
     decay_fn: impl FnOnce(&Fact, chrono::DateTime<chrono::Utc>) -> f64,
 ) -> AssembledContextItem {
+    let relevance = ranking::normalized_relevance_score(&ranked);
+    let grounding = ranked.grounding_score;
+    let semantic_available = ranked.semantic_available;
     let confidence = decay_fn(&ranked.fact, cutoff);
     AssembledContextItem {
         fact_id: ranked.fact.fact_id,
@@ -17,6 +20,9 @@ pub(super) fn ranked_fact_to_item(
         quote: ranked.fact.quote,
         source_episode: ranked.fact.source_episode,
         confidence,
+        relevance: Some(relevance),
+        grounding: Some(grounding),
+        semantic_available: Some(semantic_available),
         provenance: ranked.fact.provenance,
         rationale: ranked.rationale,
         retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),

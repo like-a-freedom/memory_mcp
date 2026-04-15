@@ -31,6 +31,16 @@ static ACTION_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("action-item line regex is valid")
 });
 
+static EMAIL_HEADER_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?im)^\s*(subject|from|to|cc|bcc|sent|date|reply-to)\s*:")
+        .expect("email header regex is valid")
+});
+
+static EMAIL_ADDRESS_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b")
+        .expect("email address regex is valid")
+});
+
 /// Check if content contains a promise statement.
 #[must_use]
 pub fn is_promise_statement(content: &str) -> bool {
@@ -61,5 +71,60 @@ pub fn is_document_action_item(content: &str) -> bool {
 #[must_use]
 pub fn is_summary_like_note_candidate(content: &str) -> bool {
     let normalized_terms = crate::service::query::search_query_terms(content);
-    normalized_terms.len() >= 6
+    normalized_terms.len() >= 6 && !is_low_value_summary_candidate(content)
+}
+
+/// Detects low-signal header/roster-style content that should not become a
+/// standalone summary fact.
+#[must_use]
+pub fn is_low_value_summary_candidate(content: &str) -> bool {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    let normalized = trimmed.to_lowercase();
+    if is_metric_statement(content)
+        || is_promise_statement(&normalized)
+        || is_document_action_item(content)
+        || is_experience_statement(content)
+    {
+        return false;
+    }
+
+    let lines = trimmed
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    if lines.is_empty() {
+        return true;
+    }
+
+    let header_lines = lines
+        .iter()
+        .filter(|line| EMAIL_HEADER_LINE_RE.is_match(line))
+        .count();
+    let email_lines = lines
+        .iter()
+        .filter(|line| EMAIL_ADDRESS_RE.is_match(line))
+        .count();
+    let has_sentence_punctuation = trimmed.ends_with('.')
+        || trimmed.contains(". ")
+        || trimmed.ends_with('!')
+        || trimmed.contains("! ")
+        || trimmed.ends_with('?')
+        || trimmed.contains("? ");
+    let alpha_terms = crate::service::query::search_query_terms(trimmed)
+        .into_iter()
+        .filter(|term| {
+            term.chars()
+                .any(|character| character.is_ascii_alphabetic())
+        })
+        .count();
+
+    let header_dominated = header_lines > 0 && header_lines * 2 >= lines.len();
+    let roster_dominated = email_lines > 0 && !has_sentence_punctuation && alpha_terms < 6;
+
+    header_dominated || roster_dominated
 }

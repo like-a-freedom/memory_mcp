@@ -53,6 +53,39 @@ async fn test_ingest_extract_and_assemble() {
 }
 
 #[tokio::test]
+async fn test_extract_skips_low_value_email_header_roster_note_fallback() {
+    let service = common::make_service().await;
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: "email".to_string(),
+                source_id: "MSG-ROSTER-1".to_string(),
+                content: "Subject: Weekly distro\nFrom: ops@example.com\nTo: alice@example.com; bob@example.com; carol@example.com\nCC: dave@example.com; erin@example.com".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2026, 4, 14, 9, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest low-value email");
+
+    let extraction = service
+        .extract(&episode_id, None, None)
+        .await
+        .expect("extract low-value email");
+
+    assert!(
+        extraction.facts.is_empty(),
+        "raw email header/recipient roster should not become a fallback note fact: {:?}",
+        extraction.facts
+    );
+}
+
+#[tokio::test]
 async fn test_resolve_aliases() {
     let service = common::make_service().await;
     let first = service
@@ -847,6 +880,96 @@ async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
         item.rationale.contains("confidence="),
         "rationale should include confidence metadata, got: {}",
         item.rationale
+    );
+    assert!(
+        item.rationale.contains("grounding="),
+        "rationale should include grounding metadata, got: {}",
+        item.rationale
+    );
+    assert!(
+        item.rationale.contains("semantic="),
+        "rationale should include semantic availability metadata, got: {}",
+        item.rationale
+    );
+    assert!(
+        serialized
+            .get("relevance")
+            .and_then(serde_json::Value::as_f64)
+            .is_some(),
+        "assembled item should expose a separate relevance score"
+    );
+    assert!(
+        serialized
+            .get("grounding")
+            .and_then(serde_json::Value::as_f64)
+            .is_some(),
+        "assembled item should expose a separate grounding score"
+    );
+    assert_eq!(
+        serialized
+            .get("semantic_available")
+            .and_then(serde_json::Value::as_bool),
+        Some(false),
+        "default test service runs without semantic embeddings and should say so explicitly"
+    );
+}
+
+#[tokio::test]
+async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_noise() {
+    let service = common::make_service().await;
+    let t = Utc.with_ymd_and_hms(2026, 4, 14, 10, 0, 0).unwrap();
+
+    service
+        .add_fact(
+            "note",
+            "Regional rollout checklist updated for Friday handoff.",
+            "Regional rollout checklist updated",
+            "episode:generic-rollout-noise-1",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:generic-rollout-noise-1"}),
+        )
+        .await
+        .expect("seed generic rollout noise 1");
+
+    service
+        .add_fact(
+            "note",
+            "Support workflow handoff checklist prepared for rollout review.",
+            "Support workflow handoff checklist prepared",
+            "episode:generic-rollout-noise-2",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:generic-rollout-noise-2"}),
+        )
+        .await
+        .expect("seed generic rollout noise 2");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "openshift migration exception compatibility rollout controls".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 14, 12, 0, 0).unwrap()),
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble low-grounding query");
+
+    assert!(
+        items.is_empty(),
+        "single generic-term overlap should not survive a long grounded query: {items:?}"
     );
 }
 

@@ -449,6 +449,8 @@ mod tests {
             source_priority: 0,
             decayed_confidence: 1.0,
             query_alignment_factor: 1.0,
+            grounding_score: 1.0,
+            semantic_available: false,
         }
     }
 
@@ -698,6 +700,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         assert!(should_prefer_episode_content(
@@ -742,6 +745,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         assert!(!should_prefer_episode_content(
@@ -785,6 +789,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         assert!(!should_prefer_episode_content(
@@ -828,6 +833,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         assert!(!should_prefer_episode_content(
@@ -930,6 +936,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         assert!(!should_prefer_episode_content(
@@ -1017,6 +1024,7 @@ mod tests {
             provenance: json!({"episode_fallback": true}),
             rationale: "fallback".to_string(),
             retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
         }];
 
         maybe_append_first_person_episode_item(
@@ -1100,6 +1108,7 @@ mod tests {
                 provenance: json!({"episode_fallback": true}),
                 rationale: "fallback".to_string(),
                 retrieval_tier: Some("fallback".to_string()),
+                ..Default::default()
             },
             AssembledContextItem {
                 fact_id: "episode_fallback:episode:profile".to_string(),
@@ -1112,6 +1121,7 @@ mod tests {
                 provenance: json!({"episode_fallback": true}),
                 rationale: "fallback".to_string(),
                 retrieval_tier: Some("fallback".to_string()),
+                ..Default::default()
             },
         ];
 
@@ -2632,6 +2642,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             Some("march 2026 launch review"),
+            false,
             "org",
             cutoff,
             crate::service::decayed_confidence,
@@ -2667,6 +2678,7 @@ mod tests {
             ],
             Vec::new(),
             Some("launch workstream"),
+            false,
             "org",
             cutoff,
             crate::service::decayed_confidence,
@@ -2755,6 +2767,7 @@ mod tests {
             Some(
                 "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
             ),
+            false,
             "org",
             cutoff,
             crate::service::decayed_confidence,

@@ -324,7 +324,7 @@ pub struct ContradictionWarning {
 }
 
 /// A ranked context item returned by the MCP `assemble_context` tool.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct AssembledContextItem {
     pub fact_id: String,
@@ -332,6 +332,12 @@ pub struct AssembledContextItem {
     pub quote: String,
     pub source_episode: String,
     pub confidence: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relevance: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grounding: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_available: Option<bool>,
     pub provenance: serde_json::Value,
     pub rationale: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

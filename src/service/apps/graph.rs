@@ -8,6 +8,12 @@ use crate::models::SurprisingConnection;
 use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
 use crate::storage::GraphDirection;
 
+const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;
+const MAX_HUB_CANDIDATE_SCAN: usize = 64;
+const MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS: usize = 64;
+const MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES: usize = 128;
+const MAX_SURPRISING_CONNECTION_RESULTS: usize = 12;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HubEntity {
     pub entity_id: String,
@@ -43,8 +49,9 @@ pub(crate) async fn find_hub_entities(
     );
     let entity_records = service.db_client.select_table("entity", namespace).await?;
     let mut hubs = Vec::new();
+    let candidate_scan_limit = hub_candidate_scan_limit(limit);
 
-    for record in entity_records {
+    for record in entity_records.into_iter().take(candidate_scan_limit) {
         let Some(map) = record.as_object() else {
             continue;
         };
@@ -213,13 +220,30 @@ pub(crate) async fn find_surprising_connections(
         0_usize,
     )]);
     let mut connections = BTreeMap::new();
+    let mut expanded_nodes = 0usize;
+    let mut neighbor_queries = 0usize;
 
     while let Some((current, path, depth)) = frontier.pop_front() {
+        if expanded_nodes >= MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS
+            || neighbor_queries >= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES
+            || connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS
+        {
+            break;
+        }
+
+        expanded_nodes += 1;
         if depth >= max_depth as usize {
             continue;
         }
 
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
+            if neighbor_queries >= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES
+                || connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS
+            {
+                break;
+            }
+
+            neighbor_queries += 1;
             for edge in service
                 .db_client
                 .select_edge_neighbors(namespace, &current, &cutoff_iso, direction)
@@ -256,6 +280,9 @@ pub(crate) async fn find_surprising_connections(
                             hop_count: next_depth,
                             path: next_path.clone(),
                         });
+                    if connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS {
+                        break;
+                    }
                 }
 
                 if visited.insert(neighbor.clone()) && next_depth < max_depth as usize {
@@ -284,6 +311,10 @@ pub(crate) async fn find_surprising_connections(
         LogLevel::Trace,
     );
     Ok(surprising_connections)
+}
+
+fn hub_candidate_scan_limit(limit: i32) -> usize {
+    (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(MAX_HUB_CANDIDATE_SCAN)
 }
 
 fn edge_identity(record: &Value) -> Option<String> {
@@ -439,6 +470,15 @@ fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    use async_trait::async_trait;
+    use serde_json::Value;
+
+    use crate::storage::DbClient;
 
     #[test]
     fn is_traversable_graph_node_accepts_valid_types() {
@@ -482,5 +522,252 @@ mod tests {
     fn graph_community_from_value_returns_none_for_empty() {
         let value = json!({});
         assert!(graph_community_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn hub_candidate_scan_limit_caps_large_requests() {
+        assert_eq!(hub_candidate_scan_limit(1), 12);
+        assert_eq!(hub_candidate_scan_limit(5), 60);
+        assert_eq!(hub_candidate_scan_limit(50), MAX_HUB_CANDIDATE_SCAN);
+    }
+
+    #[tokio::test]
+    async fn find_surprising_connections_honors_neighbor_query_budget() {
+        #[derive(Default)]
+        struct BudgetedGraphDbClient {
+            neighbor_queries: AtomicUsize,
+        }
+
+        #[async_trait]
+        impl DbClient for BudgetedGraphDbClient {
+            async fn select_one(
+                &self,
+                record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(Some(json!({
+                    "entity_id": record_id,
+                    "canonical_name": record_id,
+                })))
+            }
+
+            async fn select_table(
+                &self,
+                table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                if table == "community" {
+                    return Ok((0..256)
+                        .map(|idx| {
+                            json!({
+                                "community_id": format!("community:{idx}"),
+                                "summary": format!("Community {idx}"),
+                                "member_entities": [format!("entity:{idx}")],
+                                "updated_at": "2026-04-15T00:00:00Z",
+                            })
+                        })
+                        .collect());
+                }
+
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                node_id: &str,
+                _cutoff: &str,
+                direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                self.neighbor_queries.fetch_add(1, Ordering::Relaxed);
+
+                if direction == GraphDirection::Incoming {
+                    return Ok(vec![]);
+                }
+
+                let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
+                    let idx = idx.parse::<usize>().unwrap_or(0);
+                    json!({
+                        "in": format!("entity:{idx}"),
+                        "out": format!("episode:{idx}"),
+                        "relation": "linked",
+                    })
+                } else if let Some(idx) = node_id.strip_prefix("episode:") {
+                    let idx = idx.parse::<usize>().unwrap_or(0);
+                    json!({
+                        "in": format!("episode:{idx}"),
+                        "out": format!("entity:{}", idx + 1),
+                        "relation": "linked",
+                    })
+                } else {
+                    return Ok(vec![]);
+                };
+
+                Ok(vec![next_edge])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                _normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                _names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let db = Arc::new(BudgetedGraphDbClient::default());
+        let service = crate::service::MemoryService::new(
+            db.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let connections = find_surprising_connections(&service, "org", "entity:0", 32)
+            .await
+            .expect("connections");
+
+        assert!(
+            db.neighbor_queries.load(Ordering::Relaxed)
+                <= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES,
+            "neighbor queries should stop at the configured traversal budget"
+        );
+        assert!(connections.len() <= MAX_SURPRISING_CONNECTION_RESULTS);
     }
 }

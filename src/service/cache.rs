@@ -217,6 +217,7 @@ mod tests {
                 provenance: json!({}),
                 rationale: "rationale".to_string(),
                 retrieval_tier: None,
+                ..Default::default()
             };
             guard.put(key1.clone(), vec![item("fact:1")]);
             guard.put(key2.clone(), vec![item("fact:2")]);

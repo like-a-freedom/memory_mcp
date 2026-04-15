@@ -29,9 +29,23 @@ pub fn search_query_terms(raw: &str) -> Vec<String> {
     let s = EPISODE_REF.replace_all(raw, " ");
     let s = QUOTED.replace_all(&s, " $1 ");
 
-    s.split_whitespace()
-        .flat_map(|token| token.split(|character: char| !character.is_alphanumeric()))
-        .filter_map(normalize_search_term)
+    let mut terms = Vec::new();
+    for token in s.split_whitespace() {
+        terms.extend(
+            token
+                .split(|character: char| !character.is_alphanumeric())
+                .filter_map(normalize_search_term),
+        );
+        terms.extend(search_reference_terms(token));
+    }
+
+    terms
+}
+
+/// Extract collapsed reference-like terms (for example `R-0712` -> `r0712`).
+pub fn search_reference_terms(raw: &str) -> Vec<String> {
+    raw.split_whitespace()
+        .filter_map(normalize_reference_like_term)
         .collect()
 }
 
@@ -90,6 +104,62 @@ fn query_term_is_hard_anchor(term: &str) -> bool {
         .chars()
         .any(|character| character.is_ascii_alphabetic());
     has_digit && (has_alpha || term.chars().all(|character| character.is_ascii_digit()))
+}
+
+fn normalize_reference_like_term(raw: &str) -> Option<String> {
+    let token = raw.trim_matches(|character: char| !character.is_alphanumeric());
+    if token.len() < 3 || looks_like_iso_date(token) {
+        return None;
+    }
+
+    let has_separator = token.chars().any(|character| !character.is_alphanumeric());
+    if !has_separator {
+        return None;
+    }
+
+    let collapsed = token
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect::<String>();
+    if collapsed.len() < 3 {
+        return None;
+    }
+
+    let has_digit = collapsed
+        .chars()
+        .any(|character| character.is_ascii_digit());
+    let has_alpha = collapsed
+        .chars()
+        .any(|character| character.is_ascii_alphabetic());
+
+    if !has_digit {
+        return None;
+    }
+
+    if has_alpha || collapsed.len() >= 6 {
+        Some(collapsed)
+    } else {
+        None
+    }
+}
+
+fn looks_like_iso_date(token: &str) -> bool {
+    let segments = token
+        .split(['-', '/'])
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
+    match segments.as_slice() {
+        [year, month] | [year, month, ..]
+            if year.len() == 4
+                && year.chars().all(|character| character.is_ascii_digit())
+                && month.len() == 2
+                && month.chars().all(|character| character.is_ascii_digit()) =>
+        {
+            true
+        }
+        _ => false,
+    }
 }
 
 fn normalize_search_term(raw: &str) -> Option<String> {
@@ -244,6 +314,16 @@ mod tests {
         let result = search_query_terms("atlas analysis status access");
 
         assert_eq!(result, vec!["atlas", "analysis", "status", "access"]);
+    }
+
+    #[test]
+    fn search_query_terms_preserve_reference_like_tokens() {
+        let result = search_query_terms("Requirement R-0712 depends on work-item-9794206");
+
+        assert!(result.contains(&"0712".to_string()));
+        assert!(result.contains(&"r0712".to_string()));
+        assert!(result.contains(&"9794206".to_string()));
+        assert!(result.contains(&"workitem9794206".to_string()));
     }
 
     #[test]

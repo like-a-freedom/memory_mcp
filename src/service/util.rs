@@ -10,8 +10,8 @@ pub use ids::{
     deterministic_episode_id, deterministic_fact_id, hash_prefix,
 };
 pub use statement_detection::{
-    is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
-    is_summary_like_note_candidate,
+    is_document_action_item, is_experience_statement, is_low_value_summary_candidate,
+    is_metric_statement, is_promise_statement, is_summary_like_note_candidate,
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 
