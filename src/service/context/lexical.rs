@@ -1,12 +1,15 @@
 //! Lexical/FTS retrieval for fact and episode records.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
 use crate::models::Fact;
 use crate::service::error::MemoryError;
-use crate::service::query::search_query_terms;
+use crate::service::query::{
+    query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
+    search_query_terms, unique_query_terms,
+};
 use crate::service::value_helpers::{json_f64, json_string};
 
 use super::filtering::{
@@ -145,15 +148,57 @@ pub(crate) fn lexical_candidate_limit(limit: i32) -> i32 {
     (base.saturating_mul(5)).clamp(base, cap)
 }
 
+#[derive(Debug, Default)]
+struct LexicalAnchorProfile {
+    hard_anchor_terms: HashSet<String>,
+    soft_anchor_terms: HashSet<String>,
+    term_weights: HashMap<String, f64>,
+}
+
+impl LexicalAnchorProfile {
+    fn weight_for(&self, term: &str) -> f64 {
+        self.term_weights.get(term).copied().unwrap_or(1.0)
+    }
+
+    fn is_hard_anchor(&self, term: &str) -> bool {
+        self.hard_anchor_terms.contains(term)
+    }
+
+    fn is_soft_anchor(&self, term: &str) -> bool {
+        self.soft_anchor_terms.contains(term)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct LexicalRecordMetrics {
+    base_score: usize,
+    weighted_overlap: f64,
+    hard_anchor_hits: usize,
+    hard_anchor_mass: f64,
+    soft_anchor_mass: f64,
+}
+
 fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
     let mut queries = Vec::new();
     let standalone_temporal_terms = standalone_temporal_fallback_terms(query_terms);
+    let hard_anchor_terms = query_hard_anchor_terms(query_terms)
+        .into_iter()
+        .filter(|term| !standalone_temporal_terms.contains(term.as_str()))
+        .collect::<HashSet<_>>();
+    let enforce_anchor_windows = !hard_anchor_terms.is_empty();
 
     for width in (2..=3).rev() {
         if query_terms.len() < width {
             continue;
         }
         for window in query_terms.windows(width) {
+            if enforce_anchor_windows
+                && !window
+                    .iter()
+                    .any(|term| hard_anchor_terms.contains(term.as_str()))
+            {
+                continue;
+            }
             let query = window.join(" ");
             if !queries.contains(&query) {
                 queries.push(query);
@@ -163,6 +208,9 @@ fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
 
     for term in query_terms {
         if standalone_temporal_terms.contains(term.as_str()) {
+            continue;
+        }
+        if enforce_anchor_windows && !hard_anchor_terms.contains(term.as_str()) {
             continue;
         }
         if !queries.contains(term) {
@@ -270,9 +318,19 @@ pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[Strin
         return records;
     }
 
+    let anchor_profile = build_lexical_anchor_profile(&records, query_terms);
+
     for record in &mut records {
-        let combined_score =
-            dampened_lexical_ft_score(record) + lexical_query_score(record, query_terms) as f64;
+        let metrics = lexical_record_metrics(record, query_terms, &anchor_profile);
+        let soft_anchor_bonus = if metrics.base_score <= 1 {
+            metrics.soft_anchor_mass * 0.35
+        } else {
+            0.0
+        };
+        let combined_score = dampened_lexical_ft_score(record)
+            + metrics.base_score as f64
+            + (metrics.hard_anchor_mass * 2.0)
+            + soft_anchor_bonus;
         if let Some(object) = record.as_object_mut() {
             object.insert("ft_score".to_string(), json!(combined_score));
         } else if let Some(object) = record.get_mut("Object").and_then(Value::as_object_mut) {
@@ -281,16 +339,175 @@ pub(crate) fn rank_lexical_records(mut records: Vec<Value>, query_terms: &[Strin
     }
 
     records.sort_by(|left, right| {
-        lexical_query_score(right, query_terms)
-            .cmp(&lexical_query_score(left, query_terms))
+        let right_metrics = lexical_record_metrics(right, query_terms, &anchor_profile);
+        let left_metrics = lexical_record_metrics(left, query_terms, &anchor_profile);
+
+        right_metrics
+            .hard_anchor_hits
+            .cmp(&left_metrics.hard_anchor_hits)
+            .then_with(|| {
+                right_metrics
+                    .hard_anchor_mass
+                    .total_cmp(&left_metrics.hard_anchor_mass)
+            })
+            .then_with(|| right_metrics.base_score.cmp(&left_metrics.base_score))
+            .then_with(|| {
+                if right_metrics.base_score <= 1 && left_metrics.base_score <= 1 {
+                    right_metrics
+                        .weighted_overlap
+                        .total_cmp(&left_metrics.weighted_overlap)
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
             .then_with(|| {
                 dampened_lexical_ft_score(right).total_cmp(&dampened_lexical_ft_score(left))
             })
             .then_with(|| lexical_t_valid(right).cmp(&lexical_t_valid(left)))
+            .then_with(|| {
+                right_metrics
+                    .weighted_overlap
+                    .total_cmp(&left_metrics.weighted_overlap)
+            })
             .then_with(|| lexical_fact_id(left).cmp(&lexical_fact_id(right)))
     });
 
     records
+}
+
+fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> LexicalAnchorProfile {
+    let unique_terms = unique_query_terms(query_terms);
+    if unique_terms.is_empty() {
+        return LexicalAnchorProfile::default();
+    }
+
+    let total_records = records.len().max(1);
+    let hard_anchor_terms = query_hard_anchor_terms(&unique_terms);
+    let mut doc_freq = HashMap::<String, usize>::new();
+
+    for record in records {
+        let record_terms = lexical_record_term_set(record);
+        for term in &unique_terms {
+            if record_terms.contains(term) {
+                *doc_freq.entry(term.clone()).or_default() += 1;
+            }
+        }
+    }
+
+    let mut soft_anchor_terms = HashSet::new();
+    let mut term_weights = HashMap::new();
+
+    for term in unique_terms {
+        let doc_freq_for_term = doc_freq.get(term.as_str()).copied().unwrap_or(0);
+        let rarity = query_term_rarity_weight(doc_freq_for_term, total_records);
+        let hard_anchor_boost = if hard_anchor_terms.contains(term.as_str()) {
+            2.5
+        } else {
+            1.0
+        };
+        term_weights.insert(term.clone(), (1.0 + rarity) * hard_anchor_boost);
+
+        if !hard_anchor_terms.contains(term.as_str())
+            && query_term_should_be_soft_anchor(&term, doc_freq_for_term, total_records)
+        {
+            soft_anchor_terms.insert(term);
+        }
+    }
+
+    LexicalAnchorProfile {
+        hard_anchor_terms,
+        soft_anchor_terms,
+        term_weights,
+    }
+}
+
+fn lexical_record_metrics(
+    record: &Value,
+    query_terms: &[String],
+    anchor_profile: &LexicalAnchorProfile,
+) -> LexicalRecordMetrics {
+    let matched_terms = matched_query_terms_for_record(record, query_terms);
+    let weighted_overlap = matched_terms
+        .iter()
+        .map(|term| anchor_profile.weight_for(term))
+        .sum::<f64>();
+    let hard_anchor_hits = matched_terms
+        .iter()
+        .filter(|term| anchor_profile.is_hard_anchor(term.as_str()))
+        .count();
+    let hard_anchor_mass = matched_terms
+        .iter()
+        .filter(|term| anchor_profile.is_hard_anchor(term.as_str()))
+        .map(|term| anchor_profile.weight_for(term))
+        .sum::<f64>();
+    let soft_anchor_mass = matched_terms
+        .iter()
+        .filter(|term| anchor_profile.is_soft_anchor(term.as_str()))
+        .map(|term| anchor_profile.weight_for(term))
+        .sum::<f64>();
+
+    LexicalRecordMetrics {
+        base_score: lexical_query_score(record, query_terms),
+        weighted_overlap,
+        hard_anchor_hits,
+        hard_anchor_mass,
+        soft_anchor_mass,
+    }
+}
+
+fn lexical_record_term_set(record: &Value) -> HashSet<String> {
+    let mut record_terms = HashSet::<String>::new();
+    if let Some(content) = raw_object(record)
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
+        .and_then(json_string)
+    {
+        record_terms.extend(search_query_terms(content));
+    }
+    if let Some(index_keys) = raw_object(record)
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
+        .and_then(raw_array)
+    {
+        for value in index_keys {
+            if let Some(index_key) = json_string(value) {
+                record_terms.extend(search_query_terms(index_key));
+            }
+        }
+    }
+
+    record_terms
+}
+
+fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> HashSet<String> {
+    if query_terms.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut record_terms = best_matching_content_terms(
+        raw_object(record)
+            .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
+            .and_then(json_string)
+            .unwrap_or_default(),
+        query_terms,
+    )
+    .into_iter()
+    .collect::<HashSet<_>>();
+
+    if let Some(index_keys) = raw_object(record)
+        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
+        .and_then(raw_array)
+    {
+        for value in index_keys {
+            if let Some(index_key) = json_string(value) {
+                record_terms.extend(search_query_terms(index_key));
+            }
+        }
+    }
+
+    query_terms
+        .iter()
+        .filter(|term| record_terms.contains(term.as_str()))
+        .cloned()
+        .collect()
 }
 
 fn top_query_score(records: &[Value], query_terms: &[String]) -> usize {
@@ -646,7 +863,19 @@ pub(crate) async fn select_episode_records_for_query(
 
 #[cfg(test)]
 mod tests {
-    use super::build_lexical_fallback_queries;
+    use serde_json::{Value, json};
+
+    use super::{build_lexical_fallback_queries, rank_lexical_records};
+
+    fn test_record(fact_id: &str, content: &str, t_valid: &str) -> Value {
+        json!({
+            "fact_id": fact_id,
+            "content": content,
+            "index_keys": [],
+            "ft_score": 0.0,
+            "t_valid": t_valid,
+        })
+    }
 
     #[test]
     fn build_lexical_fallback_queries_skips_standalone_temporal_terms_for_month_year_queries() {
@@ -667,6 +896,96 @@ mod tests {
         assert!(
             !queries.contains(&"2025".to_string()),
             "year token should not be used as a standalone fallback when month/year is explicit"
+        );
+    }
+
+    #[test]
+    fn build_lexical_fallback_queries_skips_generic_singletons_when_hard_anchor_exists() {
+        let queries = build_lexical_fallback_queries(&[
+            "work".to_string(),
+            "item".to_string(),
+            "9794206".to_string(),
+            "requirement".to_string(),
+            "product".to_string(),
+            "business".to_string(),
+            "context".to_string(),
+        ]);
+
+        assert!(
+            queries.iter().any(|query| query.contains("9794206")),
+            "expected anchor-preserving fallback queries, got {queries:?}"
+        );
+        assert!(queries.contains(&"9794206".to_string()));
+        assert!(
+            !queries.contains(&"requirement".to_string()),
+            "generic singleton fallback should be skipped when a hard anchor exists: {queries:?}"
+        );
+        assert!(
+            !queries.contains(&"product".to_string()),
+            "generic singleton fallback should be skipped when a hard anchor exists: {queries:?}"
+        );
+    }
+
+    #[test]
+    fn rank_lexical_records_prioritizes_hard_anchor_matches_over_generic_overlap() {
+        let query_terms = crate::service::query::search_query_terms("300k telemetry response");
+        let ranked = rank_lexical_records(
+            vec![
+                test_record(
+                    "fact:generic",
+                    "Telemetry response workflow updated for the support team.",
+                    "2026-04-12T00:00:00Z",
+                ),
+                test_record(
+                    "fact:anchor",
+                    "300k telemetry sizing notes were approved for the deal.",
+                    "2026-04-01T00:00:00Z",
+                ),
+            ],
+            &query_terms,
+        );
+
+        let first_fact_id = ranked[0]
+            .get("fact_id")
+            .and_then(Value::as_str)
+            .expect("fact_id on ranked record");
+        assert_eq!(
+            first_fact_id, "fact:anchor",
+            "hard numeric or mixed-alphanumeric anchors should outrank generic overlap noise"
+        );
+    }
+
+    #[test]
+    fn rank_lexical_records_promotes_soft_anchor_matches_for_rare_lowercase_terms() {
+        let query_terms = crate::service::query::search_query_terms("openshift rollout");
+        let ranked = rank_lexical_records(
+            vec![
+                test_record(
+                    "fact:generic-1",
+                    "Rollout checklist updated for regional launch.",
+                    "2026-04-12T00:00:00Z",
+                ),
+                test_record(
+                    "fact:generic-2",
+                    "Rollout timeline updated for support workflow.",
+                    "2026-04-11T00:00:00Z",
+                ),
+                test_record(
+                    "fact:anchor",
+                    "OpenShift migration exception approved for the platform cluster.",
+                    "2026-04-01T00:00:00Z",
+                ),
+            ],
+            &query_terms,
+        );
+
+        let first_fact_id = ranked[0]
+            .get("fact_id")
+            .and_then(Value::as_str)
+            .expect("fact_id on ranked record");
+        assert_eq!(
+            first_fact_id, "fact:anchor",
+            "rare lower-case product/platform terms should behave like anchors when the candidate pool makes them distinctive"
         );
     }
 }

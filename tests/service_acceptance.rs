@@ -1400,3 +1400,84 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
         "expected returned items to stay anchored to the same extracted summary episode, got {items:?}"
     );
 }
+
+#[tokio::test]
+async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap_noise() {
+    let service = common::make_service().await;
+    let cutoff = Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap();
+
+    let anchor_fact_id = service
+        .add_fact(
+            "note",
+            "OpenShift migration exception approved for the platform cluster.",
+            "OpenShift migration exception approved for the platform cluster.",
+            "episode:openshift-anchor",
+            Utc.with_ymd_and_hms(2026, 4, 1, 9, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:openshift-anchor"}),
+        )
+        .await
+        .expect("seed anchor fact");
+
+    service
+        .add_fact(
+            "note",
+            "Rollout controls checklist updated for regional launch.",
+            "Rollout controls checklist updated for regional launch.",
+            "episode:generic-rollout-1",
+            Utc.with_ymd_and_hms(2026, 4, 12, 9, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:generic-rollout-1"}),
+        )
+        .await
+        .expect("seed generic rollout fact 1");
+
+    service
+        .add_fact(
+            "note",
+            "Rollout controls timeline updated for support workflow.",
+            "Rollout controls timeline updated for support workflow.",
+            "episode:generic-rollout-2",
+            Utc.with_ymd_and_hms(2026, 4, 11, 9, 0, 0).unwrap(),
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            serde_json::json!({"source_episode": "episode:generic-rollout-2"}),
+        )
+        .await
+        .expect("seed generic rollout fact 2");
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "openshift rollout controls".to_string(),
+            scope: "org".to_string(),
+            as_of: Some(cutoff),
+            budget: 3,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble anchor-aware context");
+
+    let first = items.first().expect("expected at least one result");
+    assert_eq!(
+        first.fact_id, anchor_fact_id,
+        "distinctive anchor term should outrank generic overlap noise: {items:?}"
+    );
+    assert!(
+        first.rationale.contains("alignment="),
+        "rationale should expose query alignment metadata once anchor-aware ranking is enabled: {}",
+        first.rationale
+    );
+}

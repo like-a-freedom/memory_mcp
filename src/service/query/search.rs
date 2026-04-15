@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -32,6 +33,63 @@ pub fn search_query_terms(raw: &str) -> Vec<String> {
         .flat_map(|token| token.split(|character: char| !character.is_alphanumeric()))
         .filter_map(normalize_search_term)
         .collect()
+}
+
+/// Deduplicate query terms while preserving their original order.
+pub fn unique_query_terms(query_terms: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut unique = Vec::with_capacity(query_terms.len());
+
+    for term in query_terms {
+        if seen.insert(term.clone()) {
+            unique.push(term.clone());
+        }
+    }
+
+    unique
+}
+
+/// Hard anchors are query terms whose shape already indicates high specificity.
+///
+/// This intentionally avoids any domain-specific allowlist: numeric ids and
+/// mixed alphanumeric tokens (for example `300k`) behave like anchors
+/// regardless of the product/domain vocabulary.
+pub fn query_hard_anchor_terms(query_terms: &[String]) -> HashSet<String> {
+    unique_query_terms(query_terms)
+        .into_iter()
+        .filter(|term| query_term_is_hard_anchor(term))
+        .collect()
+}
+
+/// Returns the maximum document frequency a term may have and still qualify as
+/// a soft anchor within a candidate pool.
+pub fn soft_anchor_doc_freq_threshold(total_docs: usize) -> usize {
+    total_docs.div_ceil(4).clamp(1, 3)
+}
+
+/// Soft anchors are dynamically inferred from the candidate pool.
+///
+/// Long rare terms (`openshift`) and one-off short rare terms (`jfr`, `nic`) can
+/// both become anchors without relying on enumerated project names.
+pub fn query_term_should_be_soft_anchor(term: &str, doc_freq: usize, total_docs: usize) -> bool {
+    if doc_freq == 0 || doc_freq > soft_anchor_doc_freq_threshold(total_docs) {
+        return false;
+    }
+
+    term.len() >= 4 || (term.len() >= 3 && doc_freq == 1)
+}
+
+/// Higher values mean the term is rarer within the current candidate pool.
+pub fn query_term_rarity_weight(doc_freq: usize, total_docs: usize) -> f64 {
+    (((total_docs.max(1) + 1) as f64) / ((doc_freq + 1) as f64)).ln_1p()
+}
+
+fn query_term_is_hard_anchor(term: &str) -> bool {
+    let has_digit = term.chars().any(|character| character.is_ascii_digit());
+    let has_alpha = term
+        .chars()
+        .any(|character| character.is_ascii_alphabetic());
+    has_digit && (has_alpha || term.chars().all(|character| character.is_ascii_digit()))
 }
 
 fn normalize_search_term(raw: &str) -> Option<String> {
@@ -186,5 +244,28 @@ mod tests {
         let result = search_query_terms("atlas analysis status access");
 
         assert_eq!(result, vec!["atlas", "analysis", "status", "access"]);
+    }
+
+    #[test]
+    fn query_hard_anchor_terms_detect_numeric_and_mixed_alnum_tokens() {
+        let anchors = query_hard_anchor_terms(&[
+            "work".to_string(),
+            "9794206".to_string(),
+            "300k".to_string(),
+            "openshift".to_string(),
+        ]);
+
+        assert!(anchors.contains("9794206"));
+        assert!(anchors.contains("300k"));
+        assert!(!anchors.contains("work"));
+        assert!(!anchors.contains("openshift"));
+    }
+
+    #[test]
+    fn query_term_should_be_soft_anchor_accepts_long_rare_terms_and_short_singletons() {
+        assert!(query_term_should_be_soft_anchor("openshift", 1, 3));
+        assert!(query_term_should_be_soft_anchor("jfr", 1, 3));
+        assert!(!query_term_should_be_soft_anchor("rollout", 2, 3));
+        assert!(!query_term_should_be_soft_anchor("id", 1, 3));
     }
 }

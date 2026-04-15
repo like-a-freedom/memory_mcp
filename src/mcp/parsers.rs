@@ -36,7 +36,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                 Value::String(s) => ExplainItem {
                     content: String::new(),
                     quote: String::new(),
-                    source_episode: s,
+                    source_episode: s.trim().to_string(),
                     scope: None,
                     t_ref: None,
                     t_ingested: None,
@@ -62,6 +62,7 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                         .get("source_episode")
                         .and_then(Value::as_str)
                         .unwrap_or("")
+                        .trim()
                         .to_string();
                     ExplainItem {
                         fact_id,
@@ -76,20 +77,23 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                         ..Default::default()
                     }
                 }
-                _ => ExplainItem {
-                    content: String::new(),
-                    quote: String::new(),
-                    source_episode: String::new(),
-                    scope: None,
-                    t_ref: None,
-                    t_ingested: None,
-                    provenance: Value::Null,
-                    citation_context: None,
-                    ..Default::default()
-                },
+                _ => {
+                    return Err(
+                        "context_items must be a JSON array of strings or snake_case objects"
+                            .to_string(),
+                    );
+                }
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    for item in &items {
+        if item.source_episode.trim().is_empty() {
+            return Err(
+                "context_items entries must include a non-empty `source_episode`".to_string(),
+            );
+        }
+    }
 
     Ok(items)
 }
@@ -381,10 +385,9 @@ mod tests {
     #[test]
     fn parse_context_items_handles_missing_fields() {
         let raw = r#"[{"content":"Test"}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items[0].content, "Test");
-        assert_eq!(items[0].source_episode, "");
-        assert_eq!(items[0].quote, "");
+        let err = parse_context_items(raw)
+            .expect_err("context items without a source_episode should be rejected");
+        assert!(err.contains("source_episode"), "unexpected error: {err}");
     }
 
     #[test]
@@ -395,12 +398,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_context_items_empty_string_element_produces_empty_source_episode() {
+    fn parse_context_items_rejects_empty_string_element() {
         let raw = r#"[""]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].source_episode, "");
-        assert_eq!(items[0].content, "");
+        let err =
+            parse_context_items(raw).expect_err("empty string context item should be rejected");
+        assert!(err.contains("source_episode"), "unexpected error: {err}");
     }
 
     #[test]
@@ -414,11 +416,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_context_items_object_with_fact_id_and_empty_source_episode() {
+    fn parse_context_items_rejects_fact_id_with_empty_source_episode() {
         let raw = r#"[{"fact_id":"fact:abc","source_episode":""}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].fact_id, Some("fact:abc".to_string()));
-        assert_eq!(items[0].source_episode, "");
+        let err = parse_context_items(raw)
+            .expect_err("empty source_episode should be rejected even when fact_id is present");
+        assert!(err.contains("source_episode"), "unexpected error: {err}");
     }
 }
