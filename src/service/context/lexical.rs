@@ -477,9 +477,9 @@ fn lexical_record_term_set(record: &Value) -> HashSet<String> {
     record_terms
 }
 
-fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> HashSet<String> {
+fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> Vec<String> {
     if query_terms.is_empty() {
-        return HashSet::new();
+        return Vec::new();
     }
 
     let mut record_terms = best_matching_content_terms(
@@ -503,10 +503,9 @@ fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> Has
         }
     }
 
-    query_terms
-        .iter()
+    unique_query_terms(query_terms)
+        .into_iter()
         .filter(|term| record_terms.contains(term.as_str()))
-        .cloned()
         .collect()
 }
 
@@ -863,9 +862,14 @@ pub(crate) async fn select_episode_records_for_query(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeSet, HashMap, HashSet};
+
     use serde_json::{Value, json};
 
-    use super::{build_lexical_fallback_queries, rank_lexical_records};
+    use super::{
+        LexicalAnchorProfile, build_lexical_fallback_queries, lexical_record_metrics,
+        rank_lexical_records,
+    };
 
     fn test_record(fact_id: &str, content: &str, t_valid: &str) -> Value {
         json!({
@@ -986,6 +990,64 @@ mod tests {
         assert_eq!(
             first_fact_id, "fact:anchor",
             "rare lower-case product/platform terms should behave like anchors when the candidate pool makes them distinctive"
+        );
+    }
+
+    #[test]
+    fn lexical_record_metrics_are_bitwise_stable_for_identical_input() {
+        let query_terms = [
+            "anchor01", "anchor02", "anchor03", "soft01", "soft02", "soft03", "soft04", "soft05",
+            "soft06", "soft07", "soft08",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+        let record = test_record(
+            "fact:stable",
+            &query_terms.join(" "),
+            "2026-04-12T00:00:00Z",
+        );
+        let anchor_profile = LexicalAnchorProfile {
+            hard_anchor_terms: ["anchor01", "anchor02", "anchor03"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<HashSet<_>>(),
+            soft_anchor_terms: [
+                "soft01", "soft02", "soft03", "soft04", "soft05", "soft06", "soft07", "soft08",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<HashSet<_>>(),
+            term_weights: HashMap::from([
+                ("anchor01".to_string(), 1.0e16),
+                ("anchor02".to_string(), 1.0),
+                ("anchor03".to_string(), 1.0),
+                ("soft01".to_string(), 1.0),
+                ("soft02".to_string(), 1.0),
+                ("soft03".to_string(), 1.0),
+                ("soft04".to_string(), 1.0),
+                ("soft05".to_string(), 1.0),
+                ("soft06".to_string(), 1.0),
+                ("soft07".to_string(), 1.0),
+                ("soft08".to_string(), 1.0),
+            ]),
+        };
+
+        let signatures = (0..256)
+            .map(|_| {
+                let metrics = lexical_record_metrics(&record, &query_terms, &anchor_profile);
+                (
+                    metrics.weighted_overlap.to_bits(),
+                    metrics.hard_anchor_mass.to_bits(),
+                    metrics.soft_anchor_mass.to_bits(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            signatures.len(),
+            1,
+            "lexical metrics should be deterministic for identical input, got signatures: {signatures:?}"
         );
     }
 }
