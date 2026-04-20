@@ -123,9 +123,9 @@ cargo run --quiet --bin memory_mcp
 
 The watch mode turns a directory into a **passive memory intake pipe**: drop or save files and the server auto-ingests them into memory without any manual tool calls.
 
-**Why this exists.** In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
+**Why this exists** In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
 
-**What it does.**
+**What it does**
 
 - Recursively watches a directory for file **create** and **modify** events
 - Filters to supported file types only; unsupported files are silently skipped
@@ -133,7 +133,7 @@ The watch mode turns a directory into a **passive memory intake pipe**: drop or 
 - Dispatches qualifying files through the same `ingest` → `extract` pipeline used by MCP tool calls
 - Logs every step with structured events (visible at `RUST_LOG=info`/`debug`/`trace`)
 
-**Supported file types.**
+**Supported file types**
 
 | Extension | Format | Extracted content |
 |-----------|--------|-------------------|
@@ -147,7 +147,7 @@ The watch mode turns a directory into a **passive memory intake pipe**: drop or 
 
 Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipped**.
 
-**User scenario.**
+**User scenario**
 
 <details>
 <summary><strong>Example: auto-ingest a project inbox</strong></summary>
@@ -191,7 +191,7 @@ Within `--interval` seconds, each file is:
 No manual `ingest` tool call needed.
 </details>
 
-**How it works internally.**
+**How it works internally**
 
 <details>
 <summary><strong>Architecture flow</strong></summary>
@@ -231,7 +231,7 @@ FsWatcher::run_with_interval(dir, project, scope, interval, service)
 ```
 </details>
 
-**Deduplication behavior.**
+**Deduplication behavior**
 
 <details>
 <summary><strong>How rapid saves are handled</strong></summary>
@@ -253,7 +253,7 @@ Example with `--interval 5`:
 The `--interval` flag serves **dual purposes**: it controls both the poll frequency (how often notify scans the directory) **and** the dedup window (minimum time between ingests of the same file).
 </details>
 
-**Command-line reference.**
+**Command-line reference**
 
 <details>
 <summary><strong>Flags and defaults</strong></summary>
@@ -277,7 +277,7 @@ Important notes:
 - `Remove`, `Access`, and `Metadata` change events are ignored.
 </details>
 
-**Logging during watch.**
+**Logging during watch**
 
 <details>
 <summary><strong>What to expect at each log level</strong></summary>
@@ -417,9 +417,9 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 
 To switch, you change the environment variables and **restart the server**. There is no automatic data migration. Here is what to expect:
 
-**Existing embeddings stay in the database.** Previously stored embedding vectors are never deleted, re-generated, or converted. They remain as-is in the `fact.embedding` column.
+**Existing embeddings stay in the database** Previously stored embedding vectors are never deleted, re-generated, or converted. They remain as-is in the `fact.embedding` column.
 
-**The HNSW index is rebuilt with the new dimension.** On startup, the schema migration applies the current `dimension` value to `DEFINE INDEX ... HNSW DIMENSION N`. The index structure is re-created to match the new provider's output.
+**The HNSW index is rebuilt with the new dimension** On startup, the schema migration applies the current `dimension` value to `DEFINE INDEX ... HNSW DIMENSION N`. The index structure is re-created to match the new provider's output.
 
 **Semantic retrieval will return poor results until facts are re-extracted.** Embedding vectors from different models live in different semantic spaces — even if two models produce the same dimension (e.g., both 384), their cosine similarity scores are not comparable. After a switch, old vectors and new query embeddings are computed by different models, so similarity scores are essentially meaningless.
 
