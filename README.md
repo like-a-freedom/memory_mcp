@@ -4,6 +4,8 @@
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](https://doc.rust-lang.org/edition-guide/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+> ⚠️ **Disclaimer:** This project is **not production-ready**. It is currently an **educational project** intended for learning, experimentation, and research purposes only. Do not use it in production environments or for critical workloads.
+
 `memory_mcp` is a Rust-based Model Context Protocol (MCP) server that gives AI agents a structured long-term memory layer backed by SurrealDB.
 
 It is designed for workflows where agents need more than short-lived chat context: episodic memory, extracted entities and facts, bi-temporal validity, ranked context assembly, and graph-style relationships between people, companies, tasks, and decisions.
