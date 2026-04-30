@@ -53,6 +53,65 @@ impl OllamaEmbeddingProvider {
     }
 }
 
+pub(super) async fn detect_openai_embedding_dimension(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+    api_key: Option<&str>,
+) -> Result<usize, MemoryError> {
+    let mut headers =
+        HeaderMap::from_iter([(CONTENT_TYPE, HeaderValue::from_static("application/json"))]);
+    if let Some(api_key) = api_key {
+        let value = HeaderValue::from_str(&format!("Bearer {api_key}")).map_err(|err| {
+            MemoryError::ConfigInvalid(format!("invalid EMBEDDINGS_API_KEY header: {err}"))
+        })?;
+        headers.insert(AUTHORIZATION, value);
+    }
+
+    let response = client
+        .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+        .headers(headers)
+        .json(&json!({"model": model, "input": "dimension probe"}))
+        .send()
+        .await
+        .map_err(|err| MemoryError::Storage(format!("embedding request failed: {err}")))?
+        .error_for_status()
+        .map_err(|err| {
+            MemoryError::Storage(format!("embedding request returned error status: {err}"))
+        })?;
+
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|err| MemoryError::Storage(format!("embedding response decode failed: {err}")))?;
+
+    Ok(parse_openai_embedding(&body)?.len())
+}
+
+pub(super) async fn detect_ollama_embedding_dimension(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+) -> Result<usize, MemoryError> {
+    let response = client
+        .post(format!("{}/api/embeddings", base_url.trim_end_matches('/')))
+        .json(&json!({"model": model, "prompt": "dimension probe"}))
+        .send()
+        .await
+        .map_err(|err| MemoryError::Storage(format!("embedding request failed: {err}")))?
+        .error_for_status()
+        .map_err(|err| {
+            MemoryError::Storage(format!("embedding request returned error status: {err}"))
+        })?;
+
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|err| MemoryError::Storage(format!("embedding response decode failed: {err}")))?;
+
+    Ok(parse_ollama_embedding(&body)?.len())
+}
+
 #[async_trait]
 impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
     fn is_enabled(&self) -> bool {
@@ -143,31 +202,37 @@ fn parse_openai_embedding_response(
     body: &Value,
     expected_dimension: usize,
 ) -> Result<Vec<f64>, MemoryError> {
-    let embedding = body
-        .get("data")
+    let embedding = parse_openai_embedding(body)?;
+
+    validate_dimension(embedding, expected_dimension)
+}
+
+fn parse_openai_embedding(body: &Value) -> Result<Vec<f64>, MemoryError> {
+    body.get("data")
         .and_then(Value::as_array)
         .and_then(|items| items.first())
         .and_then(|item| item.get("embedding"))
         .and_then(embedding_from_value)
         .ok_or_else(|| {
             MemoryError::Storage("embedding response missing data[0].embedding".to_string())
-        })?;
-
-    validate_dimension(embedding, expected_dimension)
+        })
 }
 
 fn parse_ollama_embedding_response(
     body: &Value,
     expected_dimension: usize,
 ) -> Result<Vec<f64>, MemoryError> {
-    let embedding = body
-        .get("embedding")
+    let embedding = parse_ollama_embedding(body)?;
+
+    validate_dimension(embedding, expected_dimension)
+}
+
+fn parse_ollama_embedding(body: &Value) -> Result<Vec<f64>, MemoryError> {
+    body.get("embedding")
         .and_then(embedding_from_value)
         .ok_or_else(|| {
             MemoryError::Storage("embedding response missing embedding array".to_string())
-        })?;
-
-    validate_dimension(embedding, expected_dimension)
+        })
 }
 
 fn validate_dimension(

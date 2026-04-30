@@ -168,6 +168,31 @@ impl LocalCandleEmbeddingProvider {
     }
 }
 
+pub(super) fn detect_embedding_dimension(
+    model_dir: &std::path::Path,
+) -> Result<usize, MemoryError> {
+    let config_path = model_dir.join("config.json");
+    let config_str = std::fs::read_to_string(&config_path)
+        .map_err(|e| MemoryError::Storage(format!("failed to read config.json: {e}")))?;
+    let config_value = serde_json::from_str::<serde_json::Value>(&config_str)
+        .map_err(|e| MemoryError::Storage(format!("failed to parse bert config: {e}")))?;
+
+    let hidden_size = config_value
+        .get("hidden_size")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| {
+            MemoryError::ConfigInvalid(
+                "local embedding model config.json missing hidden_size".to_string(),
+            )
+        })?;
+
+    usize::try_from(hidden_size).map_err(|_| {
+        MemoryError::ConfigInvalid(format!(
+            "local embedding hidden_size {hidden_size} does not fit into usize"
+        ))
+    })
+}
+
 fn split_tokens_with_overlap(tokens: &[u32], chunk_size: usize, overlap: usize) -> Vec<Vec<u32>> {
     if tokens.len() <= chunk_size || chunk_size == 0 {
         return vec![tokens.to_vec()];

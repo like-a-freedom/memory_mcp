@@ -1,5 +1,6 @@
 use memory_mcp::cli::{
-    RunMode, log_session_duration, log_startup, parse_cli_args, run_stdio_server, run_watch_mode,
+    RunMode, log_session_duration, log_startup, parse_cli_args, run_reembed_mode, run_stdio_server,
+    run_watch_mode,
 };
 use memory_mcp::logging::StdoutLogger;
 
@@ -14,12 +15,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mode_label = match &run_mode {
         RunMode::Serve => "serve",
         RunMode::Watch(_) => "watch",
+        RunMode::Reembed => "reembed",
     };
     log_startup(&logger, mode_label);
 
     match run_mode {
         RunMode::Serve => run_stdio_server(&logger).await?,
         RunMode::Watch(watch) => run_watch_mode(&logger, watch).await?,
+        RunMode::Reembed => run_reembed_mode(&logger).await?,
     }
 
     let duration = chrono::Utc::now().signed_duration_since(startup_ts);

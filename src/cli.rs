@@ -6,6 +6,7 @@ use rmcp::transport::io::stdio;
 use serde_json::json;
 
 use crate::logging::{LogLevel, StdoutLogger};
+use crate::service::EmbeddingActivationMode;
 use crate::{MemoryMcp, MemoryService};
 
 const DEFAULT_WATCH_INTERVAL_SECS: u64 = 2;
@@ -37,6 +38,7 @@ fn log_and_return_error(
 pub enum RunMode {
     Serve,
     Watch(WatchCommand),
+    Reembed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,52 +61,60 @@ where
         return Ok(RunMode::Serve);
     };
 
-    if subcommand != "watch" {
-        return Err(format!("unknown subcommand {subcommand}"));
-    }
+    match subcommand.as_str() {
+        "watch" => {
+            let Some(dir) = args.next() else {
+                return Err("watch requires <dir>".to_string());
+            };
 
-    let Some(dir) = args.next() else {
-        return Err("watch requires <dir>".to_string());
-    };
+            let mut watch = WatchCommand {
+                dir: PathBuf::from(dir),
+                project: None,
+                scope: "org".to_string(),
+                interval_secs: DEFAULT_WATCH_INTERVAL_SECS,
+            };
 
-    let mut watch = WatchCommand {
-        dir: PathBuf::from(dir),
-        project: None,
-        scope: "org".to_string(),
-        interval_secs: DEFAULT_WATCH_INTERVAL_SECS,
-    };
-
-    while let Some(flag) = args.next() {
-        match flag.as_str() {
-            "--project" => {
-                let value = args
-                    .next()
-                    .ok_or_else(|| "--project requires a value".to_string())?;
-                watch.project = Some(value);
-            }
-            "--scope" => {
-                let value = args
-                    .next()
-                    .ok_or_else(|| "--scope requires a value".to_string())?;
-                watch.scope = value;
-            }
-            "--interval" => {
-                let value = args
-                    .next()
-                    .ok_or_else(|| "--interval requires a value".to_string())?;
-                let interval_secs = value
-                    .parse::<u64>()
-                    .map_err(|_| format!("invalid --interval value {value}"))?;
-                if interval_secs == 0 {
-                    return Err("--interval must be greater than 0".to_string());
+            while let Some(flag) = args.next() {
+                match flag.as_str() {
+                    "--project" => {
+                        let value = args
+                            .next()
+                            .ok_or_else(|| "--project requires a value".to_string())?;
+                        watch.project = Some(value);
+                    }
+                    "--scope" => {
+                        let value = args
+                            .next()
+                            .ok_or_else(|| "--scope requires a value".to_string())?;
+                        watch.scope = value;
+                    }
+                    "--interval" => {
+                        let value = args
+                            .next()
+                            .ok_or_else(|| "--interval requires a value".to_string())?;
+                        let interval_secs = value
+                            .parse::<u64>()
+                            .map_err(|_| format!("invalid --interval value {value}"))?;
+                        if interval_secs == 0 {
+                            return Err("--interval must be greater than 0".to_string());
+                        }
+                        watch.interval_secs = interval_secs;
+                    }
+                    _ => return Err(format!("unknown watch flag {flag}")),
                 }
-                watch.interval_secs = interval_secs;
             }
-            _ => return Err(format!("unknown watch flag {flag}")),
-        }
-    }
 
-    Ok(RunMode::Watch(watch))
+            Ok(RunMode::Watch(watch))
+        }
+        "reembed" => {
+            if args.next().is_some() {
+                return Err("reembed does not accept positional arguments".to_string());
+            }
+
+            Ok(RunMode::Reembed)
+        }
+        _ => Err(format!("unknown subcommand {subcommand}")),
+    }
 }
 
 /// Helper: log startup event with pid and mode label.
@@ -126,14 +136,15 @@ pub fn log_session_duration(logger: &StdoutLogger, duration_secs: i64) {
 
 async fn build_memory_service(
     logger: &StdoutLogger,
+    mode: EmbeddingActivationMode,
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {
-    MemoryService::new_from_env()
+    MemoryService::new_from_env_with_mode(mode)
         .await
         .map_err(|err| log_and_return_error(logger, "main.startup_failed", err))
 }
 
 pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
-    let memory_service = build_memory_service(logger).await?;
+    let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
     let server = MemoryMcp::new(memory_service);
 
     logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
@@ -170,7 +181,7 @@ pub async fn run_watch_mode(
         LogLevel::Info,
     );
 
-    let memory_service = build_memory_service(logger).await?;
+    let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
 
     #[cfg(feature = "cli-watch")]
     {
@@ -192,6 +203,35 @@ pub async fn run_watch_mode(
             "watch subcommand requires the cli-watch feature",
         )) as Box<dyn std::error::Error>)
     }
+}
+
+pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
+    logger.log(
+        event!("op" => json!("main.reembed_starting")),
+        LogLevel::Info,
+    );
+
+    let memory_service =
+        build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
+    let started_at = std::time::Instant::now();
+    let summary = memory_service
+        .reembed_all_facts()
+        .await
+        .map_err(|err| log_and_return_error(logger, "main.reembed_failed", err))?;
+
+    logger.log(
+        event!(
+            "op" => json!("main.reembed_completed"),
+            "total_facts" => json!(summary.total_facts),
+            "processed_facts" => json!(summary.processed_facts),
+            "succeeded_facts" => json!(summary.succeeded_facts),
+            "failed_facts" => json!(summary.failed_facts),
+            "duration_ms" => json!(started_at.elapsed().as_millis() as u64),
+        ),
+        LogLevel::Info,
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -250,5 +290,25 @@ mod tests {
         .expect_err("unknown flag should fail");
 
         assert!(error.contains("unknown watch flag --mystery"));
+    }
+
+    #[test]
+    fn parse_cli_args_builds_reembed_mode() {
+        let mode = parse_cli_args(["memory_mcp".to_string(), "reembed".to_string()])
+            .expect("reembed mode should parse");
+
+        assert_eq!(mode, RunMode::Reembed);
+    }
+
+    #[test]
+    fn parse_cli_args_rejects_unexpected_reembed_arguments() {
+        let error = parse_cli_args([
+            "memory_mcp".to_string(),
+            "reembed".to_string(),
+            "extra".to_string(),
+        ])
+        .expect_err("reembed should reject extra arguments");
+
+        assert!(error.contains("reembed does not accept positional arguments"));
     }
 }

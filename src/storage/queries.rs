@@ -221,6 +221,36 @@ pub fn build_select_active_facts_query(limit: i32) -> (String, Value) {
     )
 }
 
+pub fn build_count_facts_needing_reembed_query(target_signature: &str) -> (String, Value) {
+    (
+        "SELECT count() AS count FROM fact WHERE embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature".to_string(),
+        json!({"target_signature": target_signature}),
+    )
+}
+
+pub fn build_select_facts_needing_reembed_query(
+    target_signature: &str,
+    last_completed_fact_id: Option<&str>,
+    limit: i32,
+) -> (String, Value) {
+    let cursor_clause = if last_completed_fact_id.is_some() {
+        " AND fact_id > $last_completed_fact_id"
+    } else {
+        ""
+    };
+
+    (
+        format!(
+            "SELECT * FROM fact WHERE (embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature){cursor_clause} ORDER BY fact_id ASC LIMIT $limit"
+        ),
+        json!({
+            "target_signature": target_signature,
+            "last_completed_fact_id": last_completed_fact_id,
+            "limit": limit,
+        }),
+    )
+}
+
 pub fn build_select_episodes_for_archival_query(cutoff: &str, limit: i32) -> (String, Value) {
     (
         "SELECT * FROM episode WHERE status != 'archived' AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit".to_string(),
@@ -448,11 +478,14 @@ fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
             "t_invalid",
             "t_invalid_ingested",
             "last_accessed",
+            "embedding_updated_at",
         ],
         "community" => &["updated_at"],
         "event_log" => &["ts"],
         "task" => &["due_date"],
         "script_migration" => &["executed_at"],
+        "embedding_state" => &["updated_at"],
+        "embedding_job" => &["requested_at", "started_at", "updated_at", "finished_at"],
         _ => &[],
     }
 }
@@ -469,21 +502,16 @@ fn build_set_assignments(
     let mut vars = serde_json::Map::new();
 
     for (key, value) in entries {
-        if temporal_fields.contains(&key.as_str()) {
-            match value {
-                Value::Null => assignments.push(format!("{key} = NONE")),
-                Value::String(raw) => {
-                    vars.insert(key.clone(), Value::String(raw));
-                    assignments.push(format!("{key} = type::datetime(${key})"));
-                }
-                other => {
-                    vars.insert(key.clone(), other);
-                    assignments.push(format!("{key} = ${key}"));
-                }
+        match value {
+            Value::Null => assignments.push(format!("{key} = NONE")),
+            Value::String(raw) if temporal_fields.contains(&key.as_str()) => {
+                vars.insert(key.clone(), Value::String(raw));
+                assignments.push(format!("{key} = type::datetime(${key})"));
             }
-        } else {
-            vars.insert(key.clone(), value);
-            assignments.push(format!("{key} = ${key}"));
+            other => {
+                vars.insert(key.clone(), other);
+                assignments.push(format!("{key} = ${key}"));
+            }
         }
     }
 

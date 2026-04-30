@@ -62,6 +62,14 @@ impl MemoryService {
         );
     }
 
+    pub(crate) fn build_fact_embedding_input(
+        fact_type: &str,
+        content: &str,
+        quote: &str,
+    ) -> String {
+        format!("{fact_type}\n{content}\n{quote}")
+    }
+
     /// Returns the total count of episodes.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
         let mut total = 0;
@@ -410,7 +418,7 @@ impl MemoryService {
             }
 
             match self
-                .generate_embedding(&format!("{fact_type}\n{content}\n{quote}"))
+                .generate_embedding(&Self::build_fact_embedding_input(fact_type, content, quote))
                 .await
             {
                 Ok(Some(embedding)) => {
@@ -422,6 +430,21 @@ impl MemoryService {
                         )));
                     }
                     payload.insert("embedding".to_string(), json!(embedding));
+                    payload.insert(
+                        "embedding_provider".to_string(),
+                        json!(self.embedding_provider.provider_name()),
+                    );
+                    if let Some(model) = &self.current_embedding_model {
+                        payload.insert("embedding_model".to_string(), json!(model));
+                    }
+                    payload.insert("embedding_dimension".to_string(), json!(expected_dim));
+                    if let Some(signature) = &self.current_embedding_signature {
+                        payload.insert("embedding_signature".to_string(), json!(signature));
+                    }
+                    payload.insert(
+                        "embedding_updated_at".to_string(),
+                        json!(super::normalize_dt(super::query::now())),
+                    );
                 }
                 Ok(None) => {}
                 Err(err) => {

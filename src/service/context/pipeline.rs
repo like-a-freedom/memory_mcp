@@ -16,8 +16,8 @@ use super::filtering::filter_facts_by_constraints;
 use super::lexical::{FactQueryParams, select_fact_records_for_query};
 use super::params::DefaultContextParams;
 use super::ranking::{
-    RetrievalTier, apply_time_window, build_ranked_context_facts, select_ranked_context_facts,
-    sort_ranked_context_facts_for_timeline,
+    BuildRankedContextFactsRequest, RetrievalTier, apply_time_window, build_ranked_context_facts,
+    select_ranked_context_facts, sort_ranked_context_facts_for_timeline,
 };
 use super::rescue::{
     build_episode_rescue_log_result, maybe_append_first_person_episode_item,
@@ -225,27 +225,31 @@ pub(super) async fn assemble_default_context(
         );
 
         build_ranked_context_facts(
-            lexical_facts,
-            community_facts,
-            semantic_facts,
-            params.raw_query_opt,
-            service.embedding_provider.is_enabled(),
-            params.scope,
-            params.cutoff,
+            BuildRankedContextFactsRequest {
+                lexical_facts,
+                community_facts,
+                semantic_facts,
+                query_opt: params.raw_query_opt,
+                semantic_available: service.embedding_provider.is_enabled(),
+                scope: params.scope,
+                cutoff: params.cutoff,
+            },
             decayed_confidence,
         )
     } else {
         build_ranked_context_facts(
-            direct_facts
-                .into_iter()
-                .map(|fact| (fact, RetrievalTier::Direct))
-                .collect(),
-            Vec::new(),
-            Vec::new(),
-            params.raw_query_opt,
-            service.embedding_provider.is_enabled(),
-            params.scope,
-            params.cutoff,
+            BuildRankedContextFactsRequest {
+                lexical_facts: direct_facts
+                    .into_iter()
+                    .map(|fact| (fact, RetrievalTier::Direct))
+                    .collect(),
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: params.raw_query_opt,
+                semantic_available: service.embedding_provider.is_enabled(),
+                scope: params.scope,
+                cutoff: params.cutoff,
+            },
             decayed_confidence,
         )
     };

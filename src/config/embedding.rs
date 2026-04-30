@@ -3,6 +3,8 @@
 use std::env;
 use std::path::PathBuf;
 
+use serde_json::json;
+
 use super::constants::*;
 use super::helpers::{parse_bool_env, parse_env};
 use crate::service::MemoryError;
@@ -33,8 +35,8 @@ pub struct EmbeddingConfig {
     pub api_key: Option<String>,
     /// Request timeout in seconds.
     pub timeout_secs: u64,
-    /// Expected embedding vector dimension.
-    pub dimension: usize,
+    /// Explicit operator-provided embedding dimension override.
+    pub dimension_override: Option<usize>,
     /// Maximum input tokens for chunking.
     pub max_tokens: usize,
     /// Minimum cosine similarity required for semantic retrieval.
@@ -51,12 +53,33 @@ impl Default for EmbeddingConfig {
             model: None,
             api_key: None,
             timeout_secs: DEFAULT_EMBEDDING_TIMEOUT_SECS,
-            dimension: DEFAULT_EMBEDDING_DIMENSION,
+            dimension_override: None,
             max_tokens: DEFAULT_EMBEDDING_MAX_TOKENS,
             similarity_threshold: DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             model_dir: None,
         }
     }
+}
+
+#[must_use]
+pub fn build_embedding_signature(
+    provider_label: &str,
+    model: Option<&str>,
+    base_url: Option<&str>,
+    dimension: usize,
+) -> String {
+    use sha2::{Digest, Sha256};
+
+    let material = json!({
+        "provider": provider_label,
+        "model": model,
+        "base_url": base_url.map(|url| url.trim_end_matches('/')),
+        "dimension": dimension,
+    });
+
+    let mut hasher = Sha256::new();
+    hasher.update(material.to_string().as_bytes());
+    format!("embsig:{}", hex::encode(hasher.finalize()))
 }
 
 impl EmbeddingConfig {
@@ -85,7 +108,7 @@ impl EmbeddingConfig {
         if !enabled {
             return Ok(Self {
                 timeout_secs,
-                dimension: configured_dimension.unwrap_or(DEFAULT_EMBEDDING_DIMENSION),
+                dimension_override: configured_dimension,
                 max_tokens,
                 similarity_threshold,
                 model_dir,
@@ -135,18 +158,13 @@ impl EmbeddingConfig {
             EmbeddingProviderKind::Disabled => None,
         };
 
-        let dimension = configured_dimension.unwrap_or(match provider {
-            EmbeddingProviderKind::LocalCandle => DEFAULT_LOCAL_CANDLE_EMBEDDING_DIMENSION,
-            _ => DEFAULT_EMBEDDING_DIMENSION,
-        });
-
         Ok(Self {
             provider,
             base_url,
             model,
             api_key: env::var("EMBEDDINGS_API_KEY").ok(),
             timeout_secs,
-            dimension,
+            dimension_override: configured_dimension,
             max_tokens,
             similarity_threshold,
             model_dir,
@@ -157,6 +175,26 @@ impl EmbeddingConfig {
     #[must_use]
     pub fn is_enabled(&self) -> bool {
         !matches!(self.provider, EmbeddingProviderKind::Disabled)
+    }
+
+    /// Returns the canonical provider label used in logs and signatures.
+    #[must_use]
+    pub fn provider_label(&self) -> &'static str {
+        match self.provider {
+            EmbeddingProviderKind::Disabled => "disabled",
+            EmbeddingProviderKind::LocalCandle => "local-candle",
+            EmbeddingProviderKind::OpenAiCompatible => "openai-compatible",
+            EmbeddingProviderKind::Ollama => "ollama",
+        }
+    }
+
+    /// Returns the non-authoritative fallback dimension used outside resolved preflight paths.
+    #[must_use]
+    pub fn fallback_dimension(&self) -> usize {
+        self.dimension_override.unwrap_or(match self.provider {
+            EmbeddingProviderKind::LocalCandle => DEFAULT_LOCAL_CANDLE_EMBEDDING_DIMENSION,
+            _ => DEFAULT_EMBEDDING_DIMENSION,
+        })
     }
 
     /// Resolves the model directory path for local embedding providers.
@@ -177,5 +215,115 @@ impl EmbeddingConfig {
                 .to_string_lossy()
                 .to_string()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{self, AssertUnwindSafe};
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_env_vars(vars: &[(&str, Option<&str>)], test: impl FnOnce()) {
+        let _guard = env_lock().lock().expect("env lock");
+        let saved = vars
+            .iter()
+            .map(|(key, _)| ((*key).to_string(), std::env::var(key).ok()))
+            .collect::<Vec<_>>();
+
+        unsafe {
+            for (key, value) in vars {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+
+        let result = panic::catch_unwind(AssertUnwindSafe(test));
+
+        unsafe {
+            for (key, value) in saved {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+
+        result.expect("test body should not panic");
+    }
+
+    #[test]
+    fn embedding_signature_changes_when_model_changes() {
+        let first = build_embedding_signature(
+            "openai-compatible",
+            Some("text-embedding-3-small"),
+            Some("https://api.openai.com/v1"),
+            1536,
+        );
+        let second = build_embedding_signature(
+            "openai-compatible",
+            Some("text-embedding-3-large"),
+            Some("https://api.openai.com/v1"),
+            1536,
+        );
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn embedding_signature_is_stable_for_equivalent_config() {
+        let left = build_embedding_signature(
+            "local-candle",
+            Some("intfloat/multilingual-e5-small"),
+            None,
+            384,
+        );
+        let right = build_embedding_signature(
+            "local-candle",
+            Some("intfloat/multilingual-e5-small"),
+            None,
+            384,
+        );
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn embedding_config_from_env_preserves_dimension_override_when_set() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("local-candle")),
+                ("EMBEDDINGS_MODEL", Some("intfloat/multilingual-e5-small")),
+                ("SURREALDB_EMBEDDING_DIMENSION", Some("777")),
+            ],
+            || {
+                let config = EmbeddingConfig::from_env().expect("config from env");
+                assert_eq!(config.dimension_override, Some(777));
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_from_env_leaves_dimension_override_unset_when_absent() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("local-candle")),
+                ("EMBEDDINGS_MODEL", Some("intfloat/multilingual-e5-small")),
+                ("SURREALDB_EMBEDDING_DIMENSION", None),
+            ],
+            || {
+                let config = EmbeddingConfig::from_env().expect("config from env");
+                assert_eq!(config.dimension_override, None);
+            },
+        );
     }
 }

@@ -45,6 +45,16 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "018_query_log.surql",
             sql: include_str!("../../migrations/018_query_log.surql"),
         },
+        MigrationScript {
+            file_name: "019_embedding_rebuild_maintenance.surql",
+            sql: include_str!("../../migrations/019_embedding_rebuild_maintenance.surql"),
+        },
+        MigrationScript {
+            file_name: "020_embedding_job_namespace_progress_flexible.surql",
+            sql: include_str!(
+                "../../migrations/020_embedding_job_namespace_progress_flexible.surql"
+            ),
+        },
     ]
 }
 
@@ -69,6 +79,10 @@ pub fn migration_has_statements(sql: &str) -> bool {
     sql.lines()
         .map(str::trim)
         .any(|line| !line.is_empty() && !line.starts_with("--"))
+}
+
+fn is_dynamic_embedding_migration(file_name: &str) -> bool {
+    matches!(file_name, "008_fact_semantic_embeddings.surql")
 }
 
 pub fn validate_applied_migration(
@@ -104,7 +118,8 @@ pub fn validate_applied_migration(
         )));
     }
 
-    if applied_checksum != expected_checksum {
+    if applied_checksum != expected_checksum && !is_dynamic_embedding_migration(expected_file_name)
+    {
         return Err(MemoryError::ConfigInvalid(format!(
             "applied migration {expected_file_name} was modified after execution"
         )));
@@ -121,4 +136,38 @@ pub fn validate_applied_migration(
 
 fn json_string(value: &Value) -> Option<&str> {
     value.as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn versioned_migrations_includes_embedding_rebuild_maintenance() {
+        assert!(
+            versioned_migrations()
+                .iter()
+                .any(|migration| migration.file_name == "019_embedding_rebuild_maintenance.surql")
+        );
+        assert!(versioned_migrations().iter().any(|migration| {
+            migration.file_name == "020_embedding_job_namespace_progress_flexible.surql"
+        }));
+    }
+
+    #[test]
+    fn validate_applied_migration_allows_dynamic_embedding_checksum_drift_for_008() {
+        let existing = serde_json::json!({
+            "script_name": "008_fact_semantic_embeddings.surql",
+            "checksum": "checksum-from-384-database",
+            "executed_at": "2026-04-30T00:00:00Z"
+        });
+
+        let result = validate_applied_migration(
+            &existing,
+            "008_fact_semantic_embeddings.surql",
+            "checksum-from-1536-render",
+        );
+
+        assert!(result.is_ok());
+    }
 }

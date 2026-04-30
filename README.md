@@ -408,60 +408,95 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 
 #### How it works at startup
 
-1. The server reads `EMBEDDINGS_PROVIDER` and related variables **once** at startup.
-2. A single embedding provider is created and stored as `Arc<dyn EmbeddingProvider>`.
-3. **The provider cannot be changed without restarting** — there is no runtime hot-swap.
-4. For `local-candle`, the model files are downloaded from HuggingFace Hub on first use and cached locally (default: `<data_dir>/models/<model_name>/`). Subsequent restarts reuse the cached files.
+1. The server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
+2. That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
+3. In normal `serve` / `watch` startup, every configured namespace is checked before semantic retrieval is enabled.
+4. If a namespace is already marked `ready` for the same signature, semantic retrieval starts normally.
+5. If a namespace is missing state but is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
+6. If any namespace is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
+
+That last point is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
 
 #### What happens when you switch providers
 
-To switch, you change the environment variables and **restart the server**. There is no automatic data migration. Here is what to expect:
+To switch, change the environment variables and restart the process. The server does **not** silently rewrite old vectors during normal startup.
 
-**Existing embeddings stay in the database** Previously stored embedding vectors are never deleted, re-generated, or converted. They remain as-is in the `fact.embedding` column.
+Instead, the runtime now separates two modes:
 
-**The HNSW index is rebuilt with the new dimension** On startup, the schema migration applies the current `dimension` value to `DEFINE INDEX ... HNSW DIMENSION N`. The index structure is re-created to match the new provider's output.
+- **Normal mode** (`memory_mcp` or `memory_mcp watch ...`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
+- **Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
 
-**Semantic retrieval will return poor results until facts are re-extracted.** Embedding vectors from different models live in different semantic spaces — even if two models produce the same dimension (e.g., both 384), their cosine similarity scores are not comparable. After a switch, old vectors and new query embeddings are computed by different models, so similarity scores are essentially meaningless.
+This keeps the public MCP tool surface unchanged while giving operators a deterministic recovery path after provider changes.
 
-#### Scenario: `local-candle` → `openai-compatible`
+#### The `reembed` maintenance command
 
-| Step | What happens |
-| --- | --- |
-| 1. Change `EMBEDDINGS_PROVIDER=openai-compatible`, set `EMBEDDINGS_BASE_URL`, restart | New HTTP-based provider created; BERT model released from memory |
-| 2. HNSW index re-created with new dimension (e.g., 1536) | Old 384-dim vectors still in DB but incompatible with new index |
-| 3. New `extract` calls embed facts with the OpenAI model | New 1536-dim vectors stored alongside old 384-dim ones |
-| 4. `assemble_context` semantic search | Only newly embedded facts will produce meaningful similarity scores; old facts will be filtered out by the similarity threshold |
+Use the maintenance command after changing any embedding target that should become authoritative for stored facts:
 
-#### Scenario: `openai-compatible` → `local-candle`
+- `EMBEDDINGS_PROVIDER`
+- `EMBEDDINGS_MODEL`
+- `EMBEDDINGS_BASE_URL`
+- effective embedding dimension (including override/probe changes)
 
-| Step | What happens |
-| --- | --- |
-| 1. Change `EMBEDDINGS_PROVIDER=local-candle`, restart | BERT model loaded from local cache (no re-download if already cached) |
-| 2. HNSW index re-created with dimension 384 | Old 1536-dim vectors remain in DB but are incompatible |
-| 3. New `extract` calls embed facts with BERT | New 384-dim vectors stored |
-| 4. `assemble_context` semantic search | Only newly embedded facts produce meaningful results |
+Example:
 
-#### Scenario: `local-candle` → external → `local-candle`
+```bash
+memory_mcp reembed
+```
 
-Each restart creates a completely fresh provider instance:
+From the workspace during development:
 
-1. **Start with `local-candle`** → model cached, 384-dim vectors stored.
-2. **Restart with `openai-compatible`** → BERT released, 1536-dim vectors stored. Old 384-dim vectors orphaned.
-3. **Restart with `local-candle` again** → model re-loaded from cache (fast, no re-download), 384-dim HNSW index re-created. New facts get fresh 384-dim vectors. The 1536-dim vectors from step 2 are now orphaned.
+```bash
+cargo run --quiet --bin memory_mcp -- reembed
+```
 
-**Nothing is lost** — old vectors remain in the database. But they are **not usable** for semantic search with the current provider.
+What the command does:
+
+1. Resolves the configured target signature and dimension.
+2. Loads or creates a persisted control-plane job record at `embedding_job:fact_reembed`.
+3. Marks each namespace as `rebuilding` in `embedding_state`.
+4. Rewrites **all** fact embeddings, including invalidated / historical facts.
+5. Stores fresh metadata on each fact (`embedding_provider`, `embedding_model`, `embedding_dimension`, `embedding_signature`, `embedding_updated_at`).
+6. Marks namespaces `ready` on success, or `failed` if the job stops on an error.
+
+The job is **restart-safe** for the same target signature: if the process stops mid-run, invoking `memory_mcp reembed` again resumes from the persisted per-namespace cursor instead of starting from scratch.
+
+#### Progress, status, and logging
+
+The maintenance flow is designed to be debuggable from logs alone.
+
+Key structured events include:
+
+- `reembed.job_started`
+- `reembed.namespace_started`
+- `reembed.batch_fetched`
+- `reembed.progress`
+- `reembed.fact_failed`
+- `reembed.job_failed`
+- `main.reembed_completed`
+
+Progress logs include counts and throughput data such as:
+
+- processed / succeeded / failed facts
+- total facts
+- facts per second
+- ETA in seconds (when enough progress exists to estimate it)
+
+At the end of a successful run, `main.reembed_completed` logs a compact summary with totals and elapsed time.
+
+#### Recommended procedure after switching
+
+To restore semantic retrieval safely after a provider change:
+
+1. Change the embedding environment variables.
+2. Run `memory_mcp reembed` (or `cargo run --quiet --bin memory_mcp -- reembed`).
+3. Wait for the maintenance run to complete successfully.
+4. Start the normal MCP server again.
+
+Until step 3 completes, the server may intentionally run with semantic retrieval disabled while lexical and graph-based retrieval continue to work.
 
 #### Similarity threshold
 
 The `EMBEDDINGS_SIMILARITY_THRESHOLD` (default `0.7`) filters semantic search results: only facts with cosine similarity ≥ threshold are returned. After a provider switch, this threshold effectively filters out **all** old facts because cross-provider similarity scores are meaningless.
-
-#### Recommended procedure after switching
-
-To restore full semantic retrieval quality after a provider change:
-
-1. Switch the environment variables and restart.
-2. Re-run `extract` on all episodes whose facts you want to search semantically. This re-embeds facts with the new provider.
-3. Optionally, invalidate old facts that were embedded with the previous provider to avoid mixing incompatible vectors.
 
 If you only use **lexical** (BM25/FTS) retrieval and **graph-expanded** context assembly, the provider switch has **no impact** on those retrieval tiers — they do not use embeddings.
 

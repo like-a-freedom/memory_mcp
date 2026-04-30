@@ -377,9 +377,9 @@ mod tests {
         select_episode_records_for_query, select_fact_records_for_query,
     };
     use super::ranking::{
-        RankedContextFact, RetrievalTier, build_ranked_context_facts,
-        prune_redundant_selected_facts, ranked_relevance_score, select_ranked_context_facts,
-        sort_ranked_context_facts,
+        BuildRankedContextFactsRequest, RankedContextFact, RetrievalTier,
+        build_ranked_context_facts, prune_redundant_selected_facts, ranked_relevance_score,
+        select_ranked_context_facts, sort_ranked_context_facts,
     };
     use super::rescue::{
         build_episode_rescue_log_result, maybe_append_first_person_episode_item,
@@ -2635,16 +2635,18 @@ mod tests {
         let fact = create_test_fact("fact:temporal", cutoff - chrono::Duration::days(1));
 
         let ranked = build_ranked_context_facts(
-            vec![
-                (fact.clone(), RetrievalTier::Direct),
-                (fact, RetrievalTier::TemporalExpanded),
-            ],
-            Vec::new(),
-            Vec::new(),
-            Some("march 2026 launch review"),
-            false,
-            "org",
-            cutoff,
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![
+                    (fact.clone(), RetrievalTier::Direct),
+                    (fact, RetrievalTier::TemporalExpanded),
+                ],
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: Some("march 2026 launch review"),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
             crate::service::decayed_confidence,
         );
 
@@ -2663,24 +2665,26 @@ mod tests {
         extracted.content = "Extracted fact content from alpha community".to_string();
 
         let mut ranked = build_ranked_context_facts(
-            Vec::new(),
-            vec![
-                (
-                    inferred,
-                    "matched community summary via community:beta".to_string(),
-                    0.2,
-                ),
-                (
-                    extracted,
-                    "matched community summary via community:alpha".to_string(),
-                    1.0,
-                ),
-            ],
-            Vec::new(),
-            Some("launch workstream"),
-            false,
-            "org",
-            cutoff,
+            BuildRankedContextFactsRequest {
+                lexical_facts: Vec::new(),
+                community_facts: vec![
+                    (
+                        inferred,
+                        "matched community summary via community:beta".to_string(),
+                        0.2,
+                    ),
+                    (
+                        extracted,
+                        "matched community summary via community:alpha".to_string(),
+                        1.0,
+                    ),
+                ],
+                semantic_facts: Vec::new(),
+                query_opt: Some("launch workstream"),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
             crate::service::decayed_confidence,
         );
         sort_ranked_context_facts(&mut ranked);
@@ -2758,18 +2762,20 @@ mod tests {
         assistant_fact.ft_score = 4.0;
 
         let mut ranked = build_ranked_context_facts(
-            vec![
-                (assistant_fact, RetrievalTier::Direct),
-                (user_fact, RetrievalTier::Direct),
-            ],
-            Vec::new(),
-            Vec::new(),
-            Some(
-                "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
-            ),
-            false,
-            "org",
-            cutoff,
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![
+                    (assistant_fact, RetrievalTier::Direct),
+                    (user_fact, RetrievalTier::Direct),
+                ],
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: Some(
+                    "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+                ),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
             crate::service::decayed_confidence,
         );
         sort_ranked_context_facts(&mut ranked);

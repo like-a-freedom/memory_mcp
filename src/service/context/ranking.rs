@@ -160,16 +160,31 @@ fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedCont
         existing.fact = incoming.fact;
     }
 }
+
+pub(crate) struct BuildRankedContextFactsRequest<'a> {
+    pub(crate) lexical_facts: Vec<(Fact, RetrievalTier)>,
+    pub(crate) community_facts: Vec<(Fact, String, f64)>,
+    pub(crate) semantic_facts: Vec<(Fact, String)>,
+    pub(crate) query_opt: Option<&'a str>,
+    pub(crate) semantic_available: bool,
+    pub(crate) scope: &'a str,
+    pub(crate) cutoff: DateTime<Utc>,
+}
+
 pub(crate) fn build_ranked_context_facts(
-    lexical_facts: Vec<(Fact, RetrievalTier)>,
-    community_facts: Vec<(Fact, String, f64)>,
-    semantic_facts: Vec<(Fact, String)>,
-    query_opt: Option<&str>,
-    semantic_available: bool,
-    scope: &str,
-    cutoff: DateTime<Utc>,
+    request: BuildRankedContextFactsRequest<'_>,
     decayed_fn: impl Fn(&Fact, DateTime<Utc>) -> f64,
 ) -> Vec<RankedContextFact> {
+    let BuildRankedContextFactsRequest {
+        lexical_facts,
+        community_facts,
+        semantic_facts,
+        query_opt,
+        semantic_available,
+        scope,
+        cutoff,
+    } = request;
+
     let mut ranked_by_fact_id = HashMap::<String, RankedContextFact>::new();
     let query_alignment = |fact: &Fact| query_alignment_factor(query_opt, fact);
     let grounding = |fact: &Fact| query_grounding_score(query_opt, fact);

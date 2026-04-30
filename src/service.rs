@@ -25,6 +25,7 @@ mod error;
 mod ingest;
 pub(crate) mod lifecycle;
 mod query;
+mod reembed;
 mod startup;
 mod util;
 
@@ -59,6 +60,7 @@ pub use query::{
     bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,
     parse_iso, preprocess_search_query,
 };
+pub use reembed::ReembedSummary;
 /// Re-export ids module for direct access.
 pub use util::ids;
 pub use util::{
@@ -70,3 +72,4 @@ pub use util::{
 };
 
 pub(crate) use core::{log_args_with_duration, log_event};
+pub(crate) use startup::EmbeddingActivationMode;

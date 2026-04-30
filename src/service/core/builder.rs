@@ -9,14 +9,20 @@ use crate::service::AnnoEntityExtractor;
 use crate::service::EntityExtractor;
 use crate::service::cache::CacheKey;
 use crate::service::embedding::{
-    DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider,
+    DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider_with_dimension,
+    resolve_embedding_target_identity,
 };
 use crate::service::entity_extraction::create_entity_extractor;
 use crate::service::error::MemoryError;
 use crate::service::lifecycle::{
     spawn_archival_worker, spawn_community_worker, spawn_decay_worker,
 };
-use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
+use crate::service::startup::{
+    EmbeddingActivationMode, EmbeddingStartupDecision, LEGACY_EMBEDDING_SAMPLE_SIZE,
+    apply_startup_migrations, build_startup_versions_event, count_facts_per_namespace,
+    decide_embedding_startup, load_embedding_states, sample_stored_embedding_dimensions,
+    write_bootstrap_ready_states,
+};
 use crate::service::util::RateLimiter;
 use crate::storage::{DbClient, SurrealDbClient};
 
@@ -34,6 +40,9 @@ pub struct MemoryService {
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
     pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
     pub(crate) embedding_similarity_threshold: f64,
+    pub(crate) current_embedding_signature: Option<String>,
+    pub(crate) current_embedding_model: Option<String>,
+    pub(crate) current_embedding_dimension: Option<usize>,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
 }
@@ -49,6 +58,12 @@ pub(super) struct ServiceBuildConfig {
 impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
+        Self::new_from_env_with_mode(EmbeddingActivationMode::Standard).await
+    }
+
+    pub(crate) async fn new_from_env_with_mode(
+        mode: EmbeddingActivationMode,
+    ) -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
         let default_namespace = config
             .default_namespace()
@@ -108,13 +123,177 @@ impl MemoryService {
             build_startup_versions_event(client_version, server_version.as_deref());
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
-        let embedding_provider =
-            create_embedding_provider(&config.embedding, &effective_data_dir).await?;
+        let db_client = Arc::new(db_client) as Arc<dyn DbClient>;
+        apply_startup_migrations(&db_client, &config.namespaces).await?;
+
+        let target = if config.embedding.is_enabled() {
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("embedding.preflight_started"),
+            );
+            event.insert(
+                "provider".to_string(),
+                serde_json::json!(config.embedding.provider_label()),
+            );
+            event.insert(
+                "model".to_string(),
+                serde_json::json!(config.embedding.model.clone()),
+            );
+            startup_logger.log(event, crate::logging::LogLevel::Debug);
+
+            match resolve_embedding_target_identity(&config.embedding, &effective_data_dir).await {
+                Ok(target) => {
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::json!("embedding.preflight_succeeded"),
+                    );
+                    event.insert(
+                        "provider".to_string(),
+                        serde_json::json!(target.provider_label),
+                    );
+                    event.insert("model".to_string(), serde_json::json!(target.model.clone()));
+                    event.insert("dimension".to_string(), serde_json::json!(target.dimension));
+                    event.insert(
+                        "target_signature".to_string(),
+                        serde_json::json!(target.signature.clone()),
+                    );
+                    startup_logger.log(event, crate::logging::LogLevel::Info);
+                    Some(target)
+                }
+                Err(err) if mode == EmbeddingActivationMode::Standard => {
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::json!("embedding.preflight_failed"),
+                    );
+                    event.insert("error".to_string(), serde_json::json!(err.to_string()));
+                    startup_logger.log(event, crate::logging::LogLevel::Warn);
+                    None
+                }
+                Err(err) => return Err(err),
+            }
+        } else {
+            None
+        };
+
+        let decision = if let Some(target) = target.as_ref() {
+            let namespace_states = load_embedding_states(&db_client, &config.namespaces).await?;
+            let fact_counts = count_facts_per_namespace(&db_client, &config.namespaces).await?;
+            let sample_dimensions = sample_stored_embedding_dimensions(
+                &db_client,
+                &config.namespaces,
+                LEGACY_EMBEDDING_SAMPLE_SIZE,
+            )
+            .await?;
+
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("embedding.startup_state_loaded"),
+            );
+            event.insert(
+                "namespaces".to_string(),
+                serde_json::json!(config.namespaces.clone()),
+            );
+            event.insert(
+                "state_count".to_string(),
+                serde_json::json!(namespace_states.len()),
+            );
+            event.insert(
+                "fact_counts".to_string(),
+                serde_json::json!(fact_counts.clone()),
+            );
+            startup_logger.log(event, crate::logging::LogLevel::Debug);
+
+            decide_embedding_startup(
+                &config.namespaces,
+                &namespace_states,
+                &target.signature,
+                &sample_dimensions,
+                &fact_counts,
+                target.dimension,
+            )
+        } else if config.embedding.is_enabled() {
+            EmbeddingStartupDecision::DisableSemantic {
+                reason: "embedding target preflight failed".to_string(),
+            }
+        } else {
+            EmbeddingStartupDecision::UseConfiguredProvider
+        };
+
+        let mut decision_event = std::collections::HashMap::new();
+        decision_event.insert(
+            "op".to_string(),
+            serde_json::json!("embedding.startup_decision"),
+        );
+        decision_event.insert(
+            "decision".to_string(),
+            serde_json::json!(format!("{:?}", decision)),
+        );
+        decision_event.insert(
+            "namespaces".to_string(),
+            serde_json::json!(config.namespaces.clone()),
+        );
+        decision_event.insert(
+            "target_signature".to_string(),
+            serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
+        );
+        startup_logger.log(decision_event, crate::logging::LogLevel::Info);
+
+        let embedding_provider: Arc<dyn EmbeddingProvider> = match (&mode, &decision) {
+            (EmbeddingActivationMode::ForceEnabledForReembed, _) => {
+                let target = target.as_ref().ok_or_else(|| {
+                    MemoryError::ConfigInvalid(
+                        "reembed mode requires a resolved embedding target".to_string(),
+                    )
+                })?;
+                create_embedding_provider_with_dimension(
+                    &config.embedding,
+                    &effective_data_dir,
+                    target.dimension,
+                )
+                .await?
+            }
+            (_, EmbeddingStartupDecision::UseConfiguredProvider)
+            | (_, EmbeddingStartupDecision::BootstrapReadyNamespaces { .. }) => {
+                create_embedding_provider_with_dimension(
+                    &config.embedding,
+                    &effective_data_dir,
+                    target
+                        .as_ref()
+                        .map(|value| value.dimension)
+                        .unwrap_or_else(|| config.embedding.fallback_dimension()),
+                )
+                .await?
+            }
+            (_, EmbeddingStartupDecision::DisableSemantic { reason }) => {
+                let mut event = std::collections::HashMap::new();
+                event.insert(
+                    "op".to_string(),
+                    serde_json::json!("embedding.rebuild_required"),
+                );
+                event.insert("reason".to_string(), serde_json::json!(reason));
+                event.insert(
+                    "target_signature".to_string(),
+                    serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
+                );
+                startup_logger.log(event, crate::logging::LogLevel::Warn);
+                Arc::new(DisabledEmbeddingProvider::new(
+                    target
+                        .as_ref()
+                        .map(|value| value.dimension)
+                        .unwrap_or_else(|| config.embedding.fallback_dimension()),
+                ))
+            }
+        };
+
         let entity_extractor =
             create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
 
         let mut service = Self::new_with_embedding_provider(
-            Arc::new(db_client),
+            db_client.clone(),
             config.namespaces,
             config.log_level,
             50,
@@ -124,8 +303,45 @@ impl MemoryService {
         )?
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
+        service.current_embedding_signature = target.as_ref().map(|value| value.signature.clone());
+        service.current_embedding_model = target.as_ref().and_then(|value| value.model.clone());
+        service.current_embedding_dimension = target.as_ref().map(|value| value.dimension);
         service.entity_extractor = entity_extractor;
-        apply_startup_migrations(&service.db_client, &service.namespaces).await?;
+
+        if let (
+            EmbeddingStartupDecision::BootstrapReadyNamespaces {
+                namespaces,
+                active_signature,
+            },
+            Some(target),
+        ) = (&decision, target.as_ref())
+        {
+            write_bootstrap_ready_states(
+                &service.db_client,
+                namespaces,
+                active_signature,
+                config.embedding.provider_label(),
+                config.embedding.model.as_deref(),
+                target.dimension,
+            )
+            .await?;
+
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("embedding.bootstrap_ready_written"),
+            );
+            event.insert(
+                "namespaces".to_string(),
+                serde_json::json!(namespaces.clone()),
+            );
+            event.insert(
+                "target_signature".to_string(),
+                serde_json::json!(active_signature.clone()),
+            );
+            startup_logger.log(event, crate::logging::LogLevel::Info);
+        }
+
         service.check_surrealdb_connection().await?;
 
         // Spawn lifecycle workers if enabled
@@ -282,6 +498,9 @@ impl MemoryService {
             entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
+            current_embedding_signature: None,
+            current_embedding_model: None,
+            current_embedding_dimension: None,
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
         })

@@ -149,17 +149,14 @@ fn looks_like_iso_date(token: &str) -> bool {
         .split(['-', '/'])
         .filter(|segment| !segment.is_empty())
         .collect::<Vec<_>>();
-    match segments.as_slice() {
+    matches!(
+        segments.as_slice(),
         [year, month] | [year, month, ..]
             if year.len() == 4
                 && year.chars().all(|character| character.is_ascii_digit())
                 && month.len() == 2
-                && month.chars().all(|character| character.is_ascii_digit()) =>
-        {
-            true
-        }
-        _ => false,
-    }
+                && month.chars().all(|character| character.is_ascii_digit())
+    )
 }
 
 fn normalize_search_term(raw: &str) -> Option<String> {

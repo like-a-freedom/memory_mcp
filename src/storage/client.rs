@@ -28,17 +28,17 @@ use super::migrations::{
     validate_applied_migration, versioned_migrations,
 };
 use super::queries::{
-    active_edge_scan_limit, build_create_query, build_relate_edge_query,
-    build_select_active_facts_by_episode_query, build_select_active_facts_query,
-    build_select_communities_by_member_entities_query,
+    active_edge_scan_limit, build_count_facts_needing_reembed_query, build_create_query,
+    build_relate_edge_query, build_select_active_facts_by_episode_query,
+    build_select_active_facts_query, build_select_communities_by_member_entities_query,
     build_select_communities_matching_summary_query, build_select_edge_neighbors_query,
     build_select_edges_filtered_query, build_select_entity_lookup_alias_query,
     build_select_entity_lookup_canonical_query, build_select_episodes_by_content_advanced_query,
     build_select_episodes_by_content_query, build_select_episodes_for_archival_query,
     build_select_facts_ann_query, build_select_facts_by_entity_links_query,
     build_select_facts_filtered_advanced_query, build_select_facts_filtered_query,
-    build_select_one_query, build_update_query, filter_records_by_project,
-    filter_records_by_project_and_fact_types,
+    build_select_facts_needing_reembed_query, build_select_one_query, build_update_query,
+    filter_records_by_project, filter_records_by_project_and_fact_types,
 };
 use super::types::GraphDirection;
 
@@ -180,6 +180,26 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Counts facts whose embedding metadata does not match the target signature.
+    async fn count_facts_needing_reembed(
+        &self,
+        _namespace: &str,
+        _target_signature: &str,
+    ) -> Result<usize, MemoryError> {
+        Ok(0)
+    }
+
+    /// Selects facts needing rewrite in stable `fact_id` order, optionally after a cursor.
+    async fn select_facts_needing_reembed(
+        &self,
+        _namespace: &str,
+        _target_signature: &str,
+        _last_completed_fact_id: Option<&str>,
+        _limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(Vec::new())
+    }
 
     /// Selects episodes eligible for archival.
     ///
@@ -350,7 +370,7 @@ impl SurrealDbClient {
         Ok(Self {
             engine,
             logger: StdoutLogger::new(&config.log_level),
-            fact_embedding_dimension: config.embedding.dimension,
+            fact_embedding_dimension: config.embedding.fallback_dimension(),
         })
     }
 
@@ -1339,6 +1359,98 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_active_facts.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn count_facts_needing_reembed(
+        &self,
+        namespace: &str,
+        target_signature: &str,
+    ) -> Result<usize, MemoryError> {
+        self.log_op(
+            "db.count_facts_needing_reembed",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                (
+                    "target_signature",
+                    Value::String(target_signature.to_string()),
+                ),
+            ],
+        );
+
+        let (sql, vars) = build_count_facts_needing_reembed_query(target_signature);
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(0);
+            }
+            Err(err) => return Err(err),
+        };
+
+        let normalized = surreal_to_json(surreal_val);
+        let count = extract_first_record(normalized)
+            .and_then(|record| record.get("count").cloned())
+            .and_then(|value| value.as_u64())
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0);
+
+        self.log_op(
+            "db.count_facts_needing_reembed.result",
+            vec![("count", Value::Number(serde_json::Number::from(count)))],
+        );
+
+        Ok(count)
+    }
+
+    async fn select_facts_needing_reembed(
+        &self,
+        namespace: &str,
+        target_signature: &str,
+        last_completed_fact_id: Option<&str>,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_facts_needing_reembed",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                (
+                    "target_signature",
+                    Value::String(target_signature.to_string()),
+                ),
+                (
+                    "last_completed_fact_id",
+                    last_completed_fact_id
+                        .map(|value| Value::String(value.to_string()))
+                        .unwrap_or(Value::Null),
+                ),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, vars) = build_select_facts_needing_reembed_query(
+            target_signature,
+            last_completed_fact_id,
+            limit,
+        );
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_facts_needing_reembed.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
