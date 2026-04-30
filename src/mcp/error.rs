@@ -12,7 +12,7 @@ use crate::service::MemoryError;
 /// - `NotFound` → `INVALID_PARAMS`
 /// - `ConfigMissing` → `INVALID_REQUEST`
 /// - `ConfigInvalid` → `INVALID_REQUEST`
-/// - `Storage` → `INTERNAL_ERROR`
+/// - `Storage` / `Transient` → `INTERNAL_ERROR`
 pub fn mcp_error(err: MemoryError) -> ErrorData {
     let (code, guidance) = match &err {
         MemoryError::Validation(_) => (
@@ -27,7 +27,7 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             ErrorCode::INVALID_REQUEST,
             "Fix the server configuration before retrying this tool call.",
         ),
-        MemoryError::Storage(_) => (
+        MemoryError::Storage(_) | MemoryError::Transient(_) => (
             ErrorCode::INTERNAL_ERROR,
             "Retry the request. If the problem persists, inspect server logs.",
         ),
@@ -77,6 +77,14 @@ mod tests {
         let mcp_err = mcp_error(err);
         assert_eq!(mcp_err.code, ErrorCode::INTERNAL_ERROR);
         assert!(mcp_err.message.contains("database error"));
+    }
+
+    #[test]
+    fn mcp_error_maps_transient_to_internal_error() {
+        let err = MemoryError::Transient("provider rate limited".to_string());
+        let mcp_err = mcp_error(err);
+        assert_eq!(mcp_err.code, ErrorCode::INTERNAL_ERROR);
+        assert!(mcp_err.message.contains("provider rate limited"));
     }
 
     #[test]

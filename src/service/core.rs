@@ -70,6 +70,41 @@ impl MemoryService {
         format!("{fact_type}\n{content}\n{quote}")
     }
 
+    pub(crate) fn insert_current_embedding_fields(
+        &self,
+        payload: &mut serde_json::Map<String, Value>,
+        embedding: Vec<f64>,
+    ) -> Result<(), MemoryError> {
+        let expected_dim = self
+            .current_embedding_dimension
+            .unwrap_or_else(|| self.embedding_provider.dimension());
+        if embedding.len() != expected_dim {
+            return Err(MemoryError::Validation(format!(
+                "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
+                embedding.len()
+            )));
+        }
+
+        payload.insert("embedding".to_string(), json!(embedding));
+        payload.insert(
+            "embedding_provider".to_string(),
+            json!(self.embedding_provider.provider_name()),
+        );
+        if let Some(model) = &self.current_embedding_model {
+            payload.insert("embedding_model".to_string(), json!(model));
+        }
+        payload.insert("embedding_dimension".to_string(), json!(expected_dim));
+        if let Some(signature) = &self.current_embedding_signature {
+            payload.insert("embedding_signature".to_string(), json!(signature));
+        }
+        payload.insert(
+            "embedding_updated_at".to_string(),
+            json!(super::normalize_dt(super::query::now())),
+        );
+
+        Ok(())
+    }
+
     /// Returns the total count of episodes.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
         let mut total = 0;
@@ -391,6 +426,7 @@ impl MemoryService {
         if existing.is_none() {
             let t_ingested = super::query::now();
             let project = self.project_for_source_episode(source_episode).await?;
+            let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
             let index_keys = self
                 .build_fact_index_keys(content, source_episode, &provenance, &entity_links, t_valid)
                 .await?;
@@ -417,34 +453,11 @@ impl MemoryService {
                 payload.insert("project".to_string(), json!(project));
             }
 
-            match self
-                .generate_embedding(&Self::build_fact_embedding_input(fact_type, content, quote))
-                .await
-            {
+            let mut deferred_embedding_input = None;
+
+            match self.generate_embedding(&embedding_input).await {
                 Ok(Some(embedding)) => {
-                    let expected_dim = self.embedding_provider.dimension();
-                    if embedding.len() != expected_dim {
-                        return Err(MemoryError::Validation(format!(
-                            "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
-                            embedding.len()
-                        )));
-                    }
-                    payload.insert("embedding".to_string(), json!(embedding));
-                    payload.insert(
-                        "embedding_provider".to_string(),
-                        json!(self.embedding_provider.provider_name()),
-                    );
-                    if let Some(model) = &self.current_embedding_model {
-                        payload.insert("embedding_model".to_string(), json!(model));
-                    }
-                    payload.insert("embedding_dimension".to_string(), json!(expected_dim));
-                    if let Some(signature) = &self.current_embedding_signature {
-                        payload.insert("embedding_signature".to_string(), json!(signature));
-                    }
-                    payload.insert(
-                        "embedding_updated_at".to_string(),
-                        json!(super::normalize_dt(super::query::now())),
-                    );
+                    self.insert_current_embedding_fields(&mut payload, embedding)?;
                 }
                 Ok(None) => {}
                 Err(err) => {
@@ -460,6 +473,9 @@ impl MemoryService {
                         ]),
                         LogLevel::Warn,
                     );
+                    if self.should_defer_embedding_retry(&err) {
+                        deferred_embedding_input = Some(embedding_input.clone());
+                    }
                 }
             }
 
@@ -473,6 +489,10 @@ impl MemoryService {
                 ));
             }
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
+            if let Some(input) = deferred_embedding_input {
+                self.enqueue_background_fact_embedding(namespace, fact_id.clone(), input)
+                    .await;
+            }
         }
         Ok(fact_id)
     }
@@ -651,6 +671,376 @@ impl MemoryService {
                 Err(err)
             }
         }
+    }
+
+    pub(crate) async fn generate_query_embedding_with_background(
+        &self,
+        input: &str,
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        if let Some(embedding) = self.cached_query_embedding(input).await {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.query_cache_hit")),
+                    (
+                        "provider".to_string(),
+                        json!(self.embedding_provider.provider_name()),
+                    ),
+                    ("input_chars".to_string(), json!(input.chars().count())),
+                ]),
+                LogLevel::Debug,
+            );
+            return Ok(Some(embedding));
+        }
+
+        let task_key = self.background_query_task_key(input);
+        if self.background_embedding_task_inflight(&task_key).await {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.query_deferred_inflight")),
+                    (
+                        "provider".to_string(),
+                        json!(self.embedding_provider.provider_name()),
+                    ),
+                    ("input_chars".to_string(), json!(input.chars().count())),
+                ]),
+                LogLevel::Debug,
+            );
+            return Ok(None);
+        }
+
+        match self.generate_embedding(input).await {
+            Ok(Some(embedding)) => {
+                self.store_query_embedding(input, embedding.clone()).await;
+                Ok(Some(embedding))
+            }
+            Ok(None) => Ok(None),
+            Err(err) if self.should_defer_embedding_retry(&err) => {
+                self.enqueue_background_query_embedding(input.to_string())
+                    .await;
+                Ok(None)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn should_defer_embedding_retry(&self, err: &MemoryError) -> bool {
+        super::is_transient_embedding_error(err)
+            && super::is_remote_embedding_provider(self.embedding_provider.provider_name())
+    }
+
+    fn background_fact_task_key(&self, namespace: &str, fact_id: &str) -> String {
+        let signature = self
+            .current_embedding_signature
+            .as_deref()
+            .unwrap_or(self.embedding_provider.provider_name());
+        format!("fact:{signature}:{namespace}:{fact_id}")
+    }
+
+    fn background_query_task_key(&self, input: &str) -> String {
+        let signature = self
+            .current_embedding_signature
+            .as_deref()
+            .unwrap_or(self.embedding_provider.provider_name());
+        format!(
+            "query:{signature}:{}",
+            self.query_embedding_cache_key(input)
+        )
+    }
+
+    fn query_embedding_cache_key(&self, input: &str) -> String {
+        let signature = self
+            .current_embedding_signature
+            .as_deref()
+            .unwrap_or(self.embedding_provider.provider_name());
+        crate::service::hash_prefix(&format!(
+            "{signature}|{}",
+            crate::service::normalize_text(input)
+        ))
+    }
+
+    async fn cached_query_embedding(&self, input: &str) -> Option<Vec<f64>> {
+        let cache_key = self.query_embedding_cache_key(input);
+        let mut cache = self.query_embedding_cache.lock().await;
+        let now = std::time::Instant::now();
+        if let Some(entry) = cache.get(&cache_key).cloned() {
+            if entry.expires_at > now {
+                return Some(entry.embedding);
+            }
+            cache.pop(&cache_key);
+        }
+
+        None
+    }
+
+    async fn store_query_embedding(&self, input: &str, embedding: Vec<f64>) {
+        let cache_key = self.query_embedding_cache_key(input);
+        let mut cache = self.query_embedding_cache.lock().await;
+        cache.put(
+            cache_key,
+            super::CachedQueryEmbedding {
+                embedding,
+                expires_at: std::time::Instant::now() + super::query_embedding_cache_ttl(),
+            },
+        );
+    }
+
+    async fn background_embedding_task_inflight(&self, task_key: &str) -> bool {
+        self.background_embedding_inflight
+            .lock()
+            .await
+            .contains(task_key)
+    }
+
+    async fn try_reserve_background_embedding_task(&self, task_key: &str) -> bool {
+        self.background_embedding_inflight
+            .lock()
+            .await
+            .insert(task_key.to_string())
+    }
+
+    async fn release_background_embedding_task(&self, task_key: &str) {
+        self.background_embedding_inflight
+            .lock()
+            .await
+            .remove(task_key);
+    }
+
+    async fn enqueue_background_fact_embedding(
+        &self,
+        namespace: String,
+        fact_id: String,
+        input: String,
+    ) {
+        let task_key = self.background_fact_task_key(&namespace, &fact_id);
+        if !self.try_reserve_background_embedding_task(&task_key).await {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.background_deduped")),
+                    ("kind".to_string(), json!("fact")),
+                    ("namespace".to_string(), json!(namespace)),
+                    ("fact_id".to_string(), json!(fact_id)),
+                ]),
+                LogLevel::Debug,
+            );
+            return;
+        }
+
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("embedding.background_enqueued")),
+                ("kind".to_string(), json!("fact")),
+                ("namespace".to_string(), json!(namespace.clone())),
+                ("fact_id".to_string(), json!(fact_id.clone())),
+            ]),
+            LogLevel::Info,
+        );
+
+        let service = self.clone();
+        tokio::spawn(async move {
+            service
+                .run_background_fact_embedding_task(task_key, namespace, fact_id, input)
+                .await;
+        });
+    }
+
+    async fn enqueue_background_query_embedding(&self, input: String) {
+        let task_key = self.background_query_task_key(&input);
+        if !self.try_reserve_background_embedding_task(&task_key).await {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.background_deduped")),
+                    ("kind".to_string(), json!("query")),
+                    ("input_chars".to_string(), json!(input.chars().count())),
+                ]),
+                LogLevel::Debug,
+            );
+            return;
+        }
+
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("embedding.background_enqueued")),
+                ("kind".to_string(), json!("query")),
+                ("input_chars".to_string(), json!(input.chars().count())),
+            ]),
+            LogLevel::Info,
+        );
+
+        let service = self.clone();
+        tokio::spawn(async move {
+            service
+                .run_background_query_embedding_task(task_key, input)
+                .await;
+        });
+    }
+
+    async fn run_background_fact_embedding_task(
+        &self,
+        task_key: String,
+        namespace: String,
+        fact_id: String,
+        input: String,
+    ) {
+        let outcome = self
+            .run_background_fact_embedding_task_inner(&namespace, &fact_id, &input)
+            .await;
+        self.release_background_embedding_task(&task_key).await;
+
+        if let Err(err) = outcome {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.background_failed")),
+                    ("kind".to_string(), json!("fact")),
+                    ("namespace".to_string(), json!(namespace)),
+                    ("fact_id".to_string(), json!(fact_id)),
+                    ("error".to_string(), json!(err.to_string())),
+                ]),
+                LogLevel::Warn,
+            );
+        }
+    }
+
+    async fn run_background_fact_embedding_task_inner(
+        &self,
+        namespace: &str,
+        fact_id: &str,
+        input: &str,
+    ) -> Result<(), MemoryError> {
+        for attempt in 1..=super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
+            match self.generate_embedding(input).await {
+                Ok(Some(embedding)) => {
+                    self.store_embedding_on_fact(namespace, fact_id, embedding)
+                        .await?;
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.background_succeeded")),
+                            ("kind".to_string(), json!("fact")),
+                            ("namespace".to_string(), json!(namespace)),
+                            ("fact_id".to_string(), json!(fact_id)),
+                            ("attempt".to_string(), json!(attempt)),
+                        ]),
+                        LogLevel::Info,
+                    );
+                    return Ok(());
+                }
+                Ok(None) => return Ok(()),
+                Err(err)
+                    if self.should_defer_embedding_retry(&err)
+                        && attempt < super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS =>
+                {
+                    let delay = super::background_embedding_retry_delay(attempt);
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.background_retry")),
+                            ("kind".to_string(), json!("fact")),
+                            ("namespace".to_string(), json!(namespace)),
+                            ("fact_id".to_string(), json!(fact_id)),
+                            ("attempt".to_string(), json!(attempt)),
+                            ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
+                            ("error".to_string(), json!(err.to_string())),
+                        ]),
+                        LogLevel::Warn,
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_background_query_embedding_task(&self, task_key: String, input: String) {
+        let outcome = self.run_background_query_embedding_task_inner(&input).await;
+        self.release_background_embedding_task(&task_key).await;
+
+        if let Err(err) = outcome {
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("embedding.background_failed")),
+                    ("kind".to_string(), json!("query")),
+                    ("input_chars".to_string(), json!(input.chars().count())),
+                    ("error".to_string(), json!(err.to_string())),
+                ]),
+                LogLevel::Warn,
+            );
+        }
+    }
+
+    async fn run_background_query_embedding_task_inner(
+        &self,
+        input: &str,
+    ) -> Result<(), MemoryError> {
+        for attempt in 1..=super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
+            match self.generate_embedding(input).await {
+                Ok(Some(embedding)) => {
+                    self.store_query_embedding(input, embedding).await;
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.background_succeeded")),
+                            ("kind".to_string(), json!("query")),
+                            ("input_chars".to_string(), json!(input.chars().count())),
+                            ("attempt".to_string(), json!(attempt)),
+                        ]),
+                        LogLevel::Info,
+                    );
+                    return Ok(());
+                }
+                Ok(None) => return Ok(()),
+                Err(err)
+                    if self.should_defer_embedding_retry(&err)
+                        && attempt < super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS =>
+                {
+                    let delay = super::background_embedding_retry_delay(attempt);
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("embedding.background_retry")),
+                            ("kind".to_string(), json!("query")),
+                            ("input_chars".to_string(), json!(input.chars().count())),
+                            ("attempt".to_string(), json!(attempt)),
+                            ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
+                            ("error".to_string(), json!(err.to_string())),
+                        ]),
+                        LogLevel::Warn,
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn store_embedding_on_fact(
+        &self,
+        namespace: &str,
+        fact_id: &str,
+        embedding: Vec<f64>,
+    ) -> Result<(), MemoryError> {
+        let Some(Value::Object(mut record)) = self.db_client.select_one(fact_id, namespace).await?
+        else {
+            return Err(MemoryError::NotFound(format!(
+                "fact_id not found for background embedding: {fact_id}"
+            )));
+        };
+
+        if let Some(current_signature) = self.current_embedding_signature.as_deref()
+            && record.get("embedding_signature").and_then(Value::as_str) == Some(current_signature)
+        {
+            return Ok(());
+        }
+
+        let scope = record
+            .get("scope")
+            .and_then(string_from_value)
+            .unwrap_or_else(|| namespace.to_string());
+        self.insert_current_embedding_fields(&mut record, embedding)?;
+        self.db_client
+            .update(fact_id, Value::Object(record), namespace)
+            .await?;
+        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
+        Ok(())
     }
 
     /// Invalidates a fact.
@@ -1308,6 +1698,8 @@ mod tests {
     use async_trait::async_trait;
     use serde_json::json;
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
 
     #[test]
     fn log_event_creates_expected_structure() {
@@ -3063,6 +3455,49 @@ mod tests {
         }
     }
 
+    struct FlakyRemoteTestEmbeddingProvider {
+        remaining_failures: AtomicUsize,
+        embedding: Vec<f64>,
+    }
+
+    impl FlakyRemoteTestEmbeddingProvider {
+        fn new(failures_before_success: usize) -> Self {
+            let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+            embedding[0] = 1.0;
+            Self {
+                remaining_failures: AtomicUsize::new(failures_before_success),
+                embedding,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for FlakyRemoteTestEmbeddingProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "openai-compatible"
+        }
+
+        fn dimension(&self) -> usize {
+            DEFAULT_EMBEDDING_DIMENSION
+        }
+
+        async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+            let remaining = self.remaining_failures.load(Ordering::SeqCst);
+            if remaining > 0 {
+                self.remaining_failures.fetch_sub(1, Ordering::SeqCst);
+                return Err(MemoryError::Transient(
+                    "synthetic remote embedding outage".to_string(),
+                ));
+            }
+
+            Ok(self.embedding.clone())
+        }
+    }
+
     #[tokio::test]
     async fn add_fact_persists_embedding_when_provider_enabled() {
         let db_client = Arc::new(
@@ -3113,6 +3548,133 @@ mod tests {
             fact.get("embedding")
                 .and_then(|value| value.as_array())
                 .map(Vec::len),
+            Some(DEFAULT_EMBEDDING_DIMENSION)
+        );
+    }
+
+    #[tokio::test]
+    async fn add_fact_defers_background_embedding_after_transient_remote_failure() {
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "testdb_background_fact_embedding",
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory"),
+        );
+        db_client.apply_migrations("org").await.expect("migrations");
+
+        let mut service = MemoryService::new_with_embedding_provider(
+            db_client.clone(),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(FlakyRemoteTestEmbeddingProvider::new(1)),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+        )
+        .expect("service");
+        service.current_embedding_signature = Some("embsig:background-test".to_string());
+        service.current_embedding_model = Some("test-model".to_string());
+        service.current_embedding_dimension = Some(DEFAULT_EMBEDDING_DIMENSION);
+
+        let fact_id = service
+            .add_fact(
+                "note",
+                "Provider outage should not block fact creation",
+                "Provider outage should not block fact creation",
+                "episode:test",
+                Utc::now(),
+                "org",
+                0.9,
+                vec![],
+                vec![],
+                json!({"source_episode": "episode:test"}),
+            )
+            .await
+            .expect("add fact");
+
+        let initial = db_client
+            .select_one(&fact_id, "org")
+            .await
+            .expect("select fact")
+            .expect("stored fact");
+        assert!(initial.get("embedding").is_none());
+
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let fact = db_client
+                    .select_one(&fact_id, "org")
+                    .await
+                    .expect("select fact")
+                    .expect("stored fact");
+                if fact.get("embedding_signature").and_then(Value::as_str)
+                    == Some("embsig:background-test")
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("background embedding should complete");
+    }
+
+    #[tokio::test]
+    async fn generate_query_embedding_uses_background_cache_after_transient_remote_failure() {
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "testdb_background_query_embedding",
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory"),
+        );
+        db_client.apply_migrations("org").await.expect("migrations");
+
+        let mut service = MemoryService::new_with_embedding_provider(
+            db_client,
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(FlakyRemoteTestEmbeddingProvider::new(1)),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+        )
+        .expect("service");
+        service.current_embedding_signature = Some("embsig:background-query-test".to_string());
+        service.current_embedding_model = Some("test-model".to_string());
+        service.current_embedding_dimension = Some(DEFAULT_EMBEDDING_DIMENSION);
+
+        let first = service
+            .generate_query_embedding_with_background("salary raise")
+            .await
+            .expect("transient failure should degrade to background mode");
+        assert!(first.is_none());
+
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if service
+                    .cached_query_embedding("salary raise")
+                    .await
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("background query embedding should populate cache");
+
+        let second = service
+            .generate_query_embedding_with_background("salary raise")
+            .await
+            .expect("cached embedding");
+        assert_eq!(
+            second.as_ref().map(Vec::len),
             Some(DEFAULT_EMBEDDING_DIMENSION)
         );
     }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use lru::LruCache;
@@ -43,6 +44,9 @@ pub struct MemoryService {
     pub(crate) current_embedding_signature: Option<String>,
     pub(crate) current_embedding_model: Option<String>,
     pub(crate) current_embedding_dimension: Option<usize>,
+    pub(crate) background_embedding_inflight: Arc<tokio::sync::Mutex<HashSet<String>>>,
+    pub(crate) query_embedding_cache:
+        Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
 }
@@ -484,6 +488,11 @@ impl MemoryService {
         let cache_size = std::num::NonZeroUsize::new(build_config.cache_size).ok_or_else(|| {
             MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
         })?;
+        let query_embedding_cache_size =
+            std::num::NonZeroUsize::new(crate::service::DEFAULT_QUERY_EMBEDDING_CACHE_SIZE)
+                .ok_or_else(|| {
+                    MemoryError::ConfigInvalid("query embedding cache size must be > 0".to_string())
+                })?;
         let logger = StdoutLogger::new(&log_level);
         Ok(Self {
             db_client,
@@ -501,6 +510,10 @@ impl MemoryService {
             current_embedding_signature: None,
             current_embedding_model: None,
             current_embedding_dimension: None,
+            background_embedding_inflight: Arc::new(tokio::sync::Mutex::new(HashSet::new())),
+            query_embedding_cache: Arc::new(tokio::sync::Mutex::new(LruCache::new(
+                query_embedding_cache_size,
+            ))),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
         })

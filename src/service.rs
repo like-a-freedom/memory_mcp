@@ -19,6 +19,7 @@ mod cache;
 mod context;
 mod core;
 mod embedding;
+mod embedding_runtime;
 mod entity_extraction;
 mod episode;
 mod error;
@@ -72,4 +73,9 @@ pub use util::{
 };
 
 pub(crate) use core::{log_args_with_duration, log_event};
+pub(crate) use embedding_runtime::{
+    CachedQueryEmbedding, DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS,
+    DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, background_embedding_retry_delay,
+    is_remote_embedding_provider, is_transient_embedding_error, query_embedding_cache_ttl,
+};
 pub(crate) use startup::EmbeddingActivationMode;

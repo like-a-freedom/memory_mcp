@@ -494,6 +494,24 @@ To restore semantic retrieval safely after a provider change:
 
 Until step 3 completes, the server may intentionally run with semantic retrieval disabled while lexical and graph-based retrieval continue to work.
 
+#### Transient failures from external embedding providers
+
+For external embedding backends (`openai-compatible` and `ollama`), the server now treats transient provider issues differently from hard configuration errors.
+
+Bounded retries with backoff are applied automatically for:
+
+- request timeouts / connect failures
+- HTTP `429` rate limits
+- retryable upstream statuses such as `408`, `425`, `500`, `502`, `503`, and `504`
+
+If those retries still do not recover the provider:
+
+- **write-paths** keep the fact write and schedule an **in-memory background retry** to fill in the missing embedding later;
+- **query-time semantic retrieval** falls back to lexical / graph-only results for the current request and schedules a background warm-up of a short-lived query embedding cache for repeated identical queries;
+- **`memory_mcp reembed`** still stops after bounded retries and keeps the maintenance job in a failed state so operators can fix the provider and rerun it explicitly.
+
+Important limitation: the deferred background path is intentionally **in-memory only** right now. If the process restarts before a background retry succeeds, those deferred retries are lost and will be attempted again only when a new request hits the same path.
+
 #### Similarity threshold
 
 The `EMBEDDINGS_SIMILARITY_THRESHOLD` (default `0.7`) filters semantic search results: only facts with cosine similarity ≥ threshold are returned. After a provider switch, this threshold effectively filters out **all** old facts because cross-provider similarity scores are meaningless.

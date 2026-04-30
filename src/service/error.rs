@@ -12,6 +12,9 @@ pub enum MemoryError {
     #[error("storage error: {0}")]
     Storage(String),
 
+    #[error("transient error: {0}")]
+    Transient(String),
+
     #[error("not found: {0}")]
     NotFound(String),
 

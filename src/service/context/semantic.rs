@@ -25,7 +25,10 @@ pub(crate) async fn collect_semantic_facts(
     service: &crate::service::MemoryService,
     request: CollectSemanticFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String)>, MemoryError> {
-    let query_embedding = match service.generate_embedding(request.query).await {
+    let query_embedding = match service
+        .generate_query_embedding_with_background(request.query)
+        .await
+    {
         Ok(Some(embedding)) => embedding,
         Ok(None) => return Ok(Vec::new()),
         Err(err) => {
