@@ -9,6 +9,7 @@ use crate::service::value_helpers::{json_i64, json_string};
 
 const REEMBED_JOB_ID: &str = "embedding_job:fact_reembed";
 const REEMBED_BATCH_SIZE: i32 = 100;
+const EMBEDDING_INDEX_NAME: &str = "fact_embedding_hnsw";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReembedSummary {
@@ -19,6 +20,87 @@ pub struct ReembedSummary {
 }
 
 impl MemoryService {
+    /// Drops the embedding HNSW index in the given namespace.
+    ///
+    /// If the index does not exist (e.g. already removed by a previous failed
+    /// run), the call succeeds silently.
+    async fn remove_embedding_index(&self, namespace: &str) -> Result<(), MemoryError> {
+        let sql = format!("REMOVE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact");
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.index_drop_start")),
+                ("namespace".to_string(), json!(namespace)),
+                ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
+            ]),
+            LogLevel::Info,
+        );
+
+        match self.db_client.query(&sql, None, namespace).await {
+            Ok(_) => {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("reembed.index_dropped")),
+                        ("namespace".to_string(), json!(namespace)),
+                        ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
+                    ]),
+                    LogLevel::Info,
+                );
+                Ok(())
+            }
+            Err(MemoryError::Storage(message))
+                if crate::storage::is_missing_index_error(&message) =>
+            {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("reembed.index_already_absent")),
+                        ("namespace".to_string(), json!(namespace)),
+                        ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
+                    ]),
+                    LogLevel::Info,
+                );
+                Ok(())
+            }
+            Err(err) => {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("reembed.index_drop_failed")),
+                        ("namespace".to_string(), json!(namespace)),
+                        ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
+                        ("error".to_string(), json!(err.to_string())),
+                    ]),
+                    LogLevel::Warn,
+                );
+                Err(err)
+            }
+        }
+    }
+
+    /// Creates the embedding HNSW index in the given namespace with the target
+    /// dimension.
+    async fn define_embedding_index(
+        &self,
+        namespace: &str,
+        dimension: usize,
+    ) -> Result<(), MemoryError> {
+        let sql = format!(
+            "DEFINE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact FIELDS embedding HNSW DIMENSION {dimension}"
+        );
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.index_create_start")),
+                ("namespace".to_string(), json!(namespace)),
+                ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
+                ("dimension".to_string(), json!(dimension)),
+            ]),
+            LogLevel::Info,
+        );
+
+        self.db_client
+            .query(&sql, None, namespace)
+            .await
+            .map(|_| ())
+    }
+
     pub async fn reembed_all_facts(&self) -> Result<ReembedSummary, MemoryError> {
         if !self.embedding_provider.is_enabled() {
             return Err(MemoryError::Validation(
@@ -86,6 +168,13 @@ impl MemoryService {
             started_at.elapsed(),
         )
         .await?;
+
+        // Drop the HNSW index in every namespace before rewriting facts.
+        // SurrealDB enforces vector dimension at the index level, so the
+        // index must be removed when the provider dimension changes.
+        for namespace in &self.namespaces {
+            self.remove_embedding_index(namespace).await?;
+        }
 
         for namespace in &self.namespaces {
             let mut last_completed_fact_id = resumable_job
@@ -324,6 +413,26 @@ impl MemoryService {
                         "last_completed_fact_id".to_string(),
                         json!(last_completed_fact_id.clone()),
                     ),
+                ]),
+                LogLevel::Info,
+            );
+        }
+
+        // All facts rewritten successfully — recreate the HNSW index with
+        // the new dimension.
+        for namespace in &self.namespaces {
+            self.define_embedding_index(namespace, target_dimension)
+                .await
+                .map_err(|err| {
+                    MemoryError::Storage(format!(
+                        "failed to recreate embedding index in namespace {namespace}: {err}"
+                    ))
+                })?;
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("reembed.index_recreated")),
+                    ("namespace".to_string(), json!(namespace)),
+                    ("dimension".to_string(), json!(target_dimension)),
                 ]),
                 LogLevel::Info,
             );
@@ -1400,5 +1509,134 @@ mod tests {
                 "fact {fid} in namespace {ns} should have test provider"
             );
         }
+    }
+
+    // ── Index lifecycle tests ──────────────────────────────────────
+    //
+    // These tests verify that the HNSW index is correctly dropped before
+    // fact rewrite and recreated after successful completion.  Because
+    // the in-memory HNSW index always uses DEFAULT_EMBEDDING_DIMENSION
+    // (1536), all seeded facts use that same dimension.  The tests
+    // focus on verifying that removing an already-removed index is
+    // idempotent and that the index is present (writable) after a
+    // successful reembed run.
+
+    #[tokio::test]
+    async fn reembed_remove_nonexistent_index_is_idempotent() {
+        let db = make_in_memory_db(&["org"]).await;
+        seed_fact_with_embedding(
+            &db,
+            "org",
+            "fact:one",
+            "test",
+            vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+            "embsig:old",
+        )
+        .await;
+
+        let service = make_reembed_service(
+            db.clone(),
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        // Remove twice — second remove should hit the "index does not
+        // exist" path but succeed silently.
+        service
+            .remove_embedding_index("org")
+            .await
+            .expect("first remove");
+
+        service
+            .remove_embedding_index("org")
+            .await
+            .expect("second remove on already-absent index");
+    }
+
+    #[tokio::test]
+    async fn reembed_index_recreated_after_full_success() {
+        let db = make_in_memory_db(&["org"]).await;
+        seed_fact_with_embedding(
+            &db,
+            "org",
+            "fact:one",
+            "test",
+            vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+            "embsig:old",
+        )
+        .await;
+
+        let service = make_reembed_service(
+            db.clone(),
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let summary = service
+            .reembed_all_facts()
+            .await
+            .expect("reembed should succeed");
+
+        assert_eq!(summary.succeeded_facts, 1);
+        assert_eq!(summary.failed_facts, 0);
+
+        // After success, the index should exist — we can verify by
+        // checking that the fact was actually updated.
+        let updated = db
+            .select_one("fact:one", "org")
+            .await
+            .expect("select")
+            .expect("stored");
+        assert_eq!(
+            updated.get("embedding_signature"),
+            Some(&json!("embsig:new"))
+        );
+        assert_eq!(updated.get("embedding_provider"), Some(&json!("test")));
+    }
+
+    #[tokio::test]
+    async fn reembed_index_not_recreated_on_failure() {
+        let db = make_in_memory_db(&["org"]).await;
+        seed_fact_with_embedding(
+            &db,
+            "org",
+            "fact:bad",
+            "bad fact",
+            vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+            "embsig:old",
+        )
+        .await;
+
+        // Run reembed with a failing provider
+        let service = make_reembed_service(
+            db.clone(),
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
+                DEFAULT_EMBEDDING_DIMENSION,
+                1,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let err = service
+            .reembed_all_facts()
+            .await
+            .expect_err("reembed should fail");
+
+        assert!(err.to_string().contains("reembed failed"));
+
+        // Index should NOT be recreated — job should be failed
+        let job = db
+            .select_one("embedding_job:fact_reembed", "org")
+            .await
+            .expect("select job")
+            .expect("stored job");
+        assert_eq!(job.get("status"), Some(&json!("failed")));
     }
 }

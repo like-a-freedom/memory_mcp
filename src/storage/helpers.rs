@@ -36,6 +36,12 @@ pub fn is_table_already_exists_error(message: &str) -> bool {
     lowered.contains("already exists") && lowered.contains("table")
 }
 
+/// Detects "index ... does not exist" errors from SurrealDB.
+pub fn is_missing_index_error(message: &str) -> bool {
+    let lowered = message.to_lowercase();
+    lowered.contains("does not exist") && lowered.contains("index")
+}
+
 pub fn surreal_to_json(value: SurrealValue) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
