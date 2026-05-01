@@ -611,11 +611,38 @@ impl MemoryService {
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        let timer = Instant::now(); // embedding.generate
+        // Defensive truncation: no embedding model supports more than ~32000
+        // characters (≈8000 tokens for English, smaller for many other
+        // languages). Extremely long inputs cause remote APIs to return empty
+        // responses (e.g. OpenRouter missing data[0].embedding).
+        const MAX_EMBEDDING_INPUT_CHARS: usize = 30_000;
+        let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
+            let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
+            self.logger.log(
+                log_event(
+                    "embedding.input_truncated",
+                    json!({
+                        "original_chars": input.chars().count(),
+                        "truncated_chars": truncated.chars().count(),
+                        "limit": MAX_EMBEDDING_INPUT_CHARS,
+                    }),
+                    json!({}),
+                    None,
+                    None,
+                    None,
+                ),
+                LogLevel::Warn,
+            );
+            truncated
+        } else {
+            input.to_string()
+        };
+
+        let timer = Instant::now();
         let provider = self.embedding_provider.provider_name();
         let args = json!({
             "provider": provider,
-            "input_chars": input.chars().count(),
+            "input_chars": effective_input.chars().count(),
         });
 
         if !self.embedding_provider.is_enabled() {
@@ -637,7 +664,7 @@ impl MemoryService {
             return Ok(None);
         }
 
-        match self.embedding_provider.embed(input).await {
+        match self.embedding_provider.embed(&effective_input).await {
             Ok(embedding) => {
                 self.logger.log(
                     log_event(
@@ -1863,6 +1890,18 @@ mod tests {
         assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
         assert!(!evt.contains_key("surrealdb_server_version"));
+    }
+
+    #[test]
+    fn build_fact_embedding_input_formats_correctly() {
+        let result = MemoryService::build_fact_embedding_input("note", "Hello world", "Hello!");
+        assert_eq!(result, "note\nHello world\nHello!");
+    }
+
+    #[test]
+    fn build_fact_embedding_input_handles_empty_parts() {
+        let result = MemoryService::build_fact_embedding_input("", "", "");
+        assert_eq!(result, "\n\n");
     }
 
     #[tokio::test]

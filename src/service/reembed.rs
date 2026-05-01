@@ -1639,4 +1639,52 @@ mod tests {
             .expect("stored job");
         assert_eq!(job.get("status"), Some(&json!("failed")));
     }
+
+    #[tokio::test]
+    async fn reembed_long_fact_content_does_not_fail() {
+        // Regression test for long content that previously caused
+        // "embedding response missing data[0].embedding" when the input
+        // exceeded the model's context window. The SequenceTestProvider
+        // ignores input, so this verifies the end-to-end pipeline
+        // (including generate_embedding input truncation) handles
+        // very long content without panicking or failing.
+        let db = make_in_memory_db(&["org"]).await;
+        let long_content = "word ".repeat(20_000);
+        seed_fact_with_embedding(
+            &db,
+            "org",
+            "fact:long",
+            &long_content,
+            vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+            "embsig:old",
+        )
+        .await;
+
+        let service = make_reembed_service(
+            db.clone(),
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let summary = service
+            .reembed_all_facts()
+            .await
+            .expect("reembed with long content should succeed");
+
+        assert_eq!(summary.succeeded_facts, 1);
+        assert_eq!(summary.failed_facts, 0);
+
+        let updated = db
+            .select_one("fact:long", "org")
+            .await
+            .expect("select fact")
+            .expect("stored fact");
+        assert_eq!(
+            updated.get("embedding_signature"),
+            Some(&json!("embsig:new"))
+        );
+    }
 }
