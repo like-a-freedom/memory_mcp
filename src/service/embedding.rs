@@ -96,9 +96,18 @@ fn validate_dimension_override(
 ) -> Result<usize, MemoryError> {
     match dimension_override {
         Some(expected_dimension) if expected_dimension != actual_dimension => {
-            Err(MemoryError::ConfigInvalid(format!(
-                "embedding dimension mismatch: expected {expected_dimension}, got {actual_dimension}"
-            )))
+            use std::collections::HashMap;
+            let mut event = HashMap::new();
+            event.insert("op".to_string(), json!("dimension_override_mismatch"));
+            event.insert(
+                "message".to_string(),
+                json!(format!(
+                    "SURREALDB_EMBEDDING_DIMENSION ({expected_dimension}) does not match \
+                     provider dimension ({actual_dimension}), using provider dimension"
+                )),
+            );
+            embedding_logger().log(event, LogLevel::Warn);
+            Ok(actual_dimension)
         }
         Some(expected_dimension) => Ok(expected_dimension),
         None => Ok(actual_dimension),
@@ -455,12 +464,269 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn explicit_dimension_override_mismatch_fails_fast() {
+    async fn explicit_dimension_override_mismatch_uses_provider_dimension() {
         let provider = ProbeOnlyTestProvider::new(vec![0.1, 0.2, 0.3, 0.4]);
-        let err = resolve_dimension_override_or_probe(Some(3), &provider)
+        let dim = resolve_dimension_override_or_probe(Some(3), &provider)
             .await
-            .expect_err("override mismatch should fail");
+            .expect("override mismatch should warn and use provider dimension");
 
-        assert!(err.to_string().contains("embedding dimension mismatch"));
+        assert_eq!(dim, 4, "should resolve to actual provider dimension");
+    }
+
+    // --- validate_dimension_override: all branch and edge coverage ---
+    //
+    // Each test unwraps explicitly because rkyv-archived MemoryError prevents
+    // direct assert_eq! on Result<usize, MemoryError>.
+
+    #[test]
+    fn validate_dimension_override_matches_returns_override() {
+        let r = validate_dimension_override(Some(384), 384);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 384);
+    }
+
+    #[test]
+    fn validate_dimension_override_none_returns_actual() {
+        let r = validate_dimension_override(None, 384);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 384);
+    }
+
+    #[test]
+    fn validate_dimension_override_mismatch_returns_actual() {
+        let r = validate_dimension_override(Some(128), 384);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 384);
+    }
+
+    #[test]
+    fn validate_dimension_override_mismatch_zero_actual() {
+        let r = validate_dimension_override(Some(384), 0);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 0);
+    }
+
+    #[test]
+    fn validate_dimension_override_match_zero() {
+        let r = validate_dimension_override(Some(0), 0);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 0);
+    }
+
+    #[test]
+    fn validate_dimension_override_none_zero() {
+        let r = validate_dimension_override(None, 0);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 0);
+    }
+
+    #[test]
+    fn validate_dimension_override_mismatch_large_values() {
+        let r = validate_dimension_override(Some(384), 2048);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 2048);
+    }
+
+    #[test]
+    fn validate_dimension_override_match_large_values() {
+        let r = validate_dimension_override(Some(2048), 2048);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 2048);
+    }
+
+    #[test]
+    fn validate_dimension_override_mismatch_standard_to_openai() {
+        // Common real case: SURREALDB_EMBEDDING_DIMENSION=1536 (default) but
+        // provider returns 2048 (e.g. nemotron). Should use provider dimension.
+        let r = validate_dimension_override(Some(1536), 2048);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 2048);
+    }
+
+    #[test]
+    fn validate_dimension_override_mismatch_openai_to_standard() {
+        let r = validate_dimension_override(Some(2048), 1536);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), 1536);
+    }
+
+    // --- resolve_dimension_override_or_probe: branch and edge coverage ---
+
+    #[tokio::test]
+    async fn probe_override_matches_uses_override() {
+        let provider = ProbeOnlyTestProvider::new(vec![0.1, 0.2, 0.3, 0.4]);
+        let dim = resolve_dimension_override_or_probe(Some(4), &provider)
+            .await
+            .expect("override should match probe dimension");
+        assert_eq!(dim, 4);
+    }
+
+    #[tokio::test]
+    async fn probe_one_dimensional_embedding() {
+        let provider = ProbeOnlyTestProvider::new(vec![0.5]);
+        let dim = resolve_dimension_override_or_probe(None, &provider)
+            .await
+            .expect("should detect 1-dim embedding");
+        assert_eq!(dim, 1);
+    }
+
+    #[tokio::test]
+    async fn probe_empty_embedding_returns_zero() {
+        let provider = ProbeOnlyTestProvider::new(vec![]);
+        let dim = resolve_dimension_override_or_probe(None, &provider)
+            .await
+            .expect("should handle empty embedding");
+        assert_eq!(dim, 0);
+    }
+
+    #[tokio::test]
+    async fn probe_empty_embedding_with_override_zero() {
+        let provider = ProbeOnlyTestProvider::new(vec![]);
+        let dim = resolve_dimension_override_or_probe(Some(0), &provider)
+            .await
+            .expect("override 0 and empty embedding");
+        assert_eq!(dim, 0);
+    }
+
+    #[tokio::test]
+    async fn probe_empty_embedding_with_override_mismatch() {
+        let provider = ProbeOnlyTestProvider::new(vec![]);
+        let dim = resolve_dimension_override_or_probe(Some(384), &provider)
+            .await
+            .expect("override mismatch with empty embedding uses actual (0)");
+        assert_eq!(dim, 0);
+    }
+
+    #[tokio::test]
+    async fn probe_realistic_override_mismatch_384_vs_2048() {
+        let provider = ProbeOnlyTestProvider::new(vec![0.0; 2048]);
+        let dim = resolve_dimension_override_or_probe(Some(384), &provider)
+            .await
+            .expect("384 override vs 2048 provider should resolve to 2048");
+        assert_eq!(dim, 2048);
+    }
+
+    #[tokio::test]
+    async fn probe_realistic_override_match_2048() {
+        let provider = ProbeOnlyTestProvider::new(vec![0.0; 2048]);
+        let dim = resolve_dimension_override_or_probe(Some(2048), &provider)
+            .await
+            .expect("2048 override matching provider should resolve to 2048");
+        assert_eq!(dim, 2048);
+    }
+
+    // --- resolve_embedding_target_identity integration tests ---
+
+    #[tokio::test]
+    async fn local_candle_dimension_override_matches_model_metadata() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tempdir.path().join("config.json"),
+            serde_json::json!({
+                "hidden_size": 384,
+                "model_type": "bert"
+            })
+            .to_string(),
+        )
+        .expect("write config");
+
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::LocalCandle,
+            model: Some("intfloat/multilingual-e5-small".to_string()),
+            model_dir: Some(tempdir.path().to_string_lossy().to_string()),
+            dimension_override: Some(384),
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = resolve_embedding_target_identity(&config, ".")
+            .await
+            .expect("resolved target with matching override");
+        assert_eq!(resolved.dimension, 384);
+    }
+
+    #[tokio::test]
+    async fn local_candle_dimension_override_mismatch_uses_model_dimension() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tempdir.path().join("config.json"),
+            serde_json::json!({
+                "hidden_size": 384,
+                "model_type": "bert"
+            })
+            .to_string(),
+        )
+        .expect("write config");
+
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::LocalCandle,
+            model: Some("intfloat/multilingual-e5-small".to_string()),
+            model_dir: Some(tempdir.path().to_string_lossy().to_string()),
+            dimension_override: Some(128),
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = resolve_embedding_target_identity(&config, ".")
+            .await
+            .expect("resolved target with mismatched override");
+        // Should fall back to actual model dimension (384), not the configured override (128)
+        assert_eq!(resolved.dimension, 384);
+    }
+
+    #[tokio::test]
+    async fn local_candle_dimension_override_mismatch_large_gap() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tempdir.path().join("config.json"),
+            serde_json::json!({
+                "hidden_size": 384,
+                "model_type": "bert"
+            })
+            .to_string(),
+        )
+        .expect("write config");
+
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::LocalCandle,
+            model: Some("intfloat/multilingual-e5-small".to_string()),
+            model_dir: Some(tempdir.path().to_string_lossy().to_string()),
+            dimension_override: Some(9999),
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = resolve_embedding_target_identity(&config, ".")
+            .await
+            .expect("resolved target with way-off override");
+        assert_eq!(resolved.dimension, 384);
+    }
+
+    #[tokio::test]
+    async fn disabled_provider_embedding_dimension_falls_back() {
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::Disabled,
+            dimension_override: None,
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = resolve_embedding_target_identity(&config, ".")
+            .await
+            .expect("resolved target for disabled provider");
+        assert_eq!(
+            resolved.dimension,
+            EmbeddingConfig::default().fallback_dimension()
+        );
+    }
+
+    #[tokio::test]
+    async fn disabled_provider_with_explicit_override_uses_override() {
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::Disabled,
+            dimension_override: Some(42),
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = resolve_embedding_target_identity(&config, ".")
+            .await
+            .expect("resolved target for disabled provider with override");
+        assert_eq!(resolved.dimension, 42);
     }
 }
