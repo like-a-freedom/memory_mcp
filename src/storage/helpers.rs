@@ -195,14 +195,18 @@ mod tests {
 
     #[test]
     fn test_is_table_already_exists_error_detects_correct_message() {
-        assert!(is_table_already_exists_error("The table 'episode' already exists"));
+        assert!(is_table_already_exists_error(
+            "The table 'episode' already exists"
+        ));
         assert!(is_table_already_exists_error("table already exists"));
         assert!(is_table_already_exists_error("TABLE ALREADY EXISTS"));
     }
 
     #[test]
     fn test_is_table_already_exists_error_rejects_wrong_message() {
-        assert!(!is_table_already_exists_error("The table 'episode' does not exist"));
+        assert!(!is_table_already_exists_error(
+            "The table 'episode' does not exist"
+        ));
         assert!(!is_table_already_exists_error("already exists"));
         assert!(!is_table_already_exists_error("table created"));
     }
