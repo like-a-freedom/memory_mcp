@@ -679,31 +679,7 @@ impl SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<SurrealValue, MemoryError> {
-        if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars {
-                q = q.bind(v);
-            }
-            let mut response = q
-                .await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars {
-                q = q.bind(v);
-            }
-            let mut response = q
-                .await
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
-            response
-                .take::<SurrealValue>(0)
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
-        }
+        sql_query_take(self, namespace, sql, vars).await
     }
 
     /// Shared SQL execution: runs a query and discards the result.
@@ -713,26 +689,44 @@ impl SurrealDbClient {
         vars: Option<Value>,
         namespace: &str,
     ) -> Result<(), MemoryError> {
-        if self.is_local() {
-            let db = self.with_namespace_local(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars {
-                q = q.bind(v);
-            }
-            q.await
-                .map(|_| ())
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))
-        } else {
-            let db = self.with_namespace_remote(namespace).await?;
-            let mut q = db.query(sql);
-            if let Some(v) = vars {
-                q = q.bind(v);
-            }
-            q.await
-                .map(|_| ())
-                .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))
-        }
+        sql_query_take(self, namespace, sql, vars).await?;
+        Ok(())
     }
+}
+
+/// Runs a SurrealDB query with optional variable bindings on the correct engine
+/// and extracts the first result value.
+async fn sql_query_take(
+    client: &SurrealDbClient,
+    namespace: &str,
+    sql: &str,
+    vars: Option<Value>,
+) -> Result<SurrealValue, MemoryError> {
+    if client.is_local() {
+        let db = client.with_namespace_local(namespace).await?;
+        run_query_take(&*db, sql, vars).await
+    } else {
+        let db = client.with_namespace_remote(namespace).await?;
+        run_query_take(&*db, sql, vars).await
+    }
+}
+
+/// Runs a query on any connection and extracts the first result.
+async fn run_query_take(
+    db: &surrealdb::Surreal<impl surrealdb::Connection>,
+    sql: &str,
+    vars: Option<Value>,
+) -> Result<SurrealValue, MemoryError> {
+    let mut q = db.query(sql);
+    if let Some(v) = vars {
+        q = q.bind(v);
+    }
+    let mut response = q
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB query failed: {err}")))?;
+    response
+        .take::<SurrealValue>(0)
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
 }
 
 fn duration_ms(duration: Duration) -> u64 {

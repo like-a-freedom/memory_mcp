@@ -7,12 +7,17 @@ use chrono::{DateTime, Utc};
 
 use super::graph::GraphCandidate;
 use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fact};
+use super::temporal::TemporalWindow;
 use crate::models::{Fact, FactType};
+use crate::service::normalize_text;
 use crate::service::query::{
     query_hard_anchor_terms, query_term_should_be_soft_anchor, search_query_terms,
     unique_query_terms,
 };
 
+// ---------------------------------------------------------------------------
+// Scoring and ranking constants
+// ---------------------------------------------------------------------------
 const RECIPROCAL_RANK_FUSION_K: f64 = 60.0;
 const MAX_ITEMS_PER_SOURCE_EPISODE: usize = 2;
 const ACCESS_COUNT_NOVELTY_WEIGHT: f64 = 0.08;
@@ -29,10 +34,8 @@ const TEMPORAL_ALIGNMENT_WINDOW_DAYS: f64 = 30.0;
 const MIN_TEMPORAL_ALIGNMENT_TO_FILL_BUDGET: f64 = 0.50;
 const MIN_RANKED_CONFIDENCE: f64 = 0.01;
 const MIN_QUERY_GROUNDING_RATIO: f64 = 0.25;
-use super::temporal::TemporalWindow;
 const TWO_HOP_GRAPH_WEIGHT: f64 = 0.72;
 const DEEP_GRAPH_WEIGHT: f64 = 0.55;
-use crate::service::normalize_text;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RankedContextFact {
@@ -47,6 +50,23 @@ pub(crate) struct RankedContextFact {
     pub(crate) semantic_available: bool,
     pub(crate) matched_query_terms: Vec<String>,
     pub(crate) graph_trace: Option<crate::service::context::graph::GraphTrace>,
+}
+
+impl RankedContextFact {
+    /// Merges scoring-related fields into self using element-wise `max`.
+    /// This is the common merge path used across all retrieval tiers.
+    fn merge_scoring_fields(
+        &mut self,
+        confidence: f64,
+        alignment: f64,
+        grounding: f64,
+        terms: &[String],
+    ) {
+        self.decayed_confidence = self.decayed_confidence.max(confidence);
+        self.query_alignment_factor = self.query_alignment_factor.max(alignment);
+        self.grounding_score = self.grounding_score.max(grounding);
+        merge_matched_query_terms(&mut self.matched_query_terms, terms);
+    }
 }
 
 fn merge_matched_query_terms(existing: &mut Vec<String>, incoming: &[String]) {
@@ -180,14 +200,14 @@ fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedCont
     let incoming_rationale = incoming.rationale.clone();
     let incoming_retrieval_tier = incoming.retrieval_tier;
     existing.fusion_score = existing.fusion_score.max(incoming.fusion_score);
-    existing.decayed_confidence = existing.decayed_confidence.max(incoming.decayed_confidence);
     existing.source_priority = existing.source_priority.min(incoming.source_priority);
-    existing.query_alignment_factor = existing
-        .query_alignment_factor
-        .max(incoming.query_alignment_factor);
-    existing.grounding_score = existing.grounding_score.max(incoming.grounding_score);
     existing.semantic_available = existing.semantic_available || incoming.semantic_available;
-    merge_matched_query_terms(&mut existing.matched_query_terms, &incoming_terms);
+    existing.merge_scoring_fields(
+        incoming.decayed_confidence,
+        incoming.query_alignment_factor,
+        incoming.grounding_score,
+        &incoming_terms,
+    );
     merge_graph_trace(&mut existing.graph_trace, incoming_trace);
 
     if incoming_retrieval_tier.precedence() > existing.retrieval_tier.precedence() {
@@ -243,11 +263,12 @@ pub(crate) fn build_ranked_context_facts(
             .and_modify(|candidate| {
                 candidate.fusion_score += lexical_score;
                 candidate.source_priority = 0;
-                candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
-                candidate.query_alignment_factor =
-                    candidate.query_alignment_factor.max(query_alignment_factor);
-                candidate.grounding_score = candidate.grounding_score.max(grounding_score);
-                merge_matched_query_terms(&mut candidate.matched_query_terms, &matched_terms);
+                candidate.merge_scoring_fields(
+                    confidence,
+                    query_alignment_factor,
+                    grounding_score,
+                    &matched_terms,
+                );
                 if retrieval_tier.precedence() > candidate.retrieval_tier.precedence() {
                     candidate.retrieval_tier = retrieval_tier;
                     candidate.rationale = build_rationale(
@@ -294,11 +315,12 @@ pub(crate) fn build_ranked_context_facts(
             graph_rank_weight(rank, candidate.trace.hop_count, candidate.origin_factor);
         if let Some(existing) = ranked_by_fact_id.get_mut(&fact_id) {
             existing.fusion_score += weighted_rank;
-            existing.decayed_confidence = existing.decayed_confidence.max(confidence);
-            existing.query_alignment_factor =
-                existing.query_alignment_factor.max(query_alignment_factor);
-            existing.grounding_score = existing.grounding_score.max(grounding_score);
-            merge_matched_query_terms(&mut existing.matched_query_terms, &matched_terms);
+            existing.merge_scoring_fields(
+                confidence,
+                query_alignment_factor,
+                grounding_score,
+                &matched_terms,
+            );
             merge_graph_trace(&mut existing.graph_trace, Some(candidate.trace));
             continue;
         }
@@ -340,11 +362,12 @@ pub(crate) fn build_ranked_context_facts(
         let weighted_rank = reciprocal_rank(rank) * graph_origin_factor.clamp(0.0, 1.0);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += weighted_rank;
-            candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
-            candidate.query_alignment_factor =
-                candidate.query_alignment_factor.max(query_alignment_factor);
-            candidate.grounding_score = candidate.grounding_score.max(grounding_score);
-            merge_matched_query_terms(&mut candidate.matched_query_terms, &matched_terms);
+            candidate.merge_scoring_fields(
+                confidence,
+                query_alignment_factor,
+                grounding_score,
+                &matched_terms,
+            );
             continue;
         }
 
@@ -384,11 +407,12 @@ pub(crate) fn build_ranked_context_facts(
         let matched_terms = matched_terms_for_fact(query_opt, &fact);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += reciprocal_rank(rank);
-            candidate.decayed_confidence = candidate.decayed_confidence.max(confidence);
-            candidate.query_alignment_factor =
-                candidate.query_alignment_factor.max(query_alignment_factor);
-            candidate.grounding_score = candidate.grounding_score.max(grounding_score);
-            merge_matched_query_terms(&mut candidate.matched_query_terms, &matched_terms);
+            candidate.merge_scoring_fields(
+                confidence,
+                query_alignment_factor,
+                grounding_score,
+                &matched_terms,
+            );
             continue;
         }
 

@@ -112,29 +112,38 @@ pub(crate) fn detect_ingest_transport(content: &str) -> &'static str {
 pub(crate) async fn prepare_ingest_request(
     mut request: IngestRequest,
 ) -> Result<IngestRequest, MemoryError> {
-    if let Some(prepared) = maybe_prepare_path_content(&request.content)? {
-        request.content = prepared.content;
-        if let Some(source_id) = prepared.source_id {
-            request.source_id = source_id;
-        }
+    let path_prepared = maybe_prepare_path_content(&request.content)?;
+    if apply_prepared_content(&mut request, path_prepared) {
         return Ok(request);
     }
-    if let Some(prepared) = maybe_prepare_directory_content(&request.content)? {
-        request.content = prepared.content;
-        if let Some(source_id) = prepared.source_id {
-            request.source_id = source_id;
-        }
+
+    let dir_prepared = maybe_prepare_directory_content(&request.content)?;
+    if apply_prepared_content(&mut request, dir_prepared) {
         return Ok(request);
     }
-    if let Some(prepared) = maybe_prepare_url_content(&request.content).await? {
-        request.content = prepared.content;
-        if let Some(source_id) = prepared.source_id {
-            request.source_id = source_id;
-        }
+
+    let url_prepared = maybe_prepare_url_content(&request.content).await?;
+    if apply_prepared_content(&mut request, url_prepared) {
         return Ok(request);
     }
 
     Ok(request)
+}
+
+/// Applies a successfully-prepared ingest content to the request in place.
+/// Returns `true` when content was found and applied, `false` when `None`.
+fn apply_prepared_content(
+    request: &mut IngestRequest,
+    prepared: Option<PreparedIngestContent>,
+) -> bool {
+    let Some(prep) = prepared else {
+        return false;
+    };
+    request.content = prep.content;
+    if let Some(source_id) = prep.source_id {
+        request.source_id = source_id;
+    }
+    true
 }
 
 #[cfg(test)]
@@ -563,6 +572,60 @@ mod tests {
     fn normalize_extracted_text_handles_empty_input() {
         assert_eq!(normalize_extracted_text(""), "");
         assert_eq!(normalize_extracted_text("   \n\n  "), "");
+    }
+
+    #[test]
+    fn apply_prepared_content_updates_request_when_some() {
+        let mut req = IngestRequest {
+            source_type: "test".to_string(),
+            source_id: "original".to_string(),
+            content: "old".to_string(),
+            t_ref: Utc::now(),
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        };
+
+        assert!(apply_prepared_content(
+            &mut req,
+            Some(PreparedIngestContent {
+                content: "new content".to_string(),
+                source_id: Some("new-id".to_string()),
+            }),
+        ));
+        assert_eq!(req.content, "new content");
+        assert_eq!(req.source_id, "new-id");
+
+        assert!(apply_prepared_content(
+            &mut req,
+            Some(PreparedIngestContent {
+                content: "only content".to_string(),
+                source_id: None,
+            }),
+        ));
+        assert_eq!(req.content, "only content");
+        assert_eq!(req.source_id, "new-id"); // unchanged
+    }
+
+    #[test]
+    fn apply_prepared_content_returns_false_when_none() {
+        let mut req = IngestRequest {
+            source_type: "test".to_string(),
+            source_id: "id".to_string(),
+            content: "old".to_string(),
+            t_ref: Utc::now(),
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        };
+
+        assert!(!apply_prepared_content(&mut req, None));
+        assert_eq!(req.content, "old");
+        assert_eq!(req.source_id, "id");
     }
 
     #[test]
