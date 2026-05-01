@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
+use super::query_mode::query_phrase_candidates;
+
 /// Expands a search query with entity aliases for broader recall.
 ///
 /// Looks up entities whose canonical names appear in the query,
@@ -18,17 +20,21 @@ pub(crate) async fn expand_query_with_aliases(
         return Vec::new();
     }
 
-    // Collect all n-gram phrases and their positions
-    let mut phrase_entries: Vec<(String, usize, usize)> = Vec::new();
-    for span_len in (1..=terms.len()).rev() {
-        for start in 0..=terms.len().saturating_sub(span_len) {
-            let end = start + span_len;
-            let phrase = terms[start..end].join(" ");
-            if phrase.len() >= 2 {
-                phrase_entries.push((phrase, start, end));
-            }
-        }
-    }
+    let phrase_entries = query_phrase_candidates(query)
+        .into_iter()
+        .filter_map(|phrase| {
+            let (position, phrase_len) = {
+                let phrase_terms = phrase.split_whitespace().collect::<Vec<_>>();
+                let phrase_len = phrase_terms.len();
+                let position = terms
+                    .windows(phrase_len)
+                    .position(|window| window == phrase_terms.as_slice());
+                (position, phrase_len)
+            };
+
+            position.map(|start| (phrase, start, start + phrase_len))
+        })
+        .collect::<Vec<_>>();
 
     // Deduplicate normalized names for batch lookup
     let normalized_names: Vec<String> = phrase_entries

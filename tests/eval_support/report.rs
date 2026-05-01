@@ -39,6 +39,18 @@ pub fn render_retrieval_summary(suite_name: &str, summary: &RetrievalSuiteSummar
             tier, total, passed, pass_rate
         ));
     }
+    for (tag, total) in &summary.expected_tag_totals {
+        let passed = summary
+            .expected_tag_passed_cases
+            .get(tag)
+            .copied()
+            .unwrap_or(0);
+        let pass_rate = summary.expected_tag_pass_rate(tag).unwrap_or(1.0);
+        lines.push(format!(
+            "expected_tag={} total={} passed={} pass_rate={:.2}",
+            tag, total, passed, pass_rate
+        ));
+    }
     for (tier, total) in &summary.actual_tier_totals {
         lines.push(format!("actual_tier={} total={}", tier, total));
     }
@@ -74,6 +86,12 @@ mod tests {
         summary
             .expected_tier_passed_cases
             .insert("direct".to_string(), 1);
+        summary
+            .expected_tag_totals
+            .insert("timeline_auto".to_string(), 1);
+        summary
+            .expected_tag_passed_cases
+            .insert("timeline_auto".to_string(), 1);
         summary.actual_tier_totals.insert("direct".to_string(), 1);
         summary.actual_tier_totals.insert("graph".to_string(), 1);
 
@@ -85,6 +103,7 @@ mod tests {
             )
         );
         assert!(rendered.contains("expected_tier=direct total=2 passed=1 pass_rate=0.50"));
+        assert!(rendered.contains("expected_tag=timeline_auto total=1 passed=1 pass_rate=1.00"));
         assert!(rendered.contains("actual_tier=direct total=1"));
         assert!(rendered.contains("actual_tier=graph total=1"));
     }

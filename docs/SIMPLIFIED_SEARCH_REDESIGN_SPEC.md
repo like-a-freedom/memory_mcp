@@ -1,6 +1,6 @@
 # Simplified Search Redesign Specification
 
-**Status:** Partially implemented — Waves 1-3 complete, Wave 4 partial, Wave 5 mostly complete
+**Status:** Mostly implemented — Waves 1-4 complete, Wave 5 mostly complete
 **Date:** 2026-03-26 (updated 2026-04-12)
 **Scope:** Search and retrieval only
 **Precedence:** This document defines the intended target design for the next implementation wave. It does **not** claim that the current runtime already matches this design.
@@ -14,10 +14,12 @@
 | Wave 1 — Schema contract | ✅ Complete | Breaking migration `006_simplified_search_redesign.surql` applied on startup; embedding fields/indexes removed from fresh schema |
 | Wave 2 — Embedding removal | ✅ Complete | `EmbeddingProvider`, `NullEmbedder`, embedding writes, and config removed from runtime |
 | Wave 3 — Native graph + lexical | ✅ Complete | Native `in`/`out` relation endpoints; stronger lexical FTS ordering |
-| Wave 4 — Context assembly | ⚠️ Partial | Semantic lookup removal, deterministic fusion, and rationale improvements implemented; multilabel query flags and bounded graph expansion pending |
+| Wave 4 — Context assembly | ✅ Complete | Deterministic query-mode flags, bounded entity-anchor graph expansion, explainable graph traces, and richer retrieval diagnostics are implemented |
 | Wave 5 — Cleanup | ⚠️ Mostly complete | Obsolete tests/comments/docs cleaned up; verification suite passes |
 
 See `docs/superpowers/plans/2026-03-26-simplified-search-redesign-implementation-plan.md` for detailed task tracking.
+
+Wave 4 is complete when the default retrieval path uses deterministic query-mode flags, bounded entity-anchor graph expansion, and explainable graph traces in the assembled result provenance. Semantic retrieval may still exist as an optional later-stage source, but lexical/BM25 + graph must remain sufficient on their own.
 
 ---
 

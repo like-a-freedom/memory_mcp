@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde_json::json;
+
 use crate::models::{AssembledContextItem, Fact};
 
 use super::ranking;
@@ -11,21 +13,54 @@ pub(super) fn ranked_fact_to_item(
     decay_fn: impl FnOnce(&Fact, chrono::DateTime<chrono::Utc>) -> f64,
 ) -> AssembledContextItem {
     let relevance = ranking::normalized_relevance_score(&ranked);
-    let grounding = ranked.grounding_score;
-    let semantic_available = ranked.semantic_available;
-    let confidence = decay_fn(&ranked.fact, cutoff);
+    let ranking::RankedContextFact {
+        fact,
+        rationale,
+        retrieval_tier,
+        grounding_score: grounding,
+        semantic_available,
+        matched_query_terms,
+        graph_trace,
+        ..
+    } = ranked;
+    let confidence = decay_fn(&fact, cutoff);
+    let mut provenance = fact.provenance;
+
+    if !provenance.is_object() {
+        provenance = json!({});
+    }
+    if let Some(map) = provenance.as_object_mut() {
+        if !matched_query_terms.is_empty() {
+            map.insert(
+                "matched_query_terms".to_string(),
+                json!(matched_query_terms),
+            );
+        }
+        if let Some(trace) = &graph_trace {
+            map.insert(
+                "graph_trace".to_string(),
+                json!({
+                    "anchor_entity_id": trace.anchor_entity_id,
+                    "anchor_canonical_name": trace.anchor_canonical_name,
+                    "hop_count": trace.hop_count,
+                    "path": trace.path,
+                }),
+            );
+        }
+    }
+
     AssembledContextItem {
-        fact_id: ranked.fact.fact_id,
-        content: ranked.fact.content,
-        quote: ranked.fact.quote,
-        source_episode: ranked.fact.source_episode,
+        fact_id: fact.fact_id,
+        content: fact.content,
+        quote: fact.quote,
+        source_episode: fact.source_episode,
         confidence,
         relevance: Some(relevance),
         grounding: Some(grounding),
         semantic_available: Some(semantic_available),
-        provenance: ranked.fact.provenance,
-        rationale: ranked.rationale,
-        retrieval_tier: Some(ranked.retrieval_tier.as_str().to_string()),
+        provenance,
+        rationale,
+        retrieval_tier: Some(retrieval_tier.as_str().to_string()),
     }
 }
 

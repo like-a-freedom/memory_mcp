@@ -13,6 +13,7 @@ use super::experience::{
     RecentExperienceRequest, collect_recent_experience_facts, expand_experience_query_terms,
 };
 use super::filtering::filter_facts_by_constraints;
+use super::graph::{CollectGraphFactsRequest, collect_graph_facts};
 use super::lexical::{FactQueryParams, select_fact_records_for_query};
 use super::params::DefaultContextParams;
 use super::ranking::{
@@ -160,10 +161,36 @@ pub(super) async fn assemble_default_context(
                 .then_with(|| left.fact_id.cmp(&right.fact_id))
         });
 
+        let direct_fact_ids: HashSet<_> = direct_facts
+            .iter()
+            .chain(temporal_facts.iter())
+            .chain(expanded_facts.iter())
+            .map(|fact| fact.fact_id.clone())
+            .collect();
+
+        let graph_facts = collect_graph_facts(
+            service,
+            CollectGraphFactsRequest {
+                namespace: params.namespace,
+                scope: params.scope,
+                cutoff_iso: params.cutoff_iso,
+                raw_query: query,
+                access: params.access,
+                project: params.project_opt,
+                fact_types: params.fact_types,
+                direct_fact_ids: &direct_fact_ids,
+                lexical_facts: &direct_facts,
+                max_hops: params.query_flags.max_graph_hops(),
+                budget: params.budget,
+            },
+        )
+        .await?;
+
         let all_direct_ids: HashSet<_> = direct_facts
             .iter()
             .chain(temporal_facts.iter())
             .chain(expanded_facts.iter())
+            .chain(graph_facts.iter().map(|candidate| &candidate.fact))
             .map(|fact| fact.fact_id.clone())
             .collect();
 
@@ -227,6 +254,7 @@ pub(super) async fn assemble_default_context(
         build_ranked_context_facts(
             BuildRankedContextFactsRequest {
                 lexical_facts,
+                graph_facts,
                 community_facts,
                 semantic_facts,
                 query_opt: params.raw_query_opt,
@@ -243,6 +271,7 @@ pub(super) async fn assemble_default_context(
                     .into_iter()
                     .map(|fact| (fact, RetrievalTier::Direct))
                     .collect(),
+                graph_facts: Vec::new(),
                 community_facts: Vec::new(),
                 semantic_facts: Vec::new(),
                 query_opt: params.raw_query_opt,
@@ -270,7 +299,9 @@ pub(super) async fn assemble_default_context(
 
     apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
     let ranked_candidates = ranked_facts.clone();
-    let selected_ranked = if params.view_mode == Some("timeline") {
+    let timeline_mode = params.resolved_view_mode == Some("timeline")
+        || (params.resolved_view_mode.is_none() && params.query_flags.wants_timeline);
+    let selected_ranked = if timeline_mode {
         sort_ranked_context_facts_for_timeline(&mut ranked_facts);
         ranked_facts
             .into_iter()

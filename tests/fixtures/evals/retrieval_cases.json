@@ -1749,5 +1749,105 @@
                 "max_source_episode_share": 0.5
             }
         }
+    },
+    {
+        "id": "timeline-auto-atlas-history",
+        "description": "Auto timeline routing should return Atlas history in chronological order.",
+        "query": "timeline of atlas changes in q1 2026",
+        "scope": "org",
+        "tags": ["timeline_auto"],
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Atlas planning started",
+                "t_valid": "2026-01-05T09:00:00Z"
+            },
+            {
+                "content": "Atlas budget increased",
+                "t_valid": "2026-02-10T09:00:00Z"
+            },
+            {
+                "content": "Atlas launch confirmed",
+                "t_valid": "2026-03-20T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "temporal",
+            "must_contain": [
+                "Atlas planning started",
+                "Atlas launch confirmed"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "graph-anchor-alice-neighbor",
+        "description": "Named entity anchors should expand to connected facts even without lexical overlap.",
+        "query": "Alice Stone",
+        "scope": "org",
+        "tags": ["graph_anchor"],
+        "budget": 5,
+        "facts": [
+            {
+                "content": "Bob Chen owns the Atlas launch checklist.",
+                "t_valid": "2026-04-30T12:00:00Z",
+                "entity_links": [
+                    "entity:bob"
+                ]
+            }
+        ],
+        "entities": [
+            {
+                "entity_id": "entity:alice",
+                "entity_type": "person",
+                "canonical_name": "Alice Stone",
+                "aliases": []
+            },
+            {
+                "entity_id": "entity:bob",
+                "entity_type": "person",
+                "canonical_name": "Bob Chen",
+                "aliases": []
+            }
+        ],
+        "edges": [
+            {
+                "from_id": "entity:alice",
+                "relation": "knows",
+                "to_id": "entity:bob"
+            }
+        ],
+        "expected": {
+            "tier": "graph",
+            "must_contain": [
+                "Atlas launch checklist"
+            ],
+            "min_recall_at_k": 1.0
+        }
+    },
+    {
+        "id": "first-person-rescue-profile",
+        "description": "First-person rescue should retain user-profile facts when they add unique grounding.",
+        "query": "I'm planning a weekend getaway and want something creatively fulfilling",
+        "scope": "personal",
+        "tags": ["first_person_rescue"],
+        "budget": 2,
+        "facts": [
+            {
+                "content": "User: I am committing more time to original music so my creative work feels fulfilling.",
+                "t_valid": "2026-04-13T09:00:00Z"
+            },
+            {
+                "content": "Current user persona: spends weekends experimenting with music software and digital instruments.",
+                "t_valid": "2026-04-12T09:00:00Z"
+            }
+        ],
+        "expected": {
+            "tier": "reasoning",
+            "must_contain": [
+                "Current user persona"
+            ],
+            "min_recall_at_k": 1.0
+        }
     }
 ]

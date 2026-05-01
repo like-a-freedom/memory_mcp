@@ -1,5 +1,7 @@
 use crate::models::AccessContext;
 
+use super::query_mode::QueryFlags;
+
 /// Parameters for the default context assembly pipeline.
 pub(super) struct DefaultContextParams<'a> {
     pub(super) namespace: &'a str,
@@ -14,6 +16,7 @@ pub(super) struct DefaultContextParams<'a> {
     pub(super) budget: i32,
     pub(super) window_start: Option<chrono::DateTime<chrono::Utc>>,
     pub(super) window_end: Option<chrono::DateTime<chrono::Utc>>,
-    pub(super) view_mode: Option<&'a str>,
+    pub(super) resolved_view_mode: Option<&'a str>,
+    pub(super) query_flags: &'a QueryFlags,
     pub(super) access: &'a AccessContext,
 }

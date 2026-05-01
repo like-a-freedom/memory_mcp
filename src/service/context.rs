@@ -14,10 +14,12 @@ mod budget;
 mod community;
 mod experience;
 mod filtering;
+mod graph;
 mod lexical;
 mod logging;
 mod params;
 mod pipeline;
+mod query_mode;
 mod ranking;
 mod rescue;
 mod scoring;
@@ -97,59 +99,6 @@ pub async fn assemble_context(
         return Ok(vec![]);
     }
 
-    let cache_key = CacheKey::new(
-        &request.query,
-        &request.scope,
-        cutoff,
-        request.budget,
-        request.project.as_deref(),
-        &request.fact_types,
-        CacheView::new(
-            request.view_mode.as_deref(),
-            request.window_start,
-            request.window_end,
-        ),
-        access.allowed_tags.clone(),
-    );
-
-    let cached = {
-        let mut cache = service.context_cache.write().await;
-        cache.get(&cache_key).cloned()
-    };
-
-    if let Some(cached) = cached {
-        track_fact_accesses(service, &cached, &access).await;
-
-        service.logger.log(
-            super::log_event(
-                "assemble_context.cache_hit",
-                json!({"scope": request.scope, "query": request.query}),
-                json!({"count": cached.len()}),
-                Some(&access),
-                None,
-                None,
-            ),
-            LogLevel::Info,
-        );
-
-        let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
-        logging::maybe_record_query_log(service, &request, &cached, true, latency_ms, &access)
-            .await;
-        return Ok(cached);
-    }
-
-    service.logger.log(
-        super::log_event(
-            "assemble_context.cache_miss",
-            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
-            json!({"status": "computing"}),
-            Some(&access),
-            None,
-            None,
-        ),
-        LogLevel::Trace,
-    );
-
     let namespace = service.namespace_for_scope(&request.scope);
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
@@ -183,6 +132,75 @@ pub async fn assemble_context(
     let query_terms = query_opt
         .map(super::query::search_query_terms)
         .unwrap_or_default();
+    let (resolved_view_mode, query_flags) =
+        query_mode::resolve_view_mode(requested_view_mode, raw_query_opt, &query_terms, cutoff);
+    let resolved_view_mode_opt = resolved_view_mode.as_option_str();
+    let query_flag_labels = query_flags.as_labels();
+    let query_log_diagnostics = logging::QueryLogDiagnostics {
+        resolved_view_mode: resolved_view_mode_opt,
+        query_flags: &query_flag_labels,
+    };
+
+    let cache_key = CacheKey::new(
+        &request.query,
+        &request.scope,
+        cutoff,
+        request.budget,
+        request.project.as_deref(),
+        &request.fact_types,
+        CacheView::new(
+            resolved_view_mode_opt,
+            request.window_start,
+            request.window_end,
+        ),
+        access.allowed_tags.clone(),
+    );
+
+    let cached = {
+        let mut cache = service.context_cache.write().await;
+        cache.get(&cache_key).cloned()
+    };
+
+    if let Some(cached) = cached {
+        track_fact_accesses(service, &cached, &access).await;
+
+        service.logger.log(
+            super::log_event(
+                "assemble_context.cache_hit",
+                json!({"scope": request.scope, "query": request.query}),
+                json!({"count": cached.len()}),
+                Some(&access),
+                None,
+                None,
+            ),
+            LogLevel::Info,
+        );
+
+        let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+        logging::maybe_record_query_log(
+            service,
+            &request,
+            &cached,
+            true,
+            latency_ms,
+            &access,
+            &query_log_diagnostics,
+        )
+        .await;
+        return Ok(cached);
+    }
+
+    service.logger.log(
+        super::log_event(
+            "assemble_context.cache_miss",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"status": "computing"}),
+            Some(&access),
+            None,
+            None,
+        ),
+        LogLevel::Trace,
+    );
 
     service.logger.log(
         super::log_event(
@@ -193,6 +211,7 @@ pub async fn assemble_context(
                 "budget": request.budget,
                 "project": project_opt,
                 "view_mode": requested_view_mode,
+                "resolved_view_mode": resolved_view_mode_opt,
                 "fact_type_count": fact_types.len(),
                 "window_start": request.window_start.map(super::normalize_dt),
                 "window_end": request.window_end.map(super::normalize_dt),
@@ -222,7 +241,7 @@ pub async fn assemble_context(
         );
     }
 
-    let mut results: Vec<AssembledContextItem> = if requested_view_mode == Some("facets") {
+    let mut results: Vec<AssembledContextItem> = if resolved_view_mode_opt == Some("facets") {
         build_facets_view(
             service,
             &namespace,
@@ -233,7 +252,7 @@ pub async fn assemble_context(
             &access,
         )
         .await?
-    } else if requested_view_mode == Some("wake_up") {
+    } else if resolved_view_mode_opt == Some("wake_up") {
         build_wake_up_view(
             service,
             views::FactFilterParams {
@@ -249,7 +268,7 @@ pub async fn assemble_context(
             super::normalize_dt,
         )
         .await?
-    } else if requested_view_mode == Some("map") {
+    } else if resolved_view_mode_opt == Some("map") {
         build_map_view(
             service,
             &namespace,
@@ -274,7 +293,8 @@ pub async fn assemble_context(
                 budget: request.budget,
                 window_start: request.window_start,
                 window_end: request.window_end,
-                view_mode: requested_view_mode,
+                resolved_view_mode: resolved_view_mode_opt,
+                query_flags: &query_flags,
                 access: &access,
             },
         )
@@ -284,9 +304,9 @@ pub async fn assemble_context(
     // Append recent experience facts as supplemental context only for browse-like
     // calls without a search query. Query-driven retrieval should not mix in
     // unrelated recent memories purely because they are fresh.
-    if requested_view_mode != Some("facets")
-        && requested_view_mode != Some("wake_up")
-        && requested_view_mode != Some("map")
+    if resolved_view_mode_opt != Some("facets")
+        && resolved_view_mode_opt != Some("wake_up")
+        && resolved_view_mode_opt != Some("map")
         && query_opt.is_none()
     {
         let appended_experience = append_recent_experience_items(
@@ -325,7 +345,7 @@ pub async fn assemble_context(
             json!({
                 "scope": request.scope,
                 "query": request.query,
-                "view_mode": requested_view_mode,
+                "view_mode": resolved_view_mode_opt,
                 "project": project_opt,
             }),
             json!({
@@ -360,7 +380,16 @@ pub async fn assemble_context(
     );
 
     let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
-    logging::maybe_record_query_log(service, &request, &results, false, latency_ms, &access).await;
+    logging::maybe_record_query_log(
+        service,
+        &request,
+        &results,
+        false,
+        latency_ms,
+        &access,
+        &query_log_diagnostics,
+    )
+    .await;
 
     Ok(results)
 }
@@ -451,6 +480,8 @@ mod tests {
             query_alignment_factor: 1.0,
             grounding_score: 1.0,
             semantic_available: false,
+            matched_query_terms: Vec::new(),
+            graph_trace: None,
         }
     }
 
@@ -2640,6 +2671,7 @@ mod tests {
                     (fact.clone(), RetrievalTier::Direct),
                     (fact, RetrievalTier::TemporalExpanded),
                 ],
+                graph_facts: Vec::new(),
                 community_facts: Vec::new(),
                 semantic_facts: Vec::new(),
                 query_opt: Some("march 2026 launch review"),
@@ -2667,6 +2699,7 @@ mod tests {
         let mut ranked = build_ranked_context_facts(
             BuildRankedContextFactsRequest {
                 lexical_facts: Vec::new(),
+                graph_facts: Vec::new(),
                 community_facts: vec![
                     (
                         inferred,
@@ -2767,6 +2800,7 @@ mod tests {
                     (assistant_fact, RetrievalTier::Direct),
                     (user_fact, RetrievalTier::Direct),
                 ],
+                graph_facts: Vec::new(),
                 community_facts: Vec::new(),
                 semantic_facts: Vec::new(),
                 query_opt: Some(
@@ -4126,7 +4160,13 @@ mod tests {
             results[0].rationale
         );
         assert_eq!(results[1].fact_id, "fact:community");
-        assert!(results[1].rationale.contains("community:atlas"));
+        assert!(
+            results[1].retrieval_tier.as_deref() == Some("graph")
+                || results[1].rationale.contains("community:atlas"),
+            "secondary expansion should remain the community-linked fact, even if Task 2 now surfaces it via graph expansion first; got tier={:?} rationale={}",
+            results[1].retrieval_tier,
+            results[1].rationale
+        );
     }
 
     #[tokio::test]

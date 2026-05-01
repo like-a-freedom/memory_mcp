@@ -20,6 +20,8 @@ struct RetrievalEvalCase {
     scope: String,
     #[serde(default)]
     project: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
     #[serde(default = "default_budget")]
     budget: i32,
     facts: Vec<SeedFact>,
@@ -27,6 +29,8 @@ struct RetrievalEvalCase {
     entities: Vec<SeedEntity>,
     #[serde(default)]
     communities: Vec<SeedCommunity>,
+    #[serde(default)]
+    edges: Vec<SeedEdge>,
     expected: RetrievalExpectation,
 }
 
@@ -57,6 +61,13 @@ struct SeedCommunity {
     member_entities: Vec<String>,
     summary: String,
     updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SeedEdge {
+    from_id: String,
+    relation: String,
+    to_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -226,6 +237,22 @@ fn retrieval_fixture_provides_project_filter_coverage() {
             .all(|case| !case.expected.must_not_contain.is_empty()),
         "every project-filter retrieval case should define must_not_contain"
     );
+}
+
+#[test]
+fn retrieval_fixture_provides_graph_and_timeline_tag_coverage() {
+    let cases = load_cases();
+
+    for tag in ["timeline_auto", "graph_anchor", "first_person_rescue"] {
+        let count = cases
+            .iter()
+            .filter(|case| case.tags.iter().any(|value| value == tag))
+            .count();
+        assert!(
+            count >= 1,
+            "expected at least one retrieval eval case tagged {tag}, got {count}"
+        );
+    }
 }
 
 #[test]
@@ -400,6 +427,12 @@ async fn run_retrieval_evals() {
             )
             .await;
         }
+        for edge in &case.edges {
+            service
+                .relate(&edge.from_id, &edge.relation, &edge.to_id)
+                .await
+                .unwrap_or_else(|err| panic!("case {} failed to seed edge: {err}", case.id));
+        }
         for community in &case.communities {
             let updated_at = community
                 .updated_at
@@ -486,6 +519,7 @@ async fn run_retrieval_evals() {
         let recall_passed = record_retrieval_case(
             &mut summary,
             &case.expected.tier,
+            &case.tags,
             matched_hits,
             case.expected.must_contain.len(),
             case.expected.min_recall_at_k,
@@ -507,7 +541,7 @@ async fn run_retrieval_evals() {
         );
         let passed = recall_passed && unexpected_hits == 0;
         if recall_passed && unexpected_hits > 0 {
-            revoke_retrieval_case_pass(&mut summary, &case.expected.tier);
+            revoke_retrieval_case_pass(&mut summary, &case.expected.tier, &case.tags);
         }
 
         assert!(

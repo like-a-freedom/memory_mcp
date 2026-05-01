@@ -412,6 +412,12 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-CA-10**: FTS retrieval MUST match facts via both `content` and `index_keys` fields. `index_keys` populated at ingest with canonical entity names, aliases, and temporal markers (month-year, ISO date components) extracted from fact content.
 **Status**: ✅ Done — implemented 2026-03-27. SurrealDB FTS index `fact_index_keys_search` on `index_keys` with `memory_fts` analyzer. Query searches `content @1@ $query OR index_keys @1@ $query` with merged scores.
 
+**FR-CA-11**: `assemble_context` SHOULD auto-resolve timeline ordering for explicit temporal-history queries when callers leave `view_mode` empty. Explicit `view_mode` remains authoritative. Named entity anchors SHOULD expand into bounded graph context (1 hop for entity-centric queries, 2 hops for path/introduction queries) without making semantic retrieval mandatory.
+**Status**: ✅ Done — implemented via deterministic query flags and bounded entity-anchor expansion in `src/service/context/query_mode.rs` and `src/service/context/graph.rs`.
+
+**FR-CA-12**: When query logging is enabled, the system MUST persist `resolved_view_mode`, `query_flags`, and retrieval-tier distribution alongside existing latency/result-count analytics.
+**Status**: ✅ Done — stored in `query_log` via migration `021_query_log_retrieval_diagnostics.surql`.
+
 ### 5.9 Agent Scenarios (Skills/Flows)
 
 **FR-AG-01**: System MUST expose six canonical memory operations: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, and `explain`.  

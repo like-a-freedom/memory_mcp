@@ -715,6 +715,7 @@ fn finalize_retrieval_case(
     let passed = record_retrieval_case(
         summary,
         &outcome.case.expected.tier,
+        &[],
         outcome.matched_hits,
         outcome.expected_hits,
         outcome.case.expected.min_recall_at_k,

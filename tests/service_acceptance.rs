@@ -915,6 +915,69 @@ async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
 }
 
 #[tokio::test]
+async fn test_assemble_context_graph_results_include_anchor_and_hop_trace() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t = Utc.with_ymd_and_hms(2026, 4, 30, 12, 0, 0).unwrap();
+
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:alice",
+        "person",
+        "Alice Stone",
+        &[],
+    )
+    .await;
+    common::seed_entity(&db_client, "org", "entity:bob", "person", "Bob Chen", &[]).await;
+    service
+        .relate("entity:alice", "knows", "entity:bob")
+        .await
+        .expect("seed edge");
+    common::seed_fact_with_links(
+        &service,
+        "org",
+        "Bob Chen owns the Atlas launch checklist.",
+        t,
+        vec!["entity:bob".to_string()],
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "Alice Stone".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context");
+
+    let graph_item = items
+        .iter()
+        .find(|item| item.retrieval_tier.as_deref() == Some("graph"))
+        .expect("graph-expanded item should exist");
+
+    assert!(graph_item.rationale.contains("anchor=Alice Stone"));
+    assert!(graph_item.rationale.contains("hops=1"));
+
+    let serialized = serde_json::to_value(graph_item).expect("serialize graph assembled item");
+    assert_eq!(
+        serialized
+            .get("provenance")
+            .and_then(|value| value.get("graph_trace"))
+            .and_then(|value| value.get("hop_count"))
+            .and_then(serde_json::Value::as_u64),
+        Some(1),
+    );
+}
+
+#[tokio::test]
 async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_noise() {
     let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2026, 4, 14, 10, 0, 0).unwrap();

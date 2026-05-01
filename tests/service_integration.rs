@@ -30,6 +30,7 @@ async fn seed_query_log_row(
                 "logged_at": memory_mcp::service::normalize_dt(logged_at),
                 "scope": namespace,
                 "query": query,
+                "query_flags": [],
                 "result_count": 1,
                 "latency_ms": 1.0,
                 "cache_hit": false,
@@ -877,6 +878,63 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
 }
 
 #[tokio::test]
+async fn test_service_assemble_context_records_query_log_with_resolved_view_mode_and_flags() {
+    let (mut service, db_client) = common::make_service_with_client_and_query_logging(true).await;
+    service = service.with_query_log_retention_days(30);
+
+    common::seed_fact_at(
+        &service,
+        "org",
+        "Atlas budget increased in January 2026",
+        "2026-01-10T09:00:00Z".parse().unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "org",
+        "Atlas launch confirmed in March 2026",
+        "2026-03-10T09:00:00Z".parse().unwrap(),
+    )
+    .await;
+
+    let _ = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "timeline of atlas changes in q1 2026".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context");
+
+    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let row = query_logs.first().expect("query_log row should exist");
+
+    assert_eq!(
+        row.get("resolved_view_mode")
+            .and_then(|value| value.as_str()),
+        Some("timeline"),
+    );
+    let flags = row
+        .get("query_flags")
+        .and_then(|value| value.as_array())
+        .expect("query_flags should be stored as an array");
+    assert!(flags.iter().any(|value| value.as_str() == Some("timeline")));
+    assert!(
+        row.get("retrieval_tiers")
+            .and_then(|value| value.as_object())
+            .is_some(),
+        "retrieval_tiers distribution should be recorded",
+    );
+}
+
+#[tokio::test]
 async fn test_service_assemble_context_records_query_log_for_cache_hit_queries() {
     let (service, db_client) = common::make_service_with_client_and_query_logging(true).await;
 
@@ -1186,6 +1244,107 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
         contents,
         vec!["Atlas budget increased", "Atlas launch confirmed"]
     );
+}
+
+#[tokio::test]
+async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mode() {
+    let service = common::make_service().await;
+
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas planning started",
+        Utc.with_ymd_and_hms(2026, 1, 5, 9, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas budget increased",
+        Utc.with_ymd_and_hms(2026, 2, 10, 9, 0, 0).unwrap(),
+    )
+    .await;
+    common::seed_fact_at(
+        &service,
+        "personal",
+        "Atlas launch confirmed",
+        Utc.with_ymd_and_hms(2026, 3, 20, 9, 0, 0).unwrap(),
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "timeline of atlas changes in q1 2026".to_string(),
+            scope: "personal".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context");
+
+    assert_eq!(items.len(), 3);
+    assert!(items[0].content.contains("planning started"));
+    assert!(items[1].content.contains("budget increased"));
+    assert!(items[2].content.contains("launch confirmed"));
+}
+
+#[tokio::test]
+async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t = Utc.with_ymd_and_hms(2026, 4, 30, 12, 0, 0).unwrap();
+
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:alice",
+        "person",
+        "Alice Stone",
+        &[],
+    )
+    .await;
+    common::seed_entity(&db_client, "org", "entity:bob", "person", "Bob Chen", &[]).await;
+
+    service
+        .relate("entity:alice", "knows", "entity:bob")
+        .await
+        .expect("seed edge");
+
+    common::seed_fact_with_links(
+        &service,
+        "org",
+        "Bob Chen owns the Atlas launch checklist.",
+        t,
+        vec!["entity:bob".to_string()],
+    )
+    .await;
+
+    let items = service
+        .assemble_context(memory_mcp::models::AssembleContextRequest {
+            query: "Alice Stone".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 5,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await
+        .expect("assemble context");
+
+    let graph_item = items
+        .iter()
+        .find(|item| item.retrieval_tier.as_deref() == Some("graph"))
+        .expect("graph-expanded item should exist");
+    assert!(graph_item.content.contains("Atlas launch checklist"));
 }
 
 #[tokio::test]

@@ -15,6 +15,8 @@ pub struct RetrievalSuiteSummary {
     pub expected_tier_totals: BTreeMap<String, usize>,
     pub expected_tier_passed_cases: BTreeMap<String, usize>,
     pub actual_tier_totals: BTreeMap<String, usize>,
+    pub expected_tag_totals: BTreeMap<String, usize>,
+    pub expected_tag_passed_cases: BTreeMap<String, usize>,
 }
 
 impl RetrievalSuiteSummary {
@@ -59,6 +61,20 @@ impl RetrievalSuiteSummary {
         let passed = self
             .expected_tier_passed_cases
             .get(tier)
+            .copied()
+            .unwrap_or(0);
+        Some(passed as f64 / total as f64)
+    }
+
+    pub fn expected_tag_pass_rate(&self, tag: &str) -> Option<f64> {
+        let total = self.expected_tag_totals.get(tag).copied()?;
+        if total == 0 {
+            return Some(1.0);
+        }
+
+        let passed = self
+            .expected_tag_passed_cases
+            .get(tag)
             .copied()
             .unwrap_or(0);
         Some(passed as f64 / total as f64)
@@ -152,6 +168,7 @@ pub fn source_episode_diversity(source_episodes: &[&str]) -> Option<SourceEpisod
 pub fn record_retrieval_case(
     summary: &mut RetrievalSuiteSummary,
     expected_tier: &str,
+    expected_tags: &[String],
     matched_hits: usize,
     expected_hits: usize,
     min_recall_at_k: f64,
@@ -164,6 +181,9 @@ pub fn record_retrieval_case(
         .expected_tier_totals
         .entry(expected_tier.to_string())
         .or_insert(0) += 1;
+    for tag in expected_tags {
+        *summary.expected_tag_totals.entry(tag.clone()).or_insert(0) += 1;
+    }
 
     for tier in diagnostics.actual_tiers {
         *summary
@@ -219,15 +239,30 @@ pub fn record_retrieval_case(
             .expected_tier_passed_cases
             .entry(expected_tier.to_string())
             .or_insert(0) += 1;
+        for tag in expected_tags {
+            *summary
+                .expected_tag_passed_cases
+                .entry(tag.clone())
+                .or_insert(0) += 1;
+        }
     }
 
     passed
 }
 
-pub fn revoke_retrieval_case_pass(summary: &mut RetrievalSuiteSummary, expected_tier: &str) {
+pub fn revoke_retrieval_case_pass(
+    summary: &mut RetrievalSuiteSummary,
+    expected_tier: &str,
+    expected_tags: &[String],
+) {
     summary.passed_cases = summary.passed_cases.saturating_sub(1);
     if let Some(passed_cases) = summary.expected_tier_passed_cases.get_mut(expected_tier) {
         *passed_cases = passed_cases.saturating_sub(1);
+    }
+    for tag in expected_tags {
+        if let Some(passed_cases) = summary.expected_tag_passed_cases.get_mut(tag) {
+            *passed_cases = passed_cases.saturating_sub(1);
+        }
     }
 }
 
@@ -242,6 +277,7 @@ mod tests {
         let passed = record_retrieval_case(
             &mut summary,
             "direct",
+            &["timeline_auto".to_string(), "graph_anchor".to_string()],
             1,
             1,
             1.0,
@@ -265,6 +301,11 @@ mod tests {
         assert_eq!(summary.expected_tier_passed_cases.get("direct"), Some(&1));
         assert_eq!(summary.actual_tier_totals.get("direct"), Some(&1));
         assert_eq!(summary.actual_tier_totals.get("graph"), Some(&1));
+        assert_eq!(summary.expected_tag_totals.get("timeline_auto"), Some(&1));
+        assert_eq!(
+            summary.expected_tag_passed_cases.get("graph_anchor"),
+            Some(&1)
+        );
     }
 
     #[test]
@@ -274,6 +315,7 @@ mod tests {
         let direct_passed = record_retrieval_case(
             &mut summary,
             "direct",
+            &[],
             1,
             1,
             1.0,
@@ -286,6 +328,7 @@ mod tests {
         let graph_passed = record_retrieval_case(
             &mut summary,
             "graph",
+            &[],
             0,
             1,
             1.0,
@@ -310,6 +353,7 @@ mod tests {
         let passed = record_retrieval_case(
             &mut summary,
             "direct",
+            &["timeline_auto".to_string()],
             2,
             2,
             1.0,
@@ -340,6 +384,7 @@ mod tests {
         let passed = record_retrieval_case(
             &mut summary,
             "direct",
+            &["graph_anchor".to_string()],
             1,
             1,
             1.0,
@@ -351,10 +396,14 @@ mod tests {
         );
 
         assert!(passed);
-        revoke_retrieval_case_pass(&mut summary, "direct");
+        revoke_retrieval_case_pass(&mut summary, "direct", &["graph_anchor".to_string()]);
 
         assert_eq!(summary.passed_cases, 0);
         assert_eq!(summary.expected_tier_passed_cases.get("direct"), Some(&0));
+        assert_eq!(
+            summary.expected_tag_passed_cases.get("graph_anchor"),
+            Some(&0)
+        );
     }
 
     #[test]

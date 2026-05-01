@@ -7,6 +7,11 @@ use crate::models::{AssembleContextRequest, AssembledContextItem};
 use crate::service::error::MemoryError;
 use crate::service::log_event;
 
+pub(crate) struct QueryLogDiagnostics<'a> {
+    pub(crate) resolved_view_mode: Option<&'a str>,
+    pub(crate) query_flags: &'a [String],
+}
+
 pub(crate) fn primary_retrieval_tier(results: &[AssembledContextItem]) -> Option<&str> {
     results
         .iter()
@@ -48,6 +53,7 @@ pub(crate) async fn record_query_log(
     results: &[AssembledContextItem],
     cache_hit: bool,
     latency_ms: f64,
+    diagnostics: &QueryLogDiagnostics<'_>,
 ) -> Result<(), MemoryError> {
     let namespace = service.namespace_for_scope(&request.scope);
     let logged_at = crate::service::query::now();
@@ -61,20 +67,30 @@ pub(crate) async fn record_query_log(
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty());
-    let retrieval_tier = results
-        .iter()
-        .filter_map(|item| item.retrieval_tier.as_deref())
+    let resolved_view_mode = diagnostics
+        .resolved_view_mode
         .map(str::trim)
-        .find(|value| !value.is_empty());
+        .filter(|value| !value.is_empty());
+    let query_flags = diagnostics
+        .query_flags
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let retrieval_tier = primary_retrieval_tier(results);
+    let retrieval_tiers = summarize_retrieval_tiers(results);
 
     let record_id = format!(
         "query_log:{}",
         crate::service::hash_prefix(&format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             crate::service::normalize_text(&request.scope),
             crate::service::normalize_text(&request.query),
             crate::service::normalize_text(project.unwrap_or_default()),
             crate::service::normalize_text(view_mode.unwrap_or_default()),
+            crate::service::normalize_text(resolved_view_mode.unwrap_or_default()),
+            crate::service::normalize_text(&query_flags.join(",")),
             crate::service::normalize_text(retrieval_tier.unwrap_or_default()),
             results.len(),
             if cache_hit { "1" } else { "0" },
@@ -101,8 +117,18 @@ pub(crate) async fn record_query_log(
     if let Some(view_mode) = view_mode {
         payload.insert("view_mode".to_string(), json!(view_mode));
     }
+    if let Some(resolved_view_mode) = resolved_view_mode {
+        payload.insert("resolved_view_mode".to_string(), json!(resolved_view_mode));
+    }
+    payload.insert("query_flags".to_string(), json!(query_flags));
     if let Some(retrieval_tier) = retrieval_tier {
         payload.insert("retrieval_tier".to_string(), json!(retrieval_tier));
+    }
+    if retrieval_tiers
+        .as_object()
+        .is_some_and(|value| !value.is_empty())
+    {
+        payload.insert("retrieval_tiers".to_string(), retrieval_tiers);
     }
 
     service
@@ -120,6 +146,7 @@ pub(crate) async fn maybe_record_query_log(
     cache_hit: bool,
     latency_ms: f64,
     access: &crate::models::AccessContext,
+    diagnostics: &QueryLogDiagnostics<'_>,
 ) {
     if !service.is_query_logging_enabled() {
         service.logger.log(
@@ -140,7 +167,16 @@ pub(crate) async fn maybe_record_query_log(
         return;
     }
 
-    match record_query_log(service, request, results, cache_hit, latency_ms).await {
+    match record_query_log(
+        service,
+        request,
+        results,
+        cache_hit,
+        latency_ms,
+        diagnostics,
+    )
+    .await
+    {
         Ok(()) => {
             service.logger.log(
                 log_event(
@@ -154,6 +190,8 @@ pub(crate) async fn maybe_record_query_log(
                         "result_count": results.len(),
                         "latency_ms": latency_ms,
                         "retrieval_tier": primary_retrieval_tier(results),
+                        "resolved_view_mode": diagnostics.resolved_view_mode,
+                        "query_flags": diagnostics.query_flags,
                     }),
                     Some(access),
                     None,

@@ -518,6 +518,14 @@ The `EMBEDDINGS_SIMILARITY_THRESHOLD` (default `0.7`) filters semantic search re
 
 If you only use **lexical** (BM25/FTS) retrieval and **graph-expanded** context assembly, the provider switch has **no impact** on those retrieval tiers — they do not use embeddings.
 
+### Retrieval behavior
+
+`assemble_context` remains lexical/BM25-first, but now applies deterministic query-mode routing before ranking results:
+
+- explicit `view_mode` still wins;
+- temporal-history queries such as `timeline of Atlas changes in Q1 2026` automatically resolve to timeline ordering when `view_mode` is omitted;
+- named entity anchors can expand into 1-hop graph context (2 hops for explicit connection/path questions) without requiring semantic retrieval.
+
 ### Query analytics logging
 
 Persisted query analytics are **optional** and **disabled by default**.
@@ -528,6 +536,9 @@ When `QUERY_LOGGING_ENABLED=true`, successful `assemble_context` calls write a r
 - `query`
 - `project`
 - `view_mode`
+- `resolved_view_mode`
+- `query_flags`
+- `retrieval_tiers`
 - `result_count`
 - `latency_ms`
 - `retrieval_tier`

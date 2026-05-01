@@ -111,7 +111,7 @@ pub(super) async fn collect_episode_fallback_items(
         cutoff: params.cutoff,
         window_start: params.window_start,
         window_end: params.window_end,
-        timeline_mode: params.view_mode == Some("timeline"),
+        timeline_mode: params.resolved_view_mode == Some("timeline"),
         budget: params.budget,
         fallback_rationale_fn: default_episode_fallback_rationale,
     }))

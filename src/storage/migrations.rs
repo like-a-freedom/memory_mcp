@@ -55,6 +55,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
                 "../../migrations/020_embedding_job_namespace_progress_flexible.surql"
             ),
         },
+        MigrationScript {
+            file_name: "021_query_log_retrieval_diagnostics.surql",
+            sql: include_str!("../../migrations/021_query_log_retrieval_diagnostics.surql"),
+        },
     ]
 }
 
@@ -151,6 +155,9 @@ mod tests {
         );
         assert!(versioned_migrations().iter().any(|migration| {
             migration.file_name == "020_embedding_job_namespace_progress_flexible.surql"
+        }));
+        assert!(versioned_migrations().iter().any(|migration| {
+            migration.file_name == "021_query_log_retrieval_diagnostics.surql"
         }));
     }
 
