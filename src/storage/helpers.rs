@@ -31,6 +31,11 @@ pub fn is_missing_table_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("table")
 }
 
+pub fn is_table_already_exists_error(message: &str) -> bool {
+    let lowered = message.to_lowercase();
+    lowered.contains("already exists") && lowered.contains("table")
+}
+
 pub fn surreal_to_json(value: SurrealValue) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
@@ -182,4 +187,23 @@ pub fn ensure_dir_exists(path: &Path) -> Result<(), MemoryError> {
             .map_err(|err| MemoryError::Storage(format!("failed to create data dir: {err}")))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_table_already_exists_error_detects_correct_message() {
+        assert!(is_table_already_exists_error("The table 'episode' already exists"));
+        assert!(is_table_already_exists_error("table already exists"));
+        assert!(is_table_already_exists_error("TABLE ALREADY EXISTS"));
+    }
+
+    #[test]
+    fn test_is_table_already_exists_error_rejects_wrong_message() {
+        assert!(!is_table_already_exists_error("The table 'episode' does not exist"));
+        assert!(!is_table_already_exists_error("already exists"));
+        assert!(!is_table_already_exists_error("table created"));
+    }
 }

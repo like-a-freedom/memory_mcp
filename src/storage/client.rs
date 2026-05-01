@@ -504,8 +504,23 @@ impl SurrealDbClient {
             self.fact_embedding_dimension,
         );
 
-        self.execute_raw_query(&initial_schema, None, namespace)
-            .await?;
+        // Initial migration may fail with "table already exists" if database was not cleanly shut down
+        // or if tables were created by a previous version. We tolerate this error for idempotency.
+        match self.execute_raw_query(&initial_schema, None, namespace).await {
+            Ok(()) => {}
+            Err(MemoryError::Storage(err_msg))
+                if super::helpers::is_table_already_exists_error(&err_msg) =>
+            {
+                self.logger.log(
+                    HashMap::from([(
+                        "op".to_string(),
+                        Value::String("schema.init.skipped".to_string()),
+                    )]),
+                    LogLevel::Debug,
+                );
+            }
+            Err(e) => return Err(e),
+        }
 
         for migration in versioned_migrations() {
             self.apply_versioned_migration(namespace, migration).await?;
