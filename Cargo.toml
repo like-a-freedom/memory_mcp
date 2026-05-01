@@ -18,24 +18,24 @@ schemars = "1.2.1"
 chrono = { version = "0.4.44", features = ["serde", "clock"] }
 thiserror = "2.0.18"
 async-trait = "0.1.89"
-anno = { version = "0.6.0", default-features = false }
+anno = { version = "0.10.0", default-features = false }
 regex = "1.12.3"
 lopdf = "0.40.0"
 roxmltree = "0.21.1"
 sha2 = "0.11.0"
 hex = "0.4.3"
 serde_cbor = "0.11.2"
-lru = "0.17.0"
+lru = "0.18.0"
 surrealdb = { version = "3.0.5", features = ["kv-rocksdb", "kv-mem"] }
-zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
-reqwest = { version = "0.13.2", default-features = false, features = [
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+reqwest = { version = "0.13.3", default-features = false, features = [
     "json",
     "rustls"
 ] }
 candle-core = { version = "0.10.2", default-features = false }
 candle-nn = { version = "0.10.2", default-features = false }
 candle-transformers = { version = "0.10.2", default-features = false }
-tokenizers = { version = "0.22.2", default-features = false, features = [
+tokenizers = { version = "0.23.1", default-features = false, features = [
     "fancy-regex"
 ] }
 hf-hub = { version = "0.5.0", default-features = false, features = ["tokio"] }
