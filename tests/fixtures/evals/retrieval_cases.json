@@ -1755,7 +1755,9 @@
         "description": "Auto timeline routing should return Atlas history in chronological order.",
         "query": "timeline of atlas changes in q1 2026",
         "scope": "org",
-        "tags": ["timeline_auto"],
+        "tags": [
+            "timeline_auto"
+        ],
         "budget": 5,
         "facts": [
             {
@@ -1785,7 +1787,9 @@
         "description": "Named entity anchors should expand to connected facts even without lexical overlap.",
         "query": "Alice Stone",
         "scope": "org",
-        "tags": ["graph_anchor"],
+        "tags": [
+            "graph_anchor"
+        ],
         "budget": 5,
         "facts": [
             {
@@ -1830,7 +1834,9 @@
         "description": "First-person rescue should retain user-profile facts when they add unique grounding.",
         "query": "I'm planning a weekend getaway and want something creatively fulfilling",
         "scope": "personal",
-        "tags": ["first_person_rescue"],
+        "tags": [
+            "first_person_rescue"
+        ],
         "budget": 2,
         "facts": [
             {
