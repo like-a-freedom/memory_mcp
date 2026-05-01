@@ -176,6 +176,38 @@ impl MemoryService {
                     startup_logger.log(event, crate::logging::LogLevel::Warn);
                     None
                 }
+                Err(err)
+                    if mode == EmbeddingActivationMode::ForceEnabledForReembed
+                        && config.embedding.dimension_override.is_some() =>
+                {
+                    // Probe failed but operator provided an explicit dimension
+                    // override — fall back to it with a strong warning.
+                    let dimension = config.embedding.dimension_override.unwrap();
+                    let signature = crate::config::build_embedding_signature(
+                        config.embedding.provider_label(),
+                        config.embedding.model.as_deref(),
+                        config.embedding.base_url.as_deref(),
+                        dimension,
+                    );
+                    let mut event = std::collections::HashMap::new();
+                    event.insert(
+                        "op".to_string(),
+                        serde_json::json!("embedding.preflight_fallback"),
+                    );
+                    event.insert("error".to_string(), serde_json::json!(err.to_string()));
+                    event.insert(
+                        "provider".to_string(),
+                        serde_json::json!(config.embedding.provider_label()),
+                    );
+                    event.insert("dimension".to_string(), serde_json::json!(dimension));
+                    startup_logger.log(event, crate::logging::LogLevel::Warn);
+                    Some(crate::service::embedding::ResolvedEmbeddingTarget {
+                        provider_label: config.embedding.provider_label(),
+                        model: config.embedding.model.clone(),
+                        dimension,
+                        signature,
+                    })
+                }
                 Err(err) => return Err(err),
             }
         } else {

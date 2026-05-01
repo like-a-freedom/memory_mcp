@@ -10,9 +10,9 @@ use serde_json::{Value, json};
 use super::{EmbeddingProvider, MemoryError, embedding_from_value};
 use crate::logging::LogLevel;
 
-const MAX_REMOTE_EMBEDDING_ATTEMPTS: u32 = 3;
-const BASE_REMOTE_EMBEDDING_DELAY_MS: u64 = 250;
-const MAX_REMOTE_EMBEDDING_DELAY_MS: u64 = 3_000;
+const MAX_REMOTE_EMBEDDING_ATTEMPTS: u32 = 5;
+const BASE_REMOTE_EMBEDDING_DELAY_MS: u64 = 2000;
+const MAX_REMOTE_EMBEDDING_DELAY_MS: u64 = 15_000;
 
 #[derive(Debug, Clone)]
 struct RetryableRemoteRequestFailure {

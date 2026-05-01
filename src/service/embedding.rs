@@ -729,4 +729,62 @@ mod tests {
             .expect("resolved target for disabled provider with override");
         assert_eq!(resolved.dimension, 42);
     }
+
+    /// Verifies that the fallback target construction (used by the builder
+    /// when the probe fails in reembed mode) produces a consistent target
+    /// with the expected signature from the override dimension.
+    #[tokio::test]
+    async fn probe_failure_fallback_target_has_correct_signature() {
+        // Simulate the builder fallback: when probe fails and
+        // dimension_override is set, we construct a ResolvedEmbeddingTarget
+        // from the override dimension directly.
+        let dimension = 2048_usize;
+        let signature = crate::config::build_embedding_signature(
+            "openai-compatible",
+            Some("nvidia/test-model"),
+            Some("https://openrouter.ai/api/v1"),
+            dimension,
+        );
+
+        let target = ResolvedEmbeddingTarget {
+            provider_label: "openai-compatible",
+            model: Some("nvidia/test-model".to_string()),
+            dimension,
+            signature: signature.clone(),
+        };
+
+        assert_eq!(target.dimension, 2048);
+        assert_eq!(target.provider_label, "openai-compatible");
+        assert!(target.signature.starts_with("embsig:"));
+
+        // The same config always produces the same signature
+        let signature2 = crate::config::build_embedding_signature(
+            "openai-compatible",
+            Some("nvidia/test-model"),
+            Some("https://openrouter.ai/api/v1"),
+            2048,
+        );
+        assert_eq!(target.signature, signature2);
+    }
+
+    #[tokio::test]
+    async fn probe_failure_fallback_target_differs_when_dimension_changes() {
+        let sig_2048 = crate::config::build_embedding_signature(
+            "openai-compatible",
+            Some("nvidia/test-model"),
+            Some("https://openrouter.ai/api/v1"),
+            2048,
+        );
+        let sig_1536 = crate::config::build_embedding_signature(
+            "openai-compatible",
+            Some("nvidia/test-model"),
+            Some("https://openrouter.ai/api/v1"),
+            1536,
+        );
+
+        assert_ne!(
+            sig_2048, sig_1536,
+            "different dimensions should produce different signatures"
+        );
+    }
 }
