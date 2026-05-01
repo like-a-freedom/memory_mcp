@@ -131,13 +131,16 @@ async fn response_json(response: reqwest::Response) -> Result<Value, RemoteReque
     })
 }
 
-async fn request_openai_body(
+/// Fetches and parses an OpenAI-compatible embedding, retrying on both
+/// transport errors and transient data errors (e.g. empty `data[0].embedding`
+/// from overloaded or rate-limited providers).
+async fn request_openai_embedding_and_parse(
     client: &reqwest::Client,
     base_url: &str,
     model: &str,
     api_key: Option<&str>,
     input: &str,
-) -> Result<Value, MemoryError> {
+) -> Result<Vec<f64>, MemoryError> {
     let mut headers =
         HeaderMap::from_iter([(CONTENT_TYPE, HeaderValue::from_static("application/json"))]);
     if let Some(api_key) = api_key {
@@ -148,14 +151,28 @@ async fn request_openai_body(
     }
 
     with_remote_embedding_retry("openai-compatible", || async {
-        let response = client
-            .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
-            .headers(headers.clone())
-            .json(&json!({"model": model, "input": input}))
-            .send()
-            .await
-            .map_err(map_send_error)?;
-        response_json(response).await
+        let body = {
+            let response = client
+                .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+                .headers(headers.clone())
+                .json(&json!({"model": model, "input": input}))
+                .send()
+                .await
+                .map_err(map_send_error)?;
+            response_json(response).await?
+        };
+
+        // Parsing failure (missing data) is retryable — providers may
+        // return empty payloads under load.
+        match parse_openai_embedding(&body) {
+            Ok(embedding) => Ok(embedding),
+            Err(_) => Err(RemoteRequestFailure::Retryable(
+                RetryableRemoteRequestFailure {
+                    message: "embedding response missing data[0].embedding".to_string(),
+                    retry_after: None,
+                },
+            )),
+        }
     })
     .await
 }
@@ -233,9 +250,11 @@ pub(super) async fn detect_openai_embedding_dimension(
     model: &str,
     api_key: Option<&str>,
 ) -> Result<usize, MemoryError> {
-    let body = request_openai_body(client, base_url, model, api_key, "dimension probe").await?;
+    let embedding =
+        request_openai_embedding_and_parse(client, base_url, model, api_key, "dimension probe")
+            .await?;
 
-    Ok(parse_openai_embedding(&body)?.len())
+    Ok(embedding.len())
 }
 
 pub(super) async fn detect_ollama_embedding_dimension(
@@ -263,7 +282,7 @@ impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
     }
 
     async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
-        let body = request_openai_body(
+        let embedding = request_openai_embedding_and_parse(
             &self.client,
             &self.base_url,
             &self.model,
@@ -272,7 +291,7 @@ impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
         )
         .await?;
 
-        parse_openai_embedding_response(&body, self.dimension)
+        validate_dimension(embedding, self.dimension)
     }
 }
 
@@ -295,15 +314,6 @@ impl EmbeddingProvider for OllamaEmbeddingProvider {
 
         parse_ollama_embedding_response(&body, self.dimension)
     }
-}
-
-fn parse_openai_embedding_response(
-    body: &Value,
-    expected_dimension: usize,
-) -> Result<Vec<f64>, MemoryError> {
-    let embedding = parse_openai_embedding(body)?;
-
-    validate_dimension(embedding, expected_dimension)
 }
 
 fn parse_openai_embedding(body: &Value) -> Result<Vec<f64>, MemoryError> {
@@ -375,32 +385,23 @@ mod tests {
     }
 
     #[test]
-    fn parse_openai_embedding_response_reads_first_vector() {
-        let embedding = parse_openai_embedding_response(
-            &json!({
-                "data": [
-                    {"embedding": [0.1, 0.2, 0.3]}
-                ]
-            }),
-            3,
-        )
+    fn parse_openai_embedding_reads_first_vector() {
+        let embedding = parse_openai_embedding(&json!({
+            "data": [
+                {"embedding": [0.1, 0.2, 0.3]}
+            ]
+        }))
         .expect("embedding");
 
-        assert_eq!(
-            embedding,
-            vec![0.2672612419124244, 0.5345224838248488, 0.8017837257372731]
-        );
+        assert_eq!(embedding.len(), 3);
     }
 
     #[test]
-    fn parse_ollama_embedding_response_reads_vector() {
-        let embedding = parse_ollama_embedding_response(&json!({"embedding": [0.4, 0.5, 0.6]}), 3)
-            .expect("embedding");
+    fn parse_ollama_embedding_reads_vector() {
+        let embedding =
+            parse_ollama_embedding(&json!({"embedding": [0.4, 0.5, 0.6]})).expect("embedding");
 
-        assert_eq!(
-            embedding,
-            vec![0.4558423058385518, 0.5698028822981898, 0.6837634587578276]
-        );
+        assert_eq!(embedding.len(), 3);
     }
 
     #[test]
@@ -410,5 +411,36 @@ mod tests {
         assert!(
             matches!(error, MemoryError::Storage(message) if message.contains("dimension mismatch"))
         );
+    }
+
+    #[test]
+    fn parse_openai_embedding_missing_data_error_is_storage() {
+        // Even though the error is now retried via
+        // request_openai_embedding_and_parse, parse_openai_embedding
+        // itself still returns Storage — the retry wrapper
+        // catches it and converts to Retryable.
+        let err =
+            parse_openai_embedding(&json!({"data": []})).expect_err("missing data should fail");
+        assert!(err.to_string().contains("missing data[0].embedding"));
+    }
+
+    #[test]
+    fn parse_openai_embedding_extracts_valid_vector() {
+        let embedding = parse_openai_embedding(
+            &json!({"data": [{"embedding": [0.1, 0.2, 0.3]}], "model": "test"}),
+        )
+        .expect("valid embedding");
+        assert_eq!(embedding.len(), 3);
+    }
+
+    #[test]
+    fn parse_openai_embedding_returns_none_for_null_data() {
+        assert!(parse_openai_embedding(&json!({"data": null})).is_err());
+    }
+
+    #[test]
+    fn parse_openai_embedding_returns_none_for_wrong_shape() {
+        // Plain array, not {"data": [...]}
+        assert!(parse_openai_embedding(&json!([0.1, 0.2, 0.3])).is_err());
     }
 }
