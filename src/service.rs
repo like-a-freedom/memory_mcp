@@ -13,6 +13,7 @@ pub use entity_extraction::{
     RegexEntityExtractor, create_entity_extractor,
 };
 pub use error::MemoryError;
+pub use error::is_transient_db_error;
 
 mod apps;
 mod cache;

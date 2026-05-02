@@ -596,9 +596,11 @@ impl SurrealDbClient {
             LogLevel::Debug,
         );
 
-        let result = self
-            .execute_sql_with_timing(sql, vars.clone(), namespace)
-            .await;
+        let vars_for_retry = vars.clone();
+        let result = with_db_retry("execute_query", &self.logger, || {
+            self.execute_sql_with_timing(sql, vars_for_retry.clone(), namespace)
+        })
+        .await;
 
         match result {
             Ok(value) => {
@@ -653,9 +655,11 @@ impl SurrealDbClient {
             LogLevel::Debug,
         );
 
-        let result = self
-            .execute_sql_void_with_timing(sql, vars.clone(), namespace)
-            .await;
+        let vars_for_retry = vars.clone();
+        let result = with_db_retry("execute_raw_query", &self.logger, || {
+            self.execute_sql_void_with_timing(sql, vars_for_retry.clone(), namespace)
+        })
+        .await;
 
         match result {
             Ok(()) => {
@@ -745,6 +749,71 @@ async fn run_query_take(
     response
         .take::<SurrealValue>(0)
         .map_err(|err| MemoryError::Storage(format!("SurrealDB take failed: {err}")))
+}
+
+/// Default maximum attempts for database retry on transient errors.
+const DEFAULT_DB_RETRY_ATTEMPTS: u32 = 3;
+/// Initial delay in milliseconds for database retry backoff (doubles each attempt).
+const DEFAULT_DB_RETRY_INITIAL_DELAY_MS: u64 = 200;
+
+/// Runs a fallible database operation with exponential backoff retry.
+///
+/// Only retries on errors identified as transient by `is_transient_db_error`.
+/// Logs each retry attempt via the provided logger with the operation name.
+async fn with_db_retry<T, F, Fut>(
+    op_name: &str,
+    logger: &StdoutLogger,
+    f: F,
+) -> Result<T, MemoryError>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, MemoryError>>,
+{
+    let mut attempt = 0u32;
+    loop {
+        match f().await {
+            Ok(value) => return Ok(value),
+            Err(err) => {
+                attempt += 1;
+                if attempt >= DEFAULT_DB_RETRY_ATTEMPTS
+                    || !crate::service::is_transient_db_error(&err)
+                {
+                    return Err(err);
+                }
+                let delay_ms =
+                    DEFAULT_DB_RETRY_INITIAL_DELAY_MS << attempt.saturating_sub(1).min(6);
+                let delay = Duration::from_millis(delay_ms);
+                logger.log(
+                    std::collections::HashMap::from([
+                        (
+                            "op".to_string(),
+                            serde_json::Value::String(format!("db.{op_name}.retry")),
+                        ),
+                        (
+                            "attempt".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(attempt)),
+                        ),
+                        (
+                            "delay_ms".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(delay_ms)),
+                        ),
+                        (
+                            "max_attempts".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(
+                                DEFAULT_DB_RETRY_ATTEMPTS,
+                            )),
+                        ),
+                        (
+                            "error".to_string(),
+                            serde_json::Value::String(err.to_string()),
+                        ),
+                    ]),
+                    LogLevel::Warn,
+                );
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
 }
 
 fn duration_ms(duration: Duration) -> u64 {
@@ -1855,5 +1924,107 @@ fn validate_table_name(table: &str) -> Result<(), MemoryError> {
         Err(MemoryError::ConfigInvalid(format!(
             "table `{table}` is not an allowed query target"
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    use super::*;
+    use crate::logging::StdoutLogger;
+
+    #[tokio::test]
+    async fn with_db_retry_succeeds_on_first_attempt() {
+        let logger = StdoutLogger::new("warn");
+        let result = with_db_retry("test_op", &logger, || async { Ok::<_, MemoryError>(42) }).await;
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn with_db_retry_retries_on_transient_then_succeeds() {
+        let logger = StdoutLogger::new("warn");
+        let call_count = Arc::new(AtomicU32::new(0));
+        let count = call_count.clone();
+
+        let result = with_db_retry("test_op", &logger, || {
+            let count = count.clone();
+            async move {
+                let n = count.fetch_add(1, Ordering::SeqCst);
+                if n < 2 {
+                    Err(MemoryError::Storage(
+                        "Transaction conflict: Resource busy".into(),
+                    ))
+                } else {
+                    Ok::<_, MemoryError>(99)
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(result.unwrap(), 99);
+        assert_eq!(call_count.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn with_db_retry_fails_after_max_attempts() {
+        let logger = StdoutLogger::new("warn");
+        let call_count = Arc::new(AtomicU32::new(0));
+        let count = call_count.clone();
+
+        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || {
+            let count = count.clone();
+            async move {
+                count.fetch_add(1, Ordering::SeqCst);
+                Err(MemoryError::Storage(
+                    "Transaction conflict: Resource busy".into(),
+                ))
+            }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(call_count.load(Ordering::SeqCst), 3);
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Transaction conflict")
+        );
+    }
+
+    #[tokio::test]
+    async fn with_db_retry_does_not_retry_non_transient() {
+        let logger = StdoutLogger::new("warn");
+        let call_count = Arc::new(AtomicU32::new(0));
+        let count = call_count.clone();
+
+        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || {
+            let count = count.clone();
+            async move {
+                count.fetch_add(1, Ordering::SeqCst);
+                Err(MemoryError::Storage("connection refused".into()))
+            }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(call_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn with_db_retry_exhaustion_keeps_last_error() {
+        let logger = StdoutLogger::new("warn");
+        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || async {
+            Err(MemoryError::Storage(
+                "Transaction conflict: Resource busy".into(),
+            ))
+        })
+        .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, MemoryError::Storage(_)));
+        assert!(err.to_string().contains("Resource busy"));
     }
 }
