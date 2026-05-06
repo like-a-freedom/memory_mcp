@@ -16,6 +16,7 @@ pub use error::MemoryError;
 pub use error::is_transient_db_error;
 
 mod apps;
+pub use apps::GraphTraversalBudget;
 mod cache;
 mod context;
 mod core;

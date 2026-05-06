@@ -13,7 +13,7 @@ mod common;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::models::{ExplainItem, ExplainRequest};
+use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest};
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -502,4 +502,280 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
         err_msg.contains("source_episode is required"),
         "Unexpected error message: {err_msg}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Batch graph insights sharing
+// ---------------------------------------------------------------------------
+
+/// Verify that explain with multiple items sharing the same entity produces
+/// identical graph_insights across all items (proving batch computation).
+#[tokio::test]
+async fn explain_batch_shares_graph_insights() {
+    let (service, _db_client) = common::make_service_with_client().await;
+    let t_ref = Utc::now();
+
+    let alice_id = service.resolve_person("Alice Shared").await.expect("alice");
+    let bob_id = service.resolve_person("Bob Shared").await.expect("bob");
+    service
+        .relate(&alice_id, "knows", &bob_id)
+        .await
+        .expect("edge");
+
+    // Episode A → fact with Alice
+    let ep_a = service
+        .ingest(
+            IngestRequest {
+                source_type: "note".into(),
+                source_id: "batch-ep-a".into(),
+                content: "Alice met Bob".into(),
+                t_ref,
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest a");
+    let fact_a = service
+        .add_fact(
+            "note",
+            "Alice met Bob",
+            "Alice met Bob",
+            &ep_a,
+            t_ref,
+            "org",
+            0.9,
+            vec![alice_id.clone(), bob_id.clone()],
+            vec![],
+            json!({"source_episode": ep_a}),
+        )
+        .await
+        .expect("fact a");
+
+    // Episode B → fact with same entity set (Alice + Bob)
+    let ep_b = service
+        .ingest(
+            IngestRequest {
+                source_type: "note".into(),
+                source_id: "batch-ep-b".into(),
+                content: "Bob talked to Alice again".into(),
+                t_ref,
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest b");
+    let fact_b = service
+        .add_fact(
+            "note",
+            "Bob talked to Alice again",
+            "Bob talked to Alice again",
+            &ep_b,
+            t_ref,
+            "org",
+            0.9,
+            vec![bob_id.clone(), alice_id.clone()],
+            vec![],
+            json!({"source_episode": ep_b}),
+        )
+        .await
+        .expect("fact b");
+
+    // Explain both facts in a single batch
+    let result = service
+        .explain(
+            ExplainRequest {
+                context_pack: vec![
+                    ExplainItem {
+                        fact_id: Some(fact_a),
+                        content: "Alice met Bob".into(),
+                        quote: "Alice met Bob".into(),
+                        source_episode: ep_a.clone(),
+                        ..Default::default()
+                    },
+                    ExplainItem {
+                        fact_id: Some(fact_b),
+                        content: "Bob talked to Alice again".into(),
+                        quote: "Bob talked to Alice again".into(),
+                        source_episode: ep_b.clone(),
+                        ..Default::default()
+                    },
+                ],
+            },
+            None,
+        )
+        .await
+        .expect("explain batch");
+
+    assert_eq!(result.len(), 2, "should return 2 explain items");
+
+    // Both items should have the same graph_insights (shared batch computation)
+    let insights_a = serde_json::to_value(&result[0])
+        .unwrap()
+        .get("graph_insights")
+        .cloned();
+    let insights_b = serde_json::to_value(&result[1])
+        .unwrap()
+        .get("graph_insights")
+        .cloned();
+
+    assert_eq!(
+        insights_a, insights_b,
+        "graph_insights must be identical across batch items (shared computation)"
+    );
+}
+
+/// Verify that explain correctly handles items without fact_id (no entity_links).
+#[tokio::test]
+async fn explain_batch_mixed_with_and_without_fact_ids() {
+    let (service, _db_client) = common::make_service_with_client().await;
+    let t_ref = Utc::now();
+
+    // Episode with fact
+    let ep_with = service
+        .ingest(
+            IngestRequest {
+                source_type: "note".into(),
+                source_id: "mixed-ep-1".into(),
+                content: "Fact content here".into(),
+                t_ref,
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest");
+    let alice_id = service.resolve_person("Alice Mixed").await.expect("alice");
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Fact content here",
+            "Fact content here",
+            &ep_with,
+            t_ref,
+            "org",
+            0.9,
+            vec![alice_id],
+            vec![],
+            json!({"source_episode": ep_with}),
+        )
+        .await
+        .expect("fact");
+
+    // Episode without fact (raw episode explain)
+    let ep_without = service
+        .ingest(
+            IngestRequest {
+                source_type: "note".into(),
+                source_id: "mixed-ep-2".into(),
+                content: "Just an episode, no fact".into(),
+                t_ref,
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest");
+
+    let result = service
+        .explain(
+            ExplainRequest {
+                context_pack: vec![
+                    ExplainItem {
+                        fact_id: Some(fact_id),
+                        content: "Fact content here".into(),
+                        quote: "Fact content here".into(),
+                        source_episode: ep_with.clone(),
+                        ..Default::default()
+                    },
+                    ExplainItem {
+                        fact_id: None, // no fact — will have no entity_links
+                        content: "".into(),
+                        quote: "".into(),
+                        source_episode: ep_without.clone(),
+                        ..Default::default()
+                    },
+                ],
+            },
+            None,
+        )
+        .await
+        .expect("explain mixed batch");
+
+    assert_eq!(result.len(), 2);
+    // First item has fact_id → may have graph_insights
+    let item0 = serde_json::to_value(&result[0]).unwrap();
+    // Second item has no fact_id → should still get the shared batch graph_insights
+    let item1 = serde_json::to_value(&result[1]).unwrap();
+    assert_eq!(
+        item0.get("graph_insights"),
+        item1.get("graph_insights"),
+        "both items should share the same batch graph_insights"
+    );
+}
+
+/// Verify that explain with empty context_pack returns an empty vec without error.
+#[tokio::test]
+async fn explain_empty_context_pack() {
+    let service = common::make_service().await;
+
+    let result = service
+        .explain(
+            ExplainRequest {
+                context_pack: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("explain empty");
+
+    assert!(
+        result.is_empty(),
+        "empty context_pack should yield empty result"
+    );
+}
+
+/// Verify that explain skips items with unknown source_episode gracefully.
+#[tokio::test]
+async fn explain_skips_unknown_episode() {
+    let service = common::make_service().await;
+
+    let result = service
+        .explain(
+            ExplainRequest {
+                context_pack: vec![ExplainItem {
+                    source_episode: "episode:nonexistent-99999".into(),
+                    content: "some content".into(),
+                    quote: "some quote".into(),
+                    ..Default::default()
+                }],
+            },
+            None,
+        )
+        .await
+        .expect("explain unknown episode");
+
+    assert_eq!(result.len(), 1);
+    // Should return the item as-is (no enrichment)
+    assert_eq!(result[0].source_episode, "episode:nonexistent-99999");
+    assert_eq!(result[0].content, "some content");
+    assert_eq!(result[0].scope, None);
+    assert_eq!(result[0].all_sources.len(), 0);
 }

@@ -391,8 +391,14 @@ pub(crate) async fn build_map_view(
     budget: i32,
     normalize_dt_fn: impl Fn(DateTime<Utc>) -> String,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let hub_entities =
-        crate::service::apps::graph::find_hub_entities(service, namespace, cutoff, budget).await?;
+    let hub_entities = crate::service::apps::graph::find_hub_entities(
+        service,
+        namespace,
+        cutoff,
+        budget,
+        crate::service::apps::graph::GraphTraversalBudget::FULL,
+    )
+    .await?;
     let communities =
         crate::service::apps::graph::list_communities(service, namespace, cutoff, budget).await?;
 

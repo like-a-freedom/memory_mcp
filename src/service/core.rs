@@ -251,16 +251,91 @@ impl MemoryService {
     }
 
     /// Provides explanations for context items.
+    /// Provides explanations for context items with batched graph insights.
+    ///
+    /// Phase 1: resolves episodes and facts for all items, collecting entity_links.
+    /// Phase 2: computes shared graph insights once for the entire batch.
+    /// Phase 3: builds individual explain items using cached provenance lookups.
     pub async fn explain(
         &self,
         request: ExplainRequest,
         access: Option<AccessContext>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
-        let mut explanations = Vec::with_capacity(request.context_pack.len());
+
+        // --- Phase 1: resolve episodes / facts, collect all entity_links ---
+        struct ResolvedItem {
+            item: ExplainItem,
+            episode: Option<crate::models::Episode>,
+            entity_links: Vec<String>,
+            fact_namespace: Option<String>,
+        }
+
+        let mut resolved = Vec::with_capacity(request.context_pack.len());
+        let mut all_entity_links: HashSet<String> = HashSet::new();
+
         for item in request.context_pack {
-            let explanation = self.build_explain_item(item).await?;
-            if let Some(fact_id) = explanation.fact_id.as_deref()
+            if item.source_episode.is_empty() {
+                return Err(MemoryError::Validation(
+                    "source_episode is required for explain items".into(),
+                ));
+            }
+            let (record, _) = self.find_episode_record(&item.source_episode).await?;
+            let episode = record
+                .as_ref()
+                .and_then(super::episode::episode_from_record);
+
+            let (entity_links, fact_namespace) = if let Some(ref fact_id) = item.fact_id {
+                let (fact_record, namespace) = self.find_fact_record(fact_id).await?;
+                let links = fact_record
+                    .and_then(|r| {
+                        r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                    .unwrap_or_default();
+                for link in &links {
+                    all_entity_links.insert(link.clone());
+                }
+                (links, namespace)
+            } else {
+                (Vec::new(), None)
+            };
+
+            resolved.push(ResolvedItem {
+                item,
+                episode,
+                entity_links,
+                fact_namespace,
+            });
+        }
+
+        // --- Phase 2: shared graph insights (computed once for the batch) ---
+        let entity_links_vec: Vec<String> = all_entity_links.into_iter().collect();
+        let first_namespace = resolved
+            .iter()
+            .find_map(|r| {
+                r.fact_namespace.clone().or_else(|| {
+                    r.episode
+                        .as_ref()
+                        .map(|ep| self.namespace_for_scope(&ep.scope))
+                })
+            })
+            .unwrap_or_else(|| self.default_namespace.clone());
+        let shared_insights = self
+            .build_graph_insights_batched(&entity_links_vec, &first_namespace)
+            .await?;
+
+        // --- Phase 3: build explain items with cached provenance ---
+        let mut episode_via_entity_cache: HashMap<String, Vec<crate::models::Episode>> =
+            HashMap::new();
+        let mut explanations = Vec::with_capacity(resolved.len());
+
+        for resolved_item in resolved {
+            // Track fact access regardless of whether the episode is found
+            if let Some(ref fact_id) = resolved_item.item.fact_id
                 && let Err(err) = self.record_fact_access(fact_id, 3).await
             {
                 self.logger.log(
@@ -275,6 +350,47 @@ impl MemoryService {
                     LogLevel::Warn,
                 );
             }
+
+            let Some(episode) = resolved_item.episode else {
+                explanations.push(resolved_item.item);
+                continue;
+            };
+
+            let namespace = resolved_item
+                .fact_namespace
+                .unwrap_or_else(|| self.namespace_for_scope(&episode.scope));
+
+            let all_sources = self
+                .collect_provenance_sources_cached(
+                    &episode,
+                    &resolved_item.entity_links,
+                    &namespace,
+                    &mut episode_via_entity_cache,
+                )
+                .await?;
+
+            let explanation = ExplainItem {
+                fact_id: resolved_item.item.fact_id,
+                content: if resolved_item.item.content.is_empty() {
+                    episode.content.clone()
+                } else {
+                    resolved_item.item.content
+                },
+                quote: resolved_item.item.quote,
+                source_episode: resolved_item.item.source_episode,
+                scope: Some(episode.scope.clone()),
+                t_ref: Some(episode.t_ref),
+                t_ingested: Some(episode.t_ingested),
+                provenance: json!({
+                    "source_episode": episode.episode_id,
+                    "source_type": episode.source_type,
+                    "source_id": episode.source_id,
+                }),
+                citation_context: Some(episode.content.clone()),
+                all_sources,
+                graph_insights: shared_insights.clone(),
+            };
+
             explanations.push(explanation);
         }
 
@@ -1436,73 +1552,8 @@ impl MemoryService {
         }))
     }
 
-    async fn build_explain_item(&self, item: ExplainItem) -> Result<ExplainItem, MemoryError> {
-        if item.source_episode.is_empty() {
-            return Err(MemoryError::Validation(
-                "source_episode is required for explain items".into(),
-            ));
-        }
-        let (record, _) = self.find_episode_record(&item.source_episode).await?;
-        let Some(record) = record else {
-            return Ok(item);
-        };
-
-        let Some(episode) = super::episode::episode_from_record(&record) else {
-            return Ok(item);
-        };
-
-        // Look up entity_links from the fact record if fact_id is available
-        let (entity_links, fact_namespace) = if let Some(ref fact_id) = item.fact_id {
-            let (fact_record, namespace) = self.find_fact_record(fact_id).await?;
-            let links = fact_record
-                .and_then(|r| {
-                    r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect::<Vec<_>>()
-                    })
-                })
-                .unwrap_or_default();
-            (links, namespace)
-        } else {
-            (Vec::new(), None)
-        };
-
-        let provenance_namespace =
-            fact_namespace.unwrap_or_else(|| self.namespace_for_scope(&episode.scope));
-
-        // Collect all provenance sources including linked episodes
-        let all_sources = self
-            .collect_provenance_sources(&episode, &entity_links, &provenance_namespace)
-            .await?;
-        let graph_insights = self
-            .build_graph_insights(&entity_links, &provenance_namespace)
-            .await?;
-
-        Ok(ExplainItem {
-            fact_id: item.fact_id,
-            content: if item.content.is_empty() {
-                episode.content.clone()
-            } else {
-                item.content
-            },
-            quote: item.quote,
-            source_episode: item.source_episode,
-            scope: Some(episode.scope.clone()),
-            t_ref: Some(episode.t_ref),
-            t_ingested: Some(episode.t_ingested),
-            provenance: json!({
-                "source_episode": episode.episode_id,
-                "source_type": episode.source_type,
-                "source_id": episode.source_id,
-            }),
-            citation_context: Some(episode.content.clone()),
-            all_sources,
-            graph_insights,
-        })
-    }
-
-    async fn build_graph_insights(
+    /// Computes graph insights once for a batch of entity links (reduced explain budget).
+    async fn build_graph_insights_batched(
         &self,
         entity_links: &[String],
         namespace: &str,
@@ -1545,25 +1596,32 @@ impl MemoryService {
             LogLevel::Debug,
         );
 
+        let budget = super::apps::graph::GraphTraversalBudget::EXPLAIN;
         let cutoff = super::query::now();
-        let hub_entities =
-            super::apps::graph::find_hub_entities(self, namespace, cutoff, MAX_GRAPH_INSIGHT_HUBS)
-                .await?
-                .into_iter()
-                .map(|hub| GraphHubEntity {
-                    entity_id: hub.entity_id,
-                    canonical_name: hub.canonical_name,
-                    degree: hub.degree,
-                })
-                .collect::<Vec<_>>();
+        let hub_entities = super::apps::graph::find_hub_entities(
+            self,
+            namespace,
+            cutoff,
+            MAX_GRAPH_INSIGHT_HUBS,
+            budget,
+        )
+        .await?
+        .into_iter()
+        .map(|hub| GraphHubEntity {
+            entity_id: hub.entity_id,
+            canonical_name: hub.canonical_name,
+            degree: hub.degree,
+        })
+        .collect::<Vec<_>>();
 
         let mut surprising_connections = Vec::new();
         let mut seen_connections = HashSet::new();
 
         for entity_id in linked_entities {
-            for connection in
-                super::apps::graph::find_surprising_connections(self, namespace, &entity_id, 3)
-                    .await?
+            for connection in super::apps::graph::find_surprising_connections(
+                self, namespace, &entity_id, 3, budget,
+            )
+            .await?
             {
                 let key = format!(
                     "{}->{}",
@@ -1610,12 +1668,14 @@ impl MemoryService {
         }))
     }
 
-    /// Collects all provenance sources for a fact including linked episodes.
-    async fn collect_provenance_sources(
+    /// Collects provenance sources for an explain item, using an episode-via-entity cache
+    /// to avoid redundant `find_episodes_via_entity` calls for the same entity across items.
+    async fn collect_provenance_sources_cached(
         &self,
         primary_episode: &crate::models::Episode,
         entity_links: &[String],
         namespace: &str,
+        cache: &mut HashMap<String, Vec<crate::models::Episode>>,
     ) -> Result<Vec<ProvenanceSource>, MemoryError> {
         let mut sources = Vec::new();
 
@@ -1628,9 +1688,15 @@ impl MemoryService {
             entity_path: None,
         });
 
-        // 2. Traverse entity_links to find connected episodes
+        // 2. Traverse entity_links to find connected episodes (cache-aware)
         for entity_id in entity_links {
-            let linked_episodes = self.find_episodes_via_entity(entity_id, namespace).await?;
+            let linked_episodes = if let Some(cached) = cache.get(entity_id) {
+                cached.clone()
+            } else {
+                let episodes = self.find_episodes_via_entity(entity_id, namespace).await?;
+                cache.insert(entity_id.clone(), episodes.clone());
+                episodes
+            };
 
             for ep in linked_episodes {
                 // Skip if this is the primary source (already added)

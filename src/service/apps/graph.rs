@@ -14,6 +14,33 @@ const MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS: usize = 64;
 const MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES: usize = 128;
 const MAX_SURPRISING_CONNECTION_RESULTS: usize = 12;
 
+/// Budget controls for graph traversal to prevent query explosion in different contexts.
+#[derive(Debug, Clone, Copy)]
+pub struct GraphTraversalBudget {
+    pub max_hub_scan: usize,
+    pub max_node_expansions: usize,
+    pub max_neighbor_queries: usize,
+    pub max_results: usize,
+}
+
+impl GraphTraversalBudget {
+    /// Full budget — used by dedicated graph exploration (open_app, context views).
+    pub const FULL: Self = Self {
+        max_hub_scan: MAX_HUB_CANDIDATE_SCAN,
+        max_node_expansions: MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS,
+        max_neighbor_queries: MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES,
+        max_results: MAX_SURPRISING_CONNECTION_RESULTS,
+    };
+
+    /// Reduced budget — used by inline `explain` calls to avoid per-item query explosion.
+    pub const EXPLAIN: Self = Self {
+        max_hub_scan: 24,
+        max_node_expansions: 16,
+        max_neighbor_queries: 32,
+        max_results: 5,
+    };
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HubEntity {
     pub entity_id: String,
@@ -34,6 +61,7 @@ pub(crate) async fn find_hub_entities(
     namespace: &str,
     cutoff: DateTime<Utc>,
     limit: i32,
+    budget: GraphTraversalBudget,
 ) -> Result<Vec<HubEntity>, MemoryError> {
     let cutoff_iso = normalize_dt(cutoff);
     service.logger.log(
@@ -49,7 +77,8 @@ pub(crate) async fn find_hub_entities(
     );
     let entity_records = service.db_client.select_table("entity", namespace).await?;
     let mut hubs = Vec::new();
-    let candidate_scan_limit = hub_candidate_scan_limit(limit);
+    let candidate_scan_limit =
+        (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
 
     for record in entity_records.into_iter().take(candidate_scan_limit) {
         let Some(map) = record.as_object() else {
@@ -174,6 +203,7 @@ pub(crate) async fn find_surprising_connections(
     namespace: &str,
     source_entity: &str,
     max_depth: i32,
+    budget: GraphTraversalBudget,
 ) -> Result<Vec<SurprisingConnection>, MemoryError> {
     if !is_entity_id(source_entity) || max_depth < 2 {
         service.logger.log(
@@ -224,9 +254,9 @@ pub(crate) async fn find_surprising_connections(
     let mut neighbor_queries = 0usize;
 
     while let Some((current, path, depth)) = frontier.pop_front() {
-        if expanded_nodes >= MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS
-            || neighbor_queries >= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES
-            || connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS
+        if expanded_nodes >= budget.max_node_expansions
+            || neighbor_queries >= budget.max_neighbor_queries
+            || connections.len() >= budget.max_results
         {
             break;
         }
@@ -237,8 +267,8 @@ pub(crate) async fn find_surprising_connections(
         }
 
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            if neighbor_queries >= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES
-                || connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS
+            if neighbor_queries >= budget.max_neighbor_queries
+                || connections.len() >= budget.max_results
             {
                 break;
             }
@@ -280,7 +310,7 @@ pub(crate) async fn find_surprising_connections(
                             hop_count: next_depth,
                             path: next_path.clone(),
                         });
-                    if connections.len() >= MAX_SURPRISING_CONNECTION_RESULTS {
+                    if connections.len() >= budget.max_results {
                         break;
                     }
                 }
@@ -311,10 +341,6 @@ pub(crate) async fn find_surprising_connections(
         LogLevel::Trace,
     );
     Ok(surprising_connections)
-}
-
-fn hub_candidate_scan_limit(limit: i32) -> usize {
-    (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(MAX_HUB_CANDIDATE_SCAN)
 }
 
 fn edge_identity(record: &Value) -> Option<String> {
@@ -524,11 +550,46 @@ mod tests {
         assert!(graph_community_from_value(&value).is_none());
     }
 
+    // ------------------------------------------------------------------
+    // GraphTraversalBudget
+    // ------------------------------------------------------------------
+
     #[test]
-    fn hub_candidate_scan_limit_caps_large_requests() {
-        assert_eq!(hub_candidate_scan_limit(1), 12);
-        assert_eq!(hub_candidate_scan_limit(5), 60);
-        assert_eq!(hub_candidate_scan_limit(50), MAX_HUB_CANDIDATE_SCAN);
+    fn explain_budget_is_stricter_than_full() {
+        const {
+            assert!(
+                GraphTraversalBudget::EXPLAIN.max_hub_scan
+                    < GraphTraversalBudget::FULL.max_hub_scan
+            );
+            assert!(
+                GraphTraversalBudget::EXPLAIN.max_node_expansions
+                    < GraphTraversalBudget::FULL.max_node_expansions
+            );
+            assert!(
+                GraphTraversalBudget::EXPLAIN.max_neighbor_queries
+                    < GraphTraversalBudget::FULL.max_neighbor_queries
+            );
+            assert!(
+                GraphTraversalBudget::EXPLAIN.max_results < GraphTraversalBudget::FULL.max_results
+            );
+        }
+    }
+
+    #[test]
+    fn graph_traversal_budget_is_copy() {
+        let a = GraphTraversalBudget::FULL;
+        let b = a; // Copy, not move
+        assert_eq!(a.max_hub_scan, b.max_hub_scan);
+    }
+
+    #[test]
+    fn graph_traversal_budget_constants_are_nonzero() {
+        for budget in [GraphTraversalBudget::FULL, GraphTraversalBudget::EXPLAIN] {
+            assert!(budget.max_hub_scan > 0);
+            assert!(budget.max_node_expansions > 0);
+            assert!(budget.max_neighbor_queries > 0);
+            assert!(budget.max_results > 0);
+        }
     }
 
     #[tokio::test]
@@ -759,15 +820,21 @@ mod tests {
         )
         .expect("service");
 
-        let connections = find_surprising_connections(&service, "org", "entity:0", 32)
-            .await
-            .expect("connections");
+        let connections = find_surprising_connections(
+            &service,
+            "org",
+            "entity:0",
+            32,
+            GraphTraversalBudget::FULL,
+        )
+        .await
+        .expect("connections");
 
         assert!(
             db.neighbor_queries.load(Ordering::Relaxed)
-                <= MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES,
+                <= GraphTraversalBudget::FULL.max_neighbor_queries,
             "neighbor queries should stop at the configured traversal budget"
         );
-        assert!(connections.len() <= MAX_SURPRISING_CONNECTION_RESULTS);
+        assert!(connections.len() <= GraphTraversalBudget::FULL.max_results);
     }
 }

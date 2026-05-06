@@ -755,9 +755,13 @@ async fn run_query_take(
 const DEFAULT_DB_RETRY_ATTEMPTS: u32 = 3;
 /// Initial delay in milliseconds for database retry backoff (doubles each attempt).
 const DEFAULT_DB_RETRY_INITIAL_DELAY_MS: u64 = 200;
+/// Per-query timeout to guard against stalled database connections (e.g. WebSocket hang).
+const DEFAULT_DB_QUERY_TIMEOUT_SECS: u64 = 30;
 
-/// Runs a fallible database operation with exponential backoff retry.
+/// Runs a fallible database operation with exponential backoff retry and a per-query timeout.
 ///
+/// Each individual attempt is guarded by `DEFAULT_DB_QUERY_TIMEOUT_SECS` to prevent
+/// hanging indefinitely on stalled connections (e.g. WebSocket to SurrealDB).
 /// Only retries on errors identified as transient by `is_transient_db_error`.
 /// Logs each retry attempt via the provided logger with the operation name.
 async fn with_db_retry<T, F, Fut>(
@@ -770,10 +774,11 @@ where
     Fut: std::future::Future<Output = Result<T, MemoryError>>,
 {
     let mut attempt = 0u32;
+    let timeout = Duration::from_secs(DEFAULT_DB_QUERY_TIMEOUT_SECS);
     loop {
-        match f().await {
-            Ok(value) => return Ok(value),
-            Err(err) => {
+        match tokio::time::timeout(timeout, f()).await {
+            Ok(Ok(value)) => return Ok(value),
+            Ok(Err(err)) => {
                 attempt += 1;
                 if attempt >= DEFAULT_DB_RETRY_ATTEMPTS
                     || !crate::service::is_transient_db_error(&err)
@@ -806,6 +811,42 @@ where
                         (
                             "error".to_string(),
                             serde_json::Value::String(err.to_string()),
+                        ),
+                    ]),
+                    LogLevel::Warn,
+                );
+                tokio::time::sleep(delay).await;
+            }
+            Err(_elapsed) => {
+                // Timeout elapsed — treat as a transient error for retry purposes
+                attempt += 1;
+                if attempt >= DEFAULT_DB_RETRY_ATTEMPTS {
+                    return Err(MemoryError::Storage(format!(
+                        "db.{op_name}: timed out after {DEFAULT_DB_QUERY_TIMEOUT_SECS}s ({DEFAULT_DB_RETRY_ATTEMPTS} attempts)"
+                    )));
+                }
+                let delay_ms =
+                    DEFAULT_DB_RETRY_INITIAL_DELAY_MS << attempt.saturating_sub(1).min(6);
+                let delay = Duration::from_millis(delay_ms);
+                logger.log(
+                    std::collections::HashMap::from([
+                        (
+                            "op".to_string(),
+                            serde_json::Value::String(format!("db.{op_name}.timeout")),
+                        ),
+                        (
+                            "attempt".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(attempt)),
+                        ),
+                        (
+                            "delay_ms".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(delay_ms)),
+                        ),
+                        (
+                            "max_attempts".to_string(),
+                            serde_json::Value::Number(serde_json::Number::from(
+                                DEFAULT_DB_RETRY_ATTEMPTS,
+                            )),
                         ),
                     ]),
                     LogLevel::Warn,
