@@ -50,6 +50,7 @@ fn declares_full_dataset_metadata_for_external_fixtures() {
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_provenance -- --ignored`"]
 fn raw_fixture_files_exist_for_all_datasets() {
     let kinds = [
         (
@@ -77,6 +78,7 @@ fn raw_fixture_files_exist_for_all_datasets() {
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_provenance -- --ignored`"]
 fn raw_fixtures_normalize_into_cases() {
     let kinds = [
         DatasetKind::LongMemEvalCleaned,
