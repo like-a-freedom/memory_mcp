@@ -18,6 +18,7 @@ schemars = "1.2.1"
 chrono = { version = "0.4.44", features = ["serde", "clock"] }
 thiserror = "2.0.18"
 async-trait = "0.1.89"
+
 anno = { version = "0.10.0", default-features = false }
 regex = "1.12.3"
 lopdf = "0.40.0"
@@ -39,7 +40,7 @@ tokenizers = { version = "0.23.1", default-features = false, features = [
     "fancy-regex"
 ] }
 hf-hub = { version = "0.5.0", default-features = false, features = ["tokio"] }
-# pulp = "0.22.2"
+pulp = "0.21.5"
 notify = { version = "8.2.0", optional = true }
 
 [features]
@@ -69,3 +70,6 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[patch.crates-io]
+gemm-common = { git = "https://github.com/v0idp0inter/gemm.git", tag = "v0.19.0" }

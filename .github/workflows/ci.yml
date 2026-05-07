@@ -45,6 +45,9 @@ jobs:
           components: rustfmt,clippy
           cache: true
 
+      - name: Update pulp to compatible version
+        run: cargo update -p pulp@0.22.2 --precise 0.21.5
+
       - name: Run fmt check
         run: cargo fmt --all -- --check
 
