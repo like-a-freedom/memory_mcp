@@ -755,6 +755,7 @@ fn finalize_retrieval_case(
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 fn normalizes_longmemeval_fixture_into_canonical_cases() {
     let raw = raw_dataset_raw(DatasetKind::LongMemEvalCleaned);
 
@@ -785,6 +786,7 @@ fn normalizes_longmemeval_fixture_into_canonical_cases() {
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 fn normalizes_locomo_fixture_into_canonical_cases() {
     let raw = raw_dataset_raw(DatasetKind::LoCoMo);
 
@@ -827,6 +829,7 @@ fn normalizes_locomo_fixture_into_canonical_cases() {
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 fn normalizes_personamem_fixture_into_canonical_cases() {
     let raw = raw_dataset_raw(DatasetKind::PersonaMem);
 
@@ -869,6 +872,7 @@ fn normalizes_personamem_fixture_into_canonical_cases() {
 }
 
 #[test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 fn normalizes_prefeval_fixture_into_canonical_cases() {
     let raw = raw_dataset_raw(DatasetKind::PrefEval);
 
@@ -1097,6 +1101,7 @@ async fn external_seed_case_facts_populate_entity_backed_index_keys() {
 }
 
 #[tokio::test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 async fn personamem_music_blend_case_recalls_expected_context() {
     let case_id = "personamem:acd74206-37dc-4756-94a8-b99a395d9a21";
     let case = load_external_dataset_cases(DatasetKind::PersonaMem)
@@ -1152,6 +1157,7 @@ async fn personamem_music_blend_case_recalls_expected_context() {
 }
 
 #[tokio::test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 async fn personamem_fulfilling_music_expression_case_recalls_reflective_context() {
     let case_id = "personamem:b3588797-acdf-40d3-bcc5-951f81896f95";
     let case = load_external_dataset_cases(DatasetKind::PersonaMem)
@@ -1206,6 +1212,7 @@ async fn personamem_fulfilling_music_expression_case_recalls_reflective_context(
 }
 
 #[tokio::test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 async fn personamem_weekend_getaway_case_recalls_creative_preference_context() {
     let case_id = "personamem:f546a74f-54de-40d0-9d88-8b0e30467d7b";
     let case = load_external_dataset_cases(DatasetKind::PersonaMem)
@@ -1260,6 +1267,7 @@ async fn personamem_weekend_getaway_case_recalls_creative_preference_context() {
 }
 
 #[tokio::test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 async fn personamem_podcasting_shift_case_recalls_previous_reason_context() {
     let case_id = "personamem:a40d5f67-8ec6-480b-a901-9709eecee9b9";
     let case = load_external_dataset_cases(DatasetKind::PersonaMem)
@@ -1314,6 +1322,7 @@ async fn personamem_podcasting_shift_case_recalls_previous_reason_context() {
 }
 
 #[tokio::test]
+#[ignore = "requires downloaded raw fixture files — run locally with `cargo test --test eval_external_retrieval -- --ignored`"]
 async fn prefeval_hotel_persona_case_recalls_expected_preference() {
     let case_id = "prefeval:travel_hotel_overall300_topk_history_persona:1";
     let case = load_external_dataset_cases(DatasetKind::PrefEval)
