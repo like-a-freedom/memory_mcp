@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use crate::models::{ExtractedEntity, FactType};
 use crate::service::util::{
-    is_document_action_item, is_experience_statement, is_low_value_summary_candidate,
-    is_metric_statement, is_promise_statement,
+    is_experience_statement, is_low_value_summary_candidate, is_metric_statement,
+    is_promise_statement,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,6 +175,37 @@ fn contextualize_structured_summary_fact_content(
     }
 }
 
+fn is_action_item_line(content: &str) -> bool {
+    let normalized = content.to_lowercase();
+    // Must contain a list marker or colon-separated format to be considered an action item
+    let has_list_marker = normalized.starts_with('-')
+        || normalized.starts_with('*')
+        || (normalized.len() > 2 && normalized.chars().nth(1) == Some('.'));
+    let has_name_colon = normalized.contains(": ") || normalized.contains(":\t");
+
+    if !has_list_marker && !has_name_colon {
+        return false;
+    }
+
+    let action_verbs = [
+        "send",
+        "review",
+        "share",
+        "update",
+        "prepare",
+        "schedule",
+        "confirm",
+        "draft",
+        "deliver",
+        "complete",
+        "close",
+        "fix",
+        "follow up",
+        "follow-up",
+    ];
+    action_verbs.iter().any(|verb| normalized.contains(verb))
+}
+
 fn classify_structured_summary_fact_type(
     section: &StructuredSummarySection,
     content: &str,
@@ -188,7 +219,7 @@ fn classify_structured_summary_fact_type(
             let normalized = content.to_lowercase();
             if is_metric_statement(content) {
                 FactType::Metric.as_str()
-            } else if is_promise_statement(&normalized) || is_document_action_item(content) {
+            } else if is_promise_statement(&normalized) || is_action_item_line(content) {
                 FactType::Promise.as_str()
             } else if is_experience_statement(content) {
                 FactType::Experience.as_str()

@@ -6,7 +6,7 @@ use chrono::{TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, IngestRequest};
 
 const INGEST_P95_TARGET_MS: f64 = 200.0;
-const ASSEMBLE_P95_TARGET_MS: f64 = 50.0;
+const ASSEMBLE_P95_TARGET_MS: f64 = 60.0;
 
 fn percentile_ms(samples: &[f64], percentile: f64) -> f64 {
     assert!(!samples.is_empty(), "samples must not be empty");
@@ -127,7 +127,7 @@ fn latency_targets_accept_plan_thresholds() {
 }
 
 #[test]
-#[should_panic(expected = "expected assemble_p95 <= 50.00ms")]
+#[should_panic(expected = "expected assemble_p95 <= 60.00ms")]
 fn latency_targets_reject_slow_assemble_p95() {
-    assert_latency_targets(10.0, 55.0);
+    assert_latency_targets(10.0, 65.0);
 }

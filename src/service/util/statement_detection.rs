@@ -22,12 +22,12 @@ static EXPERIENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static ACTION_HEADER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?m)^\s*(action items?|next steps|follow-?ups?|todo)\s*:")
+    Regex::new(r"(?im)^\s*(action items?|next steps|follow-?ups?|todo)\s*:")
         .expect("action-item header regex is valid")
 });
 
 static ACTION_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?m)^\s*(?:[-*]|\d+\.)\s+[a-z]+(?:\s+[a-z]+){0,2}\s*(?::|-)\s*(?:send|review|share|update|prepare|schedule|confirm|draft|deliver|complete|close|fix|follow(?:\s+|-)?up)\b")
+    Regex::new(r"(?im)^\s*(?:[-*]|\d+\.)\s+(?:[a-z]+\s+[a-z]+\s*(?::|-)\s*)?(?:send|review|share|update|prepare|schedule|confirm|draft|deliver|complete|close|fix|follow(?:\s+|-)?up)\b")
         .expect("action-item line regex is valid")
 });
 
