@@ -652,7 +652,6 @@ mod tests {
                 edge("entity:carol", "entity:dana"),
             ],
             calls: calls.clone(),
-            ..Default::default()
         };
 
         let (edges, batches) =
@@ -694,7 +693,6 @@ mod tests {
                 edge("entity:dana", "entity:erin"),
             ],
             calls: calls.clone(),
-            ..Default::default()
         };
 
         let (edges, batches) =

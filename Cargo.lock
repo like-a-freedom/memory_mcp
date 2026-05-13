@@ -3137,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "memory_mcp"
-version = "1.1.6"
+version = "1.1.7"
 dependencies = [
  "anno",
  "async-trait",
