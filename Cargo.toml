@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 rmcp = { version = "1.6.0", features = ["macros", "transport-io"] }
-tokio = { version = "1.52.2", features = [
+tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
     "macros",
     "io-std"
