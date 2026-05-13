@@ -16,46 +16,76 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  checks:
-    name: Checks (fmt, clippy, tests)
+  fmt:
+    name: Rust fmt
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: Cache cargo registry
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo target directory
-        uses: actions/cache@v5
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-
 
       - name: Set up Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
         with:
           toolchain: stable
-          components: rustfmt,clippy
+          components: rustfmt
           cache: true
 
       - name: Run fmt check
         run: cargo fmt --all -- --check
 
+  clippy:
+    name: Rust clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
+        with:
+          toolchain: stable
+          components: clippy
+          cache: true
+
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
+        with:
+          toolchain: stable
+          cache: true
 
       - name: Run tests
-        run: cargo test --lib --bins --tests
+        run: cargo test --workspace --lib --bins --tests
+
+  coverage:
+    name: Coverage
+    if: github.event_name != 'pull_request'
+    needs: [fmt, clippy, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
+        with:
+          toolchain: stable
+          cache: true
 
       - name: Cache tarpaulin coverage
-        if: runner.os == 'Linux' && github.event_name != 'pull_request'
         uses: actions/cache@v5
         with:
           path: ~/.cache/tarpaulin
@@ -63,15 +93,12 @@ jobs:
           restore-keys: tarpaulin-coverage-
 
       - name: Install cargo-tarpaulin
-        if: runner.os == 'Linux' && github.event_name != 'pull_request'
         run: cargo install cargo-tarpaulin --version 0.34.1 --locked
 
       - name: Run coverage (tarpaulin)
-        if: runner.os == 'Linux' && github.event_name != 'pull_request'
         run: cargo tarpaulin --out Xml --ciserver github --run-types Tests --timeout 900
 
       - name: Upload coverage to Codecov
-        if: runner.os == 'Linux' && github.event_name != 'pull_request'
         uses: codecov/codecov-action@v5
         with:
           files: ./cobertura.xml
@@ -81,11 +108,11 @@ jobs:
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
-    needs: checks
+    needs: [fmt, clippy, test]
     runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 60
     permissions:
       contents: write
-      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -109,40 +136,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Cache cargo registry
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Set up Rust toolchain (with cache)
+      - name: Set up Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
         with:
           toolchain: stable
-          components: clippy
           cache: true
-          cache-workspaces: true
           target: ${{ matrix.platform.target }}
 
-      - name: Cache target directory
-        uses: actions/cache@v5
-        with:
-          path: target/${{ matrix.platform.target }}
-          key: ${{ runner.os }}-cargo-target-${{ matrix.platform.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-${{ matrix.platform.target }}-
-
-      - name: Build Linux release (if Linux)
-        if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
-        run: |
-          cargo build -p memory_mcp --release --target x86_64-unknown-linux-gnu
-          mkdir -p app/${{ matrix.platform.target }}
-          cp target/${{ matrix.platform.target }}/release/memory_mcp app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
-
       - name: Build binary
-        if: matrix.platform.target != 'x86_64-unknown-linux-gnu'
         run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }}
 
       - name: Prepare artifact (Unix)
@@ -185,8 +186,9 @@ jobs:
   build_docker_images:
     name: Build Docker images
     if: github.event_name == 'release'
-    needs: checks
+    needs: [fmt, clippy, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -216,5 +218,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            ghcr.io/${{ github.repository_owner }}/rusty-memory-mcp:latest
-            ghcr.io/${{ github.repository_owner }}/rusty-memory-mcp:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/memory_mcp:latest
+            ghcr.io/${{ github.repository_owner }}/memory_mcp:${{ github.ref_name }}
