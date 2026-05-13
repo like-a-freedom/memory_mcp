@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use super::types::GraphDirection;
 
-const ACTIVE_EDGE_SCAN_LIMIT: i32 = 10_000;
+const ACTIVE_EDGE_SCAN_BATCH_SIZE: i32 = 10_000;
 const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
 
 /// Bi-temporal visibility filter: selects records visible as of a given cutoff timestamp.
@@ -13,8 +13,13 @@ pub const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
      AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
      AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
 
+pub fn active_edge_scan_batch_size() -> i32 {
+    ACTIVE_EDGE_SCAN_BATCH_SIZE
+}
+
+/// Backward-compatible alias for the active edge scan batch size.
 pub fn active_edge_scan_limit() -> i32 {
-    ACTIVE_EDGE_SCAN_LIMIT
+    active_edge_scan_batch_size()
 }
 
 pub fn fact_embedding_dimension_placeholder() -> &'static str {
@@ -366,11 +371,19 @@ fn record_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
 }
 
 pub fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
+    build_select_edges_filtered_page_query(cutoff, active_edge_scan_batch_size() as usize, 0)
+}
+
+pub fn build_select_edges_filtered_page_query(
+    cutoff: &str,
+    limit: usize,
+    start: usize,
+) -> (String, Value) {
     (
         format!(
-            "SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT {ACTIVE_EDGE_SCAN_LIMIT}"
+            "SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT $limit START $start"
         ),
-        json!({ "cutoff": cutoff }),
+        json!({ "cutoff": cutoff, "limit": limit, "start": start }),
     )
 }
 
@@ -607,5 +620,16 @@ mod tests {
         let (sql, bind) = build_select_one_query("fact:52f9d92d20d829840f24294f");
         assert_eq!(sql, "SELECT * FROM fact:⟨52f9d92d20d829840f24294f⟩");
         assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_edges_filtered_page_query_uses_limit_and_start_bindings() {
+        let (sql, vars) = build_select_edges_filtered_page_query("2026-05-13T00:00:00Z", 250, 500);
+
+        assert!(sql.contains("LIMIT $limit START $start"));
+        assert!(sql.contains("ORDER BY in ASC, out ASC, t_valid DESC"));
+        assert_eq!(vars["cutoff"], json!("2026-05-13T00:00:00Z"));
+        assert_eq!(vars["limit"], json!(250));
+        assert_eq!(vars["start"], json!(500));
     }
 }

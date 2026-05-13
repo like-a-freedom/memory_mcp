@@ -23,6 +23,7 @@ mod types;
 pub use client::{DbClient, SurrealDbClient};
 pub use helpers::is_missing_index_error;
 pub use queries::{
-    BI_TEMPORAL_WHERE, active_edge_scan_limit, fact_embedding_dimension_placeholder,
+    BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
+    fact_embedding_dimension_placeholder,
 };
 pub use types::GraphDirection;

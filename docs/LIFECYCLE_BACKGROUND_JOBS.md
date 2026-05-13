@@ -9,8 +9,9 @@ The Memory MCP server includes optional background workers that maintain memory 
 
 1. **Confidence Decay Worker** - marks stale facts as invalid
 2. **Episode Archival Worker** - archives old episodes without active facts
+3. **Community Rebuild Worker** - refreshes `community` components from active graph edges
 
-Both workers are **disabled by default** and must be explicitly enabled via environment variables.
+These workers are **disabled by default** and must be explicitly enabled via environment variables.
 
 ## Implemented Features
 
@@ -34,6 +35,11 @@ The following lifecycle jobs are now fully implemented:
   - ~~Populate missing embeddings after a real provider is enabled~~
   - ~~Reindex vector fields after dimension or provider changes~~
   - **Status:** Superseded by `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — embeddings removed from runtime
+
+- **community recomputation**
+  - Rebuilds `community` records from the currently active edge graph
+  - Uses paginated active-edge scans in 10K batches to avoid truncating larger namespaces
+  - Reuses the lifecycle worker startup path and can also be triggered on-demand via the lifecycle app
 
 ## Heat-Aware Lifecycle (Adaptive Memory)
 
@@ -96,6 +102,7 @@ If any hot facts exist, the episode is preserved regardless of age.
 |-----------|--------|----------|
 | Decay worker | ✅ Implemented | `src/service/lifecycle/decay.rs` |
 | Archival worker | ✅ Implemented | `src/service/lifecycle/archival.rs` |
+| Community worker | ✅ Implemented | `src/service/lifecycle/communities.rs` |
 | Configuration | ✅ Implemented | `src/config.rs::LifecycleConfig` |
 | Service integration | ✅ Implemented | `src/service/core.rs::new_from_env()` |
 | Documentation | ✅ Implemented | `.env.example`, `README.md` |
@@ -181,16 +188,17 @@ Errors are logged with `op=lifecycle.*.error` and include the error message.
 
 - Workers run asynchronously and do not block request handling
 - Each pass scans entire tables (O(n) complexity)
+- Community recomputation already pages active-edge scans in 10K batches to bound per-query memory
 - For large deployments (>100k facts), consider:
   - Increasing intervals to reduce frequency
   - Adding database indexes on `t_valid`, `t_invalid`
-  - Implementing batched/paginated scans in future iterations
+  - Applying similar batched/paginated scans to other lifecycle passes in future iterations
 
 ## Future Enhancements
 
 Potential improvements for later iterations:
 
-- **Batched scanning** - process facts in chunks to reduce memory pressure
+- **Batched fact scanning** - process fact-based lifecycle passes in chunks to reduce memory pressure
 - **Selective decay** - different decay rates per fact type (promises vs metrics)
 - **Archive storage tier** - move archived episodes to cold storage
 - **Reactivation workflow** - manual or automatic un-archival if new evidence appears

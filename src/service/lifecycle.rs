@@ -4,11 +4,8 @@
 //! - Episode archival: archives old episodes without active facts
 //! - Community recomputation: rebuilds community components from active edges
 //!
-//! ## Known limitations
-//!
-//! Community recomputation scans up to 10K active edges per namespace via
-//! `select_edges_filtered`. Larger graphs will be rebuilt from a truncated view,
-//! and the storage layer logs a warning when the limit is hit.
+//! Community recomputation pages active-edge scans in 10K batches per namespace,
+//! which avoids truncating larger graphs while still bounding per-query memory.
 
 mod archival;
 mod communities;

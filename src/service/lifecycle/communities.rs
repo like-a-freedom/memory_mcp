@@ -1,11 +1,12 @@
 //! Periodic community recomputation background worker.
 //!
 //! Rebuilds the `community` table from the currently active edge graph using a
-//! union-find pass over active edges.
+//! union-find pass over active edges gathered in paginated batches.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use chrono::Utc;
+use serde_json::Value;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
@@ -63,10 +64,6 @@ pub fn spawn_community_worker(
 }
 
 /// Rebuilds the community table from all currently active edges.
-///
-/// Important: `select_edges_filtered` applies a hard 10K edge limit. If a
-/// namespace exceeds that limit, community detection will be incomplete for
-/// that pass; the storage layer emits a warning when the cap is hit.
 pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize, MemoryError> {
     let cutoff = crate::service::normalize_dt(Utc::now());
     let updated_at = crate::service::normalize_dt(Utc::now());
@@ -97,10 +94,23 @@ async fn rebuild_namespace_communities(
     cutoff: &str,
     updated_at: &str,
 ) -> Result<usize, MemoryError> {
-    let edge_records = service
-        .db_client
-        .select_edges_filtered(namespace, cutoff)
-        .await?;
+    let batch_size = crate::storage::active_edge_scan_batch_size().max(1) as usize;
+    rebuild_namespace_communities_with_batch_size(
+        service, namespace, cutoff, updated_at, batch_size,
+    )
+    .await
+}
+
+async fn rebuild_namespace_communities_with_batch_size(
+    service: &MemoryService,
+    namespace: &str,
+    cutoff: &str,
+    updated_at: &str,
+    batch_size: usize,
+) -> Result<usize, MemoryError> {
+    let (edge_records, edge_scan_batches) =
+        collect_active_edge_records(service.db_client.as_ref(), namespace, cutoff, batch_size)
+            .await?;
     let rebuilt = build_communities_from_active_edges(service, namespace, &edge_records).await?;
     let active_ids = rebuilt
         .iter()
@@ -170,6 +180,8 @@ async fn rebuild_namespace_communities(
             json!({"namespace": namespace}),
             json!({
                 "edge_count": edge_records.len(),
+                "edge_scan_batches": edge_scan_batches,
+                "edge_scan_batch_size": batch_size,
                 "communities_rebuilt": rebuilt.len(),
                 "stale_deleted": stale_deleted,
             }),
@@ -183,37 +195,50 @@ async fn rebuild_namespace_communities(
     Ok(rebuilt.len())
 }
 
+async fn collect_active_edge_records<C>(
+    db_client: &C,
+    namespace: &str,
+    cutoff: &str,
+    batch_size: usize,
+) -> Result<(Vec<Value>, usize), MemoryError>
+where
+    C: crate::storage::DbClient + ?Sized,
+{
+    let batch_size = batch_size.max(1);
+    let mut edge_records = Vec::new();
+    let mut batch_count = 0;
+    let mut start = 0;
+
+    loop {
+        let batch = db_client
+            .select_edges_filtered_page(namespace, cutoff, start, batch_size)
+            .await?;
+        if batch.is_empty() {
+            break;
+        }
+
+        batch_count += 1;
+        let fetched = batch.len();
+        start += fetched;
+        edge_records.extend(batch);
+
+        if fetched < batch_size {
+            break;
+        }
+    }
+
+    Ok((edge_records, batch_count))
+}
+
 async fn build_communities_from_active_edges(
     service: &MemoryService,
     namespace: &str,
     edge_records: &[serde_json::Value],
 ) -> Result<Vec<RebuiltCommunity>, MemoryError> {
-    let mut union_find = UnionFind::default();
-    let mut entity_nodes = BTreeSet::new();
-
-    for (left, right) in edge_records.iter().filter_map(edge_endpoints_from_record) {
-        union_find.union(&left, &right);
-        if is_entity_id(&left) {
-            entity_nodes.insert(left);
-        }
-        if is_entity_id(&right) {
-            entity_nodes.insert(right);
-        }
-    }
-
-    let mut grouped_entities = BTreeMap::<String, BTreeSet<String>>::new();
-    for entity_id in entity_nodes {
-        let root = union_find.find(&entity_id);
-        grouped_entities.entry(root).or_default().insert(entity_id);
-    }
+    let grouped_entities = group_entity_components_from_active_edges(edge_records);
 
     let mut rebuilt = Vec::new();
-    for members in grouped_entities.into_values() {
-        if members.len() < 2 {
-            continue;
-        }
-
-        let member_entities = members.into_iter().collect::<Vec<_>>();
+    for member_entities in grouped_entities {
         let summary =
             super::super::episode::build_community_summary(service, namespace, &member_entities)
                 .await?;
@@ -228,6 +253,39 @@ async fn build_communities_from_active_edges(
 
     rebuilt.sort_by(|left, right| left.community_id.cmp(&right.community_id));
     Ok(rebuilt)
+}
+
+fn group_entity_components_from_active_edges(
+    edge_records: &[serde_json::Value],
+) -> Vec<Vec<String>> {
+    let mut union_find = UnionFind::default();
+    let mut entity_nodes = BTreeSet::<String>::new();
+
+    for record in edge_records {
+        let Some((left, right)) = edge_endpoints_from_record(record) else {
+            continue;
+        };
+
+        union_find.union(&left, &right);
+        if is_entity_id(&left) {
+            entity_nodes.insert(left);
+        }
+        if is_entity_id(&right) {
+            entity_nodes.insert(right);
+        }
+    }
+
+    let mut grouped_entities = BTreeMap::<String, BTreeSet<String>>::new();
+    for entity_id in entity_nodes {
+        let root = union_find.find(entity_id.as_str());
+        grouped_entities.entry(root).or_default().insert(entity_id);
+    }
+
+    grouped_entities
+        .into_values()
+        .filter(|members| members.len() >= 2)
+        .map(|members| members.into_iter().collect::<Vec<_>>())
+        .collect()
 }
 
 fn edge_endpoints_from_record(record: &serde_json::Value) -> Option<(String, String)> {
@@ -248,8 +306,206 @@ fn is_entity_id(record_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
+
     use crate::service::episode;
+    use crate::storage::{DbClient, GraphDirection};
     use serde_json::json;
+
+    #[derive(Default)]
+    struct PagedEdgeDbClient {
+        edges: Vec<Value>,
+        calls: Arc<Mutex<Vec<(usize, usize)>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl DbClient for PagedEdgeDbClient {
+        async fn select_one(
+            &self,
+            _record_id: &str,
+            _namespace: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn select_table(
+            &self,
+            _table: &str,
+            _namespace: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_facts_filtered(
+            &self,
+            _namespace: &str,
+            _scope: &str,
+            _cutoff: &str,
+            _query_contains: Option<&str>,
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_facts_by_entity_links(
+            &self,
+            _namespace: &str,
+            _scope: &str,
+            _cutoff: &str,
+            _entity_links: &[String],
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_facts_ann(
+            &self,
+            _namespace: &str,
+            _scope: &str,
+            _cutoff: &str,
+            _query_vec: &[f64],
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_edges_filtered(
+            &self,
+            _namespace: &str,
+            _cutoff: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            panic!("batched community rebuild should use paged edge scans")
+        }
+
+        async fn select_edges_filtered_page(
+            &self,
+            _namespace: &str,
+            _cutoff: &str,
+            start: usize,
+            limit: usize,
+        ) -> Result<Vec<Value>, MemoryError> {
+            self.calls
+                .lock()
+                .expect("edge call log")
+                .push((start, limit));
+            Ok(self.edges.iter().skip(start).take(limit).cloned().collect())
+        }
+
+        async fn select_edge_neighbors(
+            &self,
+            _namespace: &str,
+            _node_id: &str,
+            _cutoff: &str,
+            _direction: GraphDirection,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_entity_lookup(
+            &self,
+            _namespace: &str,
+            _normalized_name: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn select_entities_batch(
+            &self,
+            _namespace: &str,
+            _names: &[String],
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_active_facts(
+            &self,
+            _namespace: &str,
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_episodes_for_archival(
+            &self,
+            _namespace: &str,
+            _cutoff: &str,
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_active_facts_by_episode(
+            &self,
+            _namespace: &str,
+            _episode_id: &str,
+            _cutoff: &str,
+            _limit: i32,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_communities_matching_summary(
+            &self,
+            _namespace: &str,
+            _query: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_communities_by_member_entities(
+            &self,
+            _namespace: &str,
+            _member_entities: &[String],
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn relate_edge(
+            &self,
+            _namespace: &str,
+            _edge_id: &str,
+            _from_id: &str,
+            _to_id: &str,
+            _content: Value,
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn create(
+            &self,
+            _record_id: &str,
+            content: Value,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            Ok(content)
+        }
+
+        async fn update(
+            &self,
+            _record_id: &str,
+            content: Value,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            Ok(content)
+        }
+
+        async fn query(
+            &self,
+            _sql: &str,
+            _vars: Option<Value>,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    fn edge(from_id: &str, to_id: &str) -> Value {
+        json!({"in": from_id, "out": to_id})
+    }
 
     // -----------------------------------------------------------------------
     // UnionFind tests (pure data structure, no DB needed)
@@ -384,6 +640,118 @@ mod tests {
         assert!(!is_entity_id("community:xyz"));
         assert!(!is_entity_id(""));
         assert!(!is_entity_id("entity")); // no colon
+    }
+
+    #[tokio::test]
+    async fn collect_active_edge_records_pages_until_partial_batch() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let db_client = PagedEdgeDbClient {
+            edges: vec![
+                edge("entity:alice", "entity:bob"),
+                edge("entity:bob", "entity:carol"),
+                edge("entity:carol", "entity:dana"),
+            ],
+            calls: calls.clone(),
+            ..Default::default()
+        };
+
+        let (edges, batches) =
+            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+                .await
+                .expect("paged edge scan should succeed");
+
+        assert_eq!(edges.len(), 3);
+        assert_eq!(batches, 2);
+        assert_eq!(*calls.lock().expect("edge call log"), vec![(0, 2), (2, 2)]);
+    }
+
+    #[tokio::test]
+    async fn collect_active_edge_records_returns_empty_when_first_page_is_empty() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let db_client = PagedEdgeDbClient {
+            calls: calls.clone(),
+            ..Default::default()
+        };
+
+        let (edges, batches) =
+            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+                .await
+                .expect("empty paged edge scan should succeed");
+
+        assert!(edges.is_empty());
+        assert_eq!(batches, 0);
+        assert_eq!(*calls.lock().expect("edge call log"), vec![(0, 2)]);
+    }
+
+    #[tokio::test]
+    async fn collect_active_edge_records_checks_trailing_empty_page_for_exact_multiple() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let db_client = PagedEdgeDbClient {
+            edges: vec![
+                edge("entity:alice", "entity:bob"),
+                edge("entity:bob", "entity:carol"),
+                edge("entity:carol", "entity:dana"),
+                edge("entity:dana", "entity:erin"),
+            ],
+            calls: calls.clone(),
+            ..Default::default()
+        };
+
+        let (edges, batches) =
+            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+                .await
+                .expect("exact-multiple paged edge scan should succeed");
+
+        assert_eq!(edges.len(), 4);
+        assert_eq!(batches, 2);
+        assert_eq!(
+            *calls.lock().expect("edge call log"),
+            vec![(0, 2), (2, 2), (4, 2)]
+        );
+    }
+
+    #[tokio::test]
+    async fn batched_edge_scan_can_build_entity_communities_across_context_nodes() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let db_client = PagedEdgeDbClient {
+            edges: vec![
+                edge("entity:alice", "episode:shared"),
+                edge("entity:bob", "episode:shared"),
+                edge("entity:bob", "fact:joint"),
+                edge("entity:carol", "fact:joint"),
+            ],
+            calls: calls.clone(),
+        };
+
+        let (edges, batches) =
+            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+                .await
+                .expect("paged edge scan should succeed");
+        let grouped = group_entity_components_from_active_edges(&edges);
+
+        assert_eq!(batches, 2);
+        assert_eq!(
+            *calls.lock().expect("edge call log"),
+            vec![(0, 2), (2, 2), (4, 2)]
+        );
+        assert_eq!(
+            grouped,
+            vec![vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:carol".to_string(),
+            ]]
+        );
+    }
+
+    #[test]
+    fn group_entity_components_from_active_edges_ignores_single_entity_components() {
+        let grouped = group_entity_components_from_active_edges(&[
+            edge("entity:solo", "episode:orphan"),
+            edge("fact:orphan", "episode:orphan"),
+        ]);
+
+        assert!(grouped.is_empty());
     }
 }
 
