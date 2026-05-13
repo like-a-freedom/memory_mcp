@@ -70,41 +70,6 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --lib --bins --tests
 
-  coverage:
-    name: Coverage
-    if: github.event_name != 'pull_request'
-    needs: [fmt, clippy, test]
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
-        with:
-          toolchain: stable
-          cache: true
-
-      - name: Cache tarpaulin coverage
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/tarpaulin
-          key: tarpaulin-coverage-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: tarpaulin-coverage-
-
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --version 0.34.1 --locked
-
-      - name: Run coverage (tarpaulin)
-        run: cargo tarpaulin --out Xml --ciserver github --run-types Tests --timeout 900
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./cobertura.xml
-          flags: coverage
-          verbose: true
-
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
@@ -183,40 +148,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build_docker_images:
-    name: Build Docker images
-    if: github.event_name == 'release'
-    needs: [fmt, clippy, test]
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.7.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.11.1
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6.18.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/memory_mcp:latest
-            ghcr.io/${{ github.repository_owner }}/memory_mcp:${{ github.ref_name }}
