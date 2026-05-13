@@ -1,6 +1,6 @@
 [package]
 name = "memory_mcp"
-version = "1.1.5"
+version = "1.1.6"
 edition = "2024"
 resolver = "3"
 license = "MIT"

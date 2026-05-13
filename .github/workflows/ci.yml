@@ -8,7 +8,7 @@ on:
       debug:
         description: Enable debug mode
         required: false
-        default: false
+        default: 'false'
   pull_request:
     branches: [main, master]
 
@@ -45,9 +45,6 @@ jobs:
           components: rustfmt,clippy
           cache: true
 
-      - name: Update pulp to compatible version
-        run: cargo update -p pulp@0.22.2 --precise 0.21.5
-
       - name: Run fmt check
         run: cargo fmt --all -- --check
 
@@ -80,8 +77,6 @@ jobs:
           files: ./cobertura.xml
           flags: coverage
           verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
@@ -98,19 +93,19 @@ jobs:
           - os_name: Linux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            bin: intervals_icu_mcp_linux_x86_64
+            bin: memory_mcp_linux_x86_64
           - os_name: macOS-x86_64
             os: macos-latest
             target: x86_64-apple-darwin
-            bin: intervals_icu_mcp_macos_x86_64
+            bin: memory_mcp_macos_x86_64
           - os_name: macOS-aarch64
             os: macos-latest
             target: aarch64-apple-darwin
-            bin: intervals_icu_mcp_macos_aarch64
+            bin: memory_mcp_macos_aarch64
           - os_name: Windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: intervals_icu_mcp_windows_x86_64.exe
+            bin: memory_mcp_windows_x86_64.exe
     steps:
       - uses: actions/checkout@v6
 
