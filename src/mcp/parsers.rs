@@ -134,11 +134,43 @@ fn reject_legacy_context_item_aliases(map: &serde_json::Map<String, Value>) -> R
 /// Parse an ISO 8601 datetime string into `DateTime<Utc>`.
 ///
 /// Returns `None` if the input is not a valid ISO 8601 datetime.
+///
+/// Accepts RFC 3339 timestamps, including the common ISO 8601 variant
+/// where seconds are omitted (e.g. `2026-05-11T17:34Z`).
 #[must_use]
 pub fn parse_datetime(value: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value)
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok()
+    if let Ok(dt) = DateTime::parse_from_rfc3339(value) {
+        return Some(dt.with_timezone(&Utc));
+    }
+
+    // Retry with seconds inserted when they're omitted after minutes.
+    // ISO 8601 allows "HH:MM" instead of "HH:MM:SS"; RFC 3339 doesn't.
+    // Transform "T17:34Z" -> "T17:34:00Z" and "T17:34+05:00" -> "T17:34:00+05:00"
+    if let Some(patched) = try_insert_seconds(value)
+        && let Ok(dt) = DateTime::parse_from_rfc3339(&patched)
+    {
+        return Some(dt.with_timezone(&Utc));
+    }
+
+    None
+}
+
+fn try_insert_seconds(value: &str) -> Option<String> {
+    // Locate the 'T' separator between date and time.
+    let t_pos = value.find('T')?;
+    // Find timezone marker (Z, +, -) that appears after the 'T'.
+    let tz_pos = value[t_pos + 1..]
+        .find(['Z', '+', '-'])
+        .map(|p| t_pos + 1 + p)?;
+    // Length of the time portion between T and the timezone marker.
+    let time_len = tz_pos - t_pos - 1;
+    // If it's just "HH:MM" (5 chars), seconds are missing.
+    if time_len == 5 {
+        let (pre, post) = value.split_at(tz_pos);
+        Some(format!("{pre}:00{post}"))
+    } else {
+        None
+    }
 }
 
 /// Normalize an optional string, returning `None` for empty or "null" values.
@@ -275,6 +307,21 @@ mod tests {
     fn parse_datetime_parses_with_timezone() {
         let result = parse_datetime("2024-01-15T10:30:00+05:00");
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_datetime_parses_without_seconds_zulu() {
+        assert!(parse_datetime("2026-05-11T17:34Z").is_some());
+    }
+
+    #[test]
+    fn parse_datetime_parses_without_seconds_offset() {
+        assert!(parse_datetime("2026-05-11T17:34+05:00").is_some());
+    }
+
+    #[test]
+    fn parse_datetime_returns_none_for_garbage() {
+        assert!(parse_datetime("not-a-date").is_none());
     }
 
     #[test]

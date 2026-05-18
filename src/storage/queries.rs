@@ -40,9 +40,19 @@ pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
         } else {
             ("SELECT * FROM none WHERE false".to_string(), None)
         }
-    } else {
+    } else if is_valid_table_name(record_id) {
         (format!("SELECT * FROM {record_id}"), None)
+    } else {
+        ("SELECT * FROM none WHERE false".to_string(), None)
     }
+}
+
+fn is_valid_table_name(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    s.chars()
+        .all(|c| c.is_ascii_lowercase() || c == '_')
 }
 
 /// Build SQL query for creating a record.
@@ -612,6 +622,20 @@ mod tests {
     fn build_select_one_query_plain_table() {
         let (sql, bind) = build_select_one_query("episode");
         assert_eq!(sql, "SELECT * FROM episode");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_bare_hex_returns_safe_noop() {
+        let (sql, bind) = build_select_one_query("474b2d8b81b3feabf832ef08");
+        assert_eq!(sql, "SELECT * FROM none WHERE false");
+        assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_one_query_bare_hex_with_letters_returns_safe_noop() {
+        let (sql, bind) = build_select_one_query("072d682d0d467aa94aad684d");
+        assert_eq!(sql, "SELECT * FROM none WHERE false");
         assert!(bind.is_none());
     }
 
