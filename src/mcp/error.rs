@@ -46,26 +46,26 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
                 "guidance": "Review the input arguments, fix any invalid values, and retry.",
                 "explanation": msg,
             });
-            ErrorData::new(ErrorCode::INVALID_PARAMS, err.to_string(), Some(data))
+            ErrorData::invalid_params(err.to_string(), Some(data))
         }
         MemoryError::NotFound(msg) => {
             let parsed = ParsedNotFound::from_msg(msg);
             let data = parsed.to_data();
-            ErrorData::new(ErrorCode::INVALID_PARAMS, parsed.clean_msg, Some(data))
+            ErrorData::invalid_params(parsed.clean_msg, Some(data))
         }
         MemoryError::ConfigMissing(msg) => {
             let data = json!({
                 "guidance": "The server is missing a required configuration value. Update the configuration and restart.",
                 "explanation": msg,
             });
-            ErrorData::new(ErrorCode::INVALID_REQUEST, err.to_string(), Some(data))
+            ErrorData::invalid_request(err.to_string(), Some(data))
         }
         MemoryError::ConfigInvalid(msg) => {
             let data = json!({
                 "guidance": "The server has an invalid configuration value. Fix it and restart.",
                 "explanation": msg,
             });
-            ErrorData::new(ErrorCode::INVALID_REQUEST, err.to_string(), Some(data))
+            ErrorData::invalid_request(err.to_string(), Some(data))
         }
         MemoryError::Storage(msg) => {
             let data = json!({
@@ -73,7 +73,7 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
                 "explanation": msg,
                 "retryable": true,
             });
-            ErrorData::new(ErrorCode::INTERNAL_ERROR, err.to_string(), Some(data))
+            ErrorData::internal_error(err.to_string(), Some(data))
         }
         MemoryError::Transient(msg) => {
             let data = json!({
@@ -81,7 +81,7 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
                 "explanation": msg,
                 "retryable": true,
             });
-            ErrorData::new(ErrorCode::INTERNAL_ERROR, err.to_string(), Some(data))
+            ErrorData::internal_error(err.to_string(), Some(data))
         }
     }
 }
@@ -105,30 +105,57 @@ impl ParsedNotFound {
     /// Parse a raw `MemoryError::NotFound` inner message into its components.
     ///
     /// Expected input patterns (produced by the service layer):
-    /// - `"episode_id not found: <id>"`
-    /// - `"fact_id not found: <id>"`
-    /// - `"entity not found: <name>"`
-    /// - `"entity not found for name: <name>"`
+    /// - `"episode_id not found"`  /  `"episode_id not found: <id>"`
+    /// - `"fact_id not found"`  /  `"fact_id not found: <id>"`
+    /// - `"fact_id not found for background embedding: <id>"`
+    /// - `"entity not found"`  /  `"entity not found: <name>"`
+    ///   /  `"entity not found for name: <name>"`
     /// - anything else → generic fallback.
+    ///
+    /// Longer (more specific) prefixes are listed first so they win over
+    /// shorter ones in the same resource type group.
     fn from_msg(msg: &str) -> Self {
-        // Each entry: (canonical resource_type, [prefix1, prefix2, …])
-        //
-        // The first matching prefix wins; the rest of the string after the
-        // prefix becomes the missing identifier.
+        // (canonical resource_type, [prefixes ordered longest-first])
         const PREFIXES: &[(&str, &[&str])] = &[
-            ("episode", &["episode_id not found: "]),
-            ("fact", &["fact_id not found: "]),
-            ("entity", &["entity not found: ", "entity not found for name: "]),
+            (
+                "episode",
+                &[
+                    "episode_id not found: ",  // "episode_id not found: 123"
+                    "episode_id not found",     // "episode_id not found" (exact)
+                ],
+            ),
+            (
+                "fact",
+                &[
+                    "fact_id not found for background embedding: ", // "fact_id not found for background embedding: 123"
+                    "fact_id not found: ",                          // "fact_id not found: 123"
+                    "fact_id not found",                             // "fact_id not found" (exact)
+                ],
+            ),
+            (
+                "entity",
+                &[
+                    "entity not found for name: ", // "entity not found for name: John"
+                    "entity not found: ",           // "entity not found: Acme"
+                    "entity not found",              // "entity not found" (exact)
+                ],
+            ),
         ];
 
         for &(resource_type, prefixes) in PREFIXES {
             for prefix in prefixes {
-                if let Some(id) = msg.strip_prefix(prefix) {
-                    let clean_msg = format!("{} not found: {id}", title(resource_type));
+                if let Some(rest) = msg.strip_prefix(prefix) {
+                    if rest.is_empty() {
+                        return Self {
+                            resource_type,
+                            missing_id: None,
+                            clean_msg: format!("{} not found", title(resource_type)),
+                        };
+                    }
                     return Self {
                         resource_type,
-                        missing_id: Some(id.to_string()),
-                        clean_msg,
+                        missing_id: Some(rest.to_string()),
+                        clean_msg: format!("{} not found: {rest}", title(resource_type)),
                     };
                 }
             }
@@ -373,6 +400,31 @@ mod tests {
         let p = ParsedNotFound::from_msg("entity not found for name: Jane");
         assert_eq!(p.resource_type, "entity");
         assert_eq!(p.missing_id.as_deref(), Some("Jane"));
+    }
+
+    #[test]
+    fn parsed_not_found_episode_without_id() {
+        let p = ParsedNotFound::from_msg("episode_id not found");
+        assert_eq!(p.resource_type, "episode");
+        assert_eq!(p.missing_id, None);
+        assert_eq!(p.clean_msg, "Episode not found");
+    }
+
+    #[test]
+    fn parsed_not_found_fact_without_id() {
+        let p = ParsedNotFound::from_msg("fact_id not found");
+        assert_eq!(p.resource_type, "fact");
+        assert_eq!(p.missing_id, None);
+        assert_eq!(p.clean_msg, "Fact not found");
+    }
+
+    #[test]
+    fn parsed_not_found_fact_for_background_embedding() {
+        let p =
+            ParsedNotFound::from_msg("fact_id not found for background embedding: fact:abc");
+        assert_eq!(p.resource_type, "fact");
+        assert_eq!(p.missing_id.as_deref(), Some("fact:abc"));
+        assert_eq!(p.clean_msg, "Fact not found: fact:abc");
     }
 
     #[test]

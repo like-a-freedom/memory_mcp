@@ -314,7 +314,7 @@ impl MemoryMcp {
         let data = serde_json::json!({
             "guidance": "Review the input arguments, fix any issues, and retry.",
         });
-        ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, Some(data))
+        ErrorData::invalid_params(msg, Some(data))
     }
 
     fn missing_app_field(app: &str, field: &str) -> ErrorData {
@@ -328,7 +328,7 @@ impl MemoryMcp {
             "guidance": "Retry the request. If the problem persists, inspect server logs.",
             "retryable": true,
         });
-        ErrorData::new(rmcp::model::ErrorCode::INTERNAL_ERROR, msg, Some(data))
+        ErrorData::internal_error(msg, Some(data))
     }
 
     fn list_resources_result() -> ListResourcesResult {
