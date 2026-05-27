@@ -51,8 +51,7 @@ fn is_valid_table_name(s: &str) -> bool {
     if s.is_empty() {
         return false;
     }
-    s.chars()
-        .all(|c| c.is_ascii_lowercase() || c == '_')
+    s.chars().all(|c| c.is_ascii_lowercase() || c == '_')
 }
 
 /// Build SQL query for creating a record.

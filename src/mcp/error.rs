@@ -120,8 +120,8 @@ impl ParsedNotFound {
             (
                 "episode",
                 &[
-                    "episode_id not found: ",  // "episode_id not found: 123"
-                    "episode_id not found",     // "episode_id not found" (exact)
+                    "episode_id not found: ", // "episode_id not found: 123"
+                    "episode_id not found",   // "episode_id not found" (exact)
                 ],
             ),
             (
@@ -129,15 +129,15 @@ impl ParsedNotFound {
                 &[
                     "fact_id not found for background embedding: ", // "fact_id not found for background embedding: 123"
                     "fact_id not found: ",                          // "fact_id not found: 123"
-                    "fact_id not found",                             // "fact_id not found" (exact)
+                    "fact_id not found",                            // "fact_id not found" (exact)
                 ],
             ),
             (
                 "entity",
                 &[
                     "entity not found for name: ", // "entity not found for name: John"
-                    "entity not found: ",           // "entity not found: Acme"
-                    "entity not found",              // "entity not found" (exact)
+                    "entity not found: ",          // "entity not found: Acme"
+                    "entity not found",            // "entity not found" (exact)
                 ],
             ),
         ];
@@ -293,8 +293,7 @@ mod tests {
 
     #[test]
     fn cleans_not_found_entity_for_name() {
-        let err =
-            MemoryError::NotFound("entity not found for name: John".to_string());
+        let err = MemoryError::NotFound("entity not found for name: John".to_string());
         let mcp_err = mcp_error(err);
         assert_eq!(mcp_err.message, "Entity not found: John");
     }
@@ -313,9 +312,7 @@ mod tests {
         let err = MemoryError::Validation("bad input".to_string());
         let mcp_err = mcp_error(err);
         let data = mcp_err.data.expect("data should be Some");
-        assert!(
-            data.get("guidance").and_then(|v| v.as_str()).is_some(),
-        );
+        assert!(data.get("guidance").and_then(|v| v.as_str()).is_some(),);
     }
 
     #[test]
@@ -323,9 +320,7 @@ mod tests {
         let err = MemoryError::NotFound("episode_id not found: abc123".to_string());
         let mcp_err = mcp_error(err);
         let data = mcp_err.data.expect("data should be Some");
-        assert!(
-            data.get("explanation").and_then(|v| v.as_str()).is_some(),
-        );
+        assert!(data.get("explanation").and_then(|v| v.as_str()).is_some(),);
     }
 
     #[test]
@@ -420,8 +415,7 @@ mod tests {
 
     #[test]
     fn parsed_not_found_fact_for_background_embedding() {
-        let p =
-            ParsedNotFound::from_msg("fact_id not found for background embedding: fact:abc");
+        let p = ParsedNotFound::from_msg("fact_id not found for background embedding: fact:abc");
         assert_eq!(p.resource_type, "fact");
         assert_eq!(p.missing_id.as_deref(), Some("fact:abc"));
         assert_eq!(p.clean_msg, "Fact not found: fact:abc");
