@@ -28,7 +28,7 @@ use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
 use crate::storage::GraphDirection;
 use std::time::Instant;
 
-use super::error::mcp_error;
+use super::error::{mcp_error, tool_error};
 use super::params::*;
 use super::parsers::{content_hash, parse_context_items, parse_datetime};
 use super::resources::{
@@ -310,17 +310,25 @@ impl MemoryMcp {
     }
 
     fn invalid_params(message: impl Into<String>) -> ErrorData {
-        ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, message.into(), None)
+        let msg = message.into();
+        let data = serde_json::json!({
+            "guidance": "Review the input arguments, fix any issues, and retry.",
+        });
+        ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, Some(data))
     }
 
     fn missing_app_field(app: &str, field: &str) -> ErrorData {
-        Self::invalid_params(format!(
-            "`{field}` is required for {app}. Re-check the open_app/app_command contract and retry."
-        ))
+        let msg = format!("`{field}` is required for {app}");
+        Self::invalid_params(msg)
     }
 
     fn internal_error(message: impl Into<String>) -> ErrorData {
-        ErrorData::new(rmcp::model::ErrorCode::INTERNAL_ERROR, message.into(), None)
+        let msg = message.into();
+        let data = serde_json::json!({
+            "guidance": "Retry the request. If the problem persists, inspect server logs.",
+            "retryable": true,
+        });
+        ErrorData::new(rmcp::model::ErrorCode::INTERNAL_ERROR, msg, Some(data))
     }
 
     fn list_resources_result() -> ListResourcesResult {
@@ -1295,10 +1303,16 @@ impl MemoryMcp {
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
         let p = params.0;
         let t_ref = parse_datetime(&p.t_ref).ok_or_else(|| {
-            ErrorData::new(
+            tool_error(
                 rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid t_ref format".to_string(),
-                None,
+                "Invalid t_ref format",
+                "Provide a valid ISO 8601 timestamp with seconds, e.g. 2026-05-11T17:34:00Z or 2026-05-11T17:34:00+00:00.",
+                format!(
+                    "Could not parse `t_ref` as an ISO 8601 datetime: {}. \
+                     Accepted formats include 2026-05-11T17:34:00Z, 2026-05-11T17:34:00+05:00, \
+                     or 2026-05-11T17:34Z (seconds may be omitted).",
+                    p.t_ref
+                ),
             )
         })?;
         let t_ingested = p.t_ingested.as_ref().and_then(|s| parse_datetime(s));
@@ -1363,8 +1377,14 @@ impl MemoryMcp {
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
         let access = AccessContext::default();
-        let context_pack = parse_context_items(&params.0.context_items)
-            .map_err(|msg| ErrorData::new(rmcp::model::ErrorCode::INVALID_PARAMS, msg, None))?;
+        let context_pack = parse_context_items(&params.0.context_items).map_err(|msg| {
+            tool_error(
+                rmcp::model::ErrorCode::INVALID_PARAMS,
+                "Invalid context_items format",
+                "Provide a JSON array of objects with snake_case keys. Each object must have `content`, optionally `quote`, `source_episode`, and/or `source_type`.",
+                msg,
+            )
+        })?;
         let request = ExplainRequest { context_pack };
 
         let timer = Instant::now(); // explain
@@ -1495,10 +1515,15 @@ impl MemoryMcp {
         let p = params.0;
         let access = AccessContext::default();
         let t_invalid = parse_datetime(&p.t_invalid).ok_or_else(|| {
-            ErrorData::new(
+            tool_error(
                 rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid t_invalid format".to_string(),
-                None,
+                "Invalid t_invalid format",
+                "Provide a valid ISO 8601 timestamp indicating when the fact became invalid, e.g. 2026-05-11T17:34:00Z.",
+                format!(
+                    "Could not parse `t_invalid` as an ISO 8601 datetime: {}. \
+                     Accepted formats: 2026-05-11T17:34:00Z, 2026-05-11T17:34:00+05:00.",
+                    p.t_invalid
+                ),
             )
         })?;
         let request = InvalidateRequest {
