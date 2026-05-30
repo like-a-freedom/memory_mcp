@@ -321,3 +321,222 @@ pub(super) fn build_episode_rescue_log_result(
         "episode_rescue_used": episode_rescue_used,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- conversational_overlap_tokens -------------------------------------
+
+    #[test]
+    fn conversational_overlap_extracts_long_enough_tokens() {
+        let tokens = conversational_overlap_tokens("hi what would you suggest");
+        assert!(tokens.iter().any(|t| t == "what"));
+        assert!(tokens.iter().any(|t| t == "would"));
+        assert!(tokens.iter().any(|t| t == "suggest"));
+        assert!(tokens.iter().all(|t| t != "hi" && t != "you"));
+    }
+
+    #[test]
+    fn conversational_overlap_handles_punctuation() {
+        let tokens = conversational_overlap_tokens("what? should! we.");
+        assert!(tokens.iter().any(|t| t == "what"));
+        assert!(tokens.iter().any(|t| t == "should"));
+    }
+
+    #[test]
+    fn conversational_overlap_empty_for_short_text() {
+        assert!(conversational_overlap_tokens("hi").is_empty());
+    }
+
+    #[test]
+    fn conversational_overlap_lowercases_tokens() {
+        let tokens = conversational_overlap_tokens("WHAT Would");
+        assert!(tokens.iter().any(|t| t == "what"));
+        assert!(tokens.iter().any(|t| t == "would"));
+    }
+
+    // -- first_person_rescue_query_terms -----------------------------------
+
+    #[test]
+    fn rescue_terms_adds_missing_conversational_tokens() {
+        let terms = first_person_rescue_query_terms(
+            Some("what should I do about this"),
+            &["do".to_string(), "this".to_string()],
+        );
+        assert!(terms.iter().any(|t| t == "what"));
+        assert!(terms.iter().any(|t| t == "should"));
+        assert!(terms.iter().all(|t| t != "about"));
+    }
+
+    #[test]
+    fn rescue_terms_preserves_original_terms() {
+        let terms = first_person_rescue_query_terms(
+            Some("what should I do"),
+            &["do".to_string(), "this".to_string()],
+        );
+        assert!(terms.iter().any(|t| t == "do"));
+        assert!(terms.iter().any(|t| t == "this"));
+    }
+
+    #[test]
+    fn rescue_terms_no_op_for_non_first_person_query() {
+        let terms = first_person_rescue_query_terms(
+            Some("how many widgets did we sell"),
+            &["widgets".to_string(), "sell".to_string()],
+        );
+        assert_eq!(terms.len(), 2);
+        assert_eq!(terms, vec!["widgets".to_string(), "sell".to_string()]);
+    }
+
+    #[test]
+    fn rescue_terms_no_op_when_none_query() {
+        let terms = first_person_rescue_query_terms(None, &["hello".to_string()]);
+        assert_eq!(terms, vec!["hello".to_string()]);
+    }
+
+    #[test]
+    fn rescue_terms_deduplicates_added_terms() {
+        let terms = first_person_rescue_query_terms(
+            Some("what would you do"),
+            &["what".to_string(), "would".to_string()],
+        );
+        assert_eq!(terms.iter().filter(|t| t.as_str() == "what").count(), 1);
+    }
+
+    // -- first_person_episode_grounding_bonus ------------------------------
+
+    #[test]
+    fn episode_grounding_bonus_persona_profiles() {
+        assert_eq!(first_person_episode_grounding_bonus("Current user persona: friendly"), 15);
+        assert_eq!(first_person_episode_grounding_bonus("User profile: admin"), 15);
+        assert_eq!(first_person_episode_grounding_bonus("Current profile: dev"), 15);
+        assert_eq!(first_person_episode_grounding_bonus("Profile: tester"), 15);
+    }
+
+    #[test]
+    fn episode_grounding_bonus_user_prefix() {
+        assert_eq!(first_person_episode_grounding_bonus("User: hello"), 2);
+    }
+
+    #[test]
+    fn episode_grounding_bonus_assistant_penalty() {
+        assert_eq!(first_person_episode_grounding_bonus("Assistant: hello"), -2);
+    }
+
+    #[test]
+    fn episode_grounding_bonus_neutral() {
+        assert_eq!(first_person_episode_grounding_bonus("Hello world"), 0);
+        assert_eq!(first_person_episode_grounding_bonus(""), 0);
+    }
+
+    // -- first_person_fact_grounding_bonus ---------------------------------
+
+    #[test]
+    fn fact_grounding_bonus_user_prefix() {
+        assert_eq!(first_person_fact_grounding_bonus("User: hello"), 8);
+    }
+
+    #[test]
+    fn fact_grounding_bonus_profile_prefixes() {
+        assert_eq!(first_person_fact_grounding_bonus("Current user persona: admin"), 2);
+        assert_eq!(first_person_fact_grounding_bonus("User profile: tester"), 2);
+        assert_eq!(first_person_fact_grounding_bonus("Current profile: dev"), 2);
+        assert_eq!(first_person_fact_grounding_bonus("Profile: mod"), 2);
+    }
+
+    #[test]
+    fn fact_grounding_bonus_assistant_penalty() {
+        assert_eq!(first_person_fact_grounding_bonus("Assistant: hello"), -6);
+    }
+
+    #[test]
+    fn fact_grounding_bonus_neutral() {
+        assert_eq!(first_person_fact_grounding_bonus("Hello world"), 0);
+    }
+
+    // -- matched_first_person_rescue_terms_for_text ------------------------
+
+    #[test]
+    fn matched_rescue_terms_finds_query_terms_and_conversational_tokens() {
+        let terms = matched_first_person_rescue_terms_for_text(
+            "what would you suggest for this problem",
+            &["suggest".to_string(), "problem".to_string(), "missing".to_string()],
+        );
+        assert!(terms.contains("suggest"));
+        assert!(terms.contains("problem"));
+        assert!(!terms.contains("missing"));
+    }
+
+    #[test]
+    fn matched_rescue_terms_includes_conversational_tokens_from_content() {
+        let terms = matched_first_person_rescue_terms_for_text(
+            "I would recommend coffee",
+            &["recommend".to_string()],
+        );
+        assert!(terms.contains("recommend"));
+    }
+
+    #[test]
+    fn matched_rescue_terms_empty_when_no_match() {
+        let terms = matched_first_person_rescue_terms_for_text(
+            "hello world",
+            &["missing".to_string()],
+        );
+        assert!(terms.is_empty());
+    }
+
+    #[test]
+    fn matched_rescue_terms_empty_query() {
+        let terms = matched_first_person_rescue_terms_for_text("hello", &[]);
+        assert!(terms.is_empty());
+    }
+
+    // -- build_episode_rescue_log_result -----------------------------------
+
+    #[test]
+    fn rescue_log_result_builds_json() {
+        let result = build_episode_rescue_log_result(10, 3, true);
+        assert_eq!(result["episode_candidate_count"], 10);
+        assert_eq!(result["selected_fact_count"], 3);
+        assert_eq!(result["episode_rescue_used"], true);
+    }
+
+    #[test]
+    fn rescue_log_result_defaults() {
+        let result = build_episode_rescue_log_result(0, 0, false);
+        assert_eq!(result["episode_candidate_count"], 0);
+        assert_eq!(result["selected_fact_count"], 0);
+        assert_eq!(result["episode_rescue_used"], false);
+    }
+
+    // -- maybe_append_first_person_episode_item (scoring logic) ------------
+
+    #[test]
+    fn episode_grounding_bonus_leading_whitespace() {
+        assert_eq!(
+            first_person_episode_grounding_bonus("  User: hello"),
+            2,
+            "leading whitespace before 'User:' should still match",
+        );
+        assert_eq!(
+            first_person_episode_grounding_bonus("  Current user persona: admin"),
+            15,
+            "leading whitespace before persona should still match",
+        );
+    }
+
+    #[test]
+    fn fact_grounding_bonus_leading_whitespace() {
+        assert_eq!(
+            first_person_fact_grounding_bonus("\nUser: hello"),
+            8,
+            "leading newline before 'User:' should still match",
+        );
+        assert_eq!(
+            first_person_fact_grounding_bonus("\tAssistant: response"),
+            -6,
+            "leading tab before 'Assistant:' should still match",
+        );
+    }
+}

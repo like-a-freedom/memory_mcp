@@ -47,6 +47,141 @@ pub(crate) fn supplemental_experience_count(results: &[AssembledContextItem]) ->
         .count()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_item(retrieval_tier: Option<&str>, rationale: &str) -> AssembledContextItem {
+        AssembledContextItem {
+            fact_id: "f:1".into(),
+            content: "test content".into(),
+            quote: String::new(),
+            source_episode: "ep:1".into(),
+            confidence: 0.9,
+            relevance: None,
+            grounding: None,
+            semantic_available: None,
+            provenance: serde_json::Value::Null,
+            rationale: rationale.into(),
+            retrieval_tier: retrieval_tier.map(str::to_string),
+        }
+    }
+
+    // -- primary_retrieval_tier --------------------------------------------
+
+    #[test]
+    fn primary_tier_returns_first_non_empty_tier() {
+        let items = vec![
+            make_item(None, ""),
+            make_item(Some(""), ""),
+            make_item(Some("  "), ""),
+            make_item(Some("direct"), ""),
+            make_item(Some("graph"), ""),
+        ];
+        assert_eq!(primary_retrieval_tier(&items), Some("direct"));
+    }
+
+    #[test]
+    fn primary_tier_none_for_all_empty() {
+        let items = vec![
+            make_item(None, ""),
+            make_item(Some(""), ""),
+        ];
+        assert_eq!(primary_retrieval_tier(&items), None);
+    }
+
+    #[test]
+    fn primary_tier_none_for_empty_slice() {
+        assert_eq!(primary_retrieval_tier(&[]), None);
+    }
+
+    #[test]
+    fn primary_tier_trims_whitespace() {
+        let items = vec![
+            make_item(Some("  direct  "), ""),
+        ];
+        assert_eq!(primary_retrieval_tier(&items), Some("direct"));
+    }
+
+    // -- summarize_retrieval_tiers -----------------------------------------
+
+    #[test]
+    fn summarize_tiers_counts_correctly() {
+        let items = vec![
+            make_item(Some("direct"), ""),
+            make_item(Some("direct"), ""),
+            make_item(Some("graph"), ""),
+        ];
+        let summary = summarize_retrieval_tiers(&items);
+        let map = summary.as_object().expect("should be object");
+        assert_eq!(map["direct"], 2);
+        assert_eq!(map["graph"], 1);
+    }
+
+    #[test]
+    fn summarize_tiers_empty_for_no_results() {
+        let summary = summarize_retrieval_tiers(&[]);
+        assert!(summary.as_object().map_or(true, |m| m.is_empty()));
+    }
+
+    #[test]
+    fn summarize_tiers_skips_empty_and_none_tiers() {
+        let items = vec![
+            make_item(None, ""),
+            make_item(Some(""), ""),
+            make_item(Some("direct"), ""),
+        ];
+        let summary = summarize_retrieval_tiers(&items);
+        let map = summary.as_object().expect("should be object");
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["direct"], 1);
+    }
+
+    #[test]
+    fn summarize_tiers_trims_whitespace_in_tier_name() {
+        let items = vec![
+            make_item(Some("  direct  "), ""),
+            make_item(Some("direct"), ""),
+        ];
+        let summary = summarize_retrieval_tiers(&items);
+        assert_eq!(summary["direct"], 2);
+    }
+
+    // -- supplemental_experience_count -------------------------------------
+
+    #[test]
+    fn experience_count_finds_supplemental_rationales() {
+        let items = vec![
+            make_item(Some("direct"), "supplemental experience recent_t_ingested=2026-01-01"),
+            make_item(Some("graph"), "supplemental experience recent_t_ingested=2026-01-02"),
+            make_item(Some("graph"), "regular rationale"),
+        ];
+        assert_eq!(supplemental_experience_count(&items), 2);
+    }
+
+    #[test]
+    fn experience_count_zero_when_none() {
+        let items = vec![
+            make_item(Some("direct"), "regular rationale"),
+        ];
+        assert_eq!(supplemental_experience_count(&items), 0);
+    }
+
+    #[test]
+    fn experience_count_zero_for_empty() {
+        assert_eq!(supplemental_experience_count(&[]), 0);
+    }
+
+    #[test]
+    fn experience_count_requires_exact_prefix() {
+        let items = vec![
+            make_item(Some("direct"), "Supplemental experience ..."),
+            make_item(Some("direct"), "supplemental fact recent..."),
+        ];
+        assert_eq!(supplemental_experience_count(&items), 0);
+    }
+}
+
 pub(crate) async fn record_query_log(
     service: &crate::service::MemoryService,
     request: &AssembleContextRequest,

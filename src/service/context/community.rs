@@ -299,3 +299,229 @@ pub(crate) fn stored_community_summary_from_value(value: &Value) -> Option<Store
         ft_score,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- stored_community_summary_from_value --------------------------------
+
+    #[test]
+    fn parses_full_value_with_plain_array() {
+        let value = serde_json::json!({
+            "community_id": "comm:42",
+            "summary": "Tech enthusiasts group",
+            "member_entities": ["e:1", "e:2"],
+            "ft_score": 3.5,
+        });
+        let result = stored_community_summary_from_value(&value).expect("should parse");
+        assert_eq!(result.community_id, "comm:42");
+        assert_eq!(result.summary, "Tech enthusiasts group");
+        assert_eq!(result.member_entities, vec!["e:1", "e:2"]);
+        assert!((result.ft_score - 3.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parses_with_id_fallback() {
+        let value = serde_json::json!({
+            "id": "comm:99",
+            "summary": "Gaming community",
+            "member_entities": ["e:3"],
+        });
+        let result = stored_community_summary_from_value(&value).expect("should use id fallback");
+        assert_eq!(result.community_id, "comm:99");
+    }
+
+    #[test]
+    fn parses_surrealdb_wrapped_array() {
+        let value = serde_json::json!({
+            "community_id": "comm:7",
+            "summary": "test",
+            "member_entities": {"Array": ["e:1", "e:2"]},
+        });
+        let result = stored_community_summary_from_value(&value).expect("should unwrap Array");
+        assert_eq!(result.member_entities, vec!["e:1", "e:2"]);
+    }
+
+    #[test]
+    fn returns_none_for_empty_summary() {
+        let value = serde_json::json!({
+            "community_id": "comm:1",
+            "summary": "",
+            "member_entities": ["e:1"],
+        });
+        assert!(stored_community_summary_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_empty_member_entities() {
+        let value = serde_json::json!({
+            "community_id": "comm:1",
+            "summary": "test",
+            "member_entities": [],
+        });
+        assert!(stored_community_summary_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_missing_community_id() {
+        let value = serde_json::json!({
+            "summary": "test",
+            "member_entities": ["e:1"],
+        });
+        assert!(stored_community_summary_from_value(&value).is_none());
+    }
+
+    #[test]
+    fn defaults_ft_score_to_zero() {
+        let value = serde_json::json!({
+            "community_id": "comm:1",
+            "summary": "test",
+            "member_entities": ["e:1"],
+        });
+        let result = stored_community_summary_from_value(&value).expect("should parse without ft_score");
+        assert!((result.ft_score - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn returns_none_for_non_object() {
+        assert!(stored_community_summary_from_value(&serde_json::json!("string")).is_none());
+        assert!(stored_community_summary_from_value(&serde_json::json!(42)).is_none());
+        assert!(stored_community_summary_from_value(&serde_json::json!(null)).is_none());
+    }
+
+    #[test]
+    fn handles_missing_member_entities_field() {
+        let value = serde_json::json!({
+            "community_id": "comm:1",
+            "summary": "test",
+        });
+        assert!(stored_community_summary_from_value(&value).is_none());
+    }
+
+    // -- unwrap_context_array ----------------------------------------------
+
+    #[test]
+    fn unwrap_passes_through_plain_array() {
+        let value = serde_json::json!(["a", "b"]);
+        assert_eq!(unwrap_context_array(&value).map(|v| v.len()), Some(2));
+    }
+
+    #[test]
+    fn unwrap_extracts_surrealdb_wrapped_array() {
+        let value = serde_json::json!({"Array": ["x", "y"]});
+        assert_eq!(unwrap_context_array(&value).map(|v| v.len()), Some(2));
+    }
+
+    #[test]
+    fn unwrap_returns_none_for_other() {
+        assert!(unwrap_context_array(&serde_json::json!("string")).is_none());
+        assert!(unwrap_context_array(&serde_json::json!(42)).is_none());
+    }
+
+    // -- edge_origin_factor ------------------------------------------------
+
+    #[test]
+    fn edge_origin_non_object_returns_one() {
+        assert!((edge_origin_factor(&serde_json::json!("string")) - 1.0).abs() < f64::EPSILON);
+        assert!((edge_origin_factor(&serde_json::json!(42)) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn edge_origin_extracted_returns_one() {
+        let edge = serde_json::json!({
+            "origin": "extracted",
+            "confidence": 0.3,
+        });
+        assert!((edge_origin_factor(&edge) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn edge_origin_inferred_uses_confidence() {
+        let edge = serde_json::json!({
+            "origin": "inferred",
+            "confidence": 0.7,
+        });
+        assert!((edge_origin_factor(&edge) - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn edge_origin_ambiguous_returns_half() {
+        let edge = serde_json::json!({
+            "origin": "ambiguous",
+        });
+        assert!((edge_origin_factor(&edge) - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn edge_origin_missing_returns_one() {
+        let edge = serde_json::json!({});
+        assert!((edge_origin_factor(&edge) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn edge_origin_confidence_clamped() {
+        let edge = serde_json::json!({
+            "origin": "inferred",
+            "confidence": 1.5,
+        });
+        assert!((edge_origin_factor(&edge) - 1.0).abs() < f64::EPSILON);
+
+        let edge = serde_json::json!({
+            "origin": "inferred",
+            "confidence": -0.5,
+        });
+        assert!((edge_origin_factor(&edge) - 0.0).abs() < f64::EPSILON);
+    }
+
+    // -- best_community_match ----------------------------------------------
+
+    #[test]
+    fn best_match_selects_lowest_rank() {
+        let fact = Fact {
+            entity_links: vec!["e:1".into(), "e:2".into()],
+            ..make_test_fact()
+        };
+        let mut matches = HashMap::new();
+        matches.insert("e:1".into(), CommunityMatch { rank: 5, community_id: "c:5".into(), summary: "bad".into() });
+        matches.insert("e:2".into(), CommunityMatch { rank: 1, community_id: "c:1".into(), summary: "good".into() });
+        let result = best_community_match(&fact, &matches).expect("should find match");
+        assert_eq!(result.community_id, "c:1");
+        assert_eq!(result.rank, 1);
+    }
+
+    #[test]
+    fn best_match_none_when_no_entity_matches() {
+        let fact = Fact {
+            entity_links: vec!["e:99".into()],
+            ..make_test_fact()
+        };
+        let matches = HashMap::new();
+        assert!(best_community_match(&fact, &matches).is_none());
+    }
+
+    fn make_test_fact() -> Fact {
+        Fact {
+            fact_id: "f:1".into(),
+            fact_type: "note".into(),
+            content: "test".into(),
+            quote: String::new(),
+            source_episode: "ep:1".into(),
+            t_valid: chrono::Utc::now(),
+            t_ingested: chrono::Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 0.9,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".into(),
+            policy_tags: vec![],
+            provenance: serde_json::Value::Null,
+            ft_score: 0.0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------

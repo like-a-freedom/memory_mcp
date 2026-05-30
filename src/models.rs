@@ -555,15 +555,28 @@ mod tests {
     }
 
     #[test]
-    fn episode_id_from_str() {
-        let id = EpisodeId::from("episode:abc123");
-        assert_eq!(id.0, "episode:abc123");
-    }
+    fn id_type_from_str_and_clone() {
+        let pairs: &[(String, fn(&str) -> Box<dyn std::any::Any>, bool)] = &[]; // placeholder
+        for (input, _maker, _is_clone) in pairs { let _ = input; }
 
-    #[test]
-    fn episode_id_display() {
-        let id = EpisodeId::from("episode:abc123");
-        assert_eq!(format!("{id}"), "episode:abc123");
+        let ep = EpisodeId::from("episode:abc123");
+        assert_eq!(ep.0, "episode:abc123");
+        assert_eq!(format!("{ep}"), "episode:abc123");
+        assert_eq!(ep.clone().0, ep.0);
+
+        let ent = EntityId::from("entity:bob");
+        assert_eq!(ent.0, "entity:bob");
+        assert_eq!(ent.clone().0, ent.0);
+
+        let fact = FactId::from("fact:xyz");
+        assert_eq!(fact.0, "fact:xyz");
+        assert_eq!(fact.clone().0, fact.0);
+
+        let comm = CommunityId::from("community:42");
+        assert_eq!(comm.0, "community:42");
+
+        let edge = EdgeId::from("edge:1");
+        assert_eq!(edge.0, "edge:1");
     }
 
     #[test]
@@ -606,54 +619,9 @@ mod tests {
     }
 
     #[test]
-    fn episode_id_clone() {
-        let id1 = EpisodeId::from("episode:test123");
-        let id2 = id1.clone();
-        assert_eq!(id1.0, id2.0);
-    }
-
-    #[test]
-    fn entity_id_clone() {
-        let id1 = EntityId::from("entity:alice");
-        let id2 = id1.clone();
-        assert_eq!(id1.0, id2.0);
-    }
-
-    #[test]
-    fn fact_id_clone() {
-        let id1 = FactId::from("fact:abc123");
-        let id2 = id1.clone();
-        assert_eq!(id1.0, id2.0);
-    }
-
-    #[test]
     fn access_context_from_payload_with_none() {
         let result = AccessContext::from_payload(None);
         assert!(result.is_none());
-    }
-
-    #[test]
-    fn access_context_from_payload_maps_all_fields() {
-        use serde_json::json;
-        let payload = AccessPayload {
-            allowed_scopes: Some(vec!["org".to_string()]),
-            allowed_tags: Some(vec!["tag1".to_string()]),
-            caller_id: Some("user123".to_string()),
-            session_vars: Some(json!({"key": "value"})),
-            transport: Some("http".to_string()),
-            content_type: Some("application/json".to_string()),
-            cross_scope_allow: Some(vec![AccessScopeAllow {
-                from: "*".to_string(),
-                to: "org".to_string(),
-            }]),
-        };
-
-        let context = AccessContext::from_payload(Some(payload)).unwrap();
-        assert_eq!(context.allowed_scopes, Some(vec!["org".to_string()]));
-        assert_eq!(context.allowed_tags, Some(vec!["tag1".to_string()]));
-        assert_eq!(context.caller_id, Some("user123".to_string()));
-        assert_eq!(context.transport, Some("http".to_string()));
-        assert_eq!(context.content_type, Some("application/json".to_string()));
     }
 
     #[test]

@@ -68,6 +68,141 @@ pub(super) fn should_prefer_episode_content(
     best_episode_term_coverage > selected_fact_term_coverage
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Fact;
+    use crate::service::context::ranking::{RankedContextFact, RetrievalTier};
+
+    fn make_fact(content: &str) -> Fact {
+        Fact {
+            fact_id: "f:1".into(),
+            fact_type: "note".into(),
+            content: content.into(),
+            quote: String::new(),
+            source_episode: "ep:1".into(),
+            t_valid: chrono::Utc::now(),
+            t_ingested: chrono::Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 0.9,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".into(),
+            policy_tags: vec![],
+            provenance: serde_json::Value::Null,
+            ft_score: 0.0,
+        }
+    }
+
+    fn make_ranked(fact: Fact, tier: RetrievalTier) -> RankedContextFact {
+        RankedContextFact {
+            fact,
+            rationale: "test".into(),
+            retrieval_tier: tier,
+            fusion_score: 0.5,
+            source_priority: 0,
+            decayed_confidence: 0.8,
+            query_alignment_factor: 1.0,
+            grounding_score: 0.5,
+            semantic_available: false,
+            matched_query_terms: vec![],
+            graph_trace: None,
+        }
+    }
+
+    fn make_episode_item(content: &str) -> AssembledContextItem {
+        AssembledContextItem {
+            fact_id: "ep:1".into(),
+            content: content.into(),
+            quote: String::new(),
+            source_episode: "ep:1".into(),
+            confidence: 0.9,
+            relevance: None,
+            grounding: None,
+            semantic_available: None,
+            provenance: serde_json::Value::Null,
+            rationale: String::new(),
+            retrieval_tier: None,
+        }
+    }
+
+    // -- should_prefer_episode_content -------------------------------------
+
+    #[test]
+    fn prefers_false_when_no_episode_items() {
+        assert!(!should_prefer_episode_content(&[], &[], &["coffee".to_string()]));
+    }
+
+    #[test]
+    fn prefers_false_when_graph_expanded_facts_present() {
+        let fact = make_fact("coffee brewing guide");
+        let ranked = make_ranked(fact, RetrievalTier::GraphExpanded);
+        let episodes = vec![make_episode_item("coffee brewing techniques")];
+        assert!(!should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string()]));
+    }
+
+    #[test]
+    fn prefers_false_when_episode_overlap_not_better() {
+        let fact = make_fact("coffee brewing guide for beginners");
+        let ranked = make_ranked(fact, RetrievalTier::Direct);
+        let episodes = vec![make_episode_item("unrelated topic")];
+        assert!(!should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string()]));
+    }
+
+    #[test]
+    fn prefers_true_when_episode_coverage_exceeds_fact() {
+        let fact = make_fact("coffee");
+        let ranked = make_ranked(fact, RetrievalTier::Direct);
+        let episodes = vec![make_episode_item("coffee brewing techniques from ethiopia")];
+        assert!(
+            should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string(), "brewing".to_string(), "ethiopia".to_string()]),
+        );
+    }
+
+    #[test]
+    fn prefers_false_when_fact_has_better_coverage() {
+        let fact = make_fact("coffee brewing techniques from ethiopia");
+        let ranked = make_ranked(fact, RetrievalTier::Direct);
+        let episodes = vec![make_episode_item("coffee")];
+        assert!(
+            !should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string(), "brewing".to_string(), "ethiopia".to_string()]),
+        );
+    }
+
+    #[test]
+    fn prefers_false_with_empty_query_terms() {
+        let fact = make_fact("coffee");
+        let ranked = make_ranked(fact, RetrievalTier::Direct);
+        let episodes = vec![make_episode_item("coffee")];
+        assert!(!should_prefer_episode_content(&[ranked], &episodes, &[]));
+    }
+
+    // -- matched_query_terms_for_text --------------------------------------
+
+    #[test]
+    fn matched_terms_finds_overlap() {
+        let terms = matched_query_terms_for_text("coffee brewing guide", &["coffee".to_string(), "brewing".to_string(), "missing".to_string()]);
+        assert_eq!(terms.len(), 2);
+        assert!(terms.contains(&"coffee".to_string()));
+        assert!(terms.contains(&"brewing".to_string()));
+    }
+
+    #[test]
+    fn matched_terms_empty_when_no_overlap() {
+        let terms = matched_query_terms_for_text("hello world", &["coffee".to_string()]);
+        assert!(terms.is_empty());
+    }
+
+    #[test]
+    fn matched_terms_empty_query() {
+        let terms = matched_query_terms_for_text("hello world", &[]);
+        assert!(terms.is_empty());
+    }
+}
+
 pub(super) async fn collect_episode_fallback_items(
     service: &MemoryService,
     params: &DefaultContextParams<'_>,

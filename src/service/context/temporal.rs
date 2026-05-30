@@ -645,10 +645,13 @@ mod tests {
 
     #[test]
     fn expand_temporal_synonyms_quarter_shorthand() {
-        for q in &["q1", "q2", "q3", "q4"] {
+        for (q, expected_month) in &[("q1", "january"), ("q2", "april"), ("q3", "july"), ("q4", "october")] {
             let result = expand_temporal_synonyms(&format!("{q} budget"), test_cutoff())
                 .unwrap_or_else(|| panic!("should expand {q}"));
-            assert!(!result.temporal_groups.is_empty());
+            assert!(
+                result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains(expected_month))),
+                "{q} should contain {expected_month}",
+            );
         }
     }
 
@@ -656,49 +659,71 @@ mod tests {
     fn expand_temporal_synonyms_last_quarter() {
         let result =
             expand_temporal_synonyms("last quarter revenue", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        // cutoff is 2026-04-12 (Q2), so last quarter = Q1 (january/march 2026)
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("january"))),
+            "last quarter should expand to Q1 terms",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_this_week() {
         let result =
             expand_temporal_synonyms("this week update", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04"))),
+            "this week should contain April 2026 dates",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_yesterday() {
         let result =
             expand_temporal_synonyms("yesterday meeting", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-11"))),
+            "yesterday from 2026-04-12 should be 2026-04-11",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_today() {
         let result =
             expand_temporal_synonyms("today agenda", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-12"))),
+            "today should be 2026-04-12",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_tomorrow() {
         let result =
             expand_temporal_synonyms("tomorrow plan", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-13"))),
+            "tomorrow from 2026-04-12 should be 2026-04-13",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_iso_date() {
         let result =
             expand_temporal_synonyms("2026-03-15 notes", test_cutoff()).expect("should expand");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-03"))),
+            "ISO date should expand to March 2026 terms",
+        );
     }
 
     #[test]
     fn expand_temporal_synonyms_quarter_n_form() {
         let result = expand_temporal_synonyms("quarter 2 goals", test_cutoff())
             .expect("should expand quarter N");
-        assert!(!result.temporal_groups.is_empty());
+        assert!(
+            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("april"))),
+            "quarter 2 should contain April terms",
+        );
     }
 
     #[test]
@@ -753,7 +778,11 @@ mod tests {
     fn infer_temporal_window_last_quarter() {
         let window = infer_temporal_window("last quarter", test_cutoff())
             .expect("should return previous quarter window");
-        assert!(window.start.date_naive().month() > 0);
+        // cutoff is 2026-04-12 (Q2), last quarter = Q1 2026 (Jan 1 — Mar 31)
+        assert_eq!(window.start.date_naive().month(), 1, "Q1 starts in January");
+        assert_eq!(window.start.date_naive().day(), 1, "Q1 starts on the 1st");
+        assert_eq!(window.end.date_naive().month(), 3, "Q1 ends in March");
+        assert_eq!(window.end.date_naive().day(), 31, "Q1 ends on the 31st");
     }
 
     #[test]
