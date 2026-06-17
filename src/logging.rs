@@ -256,7 +256,7 @@ fn value_to_string(value: &Value) -> String {
     };
 
     if s.len() > MAX_LEN {
-        format!("{}...", &s[..MAX_LEN - 3])
+        format!("{}...", &s[..s.floor_char_boundary(MAX_LEN - 3)])
     } else {
         s
     }
@@ -362,6 +362,17 @@ mod tests {
         } else {
             panic!("missing long=");
         }
+    }
+
+    #[test]
+    fn value_to_string_truncates_multibyte_utf8_without_panic() {
+        // 10 repetitions of a 31-char Cyrillic string = 310 bytes (each char is 2 bytes).
+        // Byte index 197 is guaranteed to land mid-character.
+        let long_cyrillic = "абвгдежзийклмнопрстуфхцчшщъыьэюя".repeat(10);
+        assert!(long_cyrillic.len() > 200);
+        let result = value_to_string(&json!(long_cyrillic));
+        assert!(result.ends_with("..."));
+        // Must not panic — the truncation uses floor_char_boundary
     }
 
     #[test]
