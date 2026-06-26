@@ -3,6 +3,7 @@
 //! Periodically marks facts with decayed confidence below threshold as invalid.
 
 use chrono::Utc;
+use chrono::Duration;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
@@ -104,12 +105,14 @@ pub async fn run_decay_pass(
                 .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
                 .map(|dt| dt.with_timezone(&Utc));
 
-            let days_since_valid = (now - t_valid).num_days() as f64;
+            let delta = now - t_valid;
+            let days_since_valid = delta.num_days() as f64;
             let decay_rate = (2.0_f64).ln() / half_life_days;
             let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
             let is_hot = access_count > 0
                 && last_accessed.is_some_and(|last_accessed| {
-                    (now - last_accessed).num_days() as f64 <= half_life_days
+                    let delta_access = now - last_accessed;
+                    delta_access.num_days() as f64 <= half_life_days
                 });
 
             if decayed < threshold && !is_hot {
