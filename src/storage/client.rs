@@ -520,7 +520,7 @@ impl SurrealDbClient {
 
     /// Applies database schema migrations.
     pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
-        let initial_schema = render_initial_schema_sql(
+        let initial_schema = render_sql_template(
             include_str!("../../migrations/__Initial.surql"),
             self.fact_embedding_dimension,
         );
@@ -570,7 +570,7 @@ impl SurrealDbClient {
         migration: &MigrationScript,
     ) -> Result<(), MemoryError> {
         let record_id = migration_record_id(migration.file_name);
-        let rendered_sql = render_migration_sql(migration.sql, self.fact_embedding_dimension);
+        let rendered_sql = render_sql_template(migration.sql, self.fact_embedding_dimension);
         let checksum = migration_checksum(&rendered_sql);
 
         if let Some(existing) = self.select_one(&record_id, namespace).await? {
@@ -934,14 +934,7 @@ async fn build_namespace_clients<T: surrealdb::Connection + Clone>(
     Ok(clients)
 }
 
-fn render_initial_schema_sql(template: &str, embedding_dimension: usize) -> String {
-    template.replace(
-        crate::storage::fact_embedding_dimension_placeholder(),
-        &embedding_dimension.to_string(),
-    )
-}
-
-fn render_migration_sql(template: &str, embedding_dimension: usize) -> String {
+fn render_sql_template(template: &str, embedding_dimension: usize) -> String {
     template.replace(
         crate::storage::fact_embedding_dimension_placeholder(),
         &embedding_dimension.to_string(),

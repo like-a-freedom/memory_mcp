@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde_json::{Value, json};
 
-use crate::models::AccessContext;
+use crate::models::AccessPayload;
 
 /// Resolves a namespace from a scope string.
 /// Returns `(namespace, fell_back)` where `fell_back` is true when the default
@@ -43,7 +43,7 @@ pub(crate) fn log_event(
     op: &str,
     args: Value,
     result: Value,
-    access: Option<&AccessContext>,
+    access: Option<&AccessPayload>,
     request_id: Option<&str>,
     duration_ms: Option<u64>,
 ) -> HashMap<String, Value> {
@@ -63,7 +63,7 @@ pub(crate) fn log_event(
     event
 }
 
-pub(crate) fn serialize_access(access: &AccessContext) -> Value {
+pub(crate) fn serialize_access(access: &AccessPayload) -> Value {
     json!({
         "caller_id": access.caller_id,
         "allowed_scopes": access.allowed_scopes,

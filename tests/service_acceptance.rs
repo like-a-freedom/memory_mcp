@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use memory_mcp::models::{AccessContext, EntityCandidate, IngestRequest, InvalidateRequest};
+use memory_mcp::models::{AccessPayload, EntityCandidate, IngestRequest, InvalidateRequest};
 use memory_mcp::storage::DbClient;
 
 mod common;
@@ -575,7 +575,7 @@ async fn test_rate_limit_determinism() {
         .await
         .expect("add_fact");
 
-    let access = AccessContext {
+    let access = AccessPayload {
         allowed_scopes: Some(vec!["org".to_string()]),
         allowed_tags: None,
         caller_id: Some("u1".to_string()),

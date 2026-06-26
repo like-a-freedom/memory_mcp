@@ -280,7 +280,7 @@ pub(crate) async fn maybe_record_query_log(
     results: &[AssembledContextItem],
     cache_hit: bool,
     latency_ms: f64,
-    access: &crate::models::AccessContext,
+    access: &crate::models::AccessPayload,
     diagnostics: &QueryLogDiagnostics<'_>,
 ) {
     if !service.is_query_logging_enabled() {

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 
 use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembledContextItem, Episode};
+use crate::models::{AccessPayload, AssembledContextItem, Episode};
 use crate::service::error::MemoryError;
 use crate::service::log_event;
 use crate::service::value_helpers::json_string;
@@ -209,7 +209,7 @@ pub(crate) async fn build_facets_view(
     cutoff: DateTime<Utc>,
     project: Option<&str>,
     budget: i32,
-    access: &AccessContext,
+    access: &AccessPayload,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .db_client
@@ -303,7 +303,7 @@ pub(crate) struct FactFilterParams<'a> {
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
-    pub(crate) access: &'a AccessContext,
+    pub(crate) access: &'a AccessPayload,
 }
 
 pub(crate) async fn build_wake_up_view(

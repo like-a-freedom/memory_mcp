@@ -31,7 +31,7 @@ pub(crate) struct CollectGraphFactsRequest<'a> {
     pub(crate) scope: &'a str,
     pub(crate) cutoff_iso: &'a str,
     pub(crate) raw_query: &'a str,
-    pub(crate) access: &'a crate::models::AccessContext,
+    pub(crate) access: &'a crate::models::AccessPayload,
     pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) direct_fact_ids: &'a HashSet<String>,
@@ -394,7 +394,7 @@ mod tests {
             .await
             .expect("seed fact");
 
-        let access = crate::models::AccessContext {
+        let access = crate::models::AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
             caller_id: None,

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
-use crate::models::{AccessContext, AssembledContextItem, Fact, FactType};
+use crate::models::{AccessPayload, AssembledContextItem, Fact, FactType};
 use crate::service::error::MemoryError;
 use crate::service::query::search_query_terms;
 use crate::service::query::{decayed_confidence, normalize_dt};
@@ -19,7 +19,7 @@ pub(crate) struct RecentExperienceRequest<'a> {
     pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) project: Option<&'a str>,
-    pub(crate) access: &'a AccessContext,
+    pub(crate) access: &'a AccessPayload,
     pub(crate) budget: i32,
     pub(crate) fact_types: &'a [String],
 }

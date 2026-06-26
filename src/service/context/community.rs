@@ -16,7 +16,7 @@ pub(crate) struct CollectCommunityFactsRequest<'a> {
     pub(crate) scope: &'a str,
     pub(crate) cutoff_iso: &'a str,
     pub(crate) query: &'a str,
-    pub(crate) access: &'a crate::models::AccessContext,
+    pub(crate) access: &'a crate::models::AccessPayload,
     pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) direct_fact_ids: &'a HashSet<String>,

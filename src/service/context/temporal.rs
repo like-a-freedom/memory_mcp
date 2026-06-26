@@ -460,7 +460,7 @@ pub(crate) struct CollectTemporalFactsRequest<'a> {
     pub(crate) cutoff_iso: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) query: &'a str,
-    pub(crate) access: &'a crate::models::AccessContext,
+    pub(crate) access: &'a crate::models::AccessPayload,
     pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) budget: i32,

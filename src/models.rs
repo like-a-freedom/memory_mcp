@@ -69,18 +69,6 @@ pub struct IngestRequest {
     pub policy_tags: Vec<String>,
 }
 
-/// Input for creating an episode.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct EpisodeInput {
-    pub source_type: String,
-    pub source_id: String,
-    pub content: String,
-    pub t_ref: DateTime<Utc>,
-    pub scope: String,
-    pub project: Option<String>,
-    pub uri: Option<String>,
-}
-
 /// Request to explain context items with source citations.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ExplainRequest {
@@ -351,8 +339,8 @@ pub struct AccessScopeAllow {
     pub to: String,
 }
 
-/// Access control payload for requests.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+/// Access control payload for requests, also used as the resolved access context.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct AccessPayload {
     pub allowed_scopes: Option<Vec<String>>,
     pub allowed_tags: Option<Vec<String>>,
@@ -363,40 +351,11 @@ pub struct AccessPayload {
     pub cross_scope_allow: Option<Vec<AccessScopeAllow>>,
 }
 
-/// Resolved access context derived from a payload.
-///
-/// Shares the same fields as `AccessPayload`; this type exists solely to carry
-/// the `is_scope_allowed` behaviour and a `Default` impl.
-#[derive(Debug, Clone, Default)]
-pub struct AccessContext {
-    pub allowed_scopes: Option<Vec<String>>,
-    pub allowed_tags: Option<Vec<String>>,
-    pub caller_id: Option<String>,
-    pub session_vars: Option<serde_json::Value>,
-    pub transport: Option<String>,
-    pub content_type: Option<String>,
-    pub cross_scope_allow: Option<Vec<AccessScopeAllow>>,
-}
-
-impl From<AccessPayload> for AccessContext {
-    fn from(p: AccessPayload) -> Self {
-        Self {
-            allowed_scopes: p.allowed_scopes,
-            allowed_tags: p.allowed_tags,
-            caller_id: p.caller_id,
-            session_vars: p.session_vars,
-            transport: p.transport,
-            content_type: p.content_type,
-            cross_scope_allow: p.cross_scope_allow,
-        }
-    }
-}
-
-impl AccessContext {
+impl AccessPayload {
     /// Creates an access context from an optional payload.
     #[must_use]
-    pub fn from_payload(payload: Option<AccessPayload>) -> Option<Self> {
-        payload.map(Self::from)
+    pub fn from_payload(payload: Option<Self>) -> Option<Self> {
+        payload
     }
 
     /// Checks if a scope is allowed.
@@ -532,7 +491,7 @@ mod tests {
             }]),
         };
 
-        let access = AccessContext::from_payload(Some(payload)).expect("access context");
+        let access = AccessPayload::from_payload(Some(payload)).expect("access context");
         assert_eq!(
             access.allowed_scopes,
             Some(vec!["org".to_string(), "personal".to_string()])
@@ -581,7 +540,7 @@ mod tests {
 
     #[test]
     fn access_context_is_scope_allowed_with_explicit_scope() {
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -596,7 +555,7 @@ mod tests {
 
     #[test]
     fn access_context_is_scope_allowed_with_cross_scope() {
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -614,19 +573,19 @@ mod tests {
 
     #[test]
     fn access_context_is_scope_allowed_when_none() {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         assert!(access.is_scope_allowed("any_scope"));
     }
 
     #[test]
     fn access_context_from_payload_with_none() {
-        let result = AccessContext::from_payload(None);
+        let result = AccessPayload::from_payload(None);
         assert!(result.is_none());
     }
 
     #[test]
     fn access_context_is_scope_allowed_with_allowed_list() {
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -642,7 +601,7 @@ mod tests {
 
     #[test]
     fn access_context_is_scope_allowed_with_wildcard_cross_scope() {
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["personal".to_string()]),
             allowed_tags: None,
             caller_id: None,

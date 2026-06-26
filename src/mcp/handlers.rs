@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{
-    AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
+    AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::service::value_helpers::{json_string, normalized_edge_record};
@@ -1012,7 +1012,7 @@ impl MemoryMcp {
     ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
         use super::parsers::normalize_optional_string;
 
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let episode_id = normalize_optional_string(episode_id);
         let content = normalize_optional_string(content);
         let text = normalize_optional_string(text);
@@ -1317,7 +1317,7 @@ impl MemoryMcp {
         })?;
         let t_ingested = p.t_ingested.as_ref().and_then(|s| parse_datetime(s));
 
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let request = IngestRequest {
             source_type: p.source_type.clone(),
             source_id: p.source_id.clone(),
@@ -1376,7 +1376,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let context_pack = parse_context_items(&params.0.context_items).map_err(|msg| {
             tool_error(
                 rmcp::model::ErrorCode::INVALID_PARAMS,
@@ -1459,7 +1459,7 @@ impl MemoryMcp {
         params: Parameters<ResolveParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
         let p = params.0;
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let candidate = EntityCandidate {
             entity_type: p.entity_type.clone(),
             canonical_name: p.canonical_name.clone(),
@@ -1513,7 +1513,7 @@ impl MemoryMcp {
         params: Parameters<InvalidateParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
         let p = params.0;
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let t_invalid = parse_datetime(&p.t_invalid).ok_or_else(|| {
             tool_error(
                 rmcp::model::ErrorCode::INVALID_PARAMS,

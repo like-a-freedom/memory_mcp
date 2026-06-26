@@ -7,7 +7,7 @@ use serde_json::json;
 use super::cache::{CacheKey, CacheView};
 use super::error::{MemoryError, error_messages};
 use crate::logging::LogLevel;
-use crate::models::{AccessContext, AssembleContextRequest, AssembledContextItem};
+use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 
 mod alias_expansion;
 mod budget;
@@ -37,7 +37,7 @@ use views::{build_facets_view, build_map_view, build_wake_up_view};
 async fn track_fact_accesses(
     service: &crate::service::MemoryService,
     items: &[AssembledContextItem],
-    access: &AccessContext,
+    access: &AccessPayload,
 ) {
     for item in items {
         if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
@@ -62,7 +62,7 @@ pub async fn assemble_context(
     request: AssembleContextRequest,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let started_at = Instant::now();
-    let access = AccessContext::from_payload(request.access.clone());
+    let access = AccessPayload::from_payload(request.access.clone());
 
     service.logger.log(
         super::log_event(
@@ -85,7 +85,7 @@ pub async fn assemble_context(
     }
 
     let cutoff = request.as_of.unwrap_or_else(super::query::now);
-    let access = access.unwrap_or_else(|| AccessContext {
+    let access = access.unwrap_or_else(|| AccessPayload {
         allowed_scopes: Some(vec![request.scope.clone()]),
         allowed_tags: None,
         caller_id: None,
@@ -95,7 +95,7 @@ pub async fn assemble_context(
         cross_scope_allow: None,
     });
 
-    if !service.is_scope_allowed(&request.scope, &access) {
+    if !access.is_scope_allowed(&request.scope) {
         return Ok(vec![]);
     }
 
@@ -3296,14 +3296,14 @@ mod tests {
 
     #[test]
     fn filter_facts_by_policy_returns_empty_for_empty_input() {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let result = filter_facts_by_policy(vec![], &access);
         assert!(result.is_empty());
     }
 
     #[test]
     fn filter_facts_by_policy_skips_invalid_records() {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         let records = vec![json!({"invalid": "data"})];
         let result = filter_facts_by_policy(records, &access);
         assert!(result.is_empty());
@@ -3317,7 +3317,7 @@ mod tests {
         let mut fact2 = create_test_fact("fact:2", Utc::now());
         fact2.policy_tags = vec!["blocked".to_string()];
 
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: None,
             allowed_tags: Some(vec!["allowed".to_string()]),
             caller_id: None,
@@ -3357,7 +3357,7 @@ mod tests {
 
     #[test]
     fn filter_facts_by_policy_allows_all_when_no_tags_specified() {
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: None,
             allowed_tags: None,
             caller_id: None,
@@ -3395,7 +3395,7 @@ mod tests {
 
     #[test]
     fn filter_facts_by_policy_handles_wrapped_objects() {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
 
         let records = vec![json!({
             "Object": {
@@ -3416,7 +3416,7 @@ mod tests {
 
     #[test]
     fn filter_facts_by_policy_handles_array_wrapped_objects() {
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
 
         let records = vec![json!({
             "Array": [

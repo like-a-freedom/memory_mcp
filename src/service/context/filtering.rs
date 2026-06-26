@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-use crate::models::{AccessContext, Episode, Fact};
+use crate::models::{AccessPayload, Episode, Fact};
 use crate::service::episode::{episode_from_record, fact_from_record};
 use crate::service::value_helpers::json_string;
 
@@ -39,7 +39,7 @@ pub(crate) fn raw_array(value: &Value) -> Option<&Vec<Value>> {
 
 pub(crate) fn filter_facts_by_constraints(
     records: Vec<Value>,
-    access: &AccessContext,
+    access: &AccessPayload,
     project: Option<&str>,
     fact_types: &[String],
 ) -> Vec<Fact> {
@@ -73,13 +73,13 @@ pub(crate) fn filter_facts_by_constraints(
 }
 
 #[allow(dead_code)]
-pub(crate) fn filter_facts_by_policy(records: Vec<Value>, access: &AccessContext) -> Vec<Fact> {
+pub(crate) fn filter_facts_by_policy(records: Vec<Value>, access: &AccessPayload) -> Vec<Fact> {
     filter_facts_by_constraints(records, access, None, &[])
 }
 
 pub(crate) fn fact_record_allowed(
     record: &Value,
-    access: &AccessContext,
+    access: &AccessPayload,
     project: Option<&str>,
     fact_types: &[String],
 ) -> bool {
@@ -88,7 +88,7 @@ pub(crate) fn fact_record_allowed(
         && fact_record_allowed_by_policy(record, access)
 }
 
-fn fact_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
+fn fact_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
     let Some(tags) = raw_object(record)
         .and_then(|map| map.get("policy_tags"))
         .and_then(raw_array)
@@ -114,7 +114,7 @@ fn fact_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool
 
 pub(crate) fn filter_episodes_by_constraints(
     records: Vec<Value>,
-    access: &AccessContext,
+    access: &AccessPayload,
     project: Option<&str>,
 ) -> Vec<Episode> {
     records
@@ -132,14 +132,14 @@ pub(crate) fn filter_episodes_by_constraints(
 
 pub(crate) fn episode_record_allowed(
     record: &Value,
-    access: &AccessContext,
+    access: &AccessPayload,
     project: Option<&str>,
 ) -> bool {
     episode_record_matches_project(record, project)
         && episode_record_allowed_by_policy(record, access)
 }
 
-fn episode_record_allowed_by_policy(record: &Value, access: &AccessContext) -> bool {
+fn episode_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
     let Some(tags) = raw_object(record)
         .and_then(|map| map.get("policy_tags"))
         .and_then(raw_array)
@@ -208,8 +208,8 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
 
-    fn make_access_context(allowed_tags: Option<Vec<String>>) -> AccessContext {
-        AccessContext {
+    fn make_access_context(allowed_tags: Option<Vec<String>>) -> AccessPayload {
+        AccessPayload {
             caller_id: None,
             allowed_scopes: None,
             allowed_tags,

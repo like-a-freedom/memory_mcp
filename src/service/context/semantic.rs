@@ -14,7 +14,7 @@ pub(crate) struct CollectSemanticFactsRequest<'a> {
     pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) query: &'a str,
-    pub(crate) access: &'a crate::models::AccessContext,
+    pub(crate) access: &'a crate::models::AccessPayload,
     pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) excluded_fact_ids: &'a std::collections::HashSet<String>,

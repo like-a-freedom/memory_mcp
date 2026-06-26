@@ -1,4 +1,4 @@
-use crate::models::AccessContext;
+use crate::models::AccessPayload;
 
 use super::query_mode::QueryFlags;
 
@@ -18,5 +18,5 @@ pub(super) struct DefaultContextParams<'a> {
     pub(super) window_end: Option<chrono::DateTime<chrono::Utc>>,
     pub(super) resolved_view_mode: Option<&'a str>,
     pub(super) query_flags: &'a QueryFlags,
-    pub(super) access: &'a AccessContext,
+    pub(super) access: &'a AccessPayload,
 }

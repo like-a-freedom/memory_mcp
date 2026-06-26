@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{
-    AccessContext, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
+    AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, GraphHubEntity, GraphInsights, IngestRequest, InvalidateRequest,
     ProvenanceSource,
 };
@@ -126,7 +126,7 @@ impl MemoryService {
     pub async fn ingest(
         &self,
         request: IngestRequest,
-        access: Option<AccessContext>,
+        access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let ingest_transport = super::ingest::detect_ingest_transport(&request.content);
@@ -259,7 +259,7 @@ impl MemoryService {
     pub async fn explain(
         &self,
         request: ExplainRequest,
-        access: Option<AccessContext>,
+        access: Option<AccessPayload>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
 
@@ -420,7 +420,7 @@ impl MemoryService {
     pub async fn extract(
         &self,
         episode_id: &str,
-        access: Option<AccessContext>,
+        access: Option<AccessPayload>,
         zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
@@ -458,7 +458,7 @@ impl MemoryService {
     pub async fn resolve(
         &self,
         candidate: EntityCandidate,
-        access: Option<AccessContext>,
+        access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         validate_entity_candidate(&candidate)?;
@@ -1190,7 +1190,7 @@ impl MemoryService {
     pub async fn invalidate(
         &self,
         request: InvalidateRequest,
-        access: Option<AccessContext>,
+        access: Option<AccessPayload>,
     ) -> Result<(), MemoryError> {
         self.enforce_rate_limit(access.as_ref())?;
         let (record, namespace) = self.find_fact_record(&request.fact_id).await?;
@@ -1515,22 +1515,9 @@ impl MemoryService {
         Ok(None)
     }
 
-    pub(crate) fn is_scope_allowed(&self, scope: &str, access: &AccessContext) -> bool {
-        if let Some(scopes) = &access.allowed_scopes
-            && !scopes.contains(&scope.to_string())
-        {
-            return access.cross_scope_allow.as_ref().is_some_and(|cross| {
-                cross
-                    .iter()
-                    .any(|pair| pair.from == "*" && pair.to == scope)
-            });
-        }
-        true
-    }
-
     pub(crate) fn enforce_rate_limit(
         &self,
-        access: Option<&AccessContext>,
+        access: Option<&AccessPayload>,
     ) -> Result<(), MemoryError> {
         if let Some(access) = access
             && let Some(caller) = &access.caller_id
@@ -1783,7 +1770,7 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::EntityCandidate;
-    use crate::models::{AccessContext, AccessScopeAllow};
+    use crate::models::{AccessPayload, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
     use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
     use crate::service::util::rate_limit::SafeMutex;
@@ -1817,7 +1804,7 @@ mod tests {
 
     #[test]
     fn log_event_includes_access_when_provided() {
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: Some("test-caller".to_string()),
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
@@ -1836,7 +1823,7 @@ mod tests {
 
     #[test]
     fn serialize_access_includes_all_fields() {
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: Some("caller".to_string()),
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: Some(vec!["tag1".to_string()]),
@@ -2613,14 +2600,14 @@ mod tests {
     #[test]
     fn is_scope_allowed_returns_true_when_no_restrictions() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext::default();
-        assert!(service.is_scope_allowed("org", &access));
+        let access = AccessPayload::default();
+        assert!(access.is_scope_allowed("org"));
     }
 
     #[test]
     fn is_scope_allowed_returns_true_for_allowed_scope() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -2629,13 +2616,13 @@ mod tests {
             content_type: None,
             cross_scope_allow: None,
         };
-        assert!(service.is_scope_allowed("org", &access));
+        assert!(access.is_scope_allowed("org"));
     }
 
     #[test]
     fn is_scope_allowed_returns_false_for_disallowed_scope() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["personal".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -2644,13 +2631,13 @@ mod tests {
             content_type: None,
             cross_scope_allow: None,
         };
-        assert!(!service.is_scope_allowed("org", &access));
+        assert!(!access.is_scope_allowed("org"));
     }
 
     #[test]
     fn is_scope_allowed_allows_with_cross_scope_wildcard() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["personal".to_string()]),
             allowed_tags: None,
             caller_id: None,
@@ -2662,20 +2649,20 @@ mod tests {
                 to: "org".to_string(),
             }]),
         };
-        assert!(service.is_scope_allowed("org", &access));
+        assert!(access.is_scope_allowed("org"));
     }
 
     #[test]
     fn enforce_rate_limit_allows_without_caller_id() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext::default();
+        let access = AccessPayload::default();
         assert!(service.enforce_rate_limit(Some(&access)).is_ok());
     }
 
     #[test]
     fn enforce_rate_limit_allows_within_limit() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: Some("user-1".to_string()),
             ..Default::default()
         };
@@ -3805,7 +3792,7 @@ mod tests {
 
     #[test]
     fn log_event_with_full_access_context() {
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: Some("test-user".to_string()),
             allowed_scopes: Some(vec!["personal".to_string(), "org".to_string()]),
             allowed_tags: Some(vec!["tag1".to_string()]),
@@ -3869,7 +3856,7 @@ mod tests {
 
     #[test]
     fn serialize_access_with_all_none_fields() {
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: None,
             allowed_scopes: None,
             allowed_tags: None,
@@ -3915,29 +3902,29 @@ mod tests {
     #[test]
     fn is_scope_allowed_with_empty_allowed_scopes() {
         let service = create_test_service(vec!["org"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec![]),
             ..Default::default()
         };
-        assert!(!service.is_scope_allowed("org", &access));
+        assert!(!access.is_scope_allowed("org"));
     }
 
     #[test]
     fn is_scope_allowed_with_multiple_allowed_scopes() {
         let service = create_test_service(vec!["org", "personal"]);
-        let access = AccessContext {
+        let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
             ..Default::default()
         };
-        assert!(service.is_scope_allowed("org", &access));
-        assert!(service.is_scope_allowed("personal", &access));
-        assert!(!service.is_scope_allowed("private", &access));
+        assert!(access.is_scope_allowed("org"));
+        assert!(access.is_scope_allowed("personal"));
+        assert!(!access.is_scope_allowed("private"));
     }
 
     #[test]
     fn enforce_rate_limit_with_burst_capacity() {
         let service = create_test_service_with_rate_limit(10, 5);
-        let access = AccessContext {
+        let access = AccessPayload {
             caller_id: Some("burst-test".to_string()),
             ..Default::default()
         };
@@ -3951,11 +3938,11 @@ mod tests {
     fn enforce_rate_limit_multiple_users_isolated() {
         let service = create_test_service_with_rate_limit(10, 1);
 
-        let user1 = AccessContext {
+        let user1 = AccessPayload {
             caller_id: Some("user-1".to_string()),
             ..Default::default()
         };
-        let user2 = AccessContext {
+        let user2 = AccessPayload {
             caller_id: Some("user-2".to_string()),
             ..Default::default()
         };
