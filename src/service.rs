@@ -37,18 +37,12 @@ pub(crate) mod value_helpers;
 
 pub use constants::*;
 mod constants {
-    /// Half-life in days for metric and promise fact confidence decay.
-    pub const METRIC_HALF_LIFE_DAYS: f64 = 365.0;
-
-    /// Half-life in days for general fact confidence decay.
-    pub const DEFAULT_HALF_LIFE_DAYS: f64 = 180.0;
-
-    /// Scaling factor for confidence rounding.
-    pub const CONFIDENCE_SCALE: f64 = 10000.0;
-
     /// Default context cache size.
     pub const CONTEXT_CACHE_SIZE: usize = 512;
 }
+
+/// Re-export fact decay constants for backwards compatibility.
+pub use crate::models::Fact;
 
 pub use cache::{CacheKey, invalidate_cache_by_scope};
 pub(crate) use episode::build_extract_log_result;

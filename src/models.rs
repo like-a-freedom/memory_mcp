@@ -214,6 +214,18 @@ pub struct AssembleContextRequest {
     pub access: Option<AccessPayload>,
 }
 
+/// Half-life and scaling constants for fact confidence decay.
+impl Fact {
+    /// Half-life in days for metric and promise fact confidence decay.
+    pub const METRIC_HALF_LIFE_DAYS: f64 = 365.0;
+
+    /// Half-life in days for general fact confidence decay.
+    pub const DEFAULT_HALF_LIFE_DAYS: f64 = 180.0;
+
+    /// Scaling factor for confidence rounding.
+    pub const CONFIDENCE_SCALE: f64 = 10000.0;
+}
+
 /// A compact extracted entity returned by the MCP `extract` tool.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedEntity {

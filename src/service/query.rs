@@ -1,6 +1,6 @@
 //! Query preprocessing and utility functions.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 mod search;
 mod time;
@@ -9,21 +9,23 @@ pub use search::{
     normalize_text, preprocess_search_query, query_hard_anchor_terms, query_term_rarity_weight,
     query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
+use crate::models::Fact;
+
 pub use time::{bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso};
 
 /// Calculate decayed confidence based on fact age.
-pub fn decayed_confidence(fact: &crate::models::Fact, now: DateTime<Utc>) -> f64 {
-    let half_life_days = if fact.fact_type == crate::models::FactType::Metric.as_str()
-        || fact.fact_type == crate::models::FactType::Promise.as_str()
-        || fact.fact_type == crate::models::FactType::Decision.as_str()
+pub fn decayed_confidence(fact: &Fact, now: DateTime<Utc>) -> f64 {
+    let half_life_days = if fact.fact_type == "metric"
+        || fact.fact_type == "promise"
+        || fact.fact_type == "decision"
     {
-        super::METRIC_HALF_LIFE_DAYS
+        Fact::METRIC_HALF_LIFE_DAYS
     } else {
-        super::DEFAULT_HALF_LIFE_DAYS
+        Fact::DEFAULT_HALF_LIFE_DAYS
     };
     let delta_days = (now - fact.t_valid).num_days().max(0) as f64;
     let decay = 0.5_f64.powf(delta_days / half_life_days);
-    (fact.confidence * decay * super::CONFIDENCE_SCALE).round() / super::CONFIDENCE_SCALE
+    (fact.confidence * decay * Fact::CONFIDENCE_SCALE).round() / Fact::CONFIDENCE_SCALE
 }
 
 #[cfg(test)]
