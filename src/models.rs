@@ -224,6 +224,28 @@ impl Fact {
 
     /// Scaling factor for confidence rounding.
     pub const CONFIDENCE_SCALE: f64 = 10000.0;
+
+    /// Returns true if the fact is active (not invalidated) as of the given timestamp.
+    #[must_use]
+    pub fn is_active(&self, as_of: DateTime<Utc>) -> bool {
+        self.t_invalid.map_or(true, |t| t > as_of)
+    }
+
+    /// Calculates confidence decayed by half-life based on fact age.
+    #[must_use]
+    pub fn decayed_confidence(&self, now: DateTime<Utc>) -> f64 {
+        let half_life_days = if self.fact_type == FactType::Metric.as_str()
+            || self.fact_type == FactType::Promise.as_str()
+            || self.fact_type == FactType::Decision.as_str()
+        {
+            Self::METRIC_HALF_LIFE_DAYS
+        } else {
+            Self::DEFAULT_HALF_LIFE_DAYS
+        };
+        let delta_days = (now - self.t_valid).num_days().max(0) as f64;
+        let decay = 0.5_f64.powf(delta_days / half_life_days);
+        (self.confidence * decay * Self::CONFIDENCE_SCALE).round() / Self::CONFIDENCE_SCALE
+    }
 }
 
 /// A compact extracted entity returned by the MCP `extract` tool.
@@ -400,6 +422,16 @@ pub struct Episode {
     pub policy_tags: Vec<String>,
 }
 
+impl Episode {
+    /// Returns true if another episode represents the same source material.
+    #[must_use]
+    pub fn is_duplicate_of(&self, other: &Episode) -> bool {
+        self.source_type == other.source_type
+            && self.source_id == other.source_id
+            && self.scope == other.scope
+    }
+}
+
 /// An entity represents a canonical named thing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Entity {
@@ -407,6 +439,15 @@ pub struct Entity {
     pub entity_type: String,
     pub canonical_name: String,
     pub aliases: Vec<String>,
+}
+
+impl Entity {
+    /// Checks if this entity matches a given name or alias (case-insensitive).
+    #[must_use]
+    pub fn matches_name(&self, name: &str) -> bool {
+        self.canonical_name.to_lowercase() == name.to_lowercase()
+            || self.aliases.iter().any(|a| a.to_lowercase() == name.to_lowercase())
+    }
 }
 
 /// A fact represents a piece of knowledge extracted from an episode.
