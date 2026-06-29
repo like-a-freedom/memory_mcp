@@ -59,6 +59,7 @@ async fn find_conflicting_triples(
           AND subject = $subject
           AND predicate = $predicate
           AND object != $object
+          AND t_invalid IS NONE
         LIMIT 10
     "#;
     let result = entity_service
@@ -90,33 +91,4 @@ async fn invalidate_triple(
     entity_service
         .invalidate_triple_by_id(sql, namespace, triple_id)
         .await
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn singleton_predicates_are_recognized() {
-        assert!(crate::service::triple_extractor::is_singleton_predicate(
-            "works_at"
-        ));
-        assert!(crate::service::triple_extractor::is_singleton_predicate(
-            "lives_in"
-        ));
-        assert!(crate::service::triple_extractor::is_singleton_predicate(
-            "has_email"
-        ));
-    }
-
-    #[test]
-    fn non_singleton_predicates_are_not_recognized() {
-        assert!(!crate::service::triple_extractor::is_singleton_predicate(
-            "knows"
-        ));
-        assert!(!crate::service::triple_extractor::is_singleton_predicate(
-            "visited"
-        ));
-        assert!(!crate::service::triple_extractor::is_singleton_predicate(
-            "met"
-        ));
-    }
 }

@@ -262,51 +262,53 @@ impl MemoryService {
 
             if let Some(fact_id) = &resolved_item.item.fact_id
                 && let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await
-                    && let Some(record) = &fact_record {
-                        let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
-                        let fact_prov = crate::models::Provenance::from_json_value(&prov_value);
-                        if let Some(map) = explain_provenance.as_object_mut() {
-                            if !fact_prov.ingestion_method.is_empty() {
-                                map.insert(
-                                    "ingestion_method".to_string(),
-                                    json!(fact_prov.ingestion_method),
-                                );
-                            }
-                            if let Some(strategy) = &fact_prov.extraction_strategy {
-                                map.insert("extraction_strategy".to_string(), json!(strategy));
-                            }
-                        }
-                        ingestion_method = Some(fact_prov.ingestion_method);
-
-                        // Compute fact_age_days from t_valid
-                        if let Some(t_valid_str) = record.get("t_valid").and_then(string_from_value)
-                            && let Ok(t_valid) = chrono::DateTime::parse_from_rfc3339(&t_valid_str)
-                            {
-                                let age = Utc::now()
-                                    .signed_duration_since(t_valid.with_timezone(&Utc))
-                                    .num_days();
-                                fact_age_days = Some(age);
-                            }
-
-                        // Compute decayed_confidence
-                        if let Some(conf) = record.get("confidence").and_then(|v| v.as_f64())
-                            && let Some(age) = fact_age_days {
-                                let half_life_days = if record
-                                    .get("fact_type")
-                                    .and_then(string_from_value)
-                                    .is_some_and(|ft| ft == "metric")
-                                {
-                                    crate::models::Fact::METRIC_HALF_LIFE_DAYS
-                                } else {
-                                    crate::models::Fact::DEFAULT_HALF_LIFE_DAYS
-                                };
-                                let decay = 2.0_f64.powf(-age as f64 / half_life_days);
-                                decayed_confidence = Some(
-                                    (conf * decay * crate::models::Fact::CONFIDENCE_SCALE).round()
-                                        / crate::models::Fact::CONFIDENCE_SCALE,
-                                );
-                            }
+                && let Some(record) = &fact_record
+            {
+                let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
+                let fact_prov = crate::models::Provenance::from_json_value(&prov_value);
+                if let Some(map) = explain_provenance.as_object_mut() {
+                    if !fact_prov.ingestion_method.is_empty() {
+                        map.insert(
+                            "ingestion_method".to_string(),
+                            json!(fact_prov.ingestion_method),
+                        );
                     }
+                    if let Some(strategy) = &fact_prov.extraction_strategy {
+                        map.insert("extraction_strategy".to_string(), json!(strategy));
+                    }
+                }
+                ingestion_method = Some(fact_prov.ingestion_method);
+
+                // Compute fact_age_days from t_valid
+                if let Some(t_valid_str) = record.get("t_valid").and_then(string_from_value)
+                    && let Ok(t_valid) = chrono::DateTime::parse_from_rfc3339(&t_valid_str)
+                {
+                    let age = Utc::now()
+                        .signed_duration_since(t_valid.with_timezone(&Utc))
+                        .num_days();
+                    fact_age_days = Some(age);
+                }
+
+                // Compute decayed_confidence
+                if let Some(conf) = record.get("confidence").and_then(|v| v.as_f64())
+                    && let Some(age) = fact_age_days
+                {
+                    let half_life_days = if record
+                        .get("fact_type")
+                        .and_then(string_from_value)
+                        .is_some_and(|ft| ft == "metric")
+                    {
+                        crate::models::Fact::METRIC_HALF_LIFE_DAYS
+                    } else {
+                        crate::models::Fact::DEFAULT_HALF_LIFE_DAYS
+                    };
+                    let decay = 2.0_f64.powf(-age as f64 / half_life_days);
+                    decayed_confidence = Some(
+                        (conf * decay * crate::models::Fact::CONFIDENCE_SCALE).round()
+                            / crate::models::Fact::CONFIDENCE_SCALE,
+                    );
+                }
+            }
 
             let explanation = ExplainItem {
                 fact_id: resolved_item.item.fact_id,

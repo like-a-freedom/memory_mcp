@@ -11,6 +11,8 @@ DEFINE FIELD object ON triple TYPE string;
 DEFINE FIELD confidence ON triple TYPE float DEFAULT 1.0;
 DEFINE FIELD source_fact_id ON triple TYPE string;
 DEFINE FIELD t_ingested ON triple TYPE datetime VALUE time::now() READONLY;
+DEFINE FIELD t_invalid ON triple TYPE option<datetime>;
+DEFINE FIELD t_invalid_ingested ON triple TYPE option<datetime>;
 
 DEFINE INDEX triple_subject_idx ON triple COLUMNS namespace, subject;
 DEFINE INDEX triple_predicate_idx ON triple COLUMNS namespace, predicate;

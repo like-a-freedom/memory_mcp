@@ -524,7 +524,9 @@ impl MemoryService {
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
             entity_resolver: super::super::entity_resolution::EntityResolver::new(fuzzy_threshold),
-            triple_extractor: Arc::new(super::super::triple_extractor::NoOpTripleExtractor),
+            triple_extractor: Arc::new(
+                super::super::triple_extractor::RuleBasedTripleExtractor::new(),
+            ),
         })
     }
 
