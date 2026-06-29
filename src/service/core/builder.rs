@@ -384,51 +384,7 @@ impl MemoryService {
         service.check_surrealdb_connection().await?;
 
         // Spawn lifecycle workers if enabled
-        if config.lifecycle.enabled {
-            let decay_service = service.clone();
-            let decay_config = config.lifecycle.clone();
-
-            let _decay_handle = spawn_decay_worker(
-                decay_service,
-                decay_config.decay_interval_secs,
-                decay_config.decay_confidence_threshold,
-                decay_config.decay_half_life_days,
-            );
-
-            let archival_service = service.clone();
-            let archival_config = config.lifecycle.clone();
-
-            let _archival_handle = spawn_archival_worker(
-                archival_service,
-                archival_config.archival_interval_secs,
-                archival_config.archival_age_days,
-            );
-
-            let community_service = service.clone();
-            let community_config = config.lifecycle.clone();
-
-            let _community_handle =
-                spawn_community_worker(community_service, community_config.archival_interval_secs);
-
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::json!("lifecycle.workers.started"),
-            );
-            event.insert(
-                "decay_interval".to_string(),
-                serde_json::json!(config.lifecycle.decay_interval_secs),
-            );
-            event.insert(
-                "archival_interval".to_string(),
-                serde_json::json!(config.lifecycle.archival_interval_secs),
-            );
-            event.insert(
-                "community_interval".to_string(),
-                serde_json::json!(config.lifecycle.archival_interval_secs),
-            );
-            service.logger.log(event, crate::logging::LogLevel::Info);
-        }
+        super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
 
         Ok(service)
     }
