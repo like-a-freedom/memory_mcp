@@ -79,6 +79,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "026_cyrillic_fts_active.surql",
             sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
         },
+        MigrationScript {
+            file_name: "026_cyrillic_fts_active.surql",
+            sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
+        },
     ]
 }
 
