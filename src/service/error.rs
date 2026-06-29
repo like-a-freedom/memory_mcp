@@ -1,7 +1,7 @@
 //! Error types for memory operations.
 
 /// Error type for memory operations.
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum MemoryError {
     #[error("config missing: {0}")]
     ConfigMissing(String),

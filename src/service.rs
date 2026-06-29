@@ -35,6 +35,9 @@ mod util;
 mod model_loader;
 pub(crate) mod value_helpers;
 
+#[cfg(test)]
+pub mod mock_db;
+
 pub use constants::*;
 mod constants {
     /// Default context cache size.
