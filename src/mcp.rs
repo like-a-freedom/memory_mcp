@@ -15,11 +15,13 @@
 
 pub use handlers::*;
 pub use parsers::*;
+pub use response::{AppCommandResult, OpenAppResult, ToolResponse};
 
 mod error;
 mod handlers;
 mod params;
 mod parsers;
+pub(crate) mod response;
 mod resources;
 
 pub use error::mcp_error;
