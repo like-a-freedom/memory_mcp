@@ -8,7 +8,7 @@ on:
       debug:
         description: Enable debug mode
         required: false
-        default: 'false'
+        default: "false"
   pull_request:
     branches: [main, master]
 
@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.0
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
         with:
           toolchain: stable
           components: rustfmt
@@ -42,16 +42,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.0
 
-      - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
-        with:
-          toolchain: stable
-          components: clippy
-          cache: true
+  - name: Set up Rust toolchain
+    uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+    with:
+      toolchain: stable
+      components: clippy
+      cache: true
 
-      - name: Run clippy
+  - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   test:
@@ -59,15 +59,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.0
 
-      - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
-        with:
-          toolchain: stable
-          cache: true
+  - name: Set up Rust toolchain
+    uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+    with:
+      toolchain: stable
+      cache: true
 
-      - name: Run tests
+  - name: Run tests
         run: cargo test --workspace --lib --bins --tests
 
   build_binaries:
@@ -99,10 +99,10 @@ jobs:
             target: x86_64-pc-windows-msvc
             bin: memory_mcp_windows_x86_64.exe
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.0
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.15.4
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
         with:
           toolchain: stable
           cache: true
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload release assets
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2.5.0
+        uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -147,4 +147,3 @@ jobs:
             app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
