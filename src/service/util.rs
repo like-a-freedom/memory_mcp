@@ -1,4 +1,9 @@
 //! Service utility functions for ID generation, rate limiting, validation, and query detection.
+//!
+//! - `ids`: Deterministic ID generation functions used by multiple domain services.
+//! - `rate_limit`: In-memory rate limiter using token bucket algorithm.
+//! - `statement_detection`: Content statement type detection (promises, metrics, experiences, etc.).
+//! - `validation`: Shared validation for ingest requests, entity candidates, and fact input.
 
 pub mod ids;
 pub(crate) mod rate_limit;
