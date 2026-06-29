@@ -39,6 +39,8 @@ pub struct MemoryService {
     pub(crate) default_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
+    pub(crate) ingestion_service: super::super::ingestion::IngestionService,
+    pub(crate) entity_service: super::super::entity::EntityService,
     pub(crate) context_cache:
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
@@ -485,15 +487,29 @@ impl MemoryService {
                     MemoryError::ConfigInvalid("query embedding cache size must be > 0".to_string())
                 })?;
         let logger = StdoutLogger::new(&log_level);
+        let rate_limiter = Arc::new(RateLimiter::new(
+            build_config.rate_limit_rps,
+            build_config.rate_limit_burst,
+        ));
+        let ingestion_service = super::super::ingestion::IngestionService::new(
+            db_client.clone(),
+            namespaces.clone(),
+            logger.clone(),
+            rate_limiter.clone(),
+        );
+        let entity_service = super::super::entity::EntityService::new(
+            db_client.clone(),
+            namespaces[0].clone(),
+            rate_limiter.clone(),
+        );
         Ok(Self {
             db_client,
             namespaces: namespaces.clone(),
             default_namespace: namespaces[0].clone(),
             logger,
-            rate_limiter: Arc::new(RateLimiter::new(
-                build_config.rate_limit_rps,
-                build_config.rate_limit_burst,
-            )),
+            rate_limiter,
+            ingestion_service,
+            entity_service,
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,

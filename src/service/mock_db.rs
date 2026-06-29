@@ -137,6 +137,14 @@ impl MockDbClient {
         self
     }
 
+    pub fn expect_create_with(
+        mut self,
+        f: impl Fn() -> Result<Value, MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.fallback_create = Mutex::new(Some(Box::new(f)));
+        self
+    }
+
     pub fn expect_update(mut self, record_id: &str, result: Value) -> Self {
         self.update_responses.lock().unwrap().insert(
             record_id.to_string(),

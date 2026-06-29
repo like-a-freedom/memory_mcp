@@ -12,6 +12,7 @@ use super::util::{deterministic_episode_id, validate_ingest_request, RateLimiter
 use super::{log_event, normalize_dt, now};
 
 /// Handles episode ingestion: file parsing, deduplication, and persistence.
+#[derive(Clone)]
 pub struct IngestionService {
     db_client: Arc<dyn crate::storage::DbClient>,
     namespaces: Vec<String>,
@@ -75,7 +76,7 @@ impl IngestionService {
 
         let ingest_transport = super::ingest::detect_ingest_transport(&request.content);
         let original_source_id = request.source_id.clone();
-
+        let original_content_len = request.content.len();
         self.logger.log(
             log_event(
                 "ingest.prepare",
@@ -93,9 +94,7 @@ impl IngestionService {
             ),
             LogLevel::Debug,
         );
-
         let request = prepare_ingest_request(request).await?;
-
         self.logger.log(
             log_event(
                 "ingest.prepared",
@@ -108,6 +107,7 @@ impl IngestionService {
                 json!({
                     "source_id": request.source_id,
                     "content_len": request.content.len(),
+                    "original_content_len": original_content_len,
                 }),
                 access.as_ref(),
                 None,
@@ -192,5 +192,91 @@ impl IngestionService {
         );
 
         Ok(episode_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::logging::StdoutLogger;
+    use crate::models::IngestRequest;
+    use crate::service::mock_db::MockDbClient;
+    use crate::service::util::RateLimiter;
+    use chrono::Utc;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn ingest_creates_new_episode() {
+        let t_ref = Utc::now();
+        let expected_id =
+            super::super::util::deterministic_episode_id("inline", "test-content", t_ref, "org");
+
+        let db = MockDbClient::new()
+            .expect_select_one(&expected_id, None)
+            .expect_create(&expected_id, serde_json::Value::Null);
+
+        let svc = IngestionService::new(
+            Arc::new(db),
+            vec!["org".into()],
+            StdoutLogger::new("warn"),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
+
+        let result = svc
+            .ingest(
+                IngestRequest {
+                    source_type: "inline".into(),
+                    source_id: "test-content".into(),
+                    content: "hello world".into(),
+                    t_ref,
+                    scope: "org".into(),
+                    project: None,
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await;
+
+        assert_eq!(result.unwrap(), expected_id);
+    }
+
+    #[tokio::test]
+    async fn ingest_returns_existing_episode_id_on_duplicate() {
+        let t_ref = Utc::now();
+        let expected_id =
+            super::super::util::deterministic_episode_id("inline", "dup-content", t_ref, "org");
+
+        let db = MockDbClient::new().expect_select_one(
+            &expected_id,
+            Some(serde_json::json!({"episode_id": &expected_id, "content": "old"})),
+        );
+
+        let svc = IngestionService::new(
+            Arc::new(db),
+            vec!["org".into()],
+            StdoutLogger::new("warn"),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
+
+        let result = svc
+            .ingest(
+                IngestRequest {
+                    source_type: "inline".into(),
+                    source_id: "dup-content".into(),
+                    content: "hello world".into(),
+                    t_ref,
+                    scope: "org".into(),
+                    project: None,
+                    t_ingested: None,
+                    visibility_scope: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await;
+
+        assert_eq!(result.unwrap(), expected_id);
     }
 }
