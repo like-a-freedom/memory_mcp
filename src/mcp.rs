@@ -21,8 +21,8 @@ mod error;
 mod handlers;
 mod params;
 mod parsers;
-pub(crate) mod response;
 mod resources;
+pub(crate) mod response;
 pub(crate) mod session;
 
 pub use error::mcp_error;

@@ -31,12 +31,12 @@ use std::time::Instant;
 use super::error::{mcp_error, tool_error};
 use super::params::*;
 use super::parsers::{content_hash, parse_context_items, parse_datetime};
-use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::resources::{
     APPS_INDEX_URI, app_catalog_resources, app_resource_templates, app_root_payload,
     app_session_html_document, app_session_uri, apps_index_payload, parse_app_root_uri,
     parse_app_session_uri,
 };
+use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session::{self, SessionManager};
 
 #[derive(Debug, Clone)]
@@ -266,10 +266,15 @@ impl MemoryMcp {
         session_id: &str,
         payload: Value,
     ) -> Result<session::AppSessionState, ErrorData> {
-        self.session_manager.replace_payload(session_id, payload).await
+        self.session_manager
+            .replace_payload(session_id, payload)
+            .await
     }
 
-    async fn remove_session(&self, session_id: &str) -> Result<session::AppSessionState, ErrorData> {
+    async fn remove_session(
+        &self,
+        session_id: &str,
+    ) -> Result<session::AppSessionState, ErrorData> {
         self.session_manager.remove(session_id).await
     }
 
@@ -280,7 +285,9 @@ impl MemoryMcp {
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
-        self.session_manager.create(app, scope, ttl_seconds, payload).await
+        self.session_manager
+            .create(app, scope, ttl_seconds, payload)
+            .await
     }
 
     fn app_command_result_from_details(

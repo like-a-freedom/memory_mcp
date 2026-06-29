@@ -5,11 +5,11 @@ use chrono::{DateTime, Utc};
 mod search;
 mod time;
 
+use crate::models::Fact;
 pub use search::{
     normalize_text, preprocess_search_query, query_hard_anchor_terms, query_term_rarity_weight,
     query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
-use crate::models::Fact;
 
 pub use time::{bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso};
 

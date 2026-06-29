@@ -83,10 +83,7 @@ mod tests {
 
     #[test]
     fn primary_tier_none_for_all_empty() {
-        let items = vec![
-            make_item(None, ""),
-            make_item(Some(""), ""),
-        ];
+        let items = vec![make_item(None, ""), make_item(Some(""), "")];
         assert_eq!(primary_retrieval_tier(&items), None);
     }
 
@@ -97,9 +94,7 @@ mod tests {
 
     #[test]
     fn primary_tier_trims_whitespace() {
-        let items = vec![
-            make_item(Some("  direct  "), ""),
-        ];
+        let items = vec![make_item(Some("  direct  "), "")];
         assert_eq!(primary_retrieval_tier(&items), Some("direct"));
     }
 
@@ -152,8 +147,14 @@ mod tests {
     #[test]
     fn experience_count_finds_supplemental_rationales() {
         let items = vec![
-            make_item(Some("direct"), "supplemental experience recent_t_ingested=2026-01-01"),
-            make_item(Some("graph"), "supplemental experience recent_t_ingested=2026-01-02"),
+            make_item(
+                Some("direct"),
+                "supplemental experience recent_t_ingested=2026-01-01",
+            ),
+            make_item(
+                Some("graph"),
+                "supplemental experience recent_t_ingested=2026-01-02",
+            ),
             make_item(Some("graph"), "regular rationale"),
         ];
         assert_eq!(supplemental_experience_count(&items), 2);
@@ -161,9 +162,7 @@ mod tests {
 
     #[test]
     fn experience_count_zero_when_none() {
-        let items = vec![
-            make_item(Some("direct"), "regular rationale"),
-        ];
+        let items = vec![make_item(Some("direct"), "regular rationale")];
         assert_eq!(supplemental_experience_count(&items), 0);
     }
 

@@ -7,7 +7,7 @@ use crate::models::{AccessPayload, IngestRequest};
 
 use super::error::MemoryError;
 use super::ingest::prepare_ingest_request;
-use super::util::{deterministic_episode_id, validate_ingest_request, RateLimiter};
+use super::util::{RateLimiter, deterministic_episode_id, validate_ingest_request};
 use super::{log_event, normalize_dt, now};
 
 /// Handles episode ingestion: file parsing, deduplication, and persistence.
@@ -134,10 +134,7 @@ impl IngestionService {
                 ("source_id".to_string(), json!(request.source_id)),
                 ("content".to_string(), json!(request.content)),
                 ("t_ref".to_string(), json!(normalize_dt(request.t_ref))),
-                (
-                    "t_ingested".to_string(),
-                    json!(normalize_dt(t_ingested)),
-                ),
+                ("t_ingested".to_string(), json!(normalize_dt(t_ingested))),
                 ("scope".to_string(), json!(request.scope.clone())),
                 (
                     "visibility_scope".to_string(),

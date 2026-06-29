@@ -102,10 +102,10 @@ impl MockDbClient {
     }
 
     pub fn expect_select_one(self, record_id: &str, result: Option<Value>) -> Self {
-        self.select_one_responses.lock().unwrap().insert(
-            record_id.to_string(),
-            Ok(result),
-        );
+        self.select_one_responses
+            .lock()
+            .unwrap()
+            .insert(record_id.to_string(), Ok(result));
         self
     }
 
@@ -118,10 +118,10 @@ impl MockDbClient {
     }
 
     pub fn expect_create(self, record_id: &str, result: Value) -> Self {
-        self.create_responses.lock().unwrap().insert(
-            record_id.to_string(),
-            Ok(result),
-        );
+        self.create_responses
+            .lock()
+            .unwrap()
+            .insert(record_id.to_string(), Ok(result));
         self
     }
 
@@ -134,34 +134,34 @@ impl MockDbClient {
     }
 
     pub fn expect_update(self, record_id: &str, result: Value) -> Self {
-        self.update_responses.lock().unwrap().insert(
-            record_id.to_string(),
-            Ok(result),
-        );
+        self.update_responses
+            .lock()
+            .unwrap()
+            .insert(record_id.to_string(), Ok(result));
         self
     }
 
     pub fn expect_select_table(self, table: &str, rows: Vec<Value>) -> Self {
-        self.select_table_responses.lock().unwrap().insert(
-            table.to_string(),
-            Ok(rows),
-        );
+        self.select_table_responses
+            .lock()
+            .unwrap()
+            .insert(table.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_entity_lookup(self, normalized_name: &str, result: Option<Value>) -> Self {
-        self.entity_lookup_responses.lock().unwrap().insert(
-            normalized_name.to_string(),
-            Ok(result),
-        );
+        self.entity_lookup_responses
+            .lock()
+            .unwrap()
+            .insert(normalized_name.to_string(), Ok(result));
         self
     }
 
     pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
-        self.edge_neighbors_responses.lock().unwrap().insert(
-            node_id.to_string(),
-            Ok(neighbors),
-        );
+        self.edge_neighbors_responses
+            .lock()
+            .unwrap()
+            .insert(node_id.to_string(), Ok(neighbors));
         self
     }
 
@@ -174,58 +174,58 @@ impl MockDbClient {
     }
 
     pub fn expect_query(self, sql_prefix: &str, result: Value) -> Self {
-        self.query_responses.lock().unwrap().insert(
-            sql_prefix.to_string(),
-            Ok(result),
-        );
+        self.query_responses
+            .lock()
+            .unwrap()
+            .insert(sql_prefix.to_string(), Ok(result));
         self
     }
 
     pub fn expect_facts_filtered(self, key: &str, rows: Vec<Value>) -> Self {
-        self.facts_filtered_responses.lock().unwrap().insert(
-            key.to_string(),
-            Ok(rows),
-        );
+        self.facts_filtered_responses
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_facts_by_entity_links(self, key: &str, rows: Vec<Value>) -> Self {
-        self.facts_entity_links_responses.lock().unwrap().insert(
-            key.to_string(),
-            Ok(rows),
-        );
+        self.facts_entity_links_responses
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_active_facts(self, key: &str, rows: Vec<Value>) -> Self {
-        self.active_facts_responses.lock().unwrap().insert(
-            key.to_string(),
-            Ok(rows),
-        );
+        self.active_facts_responses
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_episodes_by_content(self, key: &str, rows: Vec<Value>) -> Self {
-        self.episodes_by_content_responses.lock().unwrap().insert(
-            key.to_string(),
-            Ok(rows),
-        );
+        self.episodes_by_content_responses
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_communities_matching_summary(self, query: &str, rows: Vec<Value>) -> Self {
-        self.communities_matching_summary_responses.lock().unwrap().insert(
-            query.to_string(),
-            Ok(rows),
-        );
+        self.communities_matching_summary_responses
+            .lock()
+            .unwrap()
+            .insert(query.to_string(), Ok(rows));
         self
     }
 
     pub fn expect_communities_by_member_entities(self, key: &str, rows: Vec<Value>) -> Self {
-        self.communities_by_members_responses.lock().unwrap().insert(
-            key.to_string(),
-            Ok(rows),
-        );
+        self.communities_by_members_responses
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), Ok(rows));
         self
     }
 
@@ -248,7 +248,13 @@ impl DbClient for MockDbClient {
         record_id: &str,
         _namespace: &str,
     ) -> Result<Option<Value>, MemoryError> {
-        if let Some(resp) = self.select_one_responses.lock().unwrap().get(record_id).cloned() {
+        if let Some(resp) = self
+            .select_one_responses
+            .lock()
+            .unwrap()
+            .get(record_id)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_select_one.lock().unwrap() {
@@ -257,12 +263,14 @@ impl DbClient for MockDbClient {
         Ok(None)
     }
 
-    async fn select_table(
-        &self,
-        table: &str,
-        _namespace: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(resp) = self.select_table_responses.lock().unwrap().get(table).cloned() {
+    async fn select_table(&self, table: &str, _namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        if let Some(resp) = self
+            .select_table_responses
+            .lock()
+            .unwrap()
+            .get(table)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_select_table.lock().unwrap() {
@@ -280,7 +288,13 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let key = format!("{}/{}", scope, query_contains.unwrap_or(""));
-        if let Some(resp) = self.facts_filtered_responses.lock().unwrap().get(&key).cloned() {
+        if let Some(resp) = self
+            .facts_filtered_responses
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_facts_filtered.lock().unwrap() {
@@ -298,7 +312,13 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let key = entity_links.join(",");
-        if let Some(resp) = self.facts_entity_links_responses.lock().unwrap().get(&key).cloned() {
+        if let Some(resp) = self
+            .facts_entity_links_responses
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_facts_by_entity_links.lock().unwrap() {
@@ -339,7 +359,13 @@ impl DbClient for MockDbClient {
         _cutoff: &str,
         _direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(resp) = self.edge_neighbors_responses.lock().unwrap().get(node_id).cloned() {
+        if let Some(resp) = self
+            .edge_neighbors_responses
+            .lock()
+            .unwrap()
+            .get(node_id)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_edge_neighbors.lock().unwrap() {
@@ -353,7 +379,13 @@ impl DbClient for MockDbClient {
         _namespace: &str,
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError> {
-        if let Some(resp) = self.entity_lookup_responses.lock().unwrap().get(normalized_name).cloned() {
+        if let Some(resp) = self
+            .entity_lookup_responses
+            .lock()
+            .unwrap()
+            .get(normalized_name)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_entity_lookup.lock().unwrap() {
@@ -466,7 +498,13 @@ impl DbClient for MockDbClient {
         _to_id: &str,
         _content: Value,
     ) -> Result<Value, MemoryError> {
-        if let Some(resp) = self.relate_edge_responses.lock().unwrap().get(edge_id).cloned() {
+        if let Some(resp) = self
+            .relate_edge_responses
+            .lock()
+            .unwrap()
+            .get(edge_id)
+            .cloned()
+        {
             return resp;
         }
         Ok(Value::Null)
@@ -478,7 +516,13 @@ impl DbClient for MockDbClient {
         _content: Value,
         _namespace: &str,
     ) -> Result<Value, MemoryError> {
-        if let Some(resp) = self.create_responses.lock().unwrap().get(record_id).cloned() {
+        if let Some(resp) = self
+            .create_responses
+            .lock()
+            .unwrap()
+            .get(record_id)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_create.lock().unwrap() {
@@ -493,7 +537,13 @@ impl DbClient for MockDbClient {
         _content: Value,
         _namespace: &str,
     ) -> Result<Value, MemoryError> {
-        if let Some(resp) = self.update_responses.lock().unwrap().get(record_id).cloned() {
+        if let Some(resp) = self
+            .update_responses
+            .lock()
+            .unwrap()
+            .get(record_id)
+            .cloned()
+        {
             return resp;
         }
         if let Some(ref f) = *self.fallback_update.lock().unwrap() {
@@ -525,7 +575,13 @@ impl DbClient for MockDbClient {
         entity_ids: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         let key = entity_ids.join(",");
-        if let Some(resp) = self.entities_by_ids_responses.lock().unwrap().get(&key).cloned() {
+        if let Some(resp) = self
+            .entities_by_ids_responses
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+        {
             return resp;
         }
         Ok(vec![])
@@ -574,9 +630,8 @@ mod tests {
 
     #[tokio::test]
     async fn mock_db_client_fallback_works() {
-        let db = MockDbClient::new().expect_select_one_with(|_id| {
-            Ok(Some(json!({"fallback": true})))
-        });
+        let db =
+            MockDbClient::new().expect_select_one_with(|_id| Ok(Some(json!({"fallback": true}))));
 
         let result = db.select_one("any:id", "org").await.unwrap();
         assert!(result.is_some());

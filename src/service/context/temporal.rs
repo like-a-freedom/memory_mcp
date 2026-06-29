@@ -645,11 +645,19 @@ mod tests {
 
     #[test]
     fn expand_temporal_synonyms_quarter_shorthand() {
-        for (q, expected_month) in &[("q1", "january"), ("q2", "april"), ("q3", "july"), ("q4", "october")] {
+        for (q, expected_month) in &[
+            ("q1", "january"),
+            ("q2", "april"),
+            ("q3", "july"),
+            ("q4", "october"),
+        ] {
             let result = expand_temporal_synonyms(&format!("{q} budget"), test_cutoff())
                 .unwrap_or_else(|| panic!("should expand {q}"));
             assert!(
-                result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains(expected_month))),
+                result
+                    .temporal_groups
+                    .iter()
+                    .any(|g| g.iter().any(|t| t.contains(expected_month))),
                 "{q} should contain {expected_month}",
             );
         }
@@ -661,7 +669,10 @@ mod tests {
             expand_temporal_synonyms("last quarter revenue", test_cutoff()).expect("should expand");
         // cutoff is 2026-04-12 (Q2), so last quarter = Q1 (january/march 2026)
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("january"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("january"))),
             "last quarter should expand to Q1 terms",
         );
     }
@@ -671,7 +682,10 @@ mod tests {
         let result =
             expand_temporal_synonyms("this week update", test_cutoff()).expect("should expand");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("2026-04"))),
             "this week should contain April 2026 dates",
         );
     }
@@ -681,7 +695,10 @@ mod tests {
         let result =
             expand_temporal_synonyms("yesterday meeting", test_cutoff()).expect("should expand");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-11"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("2026-04-11"))),
             "yesterday from 2026-04-12 should be 2026-04-11",
         );
     }
@@ -691,7 +708,10 @@ mod tests {
         let result =
             expand_temporal_synonyms("today agenda", test_cutoff()).expect("should expand");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-12"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("2026-04-12"))),
             "today should be 2026-04-12",
         );
     }
@@ -701,7 +721,10 @@ mod tests {
         let result =
             expand_temporal_synonyms("tomorrow plan", test_cutoff()).expect("should expand");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-04-13"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("2026-04-13"))),
             "tomorrow from 2026-04-12 should be 2026-04-13",
         );
     }
@@ -711,7 +734,10 @@ mod tests {
         let result =
             expand_temporal_synonyms("2026-03-15 notes", test_cutoff()).expect("should expand");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("2026-03"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("2026-03"))),
             "ISO date should expand to March 2026 terms",
         );
     }
@@ -721,7 +747,10 @@ mod tests {
         let result = expand_temporal_synonyms("quarter 2 goals", test_cutoff())
             .expect("should expand quarter N");
         assert!(
-            result.temporal_groups.iter().any(|g| g.iter().any(|t| t.contains("april"))),
+            result
+                .temporal_groups
+                .iter()
+                .any(|g| g.iter().any(|t| t.contains("april"))),
             "quarter 2 should contain April terms",
         );
     }

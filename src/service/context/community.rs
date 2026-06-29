@@ -379,7 +379,8 @@ mod tests {
             "summary": "test",
             "member_entities": ["e:1"],
         });
-        let result = stored_community_summary_from_value(&value).expect("should parse without ft_score");
+        let result =
+            stored_community_summary_from_value(&value).expect("should parse without ft_score");
         assert!((result.ft_score - 0.0).abs() < f64::EPSILON);
     }
 
@@ -483,8 +484,22 @@ mod tests {
             ..make_test_fact()
         };
         let mut matches = HashMap::new();
-        matches.insert("e:1".into(), CommunityMatch { rank: 5, community_id: "c:5".into(), summary: "bad".into() });
-        matches.insert("e:2".into(), CommunityMatch { rank: 1, community_id: "c:1".into(), summary: "good".into() });
+        matches.insert(
+            "e:1".into(),
+            CommunityMatch {
+                rank: 5,
+                community_id: "c:5".into(),
+                summary: "bad".into(),
+            },
+        );
+        matches.insert(
+            "e:2".into(),
+            CommunityMatch {
+                rank: 1,
+                community_id: "c:1".into(),
+                summary: "good".into(),
+            },
+        );
         let result = best_community_match(&fact, &matches).expect("should find match");
         assert_eq!(result.community_id, "c:1");
         assert_eq!(result.rank, 1);

@@ -554,7 +554,9 @@ mod tests {
     #[test]
     fn id_type_from_str_and_clone() {
         let pairs: &[(String, fn(&str) -> Box<dyn std::any::Any>, bool)] = &[]; // placeholder
-        for (input, _maker, _is_clone) in pairs { let _ = input; }
+        for (input, _maker, _is_clone) in pairs {
+            let _ = input;
+        }
 
         let ep = EpisodeId::from("episode:abc123");
         assert_eq!(ep.0, "episode:abc123");

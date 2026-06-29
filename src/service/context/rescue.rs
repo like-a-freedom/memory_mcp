@@ -408,9 +408,18 @@ mod tests {
 
     #[test]
     fn episode_grounding_bonus_persona_profiles() {
-        assert_eq!(first_person_episode_grounding_bonus("Current user persona: friendly"), 15);
-        assert_eq!(first_person_episode_grounding_bonus("User profile: admin"), 15);
-        assert_eq!(first_person_episode_grounding_bonus("Current profile: dev"), 15);
+        assert_eq!(
+            first_person_episode_grounding_bonus("Current user persona: friendly"),
+            15
+        );
+        assert_eq!(
+            first_person_episode_grounding_bonus("User profile: admin"),
+            15
+        );
+        assert_eq!(
+            first_person_episode_grounding_bonus("Current profile: dev"),
+            15
+        );
         assert_eq!(first_person_episode_grounding_bonus("Profile: tester"), 15);
     }
 
@@ -439,7 +448,10 @@ mod tests {
 
     #[test]
     fn fact_grounding_bonus_profile_prefixes() {
-        assert_eq!(first_person_fact_grounding_bonus("Current user persona: admin"), 2);
+        assert_eq!(
+            first_person_fact_grounding_bonus("Current user persona: admin"),
+            2
+        );
         assert_eq!(first_person_fact_grounding_bonus("User profile: tester"), 2);
         assert_eq!(first_person_fact_grounding_bonus("Current profile: dev"), 2);
         assert_eq!(first_person_fact_grounding_bonus("Profile: mod"), 2);
@@ -461,7 +473,11 @@ mod tests {
     fn matched_rescue_terms_finds_query_terms_and_conversational_tokens() {
         let terms = matched_first_person_rescue_terms_for_text(
             "what would you suggest for this problem",
-            &["suggest".to_string(), "problem".to_string(), "missing".to_string()],
+            &[
+                "suggest".to_string(),
+                "problem".to_string(),
+                "missing".to_string(),
+            ],
         );
         assert!(terms.contains("suggest"));
         assert!(terms.contains("problem"));
@@ -479,10 +495,8 @@ mod tests {
 
     #[test]
     fn matched_rescue_terms_empty_when_no_match() {
-        let terms = matched_first_person_rescue_terms_for_text(
-            "hello world",
-            &["missing".to_string()],
-        );
+        let terms =
+            matched_first_person_rescue_terms_for_text("hello world", &["missing".to_string()]);
         assert!(terms.is_empty());
     }
 

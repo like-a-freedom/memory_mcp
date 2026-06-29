@@ -5,9 +5,9 @@ use serde_json::json;
 use crate::models::{AccessPayload, EntityCandidate};
 
 use super::error::MemoryError;
-use super::util::{deterministic_entity_id, validate_entity_candidate, RateLimiter};
-use super::value_helpers::string_from_value;
 use super::query::normalize_text;
+use super::util::{RateLimiter, deterministic_entity_id, validate_entity_candidate};
+use super::value_helpers::string_from_value;
 
 /// Resolves and persists entities. Extracted from `MemoryService::resolve`.
 #[derive(Clone)]
@@ -119,27 +119,29 @@ impl EntityService {
             Err(err) => Err(err),
         }
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::EntityCandidate;
+    use crate::service::MemoryError;
     use crate::service::mock_db::MockDbClient;
     use crate::service::util::RateLimiter;
-    use crate::service::MemoryError;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn resolve_creates_new_entity_when_not_exists() {
-        let expected_id =
-            super::super::util::deterministic_entity_id("person", "Alice Smith");
+        let expected_id = super::super::util::deterministic_entity_id("person", "Alice Smith");
         let db = MockDbClient::new()
             .expect_entity_lookup("alice smith", None)
             .expect_create(&expected_id, serde_json::json!({"entity_id": &expected_id}));
 
-        let svc = EntityService::new(Arc::new(db), "org".into(), Arc::new(RateLimiter::new(1000, 100)));
+        let svc = EntityService::new(
+            Arc::new(db),
+            "org".into(),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
 
         let result = svc
             .resolve(
@@ -162,7 +164,11 @@ mod tests {
             Some(serde_json::json!({"entity_id": "entity:person:existing-alice"})),
         );
 
-        let svc = EntityService::new(Arc::new(db), "org".into(), Arc::new(RateLimiter::new(1000, 100)));
+        let svc = EntityService::new(
+            Arc::new(db),
+            "org".into(),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
 
         let result = svc
             .resolve(
@@ -185,7 +191,11 @@ mod tests {
             .expect_entity_lookup("bob", None)
             .expect_create_with(move || Err(MemoryError::Storage("already exists".into())));
 
-        let svc = EntityService::new(Arc::new(db), "org".into(), Arc::new(RateLimiter::new(1000, 100)));
+        let svc = EntityService::new(
+            Arc::new(db),
+            "org".into(),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
 
         let result = svc
             .resolve(
@@ -202,5 +212,4 @@ mod tests {
         // the fallback returns the deterministic ID.
         assert_eq!(result.unwrap(), expected_id);
     }
-
 }

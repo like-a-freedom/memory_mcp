@@ -110,10 +110,7 @@ mod tests {
     use crate::service::context::graph::GraphTrace;
     use crate::service::context::ranking;
 
-    fn make_fact(
-        content: &str,
-        index_keys: Vec<String>,
-    ) -> Fact {
+    fn make_fact(content: &str, index_keys: Vec<String>) -> Fact {
         Fact {
             fact_id: "test:1".into(),
             fact_type: "note".into(),
@@ -161,8 +158,19 @@ mod tests {
     #[test]
     fn selected_fact_matched_terms_finds_match_in_fact_content() {
         let fact = make_fact("finding relevant content for query terms", vec![]);
-        let ranked = make_ranked(fact, vec!["relevant".to_string(), "content".to_string()], ranking::RetrievalTier::Direct);
-        let terms = selected_fact_matched_terms(&[ranked], &["relevant".to_string(), "content".to_string(), "missing".to_string()]);
+        let ranked = make_ranked(
+            fact,
+            vec!["relevant".to_string(), "content".to_string()],
+            ranking::RetrievalTier::Direct,
+        );
+        let terms = selected_fact_matched_terms(
+            &[ranked],
+            &[
+                "relevant".to_string(),
+                "content".to_string(),
+                "missing".to_string(),
+            ],
+        );
         let mut expected = HashSet::new();
         expected.insert("relevant".to_string());
         expected.insert("content".to_string());
@@ -172,7 +180,11 @@ mod tests {
     #[test]
     fn selected_fact_matched_terms_matches_from_index_keys() {
         let fact = make_fact("unrelated content", vec!["python".to_string()]);
-        let ranked = make_ranked(fact, vec!["python".to_string()], ranking::RetrievalTier::Direct);
+        let ranked = make_ranked(
+            fact,
+            vec!["python".to_string()],
+            ranking::RetrievalTier::Direct,
+        );
         let terms = selected_fact_matched_terms(&[ranked], &["python".to_string()]);
         let mut expected = HashSet::new();
         expected.insert("python".to_string());
@@ -206,10 +218,25 @@ mod tests {
         let f1 = make_fact("coffee brewing techniques require practice", vec![]);
         let f2 = make_fact("coffee beans from ethiopia are excellent", vec![]);
         let facts = vec![
-            make_ranked(f1, vec!["coffee".to_string()], ranking::RetrievalTier::Direct),
-            make_ranked(f2, vec!["coffee".to_string(), "ethiopia".to_string()], ranking::RetrievalTier::TemporalExpanded),
+            make_ranked(
+                f1,
+                vec!["coffee".to_string()],
+                ranking::RetrievalTier::Direct,
+            ),
+            make_ranked(
+                f2,
+                vec!["coffee".to_string(), "ethiopia".to_string()],
+                ranking::RetrievalTier::TemporalExpanded,
+            ),
         ];
-        let terms = selected_fact_matched_terms(&facts, &["coffee".to_string(), "brewing".to_string(), "ethiopia".to_string()]);
+        let terms = selected_fact_matched_terms(
+            &facts,
+            &[
+                "coffee".to_string(),
+                "brewing".to_string(),
+                "ethiopia".to_string(),
+            ],
+        );
         let mut expected = HashSet::new();
         expected.insert("coffee".to_string());
         expected.insert("brewing".to_string());
@@ -224,22 +251,46 @@ mod tests {
         let f1 = make_fact("coffee brewing guide", vec![]);
         let f2 = make_fact("python coding guide", vec![]);
         let facts = vec![
-            make_ranked(f1, vec!["coffee".to_string()], ranking::RetrievalTier::Direct),
-            make_ranked(f2, vec!["guide".to_string()], ranking::RetrievalTier::GraphExpanded),
+            make_ranked(
+                f1,
+                vec!["coffee".to_string()],
+                ranking::RetrievalTier::Direct,
+            ),
+            make_ranked(
+                f2,
+                vec!["guide".to_string()],
+                ranking::RetrievalTier::GraphExpanded,
+            ),
         ];
-        assert_eq!(selected_fact_query_term_coverage(&facts, &["coffee".to_string(), "guide".to_string(), "missing".to_string()]), 2);
+        assert_eq!(
+            selected_fact_query_term_coverage(
+                &facts,
+                &[
+                    "coffee".to_string(),
+                    "guide".to_string(),
+                    "missing".to_string()
+                ]
+            ),
+            2
+        );
     }
 
     #[test]
     fn coverage_zero_for_no_matches() {
         let fact = make_fact("hello world", vec![]);
         let ranked = make_ranked(fact, vec![], ranking::RetrievalTier::SemanticExpanded);
-        assert_eq!(selected_fact_query_term_coverage(&[ranked], &["rareword".to_string()]), 0);
+        assert_eq!(
+            selected_fact_query_term_coverage(&[ranked], &["rareword".to_string()]),
+            0
+        );
     }
 
     #[test]
     fn coverage_zero_for_empty_selected_facts() {
-        assert_eq!(selected_fact_query_term_coverage(&[], &["hello".to_string()]), 0);
+        assert_eq!(
+            selected_fact_query_term_coverage(&[], &["hello".to_string()]),
+            0
+        );
     }
 
     // -- ranked_fact_to_item ------------------------------------------------
@@ -247,7 +298,11 @@ mod tests {
     #[test]
     fn ranked_fact_to_item_preserves_fields() {
         let fact = make_fact("test content", vec![]);
-        let ranked = make_ranked(fact, vec!["hello".to_string()], ranking::RetrievalTier::Direct);
+        let ranked = make_ranked(
+            fact,
+            vec!["hello".to_string()],
+            ranking::RetrievalTier::Direct,
+        );
         let cutoff = chrono::Utc::now();
         let item = ranked_fact_to_item(ranked, cutoff, |_, _| 0.75);
         assert_eq!(item.content, "test content");
@@ -286,9 +341,14 @@ mod tests {
         );
         let cutoff = chrono::Utc::now();
         let item = ranked_fact_to_item(ranked, cutoff, |_, _| 0.5);
-        let provenance = item.provenance.as_object().expect("provenance should be object");
+        let provenance = item
+            .provenance
+            .as_object()
+            .expect("provenance should be object");
         assert_eq!(
-            provenance["matched_query_terms"].as_array().map(|a| a.len()),
+            provenance["matched_query_terms"]
+                .as_array()
+                .map(|a| a.len()),
             Some(2),
         );
     }
@@ -299,7 +359,11 @@ mod tests {
             provenance: serde_json::json!("I am a string, not an object"),
             ..make_fact("test", vec![])
         };
-        let ranked = make_ranked(fact, vec!["hello".to_string()], ranking::RetrievalTier::Direct);
+        let ranked = make_ranked(
+            fact,
+            vec!["hello".to_string()],
+            ranking::RetrievalTier::Direct,
+        );
         let cutoff = chrono::Utc::now();
         let item = ranked_fact_to_item(ranked, cutoff, |_, _| 0.5);
         assert_eq!(item.provenance["matched_query_terms"][0], "hello");

@@ -44,7 +44,11 @@ impl<T> ToolResponse<T> {
         }
     }
 
-    pub(crate) fn complete_list(result: T, total_count: usize, guidance: impl Into<String>) -> Self {
+    pub(crate) fn complete_list(
+        result: T,
+        total_count: usize,
+        guidance: impl Into<String>,
+    ) -> Self {
         Self {
             status: "success".to_string(),
             result,

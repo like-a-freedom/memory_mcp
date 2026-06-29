@@ -18,7 +18,9 @@ pub(crate) fn fact_is_active_at(fact: &Fact, cutoff: chrono::DateTime<chrono::Ut
     fact.is_active(cutoff)
         || fact
             .t_invalid_ingested
-            .map_or(false, |invalidated_ingested_at| invalidated_ingested_at > cutoff)
+            .map_or(false, |invalidated_ingested_at| {
+                invalidated_ingested_at > cutoff
+            })
 }
 
 pub(crate) fn raw_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {

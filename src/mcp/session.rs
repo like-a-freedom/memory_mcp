@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use rmcp::ErrorData;
-use tokio::sync::RwLock;
 use serde_json::Value;
+use tokio::sync::RwLock;
 
 use super::resources::app_session_uri;
 
@@ -45,9 +45,7 @@ impl SessionManager {
             .await
             .get(session_id)
             .cloned()
-            .ok_or_else(|| {
-                invalid_params(format!("Unknown or closed app session: {session_id}"))
-            })
+            .ok_or_else(|| invalid_params(format!("Unknown or closed app session: {session_id}")))
     }
 
     pub async fn replace_payload(
@@ -68,9 +66,7 @@ impl SessionManager {
             .write()
             .await
             .remove(session_id)
-            .ok_or_else(|| {
-                invalid_params(format!("Unknown or closed app session: {session_id}"))
-            })
+            .ok_or_else(|| invalid_params(format!("Unknown or closed app session: {session_id}")))
     }
 
     pub async fn create(
@@ -120,7 +116,11 @@ pub(crate) fn internal_error(message: impl Into<String>) -> ErrorData {
     ErrorData::internal_error(msg, Some(data))
 }
 
-pub(crate) fn open_app_result(app: &str, session_id: impl Into<String>, fallback: Value) -> OpenAppResult {
+pub(crate) fn open_app_result(
+    app: &str,
+    session_id: impl Into<String>,
+    fallback: Value,
+) -> OpenAppResult {
     let session_id = session_id.into();
     OpenAppResult {
         app: app.to_string(),
@@ -137,10 +137,7 @@ pub(crate) fn app_command_result_from_details(
     resource_uri: Option<String>,
     details: Value,
 ) -> super::response::AppCommandResult {
-    let ok = details
-        .get("ok")
-        .and_then(Value::as_bool)
-        .unwrap_or(true);
+    let ok = details.get("ok").and_then(Value::as_bool).unwrap_or(true);
     let message = details
         .get("message")
         .and_then(Value::as_str)

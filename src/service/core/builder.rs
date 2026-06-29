@@ -513,7 +513,9 @@ impl MemoryService {
             current_embedding_signature: None,
             current_embedding_model: None,
             current_embedding_dimension: None,
-            task_runner: Arc::new(super::super::embedding::task_runner::BackgroundTaskRunner::new()),
+            task_runner: Arc::new(
+                super::super::embedding::task_runner::BackgroundTaskRunner::new(),
+            ),
             query_embedding_cache: Arc::new(tokio::sync::Mutex::new(LruCache::new(
                 query_embedding_cache_size,
             ))),
@@ -808,9 +810,7 @@ mod tests {
 
     #[test]
     fn test_ingest_request_builder_missing_required() {
-        let result = IngestRequest::builder()
-            .source_type("email")
-            .build();
+        let result = IngestRequest::builder().source_type("email").build();
 
         assert!(result.is_err());
     }

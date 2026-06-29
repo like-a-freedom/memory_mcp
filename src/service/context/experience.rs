@@ -99,19 +99,13 @@ mod tests {
 
     #[test]
     fn expand_terms_preserves_original_query_terms() {
-        let terms = expand_experience_query_terms(
-            &["hello".to_string(), "world".to_string()],
-            &[],
-        );
+        let terms = expand_experience_query_terms(&["hello".to_string(), "world".to_string()], &[]);
         assert_eq!(terms, vec!["hello".to_string(), "world".to_string()]);
     }
 
     #[test]
     fn expand_terms_deduplicates_original() {
-        let terms = expand_experience_query_terms(
-            &["hello".to_string(), "hello".to_string()],
-            &[],
-        );
+        let terms = expand_experience_query_terms(&["hello".to_string(), "hello".to_string()], &[]);
         assert_eq!(terms, vec!["hello".to_string()]);
     }
 
@@ -122,12 +116,15 @@ mod tests {
             make_fact("react state management is important", vec![]),
             make_fact("typescript improves react code", vec![]),
         ];
-        let expanded = expand_experience_query_terms(
-            &["hooks".to_string()],
-            &facts,
+        let expanded = expand_experience_query_terms(&["hooks".to_string()], &facts);
+        assert!(
+            expanded.contains(&"react".to_string()),
+            "react should be added as repeated term"
         );
-        assert!(expanded.contains(&"react".to_string()), "react should be added as repeated term");
-        assert!(expanded.contains(&"hooks".to_string()), "original term hooks should be preserved");
+        assert!(
+            expanded.contains(&"hooks".to_string()),
+            "original term hooks should be preserved"
+        );
     }
 
     #[test]
@@ -149,7 +146,11 @@ mod tests {
             facts.push(make_fact(&format!("{term} again"), vec![]));
         }
         let expanded = expand_experience_query_terms(&["original".to_string()], &facts);
-        assert!(expanded.len() <= 7, "should have at most 7 terms, got {}", expanded.len());
+        assert!(
+            expanded.len() <= 7,
+            "should have at most 7 terms, got {}",
+            expanded.len()
+        );
         assert!(expanded.contains(&"original".to_string()));
     }
 

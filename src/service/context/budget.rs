@@ -133,7 +133,11 @@ mod tests {
 
     #[test]
     fn prefers_false_when_no_episode_items() {
-        assert!(!should_prefer_episode_content(&[], &[], &["coffee".to_string()]));
+        assert!(!should_prefer_episode_content(
+            &[],
+            &[],
+            &["coffee".to_string()]
+        ));
     }
 
     #[test]
@@ -141,7 +145,11 @@ mod tests {
         let fact = make_fact("coffee brewing guide");
         let ranked = make_ranked(fact, RetrievalTier::GraphExpanded);
         let episodes = vec![make_episode_item("coffee brewing techniques")];
-        assert!(!should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string()]));
+        assert!(!should_prefer_episode_content(
+            &[ranked],
+            &episodes,
+            &["coffee".to_string()]
+        ));
     }
 
     #[test]
@@ -149,7 +157,11 @@ mod tests {
         let fact = make_fact("coffee brewing guide for beginners");
         let ranked = make_ranked(fact, RetrievalTier::Direct);
         let episodes = vec![make_episode_item("unrelated topic")];
-        assert!(!should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string()]));
+        assert!(!should_prefer_episode_content(
+            &[ranked],
+            &episodes,
+            &["coffee".to_string()]
+        ));
     }
 
     #[test]
@@ -157,9 +169,15 @@ mod tests {
         let fact = make_fact("coffee");
         let ranked = make_ranked(fact, RetrievalTier::Direct);
         let episodes = vec![make_episode_item("coffee brewing techniques from ethiopia")];
-        assert!(
-            should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string(), "brewing".to_string(), "ethiopia".to_string()]),
-        );
+        assert!(should_prefer_episode_content(
+            &[ranked],
+            &episodes,
+            &[
+                "coffee".to_string(),
+                "brewing".to_string(),
+                "ethiopia".to_string()
+            ]
+        ),);
     }
 
     #[test]
@@ -167,9 +185,15 @@ mod tests {
         let fact = make_fact("coffee brewing techniques from ethiopia");
         let ranked = make_ranked(fact, RetrievalTier::Direct);
         let episodes = vec![make_episode_item("coffee")];
-        assert!(
-            !should_prefer_episode_content(&[ranked], &episodes, &["coffee".to_string(), "brewing".to_string(), "ethiopia".to_string()]),
-        );
+        assert!(!should_prefer_episode_content(
+            &[ranked],
+            &episodes,
+            &[
+                "coffee".to_string(),
+                "brewing".to_string(),
+                "ethiopia".to_string()
+            ]
+        ),);
     }
 
     #[test]
@@ -184,7 +208,14 @@ mod tests {
 
     #[test]
     fn matched_terms_finds_overlap() {
-        let terms = matched_query_terms_for_text("coffee brewing guide", &["coffee".to_string(), "brewing".to_string(), "missing".to_string()]);
+        let terms = matched_query_terms_for_text(
+            "coffee brewing guide",
+            &[
+                "coffee".to_string(),
+                "brewing".to_string(),
+                "missing".to_string(),
+            ],
+        );
         assert_eq!(terms.len(), 2);
         assert!(terms.contains(&"coffee".to_string()));
         assert!(terms.contains(&"brewing".to_string()));
