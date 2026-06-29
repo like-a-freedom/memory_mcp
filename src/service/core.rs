@@ -17,9 +17,8 @@ use crate::models::{
 use crate::storage::GraphDirection;
 
 use super::error::MemoryError;
-use super::ingest::prepare_ingest_request;
-use super::util::{deterministic_entity_id, deterministic_episode_id, deterministic_fact_id};
-use super::util::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
+use super::util::deterministic_fact_id;
+use super::util::validate_fact_input;
 use super::value_helpers::{json_i64, string_from_value};
 
 mod builder;
@@ -2415,14 +2414,14 @@ mod tests {
 
     #[test]
     fn is_scope_allowed_returns_true_when_no_restrictions() {
-        let service = create_test_service(vec!["org"]);
+        let _service = create_test_service(vec!["org"]);
         let access = AccessPayload::default();
         assert!(access.is_scope_allowed("org"));
     }
 
     #[test]
     fn is_scope_allowed_returns_true_for_allowed_scope() {
-        let service = create_test_service(vec!["org"]);
+        let _service = create_test_service(vec!["org"]);
         let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
@@ -2437,7 +2436,7 @@ mod tests {
 
     #[test]
     fn is_scope_allowed_returns_false_for_disallowed_scope() {
-        let service = create_test_service(vec!["org"]);
+        let _service = create_test_service(vec!["org"]);
         let access = AccessPayload {
             allowed_scopes: Some(vec!["personal".to_string()]),
             allowed_tags: None,
@@ -2452,7 +2451,7 @@ mod tests {
 
     #[test]
     fn is_scope_allowed_allows_with_cross_scope_wildcard() {
-        let service = create_test_service(vec!["org"]);
+        let _service = create_test_service(vec!["org"]);
         let access = AccessPayload {
             allowed_scopes: Some(vec!["personal".to_string()]),
             allowed_tags: None,
@@ -3717,7 +3716,7 @@ mod tests {
 
     #[test]
     fn is_scope_allowed_with_empty_allowed_scopes() {
-        let service = create_test_service(vec!["org"]);
+        let _service = create_test_service(vec!["org"]);
         let access = AccessPayload {
             allowed_scopes: Some(vec![]),
             ..Default::default()
@@ -3727,7 +3726,7 @@ mod tests {
 
     #[test]
     fn is_scope_allowed_with_multiple_allowed_scopes() {
-        let service = create_test_service(vec!["org", "personal"]);
+        let _service = create_test_service(vec!["org", "personal"]);
         let access = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
             ..Default::default()

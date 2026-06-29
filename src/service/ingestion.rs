@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use crate::logging::{LogLevel, StdoutLogger};

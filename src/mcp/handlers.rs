@@ -1,6 +1,6 @@
 //! MCP tool handler implementations.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -247,10 +247,6 @@ impl MemoryMcp {
         }
     }
 
-    fn next_session_id(&self) -> String {
-        self.session_manager.next_session_id()
-    }
-
     fn enrich_session_payload(
         app: &str,
         session_id: &str,
@@ -259,10 +255,6 @@ impl MemoryMcp {
         payload: Value,
     ) -> Value {
         session::enrich_session_payload(app, session_id, scope, ttl_seconds, payload)
-    }
-
-    async fn insert_session(&self, session_id: String, session: session::AppSessionState) {
-        self.session_manager.insert(session_id, session).await;
     }
 
     async fn session(&self, session_id: &str) -> Result<session::AppSessionState, ErrorData> {
@@ -289,10 +281,6 @@ impl MemoryMcp {
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
         self.session_manager.create(app, scope, ttl_seconds, payload).await
-    }
-
-    fn open_app_result(app: &str, session_id: impl Into<String>, fallback: Value) -> OpenAppResult {
-        session::open_app_result(app, session_id, fallback)
     }
 
     fn app_command_result_from_details(

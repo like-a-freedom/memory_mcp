@@ -33,16 +33,10 @@ pub struct MockDbClient {
     select_table_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     facts_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    facts_ann_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    edges_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     entity_lookup_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
-    entities_batch_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     entities_by_ids_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    edges_for_triple_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     active_facts_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    episodes_for_archival_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    active_facts_by_episode_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     communities_by_members_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     communities_matching_summary_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
@@ -76,16 +70,10 @@ impl MockDbClient {
             select_table_responses: Mutex::new(HashMap::new()),
             facts_filtered_responses: Mutex::new(HashMap::new()),
             facts_entity_links_responses: Mutex::new(HashMap::new()),
-            facts_ann_responses: Mutex::new(HashMap::new()),
-            edges_filtered_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             entity_lookup_responses: Mutex::new(HashMap::new()),
-            entities_batch_responses: Mutex::new(HashMap::new()),
             entities_by_ids_responses: Mutex::new(HashMap::new()),
-            edges_for_triple_responses: Mutex::new(HashMap::new()),
             active_facts_responses: Mutex::new(HashMap::new()),
-            episodes_for_archival_responses: Mutex::new(HashMap::new()),
-            active_facts_by_episode_responses: Mutex::new(HashMap::new()),
             episodes_by_content_responses: Mutex::new(HashMap::new()),
             communities_by_members_responses: Mutex::new(HashMap::new()),
             communities_matching_summary_responses: Mutex::new(HashMap::new()),
@@ -113,7 +101,7 @@ impl MockDbClient {
         }
     }
 
-    pub fn expect_select_one(mut self, record_id: &str, result: Option<Value>) -> Self {
+    pub fn expect_select_one(self, record_id: &str, result: Option<Value>) -> Self {
         self.select_one_responses.lock().unwrap().insert(
             record_id.to_string(),
             Ok(result),
@@ -129,7 +117,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_create(mut self, record_id: &str, result: Value) -> Self {
+    pub fn expect_create(self, record_id: &str, result: Value) -> Self {
         self.create_responses.lock().unwrap().insert(
             record_id.to_string(),
             Ok(result),
@@ -145,7 +133,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_update(mut self, record_id: &str, result: Value) -> Self {
+    pub fn expect_update(self, record_id: &str, result: Value) -> Self {
         self.update_responses.lock().unwrap().insert(
             record_id.to_string(),
             Ok(result),
@@ -153,7 +141,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_select_table(mut self, table: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_select_table(self, table: &str, rows: Vec<Value>) -> Self {
         self.select_table_responses.lock().unwrap().insert(
             table.to_string(),
             Ok(rows),
@@ -161,7 +149,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_entity_lookup(mut self, normalized_name: &str, result: Option<Value>) -> Self {
+    pub fn expect_entity_lookup(self, normalized_name: &str, result: Option<Value>) -> Self {
         self.entity_lookup_responses.lock().unwrap().insert(
             normalized_name.to_string(),
             Ok(result),
@@ -169,7 +157,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_edge_neighbors(mut self, node_id: &str, neighbors: Vec<Value>) -> Self {
+    pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
         self.edge_neighbors_responses.lock().unwrap().insert(
             node_id.to_string(),
             Ok(neighbors),
@@ -185,7 +173,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_query(mut self, sql_prefix: &str, result: Value) -> Self {
+    pub fn expect_query(self, sql_prefix: &str, result: Value) -> Self {
         self.query_responses.lock().unwrap().insert(
             sql_prefix.to_string(),
             Ok(result),
@@ -193,7 +181,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_facts_filtered(mut self, key: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_facts_filtered(self, key: &str, rows: Vec<Value>) -> Self {
         self.facts_filtered_responses.lock().unwrap().insert(
             key.to_string(),
             Ok(rows),
@@ -201,7 +189,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_facts_by_entity_links(mut self, key: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_facts_by_entity_links(self, key: &str, rows: Vec<Value>) -> Self {
         self.facts_entity_links_responses.lock().unwrap().insert(
             key.to_string(),
             Ok(rows),
@@ -209,7 +197,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_active_facts(mut self, key: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_active_facts(self, key: &str, rows: Vec<Value>) -> Self {
         self.active_facts_responses.lock().unwrap().insert(
             key.to_string(),
             Ok(rows),
@@ -217,7 +205,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_episodes_by_content(mut self, key: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_episodes_by_content(self, key: &str, rows: Vec<Value>) -> Self {
         self.episodes_by_content_responses.lock().unwrap().insert(
             key.to_string(),
             Ok(rows),
@@ -225,7 +213,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_communities_matching_summary(mut self, query: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_communities_matching_summary(self, query: &str, rows: Vec<Value>) -> Self {
         self.communities_matching_summary_responses.lock().unwrap().insert(
             query.to_string(),
             Ok(rows),
@@ -233,7 +221,7 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_communities_by_member_entities(mut self, key: &str, rows: Vec<Value>) -> Self {
+    pub fn expect_communities_by_member_entities(self, key: &str, rows: Vec<Value>) -> Self {
         self.communities_by_members_responses.lock().unwrap().insert(
             key.to_string(),
             Ok(rows),

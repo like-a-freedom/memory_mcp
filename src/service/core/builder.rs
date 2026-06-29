@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -18,9 +17,6 @@ use crate::service::embedding::{
 };
 use crate::service::entity_extraction::create_entity_extractor;
 use crate::service::error::MemoryError;
-use crate::service::lifecycle::{
-    spawn_archival_worker, spawn_community_worker, spawn_decay_worker,
-};
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, LEGACY_EMBEDDING_SAMPLE_SIZE,
     apply_startup_migrations, build_startup_versions_event, count_facts_per_namespace,

@@ -5,7 +5,6 @@ use rmcp::ErrorData;
 use tokio::sync::RwLock;
 use serde_json::Value;
 
-use crate::models::AccessPayload;
 use super::resources::app_session_uri;
 
 use super::response::OpenAppResult;
@@ -28,13 +27,6 @@ impl SessionManager {
         Self {
             sessions: Arc::new(RwLock::new(std::collections::HashMap::new())),
             counter: Arc::new(AtomicU64::new(1)),
-        }
-    }
-
-    pub fn clone_inner(&self) -> Self {
-        Self {
-            sessions: self.sessions.clone(),
-            counter: self.counter.clone(),
         }
     }
 

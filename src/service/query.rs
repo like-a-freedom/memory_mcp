@@ -1,6 +1,6 @@
 //! Query preprocessing and utility functions.
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 
 mod search;
 mod time;

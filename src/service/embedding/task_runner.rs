@@ -3,28 +3,6 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-/// Identifies the kind of background embedding task.
-#[derive(Debug, Clone)]
-pub enum EmbeddingTaskKind {
-    Fact {
-        namespace: String,
-        fact_id: String,
-        input: String,
-    },
-    Query {
-        input: String,
-    },
-}
-
-impl EmbeddingTaskKind {
-    pub fn label(&self) -> &'static str {
-        match self {
-            EmbeddingTaskKind::Fact { .. } => "fact",
-            EmbeddingTaskKind::Query { .. } => "query",
-        }
-    }
-}
-
 /// Manages deduplication of background embedding tasks.
 pub struct BackgroundTaskRunner {
     inflight: Arc<Mutex<HashSet<String>>>,
@@ -35,10 +13,6 @@ impl BackgroundTaskRunner {
         Self {
             inflight: Arc::new(Mutex::new(HashSet::new())),
         }
-    }
-
-    pub fn inflight_set(&self) -> Arc<Mutex<HashSet<String>>> {
-        self.inflight.clone()
     }
 
     /// Returns true if the task was reserved (not already inflight).

@@ -120,22 +120,6 @@ impl EntityService {
         }
     }
 
-    /// Resolves an entity by its type and canonical name.
-    pub async fn resolve_typed(
-        &self,
-        entity_type: &str,
-        name: &str,
-    ) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: entity_type.to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
-    }
 }
 
 #[cfg(test)]
@@ -219,16 +203,4 @@ mod tests {
         assert_eq!(result.unwrap(), expected_id);
     }
 
-    #[tokio::test]
-    async fn resolve_typed_delegates_to_resolve() {
-        let db = MockDbClient::new().expect_entity_lookup(
-            "alice",
-            Some(serde_json::json!({"entity_id": "entity:person:alice"})),
-        );
-
-        let svc = EntityService::new(Arc::new(db), "org".into(), Arc::new(RateLimiter::new(1000, 100)));
-
-        let result = svc.resolve_typed("person", "Alice").await;
-        assert_eq!(result.unwrap(), "entity:person:alice");
-    }
 }

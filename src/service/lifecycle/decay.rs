@@ -3,7 +3,6 @@
 //! Periodically marks facts with decayed confidence below threshold as invalid.
 
 use chrono::Utc;
-use chrono::Duration;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
