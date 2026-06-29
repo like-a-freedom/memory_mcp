@@ -1589,7 +1589,7 @@ mod tests {
     use crate::models::{AccessPayload, AccessScopeAllow};
     use crate::service::EmbeddingProvider;
     use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
-    use crate::service::util::rate_limit::SafeMutex;
+    use crate::service::util::rate_limiter::SafeMutex;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;
