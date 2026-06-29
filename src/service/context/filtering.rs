@@ -13,12 +13,12 @@ pub(crate) fn fact_is_active_at(fact: &Fact, cutoff: chrono::DateTime<chrono::Ut
         return false;
     }
 
-    match (fact.t_invalid, fact.t_invalid_ingested) {
-        (None, _) => true,
-        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
-        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
-        _ => false,
-    }
+    // A fact is active if its primary invalidation timestamp hasn't been reached,
+    // or if its ingested-side invalidation is still in the future.
+    fact.is_active(cutoff)
+        || fact
+            .t_invalid_ingested
+            .map_or(false, |invalidated_ingested_at| invalidated_ingested_at > cutoff)
 }
 
 pub(crate) fn raw_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {

@@ -14,18 +14,9 @@ use crate::models::Fact;
 pub use time::{bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso};
 
 /// Calculate decayed confidence based on fact age.
+/// Delegates to [`crate::models::Fact::decayed_confidence`] (single source of truth).
 pub fn decayed_confidence(fact: &Fact, now: DateTime<Utc>) -> f64 {
-    let half_life_days = if fact.fact_type == "metric"
-        || fact.fact_type == "promise"
-        || fact.fact_type == "decision"
-    {
-        Fact::METRIC_HALF_LIFE_DAYS
-    } else {
-        Fact::DEFAULT_HALF_LIFE_DAYS
-    };
-    let delta_days = (now - fact.t_valid).num_days().max(0) as f64;
-    let decay = 0.5_f64.powf(delta_days / half_life_days);
-    (fact.confidence * decay * Fact::CONFIDENCE_SCALE).round() / Fact::CONFIDENCE_SCALE
+    fact.decayed_confidence(now)
 }
 
 #[cfg(test)]
