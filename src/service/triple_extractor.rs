@@ -57,6 +57,7 @@ pub const SINGLETON_PREDICATES: &[&str] = &[
     "has_email",
     "has_phone",
     "is_ceo_of",
+    "is_founder_of",
     "is_married_to",
     "has_birthday",
     "has_age",
@@ -94,13 +95,14 @@ impl RuleBasedTripleExtractor {
         // Patterns: list of (regex, predicate_name)
         // Each regex must have exactly two capture groups: subject and object.
         let raw_patterns: Vec<(&str, &str)> = vec![
+            // English patterns
             (r"(.+?)\s+works?\s+at\s+(.+?)$", "works_at"),
             (r"(.+?)\s+works?\s+for\s+(.+?)$", "works_at"),
             (r"(.+?)\s+lives?\s+in\s+(.+?)$", "lives_in"),
             (r"(.+?)\s+is\s+(?:the\s+)?CEO\s+of\s+(.+?)$", "is_ceo_of"),
             (
                 r"(.+?)\s+is\s+(?:the\s+)?founder\s+of\s+(.+?)$",
-                "is_ceo_of",
+                "is_founder_of",
             ),
             (r"(.+?)\s+is\s+(?:the\s+)?CTO\s+of\s+(.+?)$", "has_title"),
             (
@@ -119,6 +121,26 @@ impl RuleBasedTripleExtractor {
             (r"(.+?)\s+has\s+address\s+(.+?)$", "has_address"),
             (r"(.+?)\s+is\s+married\s+to\s+(.+?)$", "is_married_to"),
             (r"(.+?)\s+lives?\s+at\s+(.+?)$", "lives_in"),
+            // Russian patterns
+            (r"(.+?)\s+работает\s+в\s+(.+?)$", "works_at"),
+            (r"(.+?)\s+работает\s+в\s+компании\s+(.+?)$", "works_at"),
+            (r"(.+?)\s+живёт\s+в\s+(.+?)$", "lives_in"),
+            (r"(.+?)\s+живет\s+в\s+(.+?)$", "lives_in"),
+            (
+                r"(.+?)\s+является\s+(?:учредителем|основателем)\s+(.+?)$",
+                "is_founder_of",
+            ),
+            (
+                r"(.+?)\s+является\s+(?:генеральным\s+директором|CEO)\s+(?:компании\s+)?(.+?)$",
+                "is_ceo_of",
+            ),
+            (r"(.+?)\s+находится\s+в\s+(.+?)$", "located_in"),
+            (r"(.+?)\s+женат\s+на\s+(.+?)$", "is_married_to"),
+            (r"(.+?)\s+замужем\s+за\s+(.+?)$", "is_married_to"),
+            (r"(.+?)\s+имеет\s+email\s+(.+?)$", "has_email"),
+            (r"(.+?)\s+имеет\s+телефон\s+(.+?)$", "has_phone"),
+            (r"(.+?)\s+имеет\s+возраст\s+(\d+)", "has_age"),
+            (r"(.+?)\s+имеет\s+должность\s+(.+?)$", "has_title"),
         ];
         let patterns = raw_patterns
             .into_iter()
@@ -202,6 +224,52 @@ mod tests {
         assert_eq!(triples.len(), 1);
         assert_eq!(triples[0].predicate, "is_ceo_of");
         assert_eq!(triples[0].object, "Tech Inc");
+    }
+
+    #[tokio::test]
+    async fn extract_is_founder_of_triple() {
+        let extractor = RuleBasedTripleExtractor::new();
+        let triples = extractor
+            .extract("Jane Doe is the founder of StartupXYZ", "fact:3b")
+            .await
+            .unwrap();
+        assert_eq!(triples.len(), 1);
+        assert_eq!(triples[0].predicate, "is_founder_of");
+        assert_eq!(triples[0].object, "StartupXYZ");
+    }
+
+    #[tokio::test]
+    async fn extract_russian_works_at() {
+        let extractor = RuleBasedTripleExtractor::new();
+        let triples = extractor
+            .extract("Иван Петров работает в Газпроме", "fact:ru1")
+            .await
+            .unwrap();
+        assert_eq!(triples.len(), 1);
+        assert_eq!(triples[0].predicate, "works_at");
+        assert!(triples[0].object.contains("Газпром"));
+    }
+
+    #[tokio::test]
+    async fn extract_russian_lives_in() {
+        let extractor = RuleBasedTripleExtractor::new();
+        let triples = extractor
+            .extract("Мария живёт в Москве", "fact:ru2")
+            .await
+            .unwrap();
+        assert_eq!(triples.len(), 1);
+        assert_eq!(triples[0].predicate, "lives_in");
+    }
+
+    #[tokio::test]
+    async fn extract_russian_ceo() {
+        let extractor = RuleBasedTripleExtractor::new();
+        let triples = extractor
+            .extract("Пётр является генеральным директором Лукойла", "fact:ru3")
+            .await
+            .unwrap();
+        assert_eq!(triples.len(), 1);
+        assert_eq!(triples[0].predicate, "is_ceo_of");
     }
 
     #[tokio::test]
