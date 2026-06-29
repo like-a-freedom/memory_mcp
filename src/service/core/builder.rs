@@ -722,12 +722,6 @@ impl AssembleContextRequestBuilder {
         self
     }
 
-    /// Sets the as-of timestamp.
-    pub fn as_of(mut self, value: DateTime<Utc>) -> Self {
-        self.as_of = Some(value);
-        self
-    }
-
     /// Sets the budget.
     pub fn budget(mut self, value: i32) -> Self {
         self.budget = Some(value);

@@ -68,6 +68,55 @@ pub(super) fn should_prefer_episode_content(
     best_episode_term_coverage > selected_fact_term_coverage
 }
 
+pub(super) async fn collect_episode_fallback_items(
+    service: &MemoryService,
+    params: &DefaultContextParams<'_>,
+    query: &str,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let episode_records = lexical::select_episode_records_for_query(
+        service,
+        params.namespace,
+        params.scope,
+        params.cutoff_iso,
+        Some(query),
+        params.budget,
+        params.project_opt,
+    )
+    .await?;
+
+    let query_terms = crate::service::query::search_query_terms(query);
+    let mut episodes = filtering::filter_episodes_by_constraints(
+        episode_records,
+        params.access,
+        params.project_opt,
+    );
+
+    episodes.sort_by(|left, right| {
+        lexical::lexical_query_score_for_text(&right.content, &query_terms)
+            .cmp(&lexical::lexical_query_score_for_text(
+                &left.content,
+                &query_terms,
+            ))
+            .then_with(|| right.t_ref.cmp(&left.t_ref))
+            .then_with(|| left.episode_id.cmp(&right.episode_id))
+    });
+
+    use super::views::{EpisodeFallbackParams, build_episode_fallback_items};
+
+    Ok(build_episode_fallback_items(EpisodeFallbackParams {
+        episodes,
+        query_opt: Some(query),
+        semantic_available: service.embedding_provider.is_enabled(),
+        scope: params.scope,
+        cutoff: params.cutoff,
+        window_start: params.window_start,
+        window_end: params.window_end,
+        timeline_mode: params.resolved_view_mode == Some("timeline"),
+        budget: params.budget,
+        fallback_rationale_fn: default_episode_fallback_rationale,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,53 +281,4 @@ mod tests {
         let terms = matched_query_terms_for_text("hello world", &[]);
         assert!(terms.is_empty());
     }
-}
-
-pub(super) async fn collect_episode_fallback_items(
-    service: &MemoryService,
-    params: &DefaultContextParams<'_>,
-    query: &str,
-) -> Result<Vec<AssembledContextItem>, MemoryError> {
-    let episode_records = lexical::select_episode_records_for_query(
-        service,
-        params.namespace,
-        params.scope,
-        params.cutoff_iso,
-        Some(query),
-        params.budget,
-        params.project_opt,
-    )
-    .await?;
-
-    let query_terms = crate::service::query::search_query_terms(query);
-    let mut episodes = filtering::filter_episodes_by_constraints(
-        episode_records,
-        params.access,
-        params.project_opt,
-    );
-
-    episodes.sort_by(|left, right| {
-        lexical::lexical_query_score_for_text(&right.content, &query_terms)
-            .cmp(&lexical::lexical_query_score_for_text(
-                &left.content,
-                &query_terms,
-            ))
-            .then_with(|| right.t_ref.cmp(&left.t_ref))
-            .then_with(|| left.episode_id.cmp(&right.episode_id))
-    });
-
-    use super::views::{EpisodeFallbackParams, build_episode_fallback_items};
-
-    Ok(build_episode_fallback_items(EpisodeFallbackParams {
-        episodes,
-        query_opt: Some(query),
-        semantic_available: service.embedding_provider.is_enabled(),
-        scope: params.scope,
-        cutoff: params.cutoff,
-        window_start: params.window_start,
-        window_end: params.window_end,
-        timeline_mode: params.resolved_view_mode == Some("timeline"),
-        budget: params.budget,
-        fallback_rationale_fn: default_episode_fallback_rationale,
-    }))
 }

@@ -228,7 +228,7 @@ impl Fact {
     /// Returns true if the fact is active (not invalidated) as of the given timestamp.
     #[must_use]
     pub fn is_active(&self, as_of: DateTime<Utc>) -> bool {
-        self.t_invalid.map_or(true, |t| t > as_of)
+        self.t_invalid.is_none_or(|t| t > as_of)
     }
 
     /// Calculates confidence decayed by half-life based on fact age.
@@ -553,6 +553,7 @@ mod tests {
 
     #[test]
     fn id_type_from_str_and_clone() {
+        #[allow(clippy::type_complexity)]
         let pairs: &[(String, fn(&str) -> Box<dyn std::any::Any>, bool)] = &[]; // placeholder
         for (input, _maker, _is_clone) in pairs {
             let _ = input;

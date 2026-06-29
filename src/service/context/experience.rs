@@ -68,125 +68,6 @@ pub(crate) fn expand_experience_query_terms(
     expanded
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // -- expand_experience_query_terms -------------------------------------
-
-    fn make_fact(content: &str, index_keys: Vec<String>) -> Fact {
-        Fact {
-            fact_id: "test:1".into(),
-            fact_type: "experience".into(),
-            content: content.into(),
-            quote: String::new(),
-            source_episode: "ep:1".into(),
-            t_valid: chrono::Utc::now(),
-            t_ingested: chrono::Utc::now(),
-            t_invalid: None,
-            t_invalid_ingested: None,
-            confidence: 1.0,
-            index_keys,
-            access_count: 0,
-            last_accessed: None,
-            entity_links: vec![],
-            scope: "org".into(),
-            policy_tags: vec![],
-            provenance: serde_json::Value::Null,
-            ft_score: 0.0,
-        }
-    }
-
-    #[test]
-    fn expand_terms_preserves_original_query_terms() {
-        let terms = expand_experience_query_terms(&["hello".to_string(), "world".to_string()], &[]);
-        assert_eq!(terms, vec!["hello".to_string(), "world".to_string()]);
-    }
-
-    #[test]
-    fn expand_terms_deduplicates_original() {
-        let terms = expand_experience_query_terms(&["hello".to_string(), "hello".to_string()], &[]);
-        assert_eq!(terms, vec!["hello".to_string()]);
-    }
-
-    #[test]
-    fn expand_terms_adds_repeated_terms_from_direct_facts() {
-        let facts = vec![
-            make_fact("react hooks are great", vec![]),
-            make_fact("react state management is important", vec![]),
-            make_fact("typescript improves react code", vec![]),
-        ];
-        let expanded = expand_experience_query_terms(&["hooks".to_string()], &facts);
-        assert!(
-            expanded.contains(&"react".to_string()),
-            "react should be added as repeated term"
-        );
-        assert!(
-            expanded.contains(&"hooks".to_string()),
-            "original term hooks should be preserved"
-        );
-    }
-
-    #[test]
-    fn expand_terms_empty_query_terms_with_repeated_content() {
-        let facts = vec![
-            make_fact("coffee is great", vec![]),
-            make_fact("coffee in the morning", vec![]),
-        ];
-        let expanded = expand_experience_query_terms(&[], &facts);
-        assert!(expanded.contains(&"coffee".to_string()));
-    }
-
-    #[test]
-    fn expand_terms_limits_to_6_repeated_terms() {
-        let mut facts = Vec::new();
-        for i in 0..10 {
-            let term = format!("term{i}");
-            facts.push(make_fact(&format!("{term} is here"), vec![]));
-            facts.push(make_fact(&format!("{term} again"), vec![]));
-        }
-        let expanded = expand_experience_query_terms(&["original".to_string()], &facts);
-        assert!(
-            expanded.len() <= 7,
-            "should have at most 7 terms, got {}",
-            expanded.len()
-        );
-        assert!(expanded.contains(&"original".to_string()));
-    }
-
-    #[test]
-    fn expand_terms_scans_first_5_facts_only() {
-        let facts: Vec<_> = (0..20)
-            .map(|i| make_fact(&format!("common word is {i}"), vec![]))
-            .collect();
-        let expanded = expand_experience_query_terms(&["unique".to_string()], &facts);
-        assert!(expanded.contains(&"unique".to_string()));
-    }
-
-    #[test]
-    fn expand_terms_scans_index_keys_too() {
-        let facts = vec![
-            make_fact("unrelated content", vec!["typescript".to_string()]),
-            make_fact("unrelated content two", vec!["typescript".to_string()]),
-        ];
-        let expanded = expand_experience_query_terms(&[], &facts);
-        assert!(
-            expanded.contains(&"typescript".to_string()),
-            "typescript from index_keys should be detected as repeated",
-        );
-    }
-
-    #[test]
-    fn expand_terms_does_not_add_single_occurrence_terms() {
-        let facts = vec![
-            make_fact("unique term here", vec![]),
-            make_fact("something else entirely", vec![]),
-        ];
-        let expanded = expand_experience_query_terms(&["query".to_string()], &facts);
-        assert_eq!(expanded, vec!["query".to_string()]);
-    }
-}
-
 pub(crate) async fn collect_recent_experience_facts(
     service: &crate::service::MemoryService,
     request: RecentExperienceRequest<'_>,
@@ -306,4 +187,123 @@ pub(crate) async fn append_recent_experience_items(
     }
 
     Ok(appended)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- expand_experience_query_terms -------------------------------------
+
+    fn make_fact(content: &str, index_keys: Vec<String>) -> Fact {
+        Fact {
+            fact_id: "test:1".into(),
+            fact_type: "experience".into(),
+            content: content.into(),
+            quote: String::new(),
+            source_episode: "ep:1".into(),
+            t_valid: chrono::Utc::now(),
+            t_ingested: chrono::Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys,
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".into(),
+            policy_tags: vec![],
+            provenance: serde_json::Value::Null,
+            ft_score: 0.0,
+        }
+    }
+
+    #[test]
+    fn expand_terms_preserves_original_query_terms() {
+        let terms = expand_experience_query_terms(&["hello".to_string(), "world".to_string()], &[]);
+        assert_eq!(terms, vec!["hello".to_string(), "world".to_string()]);
+    }
+
+    #[test]
+    fn expand_terms_deduplicates_original() {
+        let terms = expand_experience_query_terms(&["hello".to_string(), "hello".to_string()], &[]);
+        assert_eq!(terms, vec!["hello".to_string()]);
+    }
+
+    #[test]
+    fn expand_terms_adds_repeated_terms_from_direct_facts() {
+        let facts = vec![
+            make_fact("react hooks are great", vec![]),
+            make_fact("react state management is important", vec![]),
+            make_fact("typescript improves react code", vec![]),
+        ];
+        let expanded = expand_experience_query_terms(&["hooks".to_string()], &facts);
+        assert!(
+            expanded.contains(&"react".to_string()),
+            "react should be added as repeated term"
+        );
+        assert!(
+            expanded.contains(&"hooks".to_string()),
+            "original term hooks should be preserved"
+        );
+    }
+
+    #[test]
+    fn expand_terms_empty_query_terms_with_repeated_content() {
+        let facts = vec![
+            make_fact("coffee is great", vec![]),
+            make_fact("coffee in the morning", vec![]),
+        ];
+        let expanded = expand_experience_query_terms(&[], &facts);
+        assert!(expanded.contains(&"coffee".to_string()));
+    }
+
+    #[test]
+    fn expand_terms_limits_to_6_repeated_terms() {
+        let mut facts = Vec::new();
+        for i in 0..10 {
+            let term = format!("term{i}");
+            facts.push(make_fact(&format!("{term} is here"), vec![]));
+            facts.push(make_fact(&format!("{term} again"), vec![]));
+        }
+        let expanded = expand_experience_query_terms(&["original".to_string()], &facts);
+        assert!(
+            expanded.len() <= 7,
+            "should have at most 7 terms, got {}",
+            expanded.len()
+        );
+        assert!(expanded.contains(&"original".to_string()));
+    }
+
+    #[test]
+    fn expand_terms_scans_first_5_facts_only() {
+        let facts: Vec<_> = (0..20)
+            .map(|i| make_fact(&format!("common word is {i}"), vec![]))
+            .collect();
+        let expanded = expand_experience_query_terms(&["unique".to_string()], &facts);
+        assert!(expanded.contains(&"unique".to_string()));
+    }
+
+    #[test]
+    fn expand_terms_scans_index_keys_too() {
+        let facts = vec![
+            make_fact("unrelated content", vec!["typescript".to_string()]),
+            make_fact("unrelated content two", vec!["typescript".to_string()]),
+        ];
+        let expanded = expand_experience_query_terms(&[], &facts);
+        assert!(
+            expanded.contains(&"typescript".to_string()),
+            "typescript from index_keys should be detected as repeated",
+        );
+    }
+
+    #[test]
+    fn expand_terms_does_not_add_single_occurrence_terms() {
+        let facts = vec![
+            make_fact("unique term here", vec![]),
+            make_fact("something else entirely", vec![]),
+        ];
+        let expanded = expand_experience_query_terms(&["query".to_string()], &facts);
+        assert_eq!(expanded, vec!["query".to_string()]);
+    }
 }
