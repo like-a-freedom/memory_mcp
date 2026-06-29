@@ -23,9 +23,11 @@ mod core;
 mod embedding;
 mod embedding_runtime;
 mod entity_extraction;
+mod entity;
 mod episode;
 mod error;
 mod ingest;
+pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 mod query;
 mod reembed;
@@ -71,7 +73,7 @@ pub use util::{
     validate_ingest_request,
 };
 
-pub(crate) use core::{log_args_with_duration, log_event};
+pub(crate) use core::{log_args_with_duration, log_event, resolve_namespace};
 pub(crate) use embedding_runtime::{
     CachedQueryEmbedding, DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS,
     DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, background_embedding_retry_delay,
