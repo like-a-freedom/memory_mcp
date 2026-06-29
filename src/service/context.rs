@@ -450,7 +450,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
-            provenance: json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         }
     }

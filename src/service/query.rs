@@ -45,7 +45,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
-            provenance: json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
@@ -72,7 +72,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
-            provenance: json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
@@ -99,7 +99,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
-            provenance: json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
@@ -126,7 +126,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".to_string(),
             policy_tags: vec![],
-            provenance: json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let confidence = decayed_confidence(&fact, Utc::now());

@@ -102,7 +102,9 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
         entity_links: str_array_field(map, "entity_links"),
         scope: str_field(map, "scope").unwrap_or_default(),
         policy_tags: str_array_field(map, "policy_tags"),
-        provenance: map.get("provenance").cloned().unwrap_or(Value::Null),
+        provenance: crate::models::Provenance::from_json_value(
+            &map.get("provenance").cloned().unwrap_or(Value::Null),
+        ),
         ft_score: f64_field(map, "ft_score", 0.0),
     })
 }

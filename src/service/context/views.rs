@@ -358,7 +358,7 @@ pub(crate) async fn build_wake_up_view(
                 source_episode: fact.source_episode,
                 confidence,
                 ..AssembledContextItem {
-                    provenance: fact.provenance,
+                    provenance: fact.provenance.to_json_value(),
                     rationale: format!(
                         "view_mode=wake_up persona={} recent_t_ingested={}",
                         persona,

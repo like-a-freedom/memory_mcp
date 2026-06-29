@@ -24,8 +24,10 @@ pub(super) fn ranked_fact_to_item(
         ..
     } = ranked;
     let confidence = decay_fn(&fact, cutoff);
-    let mut provenance = fact.provenance;
 
+    // Build provenance output: start with structured fields, then add
+    // query-time enrichment (matched_query_terms, graph_trace).
+    let mut provenance = fact.provenance.to_json_value();
     if !provenance.is_object() {
         provenance = json!({});
     }
@@ -128,7 +130,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".into(),
             policy_tags: vec![],
-            provenance: serde_json::Value::Null,
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         }
     }
@@ -356,7 +358,9 @@ mod tests {
     #[test]
     fn ranked_fact_to_item_handles_non_object_provenance() {
         let fact = Fact {
-            provenance: serde_json::json!("I am a string, not an object"),
+            provenance: crate::models::Provenance::from_json_value(&serde_json::json!(
+                "I am a string, not an object"
+            )),
             ..make_fact("test", vec![])
         };
         let ranked = make_ranked(

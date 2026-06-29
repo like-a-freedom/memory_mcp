@@ -13,7 +13,7 @@ mod common;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest};
+use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest, Provenance};
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -39,7 +39,7 @@ async fn explain_returns_direct_provenance_source() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": episode_id}),
+            Provenance::agent_observation(episode_id),
         )
         .await
         .expect("fact added");
@@ -105,7 +105,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             0.8,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -161,7 +161,7 @@ async fn explain_populates_all_sources_field() {
             0.95,
             vec![],
             vec![],
-            json!({"source_episode": episode_id}),
+            Provenance::agent_observation(episode_id),
         )
         .await
         .expect("fact added");
@@ -255,7 +255,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             0.9,
             vec![entity_id.clone()],
             vec![],
-            json!({"source_episode": episode_a_id}),
+            Provenance::agent_observation(&episode_a_id),
         )
         .await
         .expect("add fact A");
@@ -293,7 +293,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             0.85,
             vec![entity_id.clone()],
             vec![],
-            json!({"source_episode": episode_b_id}),
+            Provenance::agent_observation(&episode_b_id),
         )
         .await
         .expect("add fact B");
@@ -376,10 +376,10 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:explain-boost"}),
+            Provenance::agent_observation("episode:explain-boost"),
         )
         .await
-        .expect("fact added");
+        .expect("add fact");
 
     let result = service
         .explain(
@@ -551,10 +551,10 @@ async fn explain_batch_shares_graph_insights() {
             0.9,
             vec![alice_id.clone(), bob_id.clone()],
             vec![],
-            json!({"source_episode": ep_a}),
+            Provenance::agent_observation(&ep_a),
         )
         .await
-        .expect("fact a");
+        .expect("add fact a");
 
     // Episode B → fact with same entity set (Alice + Bob)
     let ep_b = service
@@ -585,10 +585,10 @@ async fn explain_batch_shares_graph_insights() {
             0.9,
             vec![bob_id.clone(), alice_id.clone()],
             vec![],
-            json!({"source_episode": ep_b}),
+            Provenance::agent_observation(&ep_b),
         )
         .await
-        .expect("fact b");
+        .expect("add fact b");
 
     // Explain both facts in a single batch
     let result = service
@@ -670,10 +670,10 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
             0.9,
             vec![alice_id],
             vec![],
-            json!({"source_episode": ep_with}),
+            Provenance::agent_observation(&ep_with),
         )
         .await
-        .expect("fact");
+        .expect("add fact");
 
     // Episode without fact (raw episode explain)
     let ep_without = service

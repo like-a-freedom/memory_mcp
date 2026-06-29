@@ -20,7 +20,7 @@ pub(crate) fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<
     m.insert("origin".to_string(), json!(edge.origin));
     m.insert("strength".to_string(), json!(edge.strength));
     m.insert("confidence".to_string(), json!(edge.confidence));
-    m.insert("provenance".to_string(), edge.provenance.clone());
+    m.insert("provenance".to_string(), edge.provenance.to_json_value());
     m.insert(
         "t_valid".to_string(),
         Value::String(normalize_dt(edge.t_valid)),

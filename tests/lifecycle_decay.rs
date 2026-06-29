@@ -8,6 +8,7 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
+use memory_mcp::models::Provenance;
 use memory_mcp::service::run_decay_pass;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
@@ -30,7 +31,7 @@ async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
             0.4,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -65,7 +66,7 @@ async fn decay_pass_processes_all_configured_namespaces() {
             0.4,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -100,7 +101,7 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
             0.4,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -169,7 +170,7 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
             0.95, // high confidence, won't decay below threshold
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -207,7 +208,7 @@ async fn decay_pass_invalidates_old_low_confidence_facts() {
             0.4, // moderate confidence, will decay
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -243,7 +244,7 @@ async fn decay_pass_respects_threshold_parameter() {
             0.8,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -260,7 +261,7 @@ async fn decay_pass_respects_threshold_parameter() {
             0.3,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -295,7 +296,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -345,7 +346,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             0.5,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -361,7 +362,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             0.5,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -383,7 +384,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             0.5,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -427,7 +428,7 @@ async fn decay_confidence_calculation_exponential() {
             0.5, // base confidence
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");

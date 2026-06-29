@@ -289,7 +289,7 @@ mod tests {
             relevance: None,
             grounding: None,
             semantic_available: None,
-            provenance: serde_json::Value::Null,
+            provenance: serde_json::json!({}),
             rationale: rationale.into(),
             retrieval_tier: retrieval_tier.map(str::to_string),
         }

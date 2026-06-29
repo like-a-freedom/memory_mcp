@@ -1,5 +1,7 @@
 use chrono::{TimeZone, Utc};
-use memory_mcp::models::{AccessPayload, EntityCandidate, IngestRequest, InvalidateRequest};
+use memory_mcp::models::{
+    AccessPayload, EntityCandidate, IngestRequest, InvalidateRequest, Provenance,
+};
 use memory_mcp::storage::DbClient;
 
 mod common;
@@ -206,7 +208,7 @@ async fn test_policy_tag_filtering() {
             0.9,
             vec!["entity:a".to_string()],
             vec!["hr.salary".to_string()],
-            serde_json::json!({"source_episode": "episode:hr"}),
+            Provenance::agent_observation("episode:hr"),
         )
         .await
         .expect("add_fact");
@@ -352,7 +354,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
             0.9,
             vec![alice_id.clone()],
             vec![],
-            serde_json::json!({"source_episode": episode_id}),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .expect("add fact");
@@ -497,7 +499,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
             0.8,
             vec![alice_id],
             vec![],
-            serde_json::json!({"source_episode": episode_id}),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .expect("add fact");
@@ -570,7 +572,7 @@ async fn test_rate_limit_determinism() {
             0.8,
             vec!["entity:a".to_string()],
             vec![],
-            serde_json::json!({"source_episode": "episode:vars"}),
+            Provenance::agent_observation("episode:vars"),
         )
         .await
         .expect("add_fact");
@@ -651,7 +653,7 @@ async fn test_multiword_query_retrieval_quality() {
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:035d8d47"}),
+            Provenance::agent_observation("episode:035d8d47"),
         )
         .await
         .expect("add fact 1");
@@ -667,7 +669,7 @@ async fn test_multiword_query_retrieval_quality() {
             0.85,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:035d8d47"}),
+            Provenance::agent_observation("episode:035d8d47"),
         )
         .await
         .expect("add fact 2");
@@ -683,7 +685,7 @@ async fn test_multiword_query_retrieval_quality() {
             0.8,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:8de581d5"}),
+            Provenance::agent_observation("episode:8de581d5"),
         )
         .await
         .expect("add fact 3");
@@ -766,7 +768,7 @@ async fn test_short_natural_language_query_uses_term_fallback() {
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:degree-answer"}),
+            Provenance::agent_observation("episode:degree-answer"),
         )
         .await
         .expect("add answer fact");
@@ -782,7 +784,7 @@ async fn test_short_natural_language_query_uses_term_fallback() {
             0.8,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:degree-generic"}),
+            Provenance::agent_observation("episode:degree-generic"),
         )
         .await
         .expect("add generic degree fact");
@@ -798,7 +800,7 @@ async fn test_short_natural_language_query_uses_term_fallback() {
             0.8,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:graduate-generic"}),
+            Provenance::agent_observation("episode:graduate-generic"),
         )
         .await
         .expect("add generic graduate fact");
@@ -993,7 +995,7 @@ async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:generic-rollout-noise-1"}),
+            Provenance::agent_observation("episode:generic-rollout-noise-1"),
         )
         .await
         .expect("seed generic rollout noise 1");
@@ -1009,7 +1011,7 @@ async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:generic-rollout-noise-2"}),
+            Provenance::agent_observation("episode:generic-rollout-noise-2"),
         )
         .await
         .expect("seed generic rollout noise 2");
@@ -1052,7 +1054,7 @@ async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_t
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:temporal-tier"}),
+            Provenance::agent_observation("episode:temporal-tier"),
         )
         .await
         .expect("seed temporal fact");
@@ -1107,7 +1109,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:july-requirement"}),
+            Provenance::agent_observation("episode:july-requirement"),
         )
         .await
         .expect("seed july requirement fact");
@@ -1123,7 +1125,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:august-noise"}),
+            Provenance::agent_observation("episode:august-noise"),
         )
         .await
         .expect("seed august noise fact");
@@ -1139,7 +1141,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
             0.95,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:recent-experience"}),
+            Provenance::agent_observation("episode:recent-experience"),
         )
         .await
         .expect("seed recent experience fact");
@@ -1194,7 +1196,7 @@ async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temp
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:october-summary"}),
+            Provenance::agent_observation("episode:october-summary"),
         )
         .await
         .expect("seed october summary fact");
@@ -1257,7 +1259,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:july-licensing-noise"}),
+            Provenance::agent_observation("episode:july-licensing-noise"),
         )
         .await
         .expect("seed unrelated fact noise");
@@ -1603,7 +1605,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:openshift-anchor"}),
+            Provenance::agent_observation("episode:openshift-anchor"),
         )
         .await
         .expect("seed anchor fact");
@@ -1619,7 +1621,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:generic-rollout-1"}),
+            Provenance::agent_observation("episode:generic-rollout-1"),
         )
         .await
         .expect("seed generic rollout fact 1");
@@ -1635,7 +1637,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:generic-rollout-2"}),
+            Provenance::agent_observation("episode:generic-rollout-2"),
         )
         .await
         .expect("seed generic rollout fact 2");

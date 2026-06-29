@@ -175,7 +175,7 @@ pub(crate) async fn append_recent_experience_items(
             source_episode: fact.source_episode,
             confidence,
             semantic_available: Some(service.embedding_provider.is_enabled()),
-            provenance: fact.provenance,
+            provenance: fact.provenance.to_json_value(),
             rationale: format!(
                 "supplemental experience recent_t_ingested={}",
                 normalize_dt(fact.t_ingested)
@@ -213,7 +213,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".into(),
             policy_tags: vec![],
-            provenance: serde_json::Value::Null,
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         }
     }

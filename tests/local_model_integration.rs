@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 use chrono::Utc;
 use memory_mcp::MemoryService;
 use memory_mcp::config::NerConfig;
-use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest};
+use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
 use serde_json::json;
 use tempfile::TempDir;
@@ -442,7 +442,7 @@ async fn add_note_fact(service: &MemoryService, source_episode: &str, content: &
             0.95,
             Vec::new(),
             Vec::new(),
-            json!({"source": "local-model-integration-test"}),
+            Provenance::agent_observation(source_episode),
         )
         .await
         .expect("fact insertion should succeed")

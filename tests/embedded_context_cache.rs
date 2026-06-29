@@ -1,7 +1,7 @@
 mod embedded_support;
 
 use chrono::{Duration, Utc};
-use memory_mcp::models::{AccessPayload, AssembleContextRequest};
+use memory_mcp::models::{AccessPayload, AssembleContextRequest, Provenance};
 
 #[tokio::test]
 async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +19,7 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
             0.8,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:cache"}),
+            Provenance::agent_observation("episode:cache"),
         )
         .await?;
 

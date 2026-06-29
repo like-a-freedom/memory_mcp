@@ -3,6 +3,7 @@
 //! These tests verify that different service components work together correctly.
 
 use chrono::{TimeZone, Utc};
+use memory_mcp::models::Provenance;
 use memory_mcp::service::EntityExtractor;
 use memory_mcp::storage::DbClient;
 use serde_json::{Value, json};
@@ -124,7 +125,9 @@ async fn test_service_add_fact_and_assemble_context() {
             0.9,
             vec![],
             vec!["finance".to_string()],
-            json!({"quarter": "Q4", "year": 2023}),
+            memory_mcp::models::Provenance::from_json_value(
+                &json!({"quarter": "Q4", "year": 2023}),
+            ),
         )
         .await
         .unwrap();
@@ -153,10 +156,11 @@ async fn test_service_add_fact_and_assemble_context() {
 async fn test_service_add_fact_persists_provenance() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let provenance = json!({
-        "source_episode": "episode:provenance",
-        "ingest": {"source_type": "email", "source_id": "prov-1"}
-    });
+    let provenance = memory_mcp::models::Provenance {
+        source_episode_id: Some("episode:provenance".to_string()),
+        ingestion_method: "manual".to_string(),
+        ..Default::default()
+    };
 
     let fact_id = service
         .add_fact(
@@ -179,7 +183,12 @@ async fn test_service_add_fact_persists_provenance() {
         .await
         .unwrap()
         .expect("stored fact");
-    assert_eq!(stored.get("provenance"), Some(&provenance));
+    assert_eq!(
+        stored
+            .get("provenance")
+            .and_then(|p| p.get("source_episode_id")),
+        Some(&serde_json::json!("episode:provenance"))
+    );
 }
 
 #[tokio::test]
@@ -211,7 +220,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     assert!(!edges.is_empty());
     assert!(edges.iter().all(|edge| {
         edge.get("provenance")
-            .and_then(|value| value.get("source_episode"))
+            .and_then(|value| value.get("source_episode_id"))
             == Some(&json!(episode_id))
     }));
     assert!(
@@ -409,7 +418,7 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
             0.8,
             vec![entity_id.clone()],
             vec![],
-            json!({"source_episode": episode_id}),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .unwrap();
@@ -450,7 +459,7 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:semantic-similarity"}),
+            Provenance::agent_observation("episode:semantic-similarity"),
         )
         .await
         .unwrap();
@@ -545,7 +554,7 @@ async fn test_service_fact_invalidation() {
             0.9,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -611,7 +620,7 @@ async fn test_service_cache_behavior() {
             0.8,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -650,7 +659,7 @@ async fn test_service_assemble_context_records_fact_access_heat() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:heat-retrieval"}),
+            Provenance::agent_observation("episode:heat-retrieval"),
         )
         .await
         .unwrap();
@@ -701,7 +710,7 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:heat-cache"}),
+            Provenance::agent_observation("episode:heat-cache"),
         )
         .await
         .unwrap();
@@ -771,7 +780,7 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:query-log-default-off"}),
+            Provenance::agent_observation("episode:query-log-default-off"),
         )
         .await
         .unwrap();
@@ -816,7 +825,7 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:query-log-direct"}),
+            Provenance::agent_observation("episode:query-log-direct"),
         )
         .await
         .unwrap();
@@ -949,7 +958,7 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:query-log-cache"}),
+            Provenance::agent_observation("episode:query-log-cache"),
         )
         .await
         .unwrap();
@@ -1021,7 +1030,7 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:query-log-retention-default"}),
+            Provenance::agent_observation("episode:query-log-retention-default"),
         )
         .await
         .unwrap();
@@ -1093,7 +1102,7 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:query-log-retention-custom"}),
+            Provenance::agent_observation("episode:query-log-retention-custom"),
         )
         .await
         .unwrap();
@@ -1157,7 +1166,7 @@ async fn test_service_scope_isolation() {
             0.9,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -1173,7 +1182,7 @@ async fn test_service_scope_isolation() {
             0.9,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -1399,7 +1408,7 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": atlas_episode}),
+            Provenance::agent_observation(&atlas_episode),
         )
         .await
         .unwrap();
@@ -1415,7 +1424,7 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": atlas_episode}),
+            Provenance::agent_observation(&atlas_episode),
         )
         .await
         .unwrap();
@@ -1431,7 +1440,7 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": beacon_episode}),
+            Provenance::agent_observation(&beacon_episode),
         )
         .await
         .unwrap();
@@ -1497,7 +1506,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": source_episode}),
+            Provenance::agent_observation(&source_episode),
         )
         .await
         .unwrap();
@@ -1513,7 +1522,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             0.8,
             vec![],
             vec![],
-            json!({"source_episode": source_episode}),
+            Provenance::agent_observation(&source_episode),
         )
         .await
         .unwrap();
@@ -1657,7 +1666,7 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             0.9,
             vec![],
             vec!["persona".to_string()],
-            json!({"source_episode": "episode:persona"}),
+            Provenance::agent_observation("episode:persona"),
         )
         .await
         .unwrap();
@@ -1673,7 +1682,7 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:old"}),
+            Provenance::agent_observation("episode:old"),
         )
         .await
         .unwrap();
@@ -1689,7 +1698,7 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:recent"}),
+            Provenance::agent_observation("episode:recent"),
         )
         .await
         .unwrap();
@@ -1854,7 +1863,7 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
                 0.9,
                 vec![],
                 vec![],
-                json!({"source_episode": format!("episode:timeline-{content}")}),
+                Provenance::agent_observation(format!("episode:timeline-{content}")),
             )
             .await
             .unwrap();
@@ -1898,7 +1907,7 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:cache-hit-access"}),
+            Provenance::agent_observation("episode:cache-hit-access"),
         )
         .await
         .unwrap();
@@ -1970,7 +1979,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": source_episode}),
+            Provenance::agent_observation(&source_episode),
         )
         .await
         .unwrap();
@@ -1986,7 +1995,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             0.8,
             vec![],
             vec![],
-            json!({"source_episode": source_episode}),
+            Provenance::agent_observation(&source_episode),
         )
         .await
         .unwrap();
@@ -2034,7 +2043,7 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:ql-enabled"}),
+            Provenance::agent_observation("episode:ql-enabled"),
         )
         .await
         .unwrap();
@@ -2110,7 +2119,7 @@ async fn test_service_add_fact_logs_warning_on_embedding_error_and_still_persist
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:embed-error"}),
+            Provenance::agent_observation("episode:embed-error"),
         )
         .await
         .expect("add_fact should succeed even when embedding fails");
@@ -2146,7 +2155,7 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:invalidate-cache"}),
+            Provenance::agent_observation("episode:invalidate-cache"),
         )
         .await
         .unwrap();
@@ -2254,7 +2263,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
             0.9,
             vec![bob_id.clone()],
             vec![],
-            json!({"source_episode": episode_id}),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .unwrap();
@@ -2270,7 +2279,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
                     scope: None,
                     t_ref: None,
                     t_ingested: None,
-                    provenance: json!({"source_episode": episode_id}),
+                    provenance: serde_json::json!({"source_episode": &episode_id}),
                     citation_context: None,
                     all_sources: vec![],
                     graph_insights: None,
@@ -2322,7 +2331,7 @@ async fn test_service_multi_namespace_scope_isolation() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:ns-personal"}),
+            Provenance::agent_observation("episode:ns-personal"),
         )
         .await
         .unwrap();
@@ -2339,7 +2348,7 @@ async fn test_service_multi_namespace_scope_isolation() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:ns-org"}),
+            Provenance::agent_observation("episode:ns-org"),
         )
         .await
         .unwrap();
@@ -2422,7 +2431,7 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
             0.9,
             vec![],
             vec![],
-            json!({"source_episode": "episode:semantic-disabled"}),
+            Provenance::agent_observation("episode:semantic-disabled"),
         )
         .await
         .unwrap();
@@ -2465,7 +2474,7 @@ async fn test_service_decay_pass_with_real_surrealdb_invalidates_old_low_confide
             0.35,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -2506,7 +2515,7 @@ async fn test_service_decay_pass_skips_already_invalidated_facts() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -2575,7 +2584,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();
@@ -2648,7 +2657,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .unwrap();

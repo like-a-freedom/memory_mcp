@@ -1,7 +1,7 @@
 mod embedded_support;
 
 use chrono::{Duration, TimeZone, Utc};
-use memory_mcp::models::AssembleContextRequest;
+use memory_mcp::models::{AssembleContextRequest, Provenance};
 
 /// Integration test: verifies that multi-word queries work through the full
 /// SurrealDB stack (embedded) with the configured full-text analyzer.
@@ -21,7 +21,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:fts_test_1"}),
+            Provenance::agent_observation("episode:fts_test_1"),
         )
         .await?;
 
@@ -36,7 +36,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             0.85,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:fts_test_2"}),
+            Provenance::agent_observation("episode:fts_test_2"),
         )
         .await?;
 
@@ -124,7 +124,7 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:fts_separator"}),
+            Provenance::agent_observation("episode:fts_separator"),
         )
         .await?;
 
@@ -169,7 +169,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             0.9,
             vec![alice_id],
             vec![],
-            serde_json::json!({"source_episode": "episode:fts_index_keys"}),
+            Provenance::agent_observation("episode:fts_index_keys"),
         )
         .await?;
 
@@ -232,10 +232,7 @@ async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn s
             0.9,
             vec![],
             vec![],
-            serde_json::json!({
-                "source_episode": "episode:fts_reference_keys",
-                "source_id": "work-item-9794206"
-            }),
+            Provenance::extraction("episode:fts_reference_keys", "", "work-item-9794206", ""),
         )
         .await?;
 

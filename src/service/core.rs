@@ -249,6 +249,33 @@ impl MemoryService {
                 )
                 .await?;
 
+            // Build provenance for the explain response: merge episode-level
+            // info with the fact's structured provenance (ingestion_method, etc.).
+            let mut explain_provenance = json!({
+                "source_episode": episode.episode_id,
+                "source_type": episode.source_type,
+                "source_id": episode.source_id,
+            });
+            if let Some(fact_id) = &resolved_item.item.fact_id {
+                if let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await {
+                    if let Some(record) = &fact_record {
+                        let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
+                        let fact_prov = crate::models::Provenance::from_json_value(&prov_value);
+                        if let Some(map) = explain_provenance.as_object_mut() {
+                            if !fact_prov.ingestion_method.is_empty() {
+                                map.insert(
+                                    "ingestion_method".to_string(),
+                                    json!(fact_prov.ingestion_method),
+                                );
+                            }
+                            if let Some(strategy) = &fact_prov.extraction_strategy {
+                                map.insert("extraction_strategy".to_string(), json!(strategy));
+                            }
+                        }
+                    }
+                }
+            }
+
             let explanation = ExplainItem {
                 fact_id: resolved_item.item.fact_id,
                 content: if resolved_item.item.content.is_empty() {
@@ -261,11 +288,7 @@ impl MemoryService {
                 scope: Some(episode.scope.clone()),
                 t_ref: Some(episode.t_ref),
                 t_ingested: Some(episode.t_ingested),
-                provenance: json!({
-                    "source_episode": episode.episode_id,
-                    "source_type": episode.source_type,
-                    "source_id": episode.source_id,
-                }),
+                provenance: explain_provenance,
                 citation_context: Some(episode.content.clone()),
                 all_sources,
                 graph_insights: shared_insights.clone(),
@@ -356,7 +379,7 @@ impl MemoryService {
         confidence: f64,
         entity_links: Vec<String>,
         policy_tags: Vec<String>,
-        provenance: Value,
+        provenance: crate::models::Provenance,
     ) -> Result<String, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
@@ -387,7 +410,7 @@ impl MemoryService {
                 ("entity_links".to_string(), json!(entity_links)),
                 ("scope".to_string(), json!(scope)),
                 ("policy_tags".to_string(), json!(policy_tags)),
-                ("provenance".to_string(), provenance),
+                ("provenance".to_string(), provenance.to_json_value()),
             ]);
             if let Some(project) = project {
                 payload.insert("project".to_string(), json!(project));
@@ -472,7 +495,7 @@ impl MemoryService {
         &self,
         content: &str,
         source_episode: &str,
-        provenance: &Value,
+        provenance: &crate::models::Provenance,
         entity_links: &[String],
         t_valid: DateTime<Utc>,
     ) -> Result<Vec<String>, MemoryError> {
@@ -520,15 +543,15 @@ impl MemoryService {
     async fn collect_fact_source_references(
         &self,
         source_episode: &str,
-        provenance: &Value,
+        provenance: &crate::models::Provenance,
     ) -> Result<Vec<String>, MemoryError> {
         let mut references = Vec::new();
         let mut seen = HashSet::new();
 
-        if let Some(source_id) = provenance_source_id(provenance) {
-            let normalized = super::normalize_text(&source_id);
+        if let Some(source_id) = &provenance.source_id {
+            let normalized = super::normalize_text(source_id);
             if !normalized.is_empty() && seen.insert(normalized) {
-                references.push(source_id);
+                references.push(source_id.clone());
             }
         }
 
@@ -1104,7 +1127,7 @@ impl MemoryService {
             origin: EdgeOrigin::Inferred,
             strength: 1.0,
             confidence: 0.8,
-            provenance: json!({"source": "manual"}),
+            provenance: crate::models::Provenance::manual(),
             t_valid: super::query::now(),
             t_ingested: super::query::now(),
             t_invalid: None,
@@ -1561,13 +1584,6 @@ impl MemoryService {
     }
 }
 
-fn provenance_source_id(provenance: &Value) -> Option<String> {
-    provenance
-        .as_object()
-        .and_then(|map| map.get("source_id"))
-        .and_then(string_from_value)
-}
-
 fn reference_index_terms(raw: &str) -> Vec<String> {
     let query_terms = crate::service::query::search_query_terms(raw);
     let mut keys = crate::service::query::query_hard_anchor_terms(&query_terms)
@@ -1585,7 +1601,7 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::EntityCandidate;
-    use crate::models::{AccessPayload, AccessScopeAllow};
+    use crate::models::{AccessPayload, AccessScopeAllow, Provenance};
     use crate::service::EmbeddingProvider;
     use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
     use crate::service::util::rate_limiter::SafeMutex;
@@ -3459,7 +3475,7 @@ mod tests {
                 0.9,
                 vec![],
                 vec![],
-                json!({"source_episode": "episode:test"}),
+                Provenance::agent_observation("episode:test"),
             )
             .await
             .expect("add fact");
@@ -3516,7 +3532,7 @@ mod tests {
                 0.9,
                 vec![],
                 vec![],
-                json!({"source_episode": "episode:test"}),
+                Provenance::agent_observation("episode:test"),
             )
             .await
             .expect("add fact");

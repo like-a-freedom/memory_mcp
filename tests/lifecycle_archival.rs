@@ -8,6 +8,7 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::MemoryService;
+use memory_mcp::models::Provenance;
 use memory_mcp::service::run_archival_pass;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
@@ -48,7 +49,7 @@ async fn archival_pass_processes_all_configured_namespaces() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("add fact");
@@ -113,7 +114,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("add fact");
@@ -197,7 +198,7 @@ async fn archival_pass_preserves_recent_episodes() {
             0.9,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -233,7 +234,7 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
             0.3, // low confidence, will decay
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -284,7 +285,7 @@ async fn archival_pass_respects_age_threshold() {
             0.5,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -302,7 +303,7 @@ async fn archival_pass_respects_age_threshold() {
             0.2,
             vec![],
             vec![],
-            json!({}),
+            Provenance::manual(),
         )
         .await
         .expect("fact added");
@@ -352,7 +353,7 @@ async fn archival_pass_batch_limit_respected() {
                 0.2,
                 vec![],
                 vec![],
-                json!({}),
+                Provenance::manual(),
             )
             .await
             .expect("fact added");

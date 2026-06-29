@@ -1066,7 +1066,7 @@ mod tests {
                 entity_links: vec![],
                 scope: "org".to_string(),
                 policy_tags: vec![],
-                provenance: serde_json::json!({}),
+                provenance: crate::models::Provenance::manual(),
                 ft_score: 0.0,
             },
             crate::models::Fact {
@@ -1086,7 +1086,7 @@ mod tests {
                 entity_links: vec![],
                 scope: "org".to_string(),
                 policy_tags: vec![],
-                provenance: serde_json::json!({}),
+                provenance: crate::models::Provenance::manual(),
                 ft_score: 0.0,
             },
         ];

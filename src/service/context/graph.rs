@@ -264,6 +264,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::models::Provenance;
     use crate::storage::DbClient;
 
     #[test]
@@ -389,7 +390,7 @@ mod tests {
                 0.9,
                 vec!["entity:bob".to_string()],
                 vec![],
-                json!({"source_episode": "episode:seed"}),
+                Provenance::agent_observation("episode:seed"),
             )
             .await
             .expect("seed fact");

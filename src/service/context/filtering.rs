@@ -370,7 +370,7 @@ mod tests {
             policy_tags: Vec::new(),
             index_keys: Vec::new(),
             entity_links: Vec::new(),
-            provenance: serde_json::json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let right = Fact {
@@ -390,7 +390,7 @@ mod tests {
             policy_tags: Vec::new(),
             index_keys: Vec::new(),
             entity_links: Vec::new(),
-            provenance: serde_json::json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
 
@@ -428,7 +428,7 @@ mod tests {
             policy_tags: Vec::new(),
             index_keys: Vec::new(),
             entity_links: Vec::new(),
-            provenance: serde_json::json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
         let right = Fact {
@@ -448,7 +448,7 @@ mod tests {
             policy_tags: Vec::new(),
             index_keys: Vec::new(),
             entity_links: Vec::new(),
-            provenance: serde_json::json!({}),
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         };
 

@@ -533,7 +533,7 @@ mod tests {
             entity_links: vec![],
             scope: "org".into(),
             policy_tags: vec![],
-            provenance: serde_json::Value::Null,
+            provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         }
     }

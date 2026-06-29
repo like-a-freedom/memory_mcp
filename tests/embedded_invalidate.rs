@@ -1,7 +1,7 @@
 mod embedded_support;
 
 use chrono::{Duration, Utc};
-use memory_mcp::models::{AssembleContextRequest, InvalidateRequest};
+use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
 use memory_mcp::service::MemoryService;
 use memory_mcp::storage::DbClient;
 use memory_mcp::storage::SurrealDbClient;
@@ -44,7 +44,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             0.9,
             vec![],
             vec![],
-            serde_json::json!({"source_episode": "episode:1"}),
+            Provenance::agent_observation("episode:1"),
         )
         .await?;
 

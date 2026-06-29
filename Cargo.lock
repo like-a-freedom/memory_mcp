@@ -3220,11 +3220,13 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "sha2 0.11.0",
+ "strsim",
  "surrealdb",
  "tempfile",
  "thiserror 2.0.18",
  "tokenizers 0.23.1",
  "tokio",
+ "unicode-normalization",
  "zip",
 ]
 

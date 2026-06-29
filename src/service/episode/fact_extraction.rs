@@ -71,12 +71,12 @@ pub(super) async fn add_extracted_fact(
             0.7,
             entity_links.to_vec(),
             Vec::new(),
-            json!({
-                "source_episode": episode.episode_id,
-                "source_type": episode.source_type,
-                "source_id": episode.source_id,
-                "extraction_strategy": extraction_strategy,
-            }),
+            crate::models::Provenance::extraction(
+                &episode.episode_id,
+                &episode.source_type,
+                &episode.source_id,
+                extraction_strategy,
+            ),
         )
         .await?;
 
@@ -360,7 +360,7 @@ pub async fn extract_from_episode(
             origin: EdgeOrigin::Extracted,
             strength: 1.0,
             confidence: 0.9,
-            provenance: json!({"source_episode": episode_id}),
+            provenance: crate::models::Provenance::agent_observation(episode_id),
             t_valid: episode.t_ref,
             t_ingested: edge_ingested,
             t_invalid: None,
@@ -386,7 +386,7 @@ pub async fn extract_from_episode(
                 origin: EdgeOrigin::Extracted,
                 strength: 0.8,
                 confidence: 0.85,
-                provenance: json!({"source_episode": episode_id}),
+                provenance: crate::models::Provenance::agent_observation(episode_id),
                 t_valid: episode.t_ref,
                 t_ingested: edge_ingested,
                 t_invalid: None,

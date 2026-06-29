@@ -59,6 +59,22 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "021_query_log_retrieval_diagnostics.surql",
             sql: include_str!("../../migrations/021_query_log_retrieval_diagnostics.surql"),
         },
+        MigrationScript {
+            file_name: "022_structured_provenance.surql",
+            sql: include_str!("../../migrations/022_structured_provenance.surql"),
+        },
+        MigrationScript {
+            file_name: "023_edge_composite_indexes.surql",
+            sql: include_str!("../../migrations/023_edge_composite_indexes.surql"),
+        },
+        MigrationScript {
+            file_name: "024_triples.surql",
+            sql: include_str!("../../migrations/024_triples.surql"),
+        },
+        MigrationScript {
+            file_name: "025_cyrillic_fts.surql",
+            sql: include_str!("../../migrations/025_cyrillic_fts.surql"),
+        },
     ]
 }
 

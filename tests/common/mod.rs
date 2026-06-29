@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use memory_mcp::models::IngestRequest;
+use memory_mcp::models::{IngestRequest, Provenance};
 use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
@@ -114,7 +114,7 @@ pub async fn seed_fact_with_links(
             0.9,
             entity_links,
             vec![],
-            json!({"source_episode": "episode:seed"}),
+            Provenance::agent_observation("episode:seed"),
         )
         .await
         .expect("seed fact should succeed")
@@ -167,11 +167,7 @@ pub async fn seed_episode_backed_fact_with_source_id(
             0.9,
             entity_links,
             vec![],
-            json!({
-                "source_episode": episode_id,
-                "source_type": "seed",
-                "source_id": source_id,
-            }),
+            Provenance::extraction(&episode_id, "seed", source_id, "manual"),
         )
         .await
         .expect("seed note fact should succeed")
@@ -232,7 +228,7 @@ pub async fn seed_fact_with_links_and_project(
             0.9,
             entity_links,
             vec![],
-            json!({"source_episode": episode_id}),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .expect("seed project fact should succeed")
