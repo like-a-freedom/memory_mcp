@@ -188,7 +188,7 @@ async fn test_invalidate_and_explain() {
                     fact_age_days: None,
                     decayed_confidence: None,
                     ingestion_method: None,
-                }]
+                }],
             },
             None,
         )
@@ -380,7 +380,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
                     fact_age_days: None,
                     decayed_confidence: None,
                     ingestion_method: None,
-                }]
+                }],
             },
             None,
         )

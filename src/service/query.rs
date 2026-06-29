@@ -24,7 +24,6 @@ mod tests {
     use super::*;
     use crate::models::Fact;
     use chrono::{TimeZone, Utc};
-    use serde_json::json;
 
     #[test]
     fn decayed_confidence_metric_uses_longer_half_life() {

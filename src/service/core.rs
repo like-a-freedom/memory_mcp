@@ -260,9 +260,9 @@ impl MemoryService {
             let mut decayed_confidence: Option<f64> = None;
             let mut ingestion_method: Option<String> = None;
 
-            if let Some(fact_id) = &resolved_item.item.fact_id {
-                if let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await {
-                    if let Some(record) = &fact_record {
+            if let Some(fact_id) = &resolved_item.item.fact_id
+                && let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await
+                    && let Some(record) = &fact_record {
                         let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
                         let fact_prov = crate::models::Provenance::from_json_value(&prov_value);
                         if let Some(map) = explain_provenance.as_object_mut() {
@@ -280,19 +280,17 @@ impl MemoryService {
 
                         // Compute fact_age_days from t_valid
                         if let Some(t_valid_str) = record.get("t_valid").and_then(string_from_value)
-                        {
-                            if let Ok(t_valid) = chrono::DateTime::parse_from_rfc3339(&t_valid_str)
+                            && let Ok(t_valid) = chrono::DateTime::parse_from_rfc3339(&t_valid_str)
                             {
                                 let age = Utc::now()
                                     .signed_duration_since(t_valid.with_timezone(&Utc))
                                     .num_days();
                                 fact_age_days = Some(age);
                             }
-                        }
 
                         // Compute decayed_confidence
-                        if let Some(conf) = record.get("confidence").and_then(|v| v.as_f64()) {
-                            if let Some(age) = fact_age_days {
+                        if let Some(conf) = record.get("confidence").and_then(|v| v.as_f64())
+                            && let Some(age) = fact_age_days {
                                 let half_life_days = if record
                                     .get("fact_type")
                                     .and_then(string_from_value)
@@ -308,10 +306,7 @@ impl MemoryService {
                                         / crate::models::Fact::CONFIDENCE_SCALE,
                                 );
                             }
-                        }
                     }
-                }
-            }
 
             let explanation = ExplainItem {
                 fact_id: resolved_item.item.fact_id,

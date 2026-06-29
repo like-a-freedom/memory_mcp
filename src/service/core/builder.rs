@@ -495,11 +495,11 @@ impl MemoryService {
             logger.clone(),
             rate_limiter.clone(),
         );
-        let entity_service = super::super::entity::EntityService::new(
-            db_client.clone(),
-            namespaces[0].clone(),
-            rate_limiter.clone(),
-        );
+        let entity_service = super::super::entity::EntityService::new(db_client.clone());
+        let fuzzy_threshold = std::env::var("ENTITY_FUZZY_THRESHOLD")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(super::super::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
         Ok(Self {
             db_client,
             namespaces: namespaces.clone(),
@@ -523,9 +523,7 @@ impl MemoryService {
             ))),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
-            entity_resolver: super::super::entity_resolution::EntityResolver::new(
-                super::super::entity_resolution::DEFAULT_FUZZY_THRESHOLD,
-            ),
+            entity_resolver: super::super::entity_resolution::EntityResolver::new(fuzzy_threshold),
             triple_extractor: Arc::new(super::super::triple_extractor::NoOpTripleExtractor),
         })
     }

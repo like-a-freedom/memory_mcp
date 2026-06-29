@@ -10,6 +10,7 @@ mod summary_parser;
 pub(crate) use communities::build_community_summary;
 pub(crate) use edges::store_edge;
 pub(crate) use fact_extraction::{build_extract_log_result, extract_from_episode};
+pub(crate) use record_parsing::fact_from_value_or_wrapper;
 pub(crate) use record_parsing::unwrap_record_string;
 pub use record_parsing::{episode_from_record, fact_from_record};
 

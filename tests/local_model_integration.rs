@@ -9,7 +9,6 @@ use memory_mcp::MemoryService;
 use memory_mcp::config::NerConfig;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
-use serde_json::json;
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 

@@ -36,10 +36,10 @@ use super::queries::{
     build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
     build_select_episodes_by_content_advanced_query, build_select_episodes_by_content_query,
     build_select_episodes_for_archival_query, build_select_facts_ann_query,
-    build_select_facts_by_entity_links_query, build_select_facts_filtered_advanced_query,
-    build_select_facts_filtered_query, build_select_facts_needing_reembed_query,
-    build_select_one_query, build_update_query, filter_records_by_project,
-    filter_records_by_project_and_fact_types,
+    build_select_facts_by_entity_links_query, build_select_facts_by_triple_query,
+    build_select_facts_filtered_advanced_query, build_select_facts_filtered_query,
+    build_select_facts_needing_reembed_query, build_select_one_query, build_update_query,
+    filter_records_by_project, filter_records_by_project_and_fact_types,
 };
 use super::types::GraphDirection;
 
@@ -95,6 +95,22 @@ pub trait DbClient: Send + Sync {
         entity_links: &[String],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
+
+    /// Selects facts linked via triples matching a search term.
+    ///
+    /// Searches the `triple` table for rows whose subject, predicate, or object
+    /// matches `query_text`, then retrieves the linked `fact` records via
+    /// `source_fact_id`. Applies the standard bi-temporal visibility filter
+    /// on the fact table.
+    async fn select_facts_by_triple(
+        &self,
+        _namespace: &str,
+        _query_text: &str,
+        _cutoff: &str,
+        _limit: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        Ok(vec![])
+    }
 
     /// Selects nearest-neighbor facts via HNSW ANN index.
     ///
@@ -1149,6 +1165,48 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_facts_by_entity_links.result",
+            vec![(
+                "count",
+                Value::Number(serde_json::Number::from(results.len())),
+            )],
+        );
+
+        Ok(results)
+    }
+
+    async fn select_facts_by_triple(
+        &self,
+        namespace: &str,
+        query_text: &str,
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.log_op(
+            "db.select_facts_by_triple",
+            vec![
+                ("namespace", Value::String(namespace.to_string())),
+                ("cutoff", Value::String(cutoff.to_string())),
+                ("limit", Value::Number(serde_json::Number::from(limit))),
+            ],
+        );
+
+        let (sql, mut vars) = build_select_facts_by_triple_query(cutoff, query_text, limit);
+        if let Some(obj) = vars.as_object_mut() {
+            obj.insert("ns".to_string(), json!(namespace));
+        }
+
+        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
+            Ok(value) => value,
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
+                return Ok(Vec::new());
+            }
+            Err(err) => return Err(err),
+        };
+        let normalized = surreal_to_json(surreal_val);
+        let results = extract_records(normalized);
+
+        self.log_op(
+            "db.select_facts_by_triple.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),

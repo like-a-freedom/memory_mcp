@@ -25,6 +25,7 @@ mod rescue;
 mod scoring;
 mod semantic;
 mod temporal;
+mod triple;
 mod views;
 
 use experience::{RecentExperienceRequest, append_recent_experience_items};

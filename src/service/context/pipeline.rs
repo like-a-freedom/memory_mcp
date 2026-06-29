@@ -27,6 +27,7 @@ use super::rescue::{
 use super::scoring::{ranked_fact_to_item, selected_fact_matched_terms};
 use super::semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
 use super::temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
+use super::triple::collect_triple_facts;
 
 /// Executes the full multi-tier retrieval pipeline for the default (non-view-mode) path.
 ///
@@ -149,6 +150,22 @@ pub(super) async fn assemble_default_context(
                 .unwrap_or(0.0);
             for fact in &mut experience_facts {
                 fact.ft_score = fact.ft_score.max(topical_floor + 1.0);
+            }
+        }
+
+        // Triple-expanded facts: facts linked via matching triples.
+        let triple_facts = collect_triple_facts(
+            service,
+            params.namespace,
+            params.scope,
+            params.cutoff_iso,
+            query,
+            params.budget,
+        )
+        .await?;
+        for fact in triple_facts {
+            if !base_direct_ids.contains(&fact.fact_id) {
+                expanded_facts.push(fact);
             }
         }
 

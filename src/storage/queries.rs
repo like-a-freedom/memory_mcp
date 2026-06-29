@@ -197,6 +197,38 @@ pub fn build_select_facts_by_entity_links_query(
     )
 }
 
+/// Build a query to select facts linked via triples matching a search term.
+///
+/// Searches the `triple` table for rows whose subject, predicate, or object
+/// matches `query`, then retrieves the linked `fact` records via `source_fact_id`.
+/// Applies the standard bi-temporal visibility filter on the fact table.
+pub fn build_select_facts_by_triple_query(
+    cutoff: &str,
+    query: &str,
+    limit: usize,
+) -> (String, Value) {
+    let sql = format!(
+        "SELECT * FROM fact \
+         WHERE fact_id IN ( \
+           SELECT source_fact_id FROM triple \
+           WHERE namespace = $ns \
+             AND (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
+         ) \
+           AND {BI_TEMPORAL_WHERE} \
+         LIMIT $limit"
+    );
+    (
+        sql,
+        json!({
+            "ns":"__placeholder__",
+            "query": query,
+            "cutoff": cutoff,
+            "limit": limit,
+        }),
+    )
+}
+
+/// Build a query to find nearest-neighbor facts via vector similarity (ANN).
 pub fn build_select_facts_ann_query(
     scope: &str,
     cutoff: &str,

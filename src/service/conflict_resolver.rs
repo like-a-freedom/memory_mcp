@@ -94,8 +94,6 @@ async fn invalidate_triple(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn singleton_predicates_are_recognized() {
         assert!(crate::service::triple_extractor::is_singleton_predicate(

@@ -57,7 +57,18 @@ impl EntityResolver {
         }
 
         // Step 3: Fuzzy match — find candidates with similar names.
-        let prefix = &normalized[..normalized.len().min(3)];
+        // Use char_indices to safely extract first 3 characters (not bytes) for prefix search.
+        let prefix = normalized
+            .char_indices()
+            .take(3)
+            .last()
+            .map(|(end, c)| &normalized[..end + c.len_utf8()])
+            .unwrap_or("");
+        if prefix.is_empty() {
+            // Entity too short for prefix search (less than 1 char). Create directly.
+            let entity_id = entity_service.create_entity(candidate, namespace).await?;
+            return Ok((entity_id, true));
+        }
         let candidates = entity_service
             .find_entities_by_prefix(namespace, prefix)
             .await?;
@@ -111,6 +122,9 @@ pub fn normalize_entity_name(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::mock_db::MockDbClient;
+    use serde_json::json;
+    use std::sync::Arc;
 
     #[test]
     fn normalize_entity_name_handles_case() {
@@ -162,6 +176,118 @@ mod tests {
         assert!(
             score < DEFAULT_FUZZY_THRESHOLD,
             "score={score} should be below {DEFAULT_FUZZY_THRESHOLD}"
+        );
+    }
+
+    // -- Integration tests for resolve_or_create with MockDbClient --
+
+    fn make_service(db: MockDbClient) -> (EntityService, EntityResolver) {
+        let db = Arc::new(db);
+        let svc = EntityService::new(db);
+        let resolver = EntityResolver::new(DEFAULT_FUZZY_THRESHOLD);
+        (svc, resolver)
+    }
+
+    #[tokio::test]
+    async fn resolve_or_create_returns_existing_on_exact_match() {
+        let db = MockDbClient::new().expect_entity_lookup(
+            "alice smith",
+            Some(json!({"entity_id": "entity:person:alice"})),
+        );
+        let (svc, resolver) = make_service(db);
+        let candidate = EntityCandidate {
+            entity_type: "person".into(),
+            canonical_name: "Alice Smith".into(),
+            aliases: vec![],
+        };
+        let (entity_id, was_created) = resolver
+            .resolve_or_create(&svc, candidate, "org")
+            .await
+            .expect("resolve");
+        assert_eq!(entity_id, "entity:person:alice");
+        assert!(!was_created);
+    }
+
+    #[tokio::test]
+    async fn resolve_or_create_creates_new_when_not_found() {
+        let db = MockDbClient::new()
+            .expect_entity_lookup("ivan petrov", None)
+            .expect_query("SELECT entity_id FROM entity", json!([]))
+            .expect_query("SELECT entity_id, canonical_name", json!([]))
+            .expect_create(
+                "entity:person:Ivan_Petrov",
+                json!({"entity_id": "entity:person:Ivan_Petrov"}),
+            );
+        let (svc, resolver) = make_service(db);
+        let candidate = EntityCandidate {
+            entity_type: "person".into(),
+            canonical_name: "Ivan Petrov".into(),
+            aliases: vec![],
+        };
+        let (entity_id, was_created) = resolver
+            .resolve_or_create(&svc, candidate, "org")
+            .await
+            .expect("resolve");
+        assert!(was_created, "should create new entity");
+        assert!(!entity_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn resolve_or_create_fuzzy_matches_cyrillic_near_duplicate() {
+        let db = MockDbClient::new()
+            // Step 1: exact lookup — returns None
+            .expect_entity_lookup("иван петров", None)
+            // Step 2: alias lookup — returns None
+            .expect_query("SELECT entity_id FROM entity WHERE aliases @1@", json!([]))
+            // Step 3: prefix search — returns the canonical "Иван Петров"
+            .expect_query(
+                "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with",
+                json!([
+                    {"entity_id": "entity:person:ivan_petrov", "canonical_name": "Иван Петров"}
+                ]),
+            );
+        let (svc, resolver) = make_service(db);
+        let candidate = EntityCandidate {
+            entity_type: "person".into(),
+            canonical_name: "иван петров".into(),
+            aliases: vec![],
+        };
+        let (entity_id, was_created) = resolver
+            .resolve_or_create(&svc, candidate, "org")
+            .await
+            .expect("resolve");
+        assert!(!was_created, "fuzzy match should not create");
+        assert_eq!(entity_id, "entity:person:ivan_petrov");
+    }
+
+    #[tokio::test]
+    async fn resolve_or_create_below_threshold_creates_new() {
+        let db = MockDbClient::new()
+            .expect_entity_lookup("bob jones", None)
+            .expect_query("SELECT entity_id FROM entity WHERE aliases @1@", json!([]))
+            .expect_query(
+                "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with",
+                json!([
+                    {"entity_id": "entity:person:alice", "canonical_name": "Alice Smith"}
+                ]),
+            )
+            .expect_create(
+                "entity:person:Bob_Jones",
+                json!({"entity_id": "entity:person:Bob_Jones"}),
+            );
+        let (svc, resolver) = make_service(db);
+        let candidate = EntityCandidate {
+            entity_type: "person".into(),
+            canonical_name: "Bob Jones".into(),
+            aliases: vec![],
+        };
+        let (_entity_id, was_created) = resolver
+            .resolve_or_create(&svc, candidate, "org")
+            .await
+            .expect("resolve");
+        assert!(
+            was_created,
+            "below-threshold names should create new entity"
         );
     }
 }
