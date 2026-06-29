@@ -47,7 +47,7 @@ pub struct MemoryService {
     pub(crate) current_embedding_signature: Option<String>,
     pub(crate) current_embedding_model: Option<String>,
     pub(crate) current_embedding_dimension: Option<usize>,
-    pub(crate) background_embedding_inflight: Arc<tokio::sync::Mutex<HashSet<String>>>,
+    pub(crate) task_runner: Arc<super::super::embedding::task_runner::BackgroundTaskRunner>,
     pub(crate) query_embedding_cache:
         Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
     pub(crate) query_logging_enabled: bool,
@@ -545,7 +545,7 @@ impl MemoryService {
             current_embedding_signature: None,
             current_embedding_model: None,
             current_embedding_dimension: None,
-            background_embedding_inflight: Arc::new(tokio::sync::Mutex::new(HashSet::new())),
+            task_runner: Arc::new(super::super::embedding::task_runner::BackgroundTaskRunner::new()),
             query_embedding_cache: Arc::new(tokio::sync::Mutex::new(LruCache::new(
                 query_embedding_cache_size,
             ))),

@@ -928,24 +928,15 @@ impl MemoryService {
     }
 
     async fn background_embedding_task_inflight(&self, task_key: &str) -> bool {
-        self.background_embedding_inflight
-            .lock()
-            .await
-            .contains(task_key)
+        self.task_runner.is_inflight(task_key).await
     }
 
     async fn try_reserve_background_embedding_task(&self, task_key: &str) -> bool {
-        self.background_embedding_inflight
-            .lock()
-            .await
-            .insert(task_key.to_string())
+        self.task_runner.try_reserve(task_key).await
     }
 
     async fn release_background_embedding_task(&self, task_key: &str) {
-        self.background_embedding_inflight
-            .lock()
-            .await
-            .remove(task_key);
+        self.task_runner.release(task_key).await;
     }
 
     async fn enqueue_background_fact_embedding(

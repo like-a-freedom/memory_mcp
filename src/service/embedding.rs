@@ -12,7 +12,8 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 
 mod local;
-mod remote;
+pub(crate) mod remote;
+pub(crate) mod task_runner;
 
 use local::LocalCandleEmbeddingProvider;
 use remote::{
