@@ -166,7 +166,7 @@ impl EntityService {
         namespace: &str,
         prefix: &str,
     ) -> Result<Vec<(String, String)>, MemoryError> {
-        let sql = "SELECT entity_id, canonical_name FROM entity WHERE string::startsWith(canonical_name_normalized, $prefix) LIMIT 50";
+        let sql = "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with(canonical_name_normalized, $prefix) LIMIT 50";
         let result = self
             .db_client
             .query(sql, Some(json!({"prefix": prefix})), namespace)
@@ -276,6 +276,17 @@ impl EntityService {
             .query(sql, Some(json!({"id": triple_id})), namespace)
             .await?;
         Ok(())
+    }
+
+    /// Execute a raw SQL query with bind variables.
+    /// Helper for triple persistence and other operations.
+    pub async fn execute_query(
+        &self,
+        sql: &str,
+        vars: serde_json::Value,
+        namespace: &str,
+    ) -> Result<serde_json::Value, MemoryError> {
+        self.db_client.query(sql, Some(vars), namespace).await
     }
 }
 

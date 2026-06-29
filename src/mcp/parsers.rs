@@ -42,6 +42,9 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     t_ingested: None,
                     provenance: Value::Null,
                     citation_context: None,
+                    fact_age_days: None,
+                    decayed_confidence: None,
+                    ingestion_method: None,
                     ..Default::default()
                 },
                 Value::Object(ref map) => {
@@ -74,6 +77,9 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                         t_ingested: None,
                         provenance: Value::Null,
                         citation_context: None,
+                        fact_age_days: None,
+                        decayed_confidence: None,
+                        ingestion_method: None,
                         ..Default::default()
                     }
                 }

@@ -58,6 +58,9 @@ async fn explain_returns_direct_provenance_source() {
             citation_context: None,
             all_sources: vec![],
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }],
     };
 
@@ -124,6 +127,9 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             citation_context: None,
             all_sources: vec![], // Empty as old code would have
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }],
     };
 
@@ -180,6 +186,9 @@ async fn explain_populates_all_sources_field() {
             citation_context: None,
             all_sources: vec![],
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }],
     };
 
@@ -336,6 +345,9 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             citation_context: None,
             all_sources: vec![],
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }],
     };
 
@@ -396,6 +408,9 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
                     citation_context: None,
                     all_sources: vec![],
                     graph_insights: None,
+                    fact_age_days: None,
+                    decayed_confidence: None,
+                    ingestion_method: None,
                 }],
             },
             None,
@@ -439,6 +454,9 @@ async fn explain_with_empty_source_episode_returns_validation_error() {
             citation_context: None,
             all_sources: vec![],
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }],
     };
 
@@ -476,6 +494,9 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
                 citation_context: None,
                 all_sources: vec![],
                 graph_insights: None,
+                fact_age_days: None,
+                decayed_confidence: None,
+                ingestion_method: None,
             },
             ExplainItem {
                 fact_id: Some("fact:3440abb2c00eb317567d3148".to_string()),
@@ -489,6 +510,9 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
                 citation_context: None,
                 all_sources: vec![],
                 graph_insights: None,
+                fact_age_days: None,
+                decayed_confidence: None,
+                ingestion_method: None,
             },
         ],
     };
@@ -764,6 +788,9 @@ async fn explain_skips_unknown_episode() {
                     source_episode: "episode:nonexistent-99999".into(),
                     content: "some content".into(),
                     quote: "some quote".into(),
+                    fact_age_days: None,
+                    decayed_confidence: None,
+                    ingestion_method: None,
                     ..Default::default()
                 }],
             },

@@ -206,7 +206,7 @@ pub struct ExplainRequest {
 }
 
 /// A single item to explain.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -229,6 +229,15 @@ pub struct ExplainItem {
     pub all_sources: Vec<ProvenanceSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graph_insights: Option<GraphInsights>,
+    /// Age of the fact in days (computed from t_valid vs now).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fact_age_days: Option<i64>,
+    /// Confidence after applying time-based decay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decayed_confidence: Option<f64>,
+    /// How this fact entered the memory system (e.g. "manual", "extraction").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ingestion_method: Option<String>,
 }
 
 impl Default for ExplainItem {
@@ -245,6 +254,9 @@ impl Default for ExplainItem {
             citation_context: None,
             all_sources: Vec::new(),
             graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
         }
     }
 }

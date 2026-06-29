@@ -50,6 +50,8 @@ pub struct MemoryService {
         Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
+    pub(crate) entity_resolver: super::super::entity_resolution::EntityResolver,
+    pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -521,6 +523,10 @@ impl MemoryService {
             ))),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
+            entity_resolver: super::super::entity_resolution::EntityResolver::new(
+                super::super::entity_resolution::DEFAULT_FUZZY_THRESHOLD,
+            ),
+            triple_extractor: Arc::new(super::super::triple_extractor::NoOpTripleExtractor),
         })
     }
 

@@ -256,6 +256,10 @@ impl MemoryService {
                 "source_type": episode.source_type,
                 "source_id": episode.source_id,
             });
+            let mut fact_age_days: Option<i64> = None;
+            let mut decayed_confidence: Option<f64> = None;
+            let mut ingestion_method: Option<String> = None;
+
             if let Some(fact_id) = &resolved_item.item.fact_id {
                 if let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await {
                     if let Some(record) = &fact_record {
@@ -270,6 +274,39 @@ impl MemoryService {
                             }
                             if let Some(strategy) = &fact_prov.extraction_strategy {
                                 map.insert("extraction_strategy".to_string(), json!(strategy));
+                            }
+                        }
+                        ingestion_method = Some(fact_prov.ingestion_method);
+
+                        // Compute fact_age_days from t_valid
+                        if let Some(t_valid_str) = record.get("t_valid").and_then(string_from_value)
+                        {
+                            if let Ok(t_valid) = chrono::DateTime::parse_from_rfc3339(&t_valid_str)
+                            {
+                                let age = Utc::now()
+                                    .signed_duration_since(t_valid.with_timezone(&Utc))
+                                    .num_days();
+                                fact_age_days = Some(age);
+                            }
+                        }
+
+                        // Compute decayed_confidence
+                        if let Some(conf) = record.get("confidence").and_then(|v| v.as_f64()) {
+                            if let Some(age) = fact_age_days {
+                                let half_life_days = if record
+                                    .get("fact_type")
+                                    .and_then(string_from_value)
+                                    .is_some_and(|ft| ft == "metric")
+                                {
+                                    crate::models::Fact::METRIC_HALF_LIFE_DAYS
+                                } else {
+                                    crate::models::Fact::DEFAULT_HALF_LIFE_DAYS
+                                };
+                                let decay = 2.0_f64.powf(-age as f64 / half_life_days);
+                                decayed_confidence = Some(
+                                    (conf * decay * crate::models::Fact::CONFIDENCE_SCALE).round()
+                                        / crate::models::Fact::CONFIDENCE_SCALE,
+                                );
                             }
                         }
                     }
@@ -292,6 +329,9 @@ impl MemoryService {
                 citation_context: Some(episode.content.clone()),
                 all_sources,
                 graph_insights: shared_insights.clone(),
+                fact_age_days,
+                decayed_confidence,
+                ingestion_method,
             };
 
             explanations.push(explanation);
@@ -358,12 +398,21 @@ impl MemoryService {
     }
 
     /// Resolves an entity candidate.
+    ///
+    /// Uses fuzzy matching via `EntityResolver` to deduplicate entities
+    /// with similar names (e.g., "Иван Петров" vs "I. Petrov").
     pub async fn resolve(
         &self,
         candidate: EntityCandidate,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        self.entity_service.resolve(candidate, access).await
+        self.enforce_rate_limit(access.as_ref())?;
+        let namespace = self.default_namespace.clone();
+        let (entity_id, _was_created) = self
+            .entity_resolver
+            .resolve_or_create(&self.entity_service, candidate, &namespace)
+            .await?;
+        Ok(entity_id)
     }
 
     /// Adds a new fact.
@@ -453,9 +502,12 @@ impl MemoryService {
             }
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
             if let Some(input) = deferred_embedding_input {
-                self.enqueue_background_fact_embedding(namespace, fact_id.clone(), input)
+                self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
                     .await;
             }
+
+            // Fire-and-forget triple extraction (non-blocking).
+            self.spawn_triple_extraction(&fact_id, content, &namespace);
         }
         Ok(fact_id)
     }
@@ -489,6 +541,63 @@ impl MemoryService {
             .await?;
 
         Ok(())
+    }
+
+    /// Spawn a fire-and-forget triple extraction task.
+    ///
+    /// If the triple extractor is a `NoOpTripleExtractor`, this is a no-op.
+    /// Otherwise, it extracts semantic triples from the fact content and
+    /// persists them to the `triple` table, then runs conflict resolution.
+    fn spawn_triple_extraction(&self, fact_id: &str, content: &str, namespace: &str) {
+        let extractor = self.triple_extractor.clone();
+        let fact_id = fact_id.to_string();
+        let content = content.to_string();
+        let namespace = namespace.to_string();
+        let entity_service = self.entity_service.clone();
+
+        tokio::spawn(async move {
+            match extractor.extract(&content, &fact_id).await {
+                Ok(triples) => {
+                    for triple in &triples {
+                        // Persist the triple
+                        let sql = r#"
+                            CREATE TYPE::thing("triple", rand::guid()) SET
+                                namespace = $ns,
+                                subject = $subject,
+                                predicate = $predicate,
+                                object = $object,
+                                confidence = $confidence,
+                                source_fact_id = $source_fact_id
+                        "#;
+                        let vars = serde_json::json!({
+                            "ns": namespace,
+                            "subject": triple.subject,
+                            "predicate": triple.predicate,
+                            "object": triple.object,
+                            "confidence": triple.confidence,
+                            "source_fact_id": triple.source_fact_id,
+                        });
+                        let _ = entity_service.execute_query(sql, vars, &namespace).await;
+
+                        // Run conflict resolution for singleton predicates
+                        if crate::service::triple_extractor::is_singleton_predicate(
+                            &triple.predicate,
+                        ) {
+                            let _ =
+                                crate::service::conflict_resolver::resolve_conflicts_for_triple(
+                                    &entity_service,
+                                    &namespace,
+                                    triple,
+                                )
+                                .await;
+                        }
+                    }
+                }
+                Err(_) => {
+                    // Triple extraction failure is non-critical
+                }
+            }
+        });
     }
 
     async fn build_fact_index_keys(
@@ -3857,6 +3966,12 @@ mod tests {
             .await
             .expect("connect in-memory test db"),
         );
+        for ns in &namespaces {
+            db_client
+                .apply_migrations(ns)
+                .await
+                .expect("apply migrations");
+        }
         let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
             .expect("create test service");
 
@@ -3886,6 +4001,12 @@ mod tests {
                 .await
                 .expect("connect in-memory test db"),
         );
+        for ns in &namespaces {
+            db_client
+                .apply_migrations(ns)
+                .await
+                .expect("apply migrations");
+        }
         let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
             .expect("create test service");
 
