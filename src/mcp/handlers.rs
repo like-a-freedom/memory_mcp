@@ -37,13 +37,7 @@ use super::resources::{
     app_session_html_document, app_session_uri, apps_index_payload, parse_app_root_uri,
     parse_app_session_uri,
 };
-
-#[derive(Debug, Clone)]
-struct AppSessionState {
-    app: String,
-    scope: String,
-    payload: Value,
-}
+use super::session::{self, SessionManager};
 
 #[derive(Debug, Clone)]
 struct GraphPathSnapshot {
@@ -164,8 +158,7 @@ fn summarize_ingestion_review_items(items: &[Value]) -> Value {
 #[derive(Clone)]
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
-    sessions: Arc<tokio::sync::RwLock<HashMap<String, AppSessionState>>>,
-    session_counter: Arc<AtomicU64>,
+    session_manager: SessionManager,
     request_counter: Arc<AtomicU64>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
@@ -185,8 +178,7 @@ impl MemoryMcp {
     pub fn new(service: MemoryService) -> Self {
         Self {
             service: Arc::new(service),
-            sessions: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
-            session_counter: Arc::new(AtomicU64::new(0)),
+            session_manager: SessionManager::new(),
             request_counter: Arc::new(AtomicU64::new(0)),
             tool_router: Self::tool_router(),
         }
@@ -217,25 +209,15 @@ impl MemoryMcp {
     }
 
     fn invalid_params(message: impl Into<String>) -> ErrorData {
-        let msg = message.into();
-        let data = serde_json::json!({
-            "guidance": "Review the input arguments, fix any issues, and retry.",
-        });
-        ErrorData::invalid_params(msg, Some(data))
+        session::invalid_params(message)
     }
 
     fn missing_app_field(app: &str, field: &str) -> ErrorData {
-        let msg = format!("`{field}` is required for {app}");
-        Self::invalid_params(msg)
+        session::missing_app_field(app, field)
     }
 
     fn internal_error(message: impl Into<String>) -> ErrorData {
-        let msg = message.into();
-        let data = serde_json::json!({
-            "guidance": "Retry the request. If the problem persists, inspect server logs.",
-            "retryable": true,
-        });
-        ErrorData::internal_error(msg, Some(data))
+        session::internal_error(message)
     }
 
     fn list_resources_result() -> ListResourcesResult {
@@ -266,8 +248,7 @@ impl MemoryMcp {
     }
 
     fn next_session_id(&self) -> String {
-        let sequence = self.session_counter.fetch_add(1, Ordering::Relaxed) + 1;
-        format!("ses:{}-{sequence}", Utc::now().timestamp_micros())
+        self.session_manager.next_session_id()
     }
 
     fn enrich_session_payload(
@@ -277,65 +258,27 @@ impl MemoryMcp {
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Value {
-        let created_at = Utc::now();
-        let expires_at = ttl_seconds
-            .filter(|ttl| *ttl > 0)
-            .map(|ttl| created_at + chrono::Duration::seconds(ttl));
-
-        let mut object = payload
-            .as_object()
-            .cloned()
-            .unwrap_or_else(serde_json::Map::new);
-        object.insert("app".to_string(), json!(app));
-        object.insert("session_id".to_string(), json!(session_id));
-        object.insert("scope".to_string(), json!(scope));
-        object.insert(
-            "meta".to_string(),
-            json!({
-                "created_at": created_at.to_rfc3339(),
-                "ttl_seconds": ttl_seconds,
-                "expires_at": expires_at.map(|value| value.to_rfc3339()),
-            }),
-        );
-        Value::Object(object)
+        session::enrich_session_payload(app, session_id, scope, ttl_seconds, payload)
     }
 
-    async fn insert_session(&self, session_id: String, session: AppSessionState) {
-        self.sessions.write().await.insert(session_id, session);
+    async fn insert_session(&self, session_id: String, session: session::AppSessionState) {
+        self.session_manager.insert(session_id, session).await;
     }
 
-    async fn session(&self, session_id: &str) -> Result<AppSessionState, ErrorData> {
-        self.sessions
-            .read()
-            .await
-            .get(session_id)
-            .cloned()
-            .ok_or_else(|| {
-                Self::invalid_params(format!("Unknown or closed app session: {session_id}"))
-            })
+    async fn session(&self, session_id: &str) -> Result<session::AppSessionState, ErrorData> {
+        self.session_manager.get(session_id).await
     }
 
     async fn replace_session_payload(
         &self,
         session_id: &str,
         payload: Value,
-    ) -> Result<AppSessionState, ErrorData> {
-        let mut sessions = self.sessions.write().await;
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            Self::invalid_params(format!("Unknown or closed app session: {session_id}"))
-        })?;
-        session.payload = payload;
-        Ok(session.clone())
+    ) -> Result<session::AppSessionState, ErrorData> {
+        self.session_manager.replace_payload(session_id, payload).await
     }
 
-    async fn remove_session(&self, session_id: &str) -> Result<AppSessionState, ErrorData> {
-        self.sessions
-            .write()
-            .await
-            .remove(session_id)
-            .ok_or_else(|| {
-                Self::invalid_params(format!("Unknown or closed app session: {session_id}"))
-            })
+    async fn remove_session(&self, session_id: &str) -> Result<session::AppSessionState, ErrorData> {
+        self.session_manager.remove(session_id).await
     }
 
     async fn create_session(
@@ -345,29 +288,11 @@ impl MemoryMcp {
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
-        let session_id = self.next_session_id();
-        let payload = Self::enrich_session_payload(app, &session_id, scope, ttl_seconds, payload);
-        self.insert_session(
-            session_id.clone(),
-            AppSessionState {
-                app: app.to_string(),
-                scope: scope.to_string(),
-                payload: payload.clone(),
-            },
-        )
-        .await;
-
-        Ok(Self::open_app_result(app, session_id, payload))
+        self.session_manager.create(app, scope, ttl_seconds, payload).await
     }
 
     fn open_app_result(app: &str, session_id: impl Into<String>, fallback: Value) -> OpenAppResult {
-        let session_id = session_id.into();
-        OpenAppResult {
-            app: app.to_string(),
-            resource_uri: app_session_uri(app, &session_id),
-            session_id,
-            fallback,
-        }
+        session::open_app_result(app, session_id, fallback)
     }
 
     fn app_command_result_from_details(
@@ -377,23 +302,7 @@ impl MemoryMcp {
         resource_uri: Option<String>,
         details: Value,
     ) -> AppCommandResult {
-        AppCommandResult {
-            app: app.to_string(),
-            session_id: session_id.to_string(),
-            action: action.to_string(),
-            ok: details.get("ok").and_then(Value::as_bool).unwrap_or(true),
-            message: details
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("App command completed")
-                .to_string(),
-            refresh_required: details
-                .get("refresh_required")
-                .and_then(Value::as_bool)
-                .unwrap_or(resource_uri.is_some()),
-            resource_uri,
-            details: Some(details),
-        }
+        session::app_command_result_from_details(app, session_id, action, resource_uri, details)
     }
 
     async fn read_app_resource_payload(
