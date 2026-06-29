@@ -280,3 +280,31 @@ graph TD
 | Fuzzy dedup merges unrelated entities | Medium | Medium | Conservative threshold (0.85), human-review mode, configurable threshold |
 | Triple extraction LLM costs | Medium | Low | NoOp by default, feature-flagged, rate-limited |
 | Conflict resolution over-invalidates | Low | High | Singleton predicate whitelist only, audit log, optional confirmation mode |
+
+---
+
+## Post-Implementation Review (2026-06-29)
+
+After the four sprints were implemented, a diff of this plan against the actual
+committed code surfaced **six discrepancies**. All six were reproduced, fixed,
+and protected by regression tests. Full details live in the implementation log
+(`2026-06-29-implementation-log.md` → "Review fix-up"); summary:
+
+| # | Sprint | Discrepancy | Severity | Resolution |
+|---|--------|-------------|----------|------------|
+| R1 | D2 | Migration `025` defined `memory_fts_ru` but **no index referenced it** — Russian stemming was dead code. Migration `006` had OVERWRITTEN the FTS indexes to use `memory_fts` (English only). | **High** | New migration `026_cyrillic_fts_active.surql` folds `snowball(russian)` into the shared `memory_fts` analyzer so all three FULLTEXT indexes inherit it. `025` left byte-identical to preserve its checksum. |
+| R2 | B1 | `find_entity_id_by_alias` used `aliases @1@ $alias` (FTS operator) on a non-FULLTEXT index → query silently returned `[]`. Reproduced on a real in-memory DB. Step 2 of the fuzzy resolver was broken. | **High** | Switched to `aliases CONTAINS $alias` (SurrealDB array-membership, index-aware). |
+| R3 | C2 | `invalidate_triple` set `t_invalid` but not `t_invalid_ingested`, violating the bi-temporal invariant that migration `024` introduced for triples. | Medium | Now sets both, mirroring `lifecycle/decay.rs`. |
+| R4 | B1 | Dead scaffolding in `entity_resolution.rs` (`let _ = (entity_id.clone(), score);`). | Low | Removed. |
+| R5 | C1 | Doc comments referenced `NoOpTripleExtractor` as the default, but the default is `RuleBasedTripleExtractor`. | Low | Comments corrected. |
+| R6 | (new) | `normalize_russian_object` had duplicate endings and didn't honor its own "longest first" claim. | Low | Deduplicated, sorted, length guard switched to `chars().count()`. |
+
+**Lessons for the plan author:**
+
+1. "Add a migration" is not complete unless existing indexes that should use the
+   new artifact are also redefined (R1).
+2. The fuzzy resolver's alias-lookup step needs an integration test that resolves
+   a name that exists *only* as an alias — unit tests with `MockDbClient` couldn't
+   catch the wrong operator because they stub the SQL away (R2).
+3. When introducing a new bi-temporal table (`triple`), every invalidation path
+   must set both time axes — review them explicitly (R3).

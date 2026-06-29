@@ -5,8 +5,10 @@
 //! `source_fact_id`. This enables structured queries like "кем работает X?"
 //! (who works where?) where the answer lives in a triple's object field.
 //!
-//! If the triple extractor is `NoOpTripleExtractor`, no triples exist in the
-//! database, so this module returns empty results immediately.
+//! When no triples exist in the database (e.g. extraction has not yet run
+//! for the matched facts), the storage layer returns an empty result and
+//! this module surfaces it unchanged. The step is best-effort: it runs after
+//! lexical, temporal, alias-expansion, and experience tiers.
 
 use crate::models::Fact;
 use crate::service::MemoryService;

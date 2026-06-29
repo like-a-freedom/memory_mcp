@@ -47,7 +47,10 @@ impl EntityService {
         normalized_alias: &str,
         namespace: &str,
     ) -> Result<Option<String>, MemoryError> {
-        let sql = "SELECT entity_id FROM entity WHERE aliases @1@ $alias LIMIT 1";
+        // NOTE: `entity_aliases` is a plain (non-FULLTEXT) index on the `aliases`
+        // array, so the FTS operator `@1@` would silently match nothing.
+        // `CONTAINS` is SurrealDB's array-membership operator and is index-aware.
+        let sql = "SELECT entity_id FROM entity WHERE aliases CONTAINS $alias LIMIT 1";
         let result = self
             .db_client
             .query(sql, Some(json!({"alias": normalized_alias})), namespace)

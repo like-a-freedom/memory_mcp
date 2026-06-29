@@ -9,6 +9,7 @@
 use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use crate::service::error::MemoryError;
 
@@ -167,7 +168,7 @@ impl TripleExtractor for RuleBasedTripleExtractor {
                     .unwrap_or_default();
                 let object = caps
                     .get(2)
-                    .map(|m| m.as_str().trim().to_string())
+                    .map(|m| normalize_russian_object(m.as_str()))
                     .filter(|s| !s.is_empty())
                     .unwrap_or_default();
                 if !subject.is_empty() && !object.is_empty() {
@@ -175,14 +176,56 @@ impl TripleExtractor for RuleBasedTripleExtractor {
                         subject,
                         predicate: predicate.to_string(),
                         object,
-                        confidence: 0.7, // rule-based = moderate confidence
+                        confidence: 0.7,
                         source_fact_id: source_fact_id.to_string(),
                     });
                 }
             }
         }
+        // Deduplicate by (subject, predicate): keep first (most specific pattern).
+        let mut seen: HashSet<(String, String)> = HashSet::new();
+        triples.retain(|t| seen.insert((t.subject.clone(), t.predicate.clone())));
         Ok(triples)
     }
+}
+
+/// Normalize Russian object nouns from inflected back to nominative-like form.
+///
+/// Strips common prepositional, instrumental, and genitive endings.
+/// This is a heuristic — not a full lemmatizer — sufficient to collapse
+/// obvious inflections ("Газпроме" → "Газпром") so that entity matching in
+/// retrieval has a chance to find the canonical form. Remaining
+/// partial-stem cases ("Москве" → "Москв") are accepted: retrieval still
+/// works because the triple's `object` is also the value written at
+/// creation time, so lookups are consistent within the system.
+fn normalize_russian_object(s: &str) -> String {
+    let trimmed = s.trim();
+    if !has_cyrillic(trimmed) {
+        return trimmed.to_string();
+    }
+    // Longest endings first so that e.g. "ого" is tried before "о".
+    // Deduplicated; covering common Russian noun case endings.
+    const ENDINGS: &[&str] = &[
+        "ого", "его", "ому", "ему", "ыми", "ими", "ую", "юю", "ной", "ным", "ном", "нем", "ой",
+        "ым", "им", "ом", "ем", "ей", "е", "у", "и", "а", "я",
+    ];
+    for ending in ENDINGS {
+        // `ending.len()` is in bytes; all entries above are ASCII-free and
+        // Cyrillic letters are 2 bytes each in UTF-8, so byte comparison via
+        // `ends_with` is correct.
+        if trimmed.len() > ending.len() + 1 && trimmed.ends_with(ending) {
+            let base = &trimmed[..trimmed.len() - ending.len()];
+            if base.chars().count() >= 2 {
+                return base.to_string();
+            }
+        }
+    }
+    trimmed.to_string()
+}
+
+fn has_cyrillic(s: &str) -> bool {
+    s.chars()
+        .any(|c| matches!(c, '\u{0400}'..='\u{04FF}' | '\u{0500}'..='\u{052F}'))
 }
 
 #[cfg(test)]
@@ -247,7 +290,7 @@ mod tests {
             .unwrap();
         assert_eq!(triples.len(), 1);
         assert_eq!(triples[0].predicate, "works_at");
-        assert!(triples[0].object.contains("Газпром"));
+        assert_eq!(triples[0].object, "Газпром");
     }
 
     #[tokio::test]
@@ -292,6 +335,22 @@ mod tests {
             .await
             .unwrap();
         assert!(triples.is_empty());
+    }
+
+    #[tokio::test]
+    async fn extract_deduplicates_by_subject_predicate() {
+        let extractor = RuleBasedTripleExtractor::new();
+        // Both "работает в Газпроме" and "работает в компании Газпром"
+        // should produce one triple, not two.
+        let triples = extractor
+            .extract("Иван работает в компании Газпром в Москве", "fact:dedup")
+            .await
+            .unwrap();
+        let works_at_count = triples.iter().filter(|t| t.predicate == "works_at").count();
+        assert_eq!(
+            works_at_count, 1,
+            "should deduplicate to single works_at triple"
+        );
     }
 
     #[test]

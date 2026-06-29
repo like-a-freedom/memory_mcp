@@ -87,13 +87,12 @@ impl EntityResolver {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((entity_id, score)) = best_match {
-            // Record the alias for future exact matches.
+            // Record the alias for future exact matches (only when the match
+            // wasn't already exact, so we don't store a redundant self-alias).
             if score < 1.0 {
                 entity_service
                     .add_alias_to_entity(&entity_id, &candidate.canonical_name, namespace)
                     .await?;
-                // Entity resolution: merged '{}' → '{}' (score={:.2})
-                let _ = (entity_id.clone(), score);
             }
             return Ok((entity_id, false));
         }
@@ -238,7 +237,10 @@ mod tests {
             // Step 1: exact lookup — returns None
             .expect_entity_lookup("иван петров", None)
             // Step 2: alias lookup — returns None
-            .expect_query("SELECT entity_id FROM entity WHERE aliases @1@", json!([]))
+            .expect_query(
+                "SELECT entity_id FROM entity WHERE aliases CONTAINS",
+                json!([]),
+            )
             // Step 3: prefix search — returns the canonical "Иван Петров"
             .expect_query(
                 "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with",
@@ -264,7 +266,10 @@ mod tests {
     async fn resolve_or_create_below_threshold_creates_new() {
         let db = MockDbClient::new()
             .expect_entity_lookup("bob jones", None)
-            .expect_query("SELECT entity_id FROM entity WHERE aliases @1@", json!([]))
+            .expect_query(
+                "SELECT entity_id FROM entity WHERE aliases CONTAINS",
+                json!([]),
+            )
             .expect_query(
                 "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with",
                 json!([

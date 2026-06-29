@@ -75,6 +75,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "025_cyrillic_fts.surql",
             sql: include_str!("../../migrations/025_cyrillic_fts.surql"),
         },
+        MigrationScript {
+            file_name: "026_cyrillic_fts_active.surql",
+            sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
+        },
     ]
 }
 
@@ -175,6 +179,18 @@ mod tests {
         assert!(versioned_migrations().iter().any(|migration| {
             migration.file_name == "021_query_log_retrieval_diagnostics.surql"
         }));
+    }
+
+    #[test]
+    fn versioned_migrations_includes_026_cyrillic_fts_active() {
+        // 025 defines `memory_fts_ru` but binds no index to it; 026 is what
+        // actually activates Russian stemming on the FTS indexes. Both must
+        // be registered so the schema is query-correct for Cyrillic content.
+        assert!(
+            versioned_migrations()
+                .iter()
+                .any(|migration| migration.file_name == "026_cyrillic_fts_active.surql")
+        );
     }
 
     #[test]

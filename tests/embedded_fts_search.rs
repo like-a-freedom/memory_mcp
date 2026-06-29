@@ -383,3 +383,110 @@ fn edge_origin_is_introduced_by_followup_migration() {
         "migration 017 should introduce the edge origin field"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Regression tests for the 2026-06-29 plan-review fix-up.
+//
+// These guard two gaps found while reviewing the implementation against the
+// plan (see docs/superpowers/plans/2026-06-29-plan-review-critical-analysis.md):
+//
+//   1. `EntityService::find_entity_id_by_alias` used the FTS operator `@1@`
+//      against a non-FULLTEXT index on `entity.aliases`, so step 2 of the
+//      fuzzy resolver silently never matched. The probe confirmed a real alias
+//      stored on disk was returned as `[]`. Fixed to use `CONTAINS`.
+//
+//   2. Migration 025 defined a `memory_fts_ru` analyzer but no index referenced
+//      it, so Russian-language stemming never ran. Migration 026 fixes this by
+//      folding `snowball(russian)` into the shared `memory_fts` analyzer.
+// ---------------------------------------------------------------------------
+
+/// Regression for the alias-lookup bug: resolving a *different* canonical name
+/// that is recorded as an alias on an existing entity must return the existing
+/// entity id, not create a new one.
+#[tokio::test]
+async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+
+    // Create "Alice Smith" and attach the alias "Alicia".
+    let alice_id = service
+        .resolve(
+            memory_mcp::models::EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Alice Smith".to_string(),
+                aliases: vec!["Alicia".to_string()],
+            },
+            None,
+        )
+        .await?;
+
+    // Resolving the bare canonical "Alicia" (which only matches via alias)
+    // must return the same entity id, NOT create a new one.
+    let alicia_id = service
+        .resolve(
+            memory_mcp::models::EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Alicia".to_string(),
+                aliases: vec![],
+            },
+            None,
+        )
+        .await?;
+
+    assert_eq!(
+        alice_id, alicia_id,
+        "resolving a name that exists only as an alias should return the existing entity, \
+         not create a new one (find_entity_id_by_alias regression)"
+    );
+    Ok(())
+}
+
+/// Regression for the Cyrillic FTS gap: a Russian-language fact must be
+/// retrievable by a Russian query term that shares a stem with the stored
+/// content. Before migration 026, the FTS analyzer only ran the English
+/// snowball stemmer, so Russian queries matched on raw substring only.
+#[tokio::test]
+async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::Error>> {
+    let service = embedded_support::setup_embedded_service().await?;
+    let t = Utc::now() - Duration::days(1);
+
+    service
+        .add_fact(
+            "note",
+            // Use an inflected object form so a stemmer has work to do;
+            // without Russian stemming the query below would not match.
+            "Иван Петров работает в Газпроме, курирует архитектуру",
+            "Иван работает в Газпроме",
+            "episode:fts_cyrillic_ru",
+            t,
+            "org",
+            0.9,
+            vec![],
+            vec![],
+            Provenance::agent_observation("episode:fts_cyrillic_ru"),
+        )
+        .await?;
+
+    let ctx = service
+        .assemble_context(AssembleContextRequest {
+            // Query the nominative form; the stored fact has the prepositional
+            // case "Газпроме". A Russian stemmer collapses both to the same stem.
+            query: "Газпром".to_string(),
+            scope: "org".to_string(),
+            as_of: None,
+            budget: 10,
+            project: None,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        })
+        .await?;
+
+    assert!(
+        !ctx.is_empty(),
+        "Russian query 'Газпром' should match fact containing 'Газпроме' via snowball(russian) \
+         (migration 026 regression)"
+    );
+    Ok(())
+}

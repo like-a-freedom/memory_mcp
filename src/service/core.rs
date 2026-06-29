@@ -542,9 +542,10 @@ impl MemoryService {
 
     /// Spawn a fire-and-forget triple extraction task.
     ///
-    /// If the triple extractor is a `NoOpTripleExtractor`, this is a no-op.
-    /// Otherwise, it extracts semantic triples from the fact content and
-    /// persists them to the `triple` table, then runs conflict resolution.
+    /// Extracts semantic triples from the fact content, persists each to the
+    /// `triple` table, and runs conflict resolution for singleton predicates.
+    /// Failures are swallowed: triple extraction is best-effort and must never
+    /// affect the fact write path.
     fn spawn_triple_extraction(&self, fact_id: &str, content: &str, namespace: &str) {
         let extractor = self.triple_extractor.clone();
         let fact_id = fact_id.to_string();

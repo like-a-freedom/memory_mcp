@@ -1,8 +1,38 @@
 # Implementation Log — 2026-06-29 (Final)
 
-## Status: ✅ ALL SPRINTS COMPLETE — 0 GAPS
+## Status: ✅ ALL SPRINTS COMPLETE — gaps closed in review
 
-**886 тестов, 0 failures.** Все пункты плана реализованы.
+All plan items implemented. Post-implementation review found and fixed six
+discrepancies between the plan and the actual code (see "Review fix-up" below).
+
+Validation: `cargo build`, `cargo clippy --all-targets` (0 warnings),
+`cargo fmt --all --check` (0 diff), full `cargo test` (0 failures across
+lib + integration + acceptance suites).
+
+---
+
+## Review fix-up — discrepancies found after the first pass
+
+A careful diff of the plan vs. the committed code revealed six gaps. Each was
+reproduced, fixed, and protected by a regression test.
+
+| # | Sprint | Gap | Severity | Fix |
+|---|--------|-----|----------|-----|
+| R1 | D2 | Migration `025_cyrillic_fts.surql` defined `memory_fts_ru` but **no index referenced it** — Russian stemming never ran. Migration `006` OVERWRITEs `fact_content_search` and `community_summary_search` to `memory_fts` (English). | High | New migration `026_cyrillic_fts_active.surql` folds `snowball(russian)` into the shared `memory_fts` analyzer so all three FULLTEXT indexes (`fact_content_search`, `community_summary_search`, `fact_index_keys_search`) get both stemmers. 025 left byte-identical to preserve its checksum. |
+| R2 | B1 | `EntityService::find_entity_id_by_alias` used `aliases @1@ $alias` (FTS operator), but `entity_aliases` is a plain (non-FULLTEXT) index → the query silently returned `[]`. Probe on real DB confirmed: alias stored on disk was not found. Step 2 of the fuzzy resolver was broken. | High | Changed operator to `aliases CONTAINS $alias` (SurrealDB array-membership, index-aware). Matches the existing legacy `build_select_entity_lookup_alias_query`. |
+| R3 | C2 | `invalidate_triple` set `t_invalid` but not `t_invalid_ingested`, breaking the bi-temporal invariant that migration `024` introduced for triples. | Medium | Now sets both: `SET t_invalid = time::now(), t_invalid_ingested = time::now()`. Mirrors the fact/edge invalidation path in `lifecycle/decay.rs`. |
+| R4 | B1 | `entity_resolution.rs` had dead scaffolding: a commented-out `// Entity resolution: merged ...` followed by `let _ = (entity_id.clone(), score);` that cloned `entity_id` only to bind it into a discarded tuple. | Low | Removed. |
+| R5 | C1 | Doc comments in `spawn_triple_extraction` and `context/triple.rs` claimed "no-op if `NoOpTripleExtractor`", but the default is `RuleBasedTripleExtractor`. `NoOpTripleExtractor` is `#[allow(dead_code)]` and never wired. | Low | Doc comments corrected. |
+| R6 | (new, untracked edits) | `normalize_russian_object` heuristic had duplicate entries in its `endings` list (`"ной"`×3, `"ого"`×2, etc.) and the "longest first" claim wasn't honored. | Low | List deduplicated, sorted longest-first, and switched the length guard from bytes to `chars().count()` for correctness on multi-byte Cyrillic. |
+
+### Regression tests added (`tests/embedded_fts_search.rs`)
+
+- `embedded_resolve_finds_entity_by_alias` — resolves a canonical name that
+  exists only as an alias on a previously-created entity; asserts it returns
+  the **same** entity id (guards R2).
+- `embedded_fts_finds_russian_content` — stores a fact containing `Газпроме`
+  (prepositional case) and queries `Газпром` (nominative); asserts a match
+  (guards R1).
 
 ---
 
@@ -51,7 +81,9 @@
 - `explain()` вычисляет: возраст от `t_valid`, decay по half-life (365/180d), ingestion_method из Provenance
 
 ### D2. Cyrillic FTS Analyzer
-- Миграция `025_cyrillic_fts.surql`: `memory_fts_ru` с `snowball(russian)`
+- Миграция `025_cyrillic_fts.surql`: определяет `memory_fts_ru` с `snowball(russian)`
+- ⚠️ Review выявил, что 025 **только определяет** анализатор — ни один индекс на него не ссылался. Кириллический стемминг не работал.
+- ✅ Fix: миграция `026_cyrillic_fts_active.surql` добавляет `snowball(russian)` в общий `memory_fts` анализатор, который уже используется индексами `fact_content_search`, `community_summary_search`, `fact_index_keys_search`. См. "Review fix-up R1" выше.
 
 ### D3. OpenAI-Compatible Embedder
 - Уже существовал: `OpenAiCompatibleEmbeddingProvider` + `OllamaEmbeddingProvider`
@@ -66,7 +98,8 @@
 | 022 | `022_structured_provenance.surql` | Структурированный провенанс |
 | 023 | `023_edge_composite_indexes.surql` | Составные индексы edge |
 | 024 | `024_triples.surql` | Таблица семантических троек |
-| 025 | `025_cyrillic_fts.surql` | Кириллический FTS анализатор |
+| 025 | `025_cyrillic_fts.surql` | Определяет `memory_fts_ru` (без привязки к индексу) |
+| 026 | `026_cyrillic_fts_active.surql` | Активирует `snowball(russian)` в общем `memory_fts` (R1) |
 
 ## Новые файлы
 
