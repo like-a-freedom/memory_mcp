@@ -97,7 +97,7 @@ impl EntityService {
         namespace: &str,
     ) -> Result<(), MemoryError> {
         let normalized_alias = normalize_text(alias);
-        let sql = "UPDATE type::thing($id) SET aliases += [$alias]";
+        let sql = "UPDATE type::record($id) SET aliases += [$alias]";
         self.db_client
             .query(
                 sql,

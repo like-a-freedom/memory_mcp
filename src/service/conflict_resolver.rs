@@ -94,7 +94,7 @@ async fn invalidate_triple(
     triple_id: &str,
 ) -> Result<(), MemoryError> {
     let sql =
-        "UPDATE type::thing($id) SET t_invalid = time::now(), t_invalid_ingested = time::now()";
+        "UPDATE type::record($id) SET t_invalid = time::now(), t_invalid_ingested = time::now()";
     entity_service
         .invalidate_triple_by_id(sql, namespace, triple_id)
         .await
