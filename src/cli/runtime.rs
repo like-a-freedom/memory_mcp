@@ -134,7 +134,7 @@ pub fn log_session_duration(logger: &StdoutLogger, duration_secs: i64) {
     logger.log(m, LogLevel::Info);
 }
 
-pub(crate) async fn build_memory_service(
+pub async fn build_memory_service(
     logger: &StdoutLogger,
     mode: EmbeddingActivationMode,
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {

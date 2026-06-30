@@ -7,7 +7,7 @@ pub(crate) const EMBEDDING_STATE_RECORD_ID: &str = "embedding_state:fact";
 pub(crate) const LEGACY_EMBEDDING_SAMPLE_SIZE: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum EmbeddingActivationMode {
+pub enum EmbeddingActivationMode {
     Standard,
     ForceEnabledForReembed,
 }

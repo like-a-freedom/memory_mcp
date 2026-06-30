@@ -8,8 +8,8 @@ pub mod runtime;
 use clap::{Parser, Subcommand};
 
 pub use runtime::{
-    RunMode, WatchCommand, log_session_duration, log_startup, parse_cli_args, run_reembed_mode,
-    run_stdio_server, run_watch_mode,
+    RunMode, WatchCommand, build_memory_service, log_session_duration, log_startup, parse_cli_args,
+    run_reembed_mode, run_stdio_server, run_watch_mode,
 };
 
 /// `memory_mcp` command-line interface.

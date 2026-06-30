@@ -37,6 +37,7 @@ pub mod config;
 pub mod logging;
 pub mod mcp;
 pub mod models;
+pub mod runner;
 pub mod service;
 pub mod storage;
 pub mod timing;
