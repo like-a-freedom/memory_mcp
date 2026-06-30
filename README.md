@@ -697,6 +697,101 @@ In particular:
 - prefer typed errors and deterministic behavior
 - run formatting, clippy, and tests before considering work done
 
+## CLI Mode
+
+Every memory tool can be invoked directly from the command line. The CLI shares the same implementation as the MCP protocol — zero code duplication.
+
+### Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `serve` (default) | Run the stdio MCP server |
+| `watch <dir>` | Watch a directory and auto-ingest files (requires `cli-watch` feature) |
+| `reembed` | Rebuild all fact embeddings |
+| `ingest` | Store raw source material as an episode |
+| `extract` | Extract entities, facts, and relationships |
+| `resolve` | Resolve entity aliases to a canonical entity id |
+| `invalidate` | Invalidate a fact while preserving history |
+| `explain` | Get citation-ready source snippets |
+| `assemble-context` | Assemble ranked, relevant context for a query |
+
+### Examples
+
+```bash
+# Ingest an episode
+memory_mcp ingest \
+  --source-type email \
+  --source-id msg-001 \
+  --content "I will finish the API by Friday." \
+  --t-ref 2026-06-30T10:00:00Z \
+  --scope team
+
+# Extract entities and facts
+memory_mcp extract --episode-id episode:abc123
+
+# Extract from inline content
+memory_mcp extract \
+  --content "Alice works at Acme Corp." \
+  --source-type ad-hoc \
+  --t-ref 2026-06-30T10:00:00Z \
+  --scope team
+
+# Resolve an entity
+memory_mcp resolve \
+  --entity-type person \
+  --canonical-name "Alice Smith" \
+  --aliases Alice --aliases "A. Smith"
+
+# Query assembled context
+memory_mcp assemble-context \
+  --query "What did Alice promise?" \
+  --scope org \
+  --budget 10
+
+# Invalidate a fact
+memory_mcp invalidate \
+  --fact-id fact:xyz \
+  --reason "Decision reversed" \
+  --t-invalid 2026-06-30T00:00:00Z
+
+# Get provenance citations
+memory_mcp explain \
+  --context-items '[{"content":"API delivery","source_episode":"episode:abc"}]'
+```
+
+### Output Format
+
+All CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**:
+
+```json
+{
+  "status": "success",
+  "result": "episode:abc123",
+  "guidance": "Call extract next to derive entities and facts.",
+  "has_more": false,
+  "total_count": 1,
+  "next_offset": null
+}
+```
+
+Structured log events go to **stdout** (controlled by `RUST_LOG`). Error responses go to **stderr** as JSON:
+
+```json
+{
+  "error": "Invalid `t_ref` value: bad-date. ...",
+  "kind": "Validation",
+  "exit_code": 2
+}
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Internal / storage / config error |
+| 2 | Validation error or not found |
+
 ## License
 
 This project is licensed under the **MIT** license. See [`LICENSE`](LICENSE) for details.

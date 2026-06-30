@@ -800,6 +800,8 @@ memory_mcp/
 - Query preprocessing for `assemble_context` exists (`preprocess_search_query()`), with test coverage for multi-word search behavior and query normalization.
 - SurrealDB 3 migration hardening completed: `store_edge` no longer writes null optional invalidation fields, runtime schema now defines `edge_id` and all required SCHEMAFULL tables (`community`, `event_log`, `task`), and legacy SurrealQL syntax updated (`SEARCH ANALYZER` → `FULLTEXT ANALYZER`, `string::is::datetime` → `string::is_datetime`).
 
+Every memory tool is reachable both via stdio MCP and via a CLI subcommand, sharing the same implementation in `src/tools/`. The CLI entry point (`main.rs`) parses arguments and dispatches directly to the same service methods — there is no separate code path for CLI vs. MCP.
+
 **Pending:**
 - Richer extraction quality (multi-pass, LLM-assisted validation)
 - Entity merge workflows with history tracking and rollback capability
