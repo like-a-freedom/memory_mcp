@@ -16,7 +16,7 @@ use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
-use crate::models::{AssembleContextRequest, AssembledContextItem, ExplainItem, ExtractResult};
+use crate::models::{AssembledContextItem, ExplainItem, ExtractResult};
 use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
 use crate::storage::GraphDirection;
@@ -1677,68 +1677,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<AssembleContextParams>,
     ) -> Result<Json<ToolResponse<Vec<AssembledContextItem>>>, ErrorData> {
-        let p = params.0;
-        let as_of = if p.as_of.trim().is_empty() {
-            None
-        } else {
-            chrono::DateTime::parse_from_rfc3339(&p.as_of)
-                .ok()
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-        };
-        let window_start = p.window_start.as_deref().and_then(parse_datetime);
-        let window_end = p.window_end.as_deref().and_then(parse_datetime);
-        let request = AssembleContextRequest {
-            query: p.query.clone(),
-            scope: p.scope.clone(),
-            project: p.project.clone(),
-            fact_types: p.fact_types.clone(),
-            as_of,
-            budget: p.budget,
-            view_mode: p.view_mode.clone(),
-            window_start,
-            window_end,
-            access: None,
-        };
-
-        let timer = Instant::now(); // assemble_context
-        let request_id = self.next_request_id();
-        self.service.log_tool_event(
-            "assemble_context.start",
-            json!({"scope": request.scope, "query": request.query}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        match self.service.assemble_context(request).await {
-            Ok(results) => {
-                self.service.log_tool_event_with_duration(
-                    "assemble_context.done",
-                    json!({}),
-                    json!({"count": results.len()}),
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                let count = results.len();
-                Ok(Json(ToolResponse::complete_list(
-                    results,
-                    count,
-                    "Call explain if you need provenance-ready citations for selected items.",
-                )))
-            }
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "assemble_context.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
+        crate::tools::assemble_context(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 }
 
