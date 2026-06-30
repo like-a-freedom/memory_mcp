@@ -1106,72 +1106,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<IngestParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        let p = params.0;
-        let t_ref = parse_datetime(&p.t_ref).ok_or_else(|| {
-            tool_error(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid t_ref format",
-                "Provide a valid ISO 8601 timestamp with seconds, e.g. 2026-05-11T17:34:00Z or 2026-05-11T17:34:00+00:00.",
-                format!(
-                    "Could not parse `t_ref` as an ISO 8601 datetime: {}. \
-                     Accepted formats include 2026-05-11T17:34:00Z, 2026-05-11T17:34:00+05:00, \
-                     or 2026-05-11T17:34Z (seconds may be omitted).",
-                    p.t_ref
-                ),
-            )
-        })?;
-        let t_ingested = p.t_ingested.as_ref().and_then(|s| parse_datetime(s));
-
-        let access = AccessPayload::default();
-        let request = IngestRequest {
-            source_type: p.source_type.clone(),
-            source_id: p.source_id.clone(),
-            content: p.content.clone(),
-            t_ref,
-            scope: p.scope.clone(),
-            project: p.project.clone(),
-            t_ingested,
-            visibility_scope: p.visibility_scope,
-            policy_tags: p.policy_tags.clone(),
-        };
-
-        let timer = Instant::now(); // ingest
-        let request_id = self.next_request_id();
-        self.service.log_tool_event(
-            "ingest.start",
-            json!({"source_type": p.source_type, "source_id": p.source_id, "scope": p.scope}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        match self.service.ingest(request, Some(access)).await {
-            Ok(episode_id) => {
-                self.service.log_tool_event_with_duration(
-                    "ingest.done",
-                    json!({"source_id": p.source_id}),
-                    json!({"episode_id": &episode_id}),
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Ok(Json(ToolResponse::success_with_guidance(
-                    episode_id,
-                    "Call extract next to derive entities and facts.",
-                )))
-            }
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "ingest.error",
-                    json!({"source_id": p.source_id}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
+        crate::tools::ingest(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 
     #[tool(
