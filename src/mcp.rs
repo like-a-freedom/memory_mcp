@@ -14,8 +14,22 @@
 //! - `resources`: MCP resource catalog and URI helpers for app sessions
 
 pub use handlers::*;
-pub use parsers::*;
-pub use response::{AppCommandResult, OpenAppResult, ToolResponse};
+pub use params::*;
+pub use response::{AppCommandResult, OpenAppResult};
+
+// Re-exports for use by refactored tools (Tasks 2-7).
+#[allow(unused_imports)]
+pub(crate) use crate::tools::{
+    params::{
+        AssembleContextParams, ExplainParams, ExtractParams, IngestParams, InvalidateParams,
+        ResolveParams,
+    },
+    parsers::{
+        content_hash, default_budget, default_scope, normalize_optional_string,
+        parse_context_items, parse_datetime,
+    },
+    response::ToolResponse,
+};
 
 mod error;
 mod handlers;
@@ -26,5 +40,3 @@ pub(crate) mod response;
 pub(crate) mod session;
 
 pub use error::mcp_error;
-pub use params::*;
-pub use parsers::{content_hash, default_scope, parse_context_items, parse_datetime};

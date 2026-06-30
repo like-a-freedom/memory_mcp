@@ -40,6 +40,7 @@ pub mod models;
 pub mod service;
 pub mod storage;
 pub mod timing;
+pub mod tools;
 
 pub use mcp::MemoryMcp;
 pub use service::{MemoryError, MemoryService};

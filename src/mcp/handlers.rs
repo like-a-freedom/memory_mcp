@@ -1,10 +1,7 @@
 //! MCP tool handler implementations.
 
 use std::collections::{HashSet, VecDeque};
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use rmcp::handler::server::tool::ToolRouter;
@@ -159,7 +156,6 @@ fn summarize_ingestion_review_items(items: &[Value]) -> Value {
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
     session_manager: SessionManager,
-    request_counter: Arc<AtomicU64>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -179,7 +175,6 @@ impl MemoryMcp {
         Self {
             service: Arc::new(service),
             session_manager: SessionManager::new(),
-            request_counter: Arc::new(AtomicU64::new(0)),
             tool_router: Self::tool_router(),
         }
     }
@@ -194,8 +189,7 @@ impl MemoryMcp {
 
     /// Generates a monotonically increasing request id like `req_0001`.
     fn next_request_id(&self) -> String {
-        let n = self.request_counter.fetch_add(1, Ordering::Relaxed) + 1;
-        format!("req_{:04}", n)
+        crate::tools::request_id::next_request_id()
     }
 
     fn build_server_info() -> ServerInfo {
