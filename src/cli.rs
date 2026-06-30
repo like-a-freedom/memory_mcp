@@ -7,9 +7,11 @@ pub mod runtime;
 
 use clap::{Parser, Subcommand};
 
+#[allow(deprecated)]
+pub use runtime::{RunMode, WatchCommand, parse_cli_args};
 pub use runtime::{
-    RunMode, WatchCommand, build_memory_service, log_session_duration, log_startup, parse_cli_args,
-    run_reembed_mode, run_stdio_server, run_watch_mode,
+    build_memory_service, log_session_duration, log_startup, run_reembed_mode, run_stdio_server,
+    run_watch_mode,
 };
 
 /// `memory_mcp` command-line interface.
@@ -39,16 +41,29 @@ pub enum Command {
     Watch(args::WatchArgs),
     /// Rebuild all fact embeddings for the current embedding provider/model.
     Reembed,
-    /// Store raw source material as an episode.
+    /// Store raw source material as an episode (source_type, source_id, content).
+    /// Requires `--source-type`, `--source-id`, `--content`, `--t-ref` (ISO 8601).
+    /// Output: ToolResponse with status, episode_id. Next step: `extract --episode-id <id>`.
     Ingest(args::IngestArgs),
     /// Extract entities, facts, and relationships from an episode or inline content.
+    /// Provide exactly one input: `--episode-id` (from ingest) or `--content` inline.
+    /// Output: ToolResponse with lists of entities and facts. Next step: `resolve`
+    /// to deduplicate aliases, or `assemble-context` to query stored facts.
     Extract(args::ExtractArgs),
-    /// Resolve entity aliases to a canonical entity id.
+    /// Resolve entity aliases to a canonical entity id (deduplication).
+    /// Merges `--aliases` under `--canonical-name` for `--entity-type`.
+    /// Output: ToolResponse with canonical_id. Run after extraction to clean up entities.
     Resolve(args::ResolveArgs),
     /// Invalidate a fact while preserving historical traceability.
+    /// Requires `--fact-id`, `--reason`, `--t-invalid` (ISO 8601).
+    /// Marks the fact as no longer valid without deleting it.
     Invalidate(args::InvalidateArgs),
     /// Explain context items with provenance-ready citations.
+    /// Takes a JSON array from `assemble-context` output as `--context-items`.
+    /// Output: ToolResponse with source snippets and provenance data.
     Explain(args::ExplainArgs),
     /// Assemble ranked, relevant context for a query.
+    /// Searches stored facts matching `--query`, scoped by `--scope` (org/team/personal).
+    /// Output: ToolResponse with ranked context_items. Next step: pipe items to `explain`.
     AssembleContext(args::AssembleContextArgs),
 }

@@ -35,6 +35,7 @@ fn log_and_return_error(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[deprecated(note = "use cli::Cli::parse() via runner::run() instead")]
 pub enum RunMode {
     Serve,
     Watch(WatchCommand),
@@ -49,6 +50,8 @@ pub struct WatchCommand {
     pub interval_secs: u64,
 }
 
+#[deprecated(note = "use Cli::parse_from() via runner::run() instead")]
+#[allow(deprecated)]
 pub fn parse_cli_args<I, S>(args: I) -> Result<RunMode, String>
 where
     I: IntoIterator<Item = S>,
@@ -236,79 +239,135 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::runtime::{RunMode, WatchCommand, parse_cli_args};
+    use crate::cli::Command;
+    use crate::cli::{Cli, args::WatchArgs};
+    use clap::Parser;
 
     #[test]
-    fn parse_cli_args_defaults_to_stdio_serve_mode() {
-        let mode = parse_cli_args(["memory_mcp".to_string()]).expect("serve mode should parse");
-
-        assert_eq!(mode, RunMode::Serve);
+    fn cli_defaults_to_stdio_serve_mode() {
+        let cli = Cli::parse_from(["memory_mcp"]);
+        assert!(cli.command.is_none());
     }
 
     #[test]
-    fn parse_cli_args_builds_watch_command_with_optional_flags() {
-        let mode = parse_cli_args([
-            "memory_mcp".to_string(),
-            "watch".to_string(),
-            "/tmp/inbox".to_string(),
-            "--project".to_string(),
-            "atlas".to_string(),
-            "--scope".to_string(),
-            "team".to_string(),
-            "--interval".to_string(),
-            "7".to_string(),
-        ])
-        .expect("watch mode should parse");
-
-        assert_eq!(
-            mode,
-            RunMode::Watch(WatchCommand {
-                dir: std::path::PathBuf::from("/tmp/inbox"),
-                project: Some("atlas".to_string()),
-                scope: "team".to_string(),
-                interval_secs: 7,
-            })
-        );
+    fn cli_serve_subcommand() {
+        let cli = Cli::parse_from(["memory_mcp", "serve"]);
+        assert!(matches!(cli.command, Some(Command::Serve)));
     }
 
     #[test]
-    fn parse_cli_args_rejects_missing_watch_directory() {
-        let error = parse_cli_args(["memory_mcp".to_string(), "watch".to_string()])
-            .expect_err("watch without directory should fail");
-
-        assert!(error.contains("watch requires <dir>"));
+    fn cli_watch_with_optional_flags() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "watch",
+            "/tmp/inbox",
+            "--project",
+            "atlas",
+            "--scope",
+            "team",
+            "--interval-secs",
+            "7",
+        ]);
+        let watch: WatchArgs = match cli.command {
+            Some(Command::Watch(w)) => w,
+            _ => panic!("expected Watch command"),
+        };
+        assert_eq!(watch.dir.to_str().unwrap(), "/tmp/inbox");
+        assert_eq!(watch.project.as_deref(), Some("atlas"));
+        assert_eq!(watch.scope, "team");
+        assert_eq!(watch.interval_secs, 7);
     }
 
     #[test]
-    fn parse_cli_args_rejects_unknown_watch_flag() {
-        let error = parse_cli_args([
-            "memory_mcp".to_string(),
-            "watch".to_string(),
-            "/tmp/inbox".to_string(),
-            "--mystery".to_string(),
-        ])
-        .expect_err("unknown flag should fail");
-
-        assert!(error.contains("unknown watch flag --mystery"));
+    fn cli_watch_defaults() {
+        let cli = Cli::parse_from(["memory_mcp", "watch", "/tmp/inbox"]);
+        let watch: WatchArgs = match cli.command {
+            Some(Command::Watch(w)) => w,
+            _ => panic!("expected Watch command"),
+        };
+        assert_eq!(watch.scope, "team");
+        assert_eq!(watch.interval_secs, 2);
     }
 
     #[test]
-    fn parse_cli_args_builds_reembed_mode() {
-        let mode = parse_cli_args(["memory_mcp".to_string(), "reembed".to_string()])
-            .expect("reembed mode should parse");
-
-        assert_eq!(mode, RunMode::Reembed);
+    fn cli_watch_rejects_missing_directory() {
+        let result = Cli::try_parse_from(["memory_mcp", "watch"]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn parse_cli_args_rejects_unexpected_reembed_arguments() {
-        let error = parse_cli_args([
-            "memory_mcp".to_string(),
-            "reembed".to_string(),
-            "extra".to_string(),
-        ])
-        .expect_err("reembed should reject extra arguments");
+    fn cli_reembed_subcommand() {
+        let cli = Cli::parse_from(["memory_mcp", "reembed"]);
+        assert!(matches!(cli.command, Some(Command::Reembed)));
+    }
 
-        assert!(error.contains("reembed does not accept positional arguments"));
+    #[test]
+    fn cli_ingest_subcommand() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "ingest",
+            "--source-type",
+            "email",
+            "--source-id",
+            "m-1",
+            "--content",
+            "hello",
+            "--t-ref",
+            "2026-06-30T10:00:00Z",
+        ]);
+        assert!(matches!(cli.command, Some(Command::Ingest(_))));
+    }
+
+    #[test]
+    fn cli_extract_subcommand() {
+        let cli = Cli::parse_from(["memory_mcp", "extract", "--episode-id", "ep:1"]);
+        assert!(matches!(cli.command, Some(Command::Extract(_))));
+    }
+
+    #[test]
+    fn cli_resolve_subcommand() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "resolve",
+            "--entity-type",
+            "person",
+            "--canonical-name",
+            "Alice",
+            "--aliases",
+            "Ali",
+        ]);
+        assert!(matches!(cli.command, Some(Command::Resolve(_))));
+    }
+
+    #[test]
+    fn cli_invalidate_subcommand() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "invalidate",
+            "--fact-id",
+            "f:1",
+            "--reason",
+            "test",
+            "--t-invalid",
+            "2026-06-30T00:00:00Z",
+        ]);
+        assert!(matches!(cli.command, Some(Command::Invalidate(_))));
+    }
+
+    #[test]
+    fn cli_explain_subcommand() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "explain",
+            "--context-items",
+            r#"[{"fact_id":"f:1"}]"#,
+        ]);
+        assert!(matches!(cli.command, Some(Command::Explain(_))));
+    }
+
+    #[test]
+    fn cli_assemble_context_subcommand() {
+        let cli = Cli::parse_from(["memory_mcp", "assemble-context", "--query", "test"]);
+        assert!(matches!(cli.command, Some(Command::AssembleContext(_))));
     }
 }
