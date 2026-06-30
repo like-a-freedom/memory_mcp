@@ -8,6 +8,7 @@
 //! `Storage` / `Transient` errors include `retryable: true`.
 
 use rmcp::ErrorData;
+#[cfg(test)]
 use rmcp::model::ErrorCode;
 use serde_json::{Value, json};
 
@@ -22,7 +23,8 @@ use crate::service::MemoryError;
 /// Unlike `mcp_error`, this factory is used for _tool-specific_ input
 /// validation where the caller needs to know **what** was wrong and
 /// **how to fix it**.
-pub fn tool_error(
+#[cfg(test)]
+pub(crate) fn tool_error(
     code: ErrorCode,
     message: impl Into<String>,
     guidance: impl Into<String>,

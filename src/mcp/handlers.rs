@@ -16,18 +16,15 @@ use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
-use crate::models::{
-    AccessPayload, AssembleContextRequest, AssembledContextItem, ExplainItem, ExplainRequest,
-    ExtractResult,
-};
+use crate::models::{AssembleContextRequest, AssembledContextItem, ExplainItem, ExtractResult};
 use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
 use crate::storage::GraphDirection;
 use std::time::Instant;
 
-use super::error::{mcp_error, tool_error};
+use super::error::mcp_error;
 use super::params::*;
-use super::parsers::{parse_context_items, parse_datetime};
+use super::parsers::parse_datetime;
 use super::resources::{
     APPS_INDEX_URI, app_catalog_resources, app_resource_templates, app_root_payload,
     app_session_html_document, app_session_uri, apps_index_payload, parse_app_root_uri,
@@ -895,56 +892,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
-        let access = AccessPayload::default();
-        let context_pack = parse_context_items(&params.0.context_items).map_err(|msg| {
-            tool_error(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid context_items format",
-                "Provide a JSON array of objects with snake_case keys. Each object must have `content`, optionally `quote`, `source_episode`, and/or `source_type`.",
-                msg,
-            )
-        })?;
-        let request = ExplainRequest { context_pack };
-
-        let timer = Instant::now(); // explain
-        let request_id = self.next_request_id();
-        self.service.log_tool_event(
-            "explain.start",
-            json!({"count": request.context_pack.len()}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        match self.service.explain(request, Some(access)).await {
-            Ok(explanations) => {
-                self.service.log_tool_event_with_duration(
-                    "explain.done",
-                    json!({}),
-                    json!({"count": explanations.len()}),
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                let count = explanations.len();
-                Ok(Json(ToolResponse::complete_list(
-                    explanations,
-                    count,
-                    "Use these citations directly in the final response.",
-                )))
-            }
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "explain.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
+        crate::tools::explain(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 
     #[tool(
