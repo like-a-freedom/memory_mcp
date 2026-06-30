@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use crate::logging::LogLevel;
 use crate::models::{
     AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
-    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
+    ExplainRequest, ExtractResult, InvalidateRequest,
 };
 use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
@@ -27,7 +27,7 @@ use std::time::Instant;
 
 use super::error::{mcp_error, tool_error};
 use super::params::*;
-use super::parsers::{content_hash, parse_context_items, parse_datetime};
+use super::parsers::{parse_context_items, parse_datetime};
 use super::resources::{
     APPS_INDEX_URI, app_catalog_resources, app_resource_templates, app_root_payload,
     app_session_html_document, app_session_uri, apps_index_payload, parse_app_root_uri,
@@ -799,230 +799,6 @@ impl MemoryMcp {
         self.create_session("graph", &params.scope, params.ttl_seconds, payload)
             .await
     }
-
-    /// Shared implementation for extract operations.
-    ///
-    /// Handles extracting from episode_id or ingesting content first.
-    #[allow(clippy::too_many_arguments)]
-    async fn extract_impl(
-        &self,
-        episode_id: Option<String>,
-        content: Option<String>,
-        text: Option<String>,
-        source_type: Option<String>,
-        source_id: Option<String>,
-        t_ref: Option<String>,
-        scope: Option<String>,
-        zero_shot_labels: Option<Vec<String>>,
-    ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
-        use super::parsers::normalize_optional_string;
-
-        let access = AccessPayload::default();
-        let episode_id = normalize_optional_string(episode_id);
-        let content = normalize_optional_string(content);
-        let text = normalize_optional_string(text);
-        let timer = Instant::now(); // extract
-        let request_id = self.next_request_id();
-
-        self.service.log_tool_event(
-            "extract.start",
-            json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        if content.is_some() && text.is_some() {
-            let message = "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.";
-            self.service.log_tool_event_with_duration(
-                "extract.invalid_input",
-                json!({"episode_id": &episode_id, "has_content": true}),
-                json!({"error": message}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
-            return Err(Self::invalid_params(message));
-        }
-
-        let inline_content = content.or(text);
-
-        if episode_id.is_some() && inline_content.is_some() {
-            let message = "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.";
-            self.service.log_tool_event_with_duration(
-                "extract.invalid_input",
-                json!({"episode_id": &episode_id, "has_content": true}),
-                json!({"error": message}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
-            return Err(Self::invalid_params(message));
-        }
-
-        if episode_id.is_none() && inline_content.is_none() {
-            let message = "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.";
-            self.service.log_tool_event_with_duration(
-                "extract.invalid_input",
-                json!({"episode_id": &episode_id, "has_content": false}),
-                json!({"error": message}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
-            return Err(Self::invalid_params(message));
-        }
-
-        if let Some(ref episode_id) = episode_id {
-            match self
-                .service
-                .extract(episode_id, Some(access), zero_shot_labels.as_deref())
-                .await
-            {
-                Ok(result) => {
-                    let log_result = match self.service.find_episode_record(episode_id).await {
-                        Ok((record, _)) => {
-                            let episode = record
-                                .as_ref()
-                                .and_then(crate::service::episode_from_record);
-                            crate::service::build_extract_log_result(
-                                episode.as_ref(),
-                                result.entities.len(),
-                                &result.facts,
-                                result.links.len(),
-                                result.warnings.len(),
-                            )
-                        }
-                        Err(_) => crate::service::build_extract_log_result(
-                            None,
-                            result.entities.len(),
-                            &result.facts,
-                            result.links.len(),
-                            result.warnings.len(),
-                        ),
-                    };
-
-                    self.service.log_tool_event_with_duration(
-                        "extract.done",
-                        json!({"episode_id": episode_id}),
-                        log_result,
-                        LogLevel::Info,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    return Ok(ToolResponse::success_with_guidance(
-                        result,
-                        "Resolve canonical entities for any ambiguous names before creating manual links.",
-                    ));
-                }
-                Err(err) => {
-                    self.service.log_tool_event_with_duration(
-                        "extract.error",
-                        json!({"episode_id": episode_id}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    return Err(mcp_error(err));
-                }
-            }
-        }
-
-        let content = inline_content.expect("validated extract inline content");
-
-        let source_type = source_type.unwrap_or_else(|| "ad-hoc".to_string());
-        let source_id = source_id.unwrap_or_else(|| content_hash(&content));
-        let t_ref = t_ref
-            .as_ref()
-            .and_then(|s| parse_datetime(s))
-            .unwrap_or_else(Utc::now);
-        let scope = scope.unwrap_or_else(|| "org".to_string());
-
-        match self
-            .service
-            .ingest(
-                IngestRequest {
-                    source_type,
-                    source_id,
-                    content,
-                    t_ref,
-                    scope,
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: Vec::new(),
-                },
-                Some(access.clone()),
-            )
-            .await
-        {
-            Ok(episode_id) => match self
-                .service
-                .extract(&episode_id, Some(access), zero_shot_labels.as_deref())
-                .await
-            {
-                Ok(result) => {
-                    let log_result = match self.service.find_episode_record(&episode_id).await {
-                        Ok((record, _)) => {
-                            let episode = record
-                                .as_ref()
-                                .and_then(crate::service::episode_from_record);
-                            crate::service::build_extract_log_result(
-                                episode.as_ref(),
-                                result.entities.len(),
-                                &result.facts,
-                                result.links.len(),
-                                result.warnings.len(),
-                            )
-                        }
-                        Err(_) => crate::service::build_extract_log_result(
-                            None,
-                            result.entities.len(),
-                            &result.facts,
-                            result.links.len(),
-                            result.warnings.len(),
-                        ),
-                    };
-
-                    self.service.log_tool_event_with_duration(
-                        "extract.done",
-                        json!({"episode_id": &episode_id}),
-                        log_result,
-                        LogLevel::Info,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Ok(ToolResponse::success_with_guidance(
-                        result,
-                        "Resolve canonical entities for any ambiguous names before creating manual links.",
-                    ))
-                }
-                Err(err) => {
-                    self.service.log_tool_event_with_duration(
-                        "extract.error",
-                        json!({}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Err(mcp_error(err))
-                }
-            },
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "extract.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
-    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -1178,20 +954,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExtractParams>,
     ) -> Result<Json<ToolResponse<ExtractResult>>, ErrorData> {
-        let p = params.0;
-        let response = self
-            .extract_impl(
-                p.episode_id,
-                p.content,
-                p.text,
-                p.source_type,
-                p.source_id,
-                p.t_ref,
-                p.scope,
-                p.zero_shot_labels,
-            )
-            .await?;
-        Ok(Json(response))
+        crate::tools::extract(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 
     #[tool(
