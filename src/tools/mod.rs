@@ -6,6 +6,7 @@
 
 pub mod extract;
 pub mod ingest;
+pub mod invalidate;
 pub mod params;
 pub mod parsers;
 pub mod request_id;
@@ -14,4 +15,5 @@ pub mod response;
 
 pub use extract::extract;
 pub use ingest::ingest;
+pub use invalidate::invalidate;
 pub use resolve::resolve;

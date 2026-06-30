@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use crate::logging::LogLevel;
 use crate::models::{
     AccessPayload, AssembleContextRequest, AssembledContextItem, ExplainItem, ExplainRequest,
-    ExtractResult, InvalidateRequest,
+    ExtractResult,
 };
 use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
@@ -980,63 +980,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<InvalidateParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        let p = params.0;
-        let access = AccessPayload::default();
-        let t_invalid = parse_datetime(&p.t_invalid).ok_or_else(|| {
-            tool_error(
-                rmcp::model::ErrorCode::INVALID_PARAMS,
-                "Invalid t_invalid format",
-                "Provide a valid ISO 8601 timestamp indicating when the fact became invalid, e.g. 2026-05-11T17:34:00Z.",
-                format!(
-                    "Could not parse `t_invalid` as an ISO 8601 datetime: {}. \
-                     Accepted formats: 2026-05-11T17:34:00Z, 2026-05-11T17:34:00+05:00.",
-                    p.t_invalid
-                ),
-            )
-        })?;
-        let request = InvalidateRequest {
-            fact_id: p.fact_id.clone(),
-            reason: p.reason.clone(),
-            t_invalid,
-        };
-
-        let timer = Instant::now(); // invalidate
-        let request_id = self.next_request_id();
-        self.service.log_tool_event(
-            "invalidate.start",
-            json!({"fact_id": request.fact_id}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        match self.service.invalidate(request, Some(access)).await {
-            Ok(()) => {
-                self.service.log_tool_event_with_duration(
-                    "invalidate.done",
-                    json!({"fact_id": p.fact_id}),
-                    json!({"status": "invalidated"}),
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Ok(Json(ToolResponse::success_with_guidance(
-                    "invalidated".to_string(),
-                    "Re-run assemble_context with a fresh `as_of` timestamp to confirm the fact is no longer active.",
-                )))
-            }
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "invalidate.error",
-                    json!({"fact_id": p.fact_id}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
+        crate::tools::invalidate(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 
     #[tool(
