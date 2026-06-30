@@ -134,7 +134,7 @@ pub fn log_session_duration(logger: &StdoutLogger, duration_secs: i64) {
     logger.log(m, LogLevel::Info);
 }
 
-async fn build_memory_service(
+pub(crate) async fn build_memory_service(
     logger: &StdoutLogger,
     mode: EmbeddingActivationMode,
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {
@@ -236,7 +236,7 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::cli::runtime::{RunMode, WatchCommand, parse_cli_args};
 
     #[test]
     fn parse_cli_args_defaults_to_stdio_serve_mode() {

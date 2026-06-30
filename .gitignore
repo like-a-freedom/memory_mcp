@@ -8,6 +8,7 @@ AGENTS.md
 # Cargo build artifacts
 /target/
 **/target/
+*.rlib
 /scripts
 
 # Cargo.lock
