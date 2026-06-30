@@ -17,8 +17,8 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{
-    AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
-    ExplainRequest, ExtractResult, InvalidateRequest,
+    AccessPayload, AssembleContextRequest, AssembledContextItem, ExplainItem, ExplainRequest,
+    ExtractResult, InvalidateRequest,
 };
 use crate::service::value_helpers::{json_string, normalized_edge_record};
 use crate::service::{MemoryService, run_community_rebuild_pass, run_decay_pass};
@@ -967,51 +967,10 @@ impl MemoryMcp {
         &self,
         params: Parameters<ResolveParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        let p = params.0;
-        let access = AccessPayload::default();
-        let candidate = EntityCandidate {
-            entity_type: p.entity_type.clone(),
-            canonical_name: p.canonical_name.clone(),
-            aliases: p.aliases.clone(),
-        };
-
-        let timer = Instant::now(); // resolve
-        let request_id = self.next_request_id();
-        self.service.log_tool_event(
-            "resolve.start",
-            json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
-            json!({}),
-            LogLevel::Info,
-            Some(&request_id),
-        );
-
-        match self.service.resolve(candidate, Some(access)).await {
-            Ok(entity_id) => {
-                self.service.log_tool_event_with_duration(
-                    "resolve.done",
-                    json!({}),
-                    json!({"entity_id": &entity_id}),
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Ok(Json(ToolResponse::success_with_guidance(
-                    entity_id,
-                    "Use this entity_id when linking facts or relationships.",
-                )))
-            }
-            Err(err) => {
-                self.service.log_tool_event_with_duration(
-                    "resolve.error",
-                    json!({}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
-                Err(mcp_error(err))
-            }
-        }
+        crate::tools::resolve(&self.service, params.0)
+            .await
+            .map(Json)
+            .map_err(mcp_error)
     }
 
     #[tool(

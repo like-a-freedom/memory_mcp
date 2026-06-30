@@ -9,7 +9,9 @@ pub mod ingest;
 pub mod params;
 pub mod parsers;
 pub mod request_id;
+pub mod resolve;
 pub mod response;
 
 pub use extract::extract;
 pub use ingest::ingest;
+pub use resolve::resolve;
