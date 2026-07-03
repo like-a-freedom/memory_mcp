@@ -8,7 +8,7 @@
 //! which avoids truncating larger graphs while still bounding per-query memory.
 
 use crate::config::LifecycleConfig;
-use crate::service::MemoryService;
+use crate::service::{LifecyclePolicy, MemoryService};
 
 mod archival;
 mod communities;
@@ -23,14 +23,15 @@ pub fn spawn_workers_from_config(service: &MemoryService, config: &LifecycleConf
     if !config.enabled {
         return;
     }
+    let policy = LifecyclePolicy::from(config);
 
     let decay_service = service.clone();
     let decay_config = config.clone();
     let _decay_handle = spawn_decay_worker(
         decay_service,
         decay_config.decay_interval_secs,
-        decay_config.decay_confidence_threshold,
-        decay_config.decay_half_life_days,
+        policy.decay_confidence_threshold,
+        policy.decay_half_life_days,
     );
 
     let archival_service = service.clone();
@@ -38,7 +39,7 @@ pub fn spawn_workers_from_config(service: &MemoryService, config: &LifecycleConf
     let _archival_handle = spawn_archival_worker(
         archival_service,
         archival_config.archival_interval_secs,
-        archival_config.archival_age_days,
+        policy.archival_age_days,
     );
 
     let community_service = service.clone();

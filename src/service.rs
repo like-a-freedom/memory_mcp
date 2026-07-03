@@ -36,12 +36,15 @@ mod reembed;
 mod startup;
 mod triple_extractor;
 mod util;
+mod scope;
 
 mod model_loader;
 pub(crate) mod value_helpers;
 
 #[cfg(test)]
 pub mod mock_db;
+
+pub(crate) use scope::{LifecyclePolicy, MemoryScope};
 
 pub use constants::*;
 mod constants {

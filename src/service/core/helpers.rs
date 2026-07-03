@@ -18,24 +18,13 @@ pub(crate) fn resolve_namespace(
     default: &str,
     scope: &str,
 ) -> (String, bool) {
-    let scope_lower = scope.to_lowercase();
-
-    if namespaces.contains(&scope_lower) {
-        return (scope_lower, false);
+    match crate::service::MemoryScope::parse(scope) {
+        Ok(parsed) => match parsed.namespace(namespaces) {
+            Ok(namespace) => (namespace, false),
+            Err(_) => (default.to_string(), true),
+        },
+        Err(_) => (default.to_string(), true),
     }
-
-    const SCOPE_PREFIXES: &[(&str, &str)] = &[
-        ("personal", "personal"),
-        ("private", "private"),
-        ("org", "org"),
-    ];
-    for (prefix, ns) in SCOPE_PREFIXES {
-        if scope_lower.starts_with(prefix) && namespaces.iter().any(|n| n == *ns) {
-            return (ns.to_string(), false);
-        }
-    }
-
-    (default.to_string(), true)
 }
 
 /// Builds a structured log event for tool operations.

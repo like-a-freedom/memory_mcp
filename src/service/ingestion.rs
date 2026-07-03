@@ -49,9 +49,7 @@ impl IngestionService {
     }
 
     pub fn namespace_for_scope(&self, scope: &str) -> String {
-        // Delegate to the existing resolve_namespace free function from helpers.rs
-        let (ns, fell_back) =
-            super::resolve_namespace(&self.namespaces, &self.default_namespace, scope);
+        let (ns, fell_back) = super::resolve_namespace(&self.namespaces, &self.default_namespace, scope);
         if fell_back {
             self.logger.log_warn_dedup(
                 std::collections::HashMap::from([

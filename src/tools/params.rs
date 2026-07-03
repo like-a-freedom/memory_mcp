@@ -19,7 +19,7 @@ pub struct IngestParams {
     /// Reference timestamp (ISO 8601 format)
     pub t_ref: String,
     /// Scope (default: "org")
-    #[serde(default = "crate::tools::parsers::default_scope")]
+    #[serde(default = "crate::models::default_scope")]
     pub scope: String,
     /// Optional project tag for project-scoped retrieval
     pub project: Option<String>,

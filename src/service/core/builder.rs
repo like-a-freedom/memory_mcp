@@ -52,6 +52,7 @@ pub struct MemoryService {
     pub(crate) query_log_retention_days: u32,
     pub(crate) entity_resolver: super::super::entity_resolution::EntityResolver,
     pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
+    pub(crate) lifecycle_config: crate::config::LifecycleConfig,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -342,6 +343,7 @@ impl MemoryService {
         )?
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
+        service.lifecycle_config = config.lifecycle.clone();
         service.current_embedding_signature = target.as_ref().map(|value| value.signature.clone());
         service.current_embedding_model = target.as_ref().and_then(|value| value.model.clone());
         service.current_embedding_dimension = target.as_ref().map(|value| value.dimension);
@@ -527,6 +529,7 @@ impl MemoryService {
             triple_extractor: Arc::new(
                 super::super::triple_extractor::RuleBasedTripleExtractor::new(),
             ),
+            lifecycle_config: crate::config::LifecycleConfig::default(),
         })
     }
 

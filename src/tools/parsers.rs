@@ -198,12 +198,6 @@ pub fn content_hash(content: &str) -> String {
     hex::encode(digest)[..16].to_string()
 }
 
-/// Default scope for operations.
-#[must_use]
-pub fn default_scope() -> String {
-    "org".to_string()
-}
-
 /// Default budget for context assembly.
 #[must_use]
 pub fn default_budget() -> i32 {
@@ -332,7 +326,7 @@ mod tests {
 
     #[test]
     fn default_scope_returns_org() {
-        assert_eq!(default_scope(), "org");
+        assert_eq!(crate::models::default_scope(), "org");
     }
 
     #[test]

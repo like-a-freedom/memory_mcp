@@ -1368,10 +1368,6 @@ impl MemoryService {
     }
 
     /// Returns the namespace for a given scope.
-    ///
-    /// Normalizes scope to lowercase for prefix matching.
-    /// Returns default namespace for unknown scopes with a warning log.
-    #[must_use]
     pub fn namespace_for_scope(&self, scope: &str) -> String {
         let (ns, fell_back) = resolve_namespace(&self.namespaces, &self.default_namespace, scope);
         if fell_back {
