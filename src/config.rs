@@ -10,5 +10,5 @@ mod surreal;
 pub use constants::*;
 pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
 pub use lifecycle::LifecycleConfig;
-pub use ner::{NerConfig, NerProviderKind};
+pub use ner::{NerConfig, NerDeviceKind, NerProviderKind};
 pub use surreal::{SurrealConfig, SurrealConfigBuilder};

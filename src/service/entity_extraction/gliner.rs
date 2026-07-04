@@ -502,6 +502,57 @@ fn infer_backbone_config_from_model_name(
     }
 }
 
+fn select_device(
+    kind: crate::config::NerDeviceKind,
+    _logger: &crate::logging::StdoutLogger,
+) -> Result<Device, MemoryError> {
+    match kind {
+        crate::config::NerDeviceKind::Cpu => Ok(Device::Cpu),
+        crate::config::NerDeviceKind::Metal => {
+            #[cfg(feature = "metal")]
+            {
+                Device::new_metal(0).map_err(|err| {
+                    MemoryError::ConfigInvalid(format!(
+                        "failed to initialize Metal NER device: {err}"
+                    ))
+                })
+            }
+            #[cfg(not(feature = "metal"))]
+            {
+                Err(MemoryError::ConfigInvalid(
+                    "NER_DEVICE=metal requires building with --features metal".to_string(),
+                ))
+            }
+        }
+        crate::config::NerDeviceKind::Auto => {
+            #[cfg(feature = "metal")]
+            {
+                match Device::new_metal(0) {
+                    Ok(device) => Ok(device),
+                    Err(error) => {
+                        logger.log(
+                            crate::service::log_event(
+                                "ner.device.fallback",
+                                serde_json::json!({"requested": "metal", "error": error.to_string()}),
+                                serde_json::json!({"selected": "cpu"}),
+                                None,
+                                None,
+                                None,
+                            ),
+                            crate::logging::LogLevel::Warn,
+                        );
+                        Ok(Device::Cpu)
+                    }
+                }
+            }
+            #[cfg(not(feature = "metal"))]
+            {
+                Ok(Device::Cpu)
+            }
+        }
+    }
+}
+
 impl GlinerEntityExtractor {
     pub fn new(model_dir: &Path, labels: Vec<String>, threshold: f64) -> Result<Self, MemoryError> {
         Self::new_with_logger(
@@ -525,10 +576,12 @@ impl GlinerEntityExtractor {
             crate::config::DEFAULT_NER_BATCH_SIZE,
             crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
             crate::config::DEFAULT_NER_MAX_CONCURRENCY,
+            crate::config::NerDeviceKind::Cpu,
             logger,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_with_runtime(
         model_dir: &Path,
         labels: Vec<String>,
@@ -536,6 +589,7 @@ impl GlinerEntityExtractor {
         batch_size: usize,
         max_batch_tokens: usize,
         max_concurrency: usize,
+        device_kind: crate::config::NerDeviceKind,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         if batch_size == 0 || max_batch_tokens == 0 {
@@ -555,6 +609,7 @@ impl GlinerEntityExtractor {
             batch_size,
             max_batch_tokens,
             max_concurrency,
+            device_kind,
             logger,
         )
     }
@@ -567,6 +622,7 @@ impl GlinerEntityExtractor {
         batch_size: usize,
         max_batch_tokens: usize,
         max_concurrency: usize,
+        device_kind: crate::config::NerDeviceKind,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         let tokenizer_path = model_dir.join("tokenizer.json");
@@ -608,7 +664,7 @@ impl GlinerEntityExtractor {
             }
         };
 
-        let device = Device::Cpu;
+        let device = select_device(device_kind, &logger)?;
 
         let vb = if safetensors_path.is_file() {
             unsafe { VarBuilder::from_mmaped_safetensors(&[&safetensors_path], DTYPE, &device) }

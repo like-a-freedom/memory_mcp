@@ -18,6 +18,17 @@ pub enum NerProviderKind {
     LocalGliner,
 }
 
+/// NER device backend selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NerDeviceKind {
+    /// CPU-only inference (default).
+    Cpu,
+    /// Apple Metal GPU (requires `metal` feature).
+    Metal,
+    /// Auto-detect: try Metal, fall back to CPU.
+    Auto,
+}
+
 /// Configuration for NER entity extraction provider selection.
 #[derive(Debug, Clone)]
 pub struct NerConfig {
@@ -37,6 +48,8 @@ pub struct NerConfig {
     pub max_batch_tokens: usize,
     /// Max concurrent local NER inference operations.
     pub max_concurrency: usize,
+    /// Device backend for local inference.
+    pub device: NerDeviceKind,
 }
 
 impl Default for NerConfig {
@@ -50,6 +63,7 @@ impl Default for NerConfig {
             batch_size: DEFAULT_NER_BATCH_SIZE,
             max_batch_tokens: DEFAULT_NER_MAX_BATCH_TOKENS,
             max_concurrency: DEFAULT_NER_MAX_CONCURRENCY,
+            device: NerDeviceKind::Cpu,
         }
     }
 }
@@ -110,6 +124,22 @@ impl NerConfig {
             ));
         }
 
+        let device = match env::var("NER_DEVICE")
+            .unwrap_or_else(|_| "cpu".to_string())
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "cpu" => NerDeviceKind::Cpu,
+            "metal" => NerDeviceKind::Metal,
+            "auto" => NerDeviceKind::Auto,
+            other => {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "unsupported NER_DEVICE `{other}`; expected cpu, metal, or auto"
+                )));
+            }
+        };
+
         Ok(Self {
             provider,
             model,
@@ -119,6 +149,7 @@ impl NerConfig {
             batch_size,
             max_batch_tokens,
             max_concurrency,
+            device,
         })
     }
 
@@ -221,5 +252,34 @@ mod tests {
                 ));
             });
         }
+    }
+
+    #[test]
+    fn ner_device_defaults_to_cpu() {
+        with_ner_env(&[("NER_DEVICE", None)], || {
+            assert_eq!(NerConfig::from_env().unwrap().device, NerDeviceKind::Cpu);
+        });
+    }
+
+    #[test]
+    fn ner_device_accepts_metal_and_auto() {
+        for (raw, expected) in [
+            ("metal", NerDeviceKind::Metal),
+            ("auto", NerDeviceKind::Auto),
+        ] {
+            with_ner_env(&[("NER_DEVICE", Some(raw))], || {
+                assert_eq!(NerConfig::from_env().unwrap().device, expected);
+            });
+        }
+    }
+
+    #[test]
+    fn ner_device_rejects_unknown_backend() {
+        with_ner_env(&[("NER_DEVICE", Some("coreml"))], || {
+            assert!(matches!(
+                NerConfig::from_env(),
+                Err(MemoryError::ConfigInvalid(_))
+            ));
+        });
     }
 }
