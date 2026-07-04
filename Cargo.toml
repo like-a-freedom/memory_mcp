@@ -6,7 +6,7 @@ resolver = "3"
 license = "MIT"
 
 [dependencies]
-rmcp = { version = "1.8.0", features = ["macros", "transport-io"] }
+rmcp = { version = "2.1.0", features = ["macros", "transport-io", "server"] }
 tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
     "macros",

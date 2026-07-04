@@ -8,10 +8,12 @@ use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{
     ListResourceTemplatesResult, ListResourcesResult, PaginatedRequestParams,
-    ReadResourceRequestParams, ReadResourceResult, ServerCapabilities, ServerInfo,
+    ReadResourceRequestParams, ReadResourceResult, ServerCapabilities, ServerInfo, TasksCapability,
 };
 use rmcp::service::RequestContext;
-use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router};
+
+type McpError = rmcp::ErrorData;
+use rmcp::{ErrorData, RoleServer, ServerHandler, task_handler, tool, tool_handler, tool_router};
 #[cfg(feature = "mcp-apps")]
 use serde_json::{Value, json};
 
@@ -63,6 +65,7 @@ use apps::{
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
     session_manager: SessionManager,
+    task_processor: Arc<tokio::sync::Mutex<rmcp::task_manager::OperationProcessor>>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -78,6 +81,9 @@ impl MemoryMcp {
         Self {
             service: Arc::new(service),
             session_manager: SessionManager::new(),
+            task_processor: Arc::new(tokio::sync::Mutex::new(
+                rmcp::task_manager::OperationProcessor::new(),
+            )),
             tool_router: Self::tool_router(),
         }
     }
@@ -101,6 +107,7 @@ impl MemoryMcp {
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
+                .enable_tasks_with(TasksCapability::server_default())
                 .build(),
         )
         .with_instructions(Self::SERVER_INSTRUCTIONS)
@@ -120,6 +127,7 @@ impl MemoryMcp {
 }
 
 #[tool_handler(router = self.tool_router)]
+#[task_handler(processor = self.task_processor)]
 impl ServerHandler for MemoryMcp {
     fn get_info(&self) -> ServerInfo {
         Self::build_server_info()
@@ -201,7 +209,8 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `scope`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
+        execution(task_support = "optional"),
+        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `scope`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
     )]
     pub async fn extract(
         &self,
@@ -1089,6 +1098,16 @@ mod tests {
         );
         assert!(capabilities.get("tools").is_some());
         assert!(capabilities.get("resources").is_some());
+        assert!(
+            capabilities.get("tasks").is_some(),
+            "tasks capability missing: {}",
+            capabilities
+        );
+        assert!(
+            capabilities["tasks"]["requests"]["tools"]["call"].is_object(),
+            "unexpected tasks structure: {}",
+            capabilities["tasks"]
+        );
     }
 
     #[test]
