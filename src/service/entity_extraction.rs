@@ -123,10 +123,12 @@ pub async fn create_entity_extractor(
             let resolved_dir =
                 super::model_loader::ensure_gliner_model_cached(model, &model_dir, logger).await?;
 
-            Ok(Arc::new(GlinerEntityExtractor::new_with_logger(
+            Ok(Arc::new(GlinerEntityExtractor::new_with_runtime(
                 &resolved_dir,
                 config.labels.clone(),
                 config.threshold,
+                config.batch_size,
+                config.max_batch_tokens,
                 logger.clone(),
             )?) as Arc<dyn EntityExtractor>)
         }

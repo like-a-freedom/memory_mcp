@@ -15,6 +15,7 @@ use crate::models::EntityCandidate;
 
 use super::{EntityExtractor, MemoryError};
 
+mod batching;
 mod scoring;
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
@@ -50,6 +51,8 @@ pub struct GlinerEntityExtractor {
     span_rep_layer: SpanRepresentationLayer,
     prompt_rep_layer: FeedForwardProjection,
     logger: crate::logging::StdoutLogger,
+    batch_size: usize,
+    max_batch_tokens: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -513,6 +516,48 @@ impl GlinerEntityExtractor {
         threshold: f64,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
+        Self::new_with_runtime(
+            model_dir,
+            labels,
+            threshold,
+            crate::config::DEFAULT_NER_BATCH_SIZE,
+            crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
+            logger,
+        )
+    }
+
+    pub(crate) fn new_with_runtime(
+        model_dir: &Path,
+        labels: Vec<String>,
+        threshold: f64,
+        batch_size: usize,
+        max_batch_tokens: usize,
+        logger: crate::logging::StdoutLogger,
+    ) -> Result<Self, MemoryError> {
+        if batch_size == 0 || max_batch_tokens == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "NER batch limits must be greater than zero".to_string(),
+            ));
+        }
+        Self::load_with_runtime(
+            model_dir,
+            labels,
+            threshold,
+            batch_size,
+            max_batch_tokens,
+            logger,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn load_with_runtime(
+        model_dir: &Path,
+        labels: Vec<String>,
+        threshold: f64,
+        batch_size: usize,
+        max_batch_tokens: usize,
+        logger: crate::logging::StdoutLogger,
+    ) -> Result<Self, MemoryError> {
         let tokenizer_path = model_dir.join("tokenizer.json");
         let config_path = if model_dir.join("gliner_config.json").exists() {
             model_dir.join("gliner_config.json")
@@ -576,9 +621,12 @@ impl GlinerEntityExtractor {
             labels,
             threshold,
             logger,
+            batch_size,
+            max_batch_tokens,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_from_var_builder(
         tokenizer: Tokenizer,
         vb: VarBuilder,
@@ -587,6 +635,8 @@ impl GlinerEntityExtractor {
         labels: Vec<String>,
         threshold: f64,
         logger: crate::logging::StdoutLogger,
+        batch_size: usize,
+        max_batch_tokens: usize,
     ) -> Result<Self, MemoryError> {
         let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
 
@@ -632,6 +682,8 @@ impl GlinerEntityExtractor {
             span_rep_layer,
             prompt_rep_layer,
             logger,
+            batch_size,
+            max_batch_tokens,
         })
     }
 
@@ -766,6 +818,7 @@ impl GlinerEntityExtractor {
         Ok((word_tensor, word_offsets))
     }
 
+    #[allow(dead_code)]
     fn run_forward(&self, input_ids: &[u32]) -> Result<Tensor, MemoryError> {
         let attention_mask = vec![1u32; input_ids.len()];
 
@@ -790,6 +843,98 @@ impl GlinerEntityExtractor {
         self.token_projection
             .forward(&hidden)
             .map_err(|err| MemoryError::Storage(format!("token projection failed: {err}")))
+    }
+
+    fn run_forward_batch(
+        &self,
+        windows: &[batching::EncodedWindow],
+    ) -> Result<Vec<Tensor>, MemoryError> {
+        let batch_size = windows.len();
+        let max_len = windows
+            .iter()
+            .map(|window| window.input_ids.len())
+            .max()
+            .unwrap_or(0);
+        let pad_id = self
+            .tokenizer
+            .get_padding()
+            .map_or(0, |padding| padding.pad_id);
+        let mut ids = vec![vec![pad_id; max_len]; batch_size];
+        let mut masks = vec![vec![0u32; max_len]; batch_size];
+        for (row, window) in windows.iter().enumerate() {
+            ids[row][..window.input_ids.len()].copy_from_slice(&window.input_ids);
+            masks[row][..window.input_ids.len()].fill(1);
+        }
+        let input_ids = Tensor::new(ids, &self.device)
+            .map_err(|err| MemoryError::Storage(format!("batched input tensor failed: {err}")))?;
+        let attention_mask = Tensor::new(masks, &self.device)
+            .map_err(|err| MemoryError::Storage(format!("batched mask tensor failed: {err}")))?;
+        let type_ids = Tensor::zeros_like(&input_ids)
+            .map_err(|err| MemoryError::Storage(format!("batched type ids failed: {err}")))?;
+        let hidden = self
+            .model
+            .forward(&input_ids, Some(type_ids), Some(attention_mask))
+            .map_err(|err| MemoryError::Storage(format!("batched forward pass failed: {err}")))?;
+        let projected = self.token_projection.forward(&hidden).map_err(|err| {
+            MemoryError::Storage(format!("batched token projection failed: {err}"))
+        })?;
+        windows
+            .iter()
+            .enumerate()
+            .map(|(row, window)| {
+                projected
+                    .narrow(0, row, 1)
+                    .and_then(|tensor| tensor.squeeze(0))
+                    .and_then(|tensor| tensor.narrow(0, 0, window.input_ids.len()))
+                    .map_err(|err| {
+                        MemoryError::Storage(format!("batched hidden split failed: {err}"))
+                    })
+            })
+            .collect()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn decode_window(
+        &self,
+        text: &str,
+        text_words: &[(String, (usize, usize))],
+        labels: &[String],
+        prompt_word_count: usize,
+        window: &batching::EncodedWindow,
+        hidden: &Tensor,
+        all_spans: &mut Vec<ScoredSpan>,
+    ) -> Result<(), MemoryError> {
+        let entity_token_positions = self.collect_prompt_entity_positions(
+            &window.input_ids,
+            &window.word_ids,
+            prompt_word_count,
+        );
+        if entity_token_positions.len() != labels.len() {
+            return Err(MemoryError::Storage(format!(
+                "GLiNER prompt extraction mismatch: expected {} entity tokens, found {}",
+                labels.len(),
+                entity_token_positions.len()
+            )));
+        }
+        let label_representations =
+            self.build_label_representations(hidden, &entity_token_positions)?;
+        let window_offsets = text_words[window.window_start..window.window_end]
+            .iter()
+            .map(|(_, offsets)| *offsets)
+            .collect::<Vec<_>>();
+        let (word_hidden, word_offsets) = self.extract_word_representations(
+            hidden,
+            &window.word_ids,
+            prompt_word_count,
+            &window_offsets,
+        )?;
+        let text_hidden = self
+            .rnn
+            .forward(&word_hidden)
+            .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
+        let spans_data = self.compute_span_scores(&text_hidden, &label_representations)?;
+        all_spans.extend(self.extract_spans(text, &spans_data, &word_offsets));
+        Ok(())
     }
 
     fn build_label_representations(
@@ -977,50 +1122,38 @@ impl GlinerEntityExtractor {
 
         let mut all_spans = Vec::new();
 
+        let mut windows = Vec::new();
         let mut window_start = 0;
         while window_start < text_words.len() {
             let (encoding, window_end) =
                 self.encode_window(&prompt_words, &text_words, window_start)?;
-            let input_ids = encoding.get_ids().to_vec();
-            let word_ids = encoding.get_word_ids().to_vec();
-            let hidden = self.run_forward(&input_ids)?;
-
-            let entity_token_positions =
-                self.collect_prompt_entity_positions(&input_ids, &word_ids, prompt_word_count);
-            if entity_token_positions.len() != labels.len() {
-                return Err(MemoryError::Storage(format!(
-                    "GLiNER prompt extraction mismatch: expected {} entity tokens, found {}",
-                    labels.len(),
-                    entity_token_positions.len()
-                )));
-            }
-
-            let label_representations =
-                self.build_label_representations(&hidden, &entity_token_positions)?;
-
-            let window_offsets = text_words[window_start..window_end]
-                .iter()
-                .map(|(_, offsets)| *offsets)
-                .collect::<Vec<_>>();
-            let (word_hidden, word_offsets) = self.extract_word_representations(
-                &hidden,
-                &word_ids,
-                prompt_word_count,
-                &window_offsets,
-            )?;
-            let text_hidden = self
-                .rnn
-                .forward(&word_hidden)
-                .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
-
-            let spans_data = self.compute_span_scores(&text_hidden, &label_representations)?;
-            let window_spans = self.extract_spans(text, &spans_data, &word_offsets);
-            all_spans.extend(window_spans);
-
+            windows.push(batching::EncodedWindow {
+                input_ids: encoding.get_ids().to_vec(),
+                word_ids: encoding.get_word_ids().to_vec(),
+                window_start,
+                window_end,
+            });
             if window_end >= text_words.len() {
                 break;
             }
             window_start = window_end.saturating_sub(1).max(window_start + 1);
+        }
+
+        for range in batching::pack_window_batches(&windows, self.batch_size, self.max_batch_tokens)
+        {
+            let batch = &windows[range];
+            let hidden_rows = self.run_forward_batch(batch)?;
+            for (window, hidden) in batch.iter().zip(hidden_rows) {
+                self.decode_window(
+                    text,
+                    &text_words,
+                    labels,
+                    prompt_word_count,
+                    window,
+                    &hidden,
+                    &mut all_spans,
+                )?;
+            }
         }
 
         let final_spans = self.apply_nms(all_spans);
