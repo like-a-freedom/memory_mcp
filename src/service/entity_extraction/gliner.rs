@@ -15,6 +15,8 @@ use crate::models::EntityCandidate;
 
 use super::{EntityExtractor, MemoryError};
 
+mod scoring;
+
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
 const SEP_TOKEN: &str = "<<SEP>>";
 const DEFAULT_MAX_SPAN_WIDTH: usize = 12;
@@ -825,38 +827,47 @@ impl GlinerEntityExtractor {
         let text_len = text_hidden
             .dim(0)
             .map_err(|err| MemoryError::Storage(format!("dim error: {err}")))?;
-        let mut spans = Vec::new();
-
-        for start in 0..text_len {
-            for end in start..std::cmp::min(start + self.max_span_width, text_len) {
-                let h_start = text_hidden
-                    .narrow(0, start, 1)
-                    .map_err(|err| MemoryError::Storage(format!("narrow error: {err}")))?;
-                let h_end = text_hidden
-                    .narrow(0, end, 1)
-                    .map_err(|err| MemoryError::Storage(format!("narrow error: {err}")))?;
-
-                let span_proj = self
-                    .span_rep_layer
-                    .forward(&h_start, &h_end)
-                    .map_err(|err| MemoryError::Storage(format!("span projection error: {err}")))?;
-
-                let scores =
-                    span_proj
-                        .matmul(&label_representations.t().map_err(|err| {
-                            MemoryError::Storage(format!("transpose error: {err}"))
-                        })?)
-                        .map_err(|err| MemoryError::Storage(format!("matmul error: {err}")))?;
-
-                let scores = scores
-                    .to_vec2::<f32>()
-                    .map_err(|err| MemoryError::Storage(format!("to_vec2 error: {err}")))?[0]
-                    .clone();
-
-                spans.push((start, end, scores));
-            }
+        let span_indices = scoring::enumerate_span_indices(text_len, self.max_span_width);
+        if span_indices.is_empty() {
+            return Ok(Vec::new());
         }
 
+        let starts = span_indices
+            .iter()
+            .map(|span| span.start as u32)
+            .collect::<Vec<_>>();
+        let ends = span_indices
+            .iter()
+            .map(|span| span.end as u32)
+            .collect::<Vec<_>>();
+        let start_indices = Tensor::new(starts.as_slice(), &self.device)
+            .map_err(|err| MemoryError::Storage(format!("start index tensor failed: {err}")))?;
+        let end_indices = Tensor::new(ends.as_slice(), &self.device)
+            .map_err(|err| MemoryError::Storage(format!("end index tensor failed: {err}")))?;
+        let start_hidden = text_hidden
+            .index_select(&start_indices, 0)
+            .map_err(|err| MemoryError::Storage(format!("start gather failed: {err}")))?;
+        let end_hidden = text_hidden
+            .index_select(&end_indices, 0)
+            .map_err(|err| MemoryError::Storage(format!("end gather failed: {err}")))?;
+        let span_representations = self
+            .span_rep_layer
+            .forward(&start_hidden, &end_hidden)
+            .map_err(|err| MemoryError::Storage(format!("span projection failed: {err}")))?;
+        let label_transposed = label_representations
+            .t()
+            .map_err(|err| MemoryError::Storage(format!("label transpose failed: {err}")))?;
+        let score_rows = span_representations
+            .matmul(&label_transposed)
+            .map_err(|err| MemoryError::Storage(format!("span score matmul failed: {err}")))?
+            .to_vec2::<f32>()
+            .map_err(|err| MemoryError::Storage(format!("span score transfer failed: {err}")))?;
+
+        let spans = span_indices
+            .into_iter()
+            .zip(score_rows)
+            .map(|(span, scores)| (span.start, span.end, scores))
+            .collect::<Vec<_>>();
         self.logger.log(
             build_span_scoring_log_event(text_len, spans.len(), timer.elapsed()),
             crate::logging::LogLevel::Debug,
