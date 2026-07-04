@@ -65,6 +65,44 @@ With `RUST_LOG=debug`, the GLiNER extractor emits:
 2. **Task 6 (MCP Tasks):** Protocol-level timeout avoidance. No performance gate — correctness and backward compatibility only.
 3. **Task 7 (Metal):** Opt-in accelerator. Shipped only after CPU results are known. Failed Metal initialization falls back to CPU when `NER_DEVICE=auto`.
 
+## Implementation Status
+
+| Task | Status | Commit | Description |
+|------|--------|--------|-------------|
+| Task 1 | Done | `32db8f99` | Stage telemetry + baseline harness |
+| Task 2 | Done | `b7034fe4` | Makefile targets + README guidance |
+| Task 3 | Done | `a8a2735a` | Vectorized span scoring |
+| Task 4 | Done | `83c11774` | Batched transformer windows |
+| Task 5 | Done | `b5c4888c` | Inference concurrency gate |
+| Task 6 | Done | `44d09ce9` | MCP Tasks (rmcp 2.1.0) |
+| Task 7 | Done | `671b3516` | Metal GPU backend |
+| Task 8 | Done | — | Quality gate + documentation |
+
+## Recommended Production Settings
+
+```bash
+# CPU (default, stable)
+NER_DEVICE=cpu NER_BATCH_SIZE=4 NER_MAX_BATCH_TOKENS=1536 NER_MAX_CONCURRENCY=1
+
+# Metal (Apple Silicon, requires --features metal)
+NER_DEVICE=metal cargo run --release --features metal -- serve
+
+# Auto-detect (Metal with CPU fallback)
+NER_DEVICE=auto cargo run --release --features metal -- serve
+```
+
+## MCP Tasks (rmcp 2.1.0)
+
+The server advertises MCP Tasks capability with `extract` marked as task-optional:
+
+- **Task-capable clients:** Use `tasks/call` with `extract` for async execution. Poll `tasks/get` for status, `tasks/result` for payload.
+- **Legacy clients:** Call `extract` synchronously as before.
+
+Key changes in rmcp 2.1.0:
+- `enable_tasks_with(TasksCapability::server_default())` populates `list`, `cancel`, and `requests.tools.call`
+- `#[task_handler]` macro generates lifecycle methods (`enqueue_task`, `list_tasks`, `get_task_info`, `get_task_result`, `cancel_task`)
+- `type McpError = rmcp::ErrorData;` required for macro compatibility
+
 ## Machine Description
 
 > To be filled with OS, CPU, and build details after baseline capture.
