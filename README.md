@@ -105,6 +105,17 @@ cargo install --path .
 cargo run
 ```
 
+For local NER workloads, run the MCP server from a release build. The development
+profile leaves the `memory_mcp` crate at `opt-level = 0`; dependency code is optimized,
+but GLiNER window orchestration and span enumeration are not. Performance claims and
+timeout investigations are valid only for release builds.
+
+```bash
+cargo run --release -- serve
+# or
+make serve-release
+```
+
 The binary uses stdio transport, which makes it suitable for local MCP client integration.
 
 ### Run with environment
@@ -644,6 +655,15 @@ cargo fmt
 cargo clippy -- -D warnings
 cargo doc --no-deps
 ```
+
+### NER latency benchmark
+
+```bash
+make eval-ner-latency
+```
+
+Requires the local GLiNER model at `tests/models/ner/urchade--gliner_multi-v2.1/`.
+See `docs/performance/NER_PERFORMANCE.md` for the full benchmark protocol.
 
 ### Binary entry points
 
