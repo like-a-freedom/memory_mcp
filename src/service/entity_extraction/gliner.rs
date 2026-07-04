@@ -47,6 +47,7 @@ pub struct GlinerEntityExtractor {
     rnn: BiLstmLayer,
     span_rep_layer: SpanRepresentationLayer,
     prompt_rep_layer: FeedForwardProjection,
+    logger: crate::logging::StdoutLogger,
 }
 
 #[derive(Debug, Clone)]
@@ -496,6 +497,20 @@ fn infer_backbone_config_from_model_name(
 
 impl GlinerEntityExtractor {
     pub fn new(model_dir: &Path, labels: Vec<String>, threshold: f64) -> Result<Self, MemoryError> {
+        Self::new_with_logger(
+            model_dir,
+            labels,
+            threshold,
+            crate::logging::StdoutLogger::new("warn"),
+        )
+    }
+
+    pub(crate) fn new_with_logger(
+        model_dir: &Path,
+        labels: Vec<String>,
+        threshold: f64,
+        logger: crate::logging::StdoutLogger,
+    ) -> Result<Self, MemoryError> {
         let tokenizer_path = model_dir.join("tokenizer.json");
         let config_path = if model_dir.join("gliner_config.json").exists() {
             model_dir.join("gliner_config.json")
@@ -551,7 +566,15 @@ impl GlinerEntityExtractor {
             ));
         };
 
-        Self::build_from_var_builder(tokenizer, vb, &device, runtime_config, labels, threshold)
+        Self::build_from_var_builder(
+            tokenizer,
+            vb,
+            &device,
+            runtime_config,
+            labels,
+            threshold,
+            logger,
+        )
     }
 
     fn build_from_var_builder(
@@ -561,6 +584,7 @@ impl GlinerEntityExtractor {
         runtime_config: GlinerRuntimeConfig,
         labels: Vec<String>,
         threshold: f64,
+        logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
 
@@ -605,6 +629,7 @@ impl GlinerEntityExtractor {
             rnn,
             span_rep_layer,
             prompt_rep_layer,
+            logger,
         })
     }
 
@@ -796,6 +821,7 @@ impl GlinerEntityExtractor {
         text_hidden: &Tensor,
         label_representations: &Tensor,
     ) -> Result<Vec<(usize, usize, Vec<f32>)>, MemoryError> {
+        let timer = std::time::Instant::now();
         let text_len = text_hidden
             .dim(0)
             .map_err(|err| MemoryError::Storage(format!("dim error: {err}")))?;
@@ -831,6 +857,10 @@ impl GlinerEntityExtractor {
             }
         }
 
+        self.logger.log(
+            build_span_scoring_log_event(text_len, spans.len(), timer.elapsed()),
+            crate::logging::LogLevel::Debug,
+        );
         Ok(spans)
     }
 
@@ -1041,4 +1071,22 @@ impl EntityExtractor for GlinerEntityExtractor {
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
         self.extract_inner_with_labels(content, zero_shot_labels)
     }
+}
+
+pub(crate) fn build_span_scoring_log_event(
+    text_words: usize,
+    span_count: usize,
+    duration: std::time::Duration,
+) -> HashMap<String, serde_json::Value> {
+    crate::service::log_event(
+        "ner.gliner.span_scores.done",
+        crate::service::log_args_with_duration(
+            serde_json::json!({"text_words": text_words}),
+            duration,
+        ),
+        serde_json::json!({"span_count": span_count}),
+        None,
+        None,
+        None,
+    )
 }

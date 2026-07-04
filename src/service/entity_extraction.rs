@@ -123,10 +123,11 @@ pub async fn create_entity_extractor(
             let resolved_dir =
                 super::model_loader::ensure_gliner_model_cached(model, &model_dir, logger).await?;
 
-            Ok(Arc::new(GlinerEntityExtractor::new(
+            Ok(Arc::new(GlinerEntityExtractor::new_with_logger(
                 &resolved_dir,
                 config.labels.clone(),
                 config.threshold,
+                logger.clone(),
             )?) as Arc<dyn EntityExtractor>)
         }
     }
@@ -343,5 +344,20 @@ mod tests {
         .expect("default extractor");
 
         assert_eq!(extractor.provider_name(), "anno");
+    }
+
+    #[test]
+    fn gliner_span_event_has_stable_operation_name() {
+        let event = crate::service::entity_extraction::gliner::build_span_scoring_log_event(
+            12,
+            72,
+            std::time::Duration::from_millis(7),
+        );
+        assert_eq!(
+            event["op"],
+            serde_json::json!("ner.gliner.span_scores.done")
+        );
+        assert_eq!(event["args"]["text_words"], serde_json::json!(12));
+        assert_eq!(event["result"]["span_count"], serde_json::json!(72));
     }
 }
