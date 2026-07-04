@@ -1111,6 +1111,34 @@ mod tests {
     }
 
     #[test]
+    fn build_server_info_enables_native_tasks() {
+        let value = serde_json::to_value(MemoryMcp::build_server_info()).expect("server info json");
+        assert!(value["capabilities"]["tasks"].is_object());
+        assert!(value["capabilities"]["tasks"]["requests"]["tools"]["call"].is_object());
+    }
+
+    #[cfg(feature = "mcp-apps")]
+    #[tokio::test]
+    async fn only_extract_allows_task_execution() {
+        use rmcp::model::TaskSupport;
+
+        let mcp = create_test_mcp().await;
+        let extract_tool = mcp.get_tool("extract").expect("extract tool must exist");
+        assert_eq!(extract_tool.task_support(), TaskSupport::Optional);
+
+        let ingest_tool = mcp.get_tool("ingest").expect("ingest tool must exist");
+        assert_eq!(ingest_tool.task_support(), TaskSupport::Forbidden);
+
+        let resolve_tool = mcp.get_tool("resolve").expect("resolve tool must exist");
+        assert_eq!(resolve_tool.task_support(), TaskSupport::Forbidden);
+
+        let invalidate_tool = mcp
+            .get_tool("invalidate")
+            .expect("invalidate tool must exist");
+        assert_eq!(invalidate_tool.task_support(), TaskSupport::Forbidden);
+    }
+
+    #[test]
     fn extract_tool_response_schema_exposes_structured_result() {
         let schema = schema_json::<ToolResponse<ExtractResult>>();
         let properties = schema["properties"].as_object().expect("properties object");

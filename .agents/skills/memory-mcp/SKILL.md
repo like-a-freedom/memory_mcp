@@ -59,6 +59,12 @@ mcp_memory-mcp_extract({
 
 **Guidance:** Resolve canonical entities for ambiguous names before creating manual links. The tool also accepts inline `content` or `text` plus optional `source_type`, `source_id`, `t_ref`, `scope`, `project`, and `zero_shot_labels`.
 
+When the client supports MCP Tasks, prefer task-based invocation for `extract` with
+local GLiNER or long documents. The tool is task-optional: legacy clients may call it
+synchronously, while task-capable clients receive a native MCP task and use
+`tasks/get` followed by `tasks/result`. Do not invent a `job_id` argument or call a
+separate polling tool.
+
 ### 3. Resolve Entity Aliases
 
 **Purpose:** Get canonical ID for names with multiple variants.
