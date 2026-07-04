@@ -32,6 +32,29 @@ actual_tier=direct total=5
 
 suite=eval_extraction total=9 passed=9 entity_precision=0.57 entity_recall=1.00 entity_f1=0.73 fact_type_accuracy=1.00 warning_recall=1.00
 
+## NER Latency (local GLiNER, CPU)
+
+> To be filled after first benchmark run with `make eval-ner-latency`.
+
+```json
+{
+  "provider": "gliner",
+  "device": "cpu",
+  "batch_size": 4,
+  "max_batch_tokens": 1536,
+  "max_concurrency": 1,
+  "iterations": 10,
+  "content_words": 640,
+  "span_scoring_p50_ms": null,
+  "span_scoring_p95_ms": null,
+  "ner_p50_ms": null,
+  "ner_p95_ms": null,
+  "four_client_wall_ms": null,
+  "four_client_per_request_p95_ms": null,
+  "candidates": []
+}
+```
+
 ## Latency (in-memory)
 
 suite=eval_latency ingest_p50_ms=0.41 ingest_p95_ms=2.90 assemble_p50_ms=4.14 assemble_p95_ms=12.72

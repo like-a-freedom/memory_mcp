@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 use memory_mcp::config::{NerConfig, NerProviderKind};
@@ -14,6 +15,15 @@ struct NerLatencyReport {
     p50_ms: f64,
     p95_ms: f64,
     candidates: Vec<(String, String)>,
+}
+
+#[derive(Serialize)]
+struct ContentionReport {
+    concurrency: usize,
+    clients: usize,
+    wall_ms: f64,
+    per_client_ms: Vec<f64>,
+    queue_wait_p95_ms: f64,
 }
 
 fn percentile(sorted: &[f64], percentile: f64) -> f64 {
@@ -71,5 +81,65 @@ async fn run_gliner_latency_eval() {
     println!(
         "{}",
         serde_json::to_string(&report).expect("serialize report")
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the local GLiNER model and release-mode timing"]
+async fn run_contention_eval() {
+    let model_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/models/ner/urchade--gliner_multi-v2.1");
+    let mut config = NerConfig::from_env().expect("load NER environment");
+    config.provider = NerProviderKind::LocalGliner;
+    config.model = Some("urchade/gliner_multi-v2.1".to_string());
+    config.model_dir = Some(model_dir.to_string_lossy().to_string());
+    let extractor = Arc::new(
+        create_entity_extractor(
+            &config,
+            env!("CARGO_MANIFEST_DIR"),
+            &StdoutLogger::new("debug"),
+        )
+        .await
+        .expect("load local GLiNER model"),
+    );
+    let paragraph =
+        "Alice Smith from OpenAI presented Project Atlas in Moscow using Rust and Kubernetes. ";
+    let content = paragraph.repeat(40);
+
+    extractor
+        .extract_candidates(&content)
+        .await
+        .expect("warm GLiNER");
+
+    let client_count = 4;
+    let started = Instant::now();
+    let handles: Vec<_> = (0..client_count)
+        .map(|_| {
+            let ext = Arc::clone(&extractor);
+            let content = content.clone();
+            tokio::spawn(async move {
+                let t = Instant::now();
+                let _ = ext.extract_candidates(&content).await;
+                t.elapsed().as_secs_f64() * 1_000.0
+            })
+        })
+        .collect();
+    let mut per_client = Vec::new();
+    for h in handles {
+        per_client.push(h.await.expect("client task panicked"));
+    }
+    let wall_ms = started.elapsed().as_secs_f64() * 1_000.0;
+    per_client.sort_by(f64::total_cmp);
+
+    let report = ContentionReport {
+        concurrency: config.max_concurrency,
+        clients: client_count,
+        wall_ms,
+        per_client_ms: per_client.clone(),
+        queue_wait_p95_ms: percentile(&per_client, 0.95),
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&report).expect("serialize contention report")
     );
 }

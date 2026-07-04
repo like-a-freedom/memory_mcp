@@ -392,7 +392,10 @@ Configuration is loaded from environment variables.
 | `NER_MODEL_DIR` | Optional local cache directory for `local-gliner` |
 | `NER_LABELS` | Comma-separated runtime labels for `local-gliner` |
 | `NER_THRESHOLD` | Confidence threshold for `local-gliner` acceptance |
-| `NER_BATCH_SIZE` | Batch size for `local-gliner` inference |
+| `NER_BATCH_SIZE` | Max windows per transformer forward pass (default: 4) |
+| `NER_MAX_BATCH_TOKENS` | Max padded tokens per batch (default: 1536) |
+| `NER_MAX_CONCURRENCY` | Concurrent local NER inference limit (default: 1) |
+| `NER_DEVICE` | Device: `cpu`, `metal`, or `auto` (default: `cpu`) |
 
 ### Example
 
@@ -664,6 +667,21 @@ make eval-ner-latency
 
 Requires the local GLiNER model at `tests/models/ner/urchade--gliner_multi-v2.1/`.
 See `docs/performance/NER_PERFORMANCE.md` for the full benchmark protocol.
+
+### MCP Tasks (optional)
+
+The server advertises MCP Tasks capability (`extract` is task-optional). Task-capable
+clients can invoke `extract` through `tasks/call` for async execution, then poll
+`tasks/get` and retrieve results via `tasks/result`. Legacy clients continue to call
+`extract` synchronously with no changes required.
+
+```bash
+# Run with Metal GPU (requires --features metal)
+NER_DEVICE=metal cargo run --release --features metal -- serve
+
+# Auto-detect (Metal with CPU fallback)
+NER_DEVICE=auto cargo run --release --features metal -- serve
+```
 
 ### Binary entry points
 
