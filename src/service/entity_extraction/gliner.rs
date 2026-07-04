@@ -16,6 +16,7 @@ use crate::models::EntityCandidate;
 use super::{EntityExtractor, MemoryError};
 
 mod batching;
+mod gate;
 mod scoring;
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
@@ -53,6 +54,7 @@ pub struct GlinerEntityExtractor {
     logger: crate::logging::StdoutLogger,
     batch_size: usize,
     max_batch_tokens: usize,
+    inference_gate: gate::InferenceGate,
 }
 
 #[derive(Debug, Clone)]
@@ -522,6 +524,7 @@ impl GlinerEntityExtractor {
             threshold,
             crate::config::DEFAULT_NER_BATCH_SIZE,
             crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
+            crate::config::DEFAULT_NER_MAX_CONCURRENCY,
             logger,
         )
     }
@@ -532,11 +535,17 @@ impl GlinerEntityExtractor {
         threshold: f64,
         batch_size: usize,
         max_batch_tokens: usize,
+        max_concurrency: usize,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         if batch_size == 0 || max_batch_tokens == 0 {
             return Err(MemoryError::ConfigInvalid(
                 "NER batch limits must be greater than zero".to_string(),
+            ));
+        }
+        if max_concurrency == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "NER_MAX_CONCURRENCY must be greater than zero".to_string(),
             ));
         }
         Self::load_with_runtime(
@@ -545,6 +554,7 @@ impl GlinerEntityExtractor {
             threshold,
             batch_size,
             max_batch_tokens,
+            max_concurrency,
             logger,
         )
     }
@@ -556,6 +566,7 @@ impl GlinerEntityExtractor {
         threshold: f64,
         batch_size: usize,
         max_batch_tokens: usize,
+        max_concurrency: usize,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         let tokenizer_path = model_dir.join("tokenizer.json");
@@ -623,6 +634,7 @@ impl GlinerEntityExtractor {
             logger,
             batch_size,
             max_batch_tokens,
+            max_concurrency,
         )
     }
 
@@ -637,6 +649,7 @@ impl GlinerEntityExtractor {
         logger: crate::logging::StdoutLogger,
         batch_size: usize,
         max_batch_tokens: usize,
+        max_concurrency: usize,
     ) -> Result<Self, MemoryError> {
         let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
 
@@ -684,6 +697,7 @@ impl GlinerEntityExtractor {
             logger,
             batch_size,
             max_batch_tokens,
+            inference_gate: gate::InferenceGate::new(max_concurrency),
         })
     }
 
@@ -1205,6 +1219,22 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let (_permit, queue_wait) = self
+            .inference_gate
+            .acquire()
+            .await
+            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
+        self.logger.log(
+            crate::service::log_event(
+                "ner.gliner.queue.done",
+                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
+                serde_json::json!({"available_permits": self.inference_gate.available_permits()}),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
         self.extract_inner(content)
     }
 
@@ -1213,6 +1243,22 @@ impl EntityExtractor for GlinerEntityExtractor {
         content: &str,
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let (_permit, queue_wait) = self
+            .inference_gate
+            .acquire()
+            .await
+            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
+        self.logger.log(
+            crate::service::log_event(
+                "ner.gliner.queue.done",
+                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
+                serde_json::json!({"available_permits": self.inference_gate.available_permits()}),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
         self.extract_inner_with_labels(content, zero_shot_labels)
     }
 }

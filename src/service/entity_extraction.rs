@@ -129,6 +129,7 @@ pub async fn create_entity_extractor(
                 config.threshold,
                 config.batch_size,
                 config.max_batch_tokens,
+                config.max_concurrency,
                 logger.clone(),
             )?) as Arc<dyn EntityExtractor>)
         }
