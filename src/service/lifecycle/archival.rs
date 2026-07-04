@@ -71,6 +71,8 @@ pub async fn run_archival_pass(
     service: &MemoryService,
     age_days: u32,
 ) -> Result<usize, MemoryError> {
+    let policy = service.lifecycle_policy();
+    let age_days = age_days.max(policy.archival_age_days);
     let now = Utc::now();
     let cutoff = now - chrono::Duration::days(age_days as i64);
     let cutoff_str = crate::service::normalize_dt(cutoff);

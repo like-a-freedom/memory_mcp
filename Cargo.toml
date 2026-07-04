@@ -49,6 +49,7 @@ notify = { version = "8.2.0", optional = true }
 [features]
 default = []
 cli-watch = ["notify"]
+mcp-apps = []
 
 [dev-dependencies]
 serde_json = "1.0.150"

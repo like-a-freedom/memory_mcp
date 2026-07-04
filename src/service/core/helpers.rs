@@ -10,23 +10,6 @@ use serde_json::{Value, json};
 
 use crate::models::AccessPayload;
 
-/// Resolves a namespace from a scope string.
-/// Returns `(namespace, fell_back)` where `fell_back` is true when the default
-/// was used for an unknown scope.
-pub(crate) fn resolve_namespace(
-    namespaces: &[String],
-    default: &str,
-    scope: &str,
-) -> (String, bool) {
-    match crate::service::MemoryScope::parse(scope) {
-        Ok(parsed) => match parsed.namespace(namespaces) {
-            Ok(namespace) => (namespace, false),
-            Err(_) => (default.to_string(), true),
-        },
-        Err(_) => (default.to_string(), true),
-    }
-}
-
 /// Builds a structured log event for tool operations.
 pub(crate) fn log_event(
     op: &str,

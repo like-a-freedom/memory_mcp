@@ -1,6 +1,9 @@
 //! Resource URI helpers and catalog entries for MCP Apps.
+#![cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 
-use rmcp::model::{AnnotateAble, RawResource, RawResourceTemplate, Resource, ResourceTemplate};
+#[cfg(feature = "mcp-apps")]
+use rmcp::model::{AnnotateAble, RawResource, RawResourceTemplate};
+use rmcp::model::{Resource, ResourceTemplate};
 use serde_json::json;
 
 pub(crate) const APPS_INDEX_URI: &str = "ui://memory/apps";
@@ -24,39 +27,57 @@ const PUBLIC_APPS: [(&str, &str); 5] = [
     ("graph", "Explore graph paths and neighborhood context."),
 ];
 
+#[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 pub(crate) fn app_catalog_resources() -> Vec<Resource> {
-    let mut resources = vec![
-        RawResource::new(APPS_INDEX_URI, "Memory Apps")
-            .with_description("Catalog of public MCP Apps and their resource contracts.")
-            .with_mime_type("application/json")
-            .no_annotation(),
-    ];
+    #[cfg(feature = "mcp-apps")]
+    {
+        let mut resources = vec![
+            RawResource::new(APPS_INDEX_URI, "Memory Apps")
+                .with_description("Catalog of public MCP Apps and their resource contracts.")
+                .with_mime_type("application/json")
+                .no_annotation(),
+        ];
 
-    resources.extend(PUBLIC_APPS.into_iter().map(|(app, description)| {
-        RawResource::new(app_root_uri(app), format!("Memory App: {app}"))
-            .with_description(description)
-            .with_mime_type("application/json")
-            .no_annotation()
-    }));
+        resources.extend(PUBLIC_APPS.into_iter().map(|(app, description)| {
+            RawResource::new(app_root_uri(app), format!("Memory App: {app}"))
+                .with_description(description)
+                .with_mime_type("application/json")
+                .no_annotation()
+        }));
 
-    resources
+        resources
+    }
+
+    #[cfg(not(feature = "mcp-apps"))]
+    {
+        Vec::new()
+    }
 }
 
+#[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 pub(crate) fn app_resource_templates() -> Vec<ResourceTemplate> {
-    PUBLIC_APPS
-        .into_iter()
-        .map(|(app, description)| {
-            RawResourceTemplate::new(
-                app_session_uri_template(app),
-                format!("Memory App Session: {app}"),
-            )
-            .with_description(format!(
-                "{description} Open a session with `open_app`, then read the concrete session URI or use this template for discovery."
-            ))
-            .with_mime_type("text/html;profile=mcp-app")
-            .no_annotation()
-        })
-        .collect()
+    #[cfg(feature = "mcp-apps")]
+    {
+        PUBLIC_APPS
+            .into_iter()
+            .map(|(app, description)| {
+                RawResourceTemplate::new(
+                    app_session_uri_template(app),
+                    format!("Memory App Session: {app}"),
+                )
+                .with_description(format!(
+                    "{description} Open a session with `open_app`, then read the concrete session URI or use this template for discovery."
+                ))
+                .with_mime_type("text/html;profile=mcp-app")
+                .no_annotation()
+            })
+            .collect()
+    }
+
+    #[cfg(not(feature = "mcp-apps"))]
+    {
+        Vec::new()
+    }
 }
 
 pub(crate) fn app_root_uri(app: &str) -> String {
@@ -87,33 +108,52 @@ pub(crate) fn parse_app_session_uri(uri: &str) -> Option<(String, String)> {
     Some((app.to_string(), session_id.to_string()))
 }
 
+#[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 pub(crate) fn apps_index_payload() -> serde_json::Value {
-    json!({
-        "apps": PUBLIC_APPS
-            .into_iter()
-            .map(|(app, description)| {
-                json!({
-                    "app": app,
-                    "description": description,
-                    "root_resource_uri": app_root_uri(app),
-                    "session_resource_template": app_session_uri_template(app),
+    #[cfg(feature = "mcp-apps")]
+    {
+        json!({
+            "apps": PUBLIC_APPS
+                .into_iter()
+                .map(|(app, description)| {
+                    json!({
+                        "app": app,
+                        "description": description,
+                        "root_resource_uri": app_root_uri(app),
+                        "session_resource_template": app_session_uri_template(app),
+                    })
                 })
-            })
-            .collect::<Vec<_>>()
-    })
+                .collect::<Vec<_>>()
+        })
+    }
+
+    #[cfg(not(feature = "mcp-apps"))]
+    {
+        json!({ "apps": [] })
+    }
 }
 
+#[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 pub(crate) fn app_root_payload(app: &str) -> Option<serde_json::Value> {
-    let description = PUBLIC_APPS
-        .into_iter()
-        .find(|(candidate, _)| *candidate == app)
-        .map(|(_, description)| description)?;
+    #[cfg(feature = "mcp-apps")]
+    {
+        let description = PUBLIC_APPS
+            .into_iter()
+            .find(|(candidate, _)| *candidate == app)
+            .map(|(_, description)| description)?;
 
-    Some(json!({
-        "app": app,
-        "description": description,
-        "session_resource_template": app_session_uri_template(app),
-    }))
+        Some(json!({
+            "app": app,
+            "description": description,
+            "session_resource_template": app_session_uri_template(app),
+        }))
+    }
+
+    #[cfg(not(feature = "mcp-apps"))]
+    {
+        let _ = app;
+        None
+    }
 }
 
 pub(crate) fn app_session_html_document(app: &str, payload: &serde_json::Value) -> String {
@@ -160,6 +200,7 @@ pub(crate) fn app_session_html_document(app: &str, payload: &serde_json::Value) 
 mod tests {
     use super::*;
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_session_uri_round_trips() {
         let uri = app_session_uri("inspector", "ses:test-123");
@@ -170,6 +211,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_catalog_contains_root_resource_and_all_public_apps() {
         let resources = app_catalog_resources();
@@ -186,6 +228,7 @@ mod tests {
         assert!(uris.contains(&"ui://memory/apps/graph"));
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_resource_templates_expose_session_templates_for_all_public_apps() {
         let templates = app_resource_templates();
@@ -210,6 +253,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_session_html_document_wraps_payload_for_app_shell() {
         let html = app_session_html_document("inspector", &json!({"app": "inspector"}));
@@ -219,21 +263,25 @@ mod tests {
         assert!(html.contains("\"app\": \"inspector\""));
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_root_uri_returns_none_for_index_uri() {
         assert!(parse_app_root_uri(APPS_INDEX_URI).is_none());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_root_uri_returns_none_for_empty_suffix() {
         assert!(parse_app_root_uri(APPS_ROOT_PREFIX).is_none());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_root_uri_returns_none_for_nested_path() {
         assert!(parse_app_root_uri("ui://memory/apps/inspector/sub").is_none());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_root_uri_extracts_app_name() {
         assert_eq!(
@@ -246,12 +294,14 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_session_uri_returns_none_for_empty_parts() {
         assert!(parse_app_session_uri("ui://memory/app//ses:123").is_none());
         assert!(parse_app_session_uri("ui://memory/app/inspector/").is_none());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn parse_app_session_uri_returns_none_for_missing_prefix() {
         assert!(parse_app_session_uri("ui://memory/apps/inspector/ses:123").is_none());
@@ -262,6 +312,7 @@ mod tests {
         assert!(app_root_payload("nonexistent").is_none());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_root_payload_returns_app_info_for_known_app() {
         let payload = app_root_payload("inspector");
@@ -271,6 +322,7 @@ mod tests {
         assert!(payload["description"].as_str().is_some());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn apps_index_payload_contains_all_public_apps() {
         let payload = apps_index_payload();
@@ -278,6 +330,7 @@ mod tests {
         assert_eq!(apps.len(), PUBLIC_APPS.len());
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_session_html_document_handles_complex_payload() {
         let payload = json!({
@@ -291,6 +344,7 @@ mod tests {
         assert!(html.contains("\"metadata\""));
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn app_uri_helpers_consistent() {
         let app = "lifecycle";

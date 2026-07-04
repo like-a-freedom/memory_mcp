@@ -70,7 +70,7 @@ pub(crate) async fn update_communities(
         return Ok(());
     }
 
-    let namespace = service.namespace_for_scope(scope);
+    let namespace = service.namespace_for_scope(scope)?;
     let member_entities =
         collect_connected_entity_component(service, entity_ids, &namespace).await?;
     if member_entities.len() < 2 {

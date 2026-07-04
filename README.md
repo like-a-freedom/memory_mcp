@@ -191,6 +191,23 @@ Within `--interval` seconds, each file is:
 No manual `ingest` tool call needed.
 </details>
 
+### Optional MCP apps surface
+
+The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is intentionally feature-gated so the six canonical memory tools stay available without exposing extra session/resource endpoints by default.
+
+Build or run with apps enabled:
+
+```bash
+cargo run --features mcp-apps -- serve
+```
+
+Recommended verification for this surface:
+
+```bash
+cargo check --all-targets --features mcp-apps
+cargo clippy --all-targets --features mcp-apps
+```
+
 **How it works internally**
 
 <details>

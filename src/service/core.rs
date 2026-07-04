@@ -69,6 +69,10 @@ impl MemoryService {
         format!("{fact_type}\n{content}\n{quote}")
     }
 
+    pub(crate) fn lifecycle_policy(&self) -> super::LifecyclePolicy {
+        super::LifecyclePolicy::from(&self.lifecycle_config)
+    }
+
     pub(crate) fn insert_current_embedding_fields(
         &self,
         payload: &mut serde_json::Map<String, Value>,
@@ -200,7 +204,7 @@ impl MemoryService {
                 r.fact_namespace.clone().or_else(|| {
                     r.episode
                         .as_ref()
-                        .map(|ep| self.namespace_for_scope(&ep.scope))
+                        .and_then(|ep| self.namespace_for_scope(&ep.scope).ok())
                 })
             })
             .unwrap_or_else(|| self.default_namespace.clone());
@@ -236,9 +240,10 @@ impl MemoryService {
                 continue;
             };
 
-            let namespace = resolved_item
-                .fact_namespace
-                .unwrap_or_else(|| self.namespace_for_scope(&episode.scope));
+            let namespace = resolved_item.fact_namespace.unwrap_or_else(|| {
+                self.namespace_for_scope(&episode.scope)
+                    .unwrap_or_else(|_| self.default_namespace.clone())
+            });
 
             let all_sources = self
                 .collect_provenance_sources_cached(
@@ -430,7 +435,7 @@ impl MemoryService {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
         let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
-        let namespace = self.namespace_for_scope(scope);
+        let namespace = self.namespace_for_scope(scope)?;
         let existing = self.db_client.select_one(&fact_id, &namespace).await?;
         if existing.is_none() {
             let t_ingested = super::query::now();
@@ -1368,26 +1373,8 @@ impl MemoryService {
     }
 
     /// Returns the namespace for a given scope.
-    pub fn namespace_for_scope(&self, scope: &str) -> String {
-        let (ns, fell_back) = resolve_namespace(&self.namespaces, &self.default_namespace, scope);
-        if fell_back {
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::Value::String("scope.namespace_fallback".to_string()),
-            );
-            event.insert(
-                "scope".to_string(),
-                serde_json::Value::String(scope.to_string()),
-            );
-            event.insert(
-                "resolved_namespace".to_string(),
-                serde_json::Value::String(ns.clone()),
-            );
-            let dedup_key = format!("scope.namespace_fallback:{}", ns);
-            self.logger.log_warn_dedup(event, &dedup_key, 10);
-        }
-        ns
+    pub fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
+        crate::service::MemoryScope::parse(scope)?.namespace(&self.namespaces)
     }
 
     pub(crate) async fn find_episode_record(
@@ -2130,33 +2117,30 @@ mod tests {
 
     #[test]
     fn namespace_for_scope_returns_exact_match() {
-        let service = create_test_service(vec!["org", "personal"]);
-        assert_eq!(service.namespace_for_scope("org"), "org");
-        assert_eq!(service.namespace_for_scope("personal"), "personal");
+        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
+        assert_eq!(service.namespace_for_scope("org").unwrap(), "org");
+        assert_eq!(service.namespace_for_scope("personal").unwrap(), "personal");
+        assert_eq!(service.namespace_for_scope("team").unwrap(), "team");
+        assert_eq!(
+            service.namespace_for_scope("private-domain").unwrap(),
+            "private-domain"
+        );
     }
 
     #[test]
-    fn namespace_for_scope_returns_default_for_unknown() {
+    fn namespace_for_scope_returns_error_for_unknown() {
         let service = create_test_service(vec!["org", "personal"]);
-        assert_eq!(service.namespace_for_scope("unknown"), "org");
+        assert!(matches!(
+            service.namespace_for_scope("unknown"),
+            Err(MemoryError::Validation(_))
+        ));
     }
 
     #[test]
-    fn namespace_for_scope_handles_personal_prefix() {
-        let service = create_test_service(vec!["org", "personal"]);
-        assert_eq!(service.namespace_for_scope("personal-work"), "personal");
-    }
-
-    #[test]
-    fn namespace_for_scope_handles_org_prefix() {
-        let service = create_test_service(vec!["org", "personal"]);
-        assert_eq!(service.namespace_for_scope("org-team"), "org");
-    }
-
-    #[test]
-    fn namespace_for_scope_handles_private_prefix() {
-        let service = create_test_service(vec!["org", "private"]);
-        assert_eq!(service.namespace_for_scope("private-notes"), "private");
+    fn namespace_for_scope_accepts_case_insensitive_inputs() {
+        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
+        assert_eq!(service.namespace_for_scope("ORG").unwrap(), "org");
+        assert_eq!(service.namespace_for_scope("TEAM").unwrap(), "team");
     }
 
     fn create_test_service(namespaces: Vec<&str>) -> MemoryService {
@@ -3823,14 +3807,18 @@ mod tests {
 
     #[test]
     fn namespace_for_scope_handles_various_inputs() {
-        let service = create_test_service(vec!["org", "personal", "private"]);
+        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
 
-        assert_eq!(service.namespace_for_scope("org"), "org");
-        assert_eq!(service.namespace_for_scope("personal"), "personal");
-        assert_eq!(service.namespace_for_scope("private"), "private");
-        assert_eq!(service.namespace_for_scope("unknown"), "org");
-        assert_eq!(service.namespace_for_scope(""), "org");
-        assert_eq!(service.namespace_for_scope("ORG"), "org");
+        assert_eq!(service.namespace_for_scope("org").unwrap(), "org");
+        assert_eq!(service.namespace_for_scope("personal").unwrap(), "personal");
+        assert_eq!(service.namespace_for_scope("team").unwrap(), "team");
+        assert_eq!(
+            service.namespace_for_scope("private-domain").unwrap(),
+            "private-domain"
+        );
+        assert!(service.namespace_for_scope("unknown").is_err());
+        assert!(service.namespace_for_scope("").is_err());
+        assert_eq!(service.namespace_for_scope("ORG").unwrap(), "org");
     }
 
     #[test]

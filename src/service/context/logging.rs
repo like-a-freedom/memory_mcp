@@ -55,7 +55,7 @@ pub(crate) async fn record_query_log(
     latency_ms: f64,
     diagnostics: &QueryLogDiagnostics<'_>,
 ) -> Result<(), MemoryError> {
-    let namespace = service.namespace_for_scope(&request.scope);
+    let namespace = service.namespace_for_scope(&request.scope)?;
     let logged_at = crate::service::query::now();
     let project = request
         .project
@@ -260,7 +260,7 @@ async fn prune_expired_query_logs(
     service: &crate::service::MemoryService,
     scope: &str,
 ) -> Result<usize, MemoryError> {
-    let namespace = service.namespace_for_scope(scope);
+    let namespace = service.namespace_for_scope(scope)?;
     let cutoff = crate::service::query::now()
         - chrono::Duration::days(i64::from(service.query_log_retention_days()));
     let deleted = service

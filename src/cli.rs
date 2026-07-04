@@ -7,11 +7,9 @@ pub mod runtime;
 
 use clap::{Parser, Subcommand};
 
-#[allow(deprecated)]
-pub use runtime::{RunMode, WatchCommand, parse_cli_args};
 pub use runtime::{
-    build_memory_service, log_session_duration, log_startup, run_reembed_mode, run_stdio_server,
-    run_watch_mode,
+    WatchCommand, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
+    run_stdio_server, run_watch_mode,
 };
 
 /// `memory_mcp` command-line interface.

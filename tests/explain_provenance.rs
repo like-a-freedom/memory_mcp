@@ -12,20 +12,19 @@
 mod common;
 
 use chrono::Utc;
-use memory_mcp::MemoryService;
 use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest, Provenance};
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn explain_returns_direct_provenance_source() {
-    // Setup: Create episode and fact
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
-
-    let episode_id = "episode:direct_provenance_integration";
+    let (service, _db_client) = common::make_service_with_client().await;
+    let episode_id = common::ingest_episode(
+        &service,
+        "direct-provenance-integration",
+        "Integration test: Alice promised to deliver the report",
+    )
+    .await;
     let episode_content = "Integration test: Alice promised to deliver the report";
 
     service
@@ -33,13 +32,13 @@ async fn explain_returns_direct_provenance_source() {
             "promise",
             "Alice will deliver the report",
             episode_content,
-            episode_id,
+            &episode_id,
             Utc::now(),
-            "test_provenance_integration",
+            "personal",
             0.9,
             vec![],
             vec![],
-            Provenance::agent_observation(episode_id),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .expect("fact added");
@@ -50,7 +49,7 @@ async fn explain_returns_direct_provenance_source() {
             fact_id: None,
             content: "Alice will deliver the report".to_string(),
             quote: episode_content.to_string(),
-            source_episode: episode_id.to_string(),
+            source_episode: episode_id.clone(),
             scope: None,
             t_ref: None,
             t_ingested: None,
@@ -88,23 +87,23 @@ async fn explain_returns_direct_provenance_source() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn explain_backward_compatible_with_empty_all_sources() {
-    // Setup
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
-
-    let episode_id = "episode:compat_provenance_test";
+    let (service, _db_client) = common::make_service_with_client().await;
+    let episode_id = common::ingest_episode(
+        &service,
+        "compat-provenance-test",
+        "Backward compatibility provenance test",
+    )
+    .await;
 
     service
         .add_fact(
             "metric",
             "Backward compatibility provenance test",
             "Backward compatibility provenance test",
-            episode_id,
+            &episode_id,
             Utc::now(),
-            "test_provenance_compat",
+            "personal",
             0.8,
             vec![],
             vec![],
@@ -119,7 +118,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             fact_id: None,
             content: String::new(),
             quote: String::new(),
-            source_episode: episode_id.to_string(),
+            source_episode: episode_id,
             scope: None,
             t_ref: None,
             t_ingested: None,
@@ -147,27 +146,27 @@ async fn explain_backward_compatible_with_empty_all_sources() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn explain_populates_all_sources_field() {
-    // Setup
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
-
-    let episode_id = "episode:all_sources_integration";
+    let (service, _db_client) = common::make_service_with_client().await;
+    let episode_id = common::ingest_episode(
+        &service,
+        "all-sources-integration",
+        "Task completed for all_sources test",
+    )
+    .await;
 
     service
         .add_fact(
             "task",
             "Task completed for all_sources test",
             "Task completed",
-            episode_id,
+            &episode_id,
             Utc::now(),
-            "test_provenance_sources",
+            "personal",
             0.95,
             vec![],
             vec![],
-            Provenance::agent_observation(episode_id),
+            Provenance::agent_observation(&episode_id),
         )
         .await
         .expect("fact added");
@@ -178,7 +177,7 @@ async fn explain_populates_all_sources_field() {
             fact_id: None,
             content: "Task completed".to_string(),
             quote: "Task completed".to_string(),
-            source_episode: episode_id.to_string(),
+            source_episode: episode_id,
             scope: None,
             t_ref: None,
             t_ingested: None,
@@ -434,11 +433,8 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn explain_with_empty_source_episode_returns_validation_error() {
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     // Act: Call explain with empty source_episode (the bug scenario)
     let request = ExplainRequest {
@@ -473,11 +469,8 @@ async fn explain_with_empty_source_episode_returns_validation_error() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn explain_with_context_items_missing_source_episode_returns_validation_error() {
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     // Simulates the exact bug payload: objects with fact_id but no source_episode
     let request = ExplainRequest {

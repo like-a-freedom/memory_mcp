@@ -17,7 +17,6 @@ pub struct IngestionService {
     namespaces: Vec<String>,
     logger: StdoutLogger,
     rate_limiter: Arc<RateLimiter>,
-    default_namespace: String,
 }
 
 impl IngestionService {
@@ -27,13 +26,11 @@ impl IngestionService {
         logger: StdoutLogger,
         rate_limiter: Arc<RateLimiter>,
     ) -> Self {
-        let default_namespace = namespaces.first().cloned().unwrap_or_else(|| "org".into());
         Self {
             db_client,
             namespaces,
             logger,
             rate_limiter,
-            default_namespace,
         }
     }
 
@@ -48,20 +45,8 @@ impl IngestionService {
         Ok(())
     }
 
-    pub fn namespace_for_scope(&self, scope: &str) -> String {
-        let (ns, fell_back) = super::resolve_namespace(&self.namespaces, &self.default_namespace, scope);
-        if fell_back {
-            self.logger.log_warn_dedup(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("scope.namespace_fallback")),
-                    ("scope".to_string(), json!(scope)),
-                    ("resolved_namespace".to_string(), json!(&ns)),
-                ]),
-                &format!("scope.namespace_fallback:{}", ns),
-                10,
-            );
-        }
-        ns
+    pub fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
+        super::MemoryScope::parse(scope)?.namespace(&self.namespaces)
     }
 
     pub async fn ingest(
@@ -121,7 +106,7 @@ impl IngestionService {
             request.t_ref,
             &request.scope,
         );
-        let namespace = self.namespace_for_scope(&request.scope);
+        let namespace = self.namespace_for_scope(&request.scope)?;
         let existing = self.db_client.select_one(&episode_id, &namespace).await?;
 
         if existing.is_none() {

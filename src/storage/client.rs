@@ -1583,7 +1583,8 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_select_active_facts_query(limit);
+        let cutoff = crate::service::normalize_dt(crate::service::now());
+        let (sql, vars) = build_select_active_facts_query(&cutoff, limit);
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {

@@ -1,6 +1,9 @@
+#![cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use chrono::{DateTime, Utc};
 use rmcp::ErrorData;
 use serde_json::Value;
 use tokio::sync::RwLock;
@@ -13,6 +16,7 @@ use super::response::OpenAppResult;
 pub(crate) struct AppSessionState {
     pub(crate) app: String,
     pub(crate) scope: String,
+    pub(crate) expires_at: Option<DateTime<Utc>>,
     pub(crate) payload: Value,
 }
 
@@ -48,6 +52,19 @@ impl SessionManager {
             .ok_or_else(|| invalid_params(format!("Unknown or closed app session: {session_id}")))
     }
 
+    pub async fn get_valid(&self, session_id: &str) -> Result<AppSessionState, ErrorData> {
+        let session = self.get(session_id).await?;
+        if session
+            .expires_at
+            .is_some_and(|expires_at| expires_at <= Utc::now())
+        {
+            self.sessions.write().await.remove(session_id);
+            return Err(invalid_params(format!("App session expired: {session_id}")));
+        }
+
+        Ok(session)
+    }
+
     pub async fn replace_payload(
         &self,
         session_id: &str,
@@ -69,6 +86,14 @@ impl SessionManager {
             .ok_or_else(|| invalid_params(format!("Unknown or closed app session: {session_id}")))
     }
 
+    pub async fn purge_expired(&self) -> usize {
+        let now = Utc::now();
+        let mut sessions = self.sessions.write().await;
+        let before = sessions.len();
+        sessions.retain(|_, session| session.expires_at.is_none_or(|expires_at| expires_at > now));
+        before.saturating_sub(sessions.len())
+    }
+
     pub async fn create(
         &self,
         app: &str,
@@ -78,11 +103,18 @@ impl SessionManager {
     ) -> Result<OpenAppResult, ErrorData> {
         let session_id = self.next_session_id();
         let payload = enrich_session_payload(app, &session_id, scope, ttl_seconds, payload);
+        let expires_at = payload
+            .get("meta")
+            .and_then(|meta| meta.get("expires_at"))
+            .and_then(Value::as_str)
+            .and_then(|raw| chrono::DateTime::parse_from_rfc3339(raw).ok())
+            .map(|value| value.with_timezone(&Utc));
         self.insert(
             session_id.clone(),
             AppSessionState {
                 app: app.to_string(),
                 scope: scope.to_string(),
+                expires_at,
                 payload: payload.clone(),
             },
         )
@@ -195,6 +227,7 @@ pub(crate) fn enrich_session_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
     use serde_json::json;
 
     #[test]
@@ -216,5 +249,62 @@ mod tests {
         assert_eq!(enriched["app"], "diff");
         assert_eq!(enriched["meta"]["ttl_seconds"], serde_json::Value::Null);
         assert!(enriched["meta"]["expires_at"].is_null());
+    }
+
+    #[tokio::test]
+    async fn get_valid_rejects_expired_session() {
+        let manager = SessionManager::new();
+        manager
+            .insert(
+                "ses:9999".to_string(),
+                AppSessionState {
+                    app: "diff".to_string(),
+                    scope: "org".to_string(),
+                    expires_at: Some(Utc::now() - Duration::seconds(1)),
+                    payload: json!({"app": "diff"}),
+                },
+            )
+            .await;
+
+        let err = manager
+            .get_valid("ses:9999")
+            .await
+            .expect_err("expired session should be rejected");
+        assert!(err.to_string().contains("expired"));
+        assert!(
+            manager.get("ses:9999").await.is_err(),
+            "expired session should be purged"
+        );
+    }
+
+    #[tokio::test]
+    async fn purge_expired_removes_only_expired_sessions() {
+        let manager = SessionManager::new();
+        manager
+            .insert(
+                "ses:expired".to_string(),
+                AppSessionState {
+                    app: "diff".to_string(),
+                    scope: "org".to_string(),
+                    expires_at: Some(Utc::now() - Duration::seconds(1)),
+                    payload: json!({}),
+                },
+            )
+            .await;
+        manager
+            .insert(
+                "ses:live".to_string(),
+                AppSessionState {
+                    app: "diff".to_string(),
+                    scope: "org".to_string(),
+                    expires_at: Some(Utc::now() + Duration::seconds(30)),
+                    payload: json!({}),
+                },
+            )
+            .await;
+
+        assert_eq!(manager.purge_expired().await, 1);
+        assert!(manager.get("ses:expired").await.is_err());
+        assert!(manager.get("ses:live").await.is_ok());
     }
 }

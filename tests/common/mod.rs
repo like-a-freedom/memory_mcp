@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{IngestRequest, Provenance};
@@ -6,12 +7,20 @@ use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
 
+static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
 fn namespace_for_scope(scope: &str) -> &str {
     match scope {
         "personal" => "personal",
-        "private" => "private",
+        "team" => "team",
+        "private" | "private-domain" | "private_domain" => "private-domain",
         _ => "org",
     }
+}
+
+fn next_test_db_name() -> String {
+    let seq = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("memory_test_{seq}")
 }
 
 #[allow(dead_code)]
@@ -38,10 +47,12 @@ pub async fn make_service_with_client_and_query_logging(
     let namespaces = vec![
         "org".to_string(),
         "personal".to_string(),
-        "private".to_string(),
+        "team".to_string(),
+        "private-domain".to_string(),
     ];
+    let db_name = next_test_db_name();
     let db_client = Arc::new(
-        SurrealDbClient::connect_in_memory_with_namespaces("memory_test", &namespaces, "warn")
+        SurrealDbClient::connect_in_memory_with_namespaces(&db_name, &namespaces, "warn")
             .await
             .expect("connect in memory service"),
     );

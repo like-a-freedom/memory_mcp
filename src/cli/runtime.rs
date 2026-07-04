@@ -9,8 +9,6 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::EmbeddingActivationMode;
 use crate::{MemoryMcp, MemoryService};
 
-const DEFAULT_WATCH_INTERVAL_SECS: u64 = 2;
-
 /// Builds a structured log event map from key-value pairs.
 macro_rules! event {
     ($($key:expr => $value:expr),+ $(,)?) => {{
@@ -35,89 +33,11 @@ fn log_and_return_error(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[deprecated(note = "use cli::Cli::parse() via runner::run() instead")]
-pub enum RunMode {
-    Serve,
-    Watch(WatchCommand),
-    Reembed,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WatchCommand {
     pub dir: PathBuf,
     pub project: Option<String>,
     pub scope: String,
     pub interval_secs: u64,
-}
-
-#[deprecated(note = "use Cli::parse_from() via runner::run() instead")]
-#[allow(deprecated)]
-pub fn parse_cli_args<I, S>(args: I) -> Result<RunMode, String>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<String>,
-{
-    let mut args = args.into_iter().map(Into::into);
-    let _program = args.next();
-
-    let Some(subcommand) = args.next() else {
-        return Ok(RunMode::Serve);
-    };
-
-    match subcommand.as_str() {
-        "watch" => {
-            let Some(dir) = args.next() else {
-                return Err("watch requires <dir>".to_string());
-            };
-
-            let mut watch = WatchCommand {
-                dir: PathBuf::from(dir),
-                project: None,
-                scope: "org".to_string(),
-                interval_secs: DEFAULT_WATCH_INTERVAL_SECS,
-            };
-
-            while let Some(flag) = args.next() {
-                match flag.as_str() {
-                    "--project" => {
-                        let value = args
-                            .next()
-                            .ok_or_else(|| "--project requires a value".to_string())?;
-                        watch.project = Some(value);
-                    }
-                    "--scope" => {
-                        let value = args
-                            .next()
-                            .ok_or_else(|| "--scope requires a value".to_string())?;
-                        watch.scope = value;
-                    }
-                    "--interval" => {
-                        let value = args
-                            .next()
-                            .ok_or_else(|| "--interval requires a value".to_string())?;
-                        let interval_secs = value
-                            .parse::<u64>()
-                            .map_err(|_| format!("invalid --interval value {value}"))?;
-                        if interval_secs == 0 {
-                            return Err("--interval must be greater than 0".to_string());
-                        }
-                        watch.interval_secs = interval_secs;
-                    }
-                    _ => return Err(format!("unknown watch flag {flag}")),
-                }
-            }
-
-            Ok(RunMode::Watch(watch))
-        }
-        "reembed" => {
-            if args.next().is_some() {
-                return Err("reembed does not accept positional arguments".to_string());
-            }
-
-            Ok(RunMode::Reembed)
-        }
-        _ => Err(format!("unknown subcommand {subcommand}")),
-    }
 }
 
 /// Helper: log startup event with pid and mode label.

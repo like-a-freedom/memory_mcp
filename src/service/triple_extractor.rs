@@ -3,8 +3,9 @@
 //! Extracts structured (subject, predicate, object) triples from fact content.
 //! Triples enable structured queries like "who works at X?" or "where does Y live?".
 //!
-//! The default `NoOpTripleExtractor` does nothing. An LLM-based extractor can be
-//! enabled via configuration to extract triples asynchronously after fact creation.
+//! Triple extraction is currently provided by rule-based patterns.
+//! Additional extractors can be added later if they have a real caller and
+//! clear evaluation coverage.
 
 use async_trait::async_trait;
 use regex::Regex;
@@ -32,21 +33,6 @@ pub trait TripleExtractor: Send + Sync {
         text: &str,
         source_fact_id: &str,
     ) -> Result<Vec<SemanticTriple>, MemoryError>;
-}
-
-/// No-op triple extractor — returns an empty list (default).
-#[allow(dead_code)]
-pub struct NoOpTripleExtractor;
-
-#[async_trait]
-impl TripleExtractor for NoOpTripleExtractor {
-    async fn extract(
-        &self,
-        _text: &str,
-        _source_fact_id: &str,
-    ) -> Result<Vec<SemanticTriple>, MemoryError> {
-        Ok(vec![])
-    }
 }
 
 /// Singleton predicates that can only have one active value per subject.

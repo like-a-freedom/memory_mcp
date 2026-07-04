@@ -13,6 +13,15 @@ pub const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
      AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
      AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
 
+pub(crate) fn build_fact_visibility_clause(cutoff_var: &str) -> String {
+    format!(
+        "t_valid <= type::datetime({cutoff}) \
+         AND (t_ingested IS NONE OR t_ingested <= type::datetime({cutoff})) \
+         AND (t_invalid IS NONE OR t_invalid > type::datetime({cutoff}) OR t_invalid_ingested > type::datetime({cutoff}))",
+        cutoff = cutoff_var
+    )
+}
+
 pub fn active_edge_scan_batch_size() -> i32 {
     ACTIVE_EDGE_SCAN_BATCH_SIZE
 }
@@ -260,10 +269,11 @@ pub fn build_select_facts_ann_query(
     )
 }
 
-pub fn build_select_active_facts_query(limit: i32) -> (String, Value) {
+pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
     (
-        "SELECT * FROM fact WHERE (t_invalid IS NONE OR t_invalid IS NULL) ORDER BY t_valid ASC LIMIT $limit".to_string(),
-        json!({"limit": limit}),
+        format!("SELECT * FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"),
+        json!({"cutoff": cutoff, "limit": limit}),
     )
 }
 
@@ -309,8 +319,11 @@ pub fn build_select_active_facts_by_episode_query(
     cutoff: &str,
     limit: i32,
 ) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
     (
-        "SELECT * FROM fact WHERE source_episode = $episode_id AND (t_invalid IS NONE OR t_invalid IS NULL OR t_invalid > type::datetime($cutoff)) LIMIT $limit".to_string(),
+        format!(
+            "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
+        ),
         json!({"episode_id": episode_id, "cutoff": cutoff, "limit": limit}),
     )
 }
@@ -686,5 +699,27 @@ mod tests {
         assert_eq!(vars["cutoff"], json!("2026-05-13T00:00:00Z"));
         assert_eq!(vars["limit"], json!(250));
         assert_eq!(vars["start"], json!(500));
+    }
+
+    #[test]
+    fn build_select_active_facts_by_episode_query_uses_full_bitemporal_visibility() {
+        let (sql, vars) =
+            build_select_active_facts_by_episode_query("episode:1", "2026-05-13T00:00:00Z", 1);
+
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
+        assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
+        assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
+        assert_eq!(vars["episode_id"], "episode:1");
+    }
+
+    #[test]
+    fn build_select_active_facts_query_uses_full_bitemporal_visibility() {
+        let (sql, vars) = build_select_active_facts_query("2026-05-13T00:00:00Z", 5);
+
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
+        assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
+        assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
+        assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
+        assert_eq!(vars["limit"], 5);
     }
 }

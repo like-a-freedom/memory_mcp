@@ -1,0 +1,149 @@
+use chrono::Utc;
+use serde_json::json;
+
+use crate::service::{
+    ArchiveCandidatesOutcome, LifecycleDashboard, LifecycleDefaults, LifecycleView, MemoryError,
+    RebuildCommunitiesOutcome, RecomputeDecayOutcome, RestoreArchivedOutcome,
+    run_community_rebuild_pass, run_decay_pass,
+};
+
+impl crate::service::MemoryService {
+    pub async fn build_lifecycle_view(&self, scope: &str) -> Result<LifecycleView, MemoryError> {
+        let dashboard = self.lifecycle_dashboard(scope).await?;
+        let policy = self.lifecycle_policy();
+
+        Ok(LifecycleView {
+            dashboard,
+            defaults: LifecycleDefaults {
+                archival_age_days: policy.archival_age_days,
+                decay_threshold: policy.decay_confidence_threshold,
+                decay_half_life_days: policy.decay_half_life_days,
+            },
+            recent_actions: Vec::new(),
+        })
+    }
+
+    pub async fn lifecycle_dashboard(
+        &self,
+        scope: &str,
+    ) -> Result<LifecycleDashboard, MemoryError> {
+        let namespace = self.namespace_for_scope(scope)?;
+        let active_facts = self
+            .db_client
+            .select_active_facts(&namespace, 10_000)
+            .await?;
+        let policy = self.lifecycle_policy();
+        let cutoff = crate::service::normalize_dt(
+            Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
+        );
+        let archival_candidates = self
+            .db_client
+            .select_episodes_for_archival(&namespace, &cutoff, 1_000)
+            .await?;
+        let communities = self.db_client.select_table("community", &namespace).await?;
+
+        Ok(LifecycleDashboard {
+            active_facts: active_facts.len(),
+            archival_candidates: archival_candidates.len(),
+            archival_candidate_ids: archival_candidates
+                .iter()
+                .filter_map(|record| {
+                    record
+                        .get("episode_id")
+                        .and_then(crate::service::value_helpers::json_string)
+                        .map(ToString::to_string)
+                })
+                .collect(),
+            communities: communities.len(),
+        })
+    }
+
+    pub async fn archive_candidates(
+        &self,
+        scope: &str,
+        target_ids: &[String],
+        dry_run: bool,
+    ) -> Result<ArchiveCandidatesOutcome, MemoryError> {
+        let namespace = self.namespace_for_scope(scope)?;
+        if !dry_run {
+            for episode_id in target_ids {
+                self.db_client
+                    .update(
+                        episode_id,
+                        json!({
+                            "status": "archived",
+                            "archived_at": crate::service::normalize_dt(Utc::now()),
+                        }),
+                        &namespace,
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(ArchiveCandidatesOutcome {
+            dry_run,
+            target_ids: target_ids.to_vec(),
+            archived_count: if dry_run { 0 } else { target_ids.len() },
+        })
+    }
+
+    pub async fn restore_archived(
+        &self,
+        scope: &str,
+        target_ids: &[String],
+    ) -> Result<RestoreArchivedOutcome, MemoryError> {
+        let namespace = self.namespace_for_scope(scope)?;
+        for episode_id in target_ids {
+            self.db_client
+                .update(
+                    episode_id,
+                    json!({
+                        "status": "active",
+                        "archived_at": serde_json::Value::Null,
+                    }),
+                    &namespace,
+                )
+                .await?;
+        }
+
+        Ok(RestoreArchivedOutcome {
+            target_ids: target_ids.to_vec(),
+            restored_count: target_ids.len(),
+        })
+    }
+
+    pub async fn recompute_decay(
+        &self,
+        dry_run: bool,
+    ) -> Result<RecomputeDecayOutcome, MemoryError> {
+        let invalidated = if dry_run {
+            0
+        } else {
+            let policy = self.lifecycle_policy();
+            run_decay_pass(
+                self,
+                policy.decay_confidence_threshold,
+                policy.decay_half_life_days,
+            )
+            .await?
+        };
+
+        Ok(RecomputeDecayOutcome {
+            dry_run,
+            invalidated,
+        })
+    }
+
+    pub async fn rebuild_communities(
+        &self,
+        dry_run: bool,
+    ) -> Result<RebuildCommunitiesOutcome, MemoryError> {
+        let rebuilt = if dry_run {
+            0
+        } else {
+            run_community_rebuild_pass(self).await?
+        };
+
+        Ok(RebuildCommunitiesOutcome { dry_run, rebuilt })
+    }
+}

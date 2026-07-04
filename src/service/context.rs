@@ -100,7 +100,7 @@ pub async fn assemble_context(
         return Ok(vec![]);
     }
 
-    let namespace = service.namespace_for_scope(&request.scope);
+    let namespace = service.namespace_for_scope(&request.scope)?;
     let cutoff_iso = super::normalize_dt(cutoff);
     let cleaned_query = super::preprocess_search_query(&request.query);
     let query_opt = if cleaned_query.is_empty() {

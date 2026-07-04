@@ -207,7 +207,7 @@ async fn test_policy_tag_filtering() {
             "$100K",
             "episode:hr",
             Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-            "private-hr",
+            "private-domain",
             0.9,
             vec!["entity:a".to_string()],
             vec!["hr.salary".to_string()],
@@ -219,7 +219,7 @@ async fn test_policy_tag_filtering() {
     let context = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: "Salary".to_string(),
-            scope: "private-hr".to_string(),
+            scope: "private-domain".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()),
             budget: 5,
             project: None,
@@ -228,7 +228,7 @@ async fn test_policy_tag_filtering() {
             window_start: None,
             window_end: None,
             access: Some(memory_mcp::models::AccessPayload {
-                allowed_scopes: Some(vec!["private-hr".to_string()]),
+                allowed_scopes: Some(vec!["private-domain".to_string()]),
                 allowed_tags: Some(vec!["deal.pipeline".to_string()]),
                 caller_id: None,
                 session_vars: None,

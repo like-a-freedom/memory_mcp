@@ -16,7 +16,14 @@ pub use error::MemoryError;
 pub use error::is_transient_db_error;
 
 mod apps;
-pub use apps::GraphTraversalBudget;
+pub use apps::{
+    ArchiveCandidatesOutcome, CommitIngestionReviewOutcome, CommitIngestionReviewRequest,
+    DiffChange, DiffRequest, DiffSummary, DiffTarget, DiffView, DiffViewRange,
+    GraphTraversalBudget, IngestionReviewBundle, IngestionReviewItem, IngestionReviewSource,
+    IngestionReviewSummary, LifecycleDashboard, LifecycleDefaults, LifecycleView,
+    PrepareIngestionReviewRequest, RebuildCommunitiesOutcome, RecomputeDecayOutcome,
+    RestoreArchivedOutcome,
+};
 mod cache;
 mod conflict_resolver;
 mod context;
@@ -33,10 +40,10 @@ pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 mod query;
 mod reembed;
+mod scope;
 mod startup;
 mod triple_extractor;
 mod util;
-mod scope;
 
 mod model_loader;
 pub(crate) mod value_helpers;
@@ -79,7 +86,7 @@ pub use util::{
     validate_ingest_request,
 };
 
-pub(crate) use core::{log_args_with_duration, log_event, resolve_namespace};
+pub(crate) use core::{log_args_with_duration, log_event};
 pub(crate) use embedding_runtime::{
     CachedQueryEmbedding, DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS,
     DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, background_embedding_retry_delay,

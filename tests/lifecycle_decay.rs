@@ -7,7 +7,6 @@
 //! Run with: cargo test lifecycle_decay -- --test-threads=1
 
 use chrono::{Duration, Utc};
-use memory_mcp::MemoryService;
 use memory_mcp::models::Provenance;
 use memory_mcp::service::run_decay_pass;
 use memory_mcp::storage::DbClient;
@@ -133,12 +132,8 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_with_empty_database() {
-    // Setup: Fresh service
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     // Act: Run decay pass
     let count = run_decay_pass(&service, 0.3, 365.0)
@@ -150,12 +145,8 @@ async fn decay_pass_with_empty_database() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_preserves_recent_high_confidence_facts() {
-    // Setup
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     // Create a recent fact with high confidence (should not decay below threshold)
     let recent_date = Utc::now() - Duration::days(1);
@@ -166,7 +157,7 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
             "recent promise content for decay test",
             "episode:recent_decay_test",
             recent_date,
-            "test_decay_preserve",
+            "org",
             0.95, // high confidence, won't decay below threshold
             vec![],
             vec![],
@@ -188,12 +179,8 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_invalidates_old_low_confidence_facts() {
-    // Setup: Create an old fact with low confidence
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     let old_date = Utc::now() - Duration::days(400);
 
@@ -204,7 +191,7 @@ async fn decay_pass_invalidates_old_low_confidence_facts() {
             "old metric",
             "episode:old_decay_test",
             old_date,
-            "test_decay_invalidate",
+            "org",
             0.4, // moderate confidence, will decay
             vec![],
             vec![],
@@ -223,12 +210,8 @@ async fn decay_pass_invalidates_old_low_confidence_facts() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_respects_threshold_parameter() {
-    // Setup: Create facts with same age but different initial confidence
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     let old_date = Utc::now() - Duration::days(200);
 
@@ -240,7 +223,7 @@ async fn decay_pass_respects_threshold_parameter() {
             "high confidence",
             "episode:high_conf_decay",
             old_date,
-            "test_decay_threshold",
+            "org",
             0.8,
             vec![],
             vec![],
@@ -257,7 +240,7 @@ async fn decay_pass_respects_threshold_parameter() {
             "low confidence",
             "episode:low_conf_decay",
             old_date,
-            "test_decay_threshold",
+            "org",
             0.3,
             vec![],
             vec![],
@@ -276,12 +259,8 @@ async fn decay_pass_respects_threshold_parameter() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_skips_already_invalidated_facts() {
-    // Setup: Create and manually invalidate a fact
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     let old_date = Utc::now() - Duration::days(200);
 
@@ -292,7 +271,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
             "pre-invalidated",
             "episode:pre_invalid_decay",
             old_date,
-            "test_decay_skip",
+            "org",
             0.2,
             vec![],
             vec![],
@@ -325,12 +304,8 @@ async fn decay_pass_skips_already_invalidated_facts() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_pass_half_life_affects_decay_rate() {
-    // Setup: Create identical old facts
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     let old_date = Utc::now() - Duration::days(300);
 
@@ -342,7 +317,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "short half-life",
             "episode:short_halflife",
             old_date,
-            "test_decay_halflife",
+            "org",
             0.5,
             vec![],
             vec![],
@@ -358,7 +333,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "long half-life",
             "episode:long_halflife",
             old_date,
-            "test_decay_halflife",
+            "org",
             0.5,
             vec![],
             vec![],
@@ -380,7 +355,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "long half-life 2",
             "episode:long_halflife_2",
             old_date,
-            "test_decay_halflife",
+            "org",
             0.5,
             vec![],
             vec![],
@@ -405,13 +380,8 @@ async fn decay_pass_half_life_affects_decay_rate() {
 }
 
 #[tokio::test]
-#[ignore = "requires --test-threads=1 due to embedded SurrealDB LOCK"]
 async fn decay_confidence_calculation_exponential() {
-    // This test verifies the exponential decay formula is applied correctly
-    // Setup: Create a fact with known age and confidence
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service created");
+    let (service, _db_client) = common::make_service_with_client().await;
 
     // Create a fact that's exactly 100 days old with 0.5 confidence
     // With half-life of 100 days, it should decay to 0.25 (half)
@@ -424,7 +394,7 @@ async fn decay_confidence_calculation_exponential() {
             "exponential decay",
             "episode:exponential_decay",
             old_date,
-            "test_decay_formula",
+            "org",
             0.5, // base confidence
             vec![],
             vec![],
