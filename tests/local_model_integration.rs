@@ -6,9 +6,10 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::config::NerConfig;
+use memory_mcp::config::{NerConfig, NerDeviceKind, NerProviderKind};
+use memory_mcp::logging::StdoutLogger;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
-use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor};
+use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor, create_entity_extractor};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
@@ -365,13 +366,72 @@ async fn local_gliner_extractor_supports_per_call_custom_labels() {
                 )
             });
 
-        // Verify extraction returns entities (model accuracy varies by label)
-        assert!(
-            !entities.is_empty() || expected_entities.is_empty(),
-            "per-call extraction should return entities for `{case_name}`, got {:?}",
-            entities
-        );
+        assert_candidate_case_entities(case_name, &entities, &expected_entities);
     }
+}
+
+async fn local_gliner_candidate_signatures_for_batch_size(
+    batch_size: usize,
+) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let config = NerConfig {
+        provider: NerProviderKind::LocalGliner,
+        model: Some("urchade/gliner_multi-v2.1".to_string()),
+        model_dir: Some(local_gliner_model_dir().display().to_string()),
+        labels: NerConfig::default().labels,
+        threshold: 0.5,
+        batch_size,
+        max_batch_tokens: 1536,
+        max_concurrency: 1,
+        device: NerDeviceKind::Cpu,
+    };
+
+    let extractor = create_entity_extractor(
+        &config,
+        env!("CARGO_MANIFEST_DIR"),
+        &StdoutLogger::new("warn"),
+    )
+    .await
+    .expect("load local GLiNER model");
+    let paragraph =
+        "Alice Smith from OpenAI presented Project Atlas in Moscow using Rust and Kubernetes. ";
+    let content = paragraph.repeat(40);
+
+    let default = extractor
+        .extract_candidates(&content)
+        .await
+        .expect("extract default-label candidates");
+    let custom_labels = zero_shot_gliner_labels();
+    let custom = extractor
+        .extract_candidates_with_labels(&content, &custom_labels)
+        .await
+        .expect("extract custom-label candidates");
+    assert!(
+        custom
+            .iter()
+            .all(|candidate| custom_labels.contains(&candidate.entity_type)),
+        "per-call extraction returned labels outside the requested set: {custom:?}"
+    );
+
+    let signature = |candidates: Vec<memory_mcp::models::EntityCandidate>| {
+        candidates
+            .into_iter()
+            .map(|candidate| (candidate.canonical_name, candidate.entity_type))
+            .collect::<Vec<_>>()
+    };
+    (signature(default), signature(custom))
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn local_gliner_batching_preserves_exact_default_and_zero_shot_candidates() {
+    let batch_one = local_gliner_candidate_signatures_for_batch_size(1).await;
+    let batch_four = local_gliner_candidate_signatures_for_batch_size(4).await;
+
+    assert_eq!(
+        batch_one.0, batch_four.0,
+        "default-label candidates changed"
+    );
+    assert_eq!(batch_one.1, batch_four.1, "zero-shot candidates changed");
 }
 
 #[tokio::test(flavor = "current_thread")]

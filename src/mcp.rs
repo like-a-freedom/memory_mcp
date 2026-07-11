@@ -24,5 +24,6 @@ mod parsers;
 mod resources;
 pub(crate) mod response;
 pub(crate) mod session;
+mod tasks;
 
 pub use error::mcp_error;

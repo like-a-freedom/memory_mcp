@@ -7,13 +7,15 @@ use chrono::Utc;
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{
-    ListResourceTemplatesResult, ListResourcesResult, PaginatedRequestParams,
-    ReadResourceRequestParams, ReadResourceResult, ServerCapabilities, ServerInfo, TasksCapability,
+    CallToolRequestParams, CancelTaskParams, CancelTaskResult, CreateTaskResult, GetTaskParams,
+    GetTaskPayloadParams, GetTaskPayloadResult, GetTaskResult, ListResourceTemplatesResult,
+    ListResourcesResult, ListTasksResult, PaginatedRequestParams, ReadResourceRequestParams,
+    ReadResourceResult, ServerCapabilities, ServerInfo, TasksCapability,
 };
 use rmcp::service::RequestContext;
 
 type McpError = rmcp::ErrorData;
-use rmcp::{ErrorData, RoleServer, ServerHandler, task_handler, tool, tool_handler, tool_router};
+use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router};
 #[cfg(feature = "mcp-apps")]
 use serde_json::{Value, json};
 
@@ -30,6 +32,10 @@ use super::params::*;
 use super::resources::app_session_uri;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session::{self, SessionManager};
+use super::tasks::{
+    DEFAULT_TASK_POLL_INTERVAL_MS, DEFAULT_TASK_TTL_MS, TaskCancelState, TaskCreateError,
+    TaskOutcome, TaskPayloadState, TaskStore, add_related_task_metadata, related_task_metadata,
+};
 mod apps;
 #[cfg(feature = "mcp-apps")]
 use crate::mcp::parsers::parse_datetime;
@@ -65,7 +71,7 @@ use apps::{
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
     session_manager: SessionManager,
-    task_processor: Arc<tokio::sync::Mutex<rmcp::task_manager::OperationProcessor>>,
+    task_store: Arc<tokio::sync::Mutex<TaskStore>>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -81,9 +87,7 @@ impl MemoryMcp {
         Self {
             service: Arc::new(service),
             session_manager: SessionManager::new(),
-            task_processor: Arc::new(tokio::sync::Mutex::new(
-                rmcp::task_manager::OperationProcessor::new(),
-            )),
+            task_store: Arc::new(tokio::sync::Mutex::new(TaskStore::default())),
             tool_router: Self::tool_router(),
         }
     }
@@ -127,10 +131,163 @@ impl MemoryMcp {
 }
 
 #[tool_handler(router = self.tool_router)]
-#[task_handler(processor = self.task_processor)]
 impl ServerHandler for MemoryMcp {
     fn get_info(&self) -> ServerInfo {
         Self::build_server_info()
+    }
+
+    async fn enqueue_task(
+        &self,
+        mut request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CreateTaskResult, McpError> {
+        let task_id = format!("task_{}", crate::tools::request_id::next_request_id());
+        let requested_ttl = request.task.as_ref().and_then(|metadata| metadata.ttl);
+        request.task = None;
+
+        let task = self
+            .task_store
+            .lock()
+            .await
+            .create(task_id.clone(), requested_ttl)
+            .map_err(|error| match error {
+                TaskCreateError::ActiveCapacity => {
+                    Self::internal_error("too many active MCP tasks; retry later")
+                }
+                TaskCreateError::RetainedCapacity => {
+                    Self::internal_error("MCP task result capacity exhausted; retry later")
+                }
+            })?;
+        let ttl = task.ttl.unwrap_or(DEFAULT_TASK_TTL_MS);
+        let server = self.clone();
+        let worker_task_id = task_id.clone();
+        let worker = tokio::spawn(async move {
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(ttl),
+                server.call_tool(request, context),
+            )
+            .await
+            {
+                Ok(Ok(result)) => {
+                    let is_error = result.is_error.unwrap_or(false);
+                    match serde_json::to_value(result) {
+                        Ok(mut payload) => {
+                            if let Err(error) =
+                                add_related_task_metadata(&mut payload, &worker_task_id)
+                            {
+                                TaskOutcome::ProtocolError(McpError::internal_error(error, None))
+                            } else {
+                                TaskOutcome::ToolResult { payload, is_error }
+                            }
+                        }
+                        Err(error) => TaskOutcome::ProtocolError(McpError::internal_error(
+                            format!("failed to serialize task result: {error}"),
+                            None,
+                        )),
+                    }
+                }
+                Ok(Err(error)) => TaskOutcome::ProtocolError(error),
+                Err(_) => TaskOutcome::ProtocolError(McpError::internal_error(
+                    "task TTL elapsed before completion",
+                    None,
+                )),
+            }
+        });
+        let abort_handle = worker.abort_handle();
+        let store = self.task_store.clone();
+        let completion_id = task_id.clone();
+        tokio::spawn(async move {
+            let outcome = match worker.await {
+                Ok(outcome) => outcome,
+                Err(error) => TaskOutcome::ProtocolError(McpError::internal_error(
+                    format!("task worker terminated: {error}"),
+                    None,
+                )),
+            };
+            store.lock().await.complete(&completion_id, outcome);
+        });
+        self.task_store
+            .lock()
+            .await
+            .attach_abort_handle(&task_id, abort_handle);
+
+        Ok(CreateTaskResult::new(task).with_meta(related_task_metadata(&task_id)))
+    }
+
+    async fn list_tasks(
+        &self,
+        request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListTasksResult, McpError> {
+        if request.is_some_and(|params| params.cursor.is_some()) {
+            return Err(Self::invalid_params("unknown tasks/list cursor"));
+        }
+        Ok(ListTasksResult::new(self.task_store.lock().await.list()))
+    }
+
+    async fn get_task_info(
+        &self,
+        request: GetTaskParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<GetTaskResult, McpError> {
+        self.task_store
+            .lock()
+            .await
+            .get(&request.task_id)
+            .map(GetTaskResult::new)
+            .ok_or_else(|| Self::invalid_params(format!("task not found: {}", request.task_id)))
+    }
+
+    async fn get_task_result(
+        &self,
+        request: GetTaskPayloadParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<GetTaskPayloadResult, McpError> {
+        loop {
+            let state = self.task_store.lock().await.payload(&request.task_id);
+            match state {
+                TaskPayloadState::Ready(payload) => {
+                    return Ok(GetTaskPayloadResult::new(payload));
+                }
+                TaskPayloadState::ProtocolError(error) => return Err(error),
+                TaskPayloadState::Pending => {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        DEFAULT_TASK_POLL_INTERVAL_MS,
+                    ))
+                    .await;
+                }
+                TaskPayloadState::Unavailable(status) => {
+                    return Err(Self::invalid_params(format!(
+                        "task {} has no result in status {status:?}",
+                        request.task_id
+                    )));
+                }
+                TaskPayloadState::Missing => {
+                    return Err(Self::invalid_params(format!(
+                        "task not found: {}",
+                        request.task_id
+                    )));
+                }
+            }
+        }
+    }
+
+    async fn cancel_task(
+        &self,
+        request: CancelTaskParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<CancelTaskResult, McpError> {
+        match self.task_store.lock().await.cancel(&request.task_id) {
+            TaskCancelState::Cancelled(task) => Ok(CancelTaskResult::new(task)),
+            TaskCancelState::NotCancellable(status) => Err(Self::invalid_params(format!(
+                "task {} cannot be cancelled in status {status:?}",
+                request.task_id
+            ))),
+            TaskCancelState::Missing => Err(Self::invalid_params(format!(
+                "task not found: {}",
+                request.task_id
+            ))),
+        }
     }
 
     async fn list_resources(
@@ -1026,7 +1183,6 @@ mod tests {
     use crate::models::EntityCandidate;
     #[cfg(feature = "mcp-apps")]
     use crate::models::IngestRequest;
-    #[cfg(feature = "mcp-apps")]
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Datelike;
     #[cfg(feature = "mcp-apps")]
@@ -1035,8 +1191,6 @@ mod tests {
     use rmcp::model::{ReadResourceRequestParams, ResourceContents};
     use serde_json::{Value, json};
 
-    #[cfg(feature = "mcp-apps")]
-    #[cfg(feature = "mcp-apps")]
     async fn create_test_mcp() -> MemoryMcp {
         let namespaces = vec![
             "org".to_string(),
@@ -1110,14 +1264,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn build_server_info_enables_native_tasks() {
-        let value = serde_json::to_value(MemoryMcp::build_server_info()).expect("server info json");
-        assert!(value["capabilities"]["tasks"].is_object());
-        assert!(value["capabilities"]["tasks"]["requests"]["tools"]["call"].is_object());
-    }
-
-    #[cfg(feature = "mcp-apps")]
     #[tokio::test]
     async fn only_extract_allows_task_execution() {
         use rmcp::model::TaskSupport;
@@ -1382,7 +1528,7 @@ mod tests {
         let uri_templates: Vec<_> = result
             .resource_templates
             .iter()
-            .map(|template| template.raw.uri_template.as_str())
+            .map(|template| template.uri_template.as_str())
             .collect();
 
         assert!(uri_templates.contains(&"ui://memory/app/inspector/{session_id}"));

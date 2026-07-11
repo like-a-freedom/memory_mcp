@@ -231,7 +231,7 @@ mod tests {
             ],
             || {
                 let config = NerConfig::from_env().expect("default NER config");
-                assert_eq!(config.batch_size, 4);
+                assert_eq!(config.batch_size, 1);
                 assert_eq!(config.max_batch_tokens, 1536);
                 assert_eq!(config.max_concurrency, 1);
             },

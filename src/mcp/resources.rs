@@ -1,8 +1,6 @@
 //! Resource URI helpers and catalog entries for MCP Apps.
 #![cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 
-#[cfg(feature = "mcp-apps")]
-use rmcp::model::{AnnotateAble, RawResource, RawResourceTemplate};
 use rmcp::model::{Resource, ResourceTemplate};
 use serde_json::json;
 
@@ -32,17 +30,15 @@ pub(crate) fn app_catalog_resources() -> Vec<Resource> {
     #[cfg(feature = "mcp-apps")]
     {
         let mut resources = vec![
-            RawResource::new(APPS_INDEX_URI, "Memory Apps")
+            Resource::new(APPS_INDEX_URI, "Memory Apps")
                 .with_description("Catalog of public MCP Apps and their resource contracts.")
-                .with_mime_type("application/json")
-                .no_annotation(),
+                .with_mime_type("application/json"),
         ];
 
         resources.extend(PUBLIC_APPS.into_iter().map(|(app, description)| {
-            RawResource::new(app_root_uri(app), format!("Memory App: {app}"))
+            Resource::new(app_root_uri(app), format!("Memory App: {app}"))
                 .with_description(description)
                 .with_mime_type("application/json")
-                .no_annotation()
         }));
 
         resources
@@ -61,7 +57,7 @@ pub(crate) fn app_resource_templates() -> Vec<ResourceTemplate> {
         PUBLIC_APPS
             .into_iter()
             .map(|(app, description)| {
-                RawResourceTemplate::new(
+                ResourceTemplate::new(
                     app_session_uri_template(app),
                     format!("Memory App Session: {app}"),
                 )
@@ -69,7 +65,6 @@ pub(crate) fn app_resource_templates() -> Vec<ResourceTemplate> {
                     "{description} Open a session with `open_app`, then read the concrete session URI or use this template for discovery."
                 ))
                 .with_mime_type("text/html;profile=mcp-app")
-                .no_annotation()
             })
             .collect()
     }
@@ -217,7 +212,7 @@ mod tests {
         let resources = app_catalog_resources();
         let uris: Vec<_> = resources
             .iter()
-            .map(|resource| resource.raw.uri.as_str())
+            .map(|resource| resource.uri.as_str())
             .collect();
 
         assert!(uris.contains(&APPS_INDEX_URI));
@@ -234,11 +229,11 @@ mod tests {
         let templates = app_resource_templates();
         let uris: Vec<_> = templates
             .iter()
-            .map(|template| template.raw.uri_template.as_str())
+            .map(|template| template.uri_template.as_str())
             .collect();
         let mime_types: Vec<_> = templates
             .iter()
-            .map(|template| template.raw.mime_type.as_deref())
+            .map(|template| template.mime_type.as_deref())
             .collect();
 
         assert!(uris.contains(&"ui://memory/app/inspector/{session_id}"));

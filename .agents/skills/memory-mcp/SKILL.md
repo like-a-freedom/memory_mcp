@@ -1,6 +1,6 @@
 ---
 name: memory-mcp
-description: 'Work with Memory MCP server for persistent agent memory. Use when storing episodes, extracting entities/facts, resolving aliases, assembling context, or managing knowledge provenance. Triggers: "ingest content", "extract entities", "resolve entity", "assemble context", "invalidate fact", "memory operations", "knowledge graph", "bi-temporal queries". All tool arguments are flat snake_case; do not use payload wrappers.'
+description: 'Manages persistent agent memory via the Memory MCP server: storing episodes, extracting entities and facts, resolving entity aliases, assembling ranked context for a query, explaining fact provenance, and invalidating outdated facts. Use when the user asks to "ingest content", "extract entities", "resolve entity", "assemble context", "invalidate fact", "explain a fact", or mentions "memory operations", "knowledge graph", or "bi-temporal queries". All tool arguments are flat snake_case; payload wrappers and camelCase keys are rejected.'
 argument-hint: 'Describe the memory operation (ingest, extract, resolve, assemble_context, explain, invalidate)'
 user-invocable: true
 disable-model-invocation: false
@@ -8,20 +8,40 @@ disable-model-invocation: false
 
 # Memory MCP Operations
 
-## When to Use
+All tools return `ToolResponse<T>` with fields: `status`, `result`, `guidance` (read this — it tells you what to do next), `has_more`, `total_count`, `next_offset`. All parameter keys are flat snake_case. CamelCase and `payload` wrappers are rejected.
 
-- Store source material (emails, documents, conversations) as episodes
-- Extract structured entities and facts from content
-- Resolve ambiguous entity names to canonical identifiers
-- Retrieve relevant context for queries with temporal filtering
-- Explain provenance of retrieved facts
-- Invalidate outdated facts while preserving audit trail
+**Rejected:**
+```
+// WRONG — nested payload, camelCase
+mcp_memory-mcp_ingest({ payload: { sourceType: "email", sourceId: "x" } })
+```
 
-## Core Workflow
+**Correct:**
+```
+mcp_memory-mcp_ingest({ source_type: "email", source_id: "x", content: "...", t_ref: "2026-03-27T10:00:00Z" })
+```
 
-### 1. Ingest Episodes
+## Common workflow
 
-**Purpose:** Store raw source material before extraction.
+For a full capture-to-retrieval cycle, follow in order:
+
+```
+Memory Progress:
+
+Step 1: ingest raw content → get episode_id
+Step 2: extract entities/facts from episode_id
+Step 3 (optional): resolve any ambiguous entity names
+Step 4: assemble_context for the user's query
+Step 5 (optional): explain context items for citations
+```
+
+Skip steps 1-2 if the caller already has an `episode_id` or wants to query existing memory directly with `assemble_context`.
+
+## Tools
+
+### ingest
+
+Store raw source material as an episode.
 
 ```
 mcp_memory-mcp_ingest({
@@ -30,44 +50,54 @@ mcp_memory-mcp_ingest({
    content: "raw text",
    t_ref: "2026-03-27T10:00:00Z",
    scope: "team"
-   // optional: project, t_ingested, visibility_scope, policy_tags
 })
 ```
 
-**Required:** `source_type`, `source_id`, `content`, `t_ref`, `scope`.
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `source_type` | yes | — | e.g. `"email"`, `"document"`, `"tfs_work_item"` |
+| `source_id` | yes | — | unique within source_type |
+| `content` | yes | — | raw text |
+| `t_ref` | yes | — | ISO 8601 |
+| `scope` | no | `"org"` | see Scope section |
+| `project` | no | — | project tag for scoped retrieval |
+| `t_ingested` | no | now | override ingestion timestamp |
+| `visibility_scope` | no | same as `scope` | |
+| `policy_tags` | no | `[]` | |
 
-**Optional:** `project`, `t_ingested`, `visibility_scope`, `policy_tags`.
+Returns `episode_id`. Guidance: call `extract` next.
 
-**Returns:** `episode_id` — use for subsequent extraction.
+### extract
 
-**Guidance:** Call `extract` next to derive entities and facts.
+Transform episodes into structured knowledge. Two modes:
 
-### 2. Extract Entities and Facts
-
-**Purpose:** Transform episodes into structured knowledge.
+- **By episode_id** — searches all configured namespaces to find the episode. Scope is not used.
+- **By inline content** — ingests first, then extracts. Scope determines namespace (defaults to `"org"`).
 
 ```
-mcp_memory-mcp_extract({
-   episode_id: "episode:abc123"
-})
+mcp_memory-mcp_extract({ episode_id: "episode:abc123" })
 ```
 
-**Returns:** `ExtractResult` with:
-- `entities`: extracted people, companies, technologies
-- `facts`: promises, metrics, decisions
-- `links`: relationships between entities
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `episode_id` | one of these | — | |
+| `content` | or this | — | inline text |
+| `text` | or this | — | alias for `content` |
+| `source_type` | no | `"ad-hoc"` | inline mode only |
+| `source_id` | no | content hash | inline mode only |
+| `t_ref` | no | now | inline mode only |
+| `scope` | no | `"org"` | inline mode only |
+| `zero_shot_labels` | no | — | custom GLiNER entity labels |
 
-**Guidance:** Resolve canonical entities for ambiguous names before creating manual links. The tool also accepts inline `content` or `text` plus optional `source_type`, `source_id`, `t_ref`, `scope`, `project`, and `zero_shot_labels`.
+Validation: exactly one input source. Both `content`+`text`, both `episode_id`+content, or neither → error.
 
-When the client supports MCP Tasks, prefer task-based invocation for `extract` with
-local GLiNER or long documents. The tool is task-optional: legacy clients may call it
-synchronously, while task-capable clients receive a native MCP task and use
-`tasks/get` followed by `tasks/result`. Do not invent a `job_id` argument or call a
-separate polling tool.
+Returns `ExtractResult`: `episode_id`, `entities` (entity_id, type, canonical_name), `facts` (fact_id, type), `links` (entity_id, episode_id), `warnings` (contradiction alerts).
 
-### 3. Resolve Entity Aliases
+Task-optional: task-capable clients can use `tasks/call` for async execution, then `tasks/get` + `tasks/result`.
 
-**Purpose:** Get canonical ID for names with multiple variants.
+### resolve
+
+Get canonical entity ID for a name with variants.
 
 ```
 mcp_memory-mcp_resolve({
@@ -77,265 +107,114 @@ mcp_memory-mcp_resolve({
 })
 ```
 
-**Returns:** `entity_id` — use for linking facts.
+| Field | Required | Default |
+|-------|----------|---------|
+| `entity_type` | yes | — |
+| `canonical_name` | yes | — |
+| `aliases` | no | `[]` |
 
-**Guidance:** Use this `entity_id` when linking facts or relationships.
+Returns `entity_id` (format: `entity:{type}:{snake_case_name}`). Resolution: exact normalized match → alias match → fuzzy match (Levenshtein ≥ 0.85) → create new.
 
-### 4. Assemble Context
+### assemble_context
 
-**Purpose:** Retrieve ranked, relevant facts for a query.
+Retrieve ranked facts for a query.
 
 ```
 mcp_memory-mcp_assemble_context({
    query: "promises John made",
    scope: "org",
-   as_of: "2026-01-20T00:00:00Z",
    budget: 10,
    fact_types: ["promise"]
 })
 ```
 
-**Returns:** Ranked `AssembledContextItem[]` with:
-- `content`: fact text
-- `quote`: source snippet
-- `source_episode`: provenance reference
-- `confidence`: relevance score
-- `rationale`: why this was included
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `query` | yes | — | |
+| `scope` | yes | — | |
+| `project` | no | — | restrict to project |
+| `fact_types` | no | `[]` | filter: `"note"`, `"decision"`, `"metric"`, `"promise"`, `"experience"` |
+| `as_of` | no | now | point-in-time snapshot |
+| `budget` | no | `5` | max facts |
+| `view_mode` | no | — | `"timeline"` for chronological sort |
+| `window_start` | no | — | valid time lower bound |
+| `window_end` | no | — | valid time upper bound |
 
-**Guidance:** Use these items directly in reasoning or pass to `explain` for citations. Optional filters include `fact_types`, `project`, `view_mode`, `window_start`, and `window_end`.
+Returns `AssembledContextItem[]`: `fact_id`, `content`, `quote`, `source_episode`, `confidence`, `rationale`, `retrieval_tier`, `provenance`.
 
-### 5. Explain Provenance
+### explain
 
-**Purpose:** Get citation-ready source snippets.
+Get citation-ready source snippets for context items.
 
 ```
 mcp_memory-mcp_explain({
    context_items: JSON.stringify([
-      {
-         fact_id: "fact:xyz...",
-         source_episode: "episode:abc...",
-         quote: "I'll have the MVP ready by this Friday"
-      }
+      { fact_id: "fact:xyz", source_episode: "episode:abc", quote: "I'll have the MVP ready by Friday" }
    ])
 })
 ```
 
-**Returns:** `ExplainItem[]` with:
-- Full source quotes
-- Episode metadata
-- Ready-to-cite text
+`context_items` is a JSON array string. Items may be snake_case objects or plain source ID strings (`"episode:abc"`). Legacy camelCase keys are rejected.
 
-**Guidance:** `context_items` must be a JSON array string; items may be full context objects with snake_case keys or plain source ID strings. Use these citations directly in the final response.
+Returns `ExplainItem[]`: `fact_id`, `content`, `quote`, `source_episode`, `scope`, `t_ref`, `t_ingested`, `all_sources` (provenance lineage), `graph_insights`, `fact_age_days`, `decayed_confidence`.
 
-### 6. Invalidate Facts
+### invalidate
 
-**Purpose:** Mark facts as outdated while preserving history.
+Mark a fact as outdated while preserving audit trail. Facts are immutable — no delete exists.
 
 ```
 mcp_memory-mcp_invalidate({
-   fact_id: "fact:old_decision...",
-   reason: "Decision reversed: new timeline approved",
+   fact_id: "fact:old_decision",
+   reason: "Decision reversed",
    t_invalid: "2026-01-20T00:00:00Z"
 })
 ```
 
-**Returns:** Confirmation message.
+All fields required. Returns confirmation.
 
-**Guidance:** Re-run `assemble_context` with fresh `as_of` to confirm fact is no longer active.
+## Scope and Namespace
 
-## Common Patterns
+Scopes map to SurrealDB namespaces. The mapping is fixed:
 
-### Pattern: New Document Ingestion
+| Scope | Resolves to namespace | Notes |
+|-------|----------------------|-------|
+| `personal` | `personal` | |
+| `team` | `team` → `org` | falls back to `org` |
+| `org` | `org` | default for ingest/extract |
+| `private-domain` | `private-domain` → `private` | |
 
-```
-1. mcp_memory-mcp_ingest({ source_type: "document", source_id: "doc-123", content: "...", t_ref: "2026-03-27T10:00:00Z", scope: "team" })
-   → Returns episode_id
+Case-insensitive. `SURREALDB_NAMESPACES` must contain at least one namespace from the resolution chain for each scope you use. If no match → validation error.
 
-2. mcp_memory-mcp_extract({ episode_id: "episode:..." })
-   → Returns entities, facts, links
+**Rule:** use the most restrictive scope that fits.
 
-3. For each ambiguous entity:
-   mcp_memory-mcp_resolve({ entity_type: "person", canonical_name: "Alice Smith", aliases: ["A. Smith", "Alice S."] })
-   → Returns entity_id
+## Entity Classification
 
-4. Use entity_ids in subsequent fact linking
-```
+The classifier runs in priority order:
 
-### Pattern: Query with Context Assembly
+1. **company** — name contains: Corp, Inc, Ltd, LLC, GmbH, AG, SA, PLC, Company, Group, Systems, Technologies, Solutions, Labs, etc.
+2. **event** — contains: Conference, Summit, Meetup, Hackathon, Workshop, Festival, etc.
+3. **location** — contains: City, County, State, Province, Country, District; OR is in gazetteer (~130 known locations)
+4. **person** — multi-word (2+ tokens), not matching above
+5. **technology** — single-word CamelCase (starts uppercase, contains another uppercase)
+6. **unknown** — fallback
 
-```
-1. mcp_memory-mcp_assemble_context({
-     query: "What did Alice promise about the API deadline?",
-     scope: "team",
-     as_of: "2026-03-27T12:00:00Z",
-     budget: 10
-   })
-   → Returns ranked context items
+**Normalization:** NFKC → lowercase → whitespace collapse. Lookups are case-insensitive.
 
-2. mcp_memory-mcp_explain({ context_items: JSON.stringify([...context items...]) })
-   → Returns citation-ready quotes
-
-3. Use citations in final response
-```
-
-### Pattern: Historical Query
-
-```
-1. mcp_memory-mcp_assemble_context({
-       query: "What was the status of Project X in January?",
-       scope: "org",
-       as_of: "2026-01-31T23:59:59Z",  // End of January
-       window_start: "2026-01-01T00:00:00Z",
-       window_end: "2026-01-31T23:59:59Z"
-    })
-   → Returns facts valid during that period
-```
-
-## Scope Management
-
-| Scope | Use Case | Access Control |
-|-------|----------|----------------|
-| `personal` | Private notes, individual tasks | Only owner |
-| `team` | Team decisions, shared projects | Team members |
-| `org` | Company-wide policies, announcements | All org members |
-| `private-domain` | Restricted content (e.g., HR) | Domain-specific ACL |
-
-**Best Practice:** Always use the most restrictive scope that fits the content.
-
-## Entity Resolution
-
-### Automatic Classification
-
-The system classifies entities by naming patterns:
-
-| Pattern | Type | Examples |
-|---------|------|----------|
-| Multi-word names | `person` | "Alice Smith", "Иван Петров" |
-| CamelCase single-word | `technology` | "PostgreSQL", "Kubernetes" |
-| Company suffixes | `company` | "Acme Corp", "Globex Inc" |
-| Event indicators | `event` | "Tech Summit", "Hackathon 2026" |
-| Location gazetteer | `location` | "San Francisco", "Moscow" |
-
-### Normalization
-
-All entity names and aliases are normalized at write time:
-- Lowercase conversion
-- Whitespace trimming and collapse
-- Unicode-aware (supports Cyrillic, Latin, etc.)
-
-**Implication:** Lookups are case-insensitive and whitespace-tolerant.
-
-## Anti-Patterns
-
-### ❌ Don't: Retrieve before storing
-
-```
-// WRONG: Trying to assemble context without prior ingestion
-assemble_context(query="What did we decide about X?")
-→ Returns empty or irrelevant results
-```
-
-**Fix:** Ingest relevant documents first, then query.
-
-### ❌ Don't: Use wrong scope
-
-```
-// WRONG: Storing team decisions in personal scope
-ingest(source_type="meeting", scope="personal", content="Team decided to use Rust...")
-→ Team members cannot retrieve this decision
-```
-
-**Fix:** Use `scope="team"` for shared decisions.
-
-### ❌ Don't: Skip entity resolution
-
-```
-// WRONG: Creating facts with raw names
-extract(episode_id=...) → entity: "A. Smith"
-// Later query uses "Alice Smith" → no match
-```
-
-**Fix:** Resolve aliases to canonical IDs before linking.
-
-### ❌ Don't: Delete facts directly
-
-```
-// WRONG: No delete operation exists
-// Facts are immutable; use invalidation instead
-```
-
-**Fix:** Use `invalidate` with reason and timestamp to preserve audit trail.
+**Resolution:** exact normalized name → alias match → fuzzy (Levenshtein ≥ 0.85) → create new entity.
 
 ## Bi-Temporal Model
 
-Memory MCP tracks two time dimensions:
+- **Valid time (`t_ref`)**: when the fact was true in reality
+- **Transaction time (`t_ingested`)**: when recorded in memory
 
-1. **Valid Time (`t_ref`)**: When the fact was true in the real world
-2. **Transaction Time (`t_ingested`)**: When the fact was recorded in the system
-
-### Query Implications
-
-- `as_of`: Query point-in-time snapshot (both dimensions considered)
-- `window_start/window_end`: Filter by valid time range
-- Invalidated facts remain queryable for historical analysis
+`as_of` queries both dimensions. Invalidated facts remain queryable for history. Fact types: `note`, `decision`, `metric`, `promise`, `experience`.
 
 ## Error Recovery
 
-| Error | Cause | Recovery |
-|-------|-------|----------|
-| `Invalid t_ref format` | Non-ISO 8601 datetime | Use format: `2026-03-27T10:00:00Z` |
-| `Invalid t_invalid format` | Non-ISO 8601 datetime | Same as above |
-| `No input` | Missing both `episode_id` and content | Provide one of them |
-| `Invalid params` | Missing required fields | Check required parameters per tool |
-
-## Response Fields
-
-### ToolResponse Structure
-
-All tools return a consistent wrapper:
-
-```json
-{
-  "status": "success" | "partial",
-  "result": <tool-specific data>,
-  "guidance": "Next step suggestion",
-  "has_more": true | false,
-  "total_count": 42,
-  "next_offset": null
-}
-```
-
-**Key fields:**
-- `guidance`: Always read this — it tells you what to do next
-- `has_more`: Pagination flag for large result sets
-- `total_count`: Total records available
-
-## Integration with Agents
-
-### Memory Agent Pattern
-
-```
-Product Manager Agent (PDM)
-├─ Strategy & roadmapping
-├─ Stakeholder management
-└─ Delegates memory ops via runSubagent("Memory Agent", ...)
-   │
-   ▼
-Memory Agent (Specialized)
-├─ Ingest episodes
-├─ Extract entities/facts
-├─ Resolve aliases
-├─ Assemble context
-└─ Manage invalidations
-```
-
-### Subagent Invocation
-
-```
-runSubagent(
-  agentName: "Memory Agent",
-  prompt: "Ingest the meeting notes from today's standup and extract action items"
-)
-```
-
-**Important:** Always use the exact agent name `"Memory Agent"` (not `"memory"`) to avoid "requested agent not found" errors.
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `no namespace configured for scope X` | `SURREALDB_NAMESPACES` missing required namespace | Add namespace to config (see Scope section) |
+| `Invalid t_ref format` | Non-ISO 8601 | Use `2026-03-27T10:00:00Z` |
+| `episode_id not found` | Episode doesn't exist or wrong namespace | Check scope, ensure episode was ingested |
+| `No input` | Missing both `episode_id` and content | Provide exactly one |
+| `Invalid params` | Missing required fields or camelCase keys | Use snake_case, check required params |

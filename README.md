@@ -102,19 +102,16 @@ cargo install --path .
 ### Run
 
 ```bash
-cargo run
+cargo run --release -- serve
+# or
+make serve-release
 ```
 
 For local NER workloads, run the MCP server from a release build. The development
 profile leaves the `memory_mcp` crate at `opt-level = 0`; dependency code is optimized,
 but GLiNER window orchestration and span enumeration are not. Performance claims and
-timeout investigations are valid only for release builds.
-
-```bash
-cargo run --release -- serve
-# or
-make serve-release
-```
+timeout investigations are valid only for release builds. Use `cargo run` only for
+development and functional debugging.
 
 The binary uses stdio transport, which makes it suitable for local MCP client integration.
 
@@ -184,7 +181,7 @@ Now any file dropped or saved in `~/projects/atlas/inbox/` is automatically inge
 
 ```bash
 # Drop an email export
-cp ~/Downloads/kaspersky_july_2025.eml ~/projects/atlas/inbox/
+cp ~/Downloads/acme_july_2025.eml ~/projects/atlas/inbox/
 
 # Save a requirements spec
 echo "# Air-gapped deployment requirement..." > ~/projects/atlas/inbox/airgap_req.md
@@ -392,10 +389,36 @@ Configuration is loaded from environment variables.
 | `NER_MODEL_DIR` | Optional local cache directory for `local-gliner` |
 | `NER_LABELS` | Comma-separated runtime labels for `local-gliner` |
 | `NER_THRESHOLD` | Confidence threshold for `local-gliner` acceptance |
-| `NER_BATCH_SIZE` | Max windows per transformer forward pass (default: 4) |
+| `NER_BATCH_SIZE` | Max windows per transformer forward pass (CPU default: 1; increase only after workload-specific benchmarking) |
 | `NER_MAX_BATCH_TOKENS` | Max padded tokens per batch (default: 1536) |
 | `NER_MAX_CONCURRENCY` | Concurrent local NER inference limit (default: 1) |
 | `NER_DEVICE` | Device: `cpu`, `metal`, or `auto` (default: `cpu`) |
+
+### Scopes and namespaces
+
+Every tool call that reads or writes data uses a **scope** to determine which SurrealDB **namespace** to operate in. The mapping is fixed:
+
+| Scope | Required namespace(s) | Notes |
+|-------|----------------------|-------|
+| `personal` | `personal` | |
+| `team` | `team` or `org` | Falls back to `org` if `team` is not configured |
+| `org` | `org` | Default scope for `ingest` and `extract` (inline content) |
+| `private-domain` | `private-domain` or `private` | |
+
+**`SURREALDB_NAMESPACES`** is the comma-separated list of SurrealDB namespace names available to the server. Every scope you use in tool calls must resolve to at least one namespace in this list.
+
+**Common mistake:** If `SURREALDB_NAMESPACES=mycompany` and you call `extract` with `scope: "org"`, the lookup fails because namespace `org` is not in the list. Either:
+
+1. Add the required namespace to your config:
+   ```
+   SURREALDB_NAMESPACES=mycompany,org
+   ```
+2. Or use a scope that matches a configured namespace (but scopes are fixed — you cannot define custom scopes).
+
+**How `extract` resolves scope:**
+
+- **With `episode_id`**: The server searches **all** configured namespaces to find the episode. The `scope` parameter is ignored — namespace resolution is not needed because the episode already exists in some namespace.
+- **With inline `content`**: The `scope` parameter is used (defaults to `"org"`). The content is first ingested into the namespace resolved from that scope, then extracted.
 
 ### Example
 
@@ -666,20 +689,30 @@ make eval-ner-latency
 ```
 
 Requires the local GLiNER model at `tests/models/ner/urchade--gliner_multi-v2.1/`.
-See `docs/performance/NER_PERFORMANCE.md` for the full benchmark protocol.
+On the measured Apple M2 Pro CPU profile, vectorized span scoring is 20.6–23.8×
+faster and the complete 520-word `extract_candidates` call is 3.45–3.53× faster.
+`NER_BATCH_SIZE=1` is the measured CPU default; larger batches require a
+workload-specific benchmark. See `docs/performance/NER_PERFORMANCE.md` for raw
+samples, contention results, and limitations.
 
 ### MCP Tasks (optional)
 
 The server advertises MCP Tasks capability (`extract` is task-optional). Task-capable
-clients can invoke `extract` through `tasks/call` for async execution, then poll
-`tasks/get` and retrieve results via `tasks/result`. Legacy clients continue to call
-`extract` synchronously with no changes required.
+clients add task metadata to the ordinary `tools/call` request for `extract`, then poll
+`tasks/get` and retrieve the payload through `tasks/result`; `tasks/list` and
+`tasks/cancel` are also supported. Legacy clients continue to call `extract`
+synchronously with no changes required. The server bounds task retention to 64 active
+and 1024 retained tasks, with an accepted TTL of 1 second to 1 hour.
+
+CPU is the production default. Metal remains an experimental, explicit opt-in until its
+candidate parity, latency, contention, and memory gates are recorded for the deployment
+hardware.
 
 ```bash
 # Run with Metal GPU (requires --features metal)
 NER_DEVICE=metal cargo run --release --features metal -- serve
 
-# Auto-detect (Metal with CPU fallback)
+# Auto tries Metal and falls back to CPU; do not make it a deployment default before gating
 NER_DEVICE=auto cargo run --release --features metal -- serve
 ```
 

@@ -34,24 +34,58 @@ suite=eval_extraction total=9 passed=9 entity_precision=0.57 entity_recall=1.00 
 
 ## NER Latency (local GLiNER, CPU)
 
-> To be filled after first benchmark run with `make eval-ner-latency`.
+Measured on 2026-07-11. See `docs/performance/NER_PERFORMANCE.md` for raw samples,
+methodology, stage telemetry, batching comparison, and limitations.
 
 ```json
 {
+  "baseline_commit": "32db8f99f44a",
+  "final_revision": "audited_working_tree_2026-07-11",
   "provider": "gliner",
+  "model": "urchade/gliner_multi-v2.1",
   "device": "cpu",
-  "batch_size": 4,
+  "batch_size": 1,
   "max_batch_tokens": 1536,
   "max_concurrency": 1,
   "iterations": 10,
-  "content_words": 640,
-  "span_scoring_p50_ms": null,
-  "span_scoring_p95_ms": null,
-  "ner_p50_ms": null,
-  "ner_p95_ms": null,
-  "four_client_wall_ms": null,
-  "four_client_per_request_p95_ms": null,
-  "candidates": []
+  "one_window": {
+    "content_words": 104,
+    "baseline_p50_ms": 1622.121,
+    "baseline_p95_ms": 1866.864,
+    "final_p50_ms": 446.138,
+    "final_p95_ms": 486.088,
+    "speedup_p50": 3.64,
+    "speedup_p95": 3.84
+  },
+  "multi_window": {
+    "content_words": 520,
+    "window_count": 3,
+    "baseline_p50_ms": 8791.471,
+    "baseline_p95_ms": 9369.734,
+    "final_p50_ms": 2546.692,
+    "final_p95_ms": 2653.017,
+    "speedup_p50": 3.45,
+    "speedup_p95": 3.53
+  },
+  "vectorized_span_scoring_multi_window": {
+    "baseline_p50_ms": 6120,
+    "baseline_p95_ms": 6743,
+    "final_p50_ms": 257,
+    "final_p95_ms": 327,
+    "speedup_p50": 23.8,
+    "speedup_p95": 20.6
+  },
+  "candidate_parity": true,
+  "contention": {
+    "clients": 4,
+    "rounds": 3,
+    "wall_p50_ms": 10228.698,
+    "wall_p95_ms": 10392.037,
+    "per_request_p95_ms": 10392.007,
+    "throughput_requests_per_s": 0.391
+  },
+  "peak_rss_bytes": null,
+  "full_extract_from_episode": null
 }
 ```
 

@@ -62,68 +62,98 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires GLiNER model weights — run with --ignored"]
+    #[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
     fn batched_forward_matches_unbatched_hidden_states_with_padding() {
-        let model_dir = std::path::PathBuf::from(
-            std::env::var("GLINER_MODEL_DIR").unwrap_or_else(|_| "models/nicegui_default".into()),
-        );
+        // Batched f32 GEMM/softmax kernels use different reduction shapes from
+        // batch=1. Keep this CPU diagnostic tight while treating exact decoded
+        // candidates as the hard quality gate.
+        const ATOL: f32 = 5e-5;
+        const RTOL: f32 = 1e-4;
+
+        let model_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/models/ner/urchade--gliner_multi-v2.1");
+        let labels = vec![
+            "person".into(),
+            "company".into(),
+            "location".into(),
+            "product".into(),
+            "event".into(),
+            "technology".into(),
+        ];
         let extractor = crate::service::entity_extraction::gliner::GlinerEntityExtractor::new(
             &model_dir,
-            vec!["person".into(), "organization".into(), "location".into()],
+            labels.clone(),
             crate::config::DEFAULT_NER_THRESHOLD,
         )
-        .unwrap();
-        let text = "Alice Johnson works at OpenAI in San Francisco and previously joined Microsoft Research.";
-        let labels = vec!["person".into(), "organization".into(), "location".into()];
+        .expect("load local GLiNER model");
         let prompt_words = extractor.build_prompt_words_for_labels(&labels);
-        let _prompt_word_count = prompt_words.len();
-        let text_words =
-            crate::service::entity_extraction::gliner::GlinerEntityExtractor::split_text_words(
-                text,
-            );
-        let mut windows = Vec::new();
-        let mut window_start = 0;
-        while window_start < text_words.len() {
+
+        let encode = |text: &str| {
+            let text_words =
+                crate::service::entity_extraction::gliner::GlinerEntityExtractor::split_text_words(
+                    text,
+                );
             let (encoding, window_end) = extractor
-                .encode_window(&prompt_words, &text_words, window_start)
-                .unwrap();
-            windows.push(EncodedWindow {
+                .encode_window(&prompt_words, &text_words, 0)
+                .expect("encode GLiNER window");
+            EncodedWindow {
                 input_ids: encoding.get_ids().to_vec(),
                 word_ids: encoding.get_word_ids().to_vec(),
-                window_start,
+                window_start: 0,
                 window_end,
-            });
-            if window_end >= text_words.len() {
-                break;
             }
-            window_start = window_end.saturating_sub(1).max(window_start + 1);
-        }
-        assert!(!windows.is_empty());
-        let sample_indices: Vec<usize> = (0..windows.len())
-            .step_by((windows.len() / 3).max(1))
-            .take(3)
-            .collect();
-        for idx in sample_indices {
-            let unbatched = extractor.run_forward(&windows[idx].input_ids).unwrap();
-            let batched = extractor
-                .run_forward_batch(&[windows[idx].clone()])
-                .unwrap();
-            assert_eq!(unbatched.dims(), batched[0].dims());
-            let unbatched_vec = unbatched.to_vec2::<f32>().unwrap();
-            let batched_vec = batched[0].to_vec2::<f32>().unwrap();
-            let mut max_diff = f32::NEG_INFINITY;
-            for (u_row, b_row) in unbatched_vec.iter().zip(batched_vec.iter()) {
-                for (u_val, b_val) in u_row.iter().zip(b_row.iter()) {
-                    let d = (u_val - b_val).abs();
-                    if d > max_diff {
-                        max_diff = d;
-                    }
-                }
+        };
+
+        let short = encode("Alice Smith joined OpenAI in Moscow.");
+        let long = encode(
+            "Alice Smith joined OpenAI in Moscow and presented Project Atlas using Rust, Kubernetes, PostgreSQL, and Candle at the annual engineering summit.",
+        );
+        assert!(short.input_ids.len() < long.input_ids.len());
+
+        let unbatched = extractor
+            .run_forward(&short.input_ids)
+            .expect("unbatched forward")
+            .to_vec2::<f32>()
+            .expect("unbatched hidden values");
+        let padded_short = extractor
+            .run_forward_batch(&[short, long])
+            .expect("batched forward")
+            .remove(0)
+            .to_vec2::<f32>()
+            .expect("batched hidden values");
+
+        assert_eq!(unbatched.len(), padded_short.len());
+        assert_eq!(
+            unbatched.first().map(Vec::len),
+            padded_short.first().map(Vec::len)
+        );
+        let mut worst_mismatch = None;
+        for (index, (expected, actual)) in unbatched
+            .iter()
+            .flatten()
+            .zip(padded_short.iter().flatten())
+            .enumerate()
+        {
+            assert!(expected.is_finite() && actual.is_finite());
+            let tolerance = ATOL + RTOL * expected.abs();
+            let difference = (expected - actual).abs();
+            if difference > tolerance
+                && worst_mismatch
+                    .as_ref()
+                    .is_none_or(|(_, _, _, _, worst_ratio)| difference / tolerance > *worst_ratio)
+            {
+                worst_mismatch = Some((
+                    index,
+                    *expected,
+                    *actual,
+                    difference,
+                    difference / tolerance,
+                ));
             }
-            assert!(
-                max_diff <= 1e-5,
-                "hidden state max diff {max_diff} exceeded atol 1e-5 at window {idx}"
-            );
         }
+        assert!(
+            worst_mismatch.is_none(),
+            "hidden-state mismatch beyond atol={ATOL} rtol={RTOL}: {worst_mismatch:?}"
+        );
     }
 }

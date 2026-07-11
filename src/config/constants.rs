@@ -21,8 +21,12 @@ pub const DEFAULT_QUERY_LOG_RETENTION_DAYS: u32 = 90;
 /// Default confidence threshold for local NER span acceptance.
 pub const DEFAULT_NER_THRESHOLD: f64 = 0.5;
 
-/// Default batch size for local NER inference.
-pub const DEFAULT_NER_BATCH_SIZE: usize = 4;
+/// Default batch size for local CPU NER inference.
+///
+/// Uneven GLiNER windows make padding overhead larger than the amortized
+/// forward-pass overhead on the supported CPU profile. Larger batches remain
+/// available as an explicit, benchmark-driven override.
+pub const DEFAULT_NER_BATCH_SIZE: usize = 1;
 
 /// Default max padded tokens per NER batch.
 pub const DEFAULT_NER_MAX_BATCH_TOKENS: usize = 1536;

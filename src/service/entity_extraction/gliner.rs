@@ -502,20 +502,39 @@ fn infer_backbone_config_from_model_name(
     }
 }
 
+fn log_selected_device(logger: &crate::logging::StdoutLogger, requested: &str, selected: &str) {
+    logger.log(
+        crate::service::log_event(
+            "ner.device.selected",
+            serde_json::json!({"requested": requested}),
+            serde_json::json!({"selected": selected}),
+            None,
+            None,
+            None,
+        ),
+        crate::logging::LogLevel::Info,
+    );
+}
+
 fn select_device(
     kind: crate::config::NerDeviceKind,
-    _logger: &crate::logging::StdoutLogger,
+    logger: &crate::logging::StdoutLogger,
 ) -> Result<Device, MemoryError> {
     match kind {
-        crate::config::NerDeviceKind::Cpu => Ok(Device::Cpu),
+        crate::config::NerDeviceKind::Cpu => {
+            log_selected_device(logger, "cpu", "cpu");
+            Ok(Device::Cpu)
+        }
         crate::config::NerDeviceKind::Metal => {
             #[cfg(feature = "metal")]
             {
-                Device::new_metal(0).map_err(|err| {
-                    MemoryError::ConfigInvalid(format!(
-                        "failed to initialize Metal NER device: {err}"
-                    ))
-                })
+                Device::new_metal(0)
+                    .inspect(|_| log_selected_device(logger, "metal", "metal"))
+                    .map_err(|err| {
+                        MemoryError::ConfigInvalid(format!(
+                            "failed to initialize Metal NER device: {err}"
+                        ))
+                    })
             }
             #[cfg(not(feature = "metal"))]
             {
@@ -528,7 +547,10 @@ fn select_device(
             #[cfg(feature = "metal")]
             {
                 match Device::new_metal(0) {
-                    Ok(device) => Ok(device),
+                    Ok(device) => {
+                        log_selected_device(logger, "auto", "metal");
+                        Ok(device)
+                    }
                     Err(error) => {
                         logger.log(
                             crate::service::log_event(
@@ -541,12 +563,14 @@ fn select_device(
                             ),
                             crate::logging::LogLevel::Warn,
                         );
+                        log_selected_device(logger, "auto", "cpu");
                         Ok(Device::Cpu)
                     }
                 }
             }
             #[cfg(not(feature = "metal"))]
             {
+                log_selected_device(logger, "auto", "cpu");
                 Ok(Device::Cpu)
             }
         }
@@ -1003,7 +1027,7 @@ impl GlinerEntityExtractor {
             .forward(&word_hidden)
             .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
         let spans_data = self.compute_span_scores(&text_hidden, &label_representations)?;
-        all_spans.extend(self.extract_spans(text, &spans_data, &word_offsets));
+        all_spans.extend(self.extract_spans(text, &spans_data, &word_offsets, labels));
         Ok(())
     }
 
@@ -1032,7 +1056,6 @@ impl GlinerEntityExtractor {
             .map_err(|err| MemoryError::Storage(format!("prompt projection failed: {err}")))
     }
 
-    #[allow(clippy::needless_range_loop)]
     fn compute_span_scores(
         &self,
         text_hidden: &Tensor,
@@ -1099,6 +1122,7 @@ impl GlinerEntityExtractor {
         text: &str,
         spans_data: &[(usize, usize, Vec<f32>)],
         offsets: &[(usize, usize)],
+        labels: &[String],
     ) -> Vec<ScoredSpan> {
         let mut spans = Vec::new();
 
@@ -1119,7 +1143,7 @@ impl GlinerEntityExtractor {
             }
 
             for (label_idx, &score) in scores.iter().enumerate() {
-                if label_idx >= self.labels.len() {
+                if label_idx >= labels.len() {
                     break;
                 }
                 let probability = 1.0_f32 / (1.0_f32 + (-score).exp());
@@ -1128,7 +1152,7 @@ impl GlinerEntityExtractor {
                         start: start_char,
                         end: end_char,
                         text: span_text.to_string(),
-                        label: self.labels[label_idx].clone(),
+                        label: labels[label_idx].clone(),
                         score: probability,
                     });
                 }
@@ -1209,8 +1233,33 @@ impl GlinerEntityExtractor {
             window_start = window_end.saturating_sub(1).max(window_start + 1);
         }
 
-        for range in batching::pack_window_batches(&windows, self.batch_size, self.max_batch_tokens)
-        {
+        let batches =
+            batching::pack_window_batches(&windows, self.batch_size, self.max_batch_tokens);
+        let largest_batch = batches.iter().map(|range| range.len()).max().unwrap_or(0);
+        let max_padded_tokens = batches
+            .iter()
+            .map(|range| {
+                let longest = windows[range.clone()]
+                    .iter()
+                    .map(|window| window.input_ids.len())
+                    .max()
+                    .unwrap_or(0);
+                longest * range.len()
+            })
+            .max()
+            .unwrap_or(0);
+        self.logger.log(
+            build_batching_log_event(
+                windows.len(),
+                batches.len(),
+                largest_batch,
+                max_padded_tokens,
+                self.max_batch_tokens,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
+
+        for range in batches {
             let batch = &windows[range];
             let hidden_rows = self.run_forward_batch(batch)?;
             for (window, hidden) in batch.iter().zip(hidden_rows) {
@@ -1257,6 +1306,30 @@ impl GlinerEntityExtractor {
         prompt.push(SEP_TOKEN.to_string());
         prompt
     }
+
+    async fn acquire_inference_permit(
+        &self,
+    ) -> Result<tokio::sync::OwnedSemaphorePermit, MemoryError> {
+        let (permit, queue_wait) = self
+            .inference_gate
+            .acquire()
+            .await
+            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
+        self.logger.log(
+            crate::service::log_event(
+                "ner.gliner.queue.done",
+                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
+                serde_json::json!({
+                    "available_permits": self.inference_gate.available_permits()
+                }),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
+        Ok(permit)
+    }
 }
 
 impl std::fmt::Debug for GlinerEntityExtractor {
@@ -1275,22 +1348,7 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
-        let (_permit, queue_wait) = self
-            .inference_gate
-            .acquire()
-            .await
-            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
-        self.logger.log(
-            crate::service::log_event(
-                "ner.gliner.queue.done",
-                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
-                serde_json::json!({"available_permits": self.inference_gate.available_permits()}),
-                None,
-                None,
-                None,
-            ),
-            crate::logging::LogLevel::Debug,
-        );
+        let _permit = self.acquire_inference_permit().await?;
         self.extract_inner(content)
     }
 
@@ -1299,22 +1357,7 @@ impl EntityExtractor for GlinerEntityExtractor {
         content: &str,
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
-        let (_permit, queue_wait) = self
-            .inference_gate
-            .acquire()
-            .await
-            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
-        self.logger.log(
-            crate::service::log_event(
-                "ner.gliner.queue.done",
-                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
-                serde_json::json!({"available_permits": self.inference_gate.available_permits()}),
-                None,
-                None,
-                None,
-            ),
-            crate::logging::LogLevel::Debug,
-        );
+        let _permit = self.acquire_inference_permit().await?;
         self.extract_inner_with_labels(content, zero_shot_labels)
     }
 }
@@ -1331,6 +1374,30 @@ pub(crate) fn build_span_scoring_log_event(
             duration,
         ),
         serde_json::json!({"span_count": span_count}),
+        None,
+        None,
+        None,
+    )
+}
+
+pub(crate) fn build_batching_log_event(
+    window_count: usize,
+    batch_count: usize,
+    largest_batch: usize,
+    max_padded_tokens: usize,
+    configured_max_padded_tokens: usize,
+) -> HashMap<String, serde_json::Value> {
+    crate::service::log_event(
+        "ner.gliner.batching.done",
+        serde_json::json!({
+            "window_count": window_count,
+            "configured_max_padded_tokens": configured_max_padded_tokens,
+        }),
+        serde_json::json!({
+            "batch_count": batch_count,
+            "largest_batch": largest_batch,
+            "max_padded_tokens": max_padded_tokens,
+        }),
         None,
         None,
         None,

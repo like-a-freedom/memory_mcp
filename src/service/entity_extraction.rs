@@ -364,4 +364,23 @@ mod tests {
         assert_eq!(event["args"]["text_words"], serde_json::json!(12));
         assert_eq!(event["result"]["span_count"], serde_json::json!(72));
     }
+
+    #[test]
+    fn gliner_batch_event_reports_actual_and_configured_bounds() {
+        let event = crate::service::entity_extraction::gliner::build_batching_log_event(
+            7, 3, 4, 1440, 1536,
+        );
+        assert_eq!(event["op"], serde_json::json!("ner.gliner.batching.done"));
+        assert_eq!(event["args"]["window_count"], serde_json::json!(7));
+        assert_eq!(
+            event["args"]["configured_max_padded_tokens"],
+            serde_json::json!(1536)
+        );
+        assert_eq!(event["result"]["batch_count"], serde_json::json!(3));
+        assert_eq!(event["result"]["largest_batch"], serde_json::json!(4));
+        assert_eq!(
+            event["result"]["max_padded_tokens"],
+            serde_json::json!(1440)
+        );
+    }
 }

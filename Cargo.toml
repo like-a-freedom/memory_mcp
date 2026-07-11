@@ -1,12 +1,12 @@
 [package]
 name = "memory_mcp"
-version = "1.4.1"
+version = "1.5.0"
 edition = "2024"
 resolver = "3"
 license = "MIT"
 
 [dependencies]
-rmcp = { version = "2.1.0", features = ["macros", "transport-io", "server"] }
+rmcp = { version = "2.2.0", features = ["macros", "transport-io", "server"] }
 tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
     "macros",

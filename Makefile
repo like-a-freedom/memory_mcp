@@ -8,7 +8,7 @@ EVAL_LOCOMO = cargo test --test eval_external_retrieval run_locomo_retrieval -- 
 EVAL_EXTRACTION = cargo test --test eval_extraction run_extraction_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_LATENCY = cargo test --test eval_latency run_latency_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 
-.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency
+.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention
 
 eval-baseline:
 	@$(EVAL_RETRIEVAL)
@@ -36,4 +36,7 @@ serve-release:
 	cargo run --release -- serve
 
 eval-ner-latency:
-	TEST_THREADS=1 cargo test --release --test eval_ner_latency run_gliner_latency_eval -- --ignored --exact --nocapture
+	cargo test --locked --release --test eval_ner_latency run_gliner_latency_eval -- --ignored --exact --nocapture --test-threads=1
+
+eval-ner-contention:
+	cargo test --locked --release --test eval_ner_latency run_contention_eval -- --ignored --exact --nocapture --test-threads=1
