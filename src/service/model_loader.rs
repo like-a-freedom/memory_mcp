@@ -163,16 +163,10 @@ pub async fn ensure_model_cached_with_files(
         ))
     })?;
 
-    let api = hf_hub::api::tokio::ApiBuilder::new()
-        .build()
-        .map_err(|e| MemoryError::Storage(format!("failed to init hf-hub api: {e}")))?;
-    let repo = api.model(repo_id.to_string());
-
-    let http = reqwest::Client::builder()
-        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()
-        .map_err(|e| MemoryError::Storage(format!("failed to build http client: {e}")))?;
+    let (owner, name) = hf_hub::split_id(repo_id);
+    let repo = hf_hub::HFClient::new()
+        .map_err(|e| MemoryError::Storage(format!("failed to init hf-hub api: {e}")))?
+        .model(owner, name);
 
     for file_name in required_files {
         let target_path = cache_dir.join(file_name);
@@ -185,11 +179,19 @@ pub async fn ensure_model_cached_with_files(
             continue;
         }
 
-        let url = repo.url(file_name);
         let mut last_err = None;
         for attempt in 1..=MAX_RETRIES {
-            match download_file(&http, &url, &target_path, logger, file_name).await {
-                Ok(bytes) => {
+            match repo
+                .download_file()
+                .filename(*file_name)
+                .local_dir(cache_dir.to_path_buf())
+                .send()
+                .await
+            {
+                Ok(_) => {
+                    let bytes = std::fs::metadata(&target_path)
+                        .map(|metadata| metadata.len())
+                        .unwrap_or_default();
                     log_message(
                         logger,
                         LogLevel::Info,

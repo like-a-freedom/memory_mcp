@@ -1,6 +1,6 @@
 [package]
 name = "memory_mcp"
-version = "1.5.0"
+version = "1.6.0"
 edition = "2024"
 resolver = "3"
 license = "MIT"
@@ -22,14 +22,14 @@ thiserror = "2.0.18"
 async-trait = "0.1.89"
 
 anno = { version = "0.11.0", default-features = false }
-regex = "1.12.4"
-lopdf = "0.43.0"
+regex = "1.13.0"
+lopdf = "0.44.0"
 roxmltree = "0.21.1"
 sha2 = "0.11.0"
 hex = "0.4.3"
 serde_cbor = "0.11.2"
-lru = "0.18.0"
-surrealdb = { version = "3.2.0", features = ["kv-rocksdb", "kv-mem"] }
+lru = "0.18.1"
+surrealdb = { version = "3.2.1", features = ["kv-rocksdb", "kv-mem"] }
 strsim = "0.11.1"
 unicode-normalization = "0.1.25"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
@@ -43,7 +43,7 @@ candle-transformers = { git = "https://github.com/huggingface/candle.git", defau
 tokenizers = { version = "0.23.1", default-features = false, features = [
     "fancy-regex"
 ] }
-hf-hub = { version = "0.5.0", default-features = false, features = ["tokio"] }
+hf-hub = { version = "1.0.0", default-features = false }
 pulp = "0.22.3"
 clap = { version = "4.6", features = ["derive", "env"] }
 notify = { version = "8.2.0", optional = true }
