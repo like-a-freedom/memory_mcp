@@ -52,7 +52,27 @@ jobs:
           cache: true
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        # `metal` is a macOS-only Candle backend.  Keep the Linux gate focused
+        # on the features that are supported by the runner instead of making
+        # `--all-features` try to compile Metal on Ubuntu.
+        run: cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings
+
+  clippy_macos:
+    name: Rust clippy (macOS features)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          components: clippy
+          cache: true
+
+      - name: Run clippy with all features
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   test:
     name: Rust tests
@@ -73,7 +93,7 @@ jobs:
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
-    needs: [fmt, clippy, test]
+    needs: [fmt, clippy, clippy_macos, test]
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60
     permissions:
