@@ -9,7 +9,10 @@ use rmcp::model::{
 };
 use serde_json::{Value, json};
 
+#[cfg(feature = "mcp-apps")]
+use crate::service::apply_ingestion_review_status;
 use crate::service::value_helpers::{json_string, normalized_edge_record};
+use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 use crate::storage::GraphDirection;
 
 use super::super::error::mcp_error;
@@ -45,6 +48,7 @@ pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     }
 }
 
+#[cfg(feature = "mcp-apps")]
 pub(super) async fn update_ingestion_item_statuses(
     service: &MemoryMcp,
     session_id: &str,
@@ -55,29 +59,37 @@ pub(super) async fn update_ingestion_item_statuses(
 ) -> Result<serde_json::Value, ErrorData> {
     let mut payload = session_payload;
     let summary = if let Some(items) = payload.get_mut("items").and_then(Value::as_array_mut) {
-        for item in items.iter_mut() {
-            let matches = item
-                .get("item_id")
-                .and_then(Value::as_str)
-                .is_some_and(|item_id| item_ids.iter().any(|candidate| candidate == item_id));
-            if matches && let Some(object) = item.as_object_mut() {
-                object.insert("status".to_string(), json!(status));
-                if status == "approved" {
-                    object.remove("reason");
-                } else if let Some(r) = reason.as_ref() {
-                    object.insert("reason".to_string(), json!(r));
-                }
-            }
-        }
-        summarize_ingestion_review_items(items)
+        let mut typed_items: Vec<IngestionReviewItem> =
+            serde_json::from_value(Value::Array(items.clone())).map_err(|error| {
+                session::internal_error(format!("invalid ingestion review items: {error}"))
+            })?;
+        let summary =
+            apply_ingestion_review_status(&mut typed_items, item_ids, status, reason.as_deref());
+        *items = serde_json::to_value(&typed_items)
+            .map_err(|error| {
+                session::internal_error(format!("failed to encode ingestion review items: {error}"))
+            })?
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        serde_json::to_value(summary).map_err(|error| {
+            session::internal_error(format!(
+                "failed to encode ingestion review summary: {error}"
+            ))
+        })?
     } else {
-        summarize_ingestion_review_items(&[])
+        serde_json::to_value(IngestionReviewSummary::from_items(&[])).map_err(|error| {
+            session::internal_error(format!(
+                "failed to encode ingestion review summary: {error}"
+            ))
+        })?
     };
     upsert_json_field(&mut payload, "summary", summary.clone());
     let updated = service.replace_session_payload(session_id, payload).await?;
     Ok(updated.payload["summary"].clone())
 }
 
+#[cfg(test)]
 pub(super) fn shallow_merge_object(
     target: &mut serde_json::Map<String, Value>,
     patch: &serde_json::Map<String, Value>,
@@ -87,6 +99,7 @@ pub(super) fn shallow_merge_object(
     }
 }
 
+#[cfg(test)]
 pub(super) fn summarize_ingestion_review_items(items: &[Value]) -> Value {
     let mut pending = 0;
     let mut approved = 0;
@@ -223,8 +236,8 @@ impl MemoryMcp {
     async fn entity_snapshot(&self, namespace: &str, entity_id: &str) -> Result<Value, ErrorData> {
         let record = self
             .service
-            .db_client
-            .select_one(entity_id, namespace)
+            .app_store()
+            .select_entity(entity_id, namespace)
             .await
             .map_err(mcp_error)?;
         let canonical_name = record
@@ -253,8 +266,8 @@ impl MemoryMcp {
             "entity" => {
                 let record = self
                     .service
-                    .db_client
-                    .select_one(target_id, &namespace)
+                    .app_store()
+                    .select_entity(target_id, &namespace)
                     .await
                     .map_err(mcp_error)?;
                 (record, Some(namespace.clone()))
@@ -347,8 +360,8 @@ impl MemoryMcp {
             for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
                 let records = self
                     .service
-                    .db_client
-                    .select_edge_neighbors(namespace, &current, &cutoff_iso, direction)
+                    .app_store()
+                    .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
                     .await
                     .map_err(mcp_error)?;
                 for record in records {
@@ -420,8 +433,8 @@ impl MemoryMcp {
                 for graph_direction in &directions {
                     for record in self
                         .service
-                        .db_client
-                        .select_edge_neighbors(namespace, &node_id, &cutoff_iso, *graph_direction)
+                        .app_store()
+                        .select_graph_neighbors(namespace, &node_id, &cutoff_iso, *graph_direction)
                         .await
                         .map_err(mcp_error)?
                     {

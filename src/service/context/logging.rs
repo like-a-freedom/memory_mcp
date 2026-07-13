@@ -132,7 +132,7 @@ pub(crate) async fn record_query_log(
     }
 
     service
-        .db_client
+        .context_access_log()
         .create(&record_id, Value::Object(payload), &namespace)
         .await?;
 
@@ -264,7 +264,7 @@ async fn prune_expired_query_logs(
     let cutoff = crate::service::query::now()
         - chrono::Duration::days(i64::from(service.query_log_retention_days()));
     let deleted = service
-        .db_client
+        .context_access_log()
         .query(
             "DELETE query_log WHERE logged_at IS NOT NONE AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
             Some(json!({"cutoff": crate::service::normalize_dt(cutoff)})),

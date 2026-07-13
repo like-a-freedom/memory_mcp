@@ -9,7 +9,7 @@ use crate::service::{
 impl crate::service::MemoryService {
     pub async fn build_diff(&self, request: DiffRequest) -> Result<DiffView, MemoryError> {
         let namespace = self.namespace_for_scope(&request.scope)?;
-        let facts = self.db_client.select_table("fact", &namespace).await?;
+        let facts = self.app_store().select_facts(&namespace).await?;
 
         let left = facts_at(
             &facts,

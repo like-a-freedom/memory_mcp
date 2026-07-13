@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Datelike, NaiveDate, Utc, Weekday};
 
+use crate::storage::ContextFactQuery;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TemporalQueryExpansion {
     pub(crate) temporal_groups: Vec<Vec<String>>,
@@ -488,7 +490,7 @@ pub(crate) async fn collect_temporal_facts(
 
     if let Some(temporal_window) = infer_temporal_window(request.query, request.cutoff) {
         let records = service
-            .db_client
+            .context_store()
             .select_table("fact", request.namespace)
             .await
             .map_err(|err| {
@@ -528,16 +530,16 @@ pub(crate) async fn collect_temporal_facts(
 
         for temporal_query in temporal_group {
             let records = service
-                .db_client
-                .select_facts_filtered_advanced(
-                    request.namespace,
-                    request.scope,
-                    request.cutoff_iso,
-                    Some(&temporal_query),
-                    search_limit,
-                    request.project,
-                    request.fact_types,
-                )
+                .context_store()
+                .select_facts_filtered_advanced(ContextFactQuery {
+                    namespace: request.namespace,
+                    scope: request.scope,
+                    cutoff: request.cutoff_iso,
+                    query_contains: Some(&temporal_query),
+                    limit: search_limit,
+                    project: request.project,
+                    fact_types: request.fact_types,
+                })
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 

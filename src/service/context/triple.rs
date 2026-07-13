@@ -33,7 +33,7 @@ pub(super) async fn collect_triple_facts(
     limit: i32,
 ) -> Result<Vec<Fact>, MemoryError> {
     let records = service
-        .db_client
+        .context_store()
         .select_facts_by_triple(namespace, query, cutoff_iso, limit as usize)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB triple query error: {err}")))?;

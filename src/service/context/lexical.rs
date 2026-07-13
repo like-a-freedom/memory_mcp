@@ -11,6 +11,7 @@ use crate::service::query::{
     search_query_terms, unique_query_terms,
 };
 use crate::service::value_helpers::{json_f64, json_string};
+use crate::storage::ContextFactQuery;
 
 use super::filtering::{
     fact_record_matches_project, fact_record_matches_type, raw_array, raw_object,
@@ -41,16 +42,16 @@ pub(crate) async fn select_fact_records_for_query(
     let candidate_limit = lexical_candidate_limit(params.limit);
 
     let initial = service
-        .db_client
-        .select_facts_filtered_advanced(
-            params.namespace,
-            params.scope,
-            params.cutoff_iso,
-            params.query_opt,
-            candidate_limit,
-            params.project,
-            params.fact_types,
-        )
+        .context_store()
+        .select_facts_filtered_advanced(ContextFactQuery {
+            namespace: params.namespace,
+            scope: params.scope,
+            cutoff: params.cutoff_iso,
+            query_contains: params.query_opt,
+            limit: candidate_limit,
+            project: params.project,
+            fact_types: params.fact_types,
+        })
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let initial = rank_lexical_records(initial, &query_terms);
@@ -67,16 +68,16 @@ pub(crate) async fn select_fact_records_for_query(
     let mut fallback_records = Vec::new();
     for term in &fallback_terms {
         let term_records = service
-            .db_client
-            .select_facts_filtered_advanced(
-                params.namespace,
-                params.scope,
-                params.cutoff_iso,
-                Some(term.as_str()),
-                candidate_limit,
-                params.project,
-                params.fact_types,
-            )
+            .context_store()
+            .select_facts_filtered_advanced(ContextFactQuery {
+                namespace: params.namespace,
+                scope: params.scope,
+                cutoff: params.cutoff_iso,
+                query_contains: Some(term.as_str()),
+                limit: candidate_limit,
+                project: params.project,
+                fact_types: params.fact_types,
+            })
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
         fallback_records.extend(term_records);
@@ -268,7 +269,7 @@ async fn scan_fact_records_by_query_terms(
     query_terms: &[String],
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
-        .db_client
+        .context_store()
         .select_table("fact", params.namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
@@ -807,7 +808,7 @@ pub(crate) async fn select_episode_records_for_query(
     project: Option<&str>,
 ) -> Result<Vec<Value>, MemoryError> {
     let initial = service
-        .db_client
+        .context_store()
         .select_episodes_by_content_advanced(
             namespace, scope, cutoff_iso, query_opt, limit, project,
         )
@@ -831,7 +832,7 @@ pub(crate) async fn select_episode_records_for_query(
     let mut fallback_records = Vec::new();
     for term in fallback_terms {
         let term_records = service
-            .db_client
+            .context_store()
             .select_episodes_by_content_advanced(
                 namespace,
                 scope,

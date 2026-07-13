@@ -57,7 +57,7 @@ pub(crate) async fn collect_semantic_facts(
     let search_limit = request.budget.max(1) * 4;
 
     let fact_records = service
-        .db_client
+        .context_store()
         .select_facts_ann(
             request.namespace,
             request.scope,

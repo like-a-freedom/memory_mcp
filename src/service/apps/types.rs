@@ -157,6 +157,35 @@ pub struct RebuildCommunitiesOutcome {
     pub rebuilt: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LifecycleCommand {
+    ArchiveCandidates {
+        target_ids: Vec<String>,
+        dry_run: bool,
+        confirmed: bool,
+    },
+    RestoreArchived {
+        target_ids: Vec<String>,
+        confirmed: bool,
+    },
+    RecomputeDecay {
+        dry_run: bool,
+        confirmed: bool,
+    },
+    RebuildCommunities {
+        dry_run: bool,
+        confirmed: bool,
+    },
+}
+
+#[derive(Debug)]
+pub enum LifecycleCommandOutcome {
+    ArchiveCandidates(ArchiveCandidatesOutcome),
+    RestoreArchived(RestoreArchivedOutcome),
+    RecomputeDecay(RecomputeDecayOutcome),
+    RebuildCommunities(RebuildCommunitiesOutcome),
+}
+
 impl IngestionReviewSummary {
     #[must_use]
     pub fn from_items(items: &[IngestionReviewItem]) -> Self {

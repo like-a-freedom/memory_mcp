@@ -344,6 +344,372 @@ pub trait DbClient: Send + Sync {
     async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError>;
 }
 
+/// Storage capability used by Context Assembly.
+///
+/// This deliberately exposes only retrieval, graph-expansion, provenance, and
+/// access-log operations needed by the context domain. The legacy [`DbClient`]
+/// remains the infrastructure adapter for now; callers in Context Assembly
+/// depend on this narrower seam instead of the full database surface.
+#[async_trait]
+pub trait ContextStore: Send + Sync {
+    async fn select_facts_filtered_advanced(
+        &self,
+        query: ContextFactQuery<'_>,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_facts_by_entity_links(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        entity_links: &[String],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_facts_by_triple(
+        &self,
+        namespace: &str,
+        query_text: &str,
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_facts_ann(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_vec: &[f64],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_edge_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_entities_batch(
+        &self,
+        namespace: &str,
+        normalized_names: &[String],
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_communities_matching_summary(
+        &self,
+        namespace: &str,
+        query: &str,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_episodes_by_content_advanced(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query: Option<&str>,
+        limit: i32,
+        project: Option<&str>,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+}
+
+pub struct ContextFactQuery<'a> {
+    pub namespace: &'a str,
+    pub scope: &'a str,
+    pub cutoff: &'a str,
+    pub query_contains: Option<&'a str>,
+    pub limit: i32,
+    pub project: Option<&'a str>,
+    pub fact_types: &'a [String],
+}
+
+#[async_trait]
+pub trait ContextAccessLog: Send + Sync {
+    async fn create(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+    ) -> Result<Value, MemoryError>;
+
+    async fn query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<Value, MemoryError>;
+}
+
+/// Storage capability used by app-facing domain workflows.
+///
+/// The app modules must not depend on the universal infrastructure client:
+/// this seam exposes only the records and mutations needed by lifecycle,
+/// graph, and temporal-diff views.
+#[async_trait]
+pub trait AppStore: Send + Sync {
+    async fn select_entities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_entity(
+        &self,
+        entity_id: &str,
+        namespace: &str,
+    ) -> Result<Option<Value>, MemoryError>;
+
+    async fn select_communities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_facts(&self, namespace: &str) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_edge(
+        &self,
+        edge_id: &str,
+        namespace: &str,
+    ) -> Result<Option<Value>, MemoryError>;
+
+    async fn select_graph_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn select_episodes_for_archival(
+        &self,
+        namespace: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
+
+    async fn update_record(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+    ) -> Result<Value, MemoryError>;
+}
+
+#[async_trait]
+impl<T: DbClient + ?Sized> ContextStore for Arc<T> {
+    async fn select_facts_filtered_advanced(
+        &self,
+        query: ContextFactQuery<'_>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_facts_filtered_advanced(
+            self.as_ref(),
+            query.namespace,
+            query.scope,
+            query.cutoff,
+            query.query_contains,
+            query.limit,
+            query.project,
+            query.fact_types,
+        )
+        .await
+    }
+
+    async fn select_facts_by_entity_links(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        entity_links: &[String],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_facts_by_entity_links(
+            self.as_ref(),
+            namespace,
+            scope,
+            cutoff,
+            entity_links,
+            limit,
+        )
+        .await
+    }
+
+    async fn select_facts_by_triple(
+        &self,
+        namespace: &str,
+        query_text: &str,
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_facts_by_triple(self.as_ref(), namespace, query_text, cutoff, limit).await
+    }
+
+    async fn select_facts_ann(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_vec: &[f64],
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_facts_ann(self.as_ref(), namespace, scope, cutoff, query_vec, limit).await
+    }
+
+    async fn select_edge_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_edge_neighbors(self.as_ref(), namespace, node_id, cutoff, direction).await
+    }
+
+    async fn select_entities_batch(
+        &self,
+        namespace: &str,
+        normalized_names: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_entities_batch(self.as_ref(), namespace, normalized_names).await
+    }
+
+    async fn select_communities_matching_summary(
+        &self,
+        namespace: &str,
+        query: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_communities_matching_summary(self.as_ref(), namespace, query).await
+    }
+
+    async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_table(self.as_ref(), table, namespace).await
+    }
+
+    async fn select_episodes_by_content_advanced(
+        &self,
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query: Option<&str>,
+        limit: i32,
+        project: Option<&str>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_episodes_by_content_advanced(
+            self.as_ref(),
+            namespace,
+            scope,
+            cutoff,
+            query,
+            limit,
+            project,
+        )
+        .await
+    }
+
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_active_facts(self.as_ref(), namespace, limit).await
+    }
+}
+
+#[async_trait]
+impl<T: DbClient + ?Sized> ContextAccessLog for Arc<T> {
+    async fn create(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+    ) -> Result<Value, MemoryError> {
+        DbClient::create(self.as_ref(), record_id, content, namespace).await
+    }
+
+    async fn query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<Value, MemoryError> {
+        DbClient::query(self.as_ref(), sql, vars, namespace).await
+    }
+}
+
+#[async_trait]
+impl<T: DbClient + ?Sized> AppStore for Arc<T> {
+    async fn select_entities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_table(self.as_ref(), "entity", namespace).await
+    }
+
+    async fn select_entity(
+        &self,
+        entity_id: &str,
+        namespace: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        DbClient::select_one(self.as_ref(), entity_id, namespace).await
+    }
+
+    async fn select_communities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_table(self.as_ref(), "community", namespace).await
+    }
+
+    async fn select_facts(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_table(self.as_ref(), "fact", namespace).await
+    }
+
+    async fn select_edge(
+        &self,
+        edge_id: &str,
+        namespace: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        DbClient::select_one(self.as_ref(), edge_id, namespace).await
+    }
+
+    async fn select_graph_neighbors(
+        &self,
+        namespace: &str,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_edge_neighbors(self.as_ref(), namespace, node_id, cutoff, direction).await
+    }
+
+    async fn select_active_facts(
+        &self,
+        namespace: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_active_facts(self.as_ref(), namespace, limit).await
+    }
+
+    async fn select_episodes_for_archival(
+        &self,
+        namespace: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        DbClient::select_episodes_for_archival(self.as_ref(), namespace, cutoff, limit).await
+    }
+
+    async fn update_record(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+    ) -> Result<Value, MemoryError> {
+        DbClient::update(self.as_ref(), record_id, content, namespace).await
+    }
+}
+
 /// Unified database client that works with both embedded and remote SurrealDB.
 pub struct SurrealDbClient {
     engine: DbEngine,

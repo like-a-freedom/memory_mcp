@@ -83,7 +83,7 @@ async fn resolve_query_anchor_entities(
         .collect::<Vec<_>>();
 
     let mut anchors = service
-        .db_client
+        .context_store()
         .select_entities_batch(namespace, &normalized_names)
         .await?
         .into_iter()
@@ -129,7 +129,7 @@ async fn walk_anchor_entities(
 
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             for edge in service
-                .db_client
+                .context_store()
                 .select_edge_neighbors(namespace, &current_entity, cutoff_iso, direction)
                 .await?
             {
@@ -202,7 +202,7 @@ pub(crate) async fn collect_graph_facts(
     .await?;
     let entity_ids = traces.keys().cloned().collect::<Vec<_>>();
     let records = service
-        .db_client
+        .context_store()
         .select_facts_by_entity_links(
             request.namespace,
             request.scope,
@@ -416,7 +416,7 @@ mod tests {
         );
 
         let outgoing_neighbors = service
-            .db_client
+            .context_store()
             .select_edge_neighbors("org", "entity:alice", &cutoff_iso, GraphDirection::Outgoing)
             .await
             .expect("select outgoing neighbors");
@@ -436,7 +436,7 @@ mod tests {
         );
 
         let raw_records = service
-            .db_client
+            .context_store()
             .select_facts_by_entity_links(
                 "org",
                 "org",

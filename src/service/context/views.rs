@@ -212,7 +212,7 @@ pub(crate) async fn build_facets_view(
     access: &AccessPayload,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
-        .db_client
+        .context_store()
         .select_table("episode", namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
@@ -314,7 +314,7 @@ pub(crate) async fn build_wake_up_view(
     normalize_dt_fn: impl Fn(DateTime<Utc>) -> String,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
-        .db_client
+        .context_store()
         .select_table("fact", params.namespace)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;

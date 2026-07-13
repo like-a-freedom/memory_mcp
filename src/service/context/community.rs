@@ -66,7 +66,7 @@ pub(crate) async fn collect_community_facts(
         .collect::<Vec<_>>();
 
     let fallback_records = service
-        .db_client
+        .context_store()
         .select_facts_by_entity_links(
             request.namespace,
             request.scope,
@@ -206,7 +206,7 @@ async fn entity_origin_factor(
     let mut best_factor: Option<f64> = None;
     for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
         for edge in service
-            .db_client
+            .context_store()
             .select_edge_neighbors(namespace, entity_id, cutoff_iso, direction)
             .await?
         {
@@ -245,7 +245,7 @@ pub(crate) async fn find_matching_communities(
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
     let communities = service
-        .db_client
+        .context_store()
         .select_communities_matching_summary(namespace, query)
         .await?;
 

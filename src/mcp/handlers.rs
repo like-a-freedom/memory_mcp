@@ -24,6 +24,11 @@ use crate::logging::LogLevel;
 use crate::models::{AssembledContextItem, ExplainItem, ExtractResult};
 use crate::service::MemoryService;
 #[cfg(feature = "mcp-apps")]
+use crate::service::{
+    AppCommand, AppCommandInput, LifecycleCommand, LifecycleCommandOutcome,
+    apply_ingestion_review_edit,
+};
+#[cfg(feature = "mcp-apps")]
 use std::time::Instant;
 
 use super::error::mcp_error;
@@ -40,10 +45,7 @@ mod apps;
 #[cfg(feature = "mcp-apps")]
 use crate::mcp::parsers::parse_datetime;
 #[cfg(feature = "mcp-apps")]
-use apps::{
-    shallow_merge_object, summarize_ingestion_review_items, update_ingestion_item_statuses,
-    upsert_json_field,
-};
+use apps::{update_ingestion_item_statuses, upsert_json_field};
 
 /// MCP (Model Context Protocol) server handler for memory operations.
 ///
@@ -405,11 +407,8 @@ impl MemoryMcp {
             .map_err(mcp_error)
     }
 
-    #[cfg_attr(
-        feature = "mcp-apps",
-        tool(
-            description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> `scope` plus optional `source_text` or `draft_episode_id`; lifecycle -> `scope` only. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
-        )
+    #[tool(
+        description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> `scope` plus optional `source_text` or `draft_episode_id`; lifecycle -> `scope` only. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
     )]
     pub async fn open_app(
         &self,
@@ -478,11 +477,8 @@ impl MemoryMcp {
         }
     }
 
-    #[cfg_attr(
-        feature = "mcp-apps",
-        tool(
-            description = "Execute a coarse-grained command for an app session opened via open_app. Use this only for session-scoped workflows that are not already covered by canonical memory tools. Arguments must be a flat snake_case object and must not be wrapped in `payload`. Supports ingestion review actions (`approve_items`, `reject_items`, `edit_item`, `commit_review`, `cancel_review`), lifecycle actions (`archive_candidates`, `restore_archived`, `recompute_decay`, `rebuild_communities`), diff export (`export_diff`), graph exploration actions (`expand_neighbors`, `open_edge_details`, `use_path_as_context`), and the generic `close_session`. Returns command status and whether the caller should re-read the app resource."
-        )
+    #[tool(
+        description = "Execute a coarse-grained command for an app session opened via open_app. Use this only for session-scoped workflows that are not already covered by canonical memory tools. Arguments must be a flat snake_case object and must not be wrapped in `payload`. Supports ingestion review actions (`approve_items`, `reject_items`, `edit_item`, `commit_review`, `cancel_review`), lifecycle actions (`archive_candidates`, `restore_archived`, `recompute_decay`, `rebuild_communities`), diff export (`export_diff`), graph exploration actions (`expand_neighbors`, `open_edge_details`, `use_path_as_context`), and the generic `close_session`. Returns command status and whether the caller should re-read the app resource."
     )]
     pub async fn app_command(
         &self,
@@ -511,22 +507,40 @@ impl MemoryMcp {
 
             let session = self.session(&p.session_id).await?;
             let app = session.app.clone();
+            let command = AppCommand::parse(
+                &app,
+                AppCommandInput {
+                    action: p.action.clone(),
+                    item_ids: p.item_ids.clone(),
+                    target_ids: p.target_ids.clone(),
+                    target_id: p.target_id.clone(),
+                    item_id: p.item_id.clone(),
+                    patch_json: p.patch_json.clone(),
+                    reason: p.reason.clone(),
+                    dry_run: p.dry_run.unwrap_or(false),
+                    confirmed: p.confirmed.unwrap_or(false),
+                    format: p.format.clone(),
+                    direction: p.direction.clone(),
+                    depth: p.depth,
+                },
+            )
+            .map_err(|error| Self::invalid_params(error.to_string()))?;
+            let action = command.action_name();
 
-            let result = match p.action.as_str() {
+            let result = match action {
                 "approve_items" | "approve_ingestion_items" => {
+                    let AppCommand::ApproveItems { item_ids } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "ingestion_review" {
                         Err(Self::invalid_params(
                             "approve_items is only supported for ingestion_review sessions",
-                        ))
-                    } else if p.item_ids.is_empty() {
-                        Err(Self::invalid_params(
-                            "`item_ids` is required for approve_items",
                         ))
                     } else {
                         let summary = update_ingestion_item_statuses(
                             self,
                             &p.session_id,
-                            &p.item_ids,
+                            item_ids,
                             "approved",
                             None,
                             session.payload.clone(),
@@ -539,34 +553,29 @@ impl MemoryMcp {
                             Some(app_session_uri(&app, &p.session_id)),
                             json!({
                                 "ok": true,
-                                "message": format!("Approved {} ingestion review item(s)", p.item_ids.len()),
+                                "message": format!("Approved {} ingestion review item(s)", item_ids.len()),
                                 "refresh_required": true,
-                                "updated_item_ids": p.item_ids,
+                                "updated_item_ids": item_ids,
                                 "summary": summary,
                             }),
                         ))
                     }
                 }
                 "reject_items" | "reject_ingestion_items" => {
+                    let AppCommand::RejectItems { item_ids, reason } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "ingestion_review" {
                         Err(Self::invalid_params(
                             "reject_items is only supported for ingestion_review sessions",
                         ))
-                    } else if p.item_ids.is_empty() {
-                        Err(Self::invalid_params(
-                            "`item_ids` is required for reject_items",
-                        ))
                     } else {
-                        let reason = p
-                            .reason
-                            .clone()
-                            .or_else(|| Some("Rejected from app review".to_string()));
                         let summary = update_ingestion_item_statuses(
                             self,
                             &p.session_id,
-                            &p.item_ids,
+                            item_ids,
                             "rejected",
-                            reason,
+                            Some(reason.clone()),
                             session.payload.clone(),
                         )
                         .await?;
@@ -577,68 +586,52 @@ impl MemoryMcp {
                             Some(app_session_uri(&app, &p.session_id)),
                             json!({
                                 "ok": true,
-                                "message": format!("Rejected {} ingestion review item(s)", p.item_ids.len()),
+                                "message": format!("Rejected {} ingestion review item(s)", item_ids.len()),
                                 "refresh_required": true,
-                                "updated_item_ids": p.item_ids,
+                                "updated_item_ids": item_ids,
                                 "summary": summary,
                             }),
                         ))
                     }
                 }
                 "edit_item" => {
+                    let AppCommand::EditItem { item_id, patch } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "ingestion_review" {
                         Err(Self::invalid_params(
                             "edit_item is only supported for ingestion_review sessions",
                         ))
                     } else {
-                        let item_id = p
-                            .item_id
-                            .as_deref()
-                            .ok_or_else(|| Self::missing_app_field("edit_item", "item_id"))?;
-                        let patch_json = p
-                            .patch_json
-                            .as_deref()
-                            .ok_or_else(|| Self::missing_app_field("edit_item", "patch_json"))?;
-                        let patch_value: Value =
-                            serde_json::from_str(patch_json).map_err(|err| {
-                                Self::invalid_params(format!(
-                                    "`patch_json` must be a valid JSON object: {err}"
-                                ))
-                            })?;
-                        let patch = patch_value.as_object().ok_or_else(|| {
-                            Self::invalid_params("`patch_json` must encode a JSON object")
-                        })?;
-
                         let mut payload = session.payload.clone();
                         let summary = if let Some(items) =
                             payload.get_mut("items").and_then(Value::as_array_mut)
                         {
-                            let mut edited = false;
-                            for item in items.iter_mut() {
-                                let matches = item
-                                    .get("item_id")
-                                    .and_then(Value::as_str)
-                                    .is_some_and(|candidate| candidate == item_id);
-                                if matches {
-                                    let object = item.as_object_mut().ok_or_else(|| {
-                                        Self::internal_error(
-                                            "ingestion review items must be objects",
-                                        )
-                                    })?;
-                                    shallow_merge_object(object, patch);
-                                    if !object.contains_key("status") {
-                                        object.insert("status".to_string(), json!("edited"));
-                                    }
-                                    edited = true;
-                                    break;
-                                }
-                            }
-                            if !edited {
-                                return Err(Self::invalid_params(format!(
-                                    "Unknown ingestion review item: {item_id}"
-                                )));
-                            }
-                            summarize_ingestion_review_items(items)
+                            let mut typed_items: Vec<crate::service::IngestionReviewItem> =
+                                serde_json::from_value(Value::Array(items.clone())).map_err(
+                                    |error| {
+                                        Self::internal_error(format!(
+                                            "invalid ingestion review items: {error}"
+                                        ))
+                                    },
+                                )?;
+                            let summary =
+                                apply_ingestion_review_edit(&mut typed_items, item_id, patch)
+                                    .map_err(mcp_error)?;
+                            *items = serde_json::to_value(&typed_items)
+                                .map_err(|error| {
+                                    Self::internal_error(format!(
+                                        "failed to encode ingestion review items: {error}"
+                                    ))
+                                })?
+                                .as_array()
+                                .cloned()
+                                .unwrap_or_default();
+                            serde_json::to_value(summary).map_err(|error| {
+                                Self::internal_error(format!(
+                                    "failed to encode ingestion review summary: {error}"
+                                ))
+                            })?
                         } else {
                             return Err(Self::internal_error(
                                 "ingestion review session is missing items",
@@ -722,25 +715,34 @@ impl MemoryMcp {
                     }
                 }
                 "archive_candidates" => {
+                    let AppCommand::Lifecycle(LifecycleCommand::ArchiveCandidates {
+                        target_ids,
+                        dry_run,
+                        confirmed,
+                    }) = &command
+                    else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "lifecycle" {
                         Err(Self::invalid_params(
                             "archive_candidates is only supported for lifecycle sessions",
                         ))
-                    } else if p.target_ids.is_empty() {
-                        Err(Self::invalid_params(
-                            "`target_ids` is required for archive_candidates",
-                        ))
-                    } else if !p.dry_run.unwrap_or(false) && !p.confirmed.unwrap_or(false) {
-                        Err(Self::invalid_params(
-                            "archive_candidates requires `confirmed=true` unless `dry_run=true`",
-                        ))
                     } else {
-                        let dry_run = p.dry_run.unwrap_or(false);
-                        let outcome = self
-                            .service
-                            .archive_candidates(&session.scope, &p.target_ids, dry_run)
-                            .await
-                            .map_err(mcp_error)?;
+                        let outcome = match crate::service::execute_lifecycle_command(
+                            &self.service,
+                            &session.scope,
+                            LifecycleCommand::ArchiveCandidates {
+                                target_ids: target_ids.clone(),
+                                dry_run: *dry_run,
+                                confirmed: *confirmed,
+                            },
+                        )
+                        .await
+                        .map_err(mcp_error)?
+                        {
+                            LifecycleCommandOutcome::ArchiveCandidates(outcome) => outcome,
+                            _ => unreachable!("lifecycle command returned the wrong outcome"),
+                        };
                         let payload = Self::enrich_session_payload(
                             &app,
                             &p.session_id,
@@ -760,10 +762,10 @@ impl MemoryMcp {
                             Some(app_session_uri(&app, &p.session_id)),
                             json!({
                                 "ok": true,
-                                "message": if dry_run {
-                                    format!("Dry-run ready to archive {} candidate(s)", p.target_ids.len())
+                                "message": if *dry_run {
+                                    format!("Dry-run ready to archive {} candidate(s)", target_ids.len())
                                 } else {
-                                    format!("Archived {} candidate(s)", p.target_ids.len())
+                                    format!("Archived {} candidate(s)", target_ids.len())
                                 },
                                 "refresh_required": true,
                                 "dry_run": outcome.dry_run,
@@ -775,24 +777,32 @@ impl MemoryMcp {
                     }
                 }
                 "restore_archived" => {
+                    let AppCommand::Lifecycle(LifecycleCommand::RestoreArchived {
+                        target_ids,
+                        confirmed,
+                    }) = &command
+                    else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "lifecycle" {
                         Err(Self::invalid_params(
                             "restore_archived is only supported for lifecycle sessions",
                         ))
-                    } else if p.target_ids.is_empty() {
-                        Err(Self::invalid_params(
-                            "`target_ids` is required for restore_archived",
-                        ))
-                    } else if !p.confirmed.unwrap_or(false) {
-                        Err(Self::invalid_params(
-                            "restore_archived requires `confirmed=true`",
-                        ))
                     } else {
-                        let outcome = self
-                            .service
-                            .restore_archived(&session.scope, &p.target_ids)
-                            .await
-                            .map_err(mcp_error)?;
+                        let outcome = match crate::service::execute_lifecycle_command(
+                            &self.service,
+                            &session.scope,
+                            LifecycleCommand::RestoreArchived {
+                                target_ids: target_ids.clone(),
+                                confirmed: *confirmed,
+                            },
+                        )
+                        .await
+                        .map_err(mcp_error)?
+                        {
+                            LifecycleCommandOutcome::RestoreArchived(outcome) => outcome,
+                            _ => unreachable!("lifecycle command returned the wrong outcome"),
+                        };
                         let payload = Self::enrich_session_payload(
                             &app,
                             &p.session_id,
@@ -822,21 +832,32 @@ impl MemoryMcp {
                     }
                 }
                 "recompute_decay" => {
+                    let AppCommand::Lifecycle(LifecycleCommand::RecomputeDecay {
+                        dry_run,
+                        confirmed,
+                    }) = &command
+                    else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "lifecycle" {
                         Err(Self::invalid_params(
                             "recompute_decay is only supported for lifecycle sessions",
                         ))
-                    } else if !p.dry_run.unwrap_or(false) && !p.confirmed.unwrap_or(false) {
-                        Err(Self::invalid_params(
-                            "recompute_decay requires `confirmed=true` unless `dry_run=true`",
-                        ))
                     } else {
-                        let dry_run = p.dry_run.unwrap_or(false);
-                        let outcome = self
-                            .service
-                            .recompute_decay(dry_run)
-                            .await
-                            .map_err(mcp_error)?;
+                        let outcome = match crate::service::execute_lifecycle_command(
+                            &self.service,
+                            &session.scope,
+                            LifecycleCommand::RecomputeDecay {
+                                dry_run: *dry_run,
+                                confirmed: *confirmed,
+                            },
+                        )
+                        .await
+                        .map_err(mcp_error)?
+                        {
+                            LifecycleCommandOutcome::RecomputeDecay(outcome) => outcome,
+                            _ => unreachable!("lifecycle command returned the wrong outcome"),
+                        };
                         let payload = Self::enrich_session_payload(
                             &app,
                             &p.session_id,
@@ -856,7 +877,7 @@ impl MemoryMcp {
                             Some(app_session_uri(&app, &p.session_id)),
                             json!({
                                 "ok": true,
-                                "message": if dry_run {
+                                "message": if *dry_run {
                                     "Dry-run decay recomputation refreshed lifecycle metrics".to_string()
                                 } else {
                                     format!("Recomputed decay and invalidated {} fact(s)", outcome.invalidated)
@@ -870,21 +891,32 @@ impl MemoryMcp {
                     }
                 }
                 "rebuild_communities" => {
+                    let AppCommand::Lifecycle(LifecycleCommand::RebuildCommunities {
+                        dry_run,
+                        confirmed,
+                    }) = &command
+                    else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "lifecycle" {
                         Err(Self::invalid_params(
                             "rebuild_communities is only supported for lifecycle sessions",
                         ))
-                    } else if !p.dry_run.unwrap_or(false) && !p.confirmed.unwrap_or(false) {
-                        Err(Self::invalid_params(
-                            "rebuild_communities requires `confirmed=true` unless `dry_run=true`",
-                        ))
                     } else {
-                        let dry_run = p.dry_run.unwrap_or(false);
-                        let outcome = self
-                            .service
-                            .rebuild_communities(dry_run)
-                            .await
-                            .map_err(mcp_error)?;
+                        let outcome = match crate::service::execute_lifecycle_command(
+                            &self.service,
+                            &session.scope,
+                            LifecycleCommand::RebuildCommunities {
+                                dry_run: *dry_run,
+                                confirmed: *confirmed,
+                            },
+                        )
+                        .await
+                        .map_err(mcp_error)?
+                        {
+                            LifecycleCommandOutcome::RebuildCommunities(outcome) => outcome,
+                            _ => unreachable!("lifecycle command returned the wrong outcome"),
+                        };
                         let payload = Self::enrich_session_payload(
                             &app,
                             &p.session_id,
@@ -904,7 +936,7 @@ impl MemoryMcp {
                             Some(app_session_uri(&app, &p.session_id)),
                             json!({
                                 "ok": true,
-                                "message": if dry_run {
+                                "message": if *dry_run {
                                     "Dry-run community rebuild refreshed lifecycle metrics".to_string()
                                 } else {
                                     format!("Rebuilt {} community record(s)", outcome.rebuilt)
@@ -918,15 +950,14 @@ impl MemoryMcp {
                     }
                 }
                 "export_diff" => {
+                    let AppCommand::ExportDiff { format } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "diff" {
                         Err(Self::invalid_params(
                             "export_diff is only supported for diff sessions",
                         ))
                     } else {
-                        let format = p
-                            .format
-                            .as_deref()
-                            .ok_or_else(|| Self::missing_app_field("export_diff", "format"))?;
                         let export = json!({
                             "format": format,
                             "generated_at": Utc::now().to_rfc3339(),
@@ -961,17 +992,19 @@ impl MemoryMcp {
                     }
                 }
                 "expand_neighbors" => {
+                    let AppCommand::ExpandNeighbors {
+                        target_id,
+                        direction,
+                        depth,
+                    } = &command
+                    else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "graph" {
                         Err(Self::invalid_params(
                             "expand_neighbors is only supported for graph sessions",
                         ))
                     } else {
-                        let target_id = p.target_id.as_deref().ok_or_else(|| {
-                            Self::missing_app_field("expand_neighbors", "target_id")
-                        })?;
-                        let direction = p.direction.as_deref().ok_or_else(|| {
-                            Self::missing_app_field("expand_neighbors", "direction")
-                        })?;
                         let cutoff = session
                             .payload
                             .get("target")
@@ -987,7 +1020,7 @@ impl MemoryMcp {
                                     .map_err(mcp_error)?,
                                 target_id,
                                 direction,
-                                p.depth.unwrap_or(1).max(1),
+                                *depth,
                                 cutoff,
                             )
                             .await?;
@@ -1019,22 +1052,22 @@ impl MemoryMcp {
                     }
                 }
                 "open_edge_details" => {
+                    let AppCommand::OpenEdgeDetails { edge_id } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "graph" {
                         Err(Self::invalid_params(
                             "open_edge_details is only supported for graph sessions",
                         ))
                     } else {
-                        let edge_id = p.target_id.as_deref().ok_or_else(|| {
-                            Self::missing_app_field("open_edge_details", "target_id")
-                        })?;
                         let namespace = self
                             .service
                             .namespace_for_scope(&session.scope)
                             .map_err(mcp_error)?;
                         let edge = self
                             .service
-                            .db_client
-                            .select_one(edge_id, &namespace)
+                            .app_store()
+                            .select_edge(edge_id, &namespace)
                             .await
                             .map_err(mcp_error)?
                             .ok_or_else(|| {
@@ -1058,12 +1091,14 @@ impl MemoryMcp {
                     }
                 }
                 "use_path_as_context" => {
+                    let AppCommand::UsePathAsContext { path_id } = &command else {
+                        unreachable!("validated app command did not match action")
+                    };
                     if app != "graph" {
                         Err(Self::invalid_params(
                             "use_path_as_context is only supported for graph sessions",
                         ))
                     } else {
-                        let path_id = p.target_id.as_deref().unwrap_or("current");
                         let node_names = session
                             .payload
                             .get("graph")

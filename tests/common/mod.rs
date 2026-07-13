@@ -23,6 +23,41 @@ fn next_test_db_name() -> String {
     format!("memory_test_{seq}")
 }
 
+pub struct TestMemory {
+    pub service: MemoryService,
+    pub db_client: Arc<SurrealDbClient>,
+}
+
+impl TestMemory {
+    pub async fn new(query_logging_enabled: bool) -> Self {
+        let namespaces = vec![
+            "org".to_string(),
+            "personal".to_string(),
+            "team".to_string(),
+            "private-domain".to_string(),
+        ];
+        let db_name = next_test_db_name();
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(&db_name, &namespaces, "warn")
+                .await
+                .expect("connect in memory service"),
+        );
+        for namespace in &namespaces {
+            db_client
+                .apply_migrations(namespace)
+                .await
+                .expect("apply in-memory migrations");
+        }
+
+        let service =
+            MemoryService::new(db_client.clone(), namespaces, "warn".to_string(), 50, 100)
+                .expect("service init")
+                .with_query_logging_enabled(query_logging_enabled);
+
+        Self { service, db_client }
+    }
+}
+
 #[allow(dead_code)]
 pub async fn make_service() -> MemoryService {
     make_service_with_query_logging(false).await
@@ -44,30 +79,8 @@ pub async fn make_service_with_query_logging(query_logging_enabled: bool) -> Mem
 pub async fn make_service_with_client_and_query_logging(
     query_logging_enabled: bool,
 ) -> (MemoryService, Arc<SurrealDbClient>) {
-    let namespaces = vec![
-        "org".to_string(),
-        "personal".to_string(),
-        "team".to_string(),
-        "private-domain".to_string(),
-    ];
-    let db_name = next_test_db_name();
-    let db_client = Arc::new(
-        SurrealDbClient::connect_in_memory_with_namespaces(&db_name, &namespaces, "warn")
-            .await
-            .expect("connect in memory service"),
-    );
-    for namespace in &namespaces {
-        db_client
-            .apply_migrations(namespace)
-            .await
-            .expect("apply in-memory migrations");
-    }
-
-    let service = MemoryService::new(db_client.clone(), namespaces, "warn".to_string(), 50, 100)
-        .expect("service init")
-        .with_query_logging_enabled(query_logging_enabled);
-
-    (service, db_client)
+    let memory = TestMemory::new(query_logging_enabled).await;
+    (memory.service, memory.db_client)
 }
 
 #[allow(dead_code)]

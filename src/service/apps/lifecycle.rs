@@ -1,11 +1,82 @@
 use chrono::Utc;
 use serde_json::json;
 
+#[cfg(feature = "mcp-apps")]
+use super::types::{LifecycleCommand, LifecycleCommandOutcome};
 use crate::service::{
     ArchiveCandidatesOutcome, LifecycleDashboard, LifecycleDefaults, LifecycleView, MemoryError,
     RebuildCommunitiesOutcome, RecomputeDecayOutcome, RestoreArchivedOutcome,
     run_community_rebuild_pass, run_decay_pass,
 };
+
+#[cfg(feature = "mcp-apps")]
+pub(crate) async fn execute_lifecycle_command(
+    service: &crate::service::MemoryService,
+    scope: &str,
+    command: LifecycleCommand,
+) -> Result<LifecycleCommandOutcome, MemoryError> {
+    match command {
+        LifecycleCommand::ArchiveCandidates {
+            target_ids,
+            dry_run,
+            confirmed,
+        } => {
+            if target_ids.is_empty() {
+                return Err(MemoryError::Validation(
+                    "archive_candidates requires at least one target id".to_string(),
+                ));
+            }
+            if !dry_run && !confirmed {
+                return Err(MemoryError::Validation(
+                    "archive_candidates requires confirmed=true unless dry_run=true".to_string(),
+                ));
+            }
+            Ok(LifecycleCommandOutcome::ArchiveCandidates(
+                service
+                    .archive_candidates(scope, &target_ids, dry_run)
+                    .await?,
+            ))
+        }
+        LifecycleCommand::RestoreArchived {
+            target_ids,
+            confirmed,
+        } => {
+            if target_ids.is_empty() {
+                return Err(MemoryError::Validation(
+                    "restore_archived requires at least one target id".to_string(),
+                ));
+            }
+            if !confirmed {
+                return Err(MemoryError::Validation(
+                    "restore_archived requires confirmed=true".to_string(),
+                ));
+            }
+            Ok(LifecycleCommandOutcome::RestoreArchived(
+                service.restore_archived(scope, &target_ids).await?,
+            ))
+        }
+        LifecycleCommand::RecomputeDecay { dry_run, confirmed } => {
+            if !dry_run && !confirmed {
+                return Err(MemoryError::Validation(
+                    "recompute_decay requires confirmed=true unless dry_run=true".to_string(),
+                ));
+            }
+            Ok(LifecycleCommandOutcome::RecomputeDecay(
+                service.recompute_decay(dry_run).await?,
+            ))
+        }
+        LifecycleCommand::RebuildCommunities { dry_run, confirmed } => {
+            if !dry_run && !confirmed {
+                return Err(MemoryError::Validation(
+                    "rebuild_communities requires confirmed=true unless dry_run=true".to_string(),
+                ));
+            }
+            Ok(LifecycleCommandOutcome::RebuildCommunities(
+                service.rebuild_communities(dry_run).await?,
+            ))
+        }
+    }
+}
 
 impl crate::service::MemoryService {
     pub async fn build_lifecycle_view(&self, scope: &str) -> Result<LifecycleView, MemoryError> {
@@ -29,7 +100,7 @@ impl crate::service::MemoryService {
     ) -> Result<LifecycleDashboard, MemoryError> {
         let namespace = self.namespace_for_scope(scope)?;
         let active_facts = self
-            .db_client
+            .app_store()
             .select_active_facts(&namespace, 10_000)
             .await?;
         let policy = self.lifecycle_policy();
@@ -37,10 +108,10 @@ impl crate::service::MemoryService {
             Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
         );
         let archival_candidates = self
-            .db_client
+            .app_store()
             .select_episodes_for_archival(&namespace, &cutoff, 1_000)
             .await?;
-        let communities = self.db_client.select_table("community", &namespace).await?;
+        let communities = self.app_store().select_communities(&namespace).await?;
 
         Ok(LifecycleDashboard {
             active_facts: active_facts.len(),
@@ -67,8 +138,8 @@ impl crate::service::MemoryService {
         let namespace = self.namespace_for_scope(scope)?;
         if !dry_run {
             for episode_id in target_ids {
-                self.db_client
-                    .update(
+                self.app_store()
+                    .update_record(
                         episode_id,
                         json!({
                             "status": "archived",
@@ -94,8 +165,8 @@ impl crate::service::MemoryService {
     ) -> Result<RestoreArchivedOutcome, MemoryError> {
         let namespace = self.namespace_for_scope(scope)?;
         for episode_id in target_ids {
-            self.db_client
-                .update(
+            self.app_store()
+                .update_record(
                     episode_id,
                     json!({
                         "status": "active",

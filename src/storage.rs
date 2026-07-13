@@ -20,7 +20,9 @@ mod queries;
 mod types;
 
 // Re-export the public API
-pub use client::{DbClient, SurrealDbClient};
+pub use client::{
+    AppStore, ContextAccessLog, ContextFactQuery, ContextStore, DbClient, SurrealDbClient,
+};
 pub use helpers::is_missing_index_error;
 pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,

@@ -6,6 +6,8 @@
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
 
+#[cfg(feature = "mcp-apps")]
+pub(crate) use apps::{apply_ingestion_review_edit, apply_ingestion_review_status};
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
 pub use entity_extraction::{
@@ -16,13 +18,17 @@ pub use error::MemoryError;
 pub use error::is_transient_db_error;
 
 mod apps;
+#[cfg(feature = "mcp-apps")]
+pub(crate) use apps::execute_lifecycle_command;
+#[cfg(feature = "mcp-apps")]
+pub(crate) use apps::{AppCommand, AppCommandInput};
 pub use apps::{
     ArchiveCandidatesOutcome, CommitIngestionReviewOutcome, CommitIngestionReviewRequest,
     DiffChange, DiffRequest, DiffSummary, DiffTarget, DiffView, DiffViewRange,
     GraphTraversalBudget, IngestionReviewBundle, IngestionReviewItem, IngestionReviewSource,
-    IngestionReviewSummary, LifecycleDashboard, LifecycleDefaults, LifecycleView,
-    PrepareIngestionReviewRequest, RebuildCommunitiesOutcome, RecomputeDecayOutcome,
-    RestoreArchivedOutcome,
+    IngestionReviewSummary, LifecycleCommand, LifecycleCommandOutcome, LifecycleDashboard,
+    LifecycleDefaults, LifecycleView, PrepareIngestionReviewRequest, RebuildCommunitiesOutcome,
+    RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
 mod cache;
 mod conflict_resolver;

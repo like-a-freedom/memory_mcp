@@ -75,7 +75,7 @@ pub(crate) async fn find_hub_entities(
         ),
         LogLevel::Debug,
     );
-    let entity_records = service.db_client.select_table("entity", namespace).await?;
+    let entity_records = service.app_store().select_entities(namespace).await?;
     let mut hubs = Vec::new();
     let candidate_scan_limit =
         (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
@@ -104,8 +104,8 @@ pub(crate) async fn find_hub_entities(
         let mut unique_edges = HashSet::new();
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             for edge in service
-                .db_client
-                .select_edge_neighbors(namespace, &entity_id, &cutoff_iso, direction)
+                .app_store()
+                .select_graph_neighbors(namespace, &entity_id, &cutoff_iso, direction)
                 .await?
             {
                 if let Some(edge_key) = edge_identity(&edge) {
@@ -165,8 +165,8 @@ pub(crate) async fn list_communities(
         LogLevel::Debug,
     );
     let mut communities = service
-        .db_client
-        .select_table("community", namespace)
+        .app_store()
+        .select_communities(namespace)
         .await?
         .into_iter()
         .filter_map(|record| graph_community_from_value(&record))
@@ -232,8 +232,8 @@ pub(crate) async fn find_surprising_connections(
 
     let cutoff_iso = normalize_dt(crate::service::now());
     let communities = service
-        .db_client
-        .select_table("community", namespace)
+        .app_store()
+        .select_communities(namespace)
         .await?
         .into_iter()
         .filter_map(|record| graph_community_from_value(&record))
@@ -275,8 +275,8 @@ pub(crate) async fn find_surprising_connections(
 
             neighbor_queries += 1;
             for edge in service
-                .db_client
-                .select_edge_neighbors(namespace, &current, &cutoff_iso, direction)
+                .app_store()
+                .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
                 .await?
             {
                 let Some(neighbor) = neighbor_node(&edge, direction, &current) else {
@@ -451,8 +451,8 @@ async fn cached_entity_name(
     }
 
     let name = service
-        .db_client
-        .select_one(entity_id, namespace)
+        .app_store()
+        .select_entity(entity_id, namespace)
         .await?
         .as_ref()
         .and_then(Value::as_object)

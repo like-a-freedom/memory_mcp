@@ -15,6 +15,7 @@ use crate::models::{
     ProvenanceSource,
 };
 use crate::storage::GraphDirection;
+use crate::storage::{AppStore, ContextAccessLog, ContextStore};
 
 use super::error::MemoryError;
 use super::util::deterministic_fact_id;
@@ -31,6 +32,18 @@ const MAX_GRAPH_INSIGHT_HUBS: i32 = 3;
 const MAX_GRAPH_INSIGHT_CONNECTIONS: usize = 5;
 
 impl MemoryService {
+    pub(crate) fn context_store(&self) -> &dyn ContextStore {
+        &self.db_client
+    }
+
+    pub(crate) fn context_access_log(&self) -> &dyn ContextAccessLog {
+        &self.db_client
+    }
+
+    pub(crate) fn app_store(&self) -> &dyn AppStore {
+        &self.db_client
+    }
+
     /// Public helper for tool-level logging.
     pub(crate) fn log_tool_event(
         &self,
