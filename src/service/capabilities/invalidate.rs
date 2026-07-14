@@ -55,7 +55,6 @@ mod tests {
     use serde_json::json;
     use tokio::sync::RwLock;
 
-    use crate::logging::StdoutLogger;
     use crate::models::{AccessPayload, InvalidateRequest};
     use crate::service::cache::{CacheKey, CacheView};
     use crate::service::capabilities::invalidate::InvalidateCapability;
@@ -68,8 +67,6 @@ mod tests {
         ServiceContext {
             db_client: Arc::new(db),
             namespaces: vec!["org".to_string()],
-            default_namespace: "org".to_string(),
-            logger: StdoutLogger::new("warn"),
             rate_limiter: Arc::new(RateLimiter::new(100, 100)),
             context_cache: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(64).unwrap()))),
         }

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use lru::LruCache;
 use tokio::sync::RwLock;
 
-use crate::logging::StdoutLogger;
 use crate::service::cache::CacheKey;
 use crate::service::util::RateLimiter;
 use crate::storage::DbClient;
@@ -17,8 +16,6 @@ use crate::models::AssembledContextItem;
 pub struct ServiceContext {
     pub db_client: Arc<dyn DbClient>,
     pub namespaces: Vec<String>,
-    pub default_namespace: String,
-    pub logger: StdoutLogger,
     pub rate_limiter: Arc<RateLimiter>,
     pub context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
 }

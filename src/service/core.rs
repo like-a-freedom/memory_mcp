@@ -51,8 +51,6 @@ impl MemoryService {
         super::service_context::ServiceContext {
             db_client: self.db_client.clone(),
             namespaces: self.namespaces.clone(),
-            default_namespace: self.default_namespace.clone(),
-            logger: self.logger.clone(),
             rate_limiter: self.rate_limiter.clone(),
             context_cache: self.context_cache.clone(),
         }
