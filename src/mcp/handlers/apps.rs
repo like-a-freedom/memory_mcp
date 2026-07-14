@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "mcp-apps"), allow(dead_code, unused_imports))]
-use std::collections::{HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
 use rmcp::ErrorData;
@@ -9,11 +8,11 @@ use rmcp::model::{
 };
 use serde_json::{Value, json};
 
+use crate::service::GraphPathSnapshot;
 #[cfg(feature = "mcp-apps")]
 use crate::service::apply_ingestion_review_status;
-use crate::service::value_helpers::{json_string, normalized_edge_record};
+pub(crate) use crate::service::edge_neighbor;
 use crate::service::{IngestionReviewItem, IngestionReviewSummary};
-use crate::storage::GraphDirection;
 
 use super::super::error::mcp_error;
 use super::super::params::OpenAppParams;
@@ -26,21 +25,6 @@ use super::super::resources::{app_catalog_resources, app_resource_templates};
 use super::super::response::{AppCommandResult, OpenAppResult};
 use super::super::session;
 use super::MemoryMcp;
-
-#[derive(Debug, Clone)]
-struct GraphPathSnapshot {
-    found: bool,
-    nodes: Vec<Value>,
-    edges: Vec<Value>,
-}
-
-pub(super) fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String> {
-    let map = record.as_object()?;
-    match direction {
-        GraphDirection::Incoming => map.get("in").and_then(json_string).map(String::from),
-        GraphDirection::Outgoing => map.get("out").and_then(json_string).map(String::from),
-    }
-}
 
 pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
@@ -234,24 +218,9 @@ impl MemoryMcp {
     }
 
     async fn entity_snapshot(&self, namespace: &str, entity_id: &str) -> Result<Value, ErrorData> {
-        let record = self
-            .service
-            .app_store()
-            .select_entity(entity_id, namespace)
+        crate::service::entity_snapshot(self.service.app_store(), namespace, entity_id)
             .await
-            .map_err(mcp_error)?;
-        let canonical_name = record
-            .as_ref()
-            .and_then(Value::as_object)
-            .and_then(|map| map.get("canonical_name"))
-            .and_then(Value::as_str)
-            .unwrap_or(entity_id)
-            .to_string();
-
-        Ok(json!({
-            "entity_id": entity_id,
-            "canonical_name": canonical_name,
-        }))
+            .map_err(mcp_error)
     }
 
     async fn inspector_payload(
@@ -336,69 +305,20 @@ impl MemoryMcp {
         cutoff: DateTime<Utc>,
         max_depth: i32,
     ) -> Result<GraphPathSnapshot, ErrorData> {
-        if from_entity_id == to_entity_id {
-            return Ok(GraphPathSnapshot {
-                found: true,
-                nodes: vec![self.entity_snapshot(namespace, from_entity_id).await?],
-                edges: Vec::new(),
-            });
-        }
-
-        let cutoff_iso = crate::service::normalize_dt(cutoff);
-        let mut visited = HashSet::from([from_entity_id.to_string()]);
-        let mut queue = VecDeque::from([(
-            from_entity_id.to_string(),
-            vec![from_entity_id.to_string()],
-            Vec::<Value>::new(),
-        )]);
-
-        while let Some((current, nodes, edges)) = queue.pop_front() {
-            if edges.len() >= max_depth.max(1) as usize {
-                continue;
-            }
-
-            for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
-                let records = self
-                    .service
-                    .app_store()
-                    .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
-                    .await
-                    .map_err(mcp_error)?;
-                for record in records {
-                    let Some(neighbor) = edge_neighbor(&record, direction) else {
-                        continue;
-                    };
-                    let mut next_nodes = nodes.clone();
-                    next_nodes.push(neighbor.clone());
-                    let mut next_edges = edges.clone();
-                    next_edges.push(normalized_edge_record(&record));
-
-                    if neighbor == to_entity_id {
-                        let mut snapshots = Vec::with_capacity(next_nodes.len());
-                        for node_id in next_nodes {
-                            snapshots.push(self.entity_snapshot(namespace, &node_id).await?);
-                        }
-                        return Ok(GraphPathSnapshot {
-                            found: true,
-                            nodes: snapshots,
-                            edges: next_edges,
-                        });
-                    }
-
-                    if visited.insert(neighbor.clone()) {
-                        queue.push_back((neighbor, next_nodes, next_edges));
-                    }
-                }
-            }
-        }
-
+        let result = crate::service::graph_path_snapshot(
+            self.service.app_store(),
+            namespace,
+            from_entity_id,
+            to_entity_id,
+            cutoff,
+            max_depth,
+        )
+        .await
+        .map_err(mcp_error)?;
         Ok(GraphPathSnapshot {
-            found: false,
-            nodes: vec![
-                self.entity_snapshot(namespace, from_entity_id).await?,
-                self.entity_snapshot(namespace, to_entity_id).await?,
-            ],
-            edges: Vec::new(),
+            found: result.found,
+            nodes: result.nodes,
+            edges: result.edges,
         })
     }
 
@@ -410,58 +330,16 @@ impl MemoryMcp {
         depth: i32,
         cutoff: DateTime<Utc>,
     ) -> Result<Value, ErrorData> {
-        let directions = match direction {
-            "incoming" => vec![GraphDirection::Incoming],
-            "outgoing" => vec![GraphDirection::Outgoing],
-            "both" => vec![GraphDirection::Outgoing, GraphDirection::Incoming],
-            other => {
-                return Err(Self::invalid_params(format!(
-                    "Unsupported graph direction: {other}. Use incoming, outgoing, or both."
-                )));
-            }
-        };
-
-        let cutoff_iso = crate::service::normalize_dt(cutoff);
-        let mut visited = HashSet::from([target_id.to_string()]);
-        let mut frontier = vec![target_id.to_string()];
-        let mut nodes = Vec::new();
-        let mut edges = Vec::new();
-
-        for _ in 0..depth.max(1) {
-            let mut next_frontier = Vec::new();
-            for node_id in frontier {
-                for graph_direction in &directions {
-                    for record in self
-                        .service
-                        .app_store()
-                        .select_graph_neighbors(namespace, &node_id, &cutoff_iso, *graph_direction)
-                        .await
-                        .map_err(mcp_error)?
-                    {
-                        if let Some(neighbor) = edge_neighbor(&record, *graph_direction) {
-                            edges.push(normalized_edge_record(&record));
-                            if visited.insert(neighbor.clone()) {
-                                nodes.push(self.entity_snapshot(namespace, &neighbor).await?);
-                                next_frontier.push(neighbor);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if next_frontier.is_empty() {
-                break;
-            }
-            frontier = next_frontier;
-        }
-
-        Ok(json!({
-            "target_id": target_id,
-            "direction": direction,
-            "depth": depth.max(1),
-            "nodes": nodes,
-            "edges": edges,
-        }))
+        crate::service::graph_neighbor_expansion(
+            self.service.app_store(),
+            namespace,
+            target_id,
+            direction,
+            depth,
+            cutoff,
+        )
+        .await
+        .map_err(mcp_error)
     }
 
     async fn graph_payload(
@@ -474,38 +352,16 @@ impl MemoryMcp {
     ) -> Result<Value, ErrorData> {
         let namespace = self.service.namespace_for_scope(scope).map_err(mcp_error)?;
         let cutoff = as_of.and_then(parse_datetime).unwrap_or_else(Utc::now);
-        let path = self
-            .graph_path_snapshot(&namespace, from_entity_id, to_entity_id, cutoff, max_depth)
-            .await?;
-        let from_neighbors = self
-            .graph_neighbor_expansion(&namespace, from_entity_id, "both", 1, cutoff)
-            .await?;
-        let to_neighbors = self
-            .graph_neighbor_expansion(&namespace, to_entity_id, "both", 1, cutoff)
-            .await?;
-
-        Ok(json!({
-            "target": {
-                "from_entity_id": from_entity_id,
-                "to_entity_id": to_entity_id,
-                "as_of": as_of,
-                "max_depth": max_depth.max(1),
-                "namespace": namespace,
-            },
-            "graph": {
-                "path_found": path.found,
-                "nodes": path.nodes,
-                "edges": path.edges,
-                "hop_count": path.edges.len(),
-            },
-            "neighbors": {
-                "from": from_neighbors,
-                "to": to_neighbors,
-            },
-            "selected_edge": Value::Null,
-            "context_preview": Value::Null,
-            "expansions": [],
-        }))
+        crate::service::graph_payload(
+            self.service.app_store(),
+            &namespace,
+            from_entity_id,
+            to_entity_id,
+            cutoff,
+            max_depth,
+        )
+        .await
+        .map_err(mcp_error)
     }
 
     pub(super) async fn open_inspector_app(

@@ -61,6 +61,11 @@ pub mod mock_db;
 
 pub(crate) use scope::{LifecyclePolicy, MemoryScope};
 
+pub(crate) use apps::{
+    GraphPathSnapshot, edge_neighbor, entity_snapshot, graph_neighbor_expansion,
+    graph_path_snapshot, graph_payload,
+};
+
 pub use constants::*;
 mod constants {
     /// Default context cache size.

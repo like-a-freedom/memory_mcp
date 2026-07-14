@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::logging::LogLevel;
 use crate::models::SurprisingConnection;
 use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
-use crate::storage::GraphDirection;
+use crate::storage::{AppStore, GraphDirection};
 
 const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;
 const MAX_HUB_CANDIDATE_SCAN: usize = 64;
@@ -491,6 +491,230 @@ fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
     } else {
         None
     }
+}
+
+// ---------------------------------------------------------------------------
+// Graph traversal for app sessions (extracted from MCP handlers)
+// ---------------------------------------------------------------------------
+
+/// Result of a BFS path search between two entities.
+#[derive(Debug, Clone)]
+pub struct GraphPathSnapshot {
+    pub found: bool,
+    pub nodes: Vec<Value>,
+    pub edges: Vec<Value>,
+}
+
+/// Extracts the neighbor entity ID from an edge record based on traversal direction.
+pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String> {
+    let map = record.as_object()?;
+    match direction {
+        GraphDirection::Incoming => map.get("in").and_then(|v| v.as_str()).map(String::from),
+        GraphDirection::Outgoing => map.get("out").and_then(|v| v.as_str()).map(String::from),
+    }
+}
+
+/// Returns a JSON snapshot of an entity (entity_id + canonical_name).
+pub async fn entity_snapshot(
+    store: &dyn AppStore,
+    namespace: &str,
+    entity_id: &str,
+) -> Result<Value, MemoryError> {
+    let record = store.select_entity(entity_id, namespace).await?;
+    let canonical_name = record
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|map| map.get("canonical_name"))
+        .and_then(Value::as_str)
+        .unwrap_or(entity_id)
+        .to_string();
+
+    Ok(json!({
+        "entity_id": entity_id,
+        "canonical_name": canonical_name,
+    }))
+}
+
+/// BFS path finding between two entities in the knowledge graph.
+pub async fn graph_path_snapshot(
+    store: &dyn AppStore,
+    namespace: &str,
+    from_entity_id: &str,
+    to_entity_id: &str,
+    cutoff: DateTime<Utc>,
+    max_depth: i32,
+) -> Result<GraphPathSnapshot, MemoryError> {
+    if from_entity_id == to_entity_id {
+        return Ok(GraphPathSnapshot {
+            found: true,
+            nodes: vec![entity_snapshot(store, namespace, from_entity_id).await?],
+            edges: Vec::new(),
+        });
+    }
+
+    let cutoff_iso = normalize_dt(cutoff);
+    let mut visited = HashSet::from([from_entity_id.to_string()]);
+    let mut queue = VecDeque::from([(
+        from_entity_id.to_string(),
+        vec![from_entity_id.to_string()],
+        Vec::<Value>::new(),
+    )]);
+
+    while let Some((current, nodes, edges)) = queue.pop_front() {
+        if edges.len() >= max_depth.max(1) as usize {
+            continue;
+        }
+
+        for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
+            let records = store
+                .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
+                .await?;
+            for record in records {
+                let Some(neighbor) = edge_neighbor(&record, direction) else {
+                    continue;
+                };
+                let mut next_nodes = nodes.clone();
+                next_nodes.push(neighbor.clone());
+                let mut next_edges = edges.clone();
+                next_edges.push(crate::service::value_helpers::normalized_edge_record(
+                    &record,
+                ));
+
+                if neighbor == to_entity_id {
+                    let mut snapshots = Vec::with_capacity(next_nodes.len());
+                    for node_id in next_nodes {
+                        snapshots.push(entity_snapshot(store, namespace, &node_id).await?);
+                    }
+                    return Ok(GraphPathSnapshot {
+                        found: true,
+                        nodes: snapshots,
+                        edges: next_edges,
+                    });
+                }
+
+                if visited.insert(neighbor.clone()) {
+                    queue.push_back((neighbor, next_nodes, next_edges));
+                }
+            }
+        }
+    }
+
+    Ok(GraphPathSnapshot {
+        found: false,
+        nodes: vec![
+            entity_snapshot(store, namespace, from_entity_id).await?,
+            entity_snapshot(store, namespace, to_entity_id).await?,
+        ],
+        edges: Vec::new(),
+    })
+}
+
+/// BFS neighbor expansion from a target entity.
+pub async fn graph_neighbor_expansion(
+    store: &dyn AppStore,
+    namespace: &str,
+    target_id: &str,
+    direction: &str,
+    depth: i32,
+    cutoff: DateTime<Utc>,
+) -> Result<Value, MemoryError> {
+    let directions = match direction {
+        "incoming" => vec![GraphDirection::Incoming],
+        "outgoing" => vec![GraphDirection::Outgoing],
+        "both" => vec![GraphDirection::Outgoing, GraphDirection::Incoming],
+        other => {
+            return Err(MemoryError::Validation(format!(
+                "Unsupported graph direction: {other}. Use incoming, outgoing, or both."
+            )));
+        }
+    };
+
+    let cutoff_iso = normalize_dt(cutoff);
+    let mut visited = HashSet::from([target_id.to_string()]);
+    let mut frontier = vec![target_id.to_string()];
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+
+    for _ in 0..depth.max(1) {
+        let mut next_frontier = Vec::new();
+        for node_id in &frontier {
+            for graph_direction in &directions {
+                for record in store
+                    .select_graph_neighbors(namespace, node_id, &cutoff_iso, *graph_direction)
+                    .await?
+                {
+                    if let Some(neighbor) = edge_neighbor(&record, *graph_direction) {
+                        edges.push(crate::service::value_helpers::normalized_edge_record(
+                            &record,
+                        ));
+                        if visited.insert(neighbor.clone()) {
+                            nodes.push(entity_snapshot(store, namespace, &neighbor).await?);
+                            next_frontier.push(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        if next_frontier.is_empty() {
+            break;
+        }
+        frontier = next_frontier;
+    }
+
+    Ok(json!({
+        "target_id": target_id,
+        "direction": direction,
+        "depth": depth.max(1),
+        "nodes": nodes,
+        "edges": edges,
+    }))
+}
+
+/// Builds the full graph payload: path + neighbor expansion for both endpoints.
+pub async fn graph_payload(
+    store: &dyn AppStore,
+    namespace: &str,
+    from_entity_id: &str,
+    to_entity_id: &str,
+    cutoff: DateTime<Utc>,
+    max_depth: i32,
+) -> Result<Value, MemoryError> {
+    let path = graph_path_snapshot(
+        store,
+        namespace,
+        from_entity_id,
+        to_entity_id,
+        cutoff,
+        max_depth,
+    )
+    .await?;
+    let from_neighbors =
+        graph_neighbor_expansion(store, namespace, from_entity_id, "both", 1, cutoff).await?;
+    let to_neighbors =
+        graph_neighbor_expansion(store, namespace, to_entity_id, "both", 1, cutoff).await?;
+
+    Ok(json!({
+        "target": {
+            "from_entity_id": from_entity_id,
+            "to_entity_id": to_entity_id,
+            "max_depth": max_depth.max(1),
+            "namespace": namespace,
+        },
+        "graph": {
+            "path_found": path.found,
+            "nodes": path.nodes,
+            "edges": path.edges,
+            "hop_count": path.edges.len(),
+        },
+        "neighbors": {
+            "from": from_neighbors,
+            "to": to_neighbors,
+        },
+        "selected_edge": Value::Null,
+        "context_preview": Value::Null,
+        "expansions": [],
+    }))
 }
 
 #[cfg(test)]
