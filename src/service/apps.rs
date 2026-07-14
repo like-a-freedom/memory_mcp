@@ -7,10 +7,9 @@ mod types;
 mod workflow;
 
 pub use graph::GraphTraversalBudget;
-pub use graph::{
-    GraphPathSnapshot, edge_neighbor, entity_snapshot, graph_neighbor_expansion,
-    graph_path_snapshot, graph_payload,
-};
+#[cfg(test)]
+pub use graph::edge_neighbor;
+pub use graph::{graph_neighbor_expansion, graph_payload};
 #[cfg(feature = "mcp-apps")]
 pub(crate) use ingestion_review::{apply_ingestion_review_edit, apply_ingestion_review_status};
 #[cfg(feature = "mcp-apps")]

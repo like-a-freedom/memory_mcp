@@ -1211,7 +1211,8 @@ impl MemoryMcp {
 
 #[cfg(test)]
 mod tests {
-    use super::apps::{edge_neighbor, shallow_merge_object, summarize_ingestion_review_items};
+    use super::apps::{shallow_merge_object, summarize_ingestion_review_items};
+    use crate::service::edge_neighbor;
     use super::*;
     use crate::mcp::parsers::parse_datetime;
     #[cfg(feature = "mcp-apps")]

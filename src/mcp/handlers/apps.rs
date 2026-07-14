@@ -8,11 +8,9 @@ use rmcp::model::{
 };
 use serde_json::{Value, json};
 
-use crate::service::GraphPathSnapshot;
+use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 #[cfg(feature = "mcp-apps")]
 use crate::service::apply_ingestion_review_status;
-pub(crate) use crate::service::edge_neighbor;
-use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 
 use super::super::error::mcp_error;
 use super::super::params::OpenAppParams;
@@ -217,12 +215,6 @@ impl MemoryMcp {
         Ok(session.payload)
     }
 
-    async fn entity_snapshot(&self, namespace: &str, entity_id: &str) -> Result<Value, ErrorData> {
-        crate::service::entity_snapshot(self.service.app_store(), namespace, entity_id)
-            .await
-            .map_err(mcp_error)
-    }
-
     async fn inspector_payload(
         &self,
         scope: &str,
@@ -295,31 +287,6 @@ impl MemoryMcp {
                 .map_err(mcp_error)?,
         )
         .map_err(|error| Self::internal_error(error.to_string()))
-    }
-
-    async fn graph_path_snapshot(
-        &self,
-        namespace: &str,
-        from_entity_id: &str,
-        to_entity_id: &str,
-        cutoff: DateTime<Utc>,
-        max_depth: i32,
-    ) -> Result<GraphPathSnapshot, ErrorData> {
-        let result = crate::service::graph_path_snapshot(
-            self.service.app_store(),
-            namespace,
-            from_entity_id,
-            to_entity_id,
-            cutoff,
-            max_depth,
-        )
-        .await
-        .map_err(mcp_error)?;
-        Ok(GraphPathSnapshot {
-            found: result.found,
-            nodes: result.nodes,
-            edges: result.edges,
-        })
     }
 
     pub(super) async fn graph_neighbor_expansion(
