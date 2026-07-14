@@ -44,6 +44,20 @@ impl MemoryService {
         &self.db_client
     }
 
+    /// Builds a `ServiceContext` from this service's fields.
+    ///
+    /// Used by capability modules that need a narrow reference instead of `&self`.
+    pub(crate) fn build_context(&self) -> super::service_context::ServiceContext {
+        super::service_context::ServiceContext {
+            db_client: self.db_client.clone(),
+            namespaces: self.namespaces.clone(),
+            default_namespace: self.default_namespace.clone(),
+            logger: self.logger.clone(),
+            rate_limiter: self.rate_limiter.clone(),
+            context_cache: self.context_cache.clone(),
+        }
+    }
+
     /// Public helper for tool-level logging.
     pub(crate) fn log_tool_event(
         &self,
@@ -1155,31 +1169,12 @@ impl MemoryService {
         request: InvalidateRequest,
         access: Option<AccessPayload>,
     ) -> Result<(), MemoryError> {
-        self.enforce_rate_limit(access.as_ref())?;
-        let (record, namespace) = self.find_fact_record(&request.fact_id).await?;
-        let namespace =
-            namespace.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
-        let mut updated =
-            record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
-
-        let scope = updated
-            .get("scope")
-            .and_then(string_from_value)
-            .unwrap_or_else(|| namespace.clone());
-
-        updated.insert(
-            "t_invalid".to_string(),
-            json!(super::normalize_dt(request.t_invalid)),
-        );
-        updated.insert(
-            "t_invalid_ingested".to_string(),
-            json!(super::normalize_dt(super::query::now())),
-        );
-        self.db_client
-            .update(&request.fact_id, Value::Object(updated), &namespace)
-            .await?;
-        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
-        Ok(())
+        super::capabilities::invalidate::InvalidateCapability::invalidate(
+            &self.build_context(),
+            request,
+            access,
+        )
+        .await
     }
 
     /// Assembles context for a query.

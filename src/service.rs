@@ -51,7 +51,9 @@ mod startup;
 mod triple_extractor;
 mod util;
 
+pub(crate) mod capabilities;
 mod model_loader;
+pub(crate) mod service_context;
 pub(crate) mod value_helpers;
 
 #[cfg(test)]
