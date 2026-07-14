@@ -1212,13 +1212,13 @@ impl MemoryMcp {
 #[cfg(test)]
 mod tests {
     use super::apps::{shallow_merge_object, summarize_ingestion_review_items};
-    use crate::service::edge_neighbor;
     use super::*;
     use crate::mcp::parsers::parse_datetime;
     #[cfg(feature = "mcp-apps")]
     use crate::models::EntityCandidate;
     #[cfg(feature = "mcp-apps")]
     use crate::models::IngestRequest;
+    use crate::service::edge_neighbor;
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Datelike;
     #[cfg(feature = "mcp-apps")]

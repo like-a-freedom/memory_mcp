@@ -8,9 +8,9 @@ use rmcp::model::{
 };
 use serde_json::{Value, json};
 
-use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 #[cfg(feature = "mcp-apps")]
 use crate::service::apply_ingestion_review_status;
+use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 
 use super::super::error::mcp_error;
 use super::super::params::OpenAppParams;
