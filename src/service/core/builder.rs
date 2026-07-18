@@ -53,6 +53,8 @@ pub struct MemoryService {
     pub(crate) entity_resolver: super::super::entity_resolution::EntityResolver,
     pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
     pub(crate) lifecycle_config: crate::config::LifecycleConfig,
+    #[allow(dead_code)]
+    pub(crate) claim_service: super::super::claims::project::ClaimService,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -530,6 +532,7 @@ impl MemoryService {
                 super::super::triple_extractor::RuleBasedTripleExtractor::new(),
             ),
             lifecycle_config: crate::config::LifecycleConfig::default(),
+            claim_service: super::super::claims::project::ClaimService::new(),
         })
     }
 

@@ -1,5 +1,6 @@
 //! Configuration management for the Memory MCP system.
 
+pub(crate) mod claims;
 mod constants;
 mod embedding;
 mod helpers;
