@@ -41,14 +41,15 @@ impl std::str::FromStr for ClaimRolloutStage {
     type Err = MemoryError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+        let trimmed = s.trim();
+        match trimmed.to_lowercase().as_str() {
             "disabled" => Ok(Self::Disabled),
             "shadow" => Ok(Self::Shadow),
             "relations" => Ok(Self::Relations),
             "evidence" => Ok(Self::Evidence),
             "lifecycle" => Ok(Self::Lifecycle),
-            other => Err(MemoryError::ConfigInvalid(format!(
-                "unknown MEMORY_CLAIM_ROLLOUT_STAGE: '{other}'. Valid: disabled, shadow, relations, evidence, lifecycle"
+            _ => Err(MemoryError::ConfigInvalid(format!(
+                "unknown MEMORY_CLAIM_ROLLOUT_STAGE: '{trimmed}'. Valid: disabled, shadow, relations, evidence, lifecycle"
             ))),
         }
     }

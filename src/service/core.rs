@@ -489,7 +489,7 @@ impl MemoryService {
                 ("policy_tags".to_string(), json!(policy_tags)),
                 ("provenance".to_string(), provenance.to_json_value()),
             ]);
-            if let Some(project) = project {
+            if let Some(ref project) = project {
                 payload.insert("project".to_string(), json!(project));
             }
 
@@ -542,11 +542,7 @@ impl MemoryService {
             let claim_fact_id = FactId::from(fact_id.clone());
             let claim_content = content.to_string();
             let claim_scope = scope.to_string();
-            let claim_project = self
-                .project_for_source_episode(source_episode)
-                .await
-                .ok()
-                .flatten();
+            let claim_project = project.clone();
             let claim_entity_links = entity_links.clone();
             let claim_t_valid = t_valid;
             let claim_fact_type = fact_type.to_string();
