@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json;
+use serde_json::{self, Value};
 
 use super::DbClient;
 use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ExtractorFingerprint};
-use crate::models::{EpisodeId, FactId};
+use crate::models::{ClaimJobId, EpisodeId, FactId};
 use crate::service::MemoryError;
 
 // ─── ClaimStore Trait ─────────────────────────────────────────────────────────
@@ -207,7 +207,6 @@ impl SurrealClaimStore {
     }
 
     fn upsert_one_sql(table: &str, record_id: &str) -> Result<String, MemoryError> {
-        // CHECK constraint: table must only contain ASCII letters and underscore
         if !table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(MemoryError::Validation(format!(
                 "invalid table name: {table}"
@@ -228,17 +227,59 @@ impl SurrealClaimStore {
             _ => vec![],
         }
     }
+
+    fn extract_first(value: serde_json::Value) -> Option<serde_json::Value> {
+        match value {
+            serde_json::Value::Array(mut arr) if !arr.is_empty() => Some(arr.remove(0)),
+            _ => None,
+        }
+    }
 }
 
 #[async_trait]
 impl ClaimStore for SurrealClaimStore {
     async fn load_projection_source(
         &self,
-        _namespace: &str,
-        _fact_id: &FactId,
+        namespace: &str,
+        fact_id: &FactId,
     ) -> Result<Option<ClaimProjectionSource>, MemoryError> {
-        // TODO: Implement in a follow-up when wire-up is needed
-        Ok(None)
+        let sql = format!("SELECT * FROM fact:⟨{}⟩", fact_id.as_ref());
+        let result = self.db.query(&sql, None, namespace).await?;
+        match Self::extract_first(result) {
+            Some(Value::Object(map)) => Ok(Some(ClaimProjectionSource {
+                fact_id: map
+                    .get("fact_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                content: map
+                    .get("content")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                t_ref: map
+                    .get("t_valid")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                scope: map
+                    .get("scope")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                project: map.get("project").and_then(Value::as_str).map(String::from),
+                policy_tags: map
+                    .get("policy_tags")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            })),
+            _ => Ok(None),
+        }
     }
 
     async fn ensure_projection_job(&self, job: &ClaimJob) -> Result<(), MemoryError> {
@@ -251,17 +292,42 @@ impl ClaimStore for SurrealClaimStore {
 
     async fn load_job(
         &self,
-        _namespace: &str,
-        _job_id: &crate::models::ClaimJobId,
+        namespace: &str,
+        job_id: &ClaimJobId,
     ) -> Result<Option<ClaimJob>, MemoryError> {
-        Ok(None)
+        let sql = format!("SELECT * FROM claim_job:⟨{}⟩", job_id);
+        let result = self.db.query(&sql, None, namespace).await?;
+        match Self::extract_first(result) {
+            Some(v) => serde_json::from_value(v)
+                .map(Some)
+                .map_err(|e| MemoryError::Storage(format!("job deser: {e}"))),
+            None => Ok(None),
+        }
     }
 
     async fn lease_next_job(
         &self,
-        _request: LeaseJobRequest<'_>,
+        request: LeaseJobRequest<'_>,
     ) -> Result<Option<ClaimJob>, MemoryError> {
-        Ok(None)
+        let expires = chrono::Utc::now() + request.lease_duration;
+        // Atomically find the next pending/expired job and lease it
+        let sql = "UPDATE claim_job SET status = 'leased', lease_owner = $owner, \
+                   lease_expires_at = $expires, started_at = $now \
+                   WHERE status = 'pending' \
+                   AND (lease_expires_at IS NONE OR lease_expires_at < time::now()) \
+                   ORDER BY job_id LIMIT 1 RETURN BEFORE";
+        let vars = serde_json::json!({
+            "owner": request.lease_owner,
+            "expires": crate::service::normalize_dt(expires),
+            "now": crate::service::normalize_dt(chrono::Utc::now()),
+        });
+        let result = self.db.query(sql, Some(vars), request.namespace).await?;
+        match Self::extract_first(result) {
+            Some(v) => serde_json::from_value(v)
+                .map(Some)
+                .map_err(|e| MemoryError::Storage(format!("job deser: {e}"))),
+            None => Ok(None),
+        }
     }
 
     async fn persist_projection(
@@ -364,37 +430,88 @@ impl ClaimStore for SurrealClaimStore {
 
     async fn select_source_evidence(
         &self,
-        _query: SourceEvidenceQuery<'_>,
+        q: SourceEvidenceQuery<'_>,
     ) -> Result<Vec<SourceEvidenceRecord>, MemoryError> {
-        Ok(vec![])
+        let sql = "SELECT claim_id, source_episode_id, source_lineage FROM claim WHERE source_fact_id = $fact_id";
+        let vars = serde_json::json!({"fact_id": q.fact_id.as_ref()});
+        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let records = Self::deserialize_vec(result);
+        records
+            .into_iter()
+            .map(|v| {
+                serde_json::from_value(v)
+                    .map_err(|e| MemoryError::Storage(format!("evidence deser: {e}")))
+            })
+            .collect()
     }
 
     async fn count_active_relations(
         &self,
-        _namespace: &str,
+        namespace: &str,
     ) -> Result<Vec<ActiveRelationCount>, MemoryError> {
-        Ok(vec![])
+        let sql = "SELECT count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE GROUP BY namespace";
+        let result = self.db.query(sql, None, namespace).await?;
+        let records = Self::deserialize_vec(result);
+        records
+            .into_iter()
+            .map(|v| {
+                serde_json::from_value(v)
+                    .map_err(|e| MemoryError::Storage(format!("count deser: {e}")))
+            })
+            .collect()
     }
 
     async fn select_facts_for_backfill(
         &self,
-        _query: BackfillFactQuery<'_>,
+        q: BackfillFactQuery<'_>,
     ) -> Result<Vec<serde_json::Value>, MemoryError> {
-        Ok(vec![])
+        let after_clause = match q.after_fact_id {
+            Some(id) => format!(" AND fact_id > \"{}\"", id),
+            None => String::new(),
+        };
+        // Backfill only facts that don't have a claim_job for the current fingerprint
+        let sql = format!(
+            "SELECT * FROM fact WHERE fact_id IS NOT NONE{after_clause} ORDER BY fact_id LIMIT $limit"
+        );
+        let vars = serde_json::json!({"limit": q.limit});
+        let result = self.db.query(&sql, Some(vars), q.namespace).await?;
+        Ok(Self::deserialize_vec(result))
     }
 
     async fn retract_fact_and_claims(
         &self,
-        _request: RetractFactAndClaimsRequest<'_>,
+        request: RetractFactAndClaimsRequest<'_>,
     ) -> Result<(), MemoryError> {
+        let now = crate::service::normalize_dt(chrono::Utc::now());
+        // Update the fact with invalidation reason
+        let sql1 = "UPDATE fact:⟨$id⟩ SET t_invalid = $now, invalidation_reason = $reason";
+        let vars1 = serde_json::json!({
+            "id": request.fact_id.as_ref(),
+            "now": now,
+            "reason": request.retract_reason,
+        });
+        self.db.query(sql1, Some(vars1), request.namespace).await?;
+        // Invalidate all claims from this fact
+        let sql2 = "UPDATE claim SET t_invalid_ingested = $now WHERE source_fact_id = $fact_id AND t_invalid_ingested IS NONE";
+        let vars2 = serde_json::json!({
+            "now": now,
+            "fact_id": request.fact_id.as_ref(),
+        });
+        self.db.query(sql2, Some(vars2), request.namespace).await?;
         Ok(())
     }
 
     async fn upsert_compiled_policies(
         &self,
-        _namespace: &str,
-        _policies: &[ClaimPolicyRecord],
+        namespace: &str,
+        policies: &[ClaimPolicyRecord],
     ) -> Result<(), MemoryError> {
+        for policy in policies {
+            let content = Self::serialize(policy)?;
+            let sql = Self::upsert_one_sql("claim_policy", &policy.policy_id)?;
+            let vars = serde_json::json!({"content": content});
+            self.db.query(&sql, Some(vars), namespace).await?;
+        }
         Ok(())
     }
 }
