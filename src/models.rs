@@ -4,6 +4,7 @@
 //! including request/response types, domain entities, and access control types.
 
 mod access;
+pub mod claim;
 mod domain;
 mod ids;
 mod provenance;
