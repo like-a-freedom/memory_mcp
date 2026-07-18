@@ -48,6 +48,8 @@ mod tests {
     use crate::models::{EpisodeId, FactId};
     use std::collections::BTreeMap;
 
+    const EMPTY_ASSERTIONS: &[crate::service::claims::structural::StructuralAssertion] = &[];
+
     fn test_input(fields: BTreeMap<String, String>) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
             namespace: "test",
@@ -60,6 +62,7 @@ mod tests {
             t_ref: chrono::Utc::now(),
             content: "test content",
             structured_fields: Box::leak(Box::new(fields)),
+            assertions: EMPTY_ASSERTIONS,
         }
     }
 
@@ -78,6 +81,7 @@ mod tests {
             t_ref: chrono::Utc::now(),
             content,
             structured_fields: Box::leak(Box::new(fields)),
+            assertions: EMPTY_ASSERTIONS,
         }
     }
 

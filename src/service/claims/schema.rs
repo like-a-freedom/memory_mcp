@@ -12,6 +12,8 @@ use crate::models::claim::{
 use crate::models::{EpisodeId, FactId};
 use crate::service::MemoryError;
 
+use super::structural::StructuralAssertion;
+
 // ─── Projection Input ─────────────────────────────────────────────────────────
 
 /// Borrowed inputs for a single projection call.
@@ -29,6 +31,8 @@ pub(crate) struct ClaimProjectionInput<'a> {
     pub content: &'a str,
     /// Structured fields parsed from connector/record sources.
     pub structured_fields: &'a BTreeMap<String, String>,
+    /// Pre-parsed structural assertions from the content.
+    pub assertions: &'a [StructuralAssertion],
 }
 
 // ─── Claim Draft (local to extraction) ───────────────────────────────────────
@@ -597,6 +601,8 @@ pub(crate) fn parse_is_sentence(content: &str) -> Option<(String, String)> {
 mod tests {
     use super::*;
 
+    const EMPTY_ASSERTIONS: &[StructuralAssertion] = &[];
+
     fn test_input(fields: BTreeMap<String, String>) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
             namespace: "test",
@@ -609,6 +615,7 @@ mod tests {
             t_ref: chrono::Utc::now(),
             content: "test content",
             structured_fields: Box::leak(Box::new(fields)),
+            assertions: EMPTY_ASSERTIONS,
         }
     }
 
@@ -627,6 +634,7 @@ mod tests {
             t_ref: chrono::Utc::now(),
             content,
             structured_fields: Box::leak(Box::new(fields)),
+            assertions: EMPTY_ASSERTIONS,
         }
     }
 

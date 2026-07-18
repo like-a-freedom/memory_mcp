@@ -78,7 +78,7 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
             "personal",
         )
         .await
-        .and_then(|v| Ok(serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()))
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {
             rows.first()
                 .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
@@ -98,7 +98,7 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
             "personal",
         )
         .await
-        .and_then(|v| Ok(serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()))
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {
             rows.first()
                 .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
@@ -132,7 +132,7 @@ async fn same_value_under_distinct_keys_produces_distinct_claims() {
             "personal",
         )
         .await
-        .and_then(|v| Ok(serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()))
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {
             rows.iter()
                 .filter_map(|r| {
@@ -158,7 +158,7 @@ async fn same_value_under_distinct_keys_produces_distinct_claims() {
 async fn reconciliation_never_crosses_scope_project_or_policy() {
     let (service, db_client) = make_service().await;
 
-    let ep_a = ingest_source(
+    let _ep_a = ingest_source(
         &service,
         "chat",
         "src:c1",
@@ -167,7 +167,7 @@ async fn reconciliation_never_crosses_scope_project_or_policy() {
         "2026-06-01T00:00:00Z",
     )
     .await;
-    let ep_b = ingest_source(
+    let _ep_b = ingest_source(
         &service,
         "chat",
         "src:c2",
@@ -180,7 +180,7 @@ async fn reconciliation_never_crosses_scope_project_or_policy() {
     let relation_count: usize = db_client
         .query("SELECT count() AS cnt FROM claim_relation", None, "org")
         .await
-        .and_then(|v| Ok(serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()))
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {
             rows.first()
                 .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
@@ -201,7 +201,7 @@ async fn relation_outcomes_use_the_accepted_persisted_vocabulary() {
     let (service, db_client) = make_service().await;
 
     // Ingest two contradicting facts
-    let ep_a = ingest_source(
+    let _ep_a = ingest_source(
         &service,
         "chat",
         "src:d1",
@@ -210,7 +210,7 @@ async fn relation_outcomes_use_the_accepted_persisted_vocabulary() {
         "2026-06-01T00:00:00Z",
     )
     .await;
-    let ep_b = ingest_source(
+    let _ep_b = ingest_source(
         &service,
         "chat",
         "src:d2",
@@ -224,7 +224,7 @@ async fn relation_outcomes_use_the_accepted_persisted_vocabulary() {
     let outcomes: Vec<String> = db_client
         .query("SELECT outcome FROM claim_relation", None, "personal")
         .await
-        .and_then(|v| Ok(serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()))
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {
             rows.iter()
                 .filter_map(|r| r.get("outcome").and_then(|o| o.as_str().map(String::from)))

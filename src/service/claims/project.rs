@@ -106,6 +106,7 @@ impl ClaimService {
             t_ref: params.t_valid,
             content: params.content,
             structured_fields: &structured_fields,
+            assertions: &crate::service::claims::structural::parse_assertions(params.content),
         };
 
         let result = project_fact(&self.registry, &input)?;

@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
-use memory_mcp::storage::DbClient;
 use serde::Deserialize;
 
 // ─── Fixture contract types ────────────────────────────────────────────────────

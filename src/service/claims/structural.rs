@@ -249,10 +249,7 @@ fn split_number_unit(val: &str) -> Option<(String, Option<String>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::claim::{
-        CanonicalPayloadHash, ClaimSchemaFamily, ClaimSchemaRef, ClaimValue, ComparisonKey,
-        ComparisonKeyHash, QualifierHash,
-    };
+    use crate::models::claim::ClaimSchemaFamily;
 
     #[test]
     fn parse_kv_measure_line() {
