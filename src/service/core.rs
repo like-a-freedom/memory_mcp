@@ -545,13 +545,11 @@ impl MemoryService {
             let claim_project = project.clone();
             let claim_entity_links = entity_links.clone();
             let claim_t_valid = t_valid;
-            let claim_fact_type = fact_type.to_string();
             let namespace_clone = namespace.clone();
             tokio::spawn(async move {
                 let params = crate::service::claims::project::FactPersistedParams {
                     namespace: &namespace_clone,
                     fact_id: &claim_fact_id,
-                    _fact_type: &claim_fact_type,
                     content: &claim_content,
                     scope: &claim_scope,
                     project: claim_project.as_deref(),

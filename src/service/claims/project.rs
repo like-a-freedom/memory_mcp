@@ -36,7 +36,6 @@ pub(crate) struct ClaimService {
 pub(crate) struct FactPersistedParams<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
-    pub _fact_type: &'a str,
     pub content: &'a str,
     pub scope: &'a str,
     pub project: Option<&'a str>,
@@ -338,7 +337,6 @@ mod tests {
         FactPersistedParams {
             namespace: "ns",
             fact_id,
-            _fact_type: "general",
             content,
             scope: "personal",
             project: None,
