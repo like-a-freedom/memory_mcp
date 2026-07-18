@@ -229,7 +229,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
         let draft = build_relation_draft(
             left,
             right,
-            ClaimRelationOutcome::Consistent,
+            ClaimRelationOutcome::Duplicate,
             ReconciliationReasonCode::Duplicate,
             "Claims are identical",
             input,
@@ -247,7 +247,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
         let draft = PersistedRelationDraft {
             left_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).0,
             right_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).1,
-            outcome: ClaimRelationOutcome::Corrects,
+            outcome: ClaimRelationOutcome::Correction,
             predecessor_claim_id: pred,
             successor_claim_id: succ,
             reason_code: ReconciliationReasonCode::Correction,
@@ -280,7 +280,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
         let draft = PersistedRelationDraft {
             left_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).0,
             right_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).1,
-            outcome: ClaimRelationOutcome::Supersedes,
+            outcome: ClaimRelationOutcome::Supersession,
             predecessor_claim_id: pred,
             successor_claim_id: succ,
             reason_code: ReconciliationReasonCode::Supersession,
@@ -305,7 +305,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
             let draft = build_relation_draft(
                 left,
                 right,
-                ClaimRelationOutcome::Contradicts,
+                ClaimRelationOutcome::Contradiction,
                 ReconciliationReasonCode::Contradiction,
                 "Mutually exclusive values with overlapping validity",
                 input,
@@ -570,7 +570,7 @@ mod tests {
         let input = default_input(&left, &right);
         match reconcile(&input) {
             ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Consistent);
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Duplicate);
                 assert_eq!(draft.reason_code, ReconciliationReasonCode::Duplicate);
             }
             other => panic!("expected Persist(Duplicate), got {:?}", other),
@@ -661,7 +661,7 @@ mod tests {
         let input = default_input(&left, &right);
         match reconcile(&input) {
             ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Contradicts);
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Contradiction);
                 assert_eq!(draft.reason_code, ReconciliationReasonCode::Contradiction);
             }
             other => panic!("expected Persist(Contradiction), got {:?}", other),
@@ -695,7 +695,7 @@ mod tests {
         let input = default_input(&left, &right);
         match reconcile(&input) {
             ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Corrects);
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Correction);
                 assert_eq!(draft.reason_code, ReconciliationReasonCode::Correction);
             }
             other => panic!("expected Persist(Correction), got {:?}", other),
@@ -729,7 +729,7 @@ mod tests {
         let input = default_input(&left, &right);
         match reconcile(&input) {
             ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Supersedes);
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Supersession);
                 assert_eq!(draft.reason_code, ReconciliationReasonCode::Supersession);
             }
             other => panic!("expected Persist(Supersession), got {:?}", other),

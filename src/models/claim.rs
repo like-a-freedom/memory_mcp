@@ -184,7 +184,7 @@ impl CanonicalDuration {
 
 // ─── Schema Types ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClaimSchemaFamily {
     Attribute,
@@ -193,7 +193,7 @@ pub enum ClaimSchemaFamily {
     Commitment,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ClaimSchemaRef {
     pub family: ClaimSchemaFamily,
     pub version: std::num::NonZeroU16,
@@ -482,16 +482,16 @@ pub struct Claim {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClaimRelationOutcome {
-    /// The right claim was explicitly stated as a correction of the left.
-    Corrects,
+    /// The claim is a duplicate of another (same proposition, compatible validity).
+    Duplicate,
     /// The right claim supersedes the left.
-    Supersedes,
-    /// The claims are consistent with each other.
-    Consistent,
+    Supersession,
+    /// The right claim was explicitly stated as a correction of the left.
+    Correction,
     /// The claims contradict each other.
-    Contradicts,
-    /// The right claim supports the left.
-    Supports,
+    Contradiction,
+    /// Claims cannot be compared due to insufficient temporal information.
+    TemporalAmbiguity,
 }
 
 /// Evidence supporting a relation evaluation.
