@@ -4,25 +4,37 @@ use crate::service::MemoryError;
 
 /// Rollout stage for claim reconciliation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub(crate) enum ClaimRolloutStage {
     /// No claim extraction or reconciliation.
     Disabled,
-    /// Extract and store claims but do not expose relations.
+    /// Extract and store claims but do not expose relations. Default.
+    #[default]
     Shadow,
-    /// Expose relation evaluation.
+    /// Persist relation decisions without exposing them.
     Relations,
-    /// Default. Expose evidence and context assembly.
+    /// Also expose authorized evidence and context.
     Evidence,
-    /// Full lifecycle: automatic correction and supersession.
-    Lifecycle,
 }
 
-#[allow(clippy::derivable_impls)]
-impl Default for ClaimRolloutStage {
-    fn default() -> Self {
-        Self::Evidence
+impl ClaimRolloutStage {
+    pub(crate) const fn projects(self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+    #[allow(dead_code)]
+    pub(crate) const fn evaluates_relations(self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+    #[allow(dead_code)]
+    pub(crate) const fn persists_relations(self) -> bool {
+        matches!(self, Self::Relations | Self::Evidence)
+    }
+    #[allow(dead_code)]
+    pub(crate) const fn exposes_evidence(self) -> bool {
+        matches!(self, Self::Evidence)
     }
 }
+
 
 impl std::fmt::Display for ClaimRolloutStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -31,7 +43,6 @@ impl std::fmt::Display for ClaimRolloutStage {
             Self::Shadow => write!(f, "shadow"),
             Self::Relations => write!(f, "relations"),
             Self::Evidence => write!(f, "evidence"),
-            Self::Lifecycle => write!(f, "lifecycle"),
         }
     }
 }
@@ -46,9 +57,14 @@ impl std::str::FromStr for ClaimRolloutStage {
             "shadow" => Ok(Self::Shadow),
             "relations" => Ok(Self::Relations),
             "evidence" => Ok(Self::Evidence),
-            "lifecycle" => Ok(Self::Lifecycle),
+            "lifecycle" => Err(MemoryError::ConfigInvalid(
+                "MEMORY_CLAIM_ROLLOUT_STAGE=lifecycle is not shipped. \
+                 Automatic lifecycle effects are disabled until a separate safety review. \
+                 Use: disabled, shadow, relations, evidence"
+                    .to_string(),
+            )),
             _ => Err(MemoryError::ConfigInvalid(format!(
-                "unknown MEMORY_CLAIM_ROLLOUT_STAGE: '{trimmed}'. Valid: disabled, shadow, relations, evidence, lifecycle"
+                "unknown MEMORY_CLAIM_ROLLOUT_STAGE: '{trimmed}'. Valid: disabled, shadow, relations, evidence"
             ))),
         }
     }
@@ -113,8 +129,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_stage_is_evidence() {
-        assert_eq!(ClaimRolloutStage::default(), ClaimRolloutStage::Evidence);
+    fn default_stage_is_shadow() {
+        assert_eq!(ClaimRolloutStage::default(), ClaimRolloutStage::Shadow);
     }
 
     #[test]
@@ -124,12 +140,17 @@ mod tests {
             ("shadow", ClaimRolloutStage::Shadow),
             ("relations", ClaimRolloutStage::Relations),
             ("evidence", ClaimRolloutStage::Evidence),
-            ("lifecycle", ClaimRolloutStage::Lifecycle),
             ("EVIDENCE", ClaimRolloutStage::Evidence),
-            ("  Lifecycle  ", ClaimRolloutStage::Lifecycle),
         ] {
             assert_eq!(input.parse::<ClaimRolloutStage>().unwrap(), expected);
         }
+    }
+
+    #[test]
+    fn parse_lifecycle_returns_config_invalid() {
+        let result = "lifecycle".parse::<ClaimRolloutStage>();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not shipped"));
     }
 
     #[test]
@@ -141,7 +162,7 @@ mod tests {
     #[test]
     fn default_config_values() {
         let config = ClaimConfig::default();
-        assert_eq!(config.rollout_stage, ClaimRolloutStage::Evidence);
+        assert_eq!(config.rollout_stage, ClaimRolloutStage::Shadow);
         assert_eq!(config.candidate_page_size, 256);
         assert_eq!(config.inline_candidate_limit, 1024);
         assert_eq!(config.inline_budget, std::time::Duration::from_millis(50));
@@ -154,7 +175,6 @@ mod tests {
             ClaimRolloutStage::Shadow,
             ClaimRolloutStage::Relations,
             ClaimRolloutStage::Evidence,
-            ClaimRolloutStage::Lifecycle,
         ] {
             let s = stage.to_string();
             let parsed: ClaimRolloutStage = s.parse().unwrap();

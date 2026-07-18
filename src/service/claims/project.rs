@@ -65,13 +65,9 @@ impl ClaimService {
         }
     }
 
-    /// Whether claim extraction is enabled (not Disabled or Shadow).
+    /// Whether claim extraction is enabled (projection runs in Shadow+).
     pub fn is_enabled(&self) -> bool {
-        !matches!(
-            self.config.rollout_stage,
-            crate::config::claims::ClaimRolloutStage::Disabled
-                | crate::config::claims::ClaimRolloutStage::Shadow
-        )
+        self.config.rollout_stage.projects()
     }
 
     /// Called after a fact is persisted. Runs deterministic claim extraction.
@@ -368,12 +364,12 @@ mod tests {
     }
 
     #[test]
-    fn claim_service_disabled_for_shadow_stage() {
+    fn claim_service_enabled_for_shadow_stage() {
         let svc = claim_svc().with_config(ClaimConfig {
             rollout_stage: crate::config::claims::ClaimRolloutStage::Shadow,
             ..Default::default()
         });
-        assert!(!svc.is_enabled());
+        assert!(svc.is_enabled());
     }
 
     #[tokio::test]

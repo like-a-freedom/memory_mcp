@@ -351,6 +351,11 @@ impl MemoryService {
         service.current_embedding_dimension = target.as_ref().map(|value| value.dimension);
         service.entity_extractor = entity_extractor;
 
+        // Wire environment-driven claim configuration
+        if let Ok(claim_config) = crate::config::claims::ClaimConfig::from_env() {
+            service.claim_service = service.claim_service.clone().with_config(claim_config);
+        }
+
         if let (
             EmbeddingStartupDecision::BootstrapReadyNamespaces {
                 namespaces,
