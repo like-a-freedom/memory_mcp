@@ -7,8 +7,9 @@ EVAL_LONGMEMEVAL = cargo test --test eval_external_retrieval run_longmemeval_ret
 EVAL_LOCOMO = cargo test --test eval_external_retrieval run_locomo_retrieval -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_EXTRACTION = cargo test --test eval_extraction run_extraction_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_LATENCY = cargo test --test eval_latency run_latency_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
+EVAL_CLAIMS = cargo test --test eval_claim_reconciliation run_claim_reconciliation_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 
-.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention
+.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention eval-claims
 
 eval-baseline:
 	@$(EVAL_RETRIEVAL)
@@ -40,3 +41,7 @@ eval-ner-latency:
 
 eval-ner-contention:
 	cargo test --locked --release --test eval_ner_latency run_contention_eval -- --ignored --exact --nocapture --test-threads=1
+
+.PHONY: eval-claims
+eval-claims:
+	@$(EVAL_CLAIMS)

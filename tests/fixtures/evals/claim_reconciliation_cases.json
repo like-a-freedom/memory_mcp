@@ -1,0 +1,1772 @@
+[
+    {
+        "id": "cr-001",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-001-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-001",
+            "content": "Alice Smith reports ARR is $7M.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-001-setup",
+                    "source_id": "cr-001",
+                    "outcome": "contradiction",
+                    "reason_code": "mutually_exclusive_values"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-002",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-002",
+            "content": "The project launches on 2026-06-01.",
+            "scope": "org",
+            "project": "atlas",
+            "policy_tags": [],
+            "t_ref": "2026-05-01T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "project launch date",
+                    "comparison_key": {"dimension": "launch date"},
+                    "value": {"datetime": "2026-06-01T00:00:00Z"},
+                    "qualifiers": {"project": "atlas"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-05-01T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-41"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_delivery"]
+    },
+    {
+        "id": "cr-003",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-003",
+            "content": "Alice Smith reports to Bob Jones.",
+            "scope": "team",
+            "policy_tags": [],
+            "t_ref": "2026-03-15T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "relation/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"relation": "reports to", "object_role": "manager"},
+                    "value": {"entity": "Bob Jones"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-03-15T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-31"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_relations"]
+    },
+    {
+        "id": "cr-004",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-004",
+            "content": "Bob Jones will deliver the report by Friday.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-02T11:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "commitment/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"action": "deliver report", "deadline": "Friday"},
+                    "value": {"boolean": true},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-02T11:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-43"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_commitments"]
+    },
+    {
+        "id": "cr-005",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-005-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-005",
+            "content": "Alice Smith reports ARR is $5M.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 5000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-005-setup",
+                    "source_id": "cr-005",
+                    "outcome": "duplicate",
+                    "reason_code": "identical_proposition"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-006",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-006",
+            "content": "Alice Smith prefers dark mode. Bob Jones prefers light mode.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-03T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "dark mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-03T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-30"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "light mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-03T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "31-61"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "set_valued", "domain_preferences"]
+    },
+    {
+        "id": "cr-007",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-007-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-007",
+            "content": "Correction: Alice Smith reports ARR is actually $6M.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 6000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-51"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-007-setup",
+                    "source_id": "cr-007",
+                    "outcome": "correction",
+                    "reason_code": "explicit_correction_language"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "correction", "domain_finance"]
+    },
+    {
+        "id": "cr-008",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-008-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-008",
+            "content": "Alice Smith's ARR has been updated to $7M, superseding the earlier report.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-10T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-10T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-71"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-008-setup",
+                    "source_id": "cr-008",
+                    "outcome": "supersession",
+                    "reason_code": "explicit_transition_language"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "supersession", "domain_finance"]
+    },
+    {
+        "id": "cr-009",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-009",
+            "content": "Alice Smith reports ARR is $5M in USD. Bob Jones reports ARR is 5000000 EUR.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 5000000, "unit": "USD"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-37"
+                },
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 5000000, "unit": "EUR"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "38-78"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": ["not_comparable"]
+        },
+        "coverage": ["free_sentence_source", "set_valued", "domain_finance"]
+    },
+    {
+        "id": "cr-010",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-010",
+            "content": "Alice Smith works in Engineering. Bob Jones works in Marketing.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "department"},
+                    "value": {"text": "Engineering"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-34"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"dimension": "department"},
+                    "value": {"text": "Marketing"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "35-66"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_staffing"]
+    },
+    {
+        "id": "cr-011",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-011",
+            "content": "The server is located in Frankfurt. The backup server is in Tokyo.",
+            "scope": "org",
+            "project": "infra",
+            "policy_tags": [],
+            "t_ref": "2026-04-06T08:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "server",
+                    "comparison_key": {"dimension": "location"},
+                    "value": {"text": "Frankfurt"},
+                    "qualifiers": {"project": "infra"},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-06T08:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "backup server",
+                    "comparison_key": {"dimension": "location"},
+                    "value": {"text": "Tokyo"},
+                    "qualifiers": {"project": "infra"},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-06T08:00:00Z",
+                    "valid_to": null,
+                    "source_span": "34-67"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "set_valued", "domain_configuration"]
+    },
+    {
+        "id": "cr-012",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "ru",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-012-setup",
+                "content": "Алиса Смит сообщает, что ARR составляет 5 миллионов долларов.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-012",
+            "content": "Алиса Смит сообщает, что ARR составляет 7 миллионов долларов.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Алиса Смит",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-62"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-012-setup",
+                    "source_id": "cr-012",
+                    "outcome": "contradiction",
+                    "reason_code": "mutually_exclusive_values"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-013",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "zh",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-013-setup",
+                "content": "张三报告ARR为500万美元。",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-013",
+            "content": "张三报告ARR为700万美元。",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "张三",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-20"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-013-setup",
+                    "source_id": "cr-013",
+                    "outcome": "contradiction",
+                    "reason_code": "mutually_exclusive_values"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-014",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-014",
+            "content": "Alice Smith is 170cm tall. Alice Smith weighs 65kg.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T12:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "height"},
+                    "value": {"number": 170, "unit": "cm"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T12:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-26"
+                },
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "weight"},
+                    "value": {"number": 65, "unit": "kg"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T12:00:00Z",
+                    "valid_to": null,
+                    "source_span": "27-51"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_staffing"]
+    },
+    {
+        "id": "cr-015",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-015",
+            "content": "Alice Smith is 170cm tall, equivalent to 5.58ft.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T12:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "height"},
+                    "value": {"number": 170, "unit": "cm"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T12:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-26"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "unit_conversion", "domain_staffing"]
+    },
+    {
+        "id": "cr-016",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-016",
+            "content": "Alice Smith scored 42 widgets on the test.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T12:00:00Z"
+        },
+        "expected": {
+            "claims": [],
+            "relations": [],
+            "skip_reason_codes": ["unknown_unit"]
+        },
+        "coverage": ["free_sentence_source", "unknown_unit"]
+    },
+    {
+        "id": "cr-017",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-017",
+            "content": "The budget was approved with no date specified.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [],
+            "relations": [],
+            "skip_reason_codes": ["missing_time"]
+        },
+        "coverage": ["free_sentence_source", "missing_time", "domain_decisions"]
+    },
+    {
+        "id": "cr-018",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "email",
+                "source_id": "cr-018-setup",
+                "content": "The project runs from January to March 2026.",
+                "scope": "org",
+                "project": "atlas",
+                "policy_tags": [],
+                "t_ref": "2026-01-01T09:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-018",
+            "content": "The project was extended through June 2026.",
+            "scope": "org",
+            "project": "atlas",
+            "policy_tags": [],
+            "t_ref": "2026-03-15T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "project timeline",
+                    "comparison_key": {"dimension": "end date"},
+                    "value": {"datetime": "2026-06-30T00:00:00Z"},
+                    "qualifiers": {"project": "atlas"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-03-15T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-43"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-018-setup",
+                    "source_id": "cr-018",
+                    "outcome": "supersession",
+                    "reason_code": "explicit_transition_language"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "supersession", "overlapping_interval", "domain_delivery"]
+    },
+    {
+        "id": "cr-019",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-019",
+            "content": "Alice Smith manages the Engineering team. Bob Jones manages the Marketing team.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "relation/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"relation": "manages", "object_role": "team"},
+                    "value": {"entity": "Engineering team"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-41"
+                },
+                {
+                    "schema": "relation/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"relation": "manages", "object_role": "team"},
+                    "value": {"entity": "Marketing team"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "42-80"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_staffing"]
+    },
+    {
+        "id": "cr-020",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-020-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-020",
+            "content": "Alice Smith reports ARR is $7M.",
+            "scope": "team",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": ["cross_scope"]
+        },
+        "coverage": ["free_sentence_source", "cross_scope", "domain_finance"]
+    },
+    {
+        "id": "cr-021",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-021-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "org",
+                "project": "atlas",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-021",
+            "content": "Alice Smith reports ARR is $7M.",
+            "scope": "org",
+            "project": "zeus",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {"project": "zeus"},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": ["cross_project"]
+        },
+        "coverage": ["free_sentence_source", "cross_project", "domain_finance"]
+    },
+    {
+        "id": "cr-022",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-022-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "org",
+                "policy_tags": ["confidential"],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-022",
+            "content": "Alice Smith reports ARR is $7M.",
+            "scope": "org",
+            "policy_tags": ["public"],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": ["cross_policy"]
+        },
+        "coverage": ["free_sentence_source", "cross_policy", "domain_finance"]
+    },
+    {
+        "id": "cr-023",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-023",
+            "content": "Someone reported the server is down.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [],
+            "relations": [],
+            "skip_reason_codes": ["unresolved_subject"]
+        },
+        "coverage": ["free_sentence_source", "unresolved_subject", "domain_incidents"]
+    },
+    {
+        "id": "cr-024",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-024",
+            "content": "Alice Smith works in Engineering since Q1. Alice Smith works in Marketing since Q2.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "department"},
+                    "value": {"text": "Engineering"},
+                    "qualifiers": {"period": "Q1"},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-01-01T00:00:00Z",
+                    "valid_to": "2026-03-31T23:59:59Z",
+                    "source_span": "0-44"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "department"},
+                    "value": {"text": "Marketing"},
+                    "qualifiers": {"period": "Q2"},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-01T00:00:00Z",
+                    "valid_to": null,
+                    "source_span": "45-88"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["structured_source", "set_valued", "domain_staffing", "disjoint_interval", "qualifier_mismatch"]
+    },
+    {
+        "id": "cr-025",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-025",
+            "content": "Alice Smith is also known as A. Smith.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "alias"},
+                    "value": {"text": "A. Smith"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-37"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "alias", "domain_staffing"]
+    },
+    {
+        "id": "cr-026",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-026",
+            "content": "Alice Smith's title is Senior Engineer.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "job title"},
+                    "value": {"text": "Senior Engineer"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-36"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_staffing"]
+    },
+    {
+        "id": "cr-027",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-027",
+            "content": "Alice Smith prefers dark mode. Bob Jones prefers dark mode. Charlie Brown prefers light mode.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "dark mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-30"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "dark mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "31-61"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Charlie Brown",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "light mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "62-96"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "set_valued", "domain_preferences"]
+    },
+    {
+        "id": "cr-028",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "anonymized_real",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "email",
+                "source_id": "cr-028-setup",
+                "content": "Q1 revenue was $2.3M.",
+                "scope": "org",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T09:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-028",
+            "content": "Correction: Q1 revenue was $2.5M, not $2.3M as previously reported.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-10T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Q1 revenue",
+                    "comparison_key": {"measure": "revenue", "period": "Q1"},
+                    "value": {"number": 2500000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-10T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-67"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-028-setup",
+                    "source_id": "cr-028",
+                    "outcome": "correction",
+                    "reason_code": "explicit_correction_language"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "correction", "domain_finance"]
+    },
+    {
+        "id": "cr-029",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "anonymized_real",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-029",
+            "content": "The incident was resolved on April 3rd. The post-mortem is scheduled for next week.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "incident",
+                    "comparison_key": {"dimension": "resolution date"},
+                    "value": {"datetime": "2026-04-03T00:00:00Z"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-35"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_incidents"]
+    },
+    {
+        "id": "cr-030",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "anonymized_real",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-030",
+            "content": "Alice Smith joined the team on January 15th, 2026.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "start date"},
+                    "value": {"datetime": "2026-01-15T00:00:00Z"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-48"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_staffing"]
+    },
+    {
+        "id": "cr-031",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-031-setup",
+                "content": "Alice Smith reports MRR is $120K.",
+                "scope": "org",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-031",
+            "content": "Alice Smith reports MRR is $140K.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "MRR"},
+                    "value": {"number": 140000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-031-setup",
+                    "source_id": "cr-031",
+                    "outcome": "contradiction",
+                    "reason_code": "mutually_exclusive_values"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-032",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-032",
+            "content": "Bob Jones will deliver the report by Friday. Bob Jones will deliver the report by next Monday.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-02T11:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "commitment/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"action": "deliver report", "deadline": "Friday"},
+                    "value": {"boolean": true},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-02T11:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-43"
+                },
+                {
+                    "schema": "commitment/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"action": "deliver report", "deadline": "next Monday"},
+                    "value": {"boolean": true},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-02T11:00:00Z",
+                    "valid_to": null,
+                    "source_span": "44-89"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-032",
+                    "source_id": "cr-032",
+                    "outcome": "coexistence",
+                    "reason_code": "set_valued_commitments"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["structured_source", "domain_commitments"]
+    },
+    {
+        "id": "cr-033",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-033",
+            "content": "Alice Smith reports to Bob Jones in the Engineering org.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "relation/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"relation": "reports to", "object_role": "manager"},
+                    "value": {"entity": "Bob Jones"},
+                    "qualifiers": {"org": "Engineering"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-48"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_relations", "qualifier_mismatch"]
+    },
+    {
+        "id": "cr-034",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "external_public",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "email",
+                "source_id": "cr-034-setup",
+                "content": "The system processes 1000 requests per second.",
+                "scope": "org",
+                "policy_tags": [],
+                "t_ref": "2026-01-01T09:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-034",
+            "content": "The system now processes 1500 requests per second after optimization.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-06-01T09:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "system throughput",
+                    "comparison_key": {"measure": "requests per second"},
+                    "value": {"number": 1500, "unit": "rps"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-06-01T09:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-65"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-034-setup",
+                    "source_id": "cr-034",
+                    "outcome": "supersession",
+                    "reason_code": "explicit_transition_language"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "supersession", "domain_configuration"]
+    },
+    {
+        "id": "cr-035",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "external_public",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-035",
+            "content": "Alice Smith prefers dark mode. Alice Smith also prefers large fonts.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "UI preference"},
+                    "value": {"text": "dark mode"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-30"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"dimension": "font size preference"},
+                    "value": {"text": "large fonts"},
+                    "qualifiers": {},
+                    "cardinality": "set_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "31-69"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "set_valued", "domain_preferences"]
+    },
+    {
+        "id": "cr-036",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "anonymized_real",
+        "language": "ru",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-036",
+            "content": "Проект запускается 1 июня 2026 года.",
+            "scope": "org",
+            "project": "atlas",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "проект",
+                    "comparison_key": {"dimension": "launch date"},
+                    "value": {"datetime": "2026-06-01T00:00:00Z"},
+                    "qualifiers": {"project": "atlas"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-36"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_delivery"]
+    },
+    {
+        "id": "cr-037",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-037-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "project": "atlas",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-037",
+            "content": "Alice Smith reports ARR is $5M.",
+            "scope": "personal",
+            "project": "atlas",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 5000000},
+                    "qualifiers": {"project": "atlas"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-037-setup",
+                    "source_id": "cr-037",
+                    "outcome": "duplicate",
+                    "reason_code": "identical_proposition"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-038",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-038",
+            "content": "The compliance audit is scheduled for December 2026. The regulatory review follows in January 2027.",
+            "scope": "org",
+            "policy_tags": ["compliance"],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "commitment/v1",
+                    "subject": "compliance audit",
+                    "comparison_key": {"action": "audit", "deadline": "December 2026"},
+                    "value": {"boolean": true},
+                    "qualifiers": {"tag": "compliance"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-45"
+                },
+                {
+                    "schema": "commitment/v1",
+                    "subject": "regulatory review",
+                    "comparison_key": {"action": "review", "deadline": "January 2027"},
+                    "value": {"boolean": true},
+                    "qualifiers": {"tag": "compliance"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "46-95"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_compliance", "domain_commitments"]
+    },
+    {
+        "id": "cr-039",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "anonymized_real",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "meeting",
+            "source_id": "cr-039",
+            "content": "Configuration: max connections = 100. Timeout = 30s.",
+            "scope": "org",
+            "project": "infra",
+            "policy_tags": [],
+            "t_ref": "2026-04-05T14:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "attribute/v1",
+                    "subject": "system configuration",
+                    "comparison_key": {"dimension": "max connections"},
+                    "value": {"integer": 100},
+                    "qualifiers": {"project": "infra"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-29"
+                },
+                {
+                    "schema": "quantity/v1",
+                    "subject": "system configuration",
+                    "comparison_key": {"measure": "timeout"},
+                    "value": {"number": 30, "unit": "seconds"},
+                    "qualifiers": {"project": "infra"},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-05T14:00:00Z",
+                    "valid_to": null,
+                    "source_span": "30-46"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": []
+        },
+        "coverage": ["kv_source", "domain_configuration"]
+    },
+    {
+        "id": "cr-040",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "test",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [
+            {
+                "source_type": "chat",
+                "source_id": "cr-040-setup",
+                "content": "Alice Smith reports ARR is $5M.",
+                "scope": "personal",
+                "policy_tags": [],
+                "t_ref": "2026-04-01T10:00:00Z"
+            }
+        ],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-040",
+            "content": "Alice Smith reports ARR is $7M.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 7000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                }
+            ],
+            "relations": [
+                {
+                    "setup_source_id": "cr-040-setup",
+                    "source_id": "cr-040",
+                    "outcome": "contradiction",
+                    "reason_code": "mutually_exclusive_values"
+                }
+            ],
+            "skip_reason_codes": []
+        },
+        "coverage": ["free_sentence_source", "domain_finance"]
+    },
+    {
+        "id": "cr-041",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "synthetic_adversarial",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "chat",
+            "source_id": "cr-041",
+            "content": "Alice Smith reports ARR is $5M. Bob Jones joined the team in March.",
+            "scope": "personal",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [
+                {
+                    "schema": "quantity/v1",
+                    "subject": "Alice Smith",
+                    "comparison_key": {"measure": "ARR"},
+                    "value": {"number": 5000000},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "0-33"
+                },
+                {
+                    "schema": "attribute/v1",
+                    "subject": "Bob Jones",
+                    "comparison_key": {"dimension": "start date"},
+                    "value": {"datetime": "2026-03-01T00:00:00Z"},
+                    "qualifiers": {},
+                    "cardinality": "single_valued",
+                    "valid_from": "2026-04-07T10:00:00Z",
+                    "valid_to": null,
+                    "source_span": "34-67"
+                }
+            ],
+            "relations": [],
+            "skip_reason_codes": ["not_same_slot"]
+        },
+        "coverage": ["free_sentence_source", "domain_finance", "domain_staffing"]
+    },
+    {
+        "id": "cr-042",
+        "corpus_version": "claim-reconciliation/v1",
+        "split": "development",
+        "origin": "anonymized_real",
+        "language": "en",
+        "setup": [],
+        "source": {
+            "source_type": "email",
+            "source_id": "cr-042",
+            "content": "Someone from the team reported the server is down.",
+            "scope": "org",
+            "policy_tags": [],
+            "t_ref": "2026-04-07T10:00:00Z"
+        },
+        "expected": {
+            "claims": [],
+            "relations": [],
+            "skip_reason_codes": ["unresolved_subject"]
+        },
+        "coverage": ["free_sentence_source", "unresolved_subject", "domain_incidents"]
+    }
+]
