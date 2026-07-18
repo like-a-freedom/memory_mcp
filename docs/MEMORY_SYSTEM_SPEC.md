@@ -1,13 +1,14 @@
 # Memory System — Unified Specification
 
-**Version:** 2.3  
-**Date:** February 5, 2026  
+**Version:** 2.4<br>
+**Date:** July 17, 2026<br>
 **Status:** Consolidated (supersedes all previous SPEC.md versions)
 
 ---
 
 ## Document Change History
 
+- **2026-07-17**: Added the deterministic Claim/ClaimRelation reconciliation target: contradiction versus supersession/correction/retraction semantics, exact claim slots, source and cardinality gates, trace/Prometheus requirements, append-only automatic migrations, resumable legacy backfill, backward-compatible MCP enrichment, and TDD/evaluation gates. See `docs/CONTRADICTION_DETECTION_DESIGN.md` and ADR-0002 through ADR-0015.
 - **2026-03-27**: Added explicit reference to `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface.
 - **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
@@ -192,11 +193,13 @@ runSubagent({
 |------|------------|
 | **Episode** | Primary "raw" fragment from a source (email, transcript, message) with source reference and timestamp |
 | **Entity** | Person/company/project/deal/object extracted from episodes, with deduplication and aliases |
-| **Fact/Item** | Promise, task, metric, decision, opinion extracted from episodes and linked to entities |
-| **Bi-temporal** | Storing both "when was it true" (validity time, `t_valid`) and "when did we learn" (transaction time, `t_ingested`) for correct historical queries and audit |
+| **Fact/Item** | Immutable provenance-bearing evidence extracted from an episode; it may yield zero or more claims |
+| **Claim** | Atomic typed proposition derived deterministically from a fact and eligible for comparison only when its claim slot is complete |
+| **ClaimRelation** | Versioned reconciliation decision between two claims: duplicate, supersession, correction, contradiction, or temporal ambiguity |
+| **Bi-temporal** | Separating real-world validity (`valid_from`/`valid_to`) from transaction validity (`t_ingested`/`t_invalid_ingested`) for correct historical queries and audit |
 | **Community/Cluster** | Cluster of densely connected entities with aggregated summary for faster context assembly |
 | **Scope** | Isolation level: `personal`, `team`, `org`, or `private-domain` (e.g., `hr.salary`, `deal.pipeline`) |
-| **Provenance** | Complete lineage: which episode generated which fact, plus invalidation/update history |
+| **Provenance** | Complete lineage from episode to fact to claim and versioned reconciliation/lifecycle decisions |
 
 ### 3.2 Data Model Conventions
 
@@ -207,9 +210,10 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 - `source_position` — position within the episode (char offset, line number, or timeframe)
 - `content` — normalized fact statement
 - `quote` — verbatim quote from source
-- `t_valid` — validity time (when the fact became true)
-- `t_invalid` — invalidation time (when the fact became false/superseded, if applicable)
-- `t_ingested` — transaction time (when the system recorded this object)
+- `t_valid` — legacy fact-level reference time; it MUST NOT be assumed to be a claim's `valid_from`
+- `t_invalid` — fact-level retraction time; it MUST NOT represent routine claim supersession
+- `valid_from`, `valid_to` — claim real-world validity bounds, each independently optional
+- `t_ingested`, `t_invalid_ingested` — transaction-valid interval for a derived claim or relation
 
 ---
 
@@ -300,8 +304,9 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-DB-01**: System MUST use **SurrealDB as the only storage backend**; for tests, only in-memory mode of SurrealDB is allowed (no separate in-memory storage in MCP).  
 **Status**: ✅ Done
 
-**FR-DB-02**: All memory objects (Episode/Entity/Fact/Edge/Community) MUST be saved and read from SurrealDB, including graph relationships.  
-**Status**: ✅ Done
+**FR-DB-02**: All memory objects (Episode/Entity/Fact/Claim/ClaimRelation/Edge/Community) MUST be saved and read from SurrealDB, including graph and reconciliation relationships.
+
+**Status**: ⚠️ Partial — current objects are persisted, but Claim and ClaimRelation storage is not implemented.
 
 **FR-DB-03**: System MUST support SurrealDB schemas/migrations as code (DDL/versions) and reproducible deployment.  
 **Status**: ✅ Done
@@ -314,6 +319,14 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-DB-06**: Execution/event log MUST be stored in SurrealDB (append-only) or synchronized there for audit.  
 **Status**: ✅ Done
+
+**FR-DB-07**: Released or applied migration files MUST be immutable. Schema and data evolution MUST use new, monotonically ordered migrations; past migrations MUST NOT be edited, deleted, reordered, or repurposed.
+
+**Status**: ⚠️ Partial — applied scripts are recorded with checksums and checksum drift fails validation, but an explicit historical-migration compatibility gate is not documented in the current test matrix.
+
+**FR-DB-08**: On startup, the application MUST automatically upgrade every configured namespace from each explicitly supported older database version before serving requests. Migrations MUST be deterministic, restart-safe, data-preserving, and compatible with legacy records missing newly introduced optional fields. Migration failure MUST stop startup before the application serves against a partially upgraded schema.
+
+**Status**: ⚠️ Partial — startup applies pending embedded migrations per namespace, but sequential upgrade coverage from a declared set of historical database versions is not established.
 
 ### 5.4 Entity and Fact Extraction
 
@@ -328,6 +341,26 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-EX-04**: To improve extraction quality, the system SHOULD use a two-step flow—initial extraction followed by self-validation—to reduce hallucinations and omissions.  
 **Status**: ❌ Not done — current extraction is single-pass and heuristic.
+
+**FR-EX-05**: A fact MUST remain the immutable provenance-bearing evidence item and MAY produce zero or more deterministic claims. Failure or lack of support for claim extraction MUST NOT make the fact unavailable.
+
+**Status**: ❌ Not done — no separate claim model or projection lifecycle exists.
+
+**FR-EX-06**: Default claim extraction MUST run locally with zero configuration and no LLM or external service. It MUST emit only claims accepted by a versioned built-in schema and typed-value validator.
+
+**Status**: ❌ Not done — current rule-based fact and triple extraction does not produce validated claim schemas.
+
+**FR-EX-07**: Claim and claim-relation identifiers MUST be deterministic from versioned canonical inputs. Their semantic payloads MUST be immutable; only open validity bounds may be closed monotonically.
+
+**Status**: ❌ Not done.
+
+**FR-EX-08**: Historical claim projection MUST run outside startup migrations as a local, bounded, durable, idempotent, and resumable backfill with per-namespace progress and an extractor fingerprint. Legacy facts MUST remain retrievable while backfill is incomplete.
+
+**Status**: ❌ Not done — the existing `reembed` job provides a reusable operational pattern, but claim backfill does not exist.
+
+**FR-EX-09**: Automatic reconciliation candidate lookup MUST use indexed stable pagination within an exact claim slot: namespace, scope, project identity, access-policy fingerprint, canonical subject, compatible schema, comparison key, and qualifiers. It MUST NOT use a global scan, fuzzy entity overlap, or a fixed latest-N window.
+
+**Status**: ❌ Not done — the current warning detector scans at most 500 active facts and filters them by fact type and entity overlap.
 
 ### 5.5 Entity Resolution (Deduplication)
 
@@ -368,8 +401,9 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-TM-01**: System MUST support decay (confidence degradation over time) by default with configurable half-life per fact type (e.g., one year for metrics/promises).  
 **Status**: ✅ Done
 
-**FR-TM-02**: System MUST support explicit fact invalidation (supersession) when a new contradictory fact appears, rather than relying only on gradual confidence decay.  
-**Status**: ✅ Done
+**FR-TM-02**: System MUST support explicit validity closure when a claim is confirmed to supersede an earlier claim. Supersession MUST close only the earlier claim's validity interval; a contradiction alone MUST NOT invalidate either source fact.
+
+**Status**: ⚠️ Partial — explicit manual fact invalidation exists, but automatic claim-level supersession and its separate lifecycle are not implemented, and current triple conflict resolution does not enforce this distinction.
 
 **FR-TM-03**: System MUST implement bi-temporal model: store validity time of fact (T) and transaction/ingest time (T′) for audit, retroactive corrections, and correct "as-of" answers.  
 **Status**: ✅ Done
@@ -377,8 +411,29 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-TM-04**: Retrieval MUST support "as-of" queries (snapshot at date): show context as it was at meeting/email time.  
 **Status**: ✅ Done
 
-**FR-TM-05**: When new fact/metric conflicts with existing ones, system MUST perform contradiction check (LLM-assisted or rule-based) and upon confirmation set `t_invalid` on old facts (explicit invalidation), preserving provenance.
-**Status**: ✅ Done — explicit fact invalidation is implemented via `invalidate` tool and `invalidate_conflicting_edges()` for edges. Contradiction detection at ingest time is implemented for same `fact_type` + overlapping `entity_links` + different content (deterministic potential-contradiction warnings, does not block ingest).
+**FR-TM-05**: When a new claim differs from an existing claim, the system MUST classify the relationship as duplicate, supersession, correction, contradiction, or temporal ambiguity and preserve the decision with provenance. Only confirmed supersession may close real-world validity, and only explicit correction may close an erroneous transaction-valid projection.
+
+**Status**: ❌ Not done — current extraction only returns non-persistent potential-contradiction warnings based on fact type, entity overlap, and different content.
+
+**FR-TM-06**: Claim-level temporal evidence MUST distinguish observation time from the interval in which the claim is true. Missing validity information remains explicitly unknown and MUST NOT trigger automatic supersession.
+
+**Status**: ❌ Not done — extracted facts currently inherit the episode reference time as `t_valid` without representing whether that time was observed, explicit, inferred from a source contract, or unknown.
+
+**FR-TM-07**: Every comparison key MUST have a cardinality policy. Unknown keys default to set-valued, and automatic supersession is permitted only for an explicitly single-valued key when subject, qualifiers, and temporal evidence establish the same logical slot.
+
+**Status**: ❌ Not done — the current triple resolver uses a global hard-coded singleton predicate list that includes naturally multi-valued relations such as employment, email, phone, and founder roles.
+
+**FR-TM-08**: Automatic supersession MUST additionally require source continuity within the same source lineage or an explicitly authoritative source for the applicable claim schema and domain scope. In zero-configuration mode no source is authoritative by default, and ingestion order alone MUST NOT grant replacement authority.
+
+**Status**: ❌ Not done — current conflict handling does not model source lineage or authority and may close triples solely because a later extraction has a different object.
+
+**FR-TM-09**: Claim supersession, targeted claim correction, and fact retraction MUST be distinct lifecycle operations. Supersession closes only the earlier claim's real-world validity interval. Correction closes the erroneous claim projection in transaction time for the same validity context. Retraction is reserved for erroneous, withdrawn, corrupted, or incorrectly ingested whole-source evidence. All operations preserve source evidence for audit.
+
+**Status**: ❌ Not done — the storage model has no separate claim entity, and the current `invalidate` operation acts on the whole fact.
+
+**FR-TM-10**: Correction MUST require explicit correction or withdrawal evidence plus source continuity or scoped authority. A different value, newer observation, higher confidence, or later ingestion alone MUST NOT authorize correction.
+
+**Status**: ❌ Not done.
 
 ### 5.8 Context Assembly
 
@@ -470,7 +525,9 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 |--------|----------------|---------------------|
 | **Episode** | `id`, `source_type`, `source_id`, `content`, `t_ref`, `t_ingested` | For any fact, can open source episode and see exact quote/fragment. |
 | **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
-| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode`, `index_keys[]`, `access_count`, `last_accessed?` | Every fact has quote and valid temporal attributes; correctly disappears/degrades when stale/invalidated. `index_keys` populated at ingest with entity names, aliases, and temporal markers for enriched BM25 retrieval. `access_count` and `last_accessed` updated on retrieval and explain for heat-aware lifecycle. |
+| **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode`, `index_keys[]`, `access_count`, `last_accessed?` | Every fact retains source evidence and provenance. Only explicit retraction excludes the fact from active truth selection; claim supersession leaves it unchanged. `index_keys` populated at ingest with entity names, aliases, and temporal markers for enriched BM25 retrieval. `access_count` and `last_accessed` updated on retrieval and explain for heat-aware lifecycle. |
+| **Claim** | `id`, `source_fact`, `schema`, `subject`, `comparison_key`, `value`, `qualifiers`, `cardinality`, `observed_at?`, `valid_from?`, `valid_to?`, `derivation`, `t_ingested`, `t_invalid_ingested?` | Atomic propositions are created only when deterministic extraction can populate a supported schema. Unsupported facts remain valid without claims. Real-world and transaction validity are separate from the source fact lifecycle. Target state; not implemented. |
+| **ClaimRelation** | `id`, `left_claim`, `right_claim`, `predecessor_claim?`, `successor_claim?`, `outcome`, `reason_code`, `evidence`, `evaluator_version`, `context_fingerprint`, `evaluated_at`, `supersedes_relation?`, `t_ingested`, `t_invalid_ingested?` | Reconciliation decisions are append-only and versioned. Direction is explicit for supersession and correction; symmetric outcomes use only the canonical pair. The active relation classifies the pair as duplicate, supersession, correction, contradiction, or temporal ambiguity; prior versions remain auditable. Target state; not implemented. |
 | **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
 | **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Communities are maintained as connected components over persisted graph links and can expand retrieval through summary matches. |
 
@@ -511,13 +568,14 @@ All IDs MUST be deterministic to ensure idempotence:
 | `ingest` | Store raw episode | `source_type`, `source_id`, `content`, `t_ref`, `scope` | `ToolResponse<String>` with `episode_id` in `result` |
 | `extract` | Extract entities, facts, and links from an episode or inline content | `episode_id` or non-empty `content`/`text` | `ToolResponse<ExtractResult>` |
 | `resolve` | Deduplicate/resolve canonical entities | `entity_type`, `canonical_name`, `aliases[]` | `ToolResponse<String>` with canonical `entity_id` |
-| `invalidate` | Mark fact as superseded | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
+| `invalidate` | Retract an erroneous or withdrawn source fact while preserving audit history | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
 | `assemble_context` | Build recency-first context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
 | `explain` | Return citation-shaped context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
 
 ### 7.2 Contract Design Notes
 
 - Public MCP surface is intentionally limited to the six canonical memory tools above.
+- Claim projection, reconciliation, supersession, and correction remain internal domain behavior; no new public MCP tool is added without a concrete user workflow.
 - Legacy UI/draft/helper tools are not part of the current public contract.
 - `extract` returns a graceful partial response with an empty typed result when neither `episode_id` nor content is supplied.
 - List-style responses use decision-ready envelope fields such as `status`, `guidance`, `has_more`, `total_count`, and `next_offset`.
@@ -561,7 +619,7 @@ Logging levels:
 ### 8.2 Reliability
 
 **NFR-R-01 (Reliability)**: Ingestion and extraction MUST be idempotent (re-run does not create duplicates).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — fact IDs are deterministic, but claim projection, relation IDs, and resumable backfill are not implemented.
 
 ### 8.3 Security
 
@@ -571,7 +629,7 @@ Logging levels:
 ### 8.4 Auditability
 
 **NFR-A-01 (Auditability)**: MUST store complete provenance: "which episode generated which fact", plus invalidation/update history (bi-temporal).  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — episode-to-fact provenance exists, but claim derivation and versioned reconciliation/correction history do not.
 
 ### 8.5 Determinism
 
@@ -587,12 +645,16 @@ Logging levels:
 ### 8.6 Maintainability
 
 **NFR-M-01 (Maintainability)**: All schemas, policies, and pipelines MUST be managed as code (Git) with migrations and versioning.  
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — existing schema migrations are versioned, but ClaimSchema, canonicalization, alias, cardinality, and reconciliation policy versions are not implemented.
 
 ### 8.7 Observability
 
 **NFR-AO-01 (Observability)**: System MUST provide structured logging with levels (trace/debug/info/warn/error); human-readable text format with keys and brief values (arrays → `[a,b]`, objects → `{k=v,..}`).  
 **Status**: ✅ Done
+
+**NFR-AO-02 (Claim Reconciliation Observability)**: Claim extraction, key matching, candidate selection, and reconciliation MUST emit trace-level structured events containing correlation IDs, claim/fact IDs, claim schema, full comparison key, match mode, candidate count, outcome, reason code, and stage duration. Prometheus MUST expose counters and histograms aggregated only by bounded-cardinality dimensions such as claim schema, stage, match mode, outcome, and reason code. Raw comparison keys, entity IDs, claim IDs, and fact IDs MUST NOT be used as Prometheus labels.
+
+**Status**: ❌ Not done — structured event logging exists, but the current text formatter truncates individual values to 200 characters; full-key claim traces, reconciliation instrumentation, and a Prometheus exporter are not implemented.
 
 ### 8.8 Error Handling
 
@@ -684,19 +746,23 @@ memory_mcp/
 - [x] Sync tables and fields with current schema (episode, entity, fact, edge, community, task, event_log)
 - [x] Deterministic ID rules (episode/entity/fact/edge/community)
 - [x] Scope/namespace rules and `scope → namespace` mapping
+- [ ] Add Claim, ClaimRelation, comparison-key alias, and durable claim-job records through a new migration
+- [ ] Add deterministic bi-temporal claim and relation IDs and indexed claim-slot queries
 
-**Status**: ✅ Done
+**Status**: ⚠️ Partial
 
 #### 9.2.7 Migrations
 
 - [x] Strategy: apply `.surql` migrations on startup
-- [x] Source selection: filesystem (`repo_root/migrations`) → embedded → none
 - [x] Idempotent error handling: ignore benign errors (already exists/defined/index exists)
 - [x] Expectations: `script_migration` schema or canonical initial migration (`__Initial.surql`)
 - [x] Integration test: apply migrations to embedded SurrealDB, verify indexes/tables
 - [x] Versioned multi-file migrations with checksum verification
+- [x] Apply pending embedded migrations to every configured namespace before serving
+- [ ] Treat every released migration as immutable and add only new monotonically ordered migrations
+- [ ] Test sequential automatic upgrades from every explicitly supported historical database version
 
-**Status**: ✅ Done
+**Status**: ⚠️ Partial — startup application and checksum validation exist; immutable-history and historical-upgrade coverage remain pending.
 
 #### 9.2.8 Configuration and Environment
 
@@ -740,8 +806,10 @@ memory_mcp/
 - [x] Unit tests for service layer and infrastructure (including `StdoutLogger`)
 - [x] Test fixtures/embedded in-memory SurrealDB (`kv-mem`)
 - [x] Code formatted (`cargo fmt`) and checked (`cargo clippy`)
+- [ ] Labeled claim reconciliation corpus with adversarial negatives
+- [ ] Historical database upgrade, resumable backfill, concurrency, and MCP compatibility tests
 
-**Status**: ✅ Done
+**Status**: ⚠️ Partial
 
 #### 9.2.13 Compatibility and Contracts
 
@@ -749,8 +817,10 @@ memory_mcp/
 - [x] Preserve/describe alias-tool behavior or remove with compatible routing
 - [x] Update `mcp.json` examples for stdio-only
 - [x] Soften contracts for intent-based calls (normalize empty strings, soft-fallbacks)
+- [ ] Preserve required response fields while adding optional claim/reconciliation metadata
+- [ ] Prove automatic upgrade and legacy fact retrieval against supported historical database snapshots
 
-**Status**: ✅ Done
+**Status**: ⚠️ Partial
 
 #### 9.2.14 Deployment and Local Operation
 
@@ -824,7 +894,7 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 | **API-01** | `ingest(episode) → episode_id` | ✅ Done |
 | **API-02** | `extract(episode_id) → {entities, facts, links}` | ✅ Done |
 | **API-03** | `resolve(entity_candidate) → canonical_entity_id (+ merge actions)` | ✅ Done |
-| **API-04** | `invalidate(fact_id, reason, t_invalid) → ok` | ✅ Done |
+| **API-04** | `invalidate(fact_id, reason, t_invalid) → ok` (whole-fact retraction; input shape preserved) | ✅ Done |
 | **API-05** | `assemble_context(query, scope, as_of, budget) → context_pack` | ✅ Done |
 | **API-06** | `explain(context_pack) → episode links/quotes` | ✅ Done — returns citation-shaped items with full provenance tracing back to source episodes, including multi-source lineage via entity links |
 
@@ -835,8 +905,9 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 **AT-01**: After adding an email with the promise "will do by Friday," the system shows that promise on the relevant contact record together with a quote and a link to the email.  
 **Status**: ✅ Done
 
-**AT-02**: If 6 months later new email states "ARR grew to $3M", old fact "$1M ARR" becomes invalidated (or confidence drops sharply), UI shows metric dynamics.  
-**Status**: ✅ Done
+**AT-02**: If a later source states "ARR grew to $3M", the old source fact remains auditable. The earlier ARR claim is superseded only when single-valued cardinality, explicit validity, and source-lineage or authority gates are satisfied; otherwise the system records contradiction or temporal ambiguity.
+
+**Status**: ❌ Not done
 
 **AT-03**: User without `hr.salary` scope cannot extract/see salary facts via UI or agent skill.  
 **Status**: ✅ Done
@@ -856,12 +927,38 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 **AT-08**: Multi-word queries in `assemble_context` (e.g., "Delta Enrollment", "release notes Module v2.2 episode:xxx") return matching facts even when query words appear non-adjacently in content. Query preprocessing correctly strips episode references and boolean operators.  
 **Status**: ✅ Done
 
+**AT-09**: Two incompatible claims with overlapping validity are both preserved and returned with a persisted contradiction relation and source evidence; neither source fact is invalidated.
+
+**Status**: ❌ Not done
+
+**AT-10**: A fact containing several claims remains retrievable when one claim is superseded or corrected; unrelated claims and the original quote are unchanged.
+
+**Status**: ❌ Not done
+
+**AT-11**: An explicitly corrected claim closes in transaction time without inventing a real-world transition, while audit can reconstruct the pre-correction view.
+
+**Status**: ❌ Not done
+
+**AT-12**: Upgrading a supported historical database automatically applies only new append-only migrations, serves legacy facts without claims, and resumes claim backfill after interruption without duplicates.
+
+**Status**: ❌ Not done
+
+**AT-13**: Claims in different scope, project, or access-policy partitions never reconcile and never leak relation metadata across authorization boundaries.
+
+**Status**: ❌ Not done
+
+**AT-14**: `extract`, `assemble_context`, and `explain` preserve existing required response fields while adding reconciliation information only through optional backward-compatible fields.
+
+**Status**: ❌ Not done
+
 ### 10.3 Test Coverage
 
-- **Unit tests**: Service layer, storage layer, logging, error handling
-- **Integration tests**: SurrealDB migrations, indexes, persistence
-- **E2E tests**: MCP tool calls with real SurrealDB (embedded)
-- **Acceptance tests**: High-level scenarios (AT-01..AT-08)
+- **Unit tests**: Service layer, storage layer, logging, error handling, canonicalization golden fixtures, deterministic IDs, and the complete reconciliation decision table
+- **Property tests**: Normalization idempotence, qualifier-order invariance, canonical pair symmetry, and isolation invariants
+- **Integration tests**: Fresh SurrealDB migrations, sequential upgrades from supported historical snapshots, indexes, persistence, concurrency, and resumable backfill
+- **E2E tests**: Real MCP handler responses against embedded SurrealDB, including backward-compatible optional reconciliation metadata
+- **Evaluation tests**: Labeled positive and negative claim/relation corpus with per-schema precision, recall, confusion matrices, and latency percentiles
+- **Acceptance tests**: High-level scenarios (AT-01..AT-14)
 
 - **Full-run status**: Full test suite (unit + integration + acceptance + embedded FTS + MCP e2e) executed locally after SurrealDB 3 migration fixes; all tests passed and linter (`cargo clippy`) reported no warnings.
 
@@ -951,16 +1048,19 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 
 ### 11.5 Migrations
 
-**Migration sources (priority order):**
+**Migration sources:**
 
-1. Filesystem: `<repo_root>/migrations/*.surql`
-2. Embedded: Rust binary includes migrations at compile time
-3. None: Skip migrations (for testing only)
+1. Canonical initial schema embedded in the Rust binary
+2. Ordered versioned migrations embedded in the Rust binary
 
 **Migration behavior:**
 
-- Applied on server startup
-- Idempotent: benign errors ignored (already exists/defined)
+- Pending embedded migrations are applied automatically to every configured namespace on server startup, before requests are served
+- Applied migrations are tracked by deterministic record ID and checksum
+- Released or applied migration files are immutable; changes require a new monotonically ordered migration
+- Migrations must be deterministic, restart-safe, and preserve legacy records and provenance
+- The current application must automatically upgrade every explicitly supported older database version
+- Migration failure stops startup before requests are served against a partially upgraded schema
 - Canonical initial migration: `migrations/__Initial.surql`
 
 ---
@@ -971,6 +1071,7 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 
 - [Subagents with MCP](https://cra.mr/subagents-with-mcp)
 - [MCP, Skills, and Agents](https://cra.mr/mcp-skills-and-agents)
+- `docs/CONTRADICTION_DETECTION_DESIGN.md` — deterministic claim-reconciliation target architecture
 - `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — retrieval target-state specification
 - `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` — adaptive-memory target-state specification
 - [Memory Agent](/.github/agents/memory.agent.md) — Full 1100+ line agent specification
@@ -999,11 +1100,13 @@ These documents are superseded by this specification:
 
 ## Document Status
 
-**Current Version**: 2.3  
-**Consolidated**: February 5, 2026  
+**Current Version**: 2.4<br>
+**Consolidated**: February 5, 2026; claim reconciliation revision July 17, 2026<br>
 **Next Review**: When significant requirements change or implementation milestones reached
 
 **Changelog:**
+
+- **2026-07-17**: Added the accepted Claim/ClaimRelation reconciliation design and corrected previous fact-level supersession, migration, observability, compatibility, and acceptance-test claims that no longer represented the target model.
 
 - **2026-03-27**: Linked this runtime spec to the new adaptive-memory target-state design doc, clarifying that SOTA alignment work is tracked separately from shipped behavior and should preserve the simplified lexical/BM25 + graph retrieval direction.
 

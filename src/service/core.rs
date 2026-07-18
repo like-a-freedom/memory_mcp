@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
+use crate::models::FactId;
 use crate::models::{
     AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, GraphHubEntity, GraphInsights, IngestRequest, InvalidateRequest,
@@ -535,6 +536,43 @@ impl MemoryService {
 
             // Fire-and-forget triple extraction (non-blocking).
             self.spawn_triple_extraction(&fact_id, content, &namespace);
+
+            // Fire-and-forget claim projection (non-blocking).
+            let claim_svc = self.claim_service.clone();
+            let claim_fact_id = FactId::from(fact_id.clone());
+            let claim_content = content.to_string();
+            let claim_scope = scope.to_string();
+            let claim_project = self
+                .project_for_source_episode(source_episode)
+                .await
+                .ok()
+                .flatten();
+            let claim_entity_links = entity_links.clone();
+            let claim_t_valid = t_valid;
+            let claim_fact_type = fact_type.to_string();
+            let namespace_clone = namespace.clone();
+            tokio::spawn(async move {
+                let params = crate::service::claims::project::FactPersistedParams {
+                    namespace: &namespace_clone,
+                    fact_id: &claim_fact_id,
+                    _fact_type: &claim_fact_type,
+                    content: &claim_content,
+                    scope: &claim_scope,
+                    project: claim_project.as_deref(),
+                    entity_links: &claim_entity_links,
+                    t_valid: claim_t_valid,
+                };
+                match claim_svc.after_fact_persisted(&params).await {
+                    Ok(_summary) => {}
+                    Err(error) => {
+                        claim_svc.record_post_fact_failure(
+                            &namespace_clone,
+                            &claim_fact_id,
+                            &error,
+                        );
+                    }
+                }
+            });
         }
         Ok(fact_id)
     }

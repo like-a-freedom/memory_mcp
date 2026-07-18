@@ -63,6 +63,24 @@ mod tests {
         }
     }
 
+    fn test_input_with_content(
+        fields: BTreeMap<String, String>,
+        content: &'static str,
+    ) -> ClaimProjectionInput<'static> {
+        ClaimProjectionInput {
+            namespace: "test",
+            source_fact_id: FactId::from("fact:test"),
+            source_episode_id: EpisodeId::from("ep:test"),
+            scope: "personal",
+            project: None,
+            policy_tags: &[],
+            subject: "entity:subject1",
+            t_ref: chrono::Utc::now(),
+            content,
+            structured_fields: Box::leak(Box::new(fields)),
+        }
+    }
+
     #[test]
     fn project_fact_deduplicates_identical_drafts() {
         let fp = ExtractorFingerprint::compute(1, "test");
@@ -74,7 +92,6 @@ mod tests {
         let input = test_input(fields);
 
         let result = project_fact(&registry, &input).unwrap();
-        // Only one attribute draft for these fields
         let attribute_drafts: Vec<_> = result
             .drafts
             .iter()
@@ -126,9 +143,59 @@ mod tests {
         let input = test_input(fields);
 
         let result = project_fact(&registry, &input).unwrap();
-        // Drafts without explicit spans have source_span = None
         for draft in &result.drafts {
             assert!(draft.source_span.is_none());
         }
+    }
+
+    #[test]
+    fn project_fact_extracts_from_kv_content() {
+        let fp = ExtractorFingerprint::compute(1, "test");
+        let registry = ClaimSchemaRegistry::built_in(fp);
+
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Height: 180 cm");
+
+        let result = project_fact(&registry, &input).unwrap();
+        assert!(!result.drafts.is_empty());
+        // Should have attribute draft from kv parsing
+        let attribute_drafts: Vec<_> = result
+            .drafts
+            .iter()
+            .filter(|d| d.schema_ref.family == ClaimSchemaFamily::Attribute)
+            .collect();
+        assert_eq!(attribute_drafts.len(), 1);
+        // Should have source span
+        assert!(attribute_drafts[0].source_span.is_some());
+    }
+
+    #[test]
+    fn project_fact_extracts_from_sentence_pattern() {
+        let fp = ExtractorFingerprint::compute(1, "test");
+        let registry = ClaimSchemaRegistry::built_in(fp);
+
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Temperature is 36.5 celsius");
+
+        let result = project_fact(&registry, &input).unwrap();
+        // Should have quantity draft from sentence parsing
+        let quantity_drafts: Vec<_> = result
+            .drafts
+            .iter()
+            .filter(|d| d.schema_ref.family == ClaimSchemaFamily::Quantity)
+            .collect();
+        assert_eq!(quantity_drafts.len(), 1);
+    }
+
+    #[test]
+    fn project_fact_skips_empty_content_without_fields() {
+        let fp = ExtractorFingerprint::compute(1, "test");
+        let registry = ClaimSchemaRegistry::built_in(fp);
+
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "");
+
+        let result = project_fact(&registry, &input).unwrap();
+        assert!(result.drafts.is_empty());
     }
 }

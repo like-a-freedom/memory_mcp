@@ -149,8 +149,7 @@ impl ClaimSchema for AttributeV1 {
         output: &mut Vec<ClaimDraftCandidate>,
         _skips: &mut Vec<ClaimSkip>,
     ) -> Result<(), MemoryError> {
-        // Extract attribute claims from structured fields
-        // Pattern: "dimension" key with a value
+        // Priority 1: Structured fields
         if let Some(dimension) = input.structured_fields.get("dimension")
             && let Some(val) = input.structured_fields.get("value")
         {
@@ -174,7 +173,67 @@ impl ClaimSchema for AttributeV1 {
                 source_lineage: None,
                 source_span: None,
             });
+            return Ok(());
         }
+
+        // Priority 2: Key-value lines from content
+        let kv = parse_key_value_lines(input.content);
+        for (key, val) in &kv {
+            // Skip keys that look like relation/quantity/commitment patterns
+            if matches!(
+                key.as_str(),
+                "measure" | "unit" | "predicate" | "object" | "action" | "target"
+            ) {
+                continue;
+            }
+            let mut components = BTreeMap::new();
+            components.insert("dimension".to_string(), key.clone());
+            let ck = ComparisonKey::new(self.schema_ref(), components)?;
+            let span_start = input.content.find(&format!("{key}: ")).unwrap_or(0);
+            let span_end = span_start + key.len() + 2 + val.len();
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: input.subject.to_string(),
+                comparison_key: ck,
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Text(NormalizedText::new(val)),
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: Some((span_start, span_end)),
+            });
+            return Ok(());
+        }
+
+        // Priority 3: Sentence pattern "The X is Y" or "X is Y"
+        if let Some((key, val)) = parse_is_sentence(input.content)
+            && !matches!(
+                key.as_str(),
+                "measure" | "unit" | "predicate" | "object" | "action" | "target"
+            )
+        {
+            let mut components = BTreeMap::new();
+            components.insert("dimension".to_string(), key.clone());
+            let ck = ComparisonKey::new(self.schema_ref(), components)?;
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: input.subject.to_string(),
+                comparison_key: ck,
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Text(NormalizedText::new(&val)),
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: None,
+            });
+        }
+
         Ok(())
     }
 
@@ -200,8 +259,9 @@ impl ClaimSchema for QuantityV1 {
         &self,
         input: &ClaimProjectionInput<'_>,
         output: &mut Vec<ClaimDraftCandidate>,
-        _skips: &mut Vec<ClaimSkip>,
+        skips: &mut Vec<ClaimSkip>,
     ) -> Result<(), MemoryError> {
+        // Priority 1: Structured fields
         if let Some(measure) = input.structured_fields.get("measure")
             && let Some(val_str) = input.structured_fields.get("value")
         {
@@ -241,13 +301,81 @@ impl ClaimSchema for QuantityV1 {
                     });
                 }
                 Err(_) => {
-                    _skips.push(ClaimSkip {
+                    skips.push(ClaimSkip {
                         reason_code: "invalid_value".to_string(),
                         detail: Some(format!("cannot parse decimal: {val_str}")),
                     });
                 }
             }
+            return Ok(());
         }
+
+        // Priority 2: Key-value lines from content
+        let kv = parse_key_value_lines(input.content);
+        for (key, val) in &kv {
+            if let Some((num_str, unit_str)) = extract_number_and_unit(val)
+                && let Ok(decimal) = CanonicalDecimal::parse(&num_str)
+            {
+                let mut components = BTreeMap::new();
+                components.insert("measure".to_string(), key.clone());
+                components.insert("unit_family".to_string(), unit_str.clone());
+                let ck = ComparisonKey::new(self.schema_ref(), components)?;
+                let span_start = input.content.find(&format!("{key}: ")).unwrap_or(0);
+                let span_end = span_start + key.len() + 2 + val.len();
+                output.push(ClaimDraftCandidate {
+                    schema_ref: self.schema_ref(),
+                    subject: input.subject.to_string(),
+                    comparison_key: ck,
+                    qualifiers: BTreeMap::new(),
+                    value: ClaimValue::Quantity {
+                        value: decimal,
+                        unit: CanonicalUnit {
+                            family: unit_str.clone(),
+                            symbol: unit_str,
+                        },
+                    },
+                    cardinality: ClaimCardinality::SingleValued,
+                    observed_at: input.t_ref,
+                    valid_from: None,
+                    valid_to: None,
+                    validity_source: ClaimValiditySource::Explicit,
+                    source_lineage: None,
+                    source_span: Some((span_start, span_end)),
+                });
+            }
+        }
+
+        // Priority 3: Sentence pattern "X is Y unit" or "The X is Y unit"
+        if let Some((key, val)) = parse_is_sentence(input.content)
+            && let Some((num_str, unit_str)) = extract_number_and_unit(&val)
+            && let Ok(decimal) = CanonicalDecimal::parse(&num_str)
+        {
+            let mut components = BTreeMap::new();
+            components.insert("measure".to_string(), key.clone());
+            components.insert("unit_family".to_string(), unit_str.clone());
+            let ck = ComparisonKey::new(self.schema_ref(), components)?;
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: input.subject.to_string(),
+                comparison_key: ck,
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Quantity {
+                    value: decimal,
+                    unit: CanonicalUnit {
+                        family: unit_str.clone(),
+                        symbol: unit_str,
+                    },
+                },
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: None,
+            });
+        }
+
         Ok(())
     }
 
@@ -275,6 +403,7 @@ impl ClaimSchema for RelationV1 {
         output: &mut Vec<ClaimDraftCandidate>,
         _skips: &mut Vec<ClaimSkip>,
     ) -> Result<(), MemoryError> {
+        // Priority 1: Structured fields
         if let Some(predicate) = input.structured_fields.get("predicate")
             && let Some(object) = input.structured_fields.get("object")
         {
@@ -299,7 +428,34 @@ impl ClaimSchema for RelationV1 {
                 source_lineage: None,
                 source_span: None,
             });
+            return Ok(());
         }
+
+        // Priority 2: Key-value lines from content (e.g. "Works at: Acme Corp")
+        let kv = parse_key_value_lines(input.content);
+        for (key, val) in &kv {
+            let mut components = BTreeMap::new();
+            components.insert("predicate".to_string(), key.clone());
+            components.insert("object_role".to_string(), "target".to_string());
+            let ck = ComparisonKey::new(self.schema_ref(), components)?;
+            let span_start = input.content.find(&format!("{key}: ")).unwrap_or(0);
+            let span_end = span_start + key.len() + 2 + val.len();
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: input.subject.to_string(),
+                comparison_key: ck,
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Text(NormalizedText::new(val)),
+                cardinality: ClaimCardinality::SetValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: Some((span_start, span_end)),
+            });
+        }
+
         Ok(())
     }
 
@@ -372,6 +528,69 @@ impl ClaimSchema for CommitmentV1 {
     }
 }
 
+// ─── Content Parsing Helpers ───────────────────────────────────────────────────
+
+/// Parse key-value lines from content (e.g. "Height: 180 cm").
+/// Returns a map of normalized key → value for lines matching `key: value` or `key = value`.
+pub(crate) fn parse_key_value_lines(content: &str) -> BTreeMap<String, String> {
+    let mut result = BTreeMap::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some(pos) = line.find(": ") {
+            let key = line[..pos].trim().to_lowercase();
+            let val = line[pos + 2..].trim().to_string();
+            if !key.is_empty() && !val.is_empty() {
+                result.insert(key, val);
+            }
+        } else if let Some(pos) = line.find(" = ") {
+            let key = line[..pos].trim().to_lowercase();
+            let val = line[pos + 3..].trim().to_string();
+            if !key.is_empty() && !val.is_empty() {
+                result.insert(key, val);
+            }
+        }
+    }
+    result
+}
+
+/// Extract a numeric value and optional unit from a string like "36.5 celsius" or "180cm".
+pub(crate) fn extract_number_and_unit(text: &str) -> Option<(String, String)> {
+    let text = text.trim();
+    // Try to find a number at the start
+    let num_end = text
+        .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+        .unwrap_or(text.len());
+    if num_end == 0 {
+        return None;
+    }
+    let num_str = &text[..num_end];
+    // Parse as canonical decimal to validate
+    let _ = CanonicalDecimal::parse(num_str).ok()?;
+    let unit = text[num_end..].trim().to_string();
+    if unit.is_empty() {
+        return Some((num_str.to_string(), String::new()));
+    }
+    Some((num_str.to_string(), unit))
+}
+
+/// Try to parse a sentence of the form "The X is Y" or "X is Y".
+/// Returns (key, value) if matched.
+pub(crate) fn parse_is_sentence(content: &str) -> Option<(String, String)> {
+    let content = content.trim();
+    // Try "The X is Y" pattern
+    let lower = content.to_lowercase();
+    let pattern_start = if lower.starts_with("the ") { 4 } else { 0 };
+    let rest = &content[pattern_start..];
+    if let Some(pos) = rest.find(" is ") {
+        let key = rest[..pos].trim().to_lowercase();
+        let val = rest[pos + 4..].trim().to_string();
+        if !key.is_empty() && !val.is_empty() {
+            return Some((key, val));
+        }
+    }
+    None
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -393,12 +612,32 @@ mod tests {
         }
     }
 
+    fn test_input_with_content(
+        fields: BTreeMap<String, String>,
+        content: &'static str,
+    ) -> ClaimProjectionInput<'static> {
+        ClaimProjectionInput {
+            namespace: "test",
+            source_fact_id: FactId::from("fact:test"),
+            source_episode_id: EpisodeId::from("ep:test"),
+            scope: "personal",
+            project: None,
+            policy_tags: &[],
+            subject: "entity:subject1",
+            t_ref: chrono::Utc::now(),
+            content,
+            structured_fields: Box::leak(Box::new(fields)),
+        }
+    }
+
     fn schema_ref(family: ClaimSchemaFamily) -> ClaimSchemaRef {
         ClaimSchemaRef {
             family,
             version: std::num::NonZeroU16::new(1).unwrap(),
         }
     }
+
+    // ── Structured field tests (existing) ─────────────────────────────────────
 
     #[test]
     fn attribute_v1_extracts_from_structured_fields() {
@@ -544,6 +783,233 @@ mod tests {
         assert!(matches!(&output[0].value, ClaimValue::Boolean(true)));
     }
 
+    // ── Key-value line parsing tests ──────────────────────────────────────────
+
+    #[test]
+    fn parse_key_value_lines_colon_separated() {
+        let content = "Height: 180 cm\nWeight: 75 kg";
+        let kv = parse_key_value_lines(content);
+        assert_eq!(kv.get("height").unwrap(), "180 cm");
+        assert_eq!(kv.get("weight").unwrap(), "75 kg");
+    }
+
+    #[test]
+    fn parse_key_value_lines_equals_separated() {
+        let content = "Status = active\nPriority = high";
+        let kv = parse_key_value_lines(content);
+        assert_eq!(kv.get("status").unwrap(), "active");
+        assert_eq!(kv.get("priority").unwrap(), "high");
+    }
+
+    #[test]
+    fn parse_key_value_lines_skips_blank_and_malformed() {
+        let content = "\nnot a kv line\n: missing key\nkey :\nkey: ";
+        let kv = parse_key_value_lines(content);
+        assert!(kv.is_empty());
+    }
+
+    // ── Key-value content extraction tests ────────────────────────────────────
+
+    #[test]
+    fn attribute_v1_extracts_from_kv_content() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Height: 180 cm");
+
+        let schema = AttributeV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].schema_ref,
+            schema_ref(ClaimSchemaFamily::Attribute)
+        );
+        // Key from kv parse is "height", value is "180 cm"
+        if let ClaimValue::Text(t) = &output[0].value {
+            assert_eq!(t.as_str(), "180 cm");
+        } else {
+            panic!("expected Text value");
+        }
+        // Source span should be set
+        assert!(output[0].source_span.is_some());
+    }
+
+    #[test]
+    fn quantity_v1_extracts_from_kv_content() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Temperature: 36.5 celsius");
+
+        let schema = QuantityV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert_eq!(output.len(), 1);
+        if let ClaimValue::Quantity { value, unit } = &output[0].value {
+            assert_eq!(value.coefficient(), 365);
+            assert_eq!(value.scale(), 1);
+            assert_eq!(unit.family, "celsius");
+        } else {
+            panic!("expected Quantity value");
+        }
+    }
+
+    #[test]
+    fn relation_v1_extracts_from_kv_content() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Works at: Acme Corp");
+
+        let schema = RelationV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert_eq!(output.len(), 1);
+        if let ClaimValue::Text(t) = &output[0].value {
+            assert_eq!(t.as_str(), "acme corp");
+        } else {
+            panic!("expected Text value");
+        }
+    }
+
+    // ── Sentence pattern extraction tests ─────────────────────────────────────
+
+    #[test]
+    fn attribute_v1_extracts_from_sentence_pattern() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "The height is 180 cm");
+
+        let schema = AttributeV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].schema_ref,
+            schema_ref(ClaimSchemaFamily::Attribute)
+        );
+    }
+
+    #[test]
+    fn quantity_v1_extracts_from_sentence_pattern() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Temperature is 36.5 celsius");
+
+        let schema = QuantityV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert_eq!(output.len(), 1);
+        if let ClaimValue::Quantity { value, .. } = &output[0].value {
+            assert_eq!(value.coefficient(), 365);
+        } else {
+            panic!("expected Quantity value");
+        }
+    }
+
+    // ── Adversarial negative tests ────────────────────────────────────────────
+
+    #[test]
+    fn attribute_v1_skips_empty_content_without_structured_fields() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "");
+
+        let schema = AttributeV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn quantity_v1_skips_unknown_unit_in_sentence() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Weight is 75 flurbs");
+
+        let schema = QuantityV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        // Should still extract with unknown unit (unit family = "flurbs")
+        // but the value should be valid
+        assert_eq!(output.len(), 1);
+        if let ClaimValue::Quantity { unit, .. } = &output[0].value {
+            assert_eq!(unit.family, "flurbs");
+        } else {
+            panic!("expected Quantity value");
+        }
+    }
+
+    #[test]
+    fn quantity_v1_skips_non_numeric_sentence_value() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "Weight is heavy");
+
+        let schema = QuantityV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        // "heavy" is not numeric, should skip
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn commitment_v1_skips_without_action_pattern() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "The weather is nice today");
+
+        let schema = CommitmentV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn relation_v1_skips_without_object_pattern() {
+        let fields = BTreeMap::new();
+        let input = test_input_with_content(fields, "The quick brown fox jumps");
+
+        let schema = RelationV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        assert!(output.is_empty());
+    }
+
+    // ── Structured fields take priority over content parsing ──────────────────
+
+    #[test]
+    fn structured_fields_take_priority_over_content() {
+        let mut fields = BTreeMap::new();
+        fields.insert("dimension".to_string(), "Color".to_string());
+        fields.insert("value".to_string(), "Red".to_string());
+        let input = test_input_with_content(fields, "Height: 180 cm");
+
+        let schema = AttributeV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+
+        // Should extract from structured fields, not content
+        assert_eq!(output.len(), 1);
+        if let ClaimValue::Text(t) = &output[0].value {
+            assert_eq!(t.as_str(), "red");
+        } else {
+            panic!("expected Text value");
+        }
+    }
+
+    // ── Registry and key tests ────────────────────────────────────────────────
+
     #[test]
     fn registry_project_all_dispatches_to_all_schemas() {
         let fp = crate::models::claim::ExtractorFingerprint::compute(1, "test");
@@ -566,7 +1032,6 @@ mod tests {
             .project_all(&input, &mut output, &mut skips)
             .unwrap();
 
-        // Should have drafts from attribute, quantity, relation, commitment
         assert!(
             output.len() >= 3,
             "expected at least 3 drafts, got {}",

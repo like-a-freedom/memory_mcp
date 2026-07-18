@@ -59,6 +59,7 @@ serde_json = "1.0.150"
 tempfile = "3.27.0"
 csv = "1.4.0"
 mockall = "0.15.0"
+proptest = "1.11.0"
 
 [profile.dev]
 opt-level = 0
