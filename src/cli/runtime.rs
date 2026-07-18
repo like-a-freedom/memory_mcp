@@ -68,6 +68,7 @@ pub async fn build_memory_service(
 
 pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
+    let claim_worker = memory_service.start_claim_workers().await;
     let server = MemoryMcp::new(memory_service);
 
     logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
@@ -80,13 +81,16 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 
     logger.log(event!("op" => json!("main.running")), LogLevel::Info);
 
-    service
+    let result = service
         .waiting()
         .await
         .map(|_quit_reason| {
             logger.log(event!("op" => json!("main.shutdown")), LogLevel::Info);
         })
-        .map_err(|err| log_and_return_error(logger, "main.error", err))
+        .map_err(|err| log_and_return_error(logger, "main.error", err));
+
+    claim_worker.shutdown().await;
+    result
 }
 
 pub async fn run_watch_mode(
@@ -105,10 +109,11 @@ pub async fn run_watch_mode(
     );
 
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
+    let claim_worker = memory_service.start_claim_workers().await;
 
     #[cfg(feature = "cli-watch")]
     {
-        crate::service::FsWatcher::run_with_interval(
+        let result = crate::service::FsWatcher::run_with_interval(
             watch.dir,
             watch.project,
             watch.scope,
@@ -116,12 +121,15 @@ pub async fn run_watch_mode(
             memory_service,
         )
         .await
-        .map_err(|err| log_and_return_error(logger, "main.watch_failed", err))
+        .map_err(|err| log_and_return_error(logger, "main.watch_failed", err));
+        claim_worker.shutdown().await;
+        result
     }
 
     #[cfg(not(feature = "cli-watch"))]
     {
         let _ = (watch, memory_service);
+        claim_worker.shutdown().await;
         Err(Box::new(std::io::Error::other(
             "watch subcommand requires the cli-watch feature",
         )) as Box<dyn std::error::Error>)

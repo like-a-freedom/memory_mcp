@@ -571,6 +571,14 @@ impl MemoryService {
         Ok(fact_id)
     }
 
+    /// Start claim reconciliation workers and schedule backfill.
+    pub(crate) async fn start_claim_workers(&self) -> super::claims::worker::ClaimWorkerRuntime {
+        let runtime = super::claims::worker::ClaimWorkerRuntime::new();
+        let worker_id = format!("claim-worker-{}", std::process::id());
+        runtime.spawn_worker(self.claim_service.clone(), worker_id);
+        runtime
+    }
+
     pub(crate) async fn record_fact_access(
         &self,
         fact_id: &str,

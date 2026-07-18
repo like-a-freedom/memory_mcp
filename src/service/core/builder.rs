@@ -392,6 +392,28 @@ impl MemoryService {
 
         service.check_surrealdb_connection().await?;
 
+        // Schedule one backfill job per namespace
+        for ns in &service.namespaces {
+            if let Err(e) = crate::service::claims::backfill::schedule_namespace_backfill(
+                &service.claim_service,
+                ns,
+            )
+            .await
+            {
+                startup_logger.log(
+                    std::collections::HashMap::from([
+                        (
+                            "op".to_string(),
+                            serde_json::json!("claim.backfill_schedule_failed"),
+                        ),
+                        ("namespace".to_string(), serde_json::json!(ns)),
+                        ("error".to_string(), serde_json::json!(e.to_string())),
+                    ]),
+                    crate::logging::LogLevel::Warn,
+                );
+            }
+        }
+
         // Spawn lifecycle workers if enabled
         super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
 
