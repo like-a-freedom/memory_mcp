@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json;
 
 use super::DbClient;
 use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ExtractorFingerprint};
@@ -238,8 +239,26 @@ impl ClaimStore for SurrealClaimStore {
 
     async fn persist_projection(
         &self,
-        _request: PersistProjectionRequest<'_>,
+        request: PersistProjectionRequest<'_>,
     ) -> Result<(), MemoryError> {
+        let namespace = request.namespace;
+
+        for claim in &request.claims {
+            let content = serde_json::to_value(claim)
+                .map_err(|e| MemoryError::Storage(format!("failed to serialize claim: {e}")))?;
+            let sql = format!("UPDATE claim:⟨{}⟩ CONTENT $content", claim.claim_id);
+            let vars = serde_json::json!({"content": content});
+            self.db.query(&sql, Some(vars), namespace).await?;
+        }
+
+        for job in &request.jobs {
+            let content = serde_json::to_value(job)
+                .map_err(|e| MemoryError::Storage(format!("failed to serialize job: {e}")))?;
+            let sql = format!("UPDATE claim_job:⟨{}⟩ CONTENT $content", job.job_id);
+            let vars = serde_json::json!({"content": content});
+            self.db.query(&sql, Some(vars), namespace).await?;
+        }
+
         Ok(())
     }
 

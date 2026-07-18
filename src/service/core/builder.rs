@@ -500,6 +500,9 @@ impl MemoryService {
             rate_limiter.clone(),
         );
         let entity_service = super::super::entity::EntityService::new(db_client.clone());
+        let claim_store = Arc::new(crate::storage::claims::SurrealClaimStore::new(
+            db_client.clone(),
+        ));
         let fuzzy_threshold = std::env::var("ENTITY_FUZZY_THRESHOLD")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
@@ -532,7 +535,7 @@ impl MemoryService {
                 super::super::triple_extractor::RuleBasedTripleExtractor::new(),
             ),
             lifecycle_config: crate::config::LifecycleConfig::default(),
-            claim_service: super::super::claims::project::ClaimService::new(),
+            claim_service: super::super::claims::project::ClaimService::new(claim_store),
         })
     }
 
