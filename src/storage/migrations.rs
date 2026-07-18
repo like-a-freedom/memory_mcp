@@ -83,6 +83,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "027_claim_reconciliation.surql",
             sql: include_str!("../../migrations/027_claim_reconciliation.surql"),
         },
+        MigrationScript {
+            file_name: "028_claim_reconciliation_hardening.surql",
+            sql: include_str!("../../migrations/028_claim_reconciliation_hardening.surql"),
+        },
     ]
 }
 

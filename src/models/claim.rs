@@ -522,6 +522,18 @@ pub struct ClaimRelation {
     pub policy_tags: Vec<String>,
     pub t_ingested: chrono::DateTime<chrono::Utc>,
     pub t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+    /// Migration 028: schema family for lookup/metrics.
+    #[serde(default)]
+    pub schema_family: Option<ClaimSchemaFamily>,
+    /// Migration 028: schema version for lookup/metrics.
+    #[serde(default)]
+    pub schema_version: Option<u16>,
+    /// Migration 028: left source fact for cross-fact relation queries.
+    #[serde(default)]
+    pub left_fact_id: Option<FactId>,
+    /// Migration 028: right source fact for cross-fact relation queries.
+    #[serde(default)]
+    pub right_fact_id: Option<FactId>,
 }
 
 // ─── Claim Job ────────────────────────────────────────────────────────────────

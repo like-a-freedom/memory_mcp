@@ -83,6 +83,12 @@ pub(crate) trait ClaimStore: Send + Sync {
         namespace: &str,
         policies: &[ClaimPolicyRecord],
     ) -> Result<(), MemoryError>;
+
+    /// Atomically commit relation versions and update job cursor.
+    async fn commit_reconciliation_page(
+        &self,
+        request: CommitReconciliationPageRequest<'_>,
+    ) -> Result<(), MemoryError>;
 }
 
 // ─── Request/Response Types ───────────────────────────────────────────────────
@@ -164,10 +170,11 @@ pub(crate) struct SourceEvidenceRecord {
     pub content: Option<String>,
 }
 
-/// Count of active relations per namespace.
+/// Count of active relations grouped by schema family and outcome.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ActiveRelationCount {
-    pub namespace: String,
+    pub schema_family: Option<String>,
+    pub outcome: Option<String>,
     pub count: i64,
 }
 
@@ -193,6 +200,26 @@ pub(crate) struct ClaimPolicyRecord {
     pub schema_version: u16,
     pub policy_fingerprint: String,
     pub definition: serde_json::Value,
+}
+
+/// Job counters for reconciliation page commits.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct JobCounters {
+    pub processed: u64,
+    pub succeeded: u64,
+    pub skipped: u64,
+    pub failed: u64,
+}
+
+/// Commit one reconciliation page with cursor update.
+pub(crate) struct CommitReconciliationPageRequest<'a> {
+    pub namespace: &'a str,
+    pub job_id: &'a crate::models::ClaimJobId,
+    pub expected_lease_owner: &'a str,
+    pub relations: &'a [crate::models::claim::ClaimRelation],
+    pub next_cursor: Option<&'a crate::models::ClaimId>,
+    pub completed: bool,
+    pub counters: JobCounters,
 }
 
 // ─── SurrealClaimStore ────────────────────────────────────────────────────────
@@ -336,23 +363,35 @@ impl ClaimStore for SurrealClaimStore {
         request: PersistProjectionRequest<'_>,
     ) -> Result<(), MemoryError> {
         let namespace = request.namespace;
+        if request.claims.is_empty() && request.jobs.is_empty() {
+            return Ok(());
+        }
 
-        for claim in &request.claims {
+        let mut stmts = Vec::new();
+        stmts.push("BEGIN TRANSACTION".to_string());
+
+        let mut vars = serde_json::json!({});
+        let v = vars.as_object_mut().unwrap();
+
+        for (i, claim) in request.claims.iter().enumerate() {
             let content = serde_json::to_value(claim)
-                .map_err(|e| MemoryError::Storage(format!("failed to serialize claim: {e}")))?;
-            let sql = format!("UPDATE claim:⟨{}⟩ CONTENT $content", claim.claim_id);
-            let vars = serde_json::json!({"content": content});
-            self.db.query(&sql, Some(vars), namespace).await?;
+                .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
+            let key = format!("c{i}");
+            v.insert(key.clone(), content);
+            stmts.push(format!("UPDATE claim:⟨{}⟩ CONTENT ${key}", claim.claim_id));
         }
 
-        for job in &request.jobs {
+        for (i, job) in request.jobs.iter().enumerate() {
             let content = serde_json::to_value(job)
-                .map_err(|e| MemoryError::Storage(format!("failed to serialize job: {e}")))?;
-            let sql = format!("UPDATE claim_job:⟨{}⟩ CONTENT $content", job.job_id);
-            let vars = serde_json::json!({"content": content});
-            self.db.query(&sql, Some(vars), namespace).await?;
+                .map_err(|e| MemoryError::Storage(format!("serialize job: {e}")))?;
+            let key = format!("j{i}");
+            v.insert(key.clone(), content);
+            stmts.push(format!("UPDATE claim_job:⟨{}⟩ CONTENT ${key}", job.job_id));
         }
 
+        stmts.push("COMMIT TRANSACTION".to_string());
+        let sql = stmts.join(";\n");
+        self.db.query(&sql, Some(vars), namespace).await?;
         Ok(())
     }
 
@@ -360,18 +399,27 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         query: ClaimCandidateQuery<'_>,
     ) -> Result<Vec<Claim>, MemoryError> {
-        let after_clause = match query.after_claim_id {
-            Some(id) => format!(" AND claim_id > \"{}\"", id),
-            None => String::new(),
+        if query.limit == 0 {
+            return Ok(vec![]);
+        }
+        let sql = match query.after_claim_id {
+            Some(_) => {
+                "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp AND claim_id > $after ORDER BY claim_id LIMIT $limit"
+            }
+            None => {
+                "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp ORDER BY claim_id LIMIT $limit"
+            }
         };
-        let sql = format!(
-            "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp{after_clause} ORDER BY claim_id LIMIT $limit"
-        );
-        let vars = serde_json::json!({
+        let mut vars = serde_json::json!({
             "slot_fp": query.slot_fingerprint,
             "limit": query.limit,
         });
-        let result = self.db.query(&sql, Some(vars), query.namespace).await?;
+        if let Some(after) = query.after_claim_id {
+            vars.as_object_mut()
+                .unwrap()
+                .insert("after".to_string(), Value::String(after.to_string()));
+        }
+        let result = self.db.query(sql, Some(vars), query.namespace).await?;
         let records = Self::deserialize_vec(result);
         records
             .into_iter()
@@ -416,7 +464,7 @@ impl ClaimStore for SurrealClaimStore {
         q: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError> {
         let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
-        let sql = "SELECT * FROM claim_relation WHERE left_claim_id IN $fact_ids OR right_claim_id IN $fact_ids";
+        let sql = "SELECT * FROM claim_relation WHERE (left_fact_id IN $fact_ids OR right_fact_id IN $fact_ids) AND t_invalid_ingested IS NONE";
         let vars = serde_json::json!({"fact_ids": fact_ids});
         let result = self.db.query(sql, Some(vars), q.namespace).await?;
         let records = Self::deserialize_vec(result);
@@ -450,7 +498,7 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         namespace: &str,
     ) -> Result<Vec<ActiveRelationCount>, MemoryError> {
-        let sql = "SELECT count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE GROUP BY namespace";
+        let sql = "SELECT schema_family, outcome, count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE GROUP BY schema_family, outcome";
         let result = self.db.query(sql, None, namespace).await?;
         let records = Self::deserialize_vec(result);
         records
@@ -466,16 +514,22 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         q: BackfillFactQuery<'_>,
     ) -> Result<Vec<serde_json::Value>, MemoryError> {
-        let after_clause = match q.after_fact_id {
-            Some(id) => format!(" AND fact_id > \"{}\"", id),
-            None => String::new(),
+        if q.limit == 0 {
+            return Ok(vec![]);
+        }
+        let sql = match q.after_fact_id {
+            Some(_) => {
+                "SELECT * FROM fact WHERE fact_id IS NOT NONE AND fact_id > $after ORDER BY fact_id LIMIT $limit"
+            }
+            None => "SELECT * FROM fact WHERE fact_id IS NOT NONE ORDER BY fact_id LIMIT $limit",
         };
-        // Backfill only facts that don't have a claim_job for the current fingerprint
-        let sql = format!(
-            "SELECT * FROM fact WHERE fact_id IS NOT NONE{after_clause} ORDER BY fact_id LIMIT $limit"
-        );
-        let vars = serde_json::json!({"limit": q.limit});
-        let result = self.db.query(&sql, Some(vars), q.namespace).await?;
+        let mut vars = serde_json::json!({"limit": q.limit});
+        if let Some(after) = q.after_fact_id {
+            vars.as_object_mut()
+                .unwrap()
+                .insert("after".to_string(), Value::String(after.to_string()));
+        }
+        let result = self.db.query(sql, Some(vars), q.namespace).await?;
         Ok(Self::deserialize_vec(result))
     }
 
@@ -515,19 +569,119 @@ impl ClaimStore for SurrealClaimStore {
         }
         Ok(())
     }
-}
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+    async fn commit_reconciliation_page(
+        &self,
+        request: CommitReconciliationPageRequest<'_>,
+    ) -> Result<(), MemoryError> {
+        let mut stmts = Vec::new();
+        stmts.push("BEGIN TRANSACTION".to_string());
+
+        let mut vars = serde_json::json!({});
+        let v = vars.as_object_mut().unwrap();
+        v.insert(
+            "job_id".to_string(),
+            Value::String(request.job_id.to_string()),
+        );
+        v.insert(
+            "owner".to_string(),
+            Value::String(request.expected_lease_owner.to_string()),
+        );
+
+        for (i, relation) in request.relations.iter().enumerate() {
+            let content = Self::serialize(relation)?;
+            let key = format!("r{i}");
+            v.insert(key.clone(), content);
+            stmts.push(format!(
+                "UPDATE claim_relation:⟨{}⟩ CONTENT ${key}",
+                relation.claim_relation_id
+            ));
+        }
+
+        // Update job counters and cursor
+        let cursor_update = match request.next_cursor {
+            Some(c) => {
+                v.insert("cursor".to_string(), Value::String(c.to_string()));
+                "cursor = $cursor,".to_string()
+            }
+            None => String::new(),
+        };
+        let processed = request.counters.processed;
+        let succeeded = request.counters.succeeded;
+        let skipped = request.counters.skipped;
+        let failed = request.counters.failed;
+
+        if request.completed {
+            let now = crate::service::normalize_dt(chrono::Utc::now());
+            v.insert("now".to_string(), Value::String(now));
+            stmts.push(format!(
+                "UPDATE claim_job:⟨{}⟩ SET status = 'completed', {cursor_update} processed += {processed}, \
+                 succeeded += {succeeded}, skipped += {skipped}, failed += {failed}, \
+                 completed_at = $now, updated_at = $now \
+                 WHERE lease_owner = $owner",
+                request.job_id
+            ));
+        } else {
+            stmts.push(format!(
+                "UPDATE claim_job:⟨{}⟩ SET status = 'running', {cursor_update} processed += {processed}, \
+                 succeeded += {succeeded}, skipped += {skipped}, failed += {failed}, \
+                 updated_at = time::now() \
+                 WHERE lease_owner = $owner",
+                request.job_id
+            ));
+        }
+
+        stmts.push("COMMIT TRANSACTION".to_string());
+        let sql = stmts.join(";\n");
+        self.db.query(&sql, Some(vars), request.namespace).await?;
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn migration_027_is_last_registered() {
+    fn migration_028_is_last_registered() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "027_claim_reconciliation.surql");
+        assert_eq!(last.file_name, "028_claim_reconciliation_hardening.surql");
+    }
+
+    #[test]
+    fn migration_028_is_registered_once() {
+        let migrations = crate::storage::migrations::versioned_migrations();
+        let count = migrations
+            .iter()
+            .filter(|m| m.file_name == "028_claim_reconciliation_hardening.surql")
+            .count();
+        assert_eq!(count, 1, "028 should be registered exactly once");
+    }
+
+    #[test]
+    fn migration_028_defines_new_fields_and_indexes() {
+        let migrations = crate::storage::migrations::versioned_migrations();
+        let m028 = migrations
+            .iter()
+            .find(|m| m.file_name == "028_claim_reconciliation_hardening.surql")
+            .expect("028 not found");
+        let sql = m028.sql;
+        assert!(sql.contains("DEFINE FIELD schema_family ON claim_relation"));
+        assert!(sql.contains("DEFINE FIELD left_fact_id ON claim_relation"));
+        assert!(sql.contains("DEFINE FIELD right_fact_id ON claim_relation"));
+        assert!(sql.contains("claim_relation_left_fact_active_idx"));
+        assert!(sql.contains("claim_relation_right_fact_active_idx"));
+        assert!(sql.contains("claim_relation_schema_outcome_active_idx"));
+    }
+
+    #[test]
+    fn migration_027_is_still_registered() {
+        let migrations = crate::storage::migrations::versioned_migrations();
+        let has_027 = migrations
+            .iter()
+            .any(|m| m.file_name == "027_claim_reconciliation.surql");
+        assert!(has_027, "027 should still be registered");
     }
 
     #[test]

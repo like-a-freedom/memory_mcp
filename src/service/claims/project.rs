@@ -324,6 +324,12 @@ mod tests {
         ) -> Result<(), MemoryError> {
             Ok(())
         }
+        async fn commit_reconciliation_page(
+            &self,
+            _req: crate::storage::claims::CommitReconciliationPageRequest<'_>,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
     }
 
     fn noop_store() -> Arc<dyn ClaimStore> {
