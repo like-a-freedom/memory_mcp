@@ -180,7 +180,45 @@ impl ClaimSchema for AttributeV1 {
             return Ok(());
         }
 
-        // Priority 2: Key-value lines from content
+        // Priority 2: Pre-parsed assertions from structural parser
+        if !input.assertions.is_empty() {
+            for assertion in input.assertions {
+                let key = assertion.predicate.to_string();
+                // Skip keys that look like relation/quantity/commitment patterns
+                if matches!(
+                    key.as_str(),
+                    "measure" | "unit" | "predicate" | "object" | "action" | "target"
+                ) {
+                    continue;
+                }
+                let mut components = BTreeMap::new();
+                components.insert("dimension".to_string(), key);
+                let ck = ComparisonKey::new(self.schema_ref(), components)?;
+                let value_text = match &assertion.value {
+                    super::structural::StructuralValue::Text(t) => t.to_string(),
+                    super::structural::StructuralValue::Boolean(b) => b.to_string(),
+                    super::structural::StructuralValue::Number { raw, .. } => raw.clone(),
+                    super::structural::StructuralValue::EntityRef(t) => t.to_string(),
+                };
+                output.push(ClaimDraftCandidate {
+                    schema_ref: self.schema_ref(),
+                    subject: input.subject.to_string(),
+                    comparison_key: ck,
+                    qualifiers: assertion.qualifiers.clone(),
+                    value: ClaimValue::Text(NormalizedText::new(&value_text)),
+                    cardinality: ClaimCardinality::SingleValued,
+                    observed_at: input.t_ref,
+                    valid_from: assertion.valid_from,
+                    valid_to: assertion.valid_to,
+                    validity_source: ClaimValiditySource::Explicit,
+                    source_lineage: None,
+                    source_span: Some((assertion.source_span.start, assertion.source_span.end)),
+                });
+            }
+            return Ok(());
+        }
+
+        // Priority 3 (fallback): Key-value lines from content
         let kv = parse_key_value_lines(input.content);
         for (key, val) in &kv {
             // Skip keys that look like relation/quantity/commitment patterns
