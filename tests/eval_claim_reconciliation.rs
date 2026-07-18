@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
+use memory_mcp::storage::DbClient;
 use serde::Deserialize;
 
 // ─── Fixture contract types ────────────────────────────────────────────────────
@@ -363,6 +364,35 @@ struct LegacyBaselineReport {
     isolation_violations: usize,
 }
 
+// ─── Current engine evaluation types ───────────────────────────────────────────
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+struct EvaluationReport {
+    corpus_version: String,
+    engine: &'static str,
+    split: &'static str,
+    total_cases: usize,
+    expected_relations: usize,
+    predicted_relations: usize,
+    true_positives: usize,
+    false_positives: usize,
+    false_negatives: usize,
+    precision: f64,
+    recall: f64,
+    isolation_violations: usize,
+    per_schema: BTreeMap<String, OutcomeCounts>,
+    latency_ms_p50: f64,
+    latency_ms_p95: f64,
+}
+
+#[derive(Debug, Default, serde::Serialize)]
+struct OutcomeCounts {
+    expected: usize,
+    predicted: usize,
+    matched: usize,
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 fn warning_matches_legacy(expected: &ExpectedRelation, actual: &ContradictionWarning) -> bool {
@@ -527,7 +557,7 @@ async fn run_claim_reconciliation_evals() {
         );
     };
 
-    if !dev_summary.total_cases == 0 {
+    if dev_summary.total_cases > 0 {
         print_report("development", &dev_summary);
     }
     if test_summary.total_cases > 0 {
