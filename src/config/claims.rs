@@ -1,5 +1,4 @@
 //! Claim reconciliation rollout configuration.
-#![allow(dead_code)]
 
 use crate::service::MemoryError;
 
@@ -77,6 +76,7 @@ impl Default for ClaimConfig {
 
 impl ClaimConfig {
     /// Parse configuration from environment variables.
+    #[allow(dead_code)]
     pub fn from_env() -> Result<Self, MemoryError> {
         let mut config = Self::default();
         if let Ok(stage_str) = std::env::var("MEMORY_CLAIM_ROLLOUT_STAGE") {

@@ -482,6 +482,8 @@ pub struct Claim {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClaimRelationOutcome {
+    /// The right claim was explicitly stated as a correction of the left.
+    Corrects,
     /// The right claim supersedes the left.
     Supersedes,
     /// The claims are consistent with each other.

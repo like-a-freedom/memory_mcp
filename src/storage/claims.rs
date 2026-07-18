@@ -1,5 +1,4 @@
 //! Narrow claim storage capability over SurrealDB.
-#![allow(dead_code)]
 
 use std::sync::Arc;
 
@@ -108,6 +107,7 @@ pub(crate) struct LeaseJobRequest<'a> {
 }
 
 /// Persist projection output (claims + jobs).
+#[allow(dead_code)]
 pub(crate) struct PersistProjectionRequest<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
@@ -133,6 +133,7 @@ pub(crate) struct ClaimCandidateQuery<'a> {
 pub(crate) struct CommitRelationRequest<'a> {
     pub namespace: &'a str,
     pub relation: ClaimRelation,
+    #[allow(dead_code)]
     pub lifecycle_mutation: Option<&'a str>,
 }
 

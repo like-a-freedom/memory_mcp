@@ -3,8 +3,6 @@
 //! No database, clock, logger, network, or service dependency.
 //! All inputs are borrowed; all outputs are value types.
 
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 
 use crate::models::ClaimId;
@@ -18,16 +16,19 @@ use crate::service::claims::schema::ClaimPolicy;
 
 /// Confirmed alias set for fuzzy alias matching.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub(crate) struct ConfirmedAliasSet {
     aliases: BTreeMap<String, String>,
 }
 
 impl ConfirmedAliasSet {
+    #[allow(dead_code)]
     pub fn new(aliases: BTreeMap<String, String>) -> Self {
         Self { aliases }
     }
 
     /// Resolve an alias to its canonical form, if confirmed.
+    #[allow(dead_code)]
     pub fn resolve(&self, key: &str) -> Option<&str> {
         self.aliases.get(key).map(|s| s.as_str())
     }
@@ -35,10 +36,12 @@ impl ConfirmedAliasSet {
 
 /// Evaluator version string.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct EvaluatorVersion(pub String);
 
 /// Bounded reason codes for reconciliation decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
 pub(crate) enum ReconciliationReasonCode {
     NotSameSlot,
     NotComparable,
@@ -69,6 +72,7 @@ impl std::fmt::Display for ReconciliationReasonCode {
 
 /// A persisted relation draft before ID assignment.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct PersistedRelationDraft {
     pub left_claim_id: ClaimId,
     pub right_claim_id: ClaimId,
@@ -84,6 +88,7 @@ pub(crate) struct PersistedRelationDraft {
 
 /// The decision returned by the pure reconciliation engine.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) enum ReconciliationDecision {
     Persist(Box<PersistedRelationDraft>),
     Skip(ReconciliationReasonCode),
@@ -91,6 +96,7 @@ pub(crate) enum ReconciliationDecision {
 }
 
 /// Borrowed inputs for reconciliation.
+#[allow(dead_code)]
 pub(crate) struct ReconciliationInput<'a> {
     pub left: &'a Claim,
     pub right: &'a Claim,
@@ -103,6 +109,7 @@ pub(crate) struct ReconciliationInput<'a> {
 
 // ─── Pure Gate Functions ──────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn same_exact_slot(left: &Claim, right: &Claim) -> bool {
     left.scope == right.scope
         && left.project_identity == right.project_identity
@@ -113,6 +120,7 @@ fn same_exact_slot(left: &Claim, right: &Claim) -> bool {
         && left.comparison_key_hash == right.comparison_key_hash
 }
 
+#[allow(dead_code)]
 fn values_comparable(left: &Claim, right: &Claim) -> bool {
     use crate::models::claim::ClaimValue;
     match (&left.value, &right.value) {
@@ -129,12 +137,14 @@ fn values_comparable(left: &Claim, right: &Claim) -> bool {
     }
 }
 
+#[allow(dead_code)]
 fn same_proposition(left: &Claim, right: &Claim) -> bool {
     left.value == right.value && left.qualifier_hash == right.qualifier_hash
 }
 
 /// Relationship between validity intervals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum ValidityRelation {
     /// Both have the same valid_from and valid_to.
     Identical,
@@ -150,6 +160,7 @@ enum ValidityRelation {
     Unknown,
 }
 
+#[allow(dead_code)]
 fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
     match (
         left.valid_from,
@@ -174,10 +185,12 @@ fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
     }
 }
 
+#[allow(dead_code)]
 fn source_gate(left: &Claim, right: &Claim) -> bool {
     left.source_fact_id != right.source_fact_id
 }
 
+#[allow(dead_code)]
 fn correction_evidence(left: &Claim, right: &Claim) -> bool {
     left.qualifiers.contains_key("correction")
         || right.qualifiers.contains_key("correction")
@@ -185,6 +198,7 @@ fn correction_evidence(left: &Claim, right: &Claim) -> bool {
         || right.qualifiers.contains_key("replaces")
 }
 
+#[allow(dead_code)]
 fn transition_evidence(left: &Claim, right: &Claim) -> bool {
     left.qualifiers.contains_key("transition")
         || right.qualifiers.contains_key("transition")
@@ -195,6 +209,7 @@ fn transition_evidence(left: &Claim, right: &Claim) -> bool {
 // ─── Main Reconciliation Entry Point ─────────────────────────────────────────
 
 /// Pure reconciliation decision engine.
+#[allow(dead_code)]
 pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecision {
     let left = input.left;
     let right = input.right;
@@ -232,7 +247,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
         let draft = PersistedRelationDraft {
             left_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).0,
             right_claim_id: canonically_order_ids(&left.claim_id, &right.claim_id).1,
-            outcome: ClaimRelationOutcome::Supersedes,
+            outcome: ClaimRelationOutcome::Corrects,
             predecessor_claim_id: pred,
             successor_claim_id: succ,
             reason_code: ReconciliationReasonCode::Correction,
@@ -306,6 +321,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
     ReconciliationDecision::Skip(ReconciliationReasonCode::TemporalAmbiguity)
 }
 
+#[allow(dead_code)]
 fn canonically_order_ids(a: &ClaimId, b: &ClaimId) -> (ClaimId, ClaimId) {
     if a.as_ref() <= b.as_ref() {
         (a.clone(), b.clone())
@@ -314,6 +330,7 @@ fn canonically_order_ids(a: &ClaimId, b: &ClaimId) -> (ClaimId, ClaimId) {
     }
 }
 
+#[allow(dead_code)]
 fn build_relation_draft(
     left: &Claim,
     right: &Claim,
@@ -677,7 +694,7 @@ mod tests {
         let input = default_input(&left, &right);
         match reconcile(&input) {
             ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Supersedes);
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Corrects);
                 assert_eq!(draft.reason_code, ReconciliationReasonCode::Correction);
             }
             other => panic!("expected Persist(Correction), got {:?}", other),
