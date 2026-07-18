@@ -269,30 +269,8 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
         return ReconciliationDecision::Coexist(ReconciliationReasonCode::SetValuedCoexistence);
     }
 
-    // Gate 6: Mutually exclusive values + overlapping validity → contradiction
-    let vr = validity_relation(left, right);
-    match vr {
-        ValidityRelation::Identical
-        | ValidityRelation::LeftContained
-        | ValidityRelation::RightContained
-        | ValidityRelation::Overlapping => {
-            let draft = build_relation_draft(
-                left,
-                right,
-                ClaimRelationOutcome::Contradicts,
-                ReconciliationReasonCode::Contradiction,
-                "Mutually exclusive values with overlapping validity",
-                input,
-            );
-            return ReconciliationDecision::Persist(Box::new(draft));
-        }
-        ValidityRelation::Disjoint => {
-            return ReconciliationDecision::Coexist(ReconciliationReasonCode::DisjointValidity);
-        }
-        ValidityRelation::Unknown => {}
-    }
-
-    // Gate 7: Transition evidence + source gate → supersession
+    // Gate 6: Transition evidence + source gate → supersession
+    // (checked before contradiction because transition supersedes exclusivity)
     if transition_evidence(left, right) && source_gate(left, right) {
         let (pred, succ) = if left.qualifiers.contains_key("supersedes") {
             (Some(left.claim_id.clone()), Some(right.claim_id.clone()))
@@ -315,6 +293,29 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
             evaluated_at: input.evaluated_at,
         };
         return ReconciliationDecision::Persist(Box::new(draft));
+    }
+
+    // Gate 7: Mutually exclusive values + overlapping validity → contradiction
+    let vr = validity_relation(left, right);
+    match vr {
+        ValidityRelation::Identical
+        | ValidityRelation::LeftContained
+        | ValidityRelation::RightContained
+        | ValidityRelation::Overlapping => {
+            let draft = build_relation_draft(
+                left,
+                right,
+                ClaimRelationOutcome::Contradicts,
+                ReconciliationReasonCode::Contradiction,
+                "Mutually exclusive values with overlapping validity",
+                input,
+            );
+            return ReconciliationDecision::Persist(Box::new(draft));
+        }
+        ValidityRelation::Disjoint => {
+            return ReconciliationDecision::Coexist(ReconciliationReasonCode::DisjointValidity);
+        }
+        ValidityRelation::Unknown => {}
     }
 
     // Gate 8: Unknown validity + exclusive values → temporal ambiguity
@@ -699,6 +700,72 @@ mod tests {
             }
             other => panic!("expected Persist(Correction), got {:?}", other),
         }
+    }
+
+    #[test]
+    fn supersession_with_transition_and_source_gate() {
+        let mut quals_left = BTreeMap::new();
+        quals_left.insert("transition".to_string(), "phase2".to_string());
+        let left = make_claim_with_fact(
+            "a",
+            ClaimValue::Text(NormalizedText::new("old value")),
+            "personal",
+            None,
+            quals_left,
+            None,
+            None,
+            "fact:old",
+        );
+        let right = make_claim_with_fact(
+            "b",
+            ClaimValue::Text(NormalizedText::new("new value")),
+            "personal",
+            None,
+            BTreeMap::new(),
+            None,
+            None,
+            "fact:new",
+        );
+        let input = default_input(&left, &right);
+        match reconcile(&input) {
+            ReconciliationDecision::Persist(draft) => {
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Supersedes);
+                assert_eq!(draft.reason_code, ReconciliationReasonCode::Supersession);
+            }
+            other => panic!("expected Persist(Supersession), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn supersession_requires_different_sources() {
+        // Same source fact → no supersession (source gate fails)
+        let mut quals = BTreeMap::new();
+        quals.insert("transition".to_string(), "v2".to_string());
+        let left = make_claim_with_fact(
+            "a",
+            ClaimValue::Text(NormalizedText::new("v1")),
+            "personal",
+            None,
+            quals.clone(),
+            None,
+            None,
+            "fact:same",
+        );
+        let right = make_claim_with_fact(
+            "b",
+            ClaimValue::Text(NormalizedText::new("v2")),
+            "personal",
+            None,
+            quals,
+            None,
+            None,
+            "fact:same",
+        );
+        let input = default_input(&left, &right);
+        // Without source gate, should fall through to contradiction or temporal ambiguity
+        assert!(
+            !matches!(reconcile(&input), ReconciliationDecision::Persist(ref d) if d.reason_code == ReconciliationReasonCode::Supersession)
+        );
     }
 
     #[test]
