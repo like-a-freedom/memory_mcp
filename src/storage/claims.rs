@@ -205,6 +205,29 @@ impl SurrealClaimStore {
     pub fn new(db: Arc<dyn DbClient>) -> Self {
         Self { db }
     }
+
+    fn upsert_one_sql(table: &str, record_id: &str) -> Result<String, MemoryError> {
+        // CHECK constraint: table must only contain ASCII letters and underscore
+        if !table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(MemoryError::Validation(format!(
+                "invalid table name: {table}"
+            )));
+        }
+        let sql = format!("UPDATE {table}:⟨{record_id}⟩ CONTENT $content");
+        Ok(sql)
+    }
+
+    fn serialize<T: serde::Serialize>(value: &T) -> Result<serde_json::Value, MemoryError> {
+        serde_json::to_value(value)
+            .map_err(|e| MemoryError::Storage(format!("serialization failed: {e}")))
+    }
+
+    fn deserialize_vec(value: serde_json::Value) -> Vec<serde_json::Value> {
+        match value {
+            serde_json::Value::Array(arr) => arr,
+            _ => vec![],
+        }
+    }
 }
 
 #[async_trait]
@@ -218,7 +241,11 @@ impl ClaimStore for SurrealClaimStore {
         Ok(None)
     }
 
-    async fn ensure_projection_job(&self, _job: &ClaimJob) -> Result<(), MemoryError> {
+    async fn ensure_projection_job(&self, job: &ClaimJob) -> Result<(), MemoryError> {
+        let content = Self::serialize(job)?;
+        let sql = Self::upsert_one_sql("claim_job", job.job_id.as_ref())?;
+        let vars = serde_json::json!({"content": content});
+        self.db.query(&sql, Some(vars), &job.namespace).await?;
         Ok(())
     }
 
@@ -264,30 +291,75 @@ impl ClaimStore for SurrealClaimStore {
 
     async fn select_candidates_page(
         &self,
-        _query: ClaimCandidateQuery<'_>,
+        query: ClaimCandidateQuery<'_>,
     ) -> Result<Vec<Claim>, MemoryError> {
-        Ok(vec![])
+        let after_clause = match query.after_claim_id {
+            Some(id) => format!(" AND claim_id > \"{}\"", id),
+            None => String::new(),
+        };
+        let sql = format!(
+            "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp{after_clause} ORDER BY claim_id LIMIT $limit"
+        );
+        let vars = serde_json::json!({
+            "slot_fp": query.slot_fingerprint,
+            "limit": query.limit,
+        });
+        let result = self.db.query(&sql, Some(vars), query.namespace).await?;
+        let records = Self::deserialize_vec(result);
+        records
+            .into_iter()
+            .map(|v| {
+                serde_json::from_value(v)
+                    .map_err(|e| MemoryError::Storage(format!("claim deser: {e}")))
+            })
+            .collect()
     }
 
-    async fn commit_relation(
-        &self,
-        _request: CommitRelationRequest<'_>,
-    ) -> Result<(), MemoryError> {
+    async fn commit_relation(&self, request: CommitRelationRequest<'_>) -> Result<(), MemoryError> {
+        let content = Self::serialize(&request.relation)?;
+        let sql = Self::upsert_one_sql(
+            "claim_relation",
+            request.relation.claim_relation_id.as_ref(),
+        )?;
+        let vars = serde_json::json!({"content": content});
+        self.db.query(&sql, Some(vars), request.namespace).await?;
         Ok(())
     }
 
     async fn select_claims_for_facts(
         &self,
-        _query: ClaimsForFactsQuery<'_>,
+        q: ClaimsForFactsQuery<'_>,
     ) -> Result<Vec<Claim>, MemoryError> {
-        Ok(vec![])
+        let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
+        let sql = "SELECT * FROM claim WHERE source_fact_id IN $fact_ids";
+        let vars = serde_json::json!({"fact_ids": fact_ids});
+        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let records = Self::deserialize_vec(result);
+        records
+            .into_iter()
+            .map(|v| {
+                serde_json::from_value(v)
+                    .map_err(|e| MemoryError::Storage(format!("claim deser: {e}")))
+            })
+            .collect()
     }
 
     async fn select_relations_for_facts(
         &self,
-        _query: RelationsForFactsQuery<'_>,
+        q: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError> {
-        Ok(vec![])
+        let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
+        let sql = "SELECT * FROM claim_relation WHERE left_claim_id IN $fact_ids OR right_claim_id IN $fact_ids";
+        let vars = serde_json::json!({"fact_ids": fact_ids});
+        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let records = Self::deserialize_vec(result);
+        records
+            .into_iter()
+            .map(|v| {
+                serde_json::from_value(v)
+                    .map_err(|e| MemoryError::Storage(format!("relation deser: {e}")))
+            })
+            .collect()
     }
 
     async fn select_source_evidence(
