@@ -7,13 +7,14 @@ license = "MIT"
 
 [dependencies]
 rmcp = { version = "2.2.0", features = ["macros", "transport-io", "server"] }
-tokio = { version = "1.52.3", features = [
+tokio = { version = "1.53.0", features = [
     "rt-multi-thread",
     "macros",
     "io-std",
     "sync",
     "time",
 ] }
+tokio-util = { version = "0.7.18", features = ["rt"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 schemars = "1.2.1"

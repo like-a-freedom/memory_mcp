@@ -3,8 +3,7 @@
 use crate::service::MemoryError;
 
 /// Rollout stage for claim reconciliation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum ClaimRolloutStage {
     /// No claim extraction or reconciliation.
     Disabled,
@@ -34,7 +33,6 @@ impl ClaimRolloutStage {
         matches!(self, Self::Evidence)
     }
 }
-
 
 impl std::fmt::Display for ClaimRolloutStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

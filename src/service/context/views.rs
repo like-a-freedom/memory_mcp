@@ -100,6 +100,7 @@ where
                     rationale_detail
                 ),
                 retrieval_tier: Some(RetrievalTier::EpisodeFallback.as_str().to_string()),
+                reconciliation: None,
             }
         })
         .collect()

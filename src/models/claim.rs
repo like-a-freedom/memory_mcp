@@ -479,7 +479,7 @@ pub struct Claim {
 // ─── Claim Relation ───────────────────────────────────────────────────────────
 
 /// The outcome of a relation evaluation between two claims.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ClaimRelationOutcome {
     /// The claim is a duplicate of another (same proposition, compatible validity).
@@ -546,6 +546,8 @@ pub enum ClaimJobKind {
     Extract,
     /// Evaluate relations between claims.
     Reconcile,
+    /// Discover facts lacking the current extractor fingerprint.
+    Backfill,
 }
 
 /// The state of a claim job.

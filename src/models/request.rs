@@ -196,6 +196,9 @@ pub struct ExtractResult {
     pub links: Vec<ExtractedLink>,
     #[serde(default)]
     pub warnings: Vec<ContradictionWarning>,
+    /// Optional reconciliation metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<ReconciliationSummary>,
 }
 
 impl ExtractResult {
@@ -220,6 +223,51 @@ pub struct ContradictionWarning {
     pub reason: String,
 }
 
+/// Summary of claim reconciliation for an extract operation.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ReconciliationSummary {
+    pub status: ReconciliationStatus,
+    pub claims_projected: usize,
+    pub active_relations: usize,
+    #[serde(default)]
+    pub reason_codes: Vec<String>,
+}
+
+/// Status of claim reconciliation processing.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReconciliationStatus {
+    Complete,
+    Pending,
+    Partial,
+    Failed,
+    #[default]
+    Unsupported,
+}
+
+/// Reconciliation metadata for a single context item.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ClaimReconciliationMetadata {
+    #[serde(default)]
+    pub claim_ids: Vec<String>,
+    #[serde(default)]
+    pub relations: Vec<ClaimRelationSummary>,
+}
+
+/// Summary of a single relation for public exposure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ClaimRelationSummary {
+    pub relation_id: String,
+    pub outcome: crate::models::claim::ClaimRelationOutcome,
+    pub counterpart_fact_id: String,
+    pub counterpart_source_episode_id: String,
+    pub reason_code: String,
+    pub evaluator_version: String,
+}
+
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -239,4 +287,6 @@ pub struct AssembledContextItem {
     pub rationale: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval_tier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<ClaimReconciliationMetadata>,
 }

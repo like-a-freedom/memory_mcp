@@ -175,6 +175,7 @@ mod tests {
             provenance: serde_json::json!({}),
             rationale: String::new(),
             retrieval_tier: None,
+            reconciliation: None,
         }
     }
 

@@ -292,6 +292,7 @@ mod tests {
             provenance: serde_json::json!({}),
             rationale: rationale.into(),
             retrieval_tier: retrieval_tier.map(str::to_string),
+            reconciliation: None,
         }
     }
 

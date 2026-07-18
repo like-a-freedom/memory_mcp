@@ -429,6 +429,7 @@ pub async fn extract_from_episode(
         facts,
         links,
         warnings,
+        reconciliation: None,
     })
 }
 

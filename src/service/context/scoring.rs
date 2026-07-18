@@ -63,6 +63,7 @@ pub(super) fn ranked_fact_to_item(
         provenance,
         rationale,
         retrieval_tier: Some(retrieval_tier.as_str().to_string()),
+        reconciliation: None,
     }
 }
 

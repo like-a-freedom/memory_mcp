@@ -1,0 +1,85 @@
+# Memory Domain
+
+This context defines the language used to represent durable knowledge, temporal change, and disagreement between sources.
+
+## Language
+
+**Fact**:
+A durable, provenance-backed evidence item derived from an episode. A fact may contain zero or more claims. Claim supersession does not modify or invalidate the source fact.
+_Avoid_: Claim, assertion
+
+**Claim**:
+An atomic, machine-comparable proposition derived from a fact, with a canonical subject, comparison key, typed value, and validity context. Claims are created only when that structure can be determined reliably.
+_Avoid_: Fact, raw statement
+
+**Claim Relation**:
+A persisted, versioned reconciliation decision connecting two claims. Its outcome is duplicate, supersession, correction, contradiction, or temporal ambiguity, and it retains the decision reason, evidence, evaluator version, and evaluation time. A later evaluation supersedes the earlier relation version rather than rewriting it.
+_Avoid_: Claim, unversioned warning
+
+**Claim Slot**:
+The exact comparison boundary formed by namespace, scope, project, access-policy fingerprint, canonical subject, comparison key, and normalized qualifiers. Only claims in the same slot are candidates for automatic reconciliation.
+_Avoid_: Fuzzy topic, entity overlap
+
+**Claim Projection**:
+The versioned deterministic derivation of zero or more claims from an immutable source fact. Recomputing a projection may replace the current derived claims in transaction time but does not modify the fact.
+_Avoid_: Source fact, destructive rewrite
+
+**Reconciliation**:
+The deterministic process that selects claims in the same claim slot and classifies their relationship using typed values, cardinality, validity, source continuity, and explicit correction evidence.
+_Avoid_: Fuzzy similarity, latest-write-wins
+
+**Claim Schema**:
+A reusable structural form that defines a claim's slots and comparison semantics without enumerating real-world properties. A small schema set can represent an open-ended set of metrics, attributes, relations, commitments, and decisions.
+_Avoid_: Property catalog, domain ontology entry
+
+**Comparison Key**:
+A stable, deterministic identifier for the specific dimension, attribute, or relation expressed by a claim. Claims participate in automatic comparison only when their comparison keys match directly or through a confirmed alias.
+_Avoid_: Arbitrary predicate string, fuzzy topic
+
+**Possible Alias**:
+A non-authoritative suggestion that two comparison keys may express the same concept. A possible alias never authorizes automatic claim comparison until it is confirmed.
+_Avoid_: Confirmed alias, automatic merge
+
+**Observation Time**:
+The time when a source recorded or reported a claim. Observation time is evidence about recency but does not imply when the claim became or stopped being true.
+_Avoid_: Valid from, ingestion time
+
+**Validity Interval**:
+The period during which a claim is true in the world. Its start or end may be unknown when the source provides no reliable temporal evidence.
+_Avoid_: Observation time, ingestion time
+
+**Transaction Validity**:
+The period during which a derived claim or claim relation is the system's current representation. It is separate from the claim's real-world validity interval and preserves what the system knew before re-extraction or correction.
+_Avoid_: Validity interval, observation time
+
+**Temporal Ambiguity**:
+An outcome in which claims differ but the available temporal evidence cannot establish whether their validity intervals overlap or one supersedes the other.
+_Avoid_: Contradiction, supersession
+
+**Cardinality Policy**:
+The rule that states whether a comparison key may have several simultaneous values or at most one value within matching qualifiers and validity. An unknown comparison key is set-valued by default.
+_Avoid_: Global singleton predicate list
+
+**Source Lineage**:
+A sequence of observations that represent successive versions or snapshots of the same logical source record. Lineage establishes continuity, not authority over unrelated sources.
+_Avoid_: Source type, ingestion order
+
+**Authoritative Source**:
+A source explicitly trusted to determine the current value for a defined claim schema or domain scope. No source is authoritative merely because it is newer.
+_Avoid_: Latest source, preferred source
+
+**Contradiction**:
+A relationship between two claims that cannot both be true in the same context during an overlapping validity interval. A contradiction does not make either source fact invalid.
+_Avoid_: Update, supersession
+
+**Supersession**:
+A temporal transition in which a claim with known validity replaces an earlier value for the same subject and comparison key from a specific validity time onward. Supersession closes the earlier claim's validity interval, not its source fact.
+_Avoid_: Contradiction, correction
+
+**Correction**:
+An explicit replacement of a claim because the earlier assertion was wrong for the same validity context. Correction closes the earlier claim in transaction time rather than pretending that the world changed, and it leaves the source fact available as historical evidence.
+_Avoid_: Supersession, whole-fact retraction
+
+**Retraction**:
+An explicit withdrawal of a source fact because the source assertion was erroneous, withdrawn, corrupted, or ingested incorrectly. A retracted fact and its derived claims are excluded from active truth selection but retained for provenance and audit.
+_Avoid_: Supersession, contradiction
