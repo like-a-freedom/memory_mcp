@@ -5,6 +5,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::ids::{ClaimId, ClaimJobId, ClaimRelationId, EpisodeId, FactId};
 use crate::service::MemoryError;
 
 // ─── Canonical Decimal ────────────────────────────────────────────────────────
@@ -328,6 +329,11 @@ impl ExtractorFingerprint {
         hasher.update(extractor_name.as_bytes());
         Self(hex::encode(hasher.finalize()))
     }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -369,6 +375,11 @@ impl CanonicalPayloadHash {
         }
         Self(hex::encode(hasher.finalize()))
     }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 // ─── Claim Slot ───────────────────────────────────────────────────────────────
@@ -385,6 +396,291 @@ pub struct ClaimSlot {
     pub subject_key: String,
     pub comparison_key_hash: ComparisonKeyHash,
     pub qualifier_hash: QualifierHash,
+}
+
+// ─── Claim Draft ──────────────────────────────────────────────────────────────
+
+/// Intermediate representation before building a persisted `Claim`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimDraft {
+    pub schema_ref: ClaimSchemaRef,
+    pub subject: ClaimSlot,
+    pub comparison_key: ComparisonKey,
+    pub qualifiers: BTreeMap<String, String>,
+    pub value: ClaimValue,
+    pub cardinality: ClaimCardinality,
+    pub observed_at: chrono::DateTime<chrono::Utc>,
+    pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
+    pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
+    pub validity_source: ClaimValiditySource,
+    pub source_lineage: Option<String>,
+}
+
+// ─── Claim Derivation ─────────────────────────────────────────────────────────
+
+/// How a claim was derived from source data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimDerivation {
+    pub source_fact_id: FactId,
+    pub source_episode_id: EpisodeId,
+    pub extractor_fingerprint: ExtractorFingerprint,
+}
+
+// ─── Validity Source ──────────────────────────────────────────────────────────
+
+/// Where the validity window of a claim came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimValiditySource {
+    /// Explicitly stated in the source.
+    Explicit,
+    /// Inherited from the episode timestamp.
+    EpisodeTimestamp,
+    /// Inferred from ordering of claims.
+    Inferred,
+}
+
+// ─── Persisted Claim ──────────────────────────────────────────────────────────
+
+/// A persisted, immutable-after-creation claim record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claim {
+    pub claim_id: ClaimId,
+    pub namespace: String,
+    pub source_fact_id: FactId,
+    pub source_episode_id: EpisodeId,
+    pub scope: String,
+    pub project: Option<String>,
+    pub project_identity: String,
+    pub policy_tags: Vec<String>,
+    pub access_policy_fingerprint: PolicyFingerprint,
+    pub schema_family: ClaimSchemaFamily,
+    pub schema_version: u16,
+    pub subject: ClaimSlot,
+    pub subject_key: String,
+    pub comparison_key: ComparisonKey,
+    pub comparison_key_hash: ComparisonKeyHash,
+    pub qualifiers: BTreeMap<String, String>,
+    pub qualifier_hash: QualifierHash,
+    pub slot_fingerprint: String,
+    pub value: ClaimValue,
+    pub cardinality: ClaimCardinality,
+    pub observed_at: chrono::DateTime<chrono::Utc>,
+    pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
+    pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
+    pub validity_source: ClaimValiditySource,
+    pub source_lineage: Option<String>,
+    pub derivation: ClaimDerivation,
+    pub extractor_fingerprint: ExtractorFingerprint,
+    pub t_ingested: chrono::DateTime<chrono::Utc>,
+    pub t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// ─── Claim Relation ───────────────────────────────────────────────────────────
+
+/// The outcome of a relation evaluation between two claims.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimRelationOutcome {
+    /// The right claim supersedes the left.
+    Supersedes,
+    /// The claims are consistent with each other.
+    Consistent,
+    /// The claims contradict each other.
+    Contradicts,
+    /// The right claim supports the left.
+    Supports,
+}
+
+/// Evidence supporting a relation evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimRelationEvidence {
+    pub reason_code: String,
+    pub description: Option<String>,
+}
+
+/// A persisted relation between two claims.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimRelation {
+    pub claim_relation_id: ClaimRelationId,
+    pub left_claim_id: ClaimId,
+    pub right_claim_id: ClaimId,
+    pub pair_fingerprint: String,
+    pub outcome: ClaimRelationOutcome,
+    pub predecessor_claim_id: Option<ClaimId>,
+    pub successor_claim_id: Option<ClaimId>,
+    pub reason_code: String,
+    pub evidence: ClaimRelationEvidence,
+    pub evaluator_version: String,
+    pub context_fingerprint: ReconciliationContextFingerprint,
+    pub evaluated_at: chrono::DateTime<chrono::Utc>,
+    pub supersedes_relation_id: Option<ClaimRelationId>,
+    pub scope: String,
+    pub project: Option<String>,
+    pub policy_tags: Vec<String>,
+    pub t_ingested: chrono::DateTime<chrono::Utc>,
+    pub t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// ─── Claim Job ────────────────────────────────────────────────────────────────
+
+/// The kind of claim job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimJobKind {
+    /// Extract claims from a fact.
+    Extract,
+    /// Evaluate relations between claims.
+    Reconcile,
+}
+
+/// The state of a claim job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimJobState {
+    Pending,
+    Leased,
+    Running,
+    Completed,
+    Failed,
+}
+
+/// A persisted claim processing job.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimJob {
+    pub job_id: ClaimJobId,
+    pub kind: ClaimJobKind,
+    pub namespace: String,
+    pub source_fact_id: Option<FactId>,
+    pub claim_id: Option<ClaimId>,
+    pub extractor_fingerprint: ExtractorFingerprint,
+    pub evaluator_fingerprint: Option<String>,
+    pub status: ClaimJobState,
+    pub cursor: Option<String>,
+    pub lease_owner: Option<String>,
+    pub lease_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub processed: u64,
+    pub succeeded: u64,
+    pub skipped: u64,
+    pub failed: u64,
+    pub retry_count: u32,
+    pub last_error: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// ─── Claim Build Input & Constructor ──────────────────────────────────────────
+
+/// Borrowed inputs for constructing a persisted `Claim`.
+pub struct ClaimBuildInput<'a> {
+    pub namespace: &'a str,
+    pub source_fact_id: &'a FactId,
+    pub source_episode_id: &'a EpisodeId,
+    pub scope: &'a str,
+    pub project: Option<&'a str>,
+    pub policy_tags: &'a [String],
+    pub draft: ClaimDraft,
+    pub extractor_fingerprint: &'a ExtractorFingerprint,
+    pub t_ingested: chrono::DateTime<chrono::Utc>,
+}
+
+/// Deterministic claim ID from content hashes.
+pub fn claim_id(
+    schema_ref: &ClaimSchemaRef,
+    extractor_fingerprint: &ExtractorFingerprint,
+    source_fact_id: &FactId,
+    canonical_payload: &CanonicalPayloadHash,
+) -> ClaimId {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(schema_ref.version.get().to_be_bytes());
+    hasher.update((schema_ref.family as u8).to_be_bytes());
+    hasher.update(extractor_fingerprint.as_str().as_bytes());
+    hasher.update(source_fact_id.as_ref().as_bytes());
+    hasher.update(canonical_payload.as_str().as_bytes());
+    let hash = hex::encode(hasher.finalize());
+    ClaimId::from_raw(format!("claim:{hash}"))
+}
+
+/// Deterministic relation ID for an unordered pair of claim IDs.
+pub fn relation_id(left: &ClaimId, right: &ClaimId) -> ClaimRelationId {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    let (a, b) = if left.as_ref() <= right.as_ref() {
+        (left.as_ref(), right.as_ref())
+    } else {
+        (right.as_ref(), left.as_ref())
+    };
+    hasher.update(a.as_bytes());
+    hasher.update(b.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+    ClaimRelationId::from_raw(format!("claim_relation:{hash}"))
+}
+
+/// Build a persisted `Claim` from borrowed inputs.
+pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
+    let draft = &input.draft;
+
+    let canonical_payload = CanonicalPayloadHash::compute(&draft.value, &draft.qualifiers);
+    let claim_id = claim_id(
+        &draft.schema_ref,
+        input.extractor_fingerprint,
+        input.source_fact_id,
+        &canonical_payload,
+    );
+
+    let comparison_key_hash = ComparisonKeyHash::compute(&draft.comparison_key);
+    let qualifier_hash = QualifierHash::compute(&draft.qualifiers);
+    let access_policy_fingerprint =
+        PolicyFingerprint::compute(input.scope, input.project, input.policy_tags);
+    let project_identity = input.project.unwrap_or("__none__").to_string();
+    let slot_fingerprint = format!(
+        "{}:{}:{}:{}:{}:{}",
+        input.namespace,
+        input.scope,
+        project_identity,
+        draft.schema_ref.version.get(),
+        draft.subject.subject_key,
+        comparison_key_hash.0,
+    );
+
+    Ok(Claim {
+        claim_id,
+        namespace: input.namespace.to_string(),
+        source_fact_id: input.source_fact_id.clone(),
+        source_episode_id: input.source_episode_id.clone(),
+        scope: input.scope.to_string(),
+        project: input.project.map(String::from),
+        project_identity,
+        policy_tags: input.policy_tags.to_vec(),
+        access_policy_fingerprint,
+        schema_family: draft.schema_ref.family,
+        schema_version: draft.schema_ref.version.get(),
+        subject: draft.subject.clone(),
+        subject_key: draft.subject.subject_key.clone(),
+        comparison_key: draft.comparison_key.clone(),
+        comparison_key_hash,
+        qualifiers: draft.qualifiers.clone(),
+        qualifier_hash,
+        slot_fingerprint,
+        value: draft.value.clone(),
+        cardinality: draft.cardinality,
+        observed_at: draft.observed_at,
+        valid_from: draft.valid_from,
+        valid_to: draft.valid_to,
+        validity_source: draft.validity_source,
+        source_lineage: draft.source_lineage.clone(),
+        derivation: ClaimDerivation {
+            source_fact_id: input.source_fact_id.clone(),
+            source_episode_id: input.source_episode_id.clone(),
+            extractor_fingerprint: input.extractor_fingerprint.clone(),
+        },
+        extractor_fingerprint: input.extractor_fingerprint.clone(),
+        t_ingested: input.t_ingested,
+        t_invalid_ingested: None,
+    })
 }
 
 // ─── Test Module ──────────────────────────────────────────────────────────────
@@ -549,5 +845,194 @@ mod tests {
             let reverse: BTreeMap<String, String> = entries.into_iter().rev().collect();
             prop_assert_eq!(QualifierHash::compute(&forward), QualifierHash::compute(&reverse));
         }
+    }
+
+    #[test]
+    fn claim_id_rejects_wrong_prefix() {
+        assert!(ClaimId::new("wrong:abc").is_err());
+    }
+
+    #[test]
+    fn claim_id_rejects_empty_body() {
+        assert!(ClaimId::new("claim:").is_err());
+    }
+
+    #[test]
+    fn claim_id_accepts_valid() {
+        let id = ClaimId::new("claim:abc123").unwrap();
+        assert_eq!(id.body(), "abc123");
+        assert_eq!(id.to_string(), "claim:abc123");
+    }
+
+    #[test]
+    fn claim_relation_id_rejects_wrong_prefix() {
+        assert!(ClaimRelationId::new("wrong:abc").is_err());
+    }
+
+    #[test]
+    fn claim_relation_id_accepts_valid() {
+        let id = ClaimRelationId::new("claim_relation:abc123").unwrap();
+        assert_eq!(id.body(), "abc123");
+    }
+
+    #[test]
+    fn claim_job_id_rejects_wrong_prefix() {
+        assert!(ClaimJobId::new("wrong:abc").is_err());
+    }
+
+    #[test]
+    fn claim_job_id_accepts_valid() {
+        let id = ClaimJobId::new("claim_job:abc123").unwrap();
+        assert_eq!(id.body(), "abc123");
+    }
+
+    #[test]
+    fn relation_id_is_symmetric_for_unordered_pair() {
+        let a = ClaimId::new("claim:aaa").unwrap();
+        let b = ClaimId::new("claim:bbb").unwrap();
+        let fwd = relation_id(&a, &b);
+        let rev = relation_id(&b, &a);
+        assert_eq!(fwd, rev);
+    }
+
+    #[test]
+    fn claim_id_changes_when_schema_version_changes() {
+        use sha2::{Digest, Sha256};
+        let mut h1 = Sha256::new();
+        h1.update(1u16.to_be_bytes());
+        h1.update(0u8.to_be_bytes());
+        h1.update("ext");
+        h1.update("fact");
+        h1.update("payload");
+        let id1 = hex::encode(h1.finalize());
+
+        let mut h2 = Sha256::new();
+        h2.update(2u16.to_be_bytes());
+        h2.update(0u8.to_be_bytes());
+        h2.update("ext");
+        h2.update("fact");
+        h2.update("payload");
+        let id2 = hex::encode(h2.finalize());
+
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn canonical_payload_hash_changes_with_value() {
+        let v1 = ClaimValue::Boolean(true);
+        let v2 = ClaimValue::Boolean(false);
+        let q = BTreeMap::new();
+        assert_ne!(
+            CanonicalPayloadHash::compute(&v1, &q),
+            CanonicalPayloadHash::compute(&v2, &q)
+        );
+    }
+
+    #[test]
+    fn unresolved_subject_cannot_construct_comparable_slot() {
+        let schema = ClaimSchemaRef {
+            family: ClaimSchemaFamily::Attribute,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        };
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "height".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let hash = ComparisonKeyHash::compute(&key);
+        // An empty subject_key signals unresolved subject
+        let slot = ClaimSlot {
+            namespace: "ns".to_string(),
+            scope: "personal".to_string(),
+            project_identity: "__none__".to_string(),
+            access_policy_fingerprint: PolicyFingerprint::compute("personal", None, &[]),
+            schema_ref: schema,
+            subject_key: String::new(),
+            comparison_key_hash: hash,
+            qualifier_hash: QualifierHash::compute(&BTreeMap::new()),
+        };
+        assert!(slot.subject_key.is_empty());
+    }
+
+    #[test]
+    fn build_claim_produces_deterministic_id() {
+        let schema = ClaimSchemaRef {
+            family: ClaimSchemaFamily::Attribute,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        };
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "height".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let hash = ComparisonKeyHash::compute(&key);
+
+        let subject = ClaimSlot {
+            namespace: "ns".to_string(),
+            scope: "personal".to_string(),
+            project_identity: "__none__".to_string(),
+            access_policy_fingerprint: PolicyFingerprint::compute("personal", None, &[]),
+            schema_ref: schema,
+            subject_key: "entity:abc".to_string(),
+            comparison_key_hash: hash,
+            qualifier_hash: QualifierHash::compute(&BTreeMap::new()),
+        };
+
+        let draft = ClaimDraft {
+            schema_ref: schema,
+            subject,
+            comparison_key: key,
+            qualifiers: BTreeMap::new(),
+            value: ClaimValue::Boolean(true),
+            cardinality: ClaimCardinality::SingleValued,
+            observed_at: chrono::Utc::now(),
+            valid_from: None,
+            valid_to: None,
+            validity_source: ClaimValiditySource::Explicit,
+            source_lineage: None,
+        };
+
+        let fact_id = FactId::from("fact:test1");
+        let episode_id = EpisodeId::from("ep:test1");
+        let ext_fp = ExtractorFingerprint::compute(1, "test");
+
+        let input = ClaimBuildInput {
+            namespace: "ns",
+            source_fact_id: &fact_id,
+            source_episode_id: &episode_id,
+            scope: "personal",
+            project: None,
+            policy_tags: &[],
+            draft,
+            extractor_fingerprint: &ext_fp,
+            t_ingested: chrono::Utc::now(),
+        };
+
+        let c1 = build_claim(input).unwrap();
+        // Rebuild with same inputs — same ID
+        let fact_id2 = FactId::from("fact:test1");
+        let episode_id2 = EpisodeId::from("ep:test1");
+        let ext_fp2 = ExtractorFingerprint::compute(1, "test");
+        let input2 = ClaimBuildInput {
+            namespace: "ns",
+            source_fact_id: &fact_id2,
+            source_episode_id: &episode_id2,
+            scope: "personal",
+            project: None,
+            policy_tags: &[],
+            draft: ClaimDraft {
+                schema_ref: schema,
+                subject: c1.subject.clone(),
+                comparison_key: c1.comparison_key.clone(),
+                qualifiers: c1.qualifiers.clone(),
+                value: c1.value.clone(),
+                cardinality: c1.cardinality,
+                observed_at: c1.observed_at,
+                valid_from: c1.valid_from,
+                valid_to: c1.valid_to,
+                validity_source: c1.validity_source,
+                source_lineage: c1.source_lineage.clone(),
+            },
+            extractor_fingerprint: &ext_fp2,
+            t_ingested: c1.t_ingested,
+        };
+        let c2 = build_claim(input2).unwrap();
+        assert_eq!(c1.claim_id, c2.claim_id);
     }
 }

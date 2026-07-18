@@ -31,6 +31,7 @@ pub use apps::{
     RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
 mod cache;
+pub(crate) mod claims;
 mod conflict_resolver;
 mod context;
 mod core;
