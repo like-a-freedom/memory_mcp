@@ -13,6 +13,7 @@
 //! - `migrations`: Schema migration management and validation
 //! - `types`: Type definitions like [`GraphDirection`]
 
+pub(crate) mod claims;
 mod client;
 mod helpers;
 mod migrations;
