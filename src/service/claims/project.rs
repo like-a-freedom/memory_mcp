@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::config::claims::ClaimConfig;
 use crate::models::ClaimJobId;
+use crate::models::EpisodeId;
 use crate::models::FactId;
 use crate::models::claim::{
     ClaimBuildInput, ClaimDraft, ClaimJob, ClaimJobKind, ClaimJobState, ClaimSlot,
@@ -36,6 +37,7 @@ pub(crate) struct ClaimService {
 pub(crate) struct FactPersistedParams<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
+    pub source_episode_id: &'a EpisodeId,
     pub content: &'a str,
     pub scope: &'a str,
     pub project: Option<&'a str>,
@@ -85,16 +87,24 @@ impl ClaimService {
 
         let structured_fields = std::collections::BTreeMap::new();
 
-        let subject = params
+        let assertions = crate::service::claims::structural::parse_assertions(params.content);
+        let subject_hint = assertions.first().and_then(|a| a.subject_hint.as_ref());
+        let candidates: Vec<crate::service::claims::structural::SubjectCandidate> = params
             .entity_links
-            .first()
-            .map(|s| s.as_str())
-            .unwrap_or("entity:unknown");
+            .iter()
+            .map(|eid| crate::service::claims::structural::SubjectCandidate {
+                entity_id: eid.clone(),
+                names: vec![crate::models::claim::NormalizedText::new(eid)],
+            })
+            .collect();
+        let subject =
+            crate::service::claims::structural::resolve_subject(subject_hint, &candidates)
+                .unwrap_or("");
 
         let input = ClaimProjectionInput {
             namespace: params.namespace,
             source_fact_id: params.fact_id.clone(),
-            source_episode_id: crate::models::EpisodeId::from("ep:inline"),
+            source_episode_id: params.source_episode_id.clone(),
             scope: params.scope,
             project: params.project,
             policy_tags: &[],
@@ -102,7 +112,7 @@ impl ClaimService {
             t_ref: params.t_valid,
             content: params.content,
             structured_fields: &structured_fields,
-            assertions: &crate::service::claims::structural::parse_assertions(params.content),
+            assertions: &assertions,
         };
 
         let result = project_fact(&self.registry, &input)?;
@@ -147,7 +157,7 @@ impl ClaimService {
             let claim = build_claim(ClaimBuildInput {
                 namespace: params.namespace,
                 source_fact_id: params.fact_id,
-                source_episode_id: &crate::models::EpisodeId::from("ep:inline"),
+                source_episode_id: params.source_episode_id,
                 scope: params.scope,
                 project: params.project,
                 policy_tags: &[],
@@ -193,7 +203,7 @@ impl ClaimService {
         let persist_request = PersistProjectionRequest {
             namespace: params.namespace,
             fact_id: params.fact_id,
-            episode_id: &crate::models::EpisodeId::from("ep:inline"),
+            episode_id: params.source_episode_id,
             scope: params.scope,
             project: params.project,
             policy_tags: &[],
@@ -340,6 +350,7 @@ mod tests {
         FactPersistedParams {
             namespace: "ns",
             fact_id,
+            source_episode_id: Box::leak(Box::new(EpisodeId::from("ep:test"))),
             content,
             scope: "personal",
             project: None,

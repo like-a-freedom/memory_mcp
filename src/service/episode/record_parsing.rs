@@ -113,17 +113,3 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
 pub fn fact_from_value_or_wrapper(value: &Value) -> Option<crate::models::Fact> {
     fact_from_record(value).or_else(|| value.get("Object").and_then(fact_from_record))
 }
-
-/// Check if a fact is active at a given cutoff time.
-pub fn fact_is_active(fact: &crate::models::Fact, cutoff: chrono::DateTime<chrono::Utc>) -> bool {
-    if fact.t_valid > cutoff || fact.t_ingested > cutoff {
-        return false;
-    }
-
-    match (fact.t_invalid, fact.t_invalid_ingested) {
-        (None, _) => true,
-        (Some(invalidated_at), _) if invalidated_at > cutoff => true,
-        (_, Some(invalidated_ingested_at)) if invalidated_ingested_at > cutoff => true,
-        _ => false,
-    }
-}

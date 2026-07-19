@@ -1,8 +1,7 @@
-use std::collections::BTreeSet;
-
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
+use crate::models::claim::ClaimRelationOutcome;
 use crate::models::{
     ContradictionWarning, Edge, EdgeOrigin, Episode, ExtractResult, ExtractedEntity, ExtractedFact,
     ExtractedLink, FactType,
@@ -11,15 +10,12 @@ use crate::service::MemoryService;
 use crate::service::episode::communities::update_communities;
 use crate::service::episode::edges::store_edge;
 use crate::service::episode::entity_extraction::extract_entities;
-use crate::service::episode::record_parsing::{
-    episode_from_record, fact_from_value_or_wrapper, fact_is_active,
-};
+use crate::service::episode::record_parsing::{episode_from_record, fact_from_value_or_wrapper};
 use crate::service::episode::summary_parser::{
     entity_links_for_fact_content, sanitized_content_for_entity_extraction,
     structured_summary_fact_candidates,
 };
 use crate::service::error::MemoryError;
-use crate::service::normalize_text;
 use crate::service::query::now;
 use crate::service::util::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
@@ -228,84 +224,77 @@ pub async fn extract_facts(
     })
 }
 
-pub(super) fn has_meaningful_entity_overlap(lhs: &[String], rhs: &[String]) -> bool {
-    let lhs = lhs.iter().cloned().collect::<BTreeSet<_>>();
-    let rhs = rhs.iter().cloned().collect::<BTreeSet<_>>();
-
-    if lhs.is_empty() || rhs.is_empty() {
-        return false;
-    }
-
-    let overlap = lhs.intersection(&rhs).count();
-    let smaller_set = lhs.len().min(rhs.len());
-
-    overlap > 0 && overlap * 2 >= smaller_set
-}
-
 pub(super) async fn detect_contradiction_warnings(
     service: &MemoryService,
-    episode: &Episode,
     facts: &[ExtractedFact],
     namespace: &str,
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
-    let cutoff = now();
-    let mut warnings = Vec::new();
-    let mut seen_conflicts = std::collections::HashSet::new();
-    let active_facts = service
-        .db_client
-        .select_active_facts(namespace, 500)
-        .await?
-        .into_iter()
-        .filter_map(|record| fact_from_value_or_wrapper(&record))
-        .filter(|fact| fact.scope == episode.scope)
-        .collect::<Vec<_>>();
+    claim_based_contradiction_warnings(service, facts, namespace).await
+}
 
-    for extracted_fact in facts {
-        let (record, _) = service.find_fact_record(&extracted_fact.fact_id).await?;
-        let Some(record) = record else {
-            continue;
-        };
-        let Some(new_fact) = fact_from_value_or_wrapper(&Value::Object(record)) else {
-            continue;
-        };
-        if new_fact.entity_links.is_empty() {
-            continue;
-        }
-
-        let new_content = normalize_text(&new_fact.content);
-
-        for existing_fact in &active_facts {
-            if existing_fact.fact_id == new_fact.fact_id
-                || existing_fact.source_episode == episode.episode_id
-                || existing_fact.fact_type != new_fact.fact_type
-                || !fact_is_active(existing_fact, cutoff)
-                || !has_meaningful_entity_overlap(
-                    &existing_fact.entity_links,
-                    &new_fact.entity_links,
-                )
-                || normalize_text(&existing_fact.content) == new_content
-            {
-                continue;
-            }
-
-            let conflict_key = format!("{}->{}", new_fact.fact_id, existing_fact.fact_id);
-            if !seen_conflicts.insert(conflict_key) {
-                continue;
-            }
-
-            warnings.push(ContradictionWarning {
-                fact_type: new_fact.fact_type.clone(),
-                new_fact_id: new_fact.fact_id.clone(),
-                conflicting_fact_id: existing_fact.fact_id.clone(),
-                existing_content: existing_fact.content.clone(),
-                new_content: new_fact.content.clone(),
-                entity_ids: new_fact.entity_links.clone(),
-                reason: "active fact with the same fact_type and entity set has different content"
-                    .to_string(),
-            });
-        }
+/// Query claim relations for active contradictions involving the extracted facts.
+async fn claim_based_contradiction_warnings(
+    service: &MemoryService,
+    facts: &[ExtractedFact],
+    namespace: &str,
+) -> Result<Vec<ContradictionWarning>, MemoryError> {
+    let fact_ids: Vec<_> = facts
+        .iter()
+        .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
+        .collect();
+    if fact_ids.is_empty() {
+        return Ok(Vec::new());
     }
-
+    let query = crate::storage::claims::RelationsForFactsQuery {
+        namespace,
+        fact_ids: &fact_ids,
+    };
+    let relations = service
+        .claim_service
+        .store
+        .select_relations_for_facts(query)
+        .await?;
+    let mut warnings = Vec::new();
+    for rel in &relations {
+        if rel.outcome != ClaimRelationOutcome::Contradiction {
+            continue;
+        }
+        let counterpart_id = if let Some(ref left) = rel.left_fact_id
+            && fact_ids.iter().any(|f| f == left)
+        {
+            rel.right_fact_id.as_ref().map(|id| id.as_ref())
+        } else {
+            rel.left_fact_id.as_ref().map(|id| id.as_ref())
+        };
+        let Some(counterpart_id) = counterpart_id else {
+            continue;
+        };
+        let counterpart = service
+            .find_fact_record(counterpart_id)
+            .await
+            .ok()
+            .and_then(|(r, _)| {
+                r.and_then(|record| {
+                    let v = serde_json::Value::Object(record);
+                    fact_from_value_or_wrapper(&v)
+                })
+            });
+        let counterpart_content = counterpart
+            .as_ref()
+            .map(|f| f.content.clone())
+            .unwrap_or_default();
+        let fact_id_owned = counterpart_id.to_string();
+        warnings.push(ContradictionWarning {
+            fact_type: String::new(),
+            new_fact_id: fact_id_owned.clone(),
+            conflicting_fact_id: counterpart_id.to_string(),
+            existing_content: counterpart_content,
+            new_content: String::new(),
+            entity_ids: Vec::new(),
+            reason: format!("claim_contradiction:{}", rel.reason_code),
+        });
+        let _ = fact_id_owned;
+    }
     Ok(warnings)
 }
 
@@ -343,7 +332,7 @@ pub async fn extract_from_episode(
     let entities = extract_entities(service, &entity_extraction_content, zero_shot_labels).await?;
     let fact_outcome = extract_facts(service, &episode, &entities).await?;
     let facts = fact_outcome.facts;
-    let warnings = detect_contradiction_warnings(service, &episode, &facts, &namespace).await?;
+    let warnings = detect_contradiction_warnings(service, &facts, &namespace).await?;
     let mut links = Vec::new();
     let edge_ingested = now();
 

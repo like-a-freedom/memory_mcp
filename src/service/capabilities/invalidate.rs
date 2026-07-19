@@ -41,6 +41,15 @@ impl InvalidateCapability {
         ctx.db_client
             .update(&request.fact_id, Value::Object(updated), &namespace)
             .await?;
+        if let Some(ref claim_store) = ctx.claim_store {
+            claim_store
+                .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
+                    namespace: &namespace,
+                    fact_id: &crate::models::FactId::from(request.fact_id.as_str()),
+                    retract_reason: "manual_invalidation",
+                })
+                .await?;
+        }
         invalidate_cache_by_scope(&ctx.context_cache, &scope).await;
         Ok(())
     }
@@ -69,6 +78,7 @@ mod tests {
             namespaces: vec!["org".to_string()],
             rate_limiter: Arc::new(RateLimiter::new(100, 100)),
             context_cache: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(64).unwrap()))),
+            claim_store: None,
         }
     }
 

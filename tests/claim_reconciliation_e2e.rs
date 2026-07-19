@@ -55,23 +55,8 @@ async fn ingest_source(
     episode_id
 }
 
-// ─── Gap 1: New facts produce projection and reconcile jobs ────────────────────
-
-#[tokio::test]
-async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
-    let (service, db_client) = make_service().await;
-
-    let ep = ingest_source(
-        &service,
-        "chat",
-        "src:a",
-        "height is 180 cm",
-        "personal",
-        "2026-06-01T00:00:00Z",
-    )
-    .await;
-
-    let claim_count: usize = db_client
+async fn claim_count_for_episode(db_client: &Arc<SurrealDbClient>, ep: &str) -> usize {
+    db_client
         .query(
             "SELECT count() AS cnt FROM claim WHERE source_episode_id = $ep",
             Some(serde_json::json!({"ep": ep})),
@@ -84,14 +69,11 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
                 .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
                 .unwrap_or(0) as usize
         })
-        .unwrap_or(0);
+        .unwrap_or(0)
+}
 
-    assert!(
-        claim_count > 0,
-        "expected at least one claim for the episode"
-    );
-
-    let job_count: usize = db_client
+async fn job_count_with_source_fact(db_client: &Arc<SurrealDbClient>) -> usize {
+    db_client
         .query(
             "SELECT count() AS cnt FROM claim_job WHERE source_fact_id IS NOT NONE",
             None,
@@ -104,28 +86,11 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
                 .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
                 .unwrap_or(0) as usize
         })
-        .unwrap_or(0);
-
-    assert!(job_count > 0, "expected at least one claim_job");
+        .unwrap_or(0)
 }
 
-// ─── Gap 2: Distinct keys produce distinct claims even with same value ─────────
-
-#[tokio::test]
-async fn same_value_under_distinct_keys_produces_distinct_claims() {
-    let (service, db_client) = make_service().await;
-
-    let ep = ingest_source(
-        &service,
-        "kv",
-        "src:b",
-        "measure_a: 100\nmeasure_b: 100",
-        "personal",
-        "2026-06-01T00:00:00Z",
-    )
-    .await;
-
-    let claim_keys: Vec<String> = db_client
+async fn fetch_claim_keys_for_episode(db_client: &Arc<SurrealDbClient>, ep: &str) -> Vec<String> {
+    db_client
         .query(
             "SELECT comparison_key_hash FROM claim WHERE source_episode_id = $ep",
             Some(serde_json::json!({"ep": ep})),
@@ -141,7 +106,113 @@ async fn same_value_under_distinct_keys_produces_distinct_claims() {
                 })
                 .collect()
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// Wait for the fire-and-forget claim projection spawned by `add_fact` to
+/// land at least one row satisfying `poll`. Yields between attempts so the
+/// runtime can drive the spawned task forward.
+async fn wait_for_claim_projection<F, Fut>(poll: F)
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 0..200 {
+        if poll().await {
+            return;
+        }
+        tokio::task::yield_now().await;
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    eprintln!("wait_for_claim_projection timed out while polling");
+}
+
+// ─── Gap 1: New facts produce projection and reconcile jobs ────────────────────
+
+#[tokio::test]
+async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
+    let (service, db_client) = make_service().await;
+
+    // Content matches the metric heuristic ("ARR" + "$5") so `extract_facts`
+    // stores one metric fact, then the fire-and-forget claim projection
+    // parses the "X is Y" sentence via `AttributeV1` and writes one claim.
+    let ep = ingest_source(
+        &service,
+        "chat",
+        "src:a",
+        "Alice Smith reports ARR is $5M.",
+        "personal",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+
+    let fact_count: usize = db_client
+        .query(
+            "SELECT count() AS cnt FROM fact WHERE source_episode = $ep",
+            Some(serde_json::json!({"ep": ep})),
+            "personal",
+        )
+        .await
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
+        .map(|rows| {
+            rows.first()
+                .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+                .unwrap_or(0) as usize
+        })
+        .unwrap_or(0);
+    assert!(fact_count > 0, "no facts for episode {ep}");
+
+    let claim_count = claim_count_for_episode(&db_client, &ep).await;
+    assert!(
+        claim_count > 0,
+        "expected at least one claim for the episode"
+    );
+
+    let db_for_jobs = db_client.clone();
+    wait_for_claim_projection(move || {
+        let db = db_for_jobs.clone();
+        async move { job_count_with_source_fact(&db).await > 0 }
+    })
+    .await;
+
+    let job_count = job_count_with_source_fact(&db_client).await;
+    assert!(job_count > 0, "expected at least one claim_job");
+}
+
+// ─── Gap 2: Distinct keys produce distinct claims even with same value ─────────
+
+#[tokio::test]
+async fn same_value_under_distinct_keys_produces_distinct_claims() {
+    let (service, db_client) = make_service().await;
+
+    // The leading `ARR` token trips `is_metric_statement`, so `extract_facts`
+    // stores exactly one metric fact containing all three lines. Claim
+    // projection then calls `parse_assertions` on that content: the `kv`
+    // parser splits `measure_a: 100` and `measure_b: 100` into two
+    // assertions whose predicates (`measure_a`, `measure_b`) are NOT in the
+    // AttributeV1 skip list (`measure`, `unit`, `predicate`, `object`,
+    // `action`, `target`). The two drafts therefore carry distinct
+    // comparison_key hashes.
+    let ep = ingest_source(
+        &service,
+        "chat",
+        "src:b",
+        "ARR\nmeasure_a: 100\nmeasure_b: 100",
+        "personal",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+
+    let db_for_wait = db_client.clone();
+    let ep_for_wait = ep.clone();
+    wait_for_claim_projection(move || {
+        let db = db_for_wait.clone();
+        let ep = ep_for_wait.clone();
+        async move { fetch_claim_keys_for_episode(&db, &ep).await.len() >= 2 }
+    })
+    .await;
+
+    let claim_keys = fetch_claim_keys_for_episode(&db_client, &ep).await;
 
     // Deduplicate
     let unique_keys: std::collections::HashSet<_> = claim_keys.iter().collect();

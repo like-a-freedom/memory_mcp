@@ -363,35 +363,22 @@ impl ClaimStore for SurrealClaimStore {
         request: PersistProjectionRequest<'_>,
     ) -> Result<(), MemoryError> {
         let namespace = request.namespace;
-        if request.claims.is_empty() && request.jobs.is_empty() {
-            return Ok(());
-        }
-
-        let mut stmts = Vec::new();
-        stmts.push("BEGIN TRANSACTION".to_string());
-
-        let mut vars = serde_json::json!({});
-        let v = vars.as_object_mut().unwrap();
-
-        for (i, claim) in request.claims.iter().enumerate() {
+        for claim in &request.claims {
             let content = serde_json::to_value(claim)
                 .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
-            let key = format!("c{i}");
-            v.insert(key.clone(), content);
-            stmts.push(format!("UPDATE claim:⟨{}⟩ CONTENT ${key}", claim.claim_id));
+            self.db
+                .create(claim.claim_id.as_ref(), content, namespace)
+                .await
+                .map_err(|e| MemoryError::Storage(format!("persist claim: {e}")))?;
         }
-
-        for (i, job) in request.jobs.iter().enumerate() {
+        for job in &request.jobs {
             let content = serde_json::to_value(job)
                 .map_err(|e| MemoryError::Storage(format!("serialize job: {e}")))?;
-            let key = format!("j{i}");
-            v.insert(key.clone(), content);
-            stmts.push(format!("UPDATE claim_job:⟨{}⟩ CONTENT ${key}", job.job_id));
+            self.db
+                .create(job.job_id.as_ref(), content, namespace)
+                .await
+                .map_err(|e| MemoryError::Storage(format!("persist job: {e}")))?;
         }
-
-        stmts.push("COMMIT TRANSACTION".to_string());
-        let sql = stmts.join(";\n");
-        self.db.query(&sql, Some(vars), namespace).await?;
         Ok(())
     }
 
@@ -538,7 +525,6 @@ impl ClaimStore for SurrealClaimStore {
         request: RetractFactAndClaimsRequest<'_>,
     ) -> Result<(), MemoryError> {
         let now = crate::service::normalize_dt(chrono::Utc::now());
-        // Update the fact with invalidation reason
         let sql1 = "UPDATE fact:⟨$id⟩ SET t_invalid = $now, invalidation_reason = $reason";
         let vars1 = serde_json::json!({
             "id": request.fact_id.as_ref(),
@@ -546,13 +532,18 @@ impl ClaimStore for SurrealClaimStore {
             "reason": request.retract_reason,
         });
         self.db.query(sql1, Some(vars1), request.namespace).await?;
-        // Invalidate all claims from this fact
         let sql2 = "UPDATE claim SET t_invalid_ingested = $now WHERE source_fact_id = $fact_id AND t_invalid_ingested IS NONE";
         let vars2 = serde_json::json!({
             "now": now,
             "fact_id": request.fact_id.as_ref(),
         });
         self.db.query(sql2, Some(vars2), request.namespace).await?;
+        let sql3 = "UPDATE claim_relation SET t_invalid_ingested = $now WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) AND t_invalid_ingested IS NONE";
+        let vars3 = serde_json::json!({
+            "now": now,
+            "fact_id": request.fact_id.as_ref(),
+        });
+        self.db.query(sql3, Some(vars3), request.namespace).await?;
         Ok(())
     }
 

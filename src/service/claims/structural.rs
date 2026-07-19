@@ -116,12 +116,17 @@ fn try_parse_key_value(lines: &[&str]) -> Option<Vec<StructuralAssertion>> {
             let val = val.trim();
             if !key.is_empty() && !val.is_empty() {
                 let (value, qualifiers) = detect_value_and_qualifiers(val);
+                let cardinality = if val.contains(',') {
+                    CardinalityEvidence::ExplicitCollection
+                } else {
+                    CardinalityEvidence::ExplicitScalar
+                };
                 assertions.push(StructuralAssertion {
                     subject_hint: None,
                     predicate: NormalizedText::new(key),
                     value,
                     qualifiers,
-                    cardinality_evidence: CardinalityEvidence::ExplicitScalar,
+                    cardinality_evidence: cardinality,
                     valid_from: None,
                     valid_to: None,
                     source_span: 0..line.len(),
@@ -147,7 +152,7 @@ fn try_parse_sentences(content: &str) -> Option<Vec<StructuralAssertion>> {
             predicate: NormalizedText::new(&predicate),
             value,
             qualifiers,
-            cardinality_evidence: CardinalityEvidence::ExplicitScalar,
+            cardinality_evidence: CardinalityEvidence::Unknown,
             valid_from: None,
             valid_to: None,
             source_span: 0..content.len(),

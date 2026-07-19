@@ -18,6 +18,7 @@ pub struct ServiceContext {
     pub namespaces: Vec<String>,
     pub rate_limiter: Arc<RateLimiter>,
     pub context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    pub claim_store: Option<Arc<dyn crate::storage::claims::ClaimStore>>,
 }
 
 impl ServiceContext {

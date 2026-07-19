@@ -54,6 +54,7 @@ impl MemoryService {
             namespaces: self.namespaces.clone(),
             rate_limiter: self.rate_limiter.clone(),
             context_cache: self.context_cache.clone(),
+            claim_store: Some(self.claim_service.store.clone()),
         }
     }
 
@@ -540,6 +541,7 @@ impl MemoryService {
             // Fire-and-forget claim projection (non-blocking).
             let claim_svc = self.claim_service.clone();
             let claim_fact_id = FactId::from(fact_id.clone());
+            let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
             let claim_content = content.to_string();
             let claim_scope = scope.to_string();
             let claim_project = project.clone();
@@ -550,21 +552,15 @@ impl MemoryService {
                 let params = crate::service::claims::project::FactPersistedParams {
                     namespace: &namespace_clone,
                     fact_id: &claim_fact_id,
+                    source_episode_id: &claim_episode_id,
                     content: &claim_content,
                     scope: &claim_scope,
                     project: claim_project.as_deref(),
                     entity_links: &claim_entity_links,
                     t_valid: claim_t_valid,
                 };
-                match claim_svc.after_fact_persisted(&params).await {
-                    Ok(_summary) => {}
-                    Err(error) => {
-                        claim_svc.record_post_fact_failure(
-                            &namespace_clone,
-                            &claim_fact_id,
-                            &error,
-                        );
-                    }
+                if let Err(error) = claim_svc.after_fact_persisted(&params).await {
+                    claim_svc.record_post_fact_failure(&namespace_clone, &claim_fact_id, &error);
                 }
             });
         }

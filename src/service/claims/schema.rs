@@ -358,9 +358,14 @@ impl ClaimSchema for QuantityV1 {
             if let Some((num_str, unit_str)) = extract_number_and_unit(val)
                 && let Ok(decimal) = CanonicalDecimal::parse(&num_str)
             {
+                let unit_family = if unit_str.is_empty() {
+                    "no_unit".to_string()
+                } else {
+                    unit_str.clone()
+                };
                 let mut components = BTreeMap::new();
                 components.insert("measure".to_string(), key.clone());
-                components.insert("unit_family".to_string(), unit_str.clone());
+                components.insert("unit_family".to_string(), unit_family.clone());
                 let ck = ComparisonKey::new(self.schema_ref(), components)?;
                 let span_start = input.content.find(&format!("{key}: ")).unwrap_or(0);
                 let span_end = span_start + key.len() + 2 + val.len();
@@ -372,7 +377,7 @@ impl ClaimSchema for QuantityV1 {
                     value: ClaimValue::Quantity {
                         value: decimal,
                         unit: CanonicalUnit {
-                            family: unit_str.clone(),
+                            family: unit_family,
                             symbol: unit_str,
                         },
                     },

@@ -130,6 +130,16 @@ pub async fn run_decay_pass(
                     .update(fact_id, payload, namespace)
                     .await?;
 
+                service
+                    .claim_service
+                    .store
+                    .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
+                        namespace,
+                        fact_id: &crate::models::FactId::from(fact_id),
+                        retract_reason: "confidence_decay",
+                    })
+                    .await?;
+
                 invalidated += 1;
             }
         }

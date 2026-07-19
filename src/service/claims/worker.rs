@@ -175,9 +175,9 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         }
         processed += 1;
 
-        let ev = super::reconcile::EvaluatorVersion("builtin/v1".to_string());
+        let ev = super::reconcile::EvaluatorVersion::new("builtin/v1");
         let cf = crate::models::claim::ReconciliationContextFingerprint::compute(
-            &ev.0,
+            ev.as_str(),
             "attribute",
             "",
             "",
@@ -185,10 +185,10 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         let input = super::reconcile::ReconciliationInput {
             left: &owning,
             right: candidate,
-            policy: &super::schema::ClaimPolicy {
+            _policy: &super::schema::ClaimPolicy {
                 cardinality: owning.cardinality,
             },
-            confirmed_aliases: &super::reconcile::ConfirmedAliasSet::new(
+            _confirmed_aliases: &super::reconcile::ConfirmedAliasSet::new(
                 std::collections::BTreeMap::new(),
             ),
             evaluator_version: &ev,
@@ -229,8 +229,8 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
                 });
                 succeeded += 1;
             }
-            super::reconcile::ReconciliationDecision::Skip(_)
-            | super::reconcile::ReconciliationDecision::Coexist(_) => {
+            super::reconcile::ReconciliationDecision::Skip
+            | super::reconcile::ReconciliationDecision::Coexist => {
                 skipped += 1;
             }
         }

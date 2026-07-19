@@ -5,7 +5,6 @@
 
 #![allow(dead_code)]
 
-
 use crate::models::claim::{ClaimJob, ClaimJobKind, ClaimJobState};
 use crate::models::{ClaimJobId, FactId};
 use crate::service::MemoryError;

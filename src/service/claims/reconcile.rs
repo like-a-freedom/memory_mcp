@@ -16,63 +16,66 @@ use crate::service::claims::schema::ClaimPolicy;
 
 /// Confirmed alias set for fuzzy alias matching.
 #[derive(Debug, Default)]
-#[allow(dead_code)]
 pub(crate) struct ConfirmedAliasSet {
-    aliases: BTreeMap<String, String>,
+    _aliases: BTreeMap<String, String>,
 }
 
 impl ConfirmedAliasSet {
-    #[allow(dead_code)]
     pub fn new(aliases: BTreeMap<String, String>) -> Self {
-        Self { aliases }
+        Self { _aliases: aliases }
     }
 
-    /// Resolve an alias to its canonical form, if confirmed.
-    #[allow(dead_code)]
-    pub fn resolve(&self, key: &str) -> Option<&str> {
-        self.aliases.get(key).map(|s| s.as_str())
+    pub fn _resolve(&self, key: &str) -> Option<&str> {
+        self._aliases.get(key).map(|s| s.as_str())
     }
 }
 
 /// Evaluator version string.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub(crate) struct EvaluatorVersion(pub String);
+pub(crate) struct EvaluatorVersion(String);
+
+impl EvaluatorVersion {
+    pub fn new(version: impl Into<String>) -> Self {
+        Self(version.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// Bounded reason codes for reconciliation decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
 pub(crate) enum ReconciliationReasonCode {
-    NotSameSlot,
-    NotComparable,
     Duplicate,
     Correction,
     Contradiction,
     Supersession,
-    TemporalAmbiguity,
-    SetValuedCoexistence,
-    DisjointValidity,
+    _NotSameSlot,
+    _NotComparable,
+    _TemporalAmbiguity,
+    _SetValuedCoexistence,
+    _DisjointValidity,
 }
 
 impl std::fmt::Display for ReconciliationReasonCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotSameSlot => write!(f, "not_same_slot"),
-            Self::NotComparable => write!(f, "not_comparable"),
+            Self::_NotSameSlot => write!(f, "not_same_slot"),
+            Self::_NotComparable => write!(f, "not_comparable"),
             Self::Duplicate => write!(f, "duplicate"),
             Self::Correction => write!(f, "correction"),
             Self::Contradiction => write!(f, "contradiction"),
             Self::Supersession => write!(f, "supersession"),
-            Self::TemporalAmbiguity => write!(f, "temporal_ambiguity"),
-            Self::SetValuedCoexistence => write!(f, "set_valued_coexistence"),
-            Self::DisjointValidity => write!(f, "disjoint_validity"),
+            Self::_TemporalAmbiguity => write!(f, "temporal_ambiguity"),
+            Self::_SetValuedCoexistence => write!(f, "set_valued_coexistence"),
+            Self::_DisjointValidity => write!(f, "disjoint_validity"),
         }
     }
 }
 
 /// A persisted relation draft before ID assignment.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct PersistedRelationDraft {
     pub left_claim_id: ClaimId,
     pub right_claim_id: ClaimId,
@@ -88,20 +91,18 @@ pub(crate) struct PersistedRelationDraft {
 
 /// The decision returned by the pure reconciliation engine.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) enum ReconciliationDecision {
     Persist(Box<PersistedRelationDraft>),
-    Skip(ReconciliationReasonCode),
-    Coexist(ReconciliationReasonCode),
+    Skip,
+    Coexist,
 }
 
 /// Borrowed inputs for reconciliation.
-#[allow(dead_code)]
 pub(crate) struct ReconciliationInput<'a> {
     pub left: &'a Claim,
     pub right: &'a Claim,
-    pub policy: &'a ClaimPolicy,
-    pub confirmed_aliases: &'a ConfirmedAliasSet,
+    pub _policy: &'a ClaimPolicy,
+    pub _confirmed_aliases: &'a ConfirmedAliasSet,
     pub evaluator_version: &'a EvaluatorVersion,
     pub context_fingerprint: &'a ReconciliationContextFingerprint,
     pub evaluated_at: chrono::DateTime<chrono::Utc>,
@@ -109,7 +110,6 @@ pub(crate) struct ReconciliationInput<'a> {
 
 // ─── Pure Gate Functions ──────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 fn same_exact_slot(left: &Claim, right: &Claim) -> bool {
     left.scope == right.scope
         && left.project_identity == right.project_identity
@@ -120,7 +120,6 @@ fn same_exact_slot(left: &Claim, right: &Claim) -> bool {
         && left.comparison_key_hash == right.comparison_key_hash
 }
 
-#[allow(dead_code)]
 fn values_comparable(left: &Claim, right: &Claim) -> bool {
     use crate::models::claim::ClaimValue;
     match (&left.value, &right.value) {
@@ -137,14 +136,12 @@ fn values_comparable(left: &Claim, right: &Claim) -> bool {
     }
 }
 
-#[allow(dead_code)]
 fn same_proposition(left: &Claim, right: &Claim) -> bool {
     left.value == right.value && left.qualifier_hash == right.qualifier_hash
 }
 
 /// Relationship between validity intervals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 enum ValidityRelation {
     /// Both have the same valid_from and valid_to.
     Identical,
@@ -160,7 +157,6 @@ enum ValidityRelation {
     Unknown,
 }
 
-#[allow(dead_code)]
 fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
     match (
         left.valid_from,
@@ -185,12 +181,10 @@ fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
     }
 }
 
-#[allow(dead_code)]
 fn source_gate(left: &Claim, right: &Claim) -> bool {
     left.source_fact_id != right.source_fact_id
 }
 
-#[allow(dead_code)]
 fn correction_evidence(left: &Claim, right: &Claim) -> bool {
     left.qualifiers.contains_key("correction")
         || right.qualifiers.contains_key("correction")
@@ -198,7 +192,6 @@ fn correction_evidence(left: &Claim, right: &Claim) -> bool {
         || right.qualifiers.contains_key("replaces")
 }
 
-#[allow(dead_code)]
 fn transition_evidence(left: &Claim, right: &Claim) -> bool {
     left.qualifiers.contains_key("transition")
         || right.qualifiers.contains_key("transition")
@@ -209,19 +202,18 @@ fn transition_evidence(left: &Claim, right: &Claim) -> bool {
 // ─── Main Reconciliation Entry Point ─────────────────────────────────────────
 
 /// Pure reconciliation decision engine.
-#[allow(dead_code)]
 pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecision {
     let left = input.left;
     let right = input.right;
 
     // Gate 1: Slot mismatch
     if !same_exact_slot(left, right) {
-        return ReconciliationDecision::Skip(ReconciliationReasonCode::NotSameSlot);
+        return ReconciliationDecision::Skip;
     }
 
     // Gate 2: Incompatible types/units
     if !values_comparable(left, right) {
-        return ReconciliationDecision::Skip(ReconciliationReasonCode::NotComparable);
+        return ReconciliationDecision::Skip;
     }
 
     // Gate 3: Same proposition → duplicate
@@ -255,7 +247,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
                 reason_code: "correction".to_string(),
                 description: Some("Explicit correction evidence with source gate".to_string()),
             },
-            evaluator_version: input.evaluator_version.0.clone(),
+            evaluator_version: input.evaluator_version.as_str().to_string(),
             context_fingerprint: input.context_fingerprint.clone(),
             evaluated_at: input.evaluated_at,
         };
@@ -266,7 +258,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
     if left.cardinality == ClaimCardinality::SetValued
         || right.cardinality == ClaimCardinality::SetValued
     {
-        return ReconciliationDecision::Coexist(ReconciliationReasonCode::SetValuedCoexistence);
+        return ReconciliationDecision::Coexist;
     }
 
     // Gate 6: Transition evidence + source gate → supersession
@@ -288,7 +280,7 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
                 reason_code: "supersession".to_string(),
                 description: Some("Explicit transition evidence with source gate".to_string()),
             },
-            evaluator_version: input.evaluator_version.0.clone(),
+            evaluator_version: input.evaluator_version.as_str().to_string(),
             context_fingerprint: input.context_fingerprint.clone(),
             evaluated_at: input.evaluated_at,
         };
@@ -313,16 +305,15 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
             return ReconciliationDecision::Persist(Box::new(draft));
         }
         ValidityRelation::Disjoint => {
-            return ReconciliationDecision::Coexist(ReconciliationReasonCode::DisjointValidity);
+            return ReconciliationDecision::Coexist;
         }
         ValidityRelation::Unknown => {}
     }
 
     // Gate 8: Unknown validity + exclusive values → temporal ambiguity
-    ReconciliationDecision::Skip(ReconciliationReasonCode::TemporalAmbiguity)
+    ReconciliationDecision::Skip
 }
 
-#[allow(dead_code)]
 fn canonically_order_ids(a: &ClaimId, b: &ClaimId) -> (ClaimId, ClaimId) {
     if a.as_ref() <= b.as_ref() {
         (a.clone(), b.clone())
@@ -331,7 +322,6 @@ fn canonically_order_ids(a: &ClaimId, b: &ClaimId) -> (ClaimId, ClaimId) {
     }
 }
 
-#[allow(dead_code)]
 fn build_relation_draft(
     left: &Claim,
     right: &Claim,
@@ -352,7 +342,7 @@ fn build_relation_draft(
             reason_code: reason_code.to_string(),
             description: Some(description.to_string()),
         },
-        evaluator_version: input.evaluator_version.0.clone(),
+        evaluator_version: input.evaluator_version.as_str().to_string(),
         context_fingerprint: input.context_fingerprint.clone(),
         evaluated_at: input.evaluated_at,
     }
@@ -470,8 +460,7 @@ mod tests {
         });
         static DEFAULT_EVAL_VERSION: std::sync::OnceLock<EvaluatorVersion> =
             std::sync::OnceLock::new();
-        let eval_version =
-            DEFAULT_EVAL_VERSION.get_or_init(|| EvaluatorVersion("test-1.0".to_string()));
+        let eval_version = DEFAULT_EVAL_VERSION.get_or_init(|| EvaluatorVersion::new("test-1.0"));
         static DEFAULT_CTX_FP: std::sync::OnceLock<ReconciliationContextFingerprint> =
             std::sync::OnceLock::new();
         let ctx_fp = DEFAULT_CTX_FP.get_or_init(|| {
@@ -485,8 +474,8 @@ mod tests {
         ReconciliationInput {
             left,
             right,
-            policy,
-            confirmed_aliases: aliases,
+            _policy: policy,
+            _confirmed_aliases: aliases,
             evaluator_version: eval_version,
             context_fingerprint: ctx_fp,
             evaluated_at: chrono::Utc::now(),
@@ -514,10 +503,7 @@ mod tests {
             None,
         );
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Skip(ReconciliationReasonCode::NotSameSlot)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
     }
 
     #[test]
@@ -541,10 +527,7 @@ mod tests {
             None,
         );
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Skip(ReconciliationReasonCode::NotComparable)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
     }
 
     #[test]
@@ -599,10 +582,7 @@ mod tests {
         );
         right.cardinality = ClaimCardinality::SetValued;
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Coexist(ReconciliationReasonCode::SetValuedCoexistence)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Coexist));
     }
 
     #[test]
@@ -630,10 +610,7 @@ mod tests {
             Some(t4),
         );
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Coexist(ReconciliationReasonCode::DisjointValidity)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Coexist));
     }
 
     #[test]
@@ -789,10 +766,7 @@ mod tests {
             None,
         );
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Skip(ReconciliationReasonCode::TemporalAmbiguity)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
     }
 
     #[test]
@@ -820,10 +794,7 @@ mod tests {
         // Same source_fact_id → source_gate fails → no correction
         // Unknown validity → temporal_ambiguity
         let input = default_input(&left, &right);
-        assert!(matches!(
-            reconcile(&input),
-            ReconciliationDecision::Skip(ReconciliationReasonCode::TemporalAmbiguity)
-        ));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
     }
 
     #[test]
