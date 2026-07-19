@@ -31,6 +31,9 @@ pub use apps::{
     RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
 mod cache;
+#[cfg(any(test, feature = "prometheus"))]
+pub mod claims;
+#[cfg(not(any(test, feature = "prometheus")))]
 pub(crate) mod claims;
 mod conflict_resolver;
 mod context;

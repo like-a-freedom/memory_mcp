@@ -494,6 +494,18 @@ pub enum ClaimRelationOutcome {
     TemporalAmbiguity,
 }
 
+impl std::fmt::Display for ClaimRelationOutcome {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Duplicate => write!(f, "duplicate"),
+            Self::Supersession => write!(f, "supersession"),
+            Self::Correction => write!(f, "correction"),
+            Self::Contradiction => write!(f, "contradiction"),
+            Self::TemporalAmbiguity => write!(f, "temporal_ambiguity"),
+        }
+    }
+}
+
 /// Evidence supporting a relation evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimRelationEvidence {
@@ -684,7 +696,12 @@ pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
         value: draft.value.clone(),
         cardinality: draft.cardinality,
         observed_at: draft.observed_at,
-        valid_from: draft.valid_from,
+        // When the source did not carry an explicit validity start, the claim
+        // is valid from the moment it was observed (the fact's `t_valid`).
+        // This keeps two contradictory values observed at the same instant
+        // from landing in the Unknown branch of `validity_relation`, which
+        // would silently drop the contradiction.
+        valid_from: draft.valid_from.or(Some(draft.observed_at)),
         valid_to: draft.valid_to,
         validity_source: draft.validity_source,
         source_lineage: draft.source_lineage.clone(),

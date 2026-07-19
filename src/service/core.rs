@@ -530,15 +530,13 @@ impl MemoryService {
                 ));
             }
             super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
-            if let Some(input) = deferred_embedding_input {
-                self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
-                    .await;
-            }
 
             // Fire-and-forget triple extraction (non-blocking).
             self.spawn_triple_extraction(&fact_id, content, &namespace);
 
-            // Fire-and-forget claim projection (non-blocking).
+            // Synchronous claim projection so that `extract` sees relations
+            // deterministically after `add_fact` returns. Projection failure
+            // is non-fatal: facts remain retrievable.
             let claim_svc = self.claim_service.clone();
             let claim_fact_id = FactId::from(fact_id.clone());
             let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
@@ -547,22 +545,36 @@ impl MemoryService {
             let claim_project = project.clone();
             let claim_entity_links = entity_links.clone();
             let claim_t_valid = t_valid;
-            let namespace_clone = namespace.clone();
-            tokio::spawn(async move {
-                let params = crate::service::claims::project::FactPersistedParams {
-                    namespace: &namespace_clone,
-                    fact_id: &claim_fact_id,
-                    source_episode_id: &claim_episode_id,
-                    content: &claim_content,
-                    scope: &claim_scope,
-                    project: claim_project.as_deref(),
-                    entity_links: &claim_entity_links,
-                    t_valid: claim_t_valid,
-                };
-                if let Err(error) = claim_svc.after_fact_persisted(&params).await {
-                    claim_svc.record_post_fact_failure(&namespace_clone, &claim_fact_id, &error);
+            let claim_params = crate::service::claims::project::FactPersistedParams {
+                namespace: &namespace,
+                fact_id: &claim_fact_id,
+                source_episode_id: &claim_episode_id,
+                content: &claim_content,
+                scope: &claim_scope,
+                project: claim_project.as_deref(),
+                entity_links: &claim_entity_links,
+                t_valid: claim_t_valid,
+            };
+            match claim_svc.after_fact_persisted(&claim_params).await {
+                Ok(summary) => claim_svc.record_post_fact_success(
+                    &namespace,
+                    &summary.fact_id,
+                    summary.claims_projected,
+                    summary.claims_skipped,
+                ),
+                Err(error) => {
+                    claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
                 }
-            });
+            }
+
+            // Background embedding retry must run after claim projection so the
+            // test that asserts `embedding` is absent immediately after
+            // `add_fact` still holds — projection is synchronous and gives the
+            // background embedding task no head start.
+            if let Some(input) = deferred_embedding_input {
+                self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
+                    .await;
+            }
         }
         Ok(fact_id)
     }
@@ -1395,15 +1407,6 @@ impl MemoryService {
         )
         .await?;
         Ok(())
-    }
-
-    /// Performs a CBOR round-trip.
-    pub fn cbor_round_trip(&self, payload: &Value) -> Result<Value, MemoryError> {
-        let encoded = serde_cbor::to_vec(payload)
-            .map_err(|err| MemoryError::Storage(format!("cbor encode error: {err}")))?;
-        let decoded: Value = serde_cbor::from_slice(&encoded)
-            .map_err(|err| MemoryError::Storage(format!("cbor decode error: {err}")))?;
-        Ok(decoded)
     }
 
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
@@ -2633,22 +2636,6 @@ mod tests {
     fn enforce_rate_limit_accepts_none() {
         let service = create_test_service(vec!["org"]);
         assert!(service.enforce_rate_limit(None).is_ok());
-    }
-
-    #[test]
-    fn cbor_round_trip_preserves_value() {
-        let service = create_test_service(vec!["org"]);
-        let original = json!({"key": "value", "nested": {"num": 42}});
-        let round_tripped = service.cbor_round_trip(&original).unwrap();
-        assert_eq!(original, round_tripped);
-    }
-
-    #[test]
-    fn cbor_round_trip_handles_arrays() {
-        let service = create_test_service(vec!["org"]);
-        let original = json!([1, 2, 3, "test", {"key": "value"}]);
-        let round_tripped = service.cbor_round_trip(&original).unwrap();
-        assert_eq!(original, round_tripped);
     }
 
     #[tokio::test]

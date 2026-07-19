@@ -259,16 +259,55 @@ async fn claim_based_contradiction_warnings(
         if rel.outcome != ClaimRelationOutcome::Contradiction {
             continue;
         }
-        let counterpart_id = if let Some(ref left) = rel.left_fact_id
+        // Determine which side of the relation is the current fact (the one
+        // being extracted) and which is the counterpart.
+        let (current_fact_id, counterpart_id): (&str, &str) = if let Some(ref left) =
+            rel.left_fact_id
             && fact_ids.iter().any(|f| f == left)
         {
-            rel.right_fact_id.as_ref().map(|id| id.as_ref())
+            (
+                left.as_ref(),
+                rel.right_fact_id
+                    .as_ref()
+                    .map(|id| id.as_ref())
+                    .unwrap_or(""),
+            )
+        } else if let Some(ref right) = rel.right_fact_id
+            && fact_ids.iter().any(|f| f == right)
+        {
+            (
+                right.as_ref(),
+                rel.left_fact_id
+                    .as_ref()
+                    .map(|id| id.as_ref())
+                    .unwrap_or(""),
+            )
         } else {
-            rel.left_fact_id.as_ref().map(|id| id.as_ref())
-        };
-        let Some(counterpart_id) = counterpart_id else {
             continue;
         };
+        if counterpart_id.is_empty() {
+            continue;
+        }
+        // Find the current extracted fact to read its type.
+        let current_fact = facts.iter().find(|f| f.fact_id == current_fact_id);
+        let fact_type = current_fact
+            .map(|f| f.fact_type.clone())
+            .unwrap_or_default();
+        // Load both fact records to read their content.
+        let current_record = service
+            .find_fact_record(current_fact_id)
+            .await
+            .ok()
+            .and_then(|(r, _)| {
+                r.and_then(|record| {
+                    let v = serde_json::Value::Object(record);
+                    fact_from_value_or_wrapper(&v)
+                })
+            });
+        let new_content = current_record
+            .as_ref()
+            .map(|f| f.content.clone())
+            .unwrap_or_default();
         let counterpart = service
             .find_fact_record(counterpart_id)
             .await
@@ -283,17 +322,15 @@ async fn claim_based_contradiction_warnings(
             .as_ref()
             .map(|f| f.content.clone())
             .unwrap_or_default();
-        let fact_id_owned = counterpart_id.to_string();
         warnings.push(ContradictionWarning {
-            fact_type: String::new(),
-            new_fact_id: fact_id_owned.clone(),
+            fact_type,
+            new_fact_id: current_fact_id.to_string(),
             conflicting_fact_id: counterpart_id.to_string(),
             existing_content: counterpart_content,
-            new_content: String::new(),
+            new_content,
             entity_ids: Vec::new(),
             reason: format!("claim_contradiction:{}", rel.reason_code),
         });
-        let _ = fact_id_owned;
     }
     Ok(warnings)
 }

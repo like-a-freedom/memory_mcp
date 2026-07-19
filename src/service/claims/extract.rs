@@ -9,7 +9,6 @@ use super::schema::{ClaimDraftCandidate, ClaimProjectionInput, ClaimSchemaRegist
 
 /// The result of projecting a fact through all schemas.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(crate) struct ProjectionResult {
     pub drafts: Vec<ClaimDraftCandidate>,
     pub skips: Vec<ClaimSkip>,
@@ -18,7 +17,6 @@ pub(crate) struct ProjectionResult {
 // ─── Project Fact ─────────────────────────────────────────────────────────────
 
 /// Project a single fact through the schema registry, returning deduplicated drafts.
-#[allow(dead_code)]
 pub(crate) fn project_fact(
     registry: &ClaimSchemaRegistry,
     input: &ClaimProjectionInput<'_>,

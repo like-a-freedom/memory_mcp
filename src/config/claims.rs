@@ -20,14 +20,20 @@ impl ClaimRolloutStage {
     pub(crate) const fn projects(self) -> bool {
         !matches!(self, Self::Disabled)
     }
+    /// Planned by Task 4 of the claim-reconciliation completion plan: gates
+    /// whether the worker is allowed to evaluate relations for a slot.
     #[allow(dead_code)]
     pub(crate) const fn evaluates_relations(self) -> bool {
         !matches!(self, Self::Disabled)
     }
+    /// Planned by Task 4 of the claim-reconciliation completion plan: gates
+    /// whether the worker persists `ClaimRelation` decisions.
     #[allow(dead_code)]
     pub(crate) const fn persists_relations(self) -> bool {
         matches!(self, Self::Relations | Self::Evidence)
     }
+    /// Planned by Task 4 of the claim-reconciliation completion plan: gates
+    /// whether context/explain expose authorized evidence.
     #[allow(dead_code)]
     pub(crate) const fn exposes_evidence(self) -> bool {
         matches!(self, Self::Evidence)
@@ -90,7 +96,6 @@ impl Default for ClaimConfig {
 
 impl ClaimConfig {
     /// Parse configuration from environment variables.
-    #[allow(dead_code)]
     pub fn from_env() -> Result<Self, MemoryError> {
         let mut config = Self::default();
         if let Ok(stage_str) = std::env::var("MEMORY_CLAIM_ROLLOUT_STAGE") {

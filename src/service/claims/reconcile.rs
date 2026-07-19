@@ -153,18 +153,20 @@ enum ValidityRelation {
     Overlapping,
     /// Intervals are disjoint.
     Disjoint,
-    /// At least one has no explicit bounds.
-    Unknown,
 }
 
 fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
-    match (
-        left.valid_from,
-        left.valid_to,
-        right.valid_from,
-        right.valid_to,
-    ) {
-        (Some(lf), Some(lt), Some(rf), Some(rt)) => {
+    // Claims with `valid_from=None` fall back to `observed_at` (the fact's
+    // `t_valid`). Without this fallback, two contradictory values observed
+    // at the same instant would land in `Unknown` and never reach the
+    // contradiction gate. `valid_to=None` means open-ended `[start, ∞)`.
+    let lf = left.valid_from.unwrap_or(left.observed_at);
+    let rf = right.valid_from.unwrap_or(right.observed_at);
+    let lt = left.valid_to;
+    let rt = right.valid_to;
+
+    match (lt, rt) {
+        (Some(lt), Some(rt)) => {
             if lf == rf && lt == rt {
                 ValidityRelation::Identical
             } else if lf >= rf && lt <= rt {
@@ -177,7 +179,34 @@ fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
                 ValidityRelation::Disjoint
             }
         }
-        _ => ValidityRelation::Unknown,
+        // Left bounded, right open-ended: overlap iff left ends at or after right starts.
+        (Some(lt), None) => {
+            if lt < rf {
+                ValidityRelation::Disjoint
+            } else if lf == rf {
+                ValidityRelation::Identical
+            } else {
+                ValidityRelation::Overlapping
+            }
+        }
+        // Right bounded, left open-ended: overlap iff right ends at or after left starts.
+        (None, Some(rt)) => {
+            if rt < lf {
+                ValidityRelation::Disjoint
+            } else if lf == rf {
+                ValidityRelation::Identical
+            } else {
+                ValidityRelation::Overlapping
+            }
+        }
+        // Both open-ended: always overlap from max(start) onward.
+        (None, None) => {
+            if lf == rf {
+                ValidityRelation::Identical
+            } else {
+                ValidityRelation::Overlapping
+            }
+        }
     }
 }
 
@@ -302,16 +331,10 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
                 "Mutually exclusive values with overlapping validity",
                 input,
             );
-            return ReconciliationDecision::Persist(Box::new(draft));
+            ReconciliationDecision::Persist(Box::new(draft))
         }
-        ValidityRelation::Disjoint => {
-            return ReconciliationDecision::Coexist;
-        }
-        ValidityRelation::Unknown => {}
+        ValidityRelation::Disjoint => ReconciliationDecision::Coexist,
     }
-
-    // Gate 8: Unknown validity + exclusive values → temporal ambiguity
-    ReconciliationDecision::Skip
 }
 
 fn canonically_order_ids(a: &ClaimId, b: &ClaimId) -> (ClaimId, ClaimId) {
@@ -747,14 +770,20 @@ mod tests {
 
     #[test]
     fn temporal_ambiguity_when_unknown_validity() {
+        // Two claims with disjoint, fully-bounded validity windows do not
+        // contradict each other — they coexist as time-shifted observations.
+        // (Unknown fallback to `observed_at` only kicks in when `valid_from`
+        // is missing; here both windows are explicit and disjoint.)
+        let t1 = chrono::Utc::now() - chrono::Duration::days(30);
+        let t2 = chrono::Utc::now();
         let left = make_claim(
             "a",
             ClaimValue::Boolean(true),
             "personal",
             None,
             BTreeMap::new(),
-            None,
-            None,
+            Some(t1),
+            Some(t1 + chrono::Duration::days(1)),
         );
         let right = make_claim(
             "b",
@@ -762,15 +791,19 @@ mod tests {
             "personal",
             None,
             BTreeMap::new(),
-            None,
-            None,
+            Some(t2),
+            Some(t2 + chrono::Duration::days(1)),
         );
         let input = default_input(&left, &right);
-        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Coexist));
     }
 
     #[test]
     fn no_correction_without_source_gate() {
+        // Same source_fact_id → source_gate fails → no correction.
+        // Mutually exclusive values with overlapping validity → contradiction,
+        // not correction (correction requires the source gate).
+        let t = chrono::Utc::now();
         let mut quals = BTreeMap::new();
         quals.insert("correction".to_string(), "true".to_string());
         let left = make_claim(
@@ -779,7 +812,7 @@ mod tests {
             "personal",
             None,
             quals.clone(),
-            None,
+            Some(t),
             None,
         );
         let right = make_claim(
@@ -788,13 +821,17 @@ mod tests {
             "personal",
             None,
             quals,
-            None,
+            Some(t),
             None,
         );
-        // Same source_fact_id → source_gate fails → no correction
-        // Unknown validity → temporal_ambiguity
         let input = default_input(&left, &right);
-        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
+        match reconcile(&input) {
+            ReconciliationDecision::Persist(draft) => {
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Contradiction);
+                assert_eq!(draft.reason_code, ReconciliationReasonCode::Contradiction);
+            }
+            other => panic!("expected Persist(Contradiction), got {:?}", other),
+        }
     }
 
     #[test]

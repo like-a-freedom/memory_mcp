@@ -240,7 +240,13 @@ impl SurrealClaimStore {
                 "invalid table name: {table}"
             )));
         }
-        let sql = format!("UPDATE {table}:⟨{record_id}⟩ CONTENT $content");
+        // `record_id` may arrive either as a bare id (`abc...`) or as the full
+        // SurrealDB record id including the table prefix (`claim:abc...`).
+        // Strip the prefix so we don't produce `claim:⟨claim:abc⟩`.
+        let body = record_id
+            .strip_prefix(&format!("{table}:"))
+            .unwrap_or(record_id);
+        let sql = format!("UPDATE {table}:⟨{body}⟩ CONTENT $content");
         Ok(sql)
     }
 
@@ -323,7 +329,7 @@ impl ClaimStore for SurrealClaimStore {
         namespace: &str,
         job_id: &ClaimJobId,
     ) -> Result<Option<ClaimJob>, MemoryError> {
-        let sql = format!("SELECT * FROM claim_job:⟨{}⟩", job_id);
+        let sql = format!("SELECT * FROM claim_job:⟨{}⟩", job_id.body());
         let result = self.db.query(&sql, None, namespace).await?;
         match Self::extract_first(result) {
             Some(v) => serde_json::from_value(v)
@@ -451,7 +457,7 @@ impl ClaimStore for SurrealClaimStore {
         q: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError> {
         let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
-        let sql = "SELECT * FROM claim_relation WHERE (left_fact_id IN $fact_ids OR right_fact_id IN $fact_ids) AND t_invalid_ingested IS NONE";
+        let sql = "SELECT * FROM claim_relation WHERE (left_fact_id IN $fact_ids OR right_fact_id IN $fact_ids) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars = serde_json::json!({"fact_ids": fact_ids});
         let result = self.db.query(sql, Some(vars), q.namespace).await?;
         let records = Self::deserialize_vec(result);
@@ -485,7 +491,7 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         namespace: &str,
     ) -> Result<Vec<ActiveRelationCount>, MemoryError> {
-        let sql = "SELECT schema_family, outcome, count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE GROUP BY schema_family, outcome";
+        let sql = "SELECT schema_family, outcome, count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL GROUP BY schema_family, outcome";
         let result = self.db.query(sql, None, namespace).await?;
         let records = Self::deserialize_vec(result);
         records
@@ -524,23 +530,21 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         request: RetractFactAndClaimsRequest<'_>,
     ) -> Result<(), MemoryError> {
-        let now = crate::service::normalize_dt(chrono::Utc::now());
-        let sql1 = "UPDATE fact:⟨$id⟩ SET t_invalid = $now, invalidation_reason = $reason";
+        // Use `time::now()` in SQL so SurrealDB stores a native datetime,
+        // not a string that fails `option<datetime>` coercion.
+        let sql1 = "UPDATE fact:⟨$id⟩ SET t_invalid = time::now(), invalidation_reason = $reason";
         let vars1 = serde_json::json!({
             "id": request.fact_id.as_ref(),
-            "now": now,
             "reason": request.retract_reason,
         });
         self.db.query(sql1, Some(vars1), request.namespace).await?;
-        let sql2 = "UPDATE claim SET t_invalid_ingested = $now WHERE source_fact_id = $fact_id AND t_invalid_ingested IS NONE";
+        let sql2 = "UPDATE claim SET t_invalid_ingested = time::now() WHERE source_fact_id = $fact_id AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars2 = serde_json::json!({
-            "now": now,
             "fact_id": request.fact_id.as_ref(),
         });
         self.db.query(sql2, Some(vars2), request.namespace).await?;
-        let sql3 = "UPDATE claim_relation SET t_invalid_ingested = $now WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) AND t_invalid_ingested IS NONE";
+        let sql3 = "UPDATE claim_relation SET t_invalid_ingested = time::now() WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars3 = serde_json::json!({
-            "now": now,
             "fact_id": request.fact_id.as_ref(),
         });
         self.db.query(sql3, Some(vars3), request.namespace).await?;
@@ -565,37 +569,41 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         request: CommitReconciliationPageRequest<'_>,
     ) -> Result<(), MemoryError> {
-        let mut stmts = Vec::new();
-        stmts.push("BEGIN TRANSACTION".to_string());
-
-        let mut vars = serde_json::json!({});
-        let v = vars.as_object_mut().unwrap();
-        v.insert(
+        // Execute each statement independently — embedded SurrealDB's
+        // transaction support is unreliable across mixed UPDATE statements,
+        // and relation persistence must not be coupled to job-counter updates
+        // (a failed job update leaves the relation uncommitted, which breaks
+        // `extract`'s contradiction detection).
+        let mut vars: serde_json::Map<String, Value> = serde_json::Map::new();
+        vars.insert(
             "job_id".to_string(),
             Value::String(request.job_id.to_string()),
         );
-        v.insert(
+        vars.insert(
             "owner".to_string(),
             Value::String(request.expected_lease_owner.to_string()),
         );
 
-        for (i, relation) in request.relations.iter().enumerate() {
+        for relation in request.relations.iter() {
+            // Use `create` instead of `UPDATE ... CONTENT` — embedded SurrealDB's
+            // UPDATE-with-CONTENT path has been observed to silently no-op when
+            // the record doesn't exist yet, which drops relations and breaks
+            // contradiction detection in `extract`.
+            let record_id = relation.claim_relation_id.as_ref();
             let content = Self::serialize(relation)?;
-            let key = format!("r{i}");
-            v.insert(key.clone(), content);
-            stmts.push(format!(
-                "UPDATE claim_relation:⟨{}⟩ CONTENT ${key}",
-                relation.claim_relation_id
-            ));
+            self.db
+                .create(record_id, content, request.namespace)
+                .await
+                .map_err(|e| MemoryError::Storage(format!("persist relation: {e}")))?;
         }
 
         // Update job counters and cursor
         let cursor_update = match request.next_cursor {
             Some(c) => {
-                v.insert("cursor".to_string(), Value::String(c.to_string()));
-                "cursor = $cursor,".to_string()
+                vars.insert("cursor".to_string(), Value::String(c.to_string()));
+                "cursor = $cursor,"
             }
-            None => String::new(),
+            None => "",
         };
         let processed = request.counters.processed;
         let succeeded = request.counters.succeeded;
@@ -603,28 +611,33 @@ impl ClaimStore for SurrealClaimStore {
         let failed = request.counters.failed;
 
         if request.completed {
-            let now = crate::service::normalize_dt(chrono::Utc::now());
-            v.insert("now".to_string(), Value::String(now));
-            stmts.push(format!(
+            vars.insert(
+                "now".to_string(),
+                Value::String(crate::service::normalize_dt(chrono::Utc::now())),
+            );
+            let sql = format!(
                 "UPDATE claim_job:⟨{}⟩ SET status = 'completed', {cursor_update} processed += {processed}, \
                  succeeded += {succeeded}, skipped += {skipped}, failed += {failed}, \
-                 completed_at = $now, updated_at = $now \
+                 completed_at = time::now(), updated_at = time::now() \
                  WHERE lease_owner = $owner",
-                request.job_id
-            ));
+                request.job_id.body()
+            );
+            self.db
+                .query(&sql, Some(Value::Object(vars.clone())), request.namespace)
+                .await?;
         } else {
-            stmts.push(format!(
+            let sql = format!(
                 "UPDATE claim_job:⟨{}⟩ SET status = 'running', {cursor_update} processed += {processed}, \
                  succeeded += {succeeded}, skipped += {skipped}, failed += {failed}, \
                  updated_at = time::now() \
                  WHERE lease_owner = $owner",
-                request.job_id
-            ));
+                request.job_id.body()
+            );
+            self.db
+                .query(&sql, Some(Value::Object(vars)), request.namespace)
+                .await?;
         }
 
-        stmts.push("COMMIT TRANSACTION".to_string());
-        let sql = stmts.join(";\n");
-        self.db.query(&sql, Some(vars), request.namespace).await?;
         Ok(())
     }
 }

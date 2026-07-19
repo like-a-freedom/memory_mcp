@@ -65,6 +65,7 @@ pub(crate) async fn run_backfill_page(
     let facts = claim_service.store.select_facts_for_backfill(query).await?;
 
     if facts.is_empty() {
+        super::telemetry::set_backfill_lag(0.0);
         return Ok(None);
     }
 
@@ -78,7 +79,7 @@ pub(crate) async fn run_backfill_page(
         let fact_id = FactId::from(fact_id_str);
 
         // Schedule a projection for this fact
-        let _ = claim_service
+        let scheduled = claim_service
             .store
             .ensure_projection_job(&ClaimJob {
                 job_id: ClaimJobId::from_raw(format!(
@@ -108,6 +109,11 @@ pub(crate) async fn run_backfill_page(
                 completed_at: None,
             })
             .await;
+
+        match &scheduled {
+            Ok(()) => super::telemetry::record_backfill_fact("completed", "completed"),
+            Err(_) => super::telemetry::record_backfill_fact("failed", "internal"),
+        }
 
         last_id = Some(fact_id);
     }

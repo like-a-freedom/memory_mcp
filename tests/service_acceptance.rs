@@ -552,19 +552,6 @@ async fn test_assemble_context_uses_matching_community_summary() {
 }
 
 #[tokio::test]
-async fn test_cbor_round_trip() {
-    let service = common::make_service().await;
-    let payload = serde_json::json!({
-        "datetime": "2026-01-01T00:00:00Z",
-        "record_id": "episode:abc123",
-        "decimal": "1000000.50"
-    });
-
-    let restored = service.cbor_round_trip(&payload).expect("cbor");
-    assert_eq!(restored["record_id"], payload["record_id"]);
-}
-
-#[tokio::test]
 async fn test_rate_limit_determinism() {
     let service = common::make_service().await;
     service

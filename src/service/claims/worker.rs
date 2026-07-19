@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::models::claim::{ClaimJob, ClaimJobKind};
+use crate::models::claim::{ClaimJob, ClaimJobKind, ClaimJobState};
 use crate::service::MemoryError;
 use crate::storage::claims::{
     ClaimCandidateQuery, CommitReconciliationPageRequest, JobCounters, LeaseJobRequest,
@@ -108,6 +108,58 @@ async fn process_job(claim_service: &ClaimService, job: &ClaimJob) -> Result<(),
     }
 }
 
+/// Run inline reconciliation for a single claim. Used by `ClaimService::after_fact_persisted`
+/// to make relations visible synchronously after `add_fact` returns.
+pub(crate) async fn reconcile_claim_inline(
+    claim_service: &ClaimService,
+    namespace: &str,
+    source_fact_id: &crate::models::FactId,
+    claim_id: &crate::models::ClaimId,
+) -> Result<(), MemoryError> {
+    // Look up the owning claim by its source fact so we can read its
+    // `slot_fingerprint` and find matching candidates.
+    let claims = claim_service
+        .store
+        .select_claims_for_facts(crate::storage::claims::ClaimsForFactsQuery {
+            namespace,
+            fact_ids: std::slice::from_ref(source_fact_id),
+        })
+        .await?;
+    let owning = claims
+        .into_iter()
+        .find(|c| &c.claim_id == claim_id)
+        .ok_or_else(|| {
+            MemoryError::Storage(format!("claim not found for inline reconcile: {claim_id}"))
+        })?;
+    let job = ClaimJob {
+        job_id: crate::models::ClaimJobId::from_raw(format!(
+            "claim_job:reconcile:inline:{}",
+            claim_id
+        )),
+        kind: ClaimJobKind::Reconcile,
+        namespace: namespace.to_string(),
+        source_fact_id: Some(source_fact_id.clone()),
+        claim_id: Some(claim_id.clone()),
+        extractor_fingerprint: claim_service.registry.extractor_fingerprint().clone(),
+        evaluator_fingerprint: None,
+        status: ClaimJobState::Pending,
+        cursor: None,
+        lease_owner: None,
+        lease_expires_at: None,
+        processed: 0,
+        succeeded: 0,
+        skipped: 0,
+        failed: 0,
+        retry_count: 0,
+        last_error: None,
+        created_at: chrono::Utc::now(),
+        started_at: None,
+        updated_at: chrono::Utc::now(),
+        completed_at: None,
+    };
+    reconcile_page_with_owning(claim_service, &job, owning).await
+}
+
 async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<(), MemoryError> {
     let namespace = &job.namespace;
     let claim_id = match &job.claim_id {
@@ -115,20 +167,34 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         None => return Ok(()),
     };
 
-    // Load the owning claim by fetching the full claim record
-    let owning = claim_service
+    // Load the owning claim by fetching the full claim record. The candidate
+    // query takes a `slot_fingerprint`, not a `claim_id`; we look up by the
+    // owning claim's source fact so we can read its slot fingerprint.
+    let source_fact_id = match &job.source_fact_id {
+        Some(id) => id.clone(),
+        None => return Ok(()),
+    };
+    let owning_claims = claim_service
         .store
-        .select_candidates_page(ClaimCandidateQuery {
+        .select_claims_for_facts(crate::storage::claims::ClaimsForFactsQuery {
             namespace,
-            slot_fingerprint: claim_id.as_ref(),
-            after_claim_id: None,
-            limit: 1,
+            fact_ids: std::slice::from_ref(&source_fact_id),
         })
         .await?;
-    let owning = match owning.into_iter().next() {
+    let owning = match owning_claims.into_iter().find(|c| c.claim_id == claim_id) {
         Some(c) => c,
         None => return Ok(()),
     };
+
+    reconcile_page_with_owning(claim_service, job, owning).await
+}
+
+async fn reconcile_page_with_owning(
+    claim_service: &ClaimService,
+    job: &ClaimJob,
+    owning: crate::models::claim::Claim,
+) -> Result<(), MemoryError> {
+    let namespace = &job.namespace;
     let slot_fp = owning.slot_fingerprint.clone();
 
     let candidates = claim_service
@@ -255,5 +321,21 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         .store
         .commit_reconciliation_page(request)
         .await?;
+
+    // Reconciliation metrics (no-op without a recorder).
+    super::telemetry::record_candidate_count(
+        owning.schema_family,
+        super::telemetry::ClaimMatchMode::Exact,
+        candidates.len(),
+    );
+    for rel in &relations {
+        let family = rel.schema_family.unwrap_or(owning.schema_family);
+        super::telemetry::record_pipeline_event(
+            super::telemetry::ClaimMetricStage::Reconcile,
+            family,
+            &rel.outcome.to_string(),
+            rel.reason_code.as_str(),
+        );
+    }
     Ok(())
 }

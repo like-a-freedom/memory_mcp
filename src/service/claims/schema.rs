@@ -16,7 +16,11 @@ use super::structural::StructuralAssertion;
 
 // ─── Projection Input ─────────────────────────────────────────────────────────
 
-/// Borrowed inputs for a single projection call.
+// Fields `namespace`, `source_fact_id`, `source_episode_id`, `scope`, `project`,
+// `policy_tags` are populated by `ClaimService::after_fact_persisted` but not
+// yet read by the four built-in `ClaimSchema::project` implementations.
+// Task 4 of the claim-reconciliation completion plan wires them into the
+// projection path. Kept as struct fields so the change is a pure consumer patch.
 #[allow(dead_code)]
 pub(crate) struct ClaimProjectionInput<'a> {
     pub namespace: &'a str,
@@ -39,7 +43,6 @@ pub(crate) struct ClaimProjectionInput<'a> {
 
 /// An intermediate claim draft produced by a projector before ID assignment.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct ClaimDraftCandidate {
     pub schema_ref: ClaimSchemaRef,
     pub subject: String,
@@ -52,22 +55,28 @@ pub(crate) struct ClaimDraftCandidate {
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
     pub validity_source: ClaimValiditySource,
     pub source_lineage: Option<String>,
-    /// Byte offset range in the original source content.
+    // Byte offset range in the original source content. Asserted by extract tests;
+    // persisted through `Claim.source_span` by Task 4 of the completion plan.
+    #[allow(dead_code)]
     pub source_span: Option<(usize, usize)>,
 }
 
-// ─── Claim Policy ─────────────────────────────────────────────────────────────
+// ─── Claim Policy ─────────────────────────────────────────────────────────────────
 
-/// The reconciliation policy for a comparison key.
+// `cardinality` is populated by each schema's `policy()` impl but not yet
+// read by a reconciliation engine. Task 4 of the completion plan wires
+// `ClaimSchema::policy` into the candidate-selection / reconciliation path.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct ClaimPolicy {
     pub cardinality: ClaimCardinality,
 }
 
-// ─── Claim Skip ───────────────────────────────────────────────────────────────
+// ─── Claim Skip ─────────────────────────────────────────────────────────────────────────
 
-/// A bounded reason a projector skipped an extraction.
+// Produced by every schema's `project()`; `extract` tests assert reason codes.
+// Persisted-skip storage and `extract` response surfacing are wired by Tasks 4
+// and 6 of the completion plan.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct ClaimSkip {
@@ -75,9 +84,10 @@ pub struct ClaimSkip {
     pub detail: Option<String>,
 }
 
-// ─── Claim Schema Trait ───────────────────────────────────────────────────────
+// ─── Claim Schema Trait ─────────────────────────────────────────────────────────────────
 
-/// A structural schema that projects source content into claim drafts.
+// `policy` is implemented by every built-in schema but not yet invoked.
+// Task 4 of the completion plan calls it from the reconciliation path.
 #[allow(dead_code)]
 pub(crate) trait ClaimSchema: Send + Sync {
     fn schema_ref(&self) -> ClaimSchemaRef;
@@ -93,13 +103,11 @@ pub(crate) trait ClaimSchema: Send + Sync {
 // ─── Schema Registry ──────────────────────────────────────────────────────────
 
 /// A compiled registry of all built-in claim schemas.
-#[allow(dead_code)]
 pub(crate) struct ClaimSchemaRegistry {
     schemas: Vec<Box<dyn ClaimSchema>>,
     extractor_fingerprint: crate::models::claim::ExtractorFingerprint,
 }
 
-#[allow(dead_code)]
 impl ClaimSchemaRegistry {
     /// Build the built-in schema registry.
     pub fn built_in(extractor_fingerprint: crate::models::claim::ExtractorFingerprint) -> Self {
@@ -138,7 +146,6 @@ impl ClaimSchemaRegistry {
 
 struct AttributeV1;
 
-#[allow(dead_code)]
 impl ClaimSchema for AttributeV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
@@ -288,7 +295,6 @@ impl ClaimSchema for AttributeV1 {
 
 struct QuantityV1;
 
-#[allow(dead_code)]
 impl ClaimSchema for QuantityV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
@@ -435,7 +441,6 @@ impl ClaimSchema for QuantityV1 {
 
 struct RelationV1;
 
-#[allow(dead_code)]
 impl ClaimSchema for RelationV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
@@ -515,7 +520,6 @@ impl ClaimSchema for RelationV1 {
 
 struct CommitmentV1;
 
-#[allow(dead_code)]
 impl ClaimSchema for CommitmentV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {

@@ -18,7 +18,6 @@ use super::schema::{ClaimProjectionInput, ClaimSchemaRegistry};
 
 /// Projection summary for a single fact.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct FactProjectionSummary {
     pub fact_id: FactId,
     pub claims_projected: usize,
@@ -58,7 +57,8 @@ impl ClaimService {
     }
 
     /// Create with a custom config.
-    #[allow(dead_code)]
+    ///
+    /// Used by `MemoryService::new_from_env_with_mode` to inject `ClaimConfig::from_env()`.
     pub fn with_config(self, config: ClaimConfig) -> Self {
         Self {
             config,
@@ -199,6 +199,9 @@ impl ClaimService {
             completed_at: Some(t_ingested),
         };
 
+        // Capture claim IDs before `claims` is moved into the persist request.
+        let new_claim_ids: Vec<_> = claims.iter().map(|c| c.claim_id.clone()).collect();
+
         // Persist via store
         let persist_request = PersistProjectionRequest {
             namespace: params.namespace,
@@ -215,6 +218,44 @@ impl ClaimService {
 
         self.store.persist_projection(persist_request).await?;
 
+        // Run inline reconciliation for each newly projected claim so that
+        // `extract` sees relations synchronously after `add_fact` returns.
+        // Failures here are non-fatal: facts remain retrievable, and the
+        // background worker will retry the durable reconcile_job.
+        for claim_id in &new_claim_ids {
+            if let Err(err) = super::worker::reconcile_claim_inline(
+                self,
+                params.namespace,
+                params.fact_id,
+                claim_id,
+            )
+            .await
+            {
+                eprintln!(
+                    "[claim] inline reconcile failed (non-fatal): namespace={} claim_id={} error={}",
+                    params.namespace, claim_id, err
+                );
+            }
+        }
+
+        // Emit bounded Prometheus metrics (no-op without a recorder).
+        for draft in &result.drafts {
+            super::telemetry::record_pipeline_event(
+                super::telemetry::ClaimMetricStage::Project,
+                draft.schema_ref.family,
+                "persisted",
+                "persisted",
+            );
+        }
+        for skip in &result.skips {
+            super::telemetry::record_pipeline_event(
+                super::telemetry::ClaimMetricStage::Project,
+                crate::models::claim::ClaimSchemaFamily::Attribute,
+                "skipped",
+                skip.reason_code.as_str(),
+            );
+        }
+
         Ok(FactProjectionSummary {
             fact_id: params.fact_id.clone(),
             claims_projected: result.drafts.len(),
@@ -227,12 +268,25 @@ impl ClaimService {
         eprintln!(
             "[claim] projection failed after fact persistence (non-fatal): namespace={namespace} fact_id={fact_id} error={error}"
         );
+        super::telemetry::record_pipeline_event(
+            super::telemetry::ClaimMetricStage::Project,
+            crate::models::claim::ClaimSchemaFamily::Attribute,
+            "failed",
+            "internal",
+        );
     }
 
-    /// The extractor fingerprint used by this service.
-    #[allow(dead_code)]
-    pub fn extractor_fingerprint(&self) -> &ExtractorFingerprint {
-        self.registry.extractor_fingerprint()
+    /// Record successful post-fact projection for observability.
+    pub fn record_post_fact_success(
+        &self,
+        namespace: &str,
+        fact_id: &FactId,
+        claims_projected: usize,
+        claims_skipped: usize,
+    ) {
+        eprintln!(
+            "[claim] projection ok: namespace={namespace} fact_id={fact_id} projected={claims_projected} skipped={claims_skipped}"
+        );
     }
 }
 

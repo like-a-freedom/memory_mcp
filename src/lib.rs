@@ -17,7 +17,6 @@
 //! - `models`: Data structures and types
 //! - `config`: Configuration management
 //! - `logging`: Structured logging utilities
-//! - `timing`: Operation timing utilities for observability
 //!
 //! # Quick Start
 //!
@@ -37,10 +36,10 @@ pub mod config;
 pub mod logging;
 pub mod mcp;
 pub mod models;
+pub mod observability;
 pub mod runner;
 pub mod service;
 pub mod storage;
-pub mod timing;
 pub mod tools;
 
 pub use mcp::MemoryMcp;
