@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{AccessPayload, IngestRequest};
 
+use super::content_extraction::prepare_ingest_request;
 use super::error::MemoryError;
-use super::ingest::prepare_ingest_request;
 use super::util::{RateLimiter, deterministic_episode_id, validate_ingest_request};
 use super::{log_event, normalize_dt, now};
 
@@ -56,7 +56,7 @@ impl IngestionService {
     ) -> Result<String, MemoryError> {
         self.rate_limiter_check(access.as_ref())?;
 
-        let ingest_transport = super::ingest::detect_ingest_transport(&request.content);
+        let ingest_transport = super::content_extraction::detect_ingest_transport(&request.content);
         let original_source_id = request.source_id.clone();
         let original_content_len = request.content.len();
         self.logger.log(

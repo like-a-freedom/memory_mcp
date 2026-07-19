@@ -36,6 +36,7 @@ pub mod claims;
 #[cfg(not(any(test, feature = "prometheus")))]
 pub(crate) mod claims;
 mod conflict_resolver;
+mod content_extraction;
 mod context;
 mod core;
 mod embedding;
@@ -45,7 +46,6 @@ mod entity_extraction;
 mod entity_resolution;
 mod episode;
 mod error;
-mod ingest;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 mod query;
@@ -79,10 +79,10 @@ mod constants {
 pub use crate::models::Fact;
 
 pub use cache::{CacheKey, invalidate_cache_by_scope};
+#[cfg(feature = "cli-watch")]
+pub use content_extraction::watcher::FsWatcher;
 pub(crate) use episode::build_extract_log_result;
 pub use episode::{episode_from_record, fact_from_record};
-#[cfg(feature = "cli-watch")]
-pub use ingest::watcher::FsWatcher;
 pub use lifecycle::{
     run_archival_pass, run_community_rebuild_pass, run_decay_pass, spawn_archival_worker,
     spawn_community_worker, spawn_decay_worker,
