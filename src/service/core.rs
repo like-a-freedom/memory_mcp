@@ -19,7 +19,6 @@ use crate::storage::GraphDirection;
 use crate::storage::{AppStore, ContextAccessLog, ContextStore};
 
 use super::error::MemoryError;
-use super::util::deterministic_fact_id;
 use super::util::validate_fact_input;
 use super::value_helpers::{json_i64, string_from_value};
 
@@ -133,6 +132,31 @@ impl MemoryService {
         );
 
         Ok(())
+    }
+
+    /// Validates embedding dimension and builds `EmbeddingPayload` for
+    /// passing to `FactService::create_fact`.
+    fn build_embedding_payload(
+        &self,
+        embedding: Vec<f64>,
+    ) -> Result<crate::service::fact::EmbeddingPayload, MemoryError> {
+        let expected_dim = self
+            .current_embedding_dimension
+            .unwrap_or_else(|| self.embedding_provider.dimension());
+        if embedding.len() != expected_dim {
+            return Err(MemoryError::Validation(format!(
+                "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
+                embedding.len()
+            )));
+        }
+        Ok(crate::service::fact::EmbeddingPayload {
+            embedding,
+            provider: self.embedding_provider.provider_name().to_string(),
+            model: self.current_embedding_model.clone(),
+            dimension: expected_dim,
+            signature: self.current_embedding_signature.clone(),
+            updated_at: super::normalize_dt(super::query::now()),
+        })
     }
 
     /// Returns the total count of episodes.
@@ -461,121 +485,158 @@ impl MemoryService {
     ) -> Result<String, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
-        let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
         let namespace = self.namespace_for_scope(scope)?;
-        let existing = self.db_client.select_one(&fact_id, &namespace).await?;
-        if existing.is_none() {
-            let t_ingested = super::query::now();
-            let project = self.project_for_source_episode(source_episode).await?;
-            let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
-            let index_keys = self
-                .build_fact_index_keys(content, source_episode, &provenance, &entity_links, t_valid)
-                .await?;
-            let mut payload = serde_json::Map::from_iter([
-                ("fact_id".to_string(), json!(fact_id.clone())),
-                ("fact_type".to_string(), json!(fact_type)),
-                ("content".to_string(), json!(content)),
-                ("quote".to_string(), json!(quote)),
-                ("source_episode".to_string(), json!(source_episode)),
-                ("t_valid".to_string(), json!(super::normalize_dt(t_valid))),
-                (
-                    "t_ingested".to_string(),
-                    json!(super::normalize_dt(t_ingested)),
-                ),
-                ("confidence".to_string(), json!(confidence)),
-                ("index_keys".to_string(), json!(index_keys)),
-                ("access_count".to_string(), json!(0)),
-                ("entity_links".to_string(), json!(entity_links)),
-                ("scope".to_string(), json!(scope)),
-                ("policy_tags".to_string(), json!(policy_tags)),
-                ("provenance".to_string(), provenance.to_json_value()),
-            ]);
-            if let Some(ref project) = project {
-                payload.insert("project".to_string(), json!(project));
-            }
+        let project = self.project_for_source_episode(source_episode).await?;
 
-            let mut deferred_embedding_input = None;
-
-            match self.generate_embedding(&embedding_input).await {
-                Ok(Some(embedding)) => {
-                    self.insert_current_embedding_fields(&mut payload, embedding)?;
-                }
-                Ok(None) => {}
-                Err(err) => {
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("embedding.write_skipped")),
-                            (
-                                "provider".to_string(),
-                                json!(self.embedding_provider.provider_name()),
-                            ),
-                            ("error".to_string(), json!(err.to_string())),
-                            ("fact_type".to_string(), json!(fact_type)),
-                        ]),
-                        LogLevel::Warn,
-                    );
-                    if self.should_defer_embedding_retry(&err) {
-                        deferred_embedding_input = Some(embedding_input.clone());
-                    }
-                }
-            }
-
-            let created = self
-                .db_client
-                .create(&fact_id, Value::Object(payload), &namespace)
-                .await?;
-            if created.is_null() {
-                return Err(MemoryError::Storage(
-                    "failed to persist fact record".to_string(),
-                ));
-            }
-            super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
-
-            // Fire-and-forget triple extraction (non-blocking).
-            self.spawn_triple_extraction(&fact_id, content, &namespace);
-
-            // Synchronous claim projection so that `extract` sees relations
-            // deterministically after `add_fact` returns. Projection failure
-            // is non-fatal: facts remain retrievable.
-            let claim_svc = self.claim_service.clone();
-            let claim_fact_id = FactId::from(fact_id.clone());
-            let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
-            let claim_content = content.to_string();
-            let claim_scope = scope.to_string();
-            let claim_project = project.clone();
-            let claim_entity_links = entity_links.clone();
-            let claim_t_valid = t_valid;
-            let claim_params = crate::service::claims::project::FactPersistedParams {
-                namespace: &namespace,
-                fact_id: &claim_fact_id,
-                source_episode_id: &claim_episode_id,
-                content: &claim_content,
-                scope: &claim_scope,
-                project: claim_project.as_deref(),
-                entity_links: &claim_entity_links,
-                t_valid: claim_t_valid,
-            };
-            match claim_svc.after_fact_persisted(&claim_params).await {
-                Ok(summary) => claim_svc.record_post_fact_success(
-                    &namespace,
-                    &summary.fact_id,
-                    summary.claims_projected,
-                    summary.claims_skipped,
-                ),
-                Err(error) => {
-                    claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
-                }
-            }
-
-            // Background embedding retry must run after claim projection so the
-            // test that asserts `embedding` is absent immediately after
-            // `add_fact` still holds — projection is synchronous and gives the
-            // background embedding task no head start.
-            if let Some(input) = deferred_embedding_input {
-                self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
-                    .await;
+        // Pre-fetch entity records to avoid async closures.
+        let mut entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
+            std::collections::HashMap::new();
+        for entity_id in &entity_links {
+            let entity_record = self.find_entity_record_by_id(entity_id).await?;
+            if let Some(map) = entity_record.as_ref().and_then(Value::as_object) {
+                let canonical = map
+                    .get("canonical_name")
+                    .and_then(Value::as_str)
+                    .unwrap_or(entity_id.as_str())
+                    .to_string();
+                let aliases = map
+                    .get("aliases")
+                    .and_then(Value::as_array)
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                entity_map.insert(entity_id.clone(), (canonical, aliases));
             }
         }
+
+        // Pre-fetch episode source_id.
+        let (episode_record, _) = self.find_episode_record(source_episode).await?;
+        let episode_source_id = episode_record
+            .as_ref()
+            .and_then(|map| map.get("source_id"))
+            .and_then(string_from_value);
+
+        let entity_lookup = |entity_id: &str| Ok(entity_map.get(entity_id).cloned());
+        let source_reference_lookup = |_episode_id: &str| Ok(episode_source_id.clone());
+
+        let index_keys = self
+            .fact_service
+            .build_index_keys(
+                content,
+                source_episode,
+                &provenance,
+                &entity_links,
+                t_valid,
+                entity_lookup,
+                source_reference_lookup,
+            )
+            .await?;
+
+        // Prepare embedding input and generate or defer.
+        let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
+        let mut deferred_embedding_input = None;
+        let embedding_fields = match self.generate_embedding(&embedding_input).await {
+            Ok(Some(embedding)) => {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("embedding.generate.success")),
+                        (
+                            "provider".to_string(),
+                            json!(self.embedding_provider.provider_name()),
+                        ),
+                        ("fact_type".to_string(), json!(fact_type)),
+                    ]),
+                    LogLevel::Info,
+                );
+                Some(self.build_embedding_payload(embedding)?)
+            }
+            Ok(None) => None,
+            Err(err) => {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("embedding.write_skipped")),
+                        (
+                            "provider".to_string(),
+                            json!(self.embedding_provider.provider_name()),
+                        ),
+                        ("error".to_string(), json!(err.to_string())),
+                        ("fact_type".to_string(), json!(fact_type)),
+                    ]),
+                    LogLevel::Warn,
+                );
+                if self.should_defer_embedding_retry(&err) {
+                    deferred_embedding_input = Some(embedding_input.clone());
+                }
+                None
+            }
+        };
+
+        // Create fact record via FactService.
+        let fact_id = self
+            .fact_service
+            .create_fact(
+                fact_type,
+                content,
+                quote,
+                source_episode,
+                t_valid,
+                scope,
+                confidence,
+                &entity_links,
+                &policy_tags,
+                &provenance,
+                &namespace,
+                project.as_deref(),
+                embedding_fields,
+                index_keys,
+            )
+            .await?;
+
+        // Invalidate caches immediately after ingestion to ensure isolation.
+        super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
+
+        // Background processes: triple extraction and pending embedding retries.
+        self.spawn_triple_extraction(&fact_id, content, &namespace);
+
+        // Synchronous claim projection for deterministic extract visibility.
+        let claim_svc = self.claim_service.clone();
+        let claim_fact_id = FactId::from(fact_id.clone());
+        let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
+        let claim_content = content.to_string();
+        let claim_scope = scope.to_string();
+        let claim_project = project.clone();
+        let claim_entity_links = entity_links.clone();
+        let claim_t_valid = t_valid;
+        let claim_params = crate::service::claims::project::FactPersistedParams {
+            namespace: &namespace,
+            fact_id: &claim_fact_id,
+            source_episode_id: &claim_episode_id,
+            content: &claim_content,
+            scope: &claim_scope,
+            project: claim_project.as_deref(),
+            entity_links: &claim_entity_links,
+            t_valid: claim_t_valid,
+        };
+        match claim_svc.after_fact_persisted(&claim_params).await {
+            Ok(summary) => claim_svc.record_post_fact_success(
+                &namespace,
+                &summary.fact_id,
+                summary.claims_projected,
+                summary.claims_skipped,
+            ),
+            Err(error) => claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error),
+        }
+
+        // Enqueue background embedding after claim projection to ensure test invariants.
+        if let Some(input) = deferred_embedding_input {
+            self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
+                .await;
+        }
+
         Ok(fact_id)
     }
 
@@ -674,85 +735,6 @@ impl MemoryService {
                 }
             }
         });
-    }
-
-    async fn build_fact_index_keys(
-        &self,
-        content: &str,
-        source_episode: &str,
-        provenance: &crate::models::Provenance,
-        entity_links: &[String],
-        t_valid: DateTime<Utc>,
-    ) -> Result<Vec<String>, MemoryError> {
-        let mut keys = HashSet::new();
-
-        for entity_id in entity_links {
-            let Some(record) = self.find_entity_record_by_id(entity_id).await? else {
-                continue;
-            };
-            let Some(map) = record.as_object() else {
-                continue;
-            };
-
-            if let Some(name) = map.get("canonical_name").and_then(string_from_value) {
-                let normalized = super::normalize_text(&name);
-                if !normalized.is_empty() {
-                    keys.insert(normalized);
-                }
-            }
-
-            if let Some(aliases) = map.get("aliases").and_then(Value::as_array) {
-                for alias in aliases.iter().filter_map(string_from_value) {
-                    let normalized = super::normalize_text(&alias);
-                    if !normalized.is_empty() {
-                        keys.insert(normalized);
-                    }
-                }
-            }
-        }
-
-        keys.extend(extract_temporal_index_keys(content, t_valid));
-        keys.extend(reference_index_terms(content));
-        for source_reference in self
-            .collect_fact_source_references(source_episode, provenance)
-            .await?
-        {
-            keys.extend(reference_index_terms(&source_reference));
-        }
-
-        let mut keys = keys.into_iter().collect::<Vec<_>>();
-        keys.sort();
-        Ok(keys)
-    }
-
-    async fn collect_fact_source_references(
-        &self,
-        source_episode: &str,
-        provenance: &crate::models::Provenance,
-    ) -> Result<Vec<String>, MemoryError> {
-        let mut references = Vec::new();
-        let mut seen = HashSet::new();
-
-        if let Some(source_id) = &provenance.source_id {
-            let normalized = super::normalize_text(source_id);
-            if !normalized.is_empty() && seen.insert(normalized) {
-                references.push(source_id.clone());
-            }
-        }
-
-        let (episode_record, _) = self.find_episode_record(source_episode).await?;
-        if let Some(source_id) = episode_record
-            .as_ref()
-            .and_then(|map| map.get("source_id"))
-            .and_then(string_from_value)
-        {
-            let normalized = super::normalize_text(&source_id);
-            if !normalized.is_empty() && seen.insert(normalized) {
-                references.push(source_id);
-            }
-        }
-
-        Ok(references)
     }
 
     pub(crate) async fn generate_embedding(
@@ -1687,15 +1669,6 @@ impl MemoryService {
 
         Ok(episodes)
     }
-}
-
-fn reference_index_terms(raw: &str) -> Vec<String> {
-    let query_terms = crate::service::query::search_query_terms(raw);
-    let mut keys = crate::service::query::query_hard_anchor_terms(&query_terms)
-        .into_iter()
-        .collect::<Vec<_>>();
-    keys.sort();
-    keys
 }
 
 /// Resolves a scope string to a namespace, using prefix matching against

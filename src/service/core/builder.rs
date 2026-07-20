@@ -37,6 +37,7 @@ pub struct MemoryService {
     pub(crate) rate_limiter: Arc<RateLimiter>,
     pub(crate) ingestion_service: super::super::ingestion::IngestionService,
     pub(crate) entity_service: super::super::entity::EntityService,
+    pub(crate) fact_service: super::super::fact::FactService,
     pub(crate) context_cache:
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
@@ -527,6 +528,7 @@ impl MemoryService {
             rate_limiter.clone(),
         );
         let entity_service = super::super::entity::EntityService::new(db_client.clone());
+        let fact_service = super::super::fact::FactService::new(db_client.clone());
         let claim_store = Arc::new(crate::storage::claims::SurrealClaimStore::new(
             db_client.clone(),
         ));
@@ -542,6 +544,7 @@ impl MemoryService {
             rate_limiter,
             ingestion_service,
             entity_service,
+            fact_service,
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider,
