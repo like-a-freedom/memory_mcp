@@ -3,10 +3,27 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
-use crate::logging::LogLevel;
+use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::SurprisingConnection;
 use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
 use crate::storage::{AppStore, GraphDirection};
+
+/// Minimal context required by graph traversal functions.
+/// Allows `ExplanationService` (and future services) to call graph
+/// operations without depending on `MemoryService` directly.
+pub(crate) trait GraphContext: Send + Sync {
+    fn app_store(&self) -> &dyn AppStore;
+    fn logger(&self) -> &StdoutLogger;
+}
+
+impl GraphContext for MemoryService {
+    fn app_store(&self) -> &dyn AppStore {
+        MemoryService::app_store(self)
+    }
+    fn logger(&self) -> &StdoutLogger {
+        &self.logger
+    }
+}
 
 const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;
 const MAX_HUB_CANDIDATE_SCAN: usize = 64;
@@ -57,14 +74,14 @@ pub(crate) struct GraphCommunity {
 }
 
 pub(crate) async fn find_hub_entities(
-    service: &MemoryService,
+    ctx: &impl GraphContext,
     namespace: &str,
     cutoff: DateTime<Utc>,
     limit: i32,
     budget: GraphTraversalBudget,
 ) -> Result<Vec<HubEntity>, MemoryError> {
     let cutoff_iso = normalize_dt(cutoff);
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.hubs.start",
             json!({"namespace": namespace, "cutoff": cutoff_iso, "limit": limit}),
@@ -75,7 +92,7 @@ pub(crate) async fn find_hub_entities(
         ),
         LogLevel::Debug,
     );
-    let entity_records = service.app_store().select_entities(namespace).await?;
+    let entity_records = ctx.app_store().select_entities(namespace).await?;
     let mut hubs = Vec::new();
     let candidate_scan_limit =
         (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
@@ -103,7 +120,7 @@ pub(crate) async fn find_hub_entities(
 
         let mut unique_edges = HashSet::new();
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            for edge in service
+            for edge in ctx
                 .app_store()
                 .select_graph_neighbors(namespace, &entity_id, &cutoff_iso, direction)
                 .await?
@@ -133,7 +150,7 @@ pub(crate) async fn find_hub_entities(
             .then_with(|| left.entity_id.cmp(&right.entity_id))
     });
     hubs.truncate(limit.max(1) as usize);
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.hubs.done",
             json!({"namespace": namespace, "limit": limit}),
@@ -148,12 +165,12 @@ pub(crate) async fn find_hub_entities(
 }
 
 pub(crate) async fn list_communities(
-    service: &MemoryService,
+    ctx: &impl GraphContext,
     namespace: &str,
     cutoff: DateTime<Utc>,
     limit: i32,
 ) -> Result<Vec<GraphCommunity>, MemoryError> {
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.communities.start",
             json!({"namespace": namespace, "limit": limit}),
@@ -164,7 +181,7 @@ pub(crate) async fn list_communities(
         ),
         LogLevel::Debug,
     );
-    let mut communities = service
+    let mut communities = ctx
         .app_store()
         .select_communities(namespace)
         .await?
@@ -184,7 +201,7 @@ pub(crate) async fn list_communities(
             .then_with(|| left.community_id.cmp(&right.community_id))
     });
     communities.truncate(limit.max(1) as usize);
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.communities.done",
             json!({"namespace": namespace, "limit": limit}),
@@ -199,14 +216,14 @@ pub(crate) async fn list_communities(
 }
 
 pub(crate) async fn find_surprising_connections(
-    service: &MemoryService,
+    ctx: &impl GraphContext,
     namespace: &str,
     source_entity: &str,
     max_depth: i32,
     budget: GraphTraversalBudget,
 ) -> Result<Vec<SurprisingConnection>, MemoryError> {
     if !is_entity_id(source_entity) || max_depth < 2 {
-        service.logger.log(
+        ctx.logger().log(
             crate::service::log_event(
                 "graph.surprising_connections.skipped",
                 json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
@@ -218,7 +235,7 @@ pub(crate) async fn find_surprising_connections(
         return Ok(Vec::new());
     }
 
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.surprising_connections.start",
             json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
@@ -231,7 +248,7 @@ pub(crate) async fn find_surprising_connections(
     );
 
     let cutoff_iso = normalize_dt(crate::service::now());
-    let communities = service
+    let communities = ctx
         .app_store()
         .select_communities(namespace)
         .await?
@@ -241,7 +258,7 @@ pub(crate) async fn find_surprising_connections(
     let source_community_ids = community_ids_for_member(&communities, source_entity);
     let mut name_cache = HashMap::new();
     let source_entity_name =
-        cached_entity_name(service, namespace, source_entity, &mut name_cache).await?;
+        cached_entity_name(ctx, namespace, source_entity, &mut name_cache).await?;
 
     let mut visited = HashSet::from([source_entity.to_string()]);
     let mut frontier = VecDeque::from([(
@@ -274,7 +291,7 @@ pub(crate) async fn find_surprising_connections(
             }
 
             neighbor_queries += 1;
-            for edge in service
+            for edge in ctx
                 .app_store()
                 .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
                 .await?
@@ -299,7 +316,7 @@ pub(crate) async fn find_surprising_connections(
                     )
                 {
                     let target_entity_name =
-                        cached_entity_name(service, namespace, &neighbor, &mut name_cache).await?;
+                        cached_entity_name(ctx, namespace, &neighbor, &mut name_cache).await?;
                     connections
                         .entry(neighbor.clone())
                         .or_insert_with(|| SurprisingConnection {
@@ -329,7 +346,7 @@ pub(crate) async fn find_surprising_connections(
             .then_with(|| left.target_entity_name.cmp(&right.target_entity_name))
             .then_with(|| left.target_entity_id.cmp(&right.target_entity_id))
     });
-    service.logger.log(
+    ctx.logger().log(
         crate::service::log_event(
             "graph.surprising_connections.done",
             json!({"namespace": namespace, "source_entity": source_entity}),
@@ -441,7 +458,7 @@ fn is_surprising_target(
 }
 
 async fn cached_entity_name(
-    service: &MemoryService,
+    ctx: &impl GraphContext,
     namespace: &str,
     entity_id: &str,
     cache: &mut HashMap<String, String>,
@@ -450,7 +467,7 @@ async fn cached_entity_name(
         return Ok(name.clone());
     }
 
-    let name = service
+    let name = ctx
         .app_store()
         .select_entity(entity_id, namespace)
         .await?

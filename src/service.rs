@@ -46,6 +46,7 @@ mod entity_extraction;
 mod entity_resolution;
 mod episode;
 mod error;
+pub(crate) mod explanation;
 pub(crate) mod fact;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
