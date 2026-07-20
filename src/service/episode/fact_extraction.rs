@@ -1,5 +1,9 @@
 use serde_json::{Value, json};
 
+use super::statement_detection::{
+    is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
+    is_summary_like_note_candidate,
+};
 use crate::logging::LogLevel;
 use crate::models::claim::ClaimRelationOutcome;
 use crate::models::{
@@ -17,10 +21,6 @@ use crate::service::episode::summary_parser::{
 };
 use crate::service::error::MemoryError;
 use crate::service::query::now;
-use crate::service::util::{
-    is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
-    is_summary_like_note_candidate,
-};
 use crate::service::{log_args_with_duration, log_event};
 
 #[derive(Debug, Default)]

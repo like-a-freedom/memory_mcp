@@ -5,6 +5,7 @@ mod edges;
 mod entity_extraction;
 mod fact_extraction;
 mod record_parsing;
+mod statement_detection;
 mod summary_parser;
 
 pub(crate) use communities::build_community_summary;
@@ -23,6 +24,10 @@ mod tests {
     use super::fact_extraction::{
         build_extract_log_result_with_metadata, should_extract_note_fact,
     };
+    use super::statement_detection::{
+        is_document_action_item, is_experience_statement, is_promise_statement,
+        is_summary_like_note_candidate,
+    };
     use super::summary_parser::{
         sanitized_content_for_entity_extraction, structured_summary_fact_candidates,
     };
@@ -33,10 +38,6 @@ mod tests {
     use crate::models::FactType;
     use crate::service::EntityExtractor;
     use crate::service::error::MemoryError;
-    use crate::service::util::{
-        is_document_action_item, is_experience_statement, is_promise_statement,
-        is_summary_like_note_candidate,
-    };
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Utc;
     use serde_json::{Value, json};

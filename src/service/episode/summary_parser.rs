@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
-use crate::models::{ExtractedEntity, FactType};
-use crate::service::util::{
+use super::statement_detection::{
     is_experience_statement, is_low_value_summary_candidate, is_metric_statement,
     is_promise_statement,
 };
+use crate::models::{ExtractedEntity, FactType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum StructuredSummaryLabel {

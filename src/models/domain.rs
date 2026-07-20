@@ -57,6 +57,16 @@ pub struct Episode {
     pub policy_tags: Vec<String>,
 }
 
+impl Episode {
+    /// Returns true if another episode represents the same source material.
+    #[must_use]
+    pub fn is_duplicate_of(&self, other: &Episode) -> bool {
+        self.source_type == other.source_type
+            && self.source_id == other.source_id
+            && self.scope == other.scope
+    }
+}
+
 /// An entity represents a canonical named thing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Entity {
@@ -64,6 +74,16 @@ pub struct Entity {
     pub entity_type: String,
     pub canonical_name: String,
     pub aliases: Vec<String>,
+}
+
+impl Entity {
+    /// Checks if this entity matches a given name or alias (case-insensitive).
+    #[must_use]
+    pub fn matches_name(&self, name: &str) -> bool {
+        let name = name.to_lowercase();
+        self.canonical_name.to_lowercase() == name
+            || self.aliases.iter().any(|a| a.to_lowercase() == name)
+    }
 }
 
 /// A fact represents a piece of knowledge extracted from an episode.

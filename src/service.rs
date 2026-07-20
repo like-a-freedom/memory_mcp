@@ -96,10 +96,8 @@ pub use reembed::ReembedSummary;
 pub use util::ids;
 pub use util::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_fact_id, hash_prefix, is_document_action_item,
-    is_experience_statement, is_metric_statement, is_promise_statement,
-    is_summary_like_note_candidate, validate_entity_candidate, validate_fact_input,
-    validate_ingest_request,
+    deterministic_episode_id, deterministic_fact_id, hash_prefix, validate_entity_candidate,
+    validate_fact_input, validate_ingest_request,
 };
 
 pub(crate) use core::{log_args_with_duration, log_event};
