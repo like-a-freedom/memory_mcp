@@ -1231,38 +1231,8 @@ impl MemoryService {
         super::context::assemble_context(self, request).await
     }
 
-    /// Resolves a person entity.
-    pub async fn resolve_person(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("person", name).await
-    }
-
-    /// Resolves a company entity.
-    pub async fn resolve_company(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("company", name).await
-    }
-
-    /// Resolves a location entity.
-    pub async fn resolve_location(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("location", name).await
-    }
-
-    /// Resolves a product entity.
-    pub async fn resolve_product(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("product", name).await
-    }
-
-    /// Resolves an event entity.
-    pub async fn resolve_event(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("event", name).await
-    }
-
-    /// Resolves a concept entity.
-    pub async fn resolve_concept(&self, name: &str) -> Result<String, MemoryError> {
-        self.resolve_entity_by_type("concept", name).await
-    }
-
-    /// Internal helper: resolves an entity by its type string and canonical name.
-    async fn resolve_entity_by_type(
+    /// Resolves an entity by its type and canonical name.
+    pub async fn resolve_entity(
         &self,
         entity_type: &str,
         name: &str,
@@ -2296,192 +2266,25 @@ mod tests {
     async fn resolve_uses_indexed_entity_lookup_instead_of_table_scan() {
         use std::sync::Arc;
 
-        struct LookupOnlyDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for LookupOnlyDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("resolve should not scan the entity table")
-            }
-
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("find_intro_chain should not bulk-load all edges")
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(direction, GraphDirection::Incoming);
-
-                Ok(match node_id {
-                    "entity:openai" => {
-                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
-                    }
-                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                    _ => vec![],
-                })
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(match normalized_name {
-                    "dima ivanov" => Some(json!({"entity_id": "entity:existing"})),
-                    "openai" => Some(json!({"entity_id": "entity:openai"})),
-                    _ => None,
-                })
-            }
-
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_select_table_panic("entity")
+            .expect_edges_filtered_panic()
+            .expect_create_with(|| {
                 panic!("resolve should not create when indexed lookup finds a record")
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
+            })
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_entity_lookup("dima ivanov", Some(json!({"entity_id": "entity:existing"})))
+            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
 
         let service = MemoryService::new(
-            Arc::new(LookupOnlyDbClient),
+            Arc::new(db),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2508,189 +2311,20 @@ mod tests {
     async fn find_intro_chain_uses_db_side_neighbor_lookups() {
         use std::sync::Arc;
 
-        struct TraversalDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for TraversalDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("find_intro_chain should not materialize the full edge table")
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(direction, GraphDirection::Incoming);
-
-                Ok(match node_id {
-                    "entity:openai" => {
-                        vec![json!({"in": "entity:bob", "out": "entity:openai"})]
-                    }
-                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                    _ => vec![],
-                })
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                assert_eq!(normalized_name, "openai");
-                Ok(Some(json!({"entity_id": "entity:openai"})))
-            }
-
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edges_filtered_panic()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
 
         let service = MemoryService::new(
-            Arc::new(TraversalDbClient),
+            Arc::new(db),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2714,190 +2348,23 @@ mod tests {
     async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
         use std::sync::Arc;
 
-        struct ShortestPathDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for ShortestPathDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("find_intro_chain should not materialize the full edge table")
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(direction, GraphDirection::Incoming);
-
-                Ok(match node_id {
-                    "entity:openai" => vec![
-                        json!({"in": "entity:bob", "out": "entity:openai"}),
-                        json!({"in": "entity:carol", "out": "entity:openai"}),
-                    ],
-                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                    _ => vec![],
-                })
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                assert_eq!(normalized_name, "openai");
-                Ok(Some(json!({"entity_id": "entity:openai"})))
-            }
-
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edges_filtered_panic()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
 
         let service = MemoryService::new(
-            Arc::new(ShortestPathDbClient),
+            Arc::new(db),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -2918,193 +2385,31 @@ mod tests {
     async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
         use std::sync::Arc;
 
-        struct DiamondTraversalDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for DiamondTraversalDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("find_intro_chain should not materialize the full edge table")
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(direction, GraphDirection::Incoming);
-
-                Ok(match node_id {
-                    "entity:openai" => vec![
-                        json!({"in": "entity:bob", "out": "entity:openai"}),
-                        json!({"in": "entity:carol", "out": "entity:openai"}),
-                    ],
-                    "entity:bob" => vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-                    "entity:carol" => vec![json!({"in": "entity:diana", "out": "entity:carol"})],
-                    "entity:alice" => vec![json!({"in": "entity:erin", "out": "entity:alice"})],
-                    _ => vec![],
-                })
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                assert_eq!(normalized_name, "openai");
-                Ok(Some(json!({"entity_id": "entity:openai"})))
-            }
-
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edges_filtered_panic()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_edge_neighbors(
+                "entity:carol",
+                vec![json!({"in": "entity:diana", "out": "entity:carol"})],
+            )
+            .expect_edge_neighbors(
+                "entity:alice",
+                vec![json!({"in": "entity:erin", "out": "entity:alice"})],
+            )
+            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
 
         let service = MemoryService::new(
-            Arc::new(DiamondTraversalDbClient),
+            Arc::new(db),
             vec!["org".to_string()],
             "warn".to_string(),
             50,
@@ -3642,17 +2947,17 @@ mod tests {
 
         // Resolve the same entity via different typed methods
         let id1 = service
-            .resolve_person("Alice Smith")
+            .resolve_entity("person", "Alice Smith")
             .await
             .expect("resolve person");
         let id2 = service
-            .resolve_person("Alice Smith")
+            .resolve_entity("person", "Alice Smith")
             .await
             .expect("resolve person again");
         assert_eq!(id1, id2);
 
         let id3 = service
-            .resolve_company("Acme Corp")
+            .resolve_entity("company", "Acme Corp")
             .await
             .expect("resolve company");
         assert_ne!(id1, id3);
@@ -3676,11 +2981,11 @@ mod tests {
             .expect("create test service");
 
         let from_id = service
-            .resolve_person("Alice Relate")
+            .resolve_entity("person", "Alice Relate")
             .await
             .expect("resolve alice");
         let to_id = service
-            .resolve_company("Acme Relate")
+            .resolve_entity("company", "Acme Relate")
             .await
             .expect("resolve acme");
 

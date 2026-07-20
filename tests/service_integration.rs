@@ -72,13 +72,19 @@ async fn test_service_ingest_and_extract_flow() {
 async fn test_service_resolve_and_relate_entities() {
     let service = common::make_service().await;
 
-    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
     assert!(alice_id.starts_with("entity:"));
 
-    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
     assert!(bob_id.starts_with("entity:"));
 
-    let alice_id_2 = service.resolve_person("Alice Smith").await.unwrap();
+    let alice_id_2 = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
     assert_eq!(alice_id, alice_id_2);
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
@@ -88,8 +94,11 @@ async fn test_service_resolve_and_relate_entities() {
 async fn test_service_relate_persists_native_edge_endpoints_and_inferred_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
-    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
+    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
 
@@ -406,7 +415,10 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
         .await
         .unwrap();
 
-    let entity_id = service.resolve_person("Alice Smith").await.unwrap();
+    let entity_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
     let fact_id = service
         .add_fact(
             "note",
@@ -489,9 +501,15 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
 #[tokio::test]
 async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
     let (service, db_client) = common::make_service_with_client().await;
-    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
-    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
-    let carol_id = service.resolve_person("Carol White").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
+    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let carol_id = service
+        .resolve_entity("person", "Carol White")
+        .await
+        .unwrap();
 
     for (source_id, content) in [
         ("community-merge-1", "Alice Smith met Bob Jones"),
@@ -1739,10 +1757,19 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
 async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_degree() {
     let (service, _db_client) = common::make_service_with_client().await;
 
-    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
-    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
-    let carol_id = service.resolve_person("Carol White").await.unwrap();
-    let diana_id = service.resolve_person("Diana Prince").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
+    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let carol_id = service
+        .resolve_entity("person", "Carol White")
+        .await
+        .unwrap();
+    let diana_id = service
+        .resolve_entity("person", "Diana Prince")
+        .await
+        .unwrap();
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
     service.relate(&bob_id, "knows", &carol_id).await.unwrap();
@@ -1787,9 +1814,15 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
 async fn test_service_assemble_context_map_view_includes_communities() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice_id = service.resolve_person("Alice Smith").await.unwrap();
-    let bob_id = service.resolve_person("Bob Jones").await.unwrap();
-    let carol_id = service.resolve_person("Carol White").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
+    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let carol_id = service
+        .resolve_entity("person", "Carol White")
+        .await
+        .unwrap();
 
     common::seed_community(
         &db_client,
@@ -2091,8 +2124,8 @@ async fn test_service_resolve_handles_concurrent_duplicate_gracefully() {
     let service = common::make_service().await;
 
     let (id1, id2) = tokio::join!(
-        service.resolve_person("Concurrent Alice"),
-        service.resolve_person("Concurrent Alice"),
+        service.resolve_entity("person", "Concurrent Alice"),
+        service.resolve_entity("person", "Concurrent Alice"),
     );
 
     let id1 = id1.expect("first resolve should succeed");
@@ -2215,9 +2248,18 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
 
     // Build a small graph: Alice -> Bob -> Carol, with Bob as the hub.
-    let alice_id = service.resolve_person("Alice Explain").await.unwrap();
-    let bob_id = service.resolve_person("Bob Explain").await.unwrap();
-    let carol_id = service.resolve_person("Carol Explain").await.unwrap();
+    let alice_id = service
+        .resolve_entity("person", "Alice Explain")
+        .await
+        .unwrap();
+    let bob_id = service
+        .resolve_entity("person", "Bob Explain")
+        .await
+        .unwrap();
+    let carol_id = service
+        .resolve_entity("person", "Carol Explain")
+        .await
+        .unwrap();
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
     service.relate(&bob_id, "knows", &carol_id).await.unwrap();

@@ -245,9 +245,15 @@ async fn test_policy_tag_filtering() {
 #[tokio::test]
 async fn test_graph_intro_chain() {
     let service = common::make_service().await;
-    let alice = service.resolve_person("Alice").await.expect("alice");
-    let bob = service.resolve_person("Bob").await.expect("bob");
-    let openai = service.resolve_company("OpenAI").await.expect("openai");
+    let alice = service
+        .resolve_entity("person", "Alice")
+        .await
+        .expect("alice");
+    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
+    let openai = service
+        .resolve_entity("company", "OpenAI")
+        .await
+        .expect("openai");
 
     service.relate(&alice, "knows", &bob).await.expect("relate");
     service
@@ -265,9 +271,15 @@ async fn test_graph_intro_chain() {
 #[tokio::test]
 async fn test_graph_intro_chain_as_of_filters_edges() {
     let service = common::make_service().await;
-    let alice = service.resolve_person("Alice").await.expect("alice");
-    let bob = service.resolve_person("Bob").await.expect("bob");
-    let openai = service.resolve_company("OpenAI").await.expect("openai");
+    let alice = service
+        .resolve_entity("person", "Alice")
+        .await
+        .expect("alice");
+    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
+    let openai = service
+        .resolve_entity("company", "OpenAI")
+        .await
+        .expect("openai");
 
     service.relate(&alice, "knows", &bob).await.expect("relate");
     service
@@ -295,10 +307,22 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
     let (service, db_client) = common::make_service_with_client().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
 
-    let alice_id = service.resolve_person("Alice Smith").await.expect("alice");
-    let bob_id = service.resolve_person("Bob Jones").await.expect("bob");
-    let carol_id = service.resolve_person("Carol White").await.expect("carol");
-    let diana_id = service.resolve_person("Diana Prince").await.expect("diana");
+    let alice_id = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .expect("alice");
+    let bob_id = service
+        .resolve_entity("person", "Bob Jones")
+        .await
+        .expect("bob");
+    let carol_id = service
+        .resolve_entity("person", "Carol White")
+        .await
+        .expect("carol");
+    let diana_id = service
+        .resolve_entity("person", "Diana Prince")
+        .await
+        .expect("diana");
 
     service
         .relate(&alice_id, "knows", &bob_id)
@@ -414,8 +438,11 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
 #[tokio::test]
 async fn test_relate_repeated_write_invalidates_previous_edge_version() {
     let (service, db_client) = common::make_service_with_client().await;
-    let alice = service.resolve_person("Alice").await.expect("alice");
-    let bob = service.resolve_person("Bob").await.expect("bob");
+    let alice = service
+        .resolve_entity("person", "Alice")
+        .await
+        .expect("alice");
+    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
 
     service
         .relate(&alice, "knows", &bob)

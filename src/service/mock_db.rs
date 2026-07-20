@@ -18,11 +18,12 @@ use crate::service::MemoryError;
 use crate::storage::{DbClient, GraphDirection};
 
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;
-type SelectTableFn = dyn Fn() -> Result<Vec<Value>, MemoryError> + Send + Sync;
+type SelectTableFn = dyn Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync;
 type QueryFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type CreateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
-type EdgeNeighborsFn = dyn Fn() -> Result<Vec<Value>, MemoryError> + Send + Sync;
+type EdgeNeighborsFn =
+    dyn Fn(&str, GraphDirection) -> Result<Vec<Value>, MemoryError> + Send + Sync;
 
 /// Configurable mock database client for tests.
 ///
@@ -167,9 +168,53 @@ impl MockDbClient {
 
     pub fn expect_edge_neighbors_with(
         mut self,
-        f: impl Fn() -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
+        f: impl Fn(&str, GraphDirection) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
     ) -> Self {
         self.fallback_edge_neighbors = Mutex::new(Some(Box::new(f)));
+        self
+    }
+
+    pub fn expect_select_table_with(
+        mut self,
+        f: impl Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.fallback_select_table = Mutex::new(Some(Box::new(f)));
+        self
+    }
+
+    pub fn expect_select_table_panic(self, table_name: &str) -> Self {
+        let table_name = table_name.to_string();
+        self.expect_select_table_with(move |table| {
+            panic!("select_table should not be called for {table_name}, got {table}");
+        })
+    }
+
+    pub fn expect_edges_filtered_with(
+        mut self,
+        f: impl Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.fallback_edges_filtered = Mutex::new(Some(Box::new(f)));
+        self
+    }
+
+    pub fn expect_edges_filtered_panic(self) -> Self {
+        self.expect_edges_filtered_with(|_| panic!("select_edges_filtered should not be called"))
+    }
+
+    pub fn expect_entity_lookup_with(
+        mut self,
+        f: impl Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.fallback_entity_lookup = Mutex::new(Some(Box::new(f)));
+        self
+    }
+
+    pub fn expect_migration_handler(
+        mut self,
+        f: impl Fn(&str) -> Result<(), MemoryError> + Send + Sync + 'static,
+    ) -> Self {
+        self.migration_result = Mutex::new(Ok(()));
+        let _ = f;
         self
     }
 
@@ -274,7 +319,7 @@ impl DbClient for MockDbClient {
             return resp;
         }
         if let Some(ref f) = *self.fallback_select_table.lock().unwrap() {
-            return f();
+            return f(table);
         }
         Ok(vec![])
     }
@@ -298,7 +343,7 @@ impl DbClient for MockDbClient {
             return resp;
         }
         if let Some(ref f) = *self.fallback_facts_filtered.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -322,7 +367,7 @@ impl DbClient for MockDbClient {
             return resp;
         }
         if let Some(ref f) = *self.fallback_facts_by_entity_links.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -336,7 +381,7 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_facts_ann.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -347,7 +392,7 @@ impl DbClient for MockDbClient {
         _cutoff: &str,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_edges_filtered.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -369,7 +414,7 @@ impl DbClient for MockDbClient {
             return resp;
         }
         if let Some(ref f) = *self.fallback_edge_neighbors.lock().unwrap() {
-            return f();
+            return f(node_id, _direction);
         }
         Ok(vec![])
     }
@@ -400,7 +445,7 @@ impl DbClient for MockDbClient {
         _names: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_entities_batch.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -411,7 +456,7 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_active_facts.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -423,7 +468,7 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_episodes_for_archival.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -436,7 +481,7 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_active_facts_by_episode.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }
@@ -450,7 +495,7 @@ impl DbClient for MockDbClient {
         _limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self.fallback_episodes_by_content.lock().unwrap() {
-            return f();
+            return f("");
         }
         Ok(vec![])
     }

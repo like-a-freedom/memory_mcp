@@ -102,8 +102,8 @@ async fn embedded_relate_invalidates_previous_active_edge_version()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, db_client) = setup_embedded_service_with_client().await?;
 
-    let alice = service.resolve_person("Alice").await?;
-    let bob = service.resolve_person("Bob").await?;
+    let alice = service.resolve_entity("person", "Alice").await?;
+    let bob = service.resolve_entity("person", "Bob").await?;
 
     service.relate(&alice, "knows", &bob).await?;
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;

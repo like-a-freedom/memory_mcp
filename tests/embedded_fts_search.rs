@@ -156,7 +156,7 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
 async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error::Error>> {
     let service = embedded_support::setup_embedded_service().await?;
     let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
-    let alice_id = service.resolve_person("Alice Smith").await?;
+    let alice_id = service.resolve_entity("person", "Alice Smith").await?;
 
     service
         .add_fact(
