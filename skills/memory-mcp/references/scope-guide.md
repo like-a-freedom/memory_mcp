@@ -15,16 +15,16 @@ When two scopes fit, pick the narrower one. Widen only when verified evidence re
 
 | Scope | Access | Typical content |
 |---|---|---|
-| `private-domain` | Domain ACL only | HR records, security incidents, customer PII, payment data, legal hold |
-| `personal` | Owner only | Private notes, individual tasks, drafts the agent has not yet verified |
-| `team` | Members of the named team | Team decisions, shared project state, internal team comms |
-| `org` | All org members | Policies, public announcements, org-wide metrics, cross-team decisions |
+| `private-domain` | Domain ACL only | HR records, security incidents, customer PII, payment data, legal hold. |
+| `personal` | Owner only | Private notes, individual tasks, drafts the agent has not yet verified. |
+| `team` | Members of the named team | Team decisions, shared project state, internal team comms. |
+| `org` | All org members | Policies, public announcements, org-wide metrics, cross-team decisions. |
 
 ## Scope interactions
 
-- An `assemble_context` call returns only facts at or below the requested scope. Asking for `org` will not surface `team` facts. Asking for `team` will not surface `private-domain` facts even if the agent would otherwise have access.
-- An `invalidate` call does not change scope; it changes validity time. To restrict an already-captured fact, ingest a new fact at the narrower scope and invalidate the old one with a reason that names the restriction.
-- A capture that is recorded at the wrong scope is not "moved" — it is re-ingested under a new `source_id` at the correct scope, and the original is invalidated.
+- `assemble_context` returns only facts at or below the requested scope. Asking for `org` will not surface `team` facts. Asking for `team` will not surface `private-domain` facts even if the caller has access. The caller's job is to pick a scope that **can hold** the answer; if the answer is not there, the absence is informative, not a signal to widen.
+- `invalidate` does not change scope; it changes validity time. To restrict an already-captured fact, ingest a new fact at the narrower scope and invalidate the old one with a reason that names the restriction.
+- A capture that is recorded at the wrong scope is not "moved" — it is re-ingested under a new `source_id` at the correct scope, and the original is invalidated. The audit trail of the old fact stays; its active status does not.
 
 ## Common errors
 
