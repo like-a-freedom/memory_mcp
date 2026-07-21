@@ -13,15 +13,12 @@ use crate::service::EntityExtractor;
 use crate::service::cache::CacheKey;
 use crate::service::embedding::{
     DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider_with_dimension,
-    resolve_embedding_target_identity,
 };
 use crate::service::entity_extraction::create_entity_extractor;
 use crate::service::error::MemoryError;
 use crate::service::startup::{
-    EmbeddingActivationMode, EmbeddingStartupDecision, LEGACY_EMBEDDING_SAMPLE_SIZE,
-    apply_startup_migrations, build_startup_versions_event, count_facts_per_namespace,
-    decide_embedding_startup, load_embedding_states, sample_stored_embedding_dimensions,
-    write_bootstrap_ready_states,
+    EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
+    build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_states,
 };
 use crate::service::util::RateLimiter;
 use crate::storage::{DbClient, SurrealDbClient};
@@ -138,153 +135,14 @@ impl MemoryService {
         let db_client = Arc::new(db_client) as Arc<dyn DbClient>;
         apply_startup_migrations(&db_client, &config.namespaces).await?;
 
-        let target = if config.embedding.is_enabled() {
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::json!("embedding.preflight_started"),
-            );
-            event.insert(
-                "provider".to_string(),
-                serde_json::json!(config.embedding.provider_label()),
-            );
-            event.insert(
-                "model".to_string(),
-                serde_json::json!(config.embedding.model.clone()),
-            );
-            startup_logger.log(event, crate::logging::LogLevel::Debug);
-
-            match resolve_embedding_target_identity(&config.embedding, &effective_data_dir).await {
-                Ok(target) => {
-                    let mut event = std::collections::HashMap::new();
-                    event.insert(
-                        "op".to_string(),
-                        serde_json::json!("embedding.preflight_succeeded"),
-                    );
-                    event.insert(
-                        "provider".to_string(),
-                        serde_json::json!(target.provider_label),
-                    );
-                    event.insert("model".to_string(), serde_json::json!(target.model.clone()));
-                    event.insert("dimension".to_string(), serde_json::json!(target.dimension));
-                    event.insert(
-                        "target_signature".to_string(),
-                        serde_json::json!(target.signature.clone()),
-                    );
-                    startup_logger.log(event, crate::logging::LogLevel::Info);
-                    Some(target)
-                }
-                Err(err) if mode == EmbeddingActivationMode::Standard => {
-                    let mut event = std::collections::HashMap::new();
-                    event.insert(
-                        "op".to_string(),
-                        serde_json::json!("embedding.preflight_failed"),
-                    );
-                    event.insert("error".to_string(), serde_json::json!(err.to_string()));
-                    startup_logger.log(event, crate::logging::LogLevel::Warn);
-                    None
-                }
-                Err(err)
-                    if mode == EmbeddingActivationMode::ForceEnabledForReembed
-                        && config.embedding.dimension_override.is_some() =>
-                {
-                    // Probe failed but operator provided an explicit dimension
-                    // override — fall back to it with a strong warning.
-                    let dimension = config.embedding.dimension_override.unwrap();
-                    let signature = crate::config::build_embedding_signature(
-                        config.embedding.provider_label(),
-                        config.embedding.model.as_deref(),
-                        config.embedding.base_url.as_deref(),
-                        dimension,
-                    );
-                    let mut event = std::collections::HashMap::new();
-                    event.insert(
-                        "op".to_string(),
-                        serde_json::json!("embedding.preflight_fallback"),
-                    );
-                    event.insert("error".to_string(), serde_json::json!(err.to_string()));
-                    event.insert(
-                        "provider".to_string(),
-                        serde_json::json!(config.embedding.provider_label()),
-                    );
-                    event.insert("dimension".to_string(), serde_json::json!(dimension));
-                    startup_logger.log(event, crate::logging::LogLevel::Warn);
-                    Some(crate::service::embedding::ResolvedEmbeddingTarget {
-                        provider_label: config.embedding.provider_label(),
-                        model: config.embedding.model.clone(),
-                        dimension,
-                        signature,
-                    })
-                }
-                Err(err) => return Err(err),
-            }
-        } else {
-            None
-        };
-
-        let decision = if let Some(target) = target.as_ref() {
-            let namespace_states = load_embedding_states(&db_client, &config.namespaces).await?;
-            let fact_counts = count_facts_per_namespace(&db_client, &config.namespaces).await?;
-            let sample_dimensions = sample_stored_embedding_dimensions(
-                &db_client,
-                &config.namespaces,
-                LEGACY_EMBEDDING_SAMPLE_SIZE,
-            )
-            .await?;
-
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::json!("embedding.startup_state_loaded"),
-            );
-            event.insert(
-                "namespaces".to_string(),
-                serde_json::json!(config.namespaces.clone()),
-            );
-            event.insert(
-                "state_count".to_string(),
-                serde_json::json!(namespace_states.len()),
-            );
-            event.insert(
-                "fact_counts".to_string(),
-                serde_json::json!(fact_counts.clone()),
-            );
-            startup_logger.log(event, crate::logging::LogLevel::Debug);
-
-            decide_embedding_startup(
-                &config.namespaces,
-                &namespace_states,
-                &target.signature,
-                &sample_dimensions,
-                &fact_counts,
-                target.dimension,
-            )
-        } else if config.embedding.is_enabled() {
-            EmbeddingStartupDecision::DisableSemantic {
-                reason: "embedding target preflight failed".to_string(),
-            }
-        } else {
-            EmbeddingStartupDecision::UseConfiguredProvider
-        };
-
-        let mut decision_event = std::collections::HashMap::new();
-        decision_event.insert(
-            "op".to_string(),
-            serde_json::json!("embedding.startup_decision"),
-        );
-        decision_event.insert(
-            "decision".to_string(),
-            serde_json::json!(format!("{:?}", decision)),
-        );
-        decision_event.insert(
-            "namespaces".to_string(),
-            serde_json::json!(config.namespaces.clone()),
-        );
-        decision_event.insert(
-            "target_signature".to_string(),
-            serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
-        );
-        startup_logger.log(decision_event, crate::logging::LogLevel::Info);
+        let (decision, target) = resolve_embedding_startup(
+            &config.embedding,
+            &db_client,
+            &config.namespaces,
+            &effective_data_dir,
+            &startup_logger,
+        )
+        .await?;
 
         let embedding_provider: Arc<dyn EmbeddingProvider> = match (&mode, &decision) {
             (EmbeddingActivationMode::ForceEnabledForReembed, _) => {

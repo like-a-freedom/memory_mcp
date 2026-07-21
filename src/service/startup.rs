@@ -237,6 +237,120 @@ pub(crate) fn decide_embedding_startup(
     }
 }
 
+/// Resolves embedding startup target and decision.
+///
+/// Combines: target preflight (dimension detection) → namespace state
+/// loading → fact counts → sample dimensions → startup decision.
+/// Returns `(decision, target)` where `target` is `None` when preflight
+/// fails or embedding is disabled.
+pub(crate) async fn resolve_embedding_startup(
+    config: &crate::config::EmbeddingConfig,
+    db_client: &Arc<dyn DbClient>,
+    namespaces: &[String],
+    data_dir: &str,
+    startup_logger: &crate::logging::StdoutLogger,
+) -> Result<
+    (
+        EmbeddingStartupDecision,
+        Option<crate::service::embedding::ResolvedEmbeddingTarget>,
+    ),
+    MemoryError,
+> {
+    use crate::service::embedding::{ResolvedEmbeddingTarget, resolve_embedding_target_identity};
+
+    let target = if config.is_enabled() {
+        match resolve_embedding_target_identity(config, data_dir).await {
+            Ok(target) => Some(target),
+            Err(err) => {
+                let mut event = std::collections::HashMap::new();
+                event.insert(
+                    "op".to_string(),
+                    serde_json::json!("embedding.preflight_fallback"),
+                );
+                event.insert("error".to_string(), serde_json::json!(err.to_string()));
+                event.insert(
+                    "provider".to_string(),
+                    serde_json::json!(config.provider_label()),
+                );
+                startup_logger.log(event, crate::logging::LogLevel::Warn);
+                // Re-run with fallback dimension
+                let dimension = config.fallback_dimension();
+                let signature = crate::config::build_embedding_signature(
+                    config.provider_label(),
+                    config.model.as_deref(),
+                    config.base_url.as_deref(),
+                    dimension,
+                );
+                Some(ResolvedEmbeddingTarget {
+                    provider_label: config.provider_label(),
+                    model: config.model.clone(),
+                    dimension,
+                    signature,
+                })
+            }
+        }
+    } else {
+        None
+    };
+
+    let decision = if let Some(target) = target.as_ref() {
+        let namespace_states = load_embedding_states(db_client, namespaces).await?;
+        let fact_counts = count_facts_per_namespace(db_client, namespaces).await?;
+        let sample_dimensions =
+            sample_stored_embedding_dimensions(db_client, namespaces, LEGACY_EMBEDDING_SAMPLE_SIZE)
+                .await?;
+
+        let mut event = std::collections::HashMap::new();
+        event.insert(
+            "op".to_string(),
+            serde_json::json!("embedding.startup_state_loaded"),
+        );
+        event.insert("namespaces".to_string(), serde_json::json!(namespaces));
+        event.insert(
+            "state_count".to_string(),
+            serde_json::json!(namespace_states.len()),
+        );
+        event.insert(
+            "fact_counts".to_string(),
+            serde_json::json!(fact_counts.clone()),
+        );
+        startup_logger.log(event, crate::logging::LogLevel::Debug);
+
+        decide_embedding_startup(
+            namespaces,
+            &namespace_states,
+            &target.signature,
+            &sample_dimensions,
+            &fact_counts,
+            target.dimension,
+        )
+    } else if config.is_enabled() {
+        EmbeddingStartupDecision::DisableSemantic {
+            reason: "embedding target preflight failed".to_string(),
+        }
+    } else {
+        EmbeddingStartupDecision::UseConfiguredProvider
+    };
+
+    let mut decision_event = std::collections::HashMap::new();
+    decision_event.insert(
+        "op".to_string(),
+        serde_json::json!("embedding.startup_decision"),
+    );
+    decision_event.insert(
+        "decision".to_string(),
+        serde_json::json!(format!("{:?}", decision)),
+    );
+    decision_event.insert("namespaces".to_string(), serde_json::json!(namespaces));
+    decision_event.insert(
+        "target_signature".to_string(),
+        serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
+    );
+    startup_logger.log(decision_event, crate::logging::LogLevel::Info);
+
+    Ok((decision, target))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
