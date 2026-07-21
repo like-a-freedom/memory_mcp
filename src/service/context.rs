@@ -1,13 +1,18 @@
-//! Context assembly operations.
+//! Context assembly operations — thin orchestrator.
+//!
+//! The heavy lifting lives in [`pipeline`]: parameter preparation,
+//! cache operations, and the multi-tier default retrieval pipeline.
+//! View-mode-specific builders are in [`views`].
 
 use std::time::Instant;
 
 use serde_json::json;
 
-use super::cache::{CacheKey, CacheView};
-use super::error::{MemoryError, error_messages};
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
+
+use super::error::MemoryError;
+use super::{log_event, normalize_dt};
 
 mod alias_expansion;
 mod budget;
@@ -43,7 +48,7 @@ async fn track_fact_accesses(
     for item in items {
         if let Err(err) = service.record_fact_access(&item.fact_id, 1).await {
             service.logger.log(
-                super::log_event(
+                log_event(
                     "assemble_context.access_track_error",
                     json!({"fact_id": item.fact_id}),
                     json!({"error": err.to_string()}),
@@ -57,7 +62,11 @@ async fn track_fact_accesses(
     }
 }
 
-/// Assemble context for a query.
+/// Assembles context for a query.
+///
+/// Orchestrates: parameter preparation → cache check → view-mode dispatch
+/// (facets / wake_up / map / default multi-tier) → experience append →
+/// cache store → query log. All logic is delegated to `pipeline` and `views`.
 pub async fn assemble_context(
     service: &crate::service::MemoryService,
     request: AssembleContextRequest,
@@ -65,112 +74,30 @@ pub async fn assemble_context(
     let started_at = Instant::now();
     let access = AccessPayload::from_payload(request.access.clone());
 
-    service.logger.log(
-        super::log_event(
-            "assemble_context.start",
-            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
-            json!({}),
-            access.as_ref(),
-            None,
-            None,
-        ),
-        LogLevel::Info,
-    );
-
+    pipeline::log_context_start(service, &request, access.as_ref());
     service.enforce_rate_limit(access.as_ref())?;
 
-    if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation(
-            error_messages::SCOPE_REQUIRED.into(),
-        ));
-    }
+    let params = pipeline::prepare_context_params(service, &request, access).await?;
 
-    let cutoff = request.as_of.unwrap_or_else(super::query::now);
-    let access = access.unwrap_or_else(|| AccessPayload {
-        allowed_scopes: Some(vec![request.scope.clone()]),
-        allowed_tags: None,
-        caller_id: None,
-        session_vars: None,
-        transport: None,
-        content_type: None,
-        cross_scope_allow: None,
-    });
-
-    if !access.is_scope_allowed(&request.scope) {
+    if !params.access.is_scope_allowed(&request.scope) {
         return Ok(vec![]);
     }
 
-    let namespace = service.namespace_for_scope(&request.scope)?;
-    let cutoff_iso = super::normalize_dt(cutoff);
-    let cleaned_query = super::preprocess_search_query(&request.query);
-    let query_opt = if cleaned_query.is_empty() {
-        None
-    } else {
-        Some(cleaned_query.as_str())
-    };
-    let raw_query_opt = if request.query.trim().is_empty() {
-        None
-    } else {
-        Some(request.query.as_str())
-    };
-    let project_opt = request
-        .project
-        .as_deref()
-        .filter(|project| !project.trim().is_empty());
-    let requested_view_mode = request
-        .view_mode
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let fact_types = request
-        .fact_types
-        .iter()
-        .filter_map(|fact_type| {
-            let trimmed = fact_type.trim();
-            (!trimmed.is_empty()).then(|| trimmed.to_string())
-        })
-        .collect::<Vec<_>>();
-    let query_terms = query_opt
-        .map(super::query::search_query_terms)
-        .unwrap_or_default();
-    let (resolved_view_mode, query_flags) =
-        query_mode::resolve_view_mode(requested_view_mode, raw_query_opt, &query_terms, cutoff);
-    let resolved_view_mode_opt = resolved_view_mode.as_option_str();
-    let query_flag_labels = query_flags.as_labels();
     let query_log_diagnostics = logging::QueryLogDiagnostics {
-        resolved_view_mode: resolved_view_mode_opt,
-        query_flags: &query_flag_labels,
+        resolved_view_mode: params.resolved_view_mode_opt.as_deref(),
+        query_flags: &params.query_flags.as_labels(),
     };
 
-    let cache_key = CacheKey::new(
-        &request.query,
-        &request.scope,
-        cutoff,
-        request.budget,
-        request.project.as_deref(),
-        &request.fact_types,
-        CacheView::new(
-            resolved_view_mode_opt,
-            request.window_start,
-            request.window_end,
-        ),
-        access.allowed_tags.clone(),
-    );
-
-    let cached = {
-        let mut cache = service.context_cache.write().await;
-        cache.get(&cache_key).cloned()
-    };
-
-    if let Some(cached) = cached {
-        track_fact_accesses(service, &cached, &access).await;
+    // --- Cache check ---
+    if let Some(cached) = pipeline::check_cache(service, &params.cache_key).await {
+        track_fact_accesses(service, &cached, &params.access).await;
 
         service.logger.log(
-            super::log_event(
+            log_event(
                 "assemble_context.cache_hit",
                 json!({"scope": request.scope, "query": request.query}),
                 json!({"count": cached.len()}),
-                Some(&access),
+                Some(&params.access),
                 None,
                 None,
             ),
@@ -184,7 +111,7 @@ pub async fn assemble_context(
             &cached,
             true,
             latency_ms,
-            &access,
+            &params.access,
             &query_log_diagnostics,
         )
         .await;
@@ -192,11 +119,11 @@ pub async fn assemble_context(
     }
 
     service.logger.log(
-        super::log_event(
+        log_event(
             "assemble_context.cache_miss",
             json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"status": "computing"}),
-            Some(&access),
+            Some(&params.access),
             None,
             None,
         ),
@@ -204,134 +131,131 @@ pub async fn assemble_context(
     );
 
     service.logger.log(
-        super::log_event(
+        log_event(
             "assemble_context.features",
             json!({
                 "scope": request.scope,
                 "query": request.query,
                 "budget": request.budget,
-                "project": project_opt,
-                "view_mode": requested_view_mode,
-                "resolved_view_mode": resolved_view_mode_opt,
-                "fact_type_count": fact_types.len(),
-                "window_start": request.window_start.map(super::normalize_dt),
-                "window_end": request.window_end.map(super::normalize_dt),
+                "project": params.project_opt,
+                "resolved_view_mode": params.resolved_view_mode_opt,
+                "fact_type_count": params.fact_types.len(),
+                "window_start": request.window_start.map(normalize_dt),
+                "window_end": request.window_end.map(normalize_dt),
                 "query_logging_enabled": service.is_query_logging_enabled(),
             }),
             json!({}),
-            Some(&access),
+            Some(&params.access),
             None,
             None,
         ),
         LogLevel::Debug,
     );
 
-    if let Some(view_mode) = requested_view_mode
-        && !matches!(view_mode, "facets" | "wake_up" | "map" | "timeline")
-    {
-        service.logger.log(
-            super::log_event(
-                "assemble_context.view_mode_unknown",
-                json!({"scope": request.scope, "query": request.query, "view_mode": view_mode}),
-                json!({"fallback": "default_ranked_retrieval"}),
-                Some(&access),
-                None,
-                None,
-            ),
-            LogLevel::Warn,
-        );
-    }
-
-    let mut results: Vec<AssembledContextItem> = if resolved_view_mode_opt == Some("facets") {
-        build_facets_view(
-            service,
-            &namespace,
-            &request.scope,
-            cutoff,
-            project_opt,
-            request.budget,
-            &access,
-        )
-        .await?
-    } else if resolved_view_mode_opt == Some("wake_up") {
-        build_wake_up_view(
-            service,
-            views::FactFilterParams {
-                namespace: &namespace,
-                scope: &request.scope,
-                cutoff,
-                project: project_opt,
-                fact_types: &fact_types,
-                access: &access,
-            },
-            request.budget,
-            super::decayed_confidence,
-            super::normalize_dt,
-        )
-        .await?
-    } else if resolved_view_mode_opt == Some("map") {
-        build_map_view(
-            service,
-            &namespace,
-            cutoff,
-            request.budget,
-            super::normalize_dt,
-        )
-        .await?
-    } else {
-        assemble_default_context(
-            service,
-            DefaultContextParams {
-                namespace: &namespace,
-                scope: &request.scope,
-                cutoff_iso: &cutoff_iso,
-                cutoff,
-                raw_query_opt,
-                query_opt,
-                query_terms: &query_terms,
-                project_opt,
-                fact_types: &fact_types,
-                budget: request.budget,
-                window_start: request.window_start,
-                window_end: request.window_end,
-                resolved_view_mode: resolved_view_mode_opt,
-                query_flags: &query_flags,
-                access: &access,
-            },
-        )
-        .await?
+    // --- View-mode dispatch ---
+    let mut results: Vec<AssembledContextItem> = match params.resolved_view_mode_opt.as_deref() {
+        Some("facets") => {
+            build_facets_view(
+                service,
+                &params.namespace,
+                &request.scope,
+                params.cutoff,
+                params.project_opt.as_deref(),
+                request.budget,
+                &params.access,
+            )
+            .await?
+        }
+        Some("wake_up") => {
+            build_wake_up_view(
+                service,
+                views::FactFilterParams {
+                    namespace: &params.namespace,
+                    scope: &request.scope,
+                    cutoff: params.cutoff,
+                    project: params.project_opt.as_deref(),
+                    fact_types: &params.fact_types,
+                    access: &params.access,
+                },
+                request.budget,
+                super::decayed_confidence,
+                normalize_dt,
+            )
+            .await?
+        }
+        Some("map") => {
+            build_map_view(
+                service,
+                &params.namespace,
+                params.cutoff,
+                request.budget,
+                normalize_dt,
+            )
+            .await?
+        }
+        _ => {
+            let query_opt = if params.cleaned_query.is_empty() {
+                None
+            } else {
+                Some(params.cleaned_query.as_str())
+            };
+            let raw_query_opt = if request.query.trim().is_empty() {
+                None
+            } else {
+                Some(request.query.as_str())
+            };
+            assemble_default_context(
+                service,
+                DefaultContextParams {
+                    namespace: &params.namespace,
+                    scope: &request.scope,
+                    cutoff_iso: &params.cutoff_iso,
+                    cutoff: params.cutoff,
+                    raw_query_opt,
+                    query_opt,
+                    query_terms: &params.query_terms,
+                    project_opt: params.project_opt.as_deref(),
+                    fact_types: &params.fact_types,
+                    budget: request.budget,
+                    window_start: request.window_start,
+                    window_end: request.window_end,
+                    resolved_view_mode: params.resolved_view_mode_opt.as_deref(),
+                    query_flags: &params.query_flags,
+                    access: &params.access,
+                },
+            )
+            .await?
+        }
     };
 
-    // Append recent experience facts as supplemental context only for browse-like
-    // calls without a search query. Query-driven retrieval should not mix in
-    // unrelated recent memories purely because they are fresh.
-    if resolved_view_mode_opt != Some("facets")
-        && resolved_view_mode_opt != Some("wake_up")
-        && resolved_view_mode_opt != Some("map")
-        && query_opt.is_none()
+    // --- Append recent experience for browse-like queries ---
+    if params.resolved_view_mode_opt.as_deref() != Some("facets")
+        && params.resolved_view_mode_opt.as_deref() != Some("wake_up")
+        && params.resolved_view_mode_opt.as_deref() != Some("map")
+        && params.cleaned_query.is_empty()
     {
-        let appended_experience = append_recent_experience_items(
+        let appended = append_recent_experience_items(
             &mut results,
             service,
             RecentExperienceRequest {
-                namespace: &namespace,
+                namespace: &params.namespace,
                 scope: &request.scope,
-                cutoff,
-                project: project_opt,
-                access: &access,
+                cutoff: params.cutoff,
+                project: params.project_opt.as_deref(),
+                access: &params.access,
                 budget: request.budget,
-                fact_types: &fact_types,
+                fact_types: &params.fact_types,
             },
         )
         .await?;
 
-        if appended_experience > 0 {
+        if appended > 0 {
             service.logger.log(
-                super::log_event(
+                log_event(
                     "assemble_context.experience_appended",
                     json!({"scope": request.scope, "query": request.query}),
-                    json!({"count": appended_experience}),
-                    Some(&access),
+                    json!({"count": appended}),
+                    Some(&params.access),
                     None,
                     None,
                 ),
@@ -340,40 +264,37 @@ pub async fn assemble_context(
         }
     }
 
+    // --- Results logging, access tracking, cache store ---
     service.logger.log(
-        super::log_event(
+        log_event(
             "assemble_context.results",
             json!({
                 "scope": request.scope,
                 "query": request.query,
-                "view_mode": resolved_view_mode_opt,
-                "project": project_opt,
+                "view_mode": params.resolved_view_mode_opt,
+                "project": params.project_opt,
             }),
             json!({
                 "count": results.len(),
                 "retrieval_tiers": summarize_retrieval_tiers(&results),
                 "supplemental_experience": supplemental_experience_count(&results),
             }),
-            Some(&access),
+            Some(&params.access),
             None,
             None,
         ),
         LogLevel::Trace,
     );
 
-    track_fact_accesses(service, &results, &access).await;
-
-    {
-        let mut cache = service.context_cache.write().await;
-        cache.put(cache_key, results.clone());
-    }
+    track_fact_accesses(service, &results, &params.access).await;
+    pipeline::store_cache(service, params.cache_key.clone(), &results).await;
 
     service.logger.log(
-        super::log_event(
+        log_event(
             "assemble_context.cache_set",
             json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
             json!({"count": results.len()}),
-            Some(&access),
+            Some(&params.access),
             None,
             None,
         ),
@@ -387,7 +308,7 @@ pub async fn assemble_context(
         &results,
         false,
         latency_ms,
-        &access,
+        &params.access,
         &query_log_diagnostics,
     )
     .await;

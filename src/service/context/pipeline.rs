@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 
-use crate::models::AssembledContextItem;
+use chrono::{DateTime, Utc};
+use serde_json::json;
+
+use crate::logging::LogLevel;
+use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 use crate::service::MemoryService;
 use crate::service::decayed_confidence;
-use crate::service::error::MemoryError;
+use crate::service::error::{MemoryError, error_messages};
 use crate::service::log_event;
 
 use super::alias_expansion::expand_query_with_aliases;
@@ -16,6 +20,7 @@ use super::filtering::filter_facts_by_constraints;
 use super::graph::{CollectGraphFactsRequest, collect_graph_facts};
 use super::lexical::{FactQueryParams, select_fact_records_for_query};
 use super::params::DefaultContextParams;
+use super::query_mode;
 use super::ranking::{
     BuildRankedContextFactsRequest, RetrievalTier, apply_time_window, build_ranked_context_facts,
     select_ranked_context_facts, sort_ranked_context_facts_for_timeline,
@@ -28,6 +33,156 @@ use super::scoring::{ranked_fact_to_item, selected_fact_matched_terms};
 use super::semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
 use super::temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
 use super::triple::collect_triple_facts;
+use crate::service::cache::{CacheKey, CacheView};
+
+// ─── Parameter preparation and cache operations ──────────────────────────
+
+/// Prepared parameters for context assembly, extracted from the request
+/// and access payload. Avoids re-parsing in the main orchestrator.
+pub(super) struct PreparedContextParams {
+    pub access: AccessPayload,
+    pub namespace: String,
+    pub cutoff: DateTime<Utc>,
+    pub cutoff_iso: String,
+    pub cleaned_query: String,
+    pub project_opt: Option<String>,
+    pub fact_types: Vec<String>,
+    pub query_terms: Vec<String>,
+    pub resolved_view_mode_opt: Option<String>,
+    pub query_flags: super::query_mode::QueryFlags,
+    pub cache_key: CacheKey,
+}
+
+/// Parses the request and prepares all parameters needed for context assembly.
+pub(super) async fn prepare_context_params(
+    service: &MemoryService,
+    request: &AssembleContextRequest,
+    access_opt: Option<AccessPayload>,
+) -> Result<PreparedContextParams, MemoryError> {
+    if request.scope.trim().is_empty() {
+        return Err(MemoryError::Validation(
+            error_messages::SCOPE_REQUIRED.into(),
+        ));
+    }
+
+    let cutoff = request.as_of.unwrap_or_else(super::super::query::now);
+    let access = access_opt.unwrap_or_else(|| AccessPayload {
+        allowed_scopes: Some(vec![request.scope.clone()]),
+        allowed_tags: None,
+        caller_id: None,
+        session_vars: None,
+        transport: None,
+        content_type: None,
+        cross_scope_allow: None,
+    });
+
+    let namespace = service.namespace_for_scope(&request.scope)?;
+    let cutoff_iso = super::super::normalize_dt(cutoff);
+    let cleaned_query = super::super::preprocess_search_query(&request.query);
+    let project_opt = request
+        .project
+        .as_deref()
+        .filter(|project| !project.trim().is_empty())
+        .map(str::to_string);
+    let requested_view_mode = request
+        .view_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let fact_types = request
+        .fact_types
+        .iter()
+        .filter_map(|fact_type| {
+            let trimmed = fact_type.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        })
+        .collect::<Vec<_>>();
+    let query_terms = if cleaned_query.is_empty() {
+        Vec::new()
+    } else {
+        super::super::query::search_query_terms(&cleaned_query)
+    };
+    let raw_query_opt = if request.query.trim().is_empty() {
+        None
+    } else {
+        Some(request.query.as_str())
+    };
+    let (resolved_view_mode, query_flags) = query_mode::resolve_view_mode(
+        requested_view_mode.as_deref(),
+        raw_query_opt,
+        &query_terms,
+        cutoff,
+    );
+    let resolved_view_mode_opt = resolved_view_mode.as_option_str().map(str::to_string);
+    let cache_key = CacheKey::new(
+        &request.query,
+        &request.scope,
+        cutoff,
+        request.budget,
+        request.project.as_deref(),
+        &request.fact_types,
+        CacheView::new(
+            resolved_view_mode.as_option_str(),
+            request.window_start,
+            request.window_end,
+        ),
+        access.allowed_tags.clone(),
+    );
+    let _ = raw_query_opt;
+
+    Ok(PreparedContextParams {
+        access,
+        namespace,
+        cutoff,
+        cutoff_iso,
+        cleaned_query,
+        project_opt,
+        fact_types,
+        query_terms,
+        resolved_view_mode_opt,
+        query_flags,
+        cache_key,
+    })
+}
+
+/// Checks the context cache for a hit. Returns cached items if found.
+pub(super) async fn check_cache(
+    service: &MemoryService,
+    cache_key: &CacheKey,
+) -> Option<Vec<AssembledContextItem>> {
+    let mut cache = service.context_cache.write().await;
+    cache.get(cache_key).cloned()
+}
+
+/// Stores results in the context cache.
+pub(super) async fn store_cache(
+    service: &MemoryService,
+    cache_key: CacheKey,
+    results: &[AssembledContextItem],
+) {
+    let mut cache = service.context_cache.write().await;
+    cache.put(cache_key, results.to_vec());
+}
+
+/// Logs the start of context assembly.
+pub(super) fn log_context_start(
+    service: &MemoryService,
+    request: &AssembleContextRequest,
+    access: Option<&AccessPayload>,
+) {
+    service.logger.log(
+        log_event(
+            "assemble_context.start",
+            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({}),
+            access,
+            None,
+            None,
+        ),
+        LogLevel::Info,
+    );
+}
 
 /// Executes the full multi-tier retrieval pipeline for the default (non-view-mode) path.
 ///
