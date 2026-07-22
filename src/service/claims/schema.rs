@@ -9,26 +9,18 @@ use crate::models::claim::{
     CanonicalDecimal, CanonicalUnit, ClaimCardinality, ClaimSchemaFamily, ClaimSchemaRef,
     ClaimValiditySource, ClaimValue, ComparisonKey, NormalizedText,
 };
-use crate::models::{EpisodeId, FactId};
 use crate::service::MemoryError;
 
 use super::structural::StructuralAssertion;
 
 // ─── Projection Input ─────────────────────────────────────────────────────────
 
-// Fields `namespace`, `source_fact_id`, `source_episode_id`, `scope`, `project`,
-// `policy_tags` are populated by `ClaimService::after_fact_persisted` but not
-// yet read by the four built-in `ClaimSchema::project` implementations.
-// Task 4 of the claim-reconciliation completion plan wires them into the
-// projection path. Kept as struct fields so the change is a pure consumer patch.
-#[allow(dead_code)]
+/// Input for claim schema projection. Contains only the fields that
+/// `ClaimSchema::project` implementations actually read: subject hint,
+/// temporal anchor, content, structured fields, and assertions.
+/// Namespace, fact_id, episode_id, scope, project, and policy_tags are
+/// consumed by `build_claim` directly from `FactPersistedParams`.
 pub(crate) struct ClaimProjectionInput<'a> {
-    pub namespace: &'a str,
-    pub source_fact_id: FactId,
-    pub source_episode_id: EpisodeId,
-    pub scope: &'a str,
-    pub project: Option<&'a str>,
-    pub policy_tags: &'a [String],
     pub subject: &'a str,
     pub t_ref: chrono::DateTime<chrono::Utc>,
     /// The raw source content text.
@@ -63,22 +55,14 @@ pub(crate) struct ClaimDraftCandidate {
 
 // ─── Claim Policy ─────────────────────────────────────────────────────────────────
 
-// `cardinality` is populated by each schema's `policy()` impl but not yet
-// read by a reconciliation engine. Task 4 of the completion plan wires
-// `ClaimSchema::policy` into the candidate-selection / reconciliation path.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ClaimPolicy {
     pub cardinality: ClaimCardinality,
 }
 
 // ─── Claim Skip ─────────────────────────────────────────────────────────────────────────
 
-// Produced by every schema's `project()`; `extract` tests assert reason codes.
-// Persisted-skip storage and `extract` response surfacing are wired by Tasks 4
-// and 6 of the completion plan.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ClaimSkip {
     pub reason_code: String,
     pub detail: Option<String>,
@@ -86,9 +70,6 @@ pub struct ClaimSkip {
 
 // ─── Claim Schema Trait ─────────────────────────────────────────────────────────────────
 
-// `policy` is implemented by every built-in schema but not yet invoked.
-// Task 4 of the completion plan calls it from the reconciliation path.
-#[allow(dead_code)]
 pub(crate) trait ClaimSchema: Send + Sync {
     fn schema_ref(&self) -> ClaimSchemaRef;
     fn project(
@@ -134,6 +115,19 @@ impl ClaimSchemaRegistry {
             schema.project(input, output, skips)?;
         }
         Ok(())
+    }
+
+    /// Look up the policy for a given schema ref and comparison key.
+    /// Falls back to a policy with the claim's own cardinality if no schema matches.
+    pub fn policy_for(&self, schema_ref: &ClaimSchemaRef, key: &ComparisonKey) -> ClaimPolicy {
+        for schema in &self.schemas {
+            if &schema.schema_ref() == schema_ref {
+                return schema.policy(key);
+            }
+        }
+        ClaimPolicy {
+            cardinality: ClaimCardinality::SingleValued,
+        }
     }
 
     #[must_use]
@@ -652,12 +646,6 @@ mod tests {
 
     fn test_input(fields: BTreeMap<String, String>) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
-            namespace: "test",
-            source_fact_id: FactId::from("fact:test"),
-            source_episode_id: EpisodeId::from("ep:test"),
-            scope: "personal",
-            project: None,
-            policy_tags: &[],
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content: "test content",
@@ -671,12 +659,6 @@ mod tests {
         content: &'static str,
     ) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
-            namespace: "test",
-            source_fact_id: FactId::from("fact:test"),
-            source_episode_id: EpisodeId::from("ep:test"),
-            scope: "personal",
-            project: None,
-            policy_tags: &[],
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content,

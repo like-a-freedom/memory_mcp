@@ -199,6 +199,16 @@ pub struct ClaimSchemaRef {
     pub version: std::num::NonZeroU16,
 }
 
+impl ClaimSchemaRef {
+    pub fn new(family: ClaimSchemaFamily, version: u16) -> Self {
+        Self {
+            family,
+            version: std::num::NonZeroU16::new(version)
+                .unwrap_or_else(|| std::num::NonZeroU16::new(1).unwrap()),
+        }
+    }
+}
+
 // ─── Claim Value ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

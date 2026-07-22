@@ -248,13 +248,20 @@ async fn reconcile_page_with_owning(
             "",
             "",
         );
+        // Look up the schema policy for the owning claim's comparison key.
+        // This invokes ClaimSchema::policy which may override cardinality
+        // for specific comparison keys (e.g. force set-valued for certain
+        // attribute predicates).
+        let schema_ref =
+            crate::models::claim::ClaimSchemaRef::new(owning.schema_family, owning.schema_version);
+        let schema_policy = claim_service
+            .registry
+            .policy_for(&schema_ref, &owning.comparison_key);
         let input = super::reconcile::ReconciliationInput {
             left: &owning,
             right: candidate,
-            _policy: &super::schema::ClaimPolicy {
-                cardinality: owning.cardinality,
-            },
-            _confirmed_aliases: &super::reconcile::ConfirmedAliasSet::new(
+            policy: &schema_policy,
+            confirmed_aliases: &super::reconcile::ConfirmedAliasSet::new(
                 std::collections::BTreeMap::new(),
             ),
             evaluator_version: &ev,

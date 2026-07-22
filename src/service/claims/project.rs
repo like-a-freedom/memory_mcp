@@ -102,12 +102,6 @@ impl ClaimService {
                 .unwrap_or("");
 
         let input = ClaimProjectionInput {
-            namespace: params.namespace,
-            source_fact_id: params.fact_id.clone(),
-            source_episode_id: params.source_episode_id.clone(),
-            scope: params.scope,
-            project: params.project,
-            policy_tags: &[],
             subject,
             t_ref: params.t_valid,
             content: params.content,
@@ -220,21 +214,25 @@ impl ClaimService {
 
         // Run inline reconciliation for each newly projected claim so that
         // `extract` sees relations synchronously after `add_fact` returns.
+        // Shadow stage evaluates relations for telemetry but does not persist
+        // ClaimRelation rows; Relations+ persists and may expose.
         // Failures here are non-fatal: facts remain retrievable, and the
         // background worker will retry the durable reconcile_job.
-        for claim_id in &new_claim_ids {
-            if let Err(err) = super::worker::reconcile_claim_inline(
-                self,
-                params.namespace,
-                params.fact_id,
-                claim_id,
-            )
-            .await
-            {
-                eprintln!(
-                    "[claim] inline reconcile failed (non-fatal): namespace={} claim_id={} error={}",
-                    params.namespace, claim_id, err
-                );
+        if self.config.rollout_stage.evaluates_relations() {
+            for claim_id in &new_claim_ids {
+                if let Err(err) = super::worker::reconcile_claim_inline(
+                    self,
+                    params.namespace,
+                    params.fact_id,
+                    claim_id,
+                )
+                .await
+                {
+                    eprintln!(
+                        "[claim] inline reconcile failed (non-fatal): namespace={} claim_id={} error={}",
+                        params.namespace, claim_id, err
+                    );
+                }
             }
         }
 
@@ -254,6 +252,12 @@ impl ClaimService {
                 "skipped",
                 skip.reason_code.as_str(),
             );
+            if let Some(detail) = &skip.detail {
+                eprintln!(
+                    "[claim] skip detail: reason={} detail={}",
+                    skip.reason_code, detail
+                );
+            }
         }
 
         Ok(FactProjectionSummary {

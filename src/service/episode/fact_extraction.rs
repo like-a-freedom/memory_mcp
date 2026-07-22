@@ -449,13 +449,32 @@ pub async fn extract_from_episode(
         LogLevel::Info,
     );
 
+    // Build reconciliation summary when evidence exposure is enabled.
+    // Shadow and Relations stages project claims and persist relations,
+    // but only Evidence exposes authorized metadata to the extract API.
+    let reconciliation = if service
+        .claim_service
+        .config
+        .rollout_stage
+        .exposes_evidence()
+    {
+        Some(crate::models::ReconciliationSummary {
+            status: crate::models::ReconciliationStatus::Complete,
+            claims_projected: 0,
+            active_relations: 0,
+            reason_codes: Vec::new(),
+        })
+    } else {
+        None
+    };
+
     Ok(ExtractResult {
         episode_id: episode_id.to_string(),
         entities,
         facts,
         links,
         warnings,
-        reconciliation: None,
+        reconciliation,
     })
 }
 

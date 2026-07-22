@@ -14,19 +14,21 @@ use crate::service::claims::schema::ClaimPolicy;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/// Confirmed alias set for fuzzy alias matching.
+/// Confirmed alias set for fuzzy alias matching during reconciliation.
+/// When two claims have subjects that differ only by a confirmed alias,
+/// they should be treated as the same slot.
 #[derive(Debug, Default)]
 pub(crate) struct ConfirmedAliasSet {
-    _aliases: BTreeMap<String, String>,
+    aliases: BTreeMap<String, String>,
 }
 
 impl ConfirmedAliasSet {
     pub fn new(aliases: BTreeMap<String, String>) -> Self {
-        Self { _aliases: aliases }
+        Self { aliases }
     }
 
-    pub fn _resolve(&self, key: &str) -> Option<&str> {
-        self._aliases.get(key).map(|s| s.as_str())
+    pub fn resolve(&self, key: &str) -> Option<&str> {
+        self.aliases.get(key).map(|s| s.as_str())
     }
 }
 
@@ -101,8 +103,8 @@ pub(crate) enum ReconciliationDecision {
 pub(crate) struct ReconciliationInput<'a> {
     pub left: &'a Claim,
     pub right: &'a Claim,
-    pub _policy: &'a ClaimPolicy,
-    pub _confirmed_aliases: &'a ConfirmedAliasSet,
+    pub policy: &'a ClaimPolicy,
+    pub confirmed_aliases: &'a ConfirmedAliasSet,
     pub evaluator_version: &'a EvaluatorVersion,
     pub context_fingerprint: &'a ReconciliationContextFingerprint,
     pub evaluated_at: chrono::DateTime<chrono::Utc>,
@@ -110,13 +112,19 @@ pub(crate) struct ReconciliationInput<'a> {
 
 // ─── Pure Gate Functions ──────────────────────────────────────────────────────
 
-fn same_exact_slot(left: &Claim, right: &Claim) -> bool {
+fn same_exact_slot(left: &Claim, right: &Claim, aliases: &ConfirmedAliasSet) -> bool {
+    // Resolve subject aliases: if left.subject_key is a known alias for
+    // right.subject_key (or vice versa), treat them as the same slot.
+    let subjects_match = left.subject_key == right.subject_key
+        || aliases.resolve(&left.subject_key) == Some(right.subject_key.as_str())
+        || aliases.resolve(&right.subject_key) == Some(left.subject_key.as_str());
+
     left.scope == right.scope
         && left.project_identity == right.project_identity
         && left.access_policy_fingerprint == right.access_policy_fingerprint
         && left.schema_family == right.schema_family
         && left.schema_version == right.schema_version
-        && left.subject_key == right.subject_key
+        && subjects_match
         && left.comparison_key_hash == right.comparison_key_hash
 }
 
@@ -235,8 +243,8 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
     let left = input.left;
     let right = input.right;
 
-    // Gate 1: Slot mismatch
-    if !same_exact_slot(left, right) {
+    // Gate 1: Slot mismatch (with alias resolution)
+    if !same_exact_slot(left, right, input.confirmed_aliases) {
         return ReconciliationDecision::Skip;
     }
 
@@ -284,7 +292,11 @@ pub(crate) fn reconcile(input: &ReconciliationInput<'_>) -> ReconciliationDecisi
     }
 
     // Gate 5: Set-valued coexistence (no exclusivity)
-    if left.cardinality == ClaimCardinality::SetValued
+    // Uses the schema policy cardinality (from ClaimSchema::policy) rather
+    // than the raw claim draft cardinality, so the policy layer can
+    // override single-valued → set-valued for specific comparison keys.
+    if input.policy.cardinality == ClaimCardinality::SetValued
+        || left.cardinality == ClaimCardinality::SetValued
         || right.cardinality == ClaimCardinality::SetValued
     {
         return ReconciliationDecision::Coexist;
@@ -497,8 +509,8 @@ mod tests {
         ReconciliationInput {
             left,
             right,
-            _policy: policy,
-            _confirmed_aliases: aliases,
+            policy,
+            confirmed_aliases: aliases,
             evaluator_version: eval_version,
             context_fingerprint: ctx_fp,
             evaluated_at: chrono::Utc::now(),

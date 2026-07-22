@@ -43,19 +43,13 @@ mod tests {
     use super::super::schema::*;
     use super::*;
     use crate::models::claim::{ClaimSchemaFamily, ExtractorFingerprint};
-    use crate::models::{EpisodeId, FactId};
+
     use std::collections::BTreeMap;
 
     const EMPTY_ASSERTIONS: &[crate::service::claims::structural::StructuralAssertion] = &[];
 
     fn test_input(fields: BTreeMap<String, String>) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
-            namespace: "test",
-            source_fact_id: FactId::from("fact:test"),
-            source_episode_id: EpisodeId::from("ep:test"),
-            scope: "personal",
-            project: None,
-            policy_tags: &[],
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content: "test content",
@@ -69,12 +63,6 @@ mod tests {
         content: &'static str,
     ) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {
-            namespace: "test",
-            source_fact_id: FactId::from("fact:test"),
-            source_episode_id: EpisodeId::from("ep:test"),
-            scope: "personal",
-            project: None,
-            policy_tags: &[],
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content,
