@@ -129,7 +129,6 @@ pub(super) async fn prepare_context_params(
         ),
         access.allowed_tags.clone(),
     );
-    let _ = raw_query_opt;
 
     Ok(PreparedContextParams {
         access,

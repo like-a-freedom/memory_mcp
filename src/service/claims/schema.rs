@@ -65,7 +65,6 @@ pub struct ClaimPolicy {
 #[derive(Debug, Clone)]
 pub struct ClaimSkip {
     pub reason_code: String,
-    pub detail: Option<String>,
 }
 
 // ─── Claim Schema Trait ─────────────────────────────────────────────────────────────────
@@ -118,7 +117,7 @@ impl ClaimSchemaRegistry {
     }
 
     /// Look up the policy for a given schema ref and comparison key.
-    /// Falls back to a policy with the claim's own cardinality if no schema matches.
+    /// Falls back to SingleValued (conservative) if no schema matches.
     pub fn policy_for(&self, schema_ref: &ClaimSchemaRef, key: &ComparisonKey) -> ClaimPolicy {
         for schema in &self.schemas {
             if &schema.schema_ref() == schema_ref {
@@ -345,7 +344,6 @@ impl ClaimSchema for QuantityV1 {
                 Err(_) => {
                     skips.push(ClaimSkip {
                         reason_code: "invalid_value".to_string(),
-                        detail: Some(format!("cannot parse decimal: {val_str}")),
                     });
                 }
             }

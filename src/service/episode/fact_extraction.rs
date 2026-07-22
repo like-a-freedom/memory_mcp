@@ -452,17 +452,43 @@ pub async fn extract_from_episode(
     // Build reconciliation summary when evidence exposure is enabled.
     // Shadow and Relations stages project claims and persist relations,
     // but only Evidence exposes authorized metadata to the extract API.
+    // Build reconciliation summary when evidence exposure is enabled.
+    // Queries active claim relations for the extracted facts.
     let reconciliation = if service
         .claim_service
         .config
         .rollout_stage
         .exposes_evidence()
     {
+        let fact_ids: Vec<_> = facts
+            .iter()
+            .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
+            .collect();
+        let query = crate::storage::claims::RelationsForFactsQuery {
+            namespace: &namespace,
+            fact_ids: &fact_ids,
+        };
+        let relations = service
+            .claim_service
+            .store
+            .select_relations_for_facts(query)
+            .await
+            .unwrap_or_default();
+        let active_relations = relations
+            .iter()
+            .filter(|r| r.t_invalid_ingested.is_none())
+            .count();
+        let reason_codes: Vec<String> = relations
+            .iter()
+            .map(|r| r.reason_code.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
         Some(crate::models::ReconciliationSummary {
             status: crate::models::ReconciliationStatus::Complete,
-            claims_projected: 0,
-            active_relations: 0,
-            reason_codes: Vec::new(),
+            claims_projected: facts.len(),
+            active_relations,
+            reason_codes,
         })
     } else {
         None

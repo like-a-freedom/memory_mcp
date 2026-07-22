@@ -252,12 +252,6 @@ impl ClaimService {
                 "skipped",
                 skip.reason_code.as_str(),
             );
-            if let Some(detail) = &skip.detail {
-                eprintln!(
-                    "[claim] skip detail: reason={} detail={}",
-                    skip.reason_code, detail
-                );
-            }
         }
 
         Ok(FactProjectionSummary {
