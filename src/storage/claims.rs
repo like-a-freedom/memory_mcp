@@ -344,12 +344,15 @@ impl ClaimStore for SurrealClaimStore {
         request: LeaseJobRequest<'_>,
     ) -> Result<Option<ClaimJob>, MemoryError> {
         let expires = chrono::Utc::now() + request.lease_duration;
-        // Atomically find the next pending/expired job and lease it
-        let sql = "UPDATE claim_job SET status = 'leased', lease_owner = $owner, \
-                   lease_expires_at = $expires, started_at = $now \
+        // Atomically find the next pending/expired job and lease it.
+        // SurrealDB doesn't support ORDER BY in UPDATE, so we use a subquery
+        // to find the next job ID and then update it.
+        let sql = "UPDATE (SELECT id FROM claim_job \
                    WHERE status = 'pending' \
                    AND (lease_expires_at IS NONE OR lease_expires_at < time::now()) \
-                   ORDER BY job_id LIMIT 1 RETURN BEFORE";
+                   ORDER BY job_id LIMIT 1) \
+                   SET status = 'leased', lease_owner = $owner, \
+                   lease_expires_at = $expires, started_at = $now RETURN BEFORE";
         let vars = serde_json::json!({
             "owner": request.lease_owner,
             "expires": crate::service::normalize_dt(expires),

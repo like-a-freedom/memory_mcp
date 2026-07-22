@@ -32,7 +32,7 @@ impl ClaimWorkerRuntime {
         }
     }
 
-    pub(crate) fn spawn_worker(&self, claim_service: ClaimService, worker_id: String) {
+    pub(crate) async fn spawn_worker(&self, claim_service: ClaimService, worker_id: String) {
         let shutdown = self.shutdown.clone();
         let handle = tokio::spawn(async move {
             loop {
@@ -54,7 +54,7 @@ impl ClaimWorkerRuntime {
                 }
             }
         });
-        let mut handles = self.handles.blocking_lock();
+        let mut handles = self.handles.lock().await;
         handles.push(handle);
     }
 

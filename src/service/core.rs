@@ -433,7 +433,9 @@ impl MemoryService {
     pub(crate) async fn start_claim_workers(&self) -> super::claims::worker::ClaimWorkerRuntime {
         let runtime = super::claims::worker::ClaimWorkerRuntime::new();
         let worker_id = format!("claim-worker-{}", std::process::id());
-        runtime.spawn_worker(self.claim_service.clone(), worker_id);
+        runtime
+            .spawn_worker(self.claim_service.clone(), worker_id)
+            .await;
         runtime
     }
 
