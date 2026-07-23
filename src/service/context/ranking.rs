@@ -1330,4 +1330,787 @@ mod tests {
         assert!(one_hop > two_hop);
         assert!(one_hop > weak_one_hop);
     }
+
+    // -----------------------------------------------------------------------
+    // Tests relocated from context.rs — build_ranked_context_facts,
+    // ranked_relevance_score, select_ranked_context_facts, and
+    // prune_redundant_selected_facts scenario coverage.
+    // -----------------------------------------------------------------------
+
+    use crate::service::context::temporal::infer_temporal_window;
+
+    fn create_test_fact(fact_id: &str, t_valid: DateTime<Utc>) -> Fact {
+        Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "note".to_string(),
+            content: "Test content".to_string(),
+            quote: "Test quote".to_string(),
+            source_episode: "episode:123".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    fn create_ranked_test_fact(
+        fact_id: &str,
+        source_episode: &str,
+        t_valid: DateTime<Utc>,
+        fusion_score: f64,
+        ft_score: f64,
+        access_count: i64,
+        index_keys: &[&str],
+    ) -> RankedContextFact {
+        let mut fact = create_test_fact(fact_id, t_valid);
+        fact.source_episode = source_episode.to_string();
+        fact.ft_score = ft_score;
+        fact.access_count = access_count;
+        fact.index_keys = index_keys.iter().map(|key| (*key).to_string()).collect();
+
+        RankedContextFact {
+            fact,
+            rationale: "test rationale".to_string(),
+            retrieval_tier: RetrievalTier::Direct,
+            fusion_score,
+            source_priority: 0,
+            decayed_confidence: 1.0,
+            query_alignment_factor: 1.0,
+            grounding_score: 1.0,
+            semantic_available: false,
+            matched_query_terms: Vec::new(),
+            graph_trace: None,
+        }
+    }
+
+    fn fixed_temporal_cutoff() -> DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-04-08T12:00:00Z")
+            .expect("cutoff")
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn query_is_first_person_memory_recognizes_contractions() {
+        assert!(query_is_first_person_memory(
+            "I'm planning a weekend getaway and want something creatively fulfilling"
+        ));
+        assert!(query_is_first_person_memory(
+            "I've decided to focus on original music projects"
+        ));
+        assert!(query_is_first_person_memory(
+            "My reviews felt less authentic over time"
+        ));
+        assert!(!query_is_first_person_memory(
+            "What activities feel creatively fulfilling for a music lover?"
+        ));
+    }
+
+    #[test]
+    fn build_ranked_context_facts_promotes_temporal_tier_over_direct() {
+        let cutoff = Utc::now();
+        let fact = create_test_fact("fact:temporal", cutoff - chrono::Duration::days(1));
+
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![
+                    (fact.clone(), RetrievalTier::Direct),
+                    (fact, RetrievalTier::TemporalExpanded),
+                ],
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: Some("march 2026 launch review"),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
+            crate::service::decayed_confidence,
+        );
+
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].retrieval_tier, RetrievalTier::TemporalExpanded);
+        assert!(ranked[0].rationale.contains("tier=temporal"));
+    }
+
+    #[test]
+    fn build_ranked_context_facts_weights_graph_results_by_origin_factor() {
+        let cutoff = Utc::now();
+
+        let mut inferred = create_test_fact("fact:inferred", cutoff - chrono::Duration::days(1));
+        inferred.content = "Inferred fact content from beta community".to_string();
+        let mut extracted = create_test_fact("fact:extracted", cutoff - chrono::Duration::days(1));
+        extracted.content = "Extracted fact content from alpha community".to_string();
+
+        let mut ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: Vec::new(),
+                graph_facts: Vec::new(),
+                community_facts: vec![
+                    (
+                        inferred,
+                        "matched community summary via community:beta".to_string(),
+                        0.2,
+                    ),
+                    (
+                        extracted,
+                        "matched community summary via community:alpha".to_string(),
+                        1.0,
+                    ),
+                ],
+                semantic_facts: Vec::new(),
+                query_opt: Some("launch workstream"),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
+            crate::service::decayed_confidence,
+        );
+        sort_ranked_context_facts(&mut ranked);
+
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].fact.fact_id, "fact:extracted");
+        assert_eq!(ranked[1].fact.fact_id, "fact:inferred");
+    }
+
+    #[test]
+    fn ranked_relevance_score_softly_penalizes_frequently_accessed_facts() {
+        let cutoff = Utc::now();
+        let cold = create_ranked_test_fact(
+            "fact:cold",
+            "episode:cold",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["alpha"],
+        );
+        let hot =
+            create_ranked_test_fact("fact:hot", "episode:hot", cutoff, 10.0, 5.0, 50, &["alpha"]);
+
+        assert!(ranked_relevance_score(&cold) > ranked_relevance_score(&hot));
+    }
+
+    #[test]
+    fn ranked_relevance_score_prefers_experience_facts_when_other_signals_tie() {
+        let cutoff = Utc::now();
+        let mut note = create_ranked_test_fact(
+            "fact:note",
+            "episode:shared",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["hotel", "quiet"],
+        );
+        note.fact.fact_type = "note".to_string();
+
+        let mut experience = create_ranked_test_fact(
+            "fact:experience",
+            "episode:shared",
+            cutoff,
+            10.0,
+            5.0,
+            0,
+            &["hotel", "quiet"],
+        );
+        experience.fact.fact_type = "experience".to_string();
+
+        assert!(
+            ranked_relevance_score(&experience) > ranked_relevance_score(&note),
+            "experience memories should beat otherwise identical generic notes"
+        );
+    }
+
+    #[test]
+    fn build_ranked_context_facts_prefers_user_memories_for_first_person_queries() {
+        let cutoff = Utc::now();
+
+        let mut user_fact = create_test_fact("fact:user", cutoff);
+        user_fact.content =
+            "User: I was thrilled to hear modern beats blended with Pacific sounds live."
+                .to_string();
+        user_fact.quote = user_fact.content.clone();
+        user_fact.ft_score = 4.0;
+
+        let mut assistant_fact = create_test_fact("fact:assistant", cutoff);
+        assistant_fact.content =
+            "Assistant: It sounds like live music gives you a strong sense of cultural connection."
+                .to_string();
+        assistant_fact.quote = assistant_fact.content.clone();
+        assistant_fact.ft_score = 4.0;
+
+        let mut ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![
+                    (assistant_fact, RetrievalTier::Direct),
+                    (user_fact, RetrievalTier::Direct),
+                ],
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: Some(
+                    "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
+                ),
+                semantic_available: false,
+                scope: "org",
+                cutoff,
+            },
+            crate::service::decayed_confidence,
+        );
+        sort_ranked_context_facts(&mut ranked);
+
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].fact.fact_id, "fact:user");
+        assert_eq!(ranked[1].fact.fact_id, "fact:assistant");
+    }
+
+    #[test]
+    fn select_ranked_context_facts_filters_out_of_window_candidates_without_temporal_support() {
+        let temporal_focus =
+            infer_temporal_window("july 2025", fixed_temporal_cutoff()).expect("temporal focus");
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+
+        let july_candidate_time = chrono::DateTime::parse_from_rfc3339("2025-07-10T10:00:00Z")
+            .expect("july candidate timestamp")
+            .with_timezone(&Utc);
+        let october_candidate_time = chrono::DateTime::parse_from_rfc3339("2025-10-13T10:00:00Z")
+            .expect("october candidate timestamp")
+            .with_timezone(&Utc);
+
+        let july_candidate = RankedContextFact {
+            fact: Fact {
+                content: "Platform planning notes were finalized in July 2025.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:july",
+                    "episode:july",
+                    july_candidate_time,
+                    2.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::Direct,
+            ..create_ranked_test_fact(
+                "fact:july",
+                "episode:july",
+                july_candidate_time,
+                2.0,
+                6.0,
+                0,
+                &[],
+            )
+        };
+
+        let october_semantic_candidate = RankedContextFact {
+            fact: Fact {
+                content: "October 2025 summary: Platform 2.3 patch release updates.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:october",
+                    "episode:october",
+                    october_candidate_time,
+                    1.8,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::SemanticExpanded,
+            ..create_ranked_test_fact(
+                "fact:october",
+                "episode:october",
+                october_candidate_time,
+                1.8,
+                5.0,
+                0,
+                &[],
+            )
+        };
+
+        let selected = select_ranked_context_facts(
+            vec![october_semantic_candidate, july_candidate],
+            5,
+            Some(temporal_focus),
+            query_terms,
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|fact| fact.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:july"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_caps_source_episode_before_budget_fill() {
+        let cutoff = Utc::now();
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:a1",
+                    "episode:alpha",
+                    cutoff,
+                    12.0,
+                    10.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:a2",
+                    "episode:alpha",
+                    cutoff - chrono::Duration::days(1),
+                    11.0,
+                    9.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:a3",
+                    "episode:alpha",
+                    cutoff - chrono::Duration::days(2),
+                    10.5,
+                    8.0,
+                    0,
+                    &["alpha", "shared"],
+                ),
+                create_ranked_test_fact(
+                    "fact:b1",
+                    "episode:beta",
+                    cutoff - chrono::Duration::days(3),
+                    9.5,
+                    8.0,
+                    0,
+                    &["beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:c1",
+                    "episode:gamma",
+                    cutoff - chrono::Duration::days(4),
+                    9.0,
+                    8.0,
+                    0,
+                    &["gamma"],
+                ),
+            ],
+            4,
+            None,
+            vec![],
+        );
+
+        assert_eq!(selected.len(), 4);
+        assert_eq!(
+            selected
+                .iter()
+                .filter(|item| item.fact.source_episode == "episode:alpha")
+                .count(),
+            2
+        );
+        assert!(
+            selected
+                .iter()
+                .any(|item| item.fact.source_episode == "episode:beta")
+        );
+        assert!(
+            selected
+                .iter()
+                .any(|item| item.fact.source_episode == "episode:gamma")
+        );
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_novel_index_keys_when_scores_are_close() {
+        let cutoff = Utc::now();
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:anchor",
+                    "episode:anchor",
+                    cutoff,
+                    10.0,
+                    10.0,
+                    0,
+                    &["alpha", "beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:redundant",
+                    "episode:redundant",
+                    cutoff - chrono::Duration::days(1),
+                    9.9,
+                    9.0,
+                    0,
+                    &["alpha", "beta"],
+                ),
+                create_ranked_test_fact(
+                    "fact:diverse",
+                    "episode:diverse",
+                    cutoff - chrono::Duration::days(1),
+                    9.7,
+                    9.0,
+                    0,
+                    &["gamma", "delta"],
+                ),
+            ],
+            2,
+            None,
+            vec![],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:anchor", "fact:diverse"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_temporal_spread_for_tied_candidates() {
+        let anchor_time = chrono::DateTime::parse_from_rfc3339("2026-01-01T12:00:00Z")
+            .expect("anchor time")
+            .with_timezone(&Utc);
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:anchor",
+                    "episode:anchor",
+                    anchor_time,
+                    10.0,
+                    10.0,
+                    0,
+                    &[],
+                ),
+                create_ranked_test_fact(
+                    "fact:nearby",
+                    "episode:nearby",
+                    anchor_time + chrono::Duration::days(1),
+                    9.5,
+                    9.0,
+                    0,
+                    &[],
+                ),
+                create_ranked_test_fact(
+                    "fact:distant",
+                    "episode:distant",
+                    anchor_time + chrono::Duration::days(60),
+                    9.5,
+                    9.0,
+                    0,
+                    &[],
+                ),
+            ],
+            2,
+            None,
+            vec![],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:anchor", "fact:distant"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_prefers_in_window_items_over_stale_out_of_window_digests() {
+        let anchor_time = chrono::DateTime::parse_from_rfc3339("2026-03-10T12:00:00Z")
+            .expect("anchor time")
+            .with_timezone(&Utc);
+        let temporal_focus = infer_temporal_window(
+            "march april 2026 alpha suite decisions",
+            fixed_temporal_cutoff(),
+        );
+
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:stale-digest",
+                    "episode:stale-digest",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-14T09:00:00Z")
+                        .expect("stale time")
+                        .with_timezone(&Utc),
+                    12.0,
+                    11.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:in-window",
+                    "episode:in-window",
+                    anchor_time,
+                    10.5,
+                    9.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+            ],
+            1,
+            temporal_focus,
+            vec![
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "alpha".to_string(),
+                "suite".to_string(),
+                "decision".to_string(),
+            ],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(fact_ids, vec!["fact:in-window"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_stops_before_budget_for_far_out_of_window_tail() {
+        let temporal_focus = infer_temporal_window(
+            "march april 2026 alpha suite delta control signal monitor orbit portal decisions",
+            fixed_temporal_cutoff(),
+        );
+        let selected = select_ranked_context_facts(
+            vec![
+                create_ranked_test_fact(
+                    "fact:alpha",
+                    "episode:alpha",
+                    chrono::DateTime::parse_from_rfc3339("2026-03-10T09:00:00Z")
+                        .expect("alpha time")
+                        .with_timezone(&Utc),
+                    11.0,
+                    10.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:delta",
+                    "episode:delta",
+                    chrono::DateTime::parse_from_rfc3339("2026-03-11T09:00:00Z")
+                        .expect("delta time")
+                        .with_timezone(&Utc),
+                    10.5,
+                    9.5,
+                    0,
+                    &["delta", "control", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:signal",
+                    "episode:signal",
+                    chrono::DateTime::parse_from_rfc3339("2026-04-02T09:00:00Z")
+                        .expect("signal time")
+                        .with_timezone(&Utc),
+                    10.0,
+                    9.0,
+                    0,
+                    &["signal", "monitor", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:orbit",
+                    "episode:orbit",
+                    chrono::DateTime::parse_from_rfc3339("2026-04-03T09:00:00Z")
+                        .expect("orbit time")
+                        .with_timezone(&Utc),
+                    9.8,
+                    9.0,
+                    0,
+                    &["orbit", "portal", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:stale-1",
+                    "episode:stale-1",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-14T09:00:00Z")
+                        .expect("stale 1 time")
+                        .with_timezone(&Utc),
+                    12.0,
+                    11.0,
+                    0,
+                    &["alpha", "suite", "decisions"],
+                ),
+                create_ranked_test_fact(
+                    "fact:stale-2",
+                    "episode:stale-2",
+                    chrono::DateTime::parse_from_rfc3339("2025-10-13T09:00:00Z")
+                        .expect("stale 2 time")
+                        .with_timezone(&Utc),
+                    11.5,
+                    10.5,
+                    0,
+                    &["orbit", "portal", "decisions"],
+                ),
+            ],
+            6,
+            temporal_focus,
+            vec![
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "alpha".to_string(),
+                "suite".to_string(),
+                "delta".to_string(),
+                "control".to_string(),
+                "signal".to_string(),
+                "monitor".to_string(),
+                "orbit".to_string(),
+                "portal".to_string(),
+                "decision".to_string(),
+            ],
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec!["fact:alpha", "fact:delta", "fact:signal", "fact:orbit"]
+        );
+    }
+
+    #[test]
+    fn prune_redundant_selected_facts_removes_broad_umbrella_summaries() {
+        let selected = prune_redundant_selected_facts(
+            vec![
+                // Specific facts first — highest relevance, they fill the protected set.
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:atlas",
+                        "episode:atlas",
+                        chrono::DateTime::parse_from_rfc3339("2026-03-15T09:00:00Z")
+                            .expect("atlas time")
+                            .with_timezone(&Utc),
+                        10.0,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "March 2026 Atlas blocker: legal signoff is still missing for the reseller appendix.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:beacon",
+                        "episode:beacon",
+                        chrono::DateTime::parse_from_rfc3339("2026-03-16T09:00:00Z")
+                            .expect("beacon time")
+                            .with_timezone(&Utc),
+                        9.9,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content =
+                        "March 2026 Beacon blocker and decision: finance approved the revised launch budget after the blocker was resolved."
+                            .to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:atlas-april",
+                        "episode:atlas-april",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-05T09:00:00Z")
+                            .expect("atlas april time")
+                            .with_timezone(&Utc),
+                        9.8,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "April 2026 Atlas decision: partner onboarding moved to the managed rollout path.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:beacon-april",
+                        "episode:beacon-april",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-06T09:00:00Z")
+                            .expect("beacon april time")
+                            .with_timezone(&Utc),
+                        9.7,
+                        9.0,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "April 2026 Beacon blocker: the migration depends on the final tax mapping table.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                // Broad umbrella summaries — lower scores, NOT protected.
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-a",
+                        "episode:digest-a",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T09:00:00Z")
+                            .expect("digest a time")
+                            .with_timezone(&Utc),
+                        8.5,
+                        7.5,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Quarterly digest for Atlas and Beacon repeated blockers and decisions keywords across March and April 2026 without resolving any specific item.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+                {
+                    let mut fact = create_ranked_test_fact(
+                        "fact:digest-b",
+                        "episode:digest-b",
+                        chrono::DateTime::parse_from_rfc3339("2026-04-07T10:00:00Z")
+                            .expect("digest b time")
+                            .with_timezone(&Utc),
+                        8.3,
+                        7.3,
+                        0,
+                        &[],
+                    );
+                    fact.fact.content = "Combined Atlas and Beacon digest covering March and April 2026: blocker updates, decision summaries, and launch progress across both workstreams.".to_string();
+                    fact.fact.quote = fact.fact.content.clone();
+                    fact
+                },
+            ],
+            &[
+                "march".to_string(),
+                "april".to_string(),
+                "2026".to_string(),
+                "atlas".to_string(),
+                "beacon".to_string(),
+                "blocker".to_string(),
+                "decision".to_string(),
+            ],
+            None,
+        );
+
+        let fact_ids = selected
+            .iter()
+            .map(|item| item.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            fact_ids,
+            vec![
+                "fact:atlas",
+                "fact:beacon",
+                "fact:atlas-april",
+                "fact:beacon-april"
+            ]
+        );
+    }
 }

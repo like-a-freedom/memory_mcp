@@ -5,10 +5,10 @@ use serde_json::json;
 
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
-use crate::service::MemoryService;
 use crate::service::decayed_confidence;
 use crate::service::error::{MemoryError, error_messages};
 use crate::service::log_event;
+use crate::service::service_context::ServiceContext;
 
 use super::alias_expansion::expand_query_with_aliases;
 use super::budget::{collect_episode_fallback_items, should_prefer_episode_content};
@@ -55,7 +55,7 @@ pub(super) struct PreparedContextParams {
 
 /// Parses the request and prepares all parameters needed for context assembly.
 pub(super) async fn prepare_context_params(
-    service: &MemoryService,
+    service: &ServiceContext,
     request: &AssembleContextRequest,
     access_opt: Option<AccessPayload>,
 ) -> Result<PreparedContextParams, MemoryError> {
@@ -147,7 +147,7 @@ pub(super) async fn prepare_context_params(
 
 /// Checks the context cache for a hit. Returns cached items if found.
 pub(super) async fn check_cache(
-    service: &MemoryService,
+    service: &ServiceContext,
     cache_key: &CacheKey,
 ) -> Option<Vec<AssembledContextItem>> {
     let mut cache = service.context_cache.write().await;
@@ -156,7 +156,7 @@ pub(super) async fn check_cache(
 
 /// Stores results in the context cache.
 pub(super) async fn store_cache(
-    service: &MemoryService,
+    service: &ServiceContext,
     cache_key: CacheKey,
     results: &[AssembledContextItem],
 ) {
@@ -166,7 +166,7 @@ pub(super) async fn store_cache(
 
 /// Logs the start of context assembly.
 pub(super) fn log_context_start(
-    service: &MemoryService,
+    service: &ServiceContext,
     request: &AssembleContextRequest,
     access: Option<&AccessPayload>,
 ) {
@@ -188,7 +188,7 @@ pub(super) fn log_context_start(
 /// Tiers: lexical BM25 → temporal → alias expansion → experience → community → semantic ANN.
 /// Falls back to episode search if no facts match.
 pub(super) async fn assemble_default_context(
-    service: &MemoryService,
+    service: &ServiceContext,
     params: DefaultContextParams<'_>,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let lexical_result = select_fact_records_for_query(

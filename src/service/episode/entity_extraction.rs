@@ -5,9 +5,9 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{EntityCandidate, ExtractedEntity};
-use crate::service::MemoryService;
 use crate::service::error::MemoryError;
 use crate::service::normalize_text;
+use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
 
 fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
@@ -23,7 +23,7 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
 /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
 ///   When provided, these labels override the default NER configuration.
 pub async fn extract_entities(
-    service: &MemoryService,
+    service: &ServiceContext,
     content: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
@@ -98,8 +98,14 @@ pub async fn extract_entities(
         let canonical_name = candidate.canonical_name.clone();
 
         let entity_id = service
-            .resolve(candidate.clone(), None)
+            .entity_resolver
+            .resolve_or_create(
+                &service.entity_service,
+                candidate.clone(),
+                &service.default_namespace,
+            )
             .await
+            .map(|(id, _created)| id)
             .inspect_err(|err| {
                 service.logger.log(
                     log_event(
@@ -274,7 +280,7 @@ pub(super) fn build_ner_log_result(
 }
 
 fn log_ner_error(
-    service: &MemoryService,
+    service: &ServiceContext,
     provider: &str,
     content_chars: usize,
     zero_shot_label_count: Option<usize>,

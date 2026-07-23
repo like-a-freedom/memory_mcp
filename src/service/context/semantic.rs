@@ -22,7 +22,7 @@ pub(crate) struct CollectSemanticFactsRequest<'a> {
 }
 
 pub(crate) async fn collect_semantic_facts(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: CollectSemanticFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String)>, MemoryError> {
     let query_embedding = match service

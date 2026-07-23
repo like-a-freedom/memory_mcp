@@ -486,4 +486,242 @@ mod tests {
         let value = serde_json::json!({"Array": [1, 2, 3]});
         assert!(raw_array(&value).is_some());
     }
+
+    // -----------------------------------------------------------------------
+    // Tests relocated from context.rs — sort_facts_by_recency wrapper and
+    // filter_facts_by_policy scenarios that mirror user-facing inputs.
+    // -----------------------------------------------------------------------
+
+    fn create_test_fact(fact_id: &str, t_valid: chrono::DateTime<Utc>) -> Fact {
+        Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "note".to_string(),
+            content: "Test content".to_string(),
+            quote: "Test quote".to_string(),
+            source_episode: "episode:123".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    fn sort_facts_by_recency(facts: &mut [Fact]) {
+        facts.sort_by(compare_facts_by_recency);
+    }
+
+    #[test]
+    fn sort_facts_by_recency_orders_by_date_desc() {
+        let t1 = Utc::now();
+        let t2 = t1 - chrono::Duration::hours(1);
+        let t3 = t1 - chrono::Duration::hours(2);
+
+        let mut facts = vec![
+            create_test_fact("fact:3", t3),
+            create_test_fact("fact:1", t1),
+            create_test_fact("fact:2", t2),
+        ];
+
+        sort_facts_by_recency(&mut facts);
+
+        assert_eq!(facts[0].fact_id, "fact:1");
+        assert_eq!(facts[1].fact_id, "fact:2");
+        assert_eq!(facts[2].fact_id, "fact:3");
+    }
+
+    #[test]
+    fn sort_facts_by_recency_breaks_ties_with_id() {
+        let t = Utc::now();
+
+        let mut facts = vec![
+            create_test_fact("fact:b", t),
+            create_test_fact("fact:a", t),
+            create_test_fact("fact:c", t),
+        ];
+
+        sort_facts_by_recency(&mut facts);
+
+        assert_eq!(facts[0].fact_id, "fact:a");
+        assert_eq!(facts[1].fact_id, "fact:b");
+        assert_eq!(facts[2].fact_id, "fact:c");
+    }
+
+    #[test]
+    fn sort_facts_by_recency_handles_empty() {
+        let mut facts: Vec<Fact> = vec![];
+        sort_facts_by_recency(&mut facts);
+        assert!(facts.is_empty());
+    }
+
+    #[test]
+    fn sort_facts_by_recency_handles_single() {
+        let mut facts = vec![create_test_fact("fact:1", Utc::now())];
+        sort_facts_by_recency(&mut facts);
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].fact_id, "fact:1");
+    }
+
+    #[test]
+    fn filter_facts_by_policy_returns_empty_for_empty_input() {
+        let access = AccessPayload::default();
+        let result = filter_facts_by_policy(vec![], &access);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_facts_by_policy_skips_invalid_records() {
+        let access = AccessPayload::default();
+        let records = vec![serde_json::json!({"invalid": "data"})];
+        let result = filter_facts_by_policy(records, &access);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_facts_by_policy_filters_by_allowed_tags() {
+        let mut fact1 = create_test_fact("fact:1", Utc::now());
+        fact1.policy_tags = vec!["allowed".to_string(), "other".to_string()];
+
+        let mut fact2 = create_test_fact("fact:2", Utc::now());
+        fact2.policy_tags = vec!["blocked".to_string()];
+
+        let access = AccessPayload {
+            allowed_scopes: None,
+            allowed_tags: Some(vec!["allowed".to_string()]),
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+
+        let records = vec![
+            serde_json::json!({
+                "fact_id": "fact:1",
+                "fact_type": "note",
+                "content": "Test",
+                "quote": "Quote",
+                "source_episode": "episode:1",
+                "t_valid": "2024-01-15T10:30:00Z",
+                "scope": "org",
+                "policy_tags": ["allowed", "other"]
+            }),
+            serde_json::json!({
+                "fact_id": "fact:2",
+                "fact_type": "note",
+                "content": "Test",
+                "quote": "Quote",
+                "source_episode": "episode:1",
+                "t_valid": "2024-01-15T10:30:00Z",
+                "scope": "org",
+                "policy_tags": ["blocked"]
+            }),
+        ];
+
+        let result = filter_facts_by_policy(records, &access);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].fact_id, "fact:1");
+    }
+
+    #[test]
+    fn filter_facts_by_policy_allows_all_when_no_tags_specified() {
+        let access = AccessPayload {
+            allowed_scopes: None,
+            allowed_tags: None,
+            caller_id: None,
+            session_vars: None,
+            transport: None,
+            content_type: None,
+            cross_scope_allow: None,
+        };
+
+        let records = vec![
+            serde_json::json!({
+                "fact_id": "fact:1",
+                "fact_type": "note",
+                "content": "Test",
+                "quote": "Quote",
+                "source_episode": "episode:1",
+                "t_valid": "2024-01-15T10:30:00Z",
+                "scope": "org",
+                "policy_tags": ["tag1"]
+            }),
+            serde_json::json!({
+                "fact_id": "fact:2",
+                "fact_type": "note",
+                "content": "Test",
+                "quote": "Quote",
+                "source_episode": "episode:1",
+                "t_valid": "2024-01-15T10:30:00Z",
+                "scope": "org"
+            }),
+        ];
+
+        let result = filter_facts_by_policy(records, &access);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn filter_facts_by_policy_handles_wrapped_objects() {
+        let access = AccessPayload::default();
+
+        let records = vec![serde_json::json!({
+            "Object": {
+                "fact_id": "fact:1",
+                "fact_type": "note",
+                "content": "Test",
+                "quote": "Quote",
+                "source_episode": "episode:1",
+                "t_valid": "2024-01-15T10:30:00Z",
+                "scope": "org"
+            }
+        })];
+
+        let result = filter_facts_by_policy(records, &access);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].fact_id, "fact:1");
+    }
+
+    #[test]
+    fn filter_facts_by_policy_handles_array_wrapped_objects() {
+        let access = AccessPayload::default();
+
+        let records = vec![serde_json::json!({
+            "Array": [
+                {
+                    "Object": {
+                        "fact_id": "fact:1",
+                        "fact_type": "note",
+                        "content": "Test",
+                        "quote": "Quote",
+                        "source_episode": "episode:1",
+                        "t_valid": "2024-01-15T10:30:00Z",
+                        "scope": "org"
+                    }
+                },
+                {
+                    "Object": {
+                        "fact_id": "fact:2",
+                        "fact_type": "note",
+                        "content": "Test2",
+                        "quote": "Quote2",
+                        "source_episode": "episode:2",
+                        "t_valid": "2024-01-15T10:30:00Z",
+                        "scope": "org"
+                    }
+                }
+            ]
+        })];
+
+        let result = filter_facts_by_policy(records, &access);
+        assert_eq!(result.len(), 2);
+    }
 }

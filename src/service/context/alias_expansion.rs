@@ -11,7 +11,7 @@ use super::query_mode::query_phrase_candidates;
 /// Looks up entities whose canonical names appear in the query,
 /// and returns additional query terms derived from their aliases.
 pub(crate) async fn expand_query_with_aliases(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     query: &str,
     namespace: &str,
 ) -> Vec<String> {
@@ -110,9 +110,233 @@ pub(crate) async fn expand_query_with_aliases(
 
 #[allow(dead_code)]
 pub(crate) async fn expand_query_with_aliases_for_test(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     query: &str,
     namespace: &str,
 ) -> Vec<String> {
     expand_query_with_aliases(service, query, namespace).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expand_query_with_aliases_for_test;
+    use crate::service::error::MemoryError;
+    use crate::storage::{DbClient, GraphDirection};
+    use async_trait::async_trait;
+    use serde_json::{Value, json};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn expand_query_with_aliases_supports_multi_word_entities() {
+        struct MultiWordAliasDbClient;
+
+        #[async_trait]
+        impl DbClient for MultiWordAliasDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_filtered(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_by_entity_links(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _entity_links: &[String],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_facts_ann(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_vec: &[f64],
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_filtered(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edge_neighbors(
+                &self,
+                _namespace: &str,
+                _node_id: &str,
+                _cutoff: &str,
+                _direction: GraphDirection,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entity_lookup(
+                &self,
+                _namespace: &str,
+                normalized_name: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                if normalized_name == "alice smith" {
+                    return Ok(Some(json!({
+                        "entity_id": "entity:alice_smith",
+                        "aliases": ["alice s."]
+                    })));
+                }
+
+                Ok(None)
+            }
+
+            async fn select_entities_batch(
+                &self,
+                _namespace: &str,
+                names: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                let mut results = Vec::new();
+                for name in names {
+                    if name == "alice smith" {
+                        results.push(json!({
+                            "entity_id": "entity:alice_smith",
+                            "canonical_name_normalized": "alice smith",
+                            "aliases": ["alice s."]
+                        }));
+                    }
+                }
+                Ok(results)
+            }
+
+            async fn select_communities_by_member_entities(
+                &self,
+                _namespace: &str,
+                _member_entities: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_communities_matching_summary(
+                &self,
+                _namespace: &str,
+                _query: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn relate_edge(
+                &self,
+                _namespace: &str,
+                _edge_id: &str,
+                _from_id: &str,
+                _to_id: &str,
+                _content: Value,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn select_active_facts(
+                &self,
+                _namespace: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_episodes_for_archival(
+                &self,
+                _namespace: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_active_facts_by_episode(
+                &self,
+                _namespace: &str,
+                _episode_id: &str,
+                _cutoff: &str,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(MultiWordAliasDbClient),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+
+        let expanded = expand_query_with_aliases_for_test(
+            &service.build_context(),
+            "alice smith atlas",
+            "org",
+        )
+        .await;
+
+        assert!(
+            expanded.iter().any(|query| query == "alice s. atlas"),
+            "multi-word entity alias should expand the full phrase, got: {expanded:?}"
+        );
+    }
 }

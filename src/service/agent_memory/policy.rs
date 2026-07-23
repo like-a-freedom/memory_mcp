@@ -20,7 +20,6 @@ use crate::models::{
 ///
 /// It is pure: given the same inputs it produces the same decision. It never
 /// touches storage, the network, or the clock beyond what the caller passes.
-#[allow(dead_code)]
 pub struct CapturePolicy;
 
 impl CapturePolicy {
@@ -29,7 +28,6 @@ impl CapturePolicy {
     /// The decision is deterministic and monotone in trust: a derived class is
     /// never higher than the source class.
     #[must_use]
-    #[allow(dead_code)]
     pub fn evaluate(
         event: &NormalizedHostEvent,
         context: &InvocationContext,
@@ -142,7 +140,6 @@ impl CapturePolicy {
 }
 
 /// Returns the trust class derived from the invocation origin.
-#[allow(dead_code)]
 fn source_trust(context: &InvocationContext) -> TrustClass {
     use crate::models::InvocationOrigin;
     match &context.origin {
@@ -154,7 +151,6 @@ fn source_trust(context: &InvocationContext) -> TrustClass {
 }
 
 /// Returns `true` if the signal is a recognized capture-eligible signal.
-#[allow(dead_code)]
 fn is_recognized_capture_signal(signal: Option<&str>) -> bool {
     matches!(
         signal,
@@ -174,7 +170,6 @@ fn is_recognized_capture_signal(signal: Option<&str>) -> bool {
 }
 
 /// Returns the reason code for an accepted capture based on its signal.
-#[allow(dead_code)]
 fn accepted_reason(signal: Option<&str>) -> Vec<CaptureReasonCode> {
     match signal {
         Some("preference") => vec![CaptureReasonCode::AcceptedPreference],
@@ -192,7 +187,6 @@ fn accepted_reason(signal: Option<&str>) -> Vec<CaptureReasonCode> {
 
 /// Maps a source kind to its default trust class.
 #[must_use]
-#[allow(dead_code)]
 pub fn trust_for_source(source: &SourceKind, context: &InvocationContext) -> TrustClass {
     use crate::models::InvocationOrigin;
     match source {

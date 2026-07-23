@@ -29,7 +29,7 @@ async fn tools_ingest_returns_validation_error_for_bad_t_ref() {
         policy_tags: vec![],
     };
 
-    let result = memory_mcp::tools::ingest(&service, params).await;
+    let result = memory_mcp::tools::ingest(&service.build_context(), params).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {
@@ -54,7 +54,7 @@ async fn tools_extract_rejects_both_episode_and_inline() {
         zero_shot_labels: None,
     };
 
-    let result = memory_mcp::tools::extract(&service, params).await;
+    let result = memory_mcp::tools::extract(&service.build_context(), params).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {
@@ -82,7 +82,7 @@ async fn tools_extract_rejects_no_input() {
         zero_shot_labels: None,
     };
 
-    let result = memory_mcp::tools::extract(&service, params).await;
+    let result = memory_mcp::tools::extract(&service.build_context(), params).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {
@@ -111,7 +111,7 @@ async fn tools_ingest_and_extract_happy_path() {
         policy_tags: vec![],
     };
 
-    let response = memory_mcp::tools::ingest(&service, params)
+    let response = memory_mcp::tools::ingest(&service.build_context(), params)
         .await
         .expect("ingest should succeed");
     assert_eq!(response.status, "success");
@@ -137,7 +137,7 @@ async fn tools_ingest_and_extract_happy_path() {
         zero_shot_labels: None,
     };
 
-    let extract_response = memory_mcp::tools::extract(&service, extract_params)
+    let extract_response = memory_mcp::tools::extract(&service.build_context(), extract_params)
         .await
         .expect("extract should succeed");
     assert_eq!(extract_response.status, "success");
@@ -157,7 +157,7 @@ async fn tools_resolve_creates_canonical_entity() {
         aliases: vec!["Alice".to_string(), "A. Smith".to_string()],
     };
 
-    let response = memory_mcp::tools::resolve(&service, params)
+    let response = memory_mcp::tools::resolve(&service.build_context(), params)
         .await
         .expect("resolve should succeed");
     assert_eq!(response.status, "success");
@@ -182,7 +182,7 @@ async fn tools_invalidate_validates_t_invalid() {
         t_invalid: "bad-date".to_string(),
     };
 
-    let result = memory_mcp::tools::invalidate(&service, params).await;
+    let result = memory_mcp::tools::invalidate(&service.build_context(), params).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {
@@ -211,7 +211,7 @@ async fn tools_assemble_context_returns_empty_for_empty_db() {
         window_end: None,
     };
 
-    let response = memory_mcp::tools::assemble_context(&service, params)
+    let response = memory_mcp::tools::assemble_context(&service.build_context(), params)
         .await
         .expect("assemble_context should succeed");
     assert_eq!(response.status, "success");
@@ -227,7 +227,7 @@ async fn tools_explain_rejects_bad_json() {
         context_items: "not valid json".to_string(),
     };
 
-    let result = memory_mcp::tools::explain(&service, params).await;
+    let result = memory_mcp::tools::explain(&service.build_context(), params).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         MemoryError::Validation(msg) => {

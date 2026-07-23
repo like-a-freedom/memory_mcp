@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, IngestRequest};
 use crate::service::MemoryError;
-use crate::service::MemoryService;
+use crate::service::capabilities::ingest::IngestCapability;
+use crate::service::service_context::ServiceContext;
 use crate::tools::params::IngestParams;
 use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
@@ -19,7 +20,7 @@ use crate::tools::response::ToolResponse;
 /// same `ingest.start` / `ingest.done` / `ingest.error` events, same
 /// `ToolResponse::success_with_guidance` guidance string.
 pub async fn ingest(
-    service: &MemoryService,
+    ctx: &ServiceContext,
     params: IngestParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
     let t_ref = parse_datetime(&params.t_ref).ok_or_else(|| {
@@ -47,7 +48,7 @@ pub async fn ingest(
     let timer = Instant::now();
     let request_id = next_request_id();
     let source_id = request.source_id.clone();
-    service.log_tool_event(
+    ctx.log_tool_event(
         "ingest.start",
         json!({"source_type": &request.source_type, "source_id": &source_id, "scope": &request.scope}),
         json!({}),
@@ -55,9 +56,9 @@ pub async fn ingest(
         Some(&request_id),
     );
 
-    match service.ingest(request, Some(access)).await {
+    match IngestCapability::ingest(ctx, request, Some(access)).await {
         Ok(episode_id) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "ingest.done",
                 json!({"source_id": &source_id}),
                 json!({"episode_id": &episode_id}),
@@ -71,7 +72,7 @@ pub async fn ingest(
             ))
         }
         Err(err) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "ingest.error",
                 json!({"source_id": &source_id}),
                 json!({"error": err.to_string()}),

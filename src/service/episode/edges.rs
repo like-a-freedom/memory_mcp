@@ -8,6 +8,7 @@ use crate::service::error::MemoryError;
 use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::parse_iso;
+use crate::service::service_context::ServiceContext;
 use crate::service::value_helpers::string_from_value;
 
 /// Payload map for edge database records.
@@ -46,7 +47,7 @@ pub(crate) fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<
 
 /// Persist a new edge after confirming it does not already exist.
 pub(crate) async fn store_edge(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     edge: &Edge,
     namespace: &str,
 ) -> Result<(), MemoryError> {
@@ -90,7 +91,7 @@ pub(crate) struct StoredEdgeVersion {
 }
 
 async fn invalidate_conflicting_edges(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     new_edge: &Edge,
     namespace: &str,
 ) -> Result<(), MemoryError> {

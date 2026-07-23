@@ -348,7 +348,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<IngestParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::ingest(&self.service, params.0)
+        crate::tools::ingest(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -361,7 +361,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
-        crate::tools::explain(&self.service, params.0)
+        crate::tools::explain(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -375,7 +375,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExtractParams>,
     ) -> Result<Json<ToolResponse<ExtractResult>>, ErrorData> {
-        crate::tools::extract(&self.service, params.0)
+        crate::tools::extract(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -388,7 +388,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ResolveParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::resolve(&self.service, params.0)
+        crate::tools::resolve(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -401,7 +401,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<InvalidateParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::invalidate(&self.service, params.0)
+        crate::tools::invalidate(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -1202,7 +1202,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<AssembleContextParams>,
     ) -> Result<Json<ToolResponse<Vec<AssembledContextItem>>>, ErrorData> {
-        crate::tools::assemble_context(&self.service, params.0)
+        crate::tools::assemble_context(&self.service.build_context(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)

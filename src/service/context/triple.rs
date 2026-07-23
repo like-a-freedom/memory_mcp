@@ -11,9 +11,9 @@
 //! lexical, temporal, alias-expansion, and experience tiers.
 
 use crate::models::Fact;
-use crate::service::MemoryService;
 use crate::service::episode::fact_from_value_or_wrapper;
 use crate::service::error::MemoryError;
+use crate::service::service_context::ServiceContext;
 
 /// Collect facts linked via triples matching the given query text.
 ///
@@ -25,7 +25,7 @@ use crate::service::error::MemoryError;
 /// This is a best-effort retrieval step called after lexical, temporal,
 /// alias-expansion, and experience tiers.
 pub(super) async fn collect_triple_facts(
-    service: &MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     _scope: &str,
     cutoff_iso: &str,

@@ -63,7 +63,7 @@ pub mod procedures;
 
 pub(crate) mod capabilities;
 mod model_loader;
-pub(crate) mod service_context;
+pub mod service_context;
 pub(crate) mod value_helpers;
 
 #[cfg(test)]

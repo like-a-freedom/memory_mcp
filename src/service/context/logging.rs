@@ -48,7 +48,7 @@ pub(crate) fn supplemental_experience_count(results: &[AssembledContextItem]) ->
 }
 
 pub(crate) async fn record_query_log(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: &AssembleContextRequest,
     results: &[AssembledContextItem],
     cache_hit: bool,
@@ -140,7 +140,7 @@ pub(crate) async fn record_query_log(
 }
 
 pub(crate) async fn maybe_record_query_log(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: &AssembleContextRequest,
     results: &[AssembledContextItem],
     cache_hit: bool,
@@ -257,7 +257,7 @@ pub(crate) async fn maybe_record_query_log(
 }
 
 async fn prune_expired_query_logs(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     scope: &str,
 ) -> Result<usize, MemoryError> {
     let namespace = service.namespace_for_scope(scope)?;

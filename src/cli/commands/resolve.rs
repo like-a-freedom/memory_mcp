@@ -10,7 +10,7 @@ pub async fn run(service: &MemoryService, args: ResolveArgs) -> Result<(), Memor
         canonical_name: args.canonical_name,
         aliases: args.aliases,
     };
-    let response = crate::tools::resolve(service, params).await?;
+    let response = crate::tools::resolve(&service.build_context(), params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;
     Ok(())
 }

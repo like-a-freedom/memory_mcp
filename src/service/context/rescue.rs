@@ -553,4 +553,400 @@ mod tests {
             "leading tab before 'Assistant:' should still match",
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Tests relocated from context.rs — first-person rescue scenarios that
+    // exercise maybe_append_first_person_episode_item,
+    // maybe_append_first_person_ranked_fact_item, and
+    // build_episode_rescue_log_result with realistic inputs.
+    // -----------------------------------------------------------------------
+
+    use crate::models::{AssembledContextItem, Fact};
+    use crate::service::context::ranking::{RankedContextFact, RetrievalTier};
+    use crate::service::context::scoring::ranked_fact_to_item;
+    use crate::service::context::scoring::selected_fact_matched_terms;
+    use crate::service::decayed_confidence;
+    use serde_json::json;
+
+    fn create_test_fact(fact_id: &str, t_valid: chrono::DateTime<chrono::Utc>) -> Fact {
+        Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "note".to_string(),
+            content: "Test content".to_string(),
+            quote: "Test quote".to_string(),
+            source_episode: "episode:123".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    fn create_ranked_test_fact(
+        fact_id: &str,
+        source_episode: &str,
+        t_valid: chrono::DateTime<chrono::Utc>,
+        fusion_score: f64,
+        ft_score: f64,
+        access_count: i64,
+        index_keys: &[&str],
+    ) -> RankedContextFact {
+        let mut fact = create_test_fact(fact_id, t_valid);
+        fact.source_episode = source_episode.to_string();
+        fact.ft_score = ft_score;
+        fact.access_count = access_count;
+        fact.index_keys = index_keys.iter().map(|key| (*key).to_string()).collect();
+
+        RankedContextFact {
+            fact,
+            rationale: "test rationale".to_string(),
+            retrieval_tier: RetrievalTier::Direct,
+            fusion_score,
+            source_priority: 0,
+            decayed_confidence: 1.0,
+            query_alignment_factor: 1.0,
+            grounding_score: 1.0,
+            semantic_available: false,
+            matched_query_terms: Vec::new(),
+            graph_trace: None,
+        }
+    }
+
+    #[test]
+    fn first_person_episode_item_supplements_selected_results_when_it_adds_unique_query_terms() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![
+            RankedContextFact {
+                fact: Fact {
+                    content: "I am committing more time to original music so my creative work feels fulfilling."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:creative",
+                        "episode:creative",
+                        fact_time,
+                        1.0,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:creative",
+                    "episode:creative",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: Fact {
+                    content: "I am exploring new artistic projects that feel more authentic."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:projects",
+                        "episode:projects",
+                        fact_time,
+                        0.9,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:projects",
+                    "episode:projects",
+                    fact_time,
+                    0.9,
+                    4.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
+        let mut results = selected_facts
+            .into_iter()
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time, decayed_confidence))
+            .collect::<Vec<_>>();
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:profile".to_string(),
+            content: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                .to_string(),
+            quote: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                .to_string(),
+            source_episode: "episode:profile".to_string(),
+            confidence: 1.0,
+            provenance: json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        maybe_append_first_person_episode_item(
+            &mut results,
+            &episode_items,
+            &selected_terms,
+            Some(query),
+            &query_terms,
+            2,
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].fact_id, "episode_fallback:episode:profile");
+    }
+
+    #[test]
+    fn first_person_episode_item_prefers_profile_summary_over_generic_reflection() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: Fact {
+                content: "I am committing more time to original music so my creative work feels fulfilling."
+                    .to_string(),
+                ..create_ranked_test_fact(
+                    "fact:creative",
+                    "episode:creative",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact(
+                "fact:creative",
+                "episode:creative",
+                fact_time,
+                1.0,
+                5.0,
+                0,
+                &[],
+            )
+        }];
+
+        let selected_terms = selected_fact_matched_terms(&selected_facts, &query_terms);
+        let mut results = selected_facts
+            .into_iter()
+            .map(|ranked| ranked_fact_to_item(ranked, fact_time, decayed_confidence))
+            .collect::<Vec<_>>();
+
+        let episode_items = vec![
+            AssembledContextItem {
+                fact_id: "episode_fallback:episode:reflection".to_string(),
+                content: "User: Every new activity helps me understand what feels creatively fulfilling."
+                    .to_string(),
+                quote: "User: Every new activity helps me understand what feels creatively fulfilling."
+                    .to_string(),
+                source_episode: "episode:reflection".to_string(),
+                confidence: 1.0,
+                provenance: json!({"episode_fallback": true}),
+                rationale: "fallback".to_string(),
+                retrieval_tier: Some("fallback".to_string()),
+                ..Default::default()
+            },
+            AssembledContextItem {
+                fact_id: "episode_fallback:episode:profile".to_string(),
+                content: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                    .to_string(),
+                quote: "Current user persona: spends weekends experimenting with music software and digital instruments."
+                    .to_string(),
+                source_episode: "episode:profile".to_string(),
+                confidence: 1.0,
+                provenance: json!({"episode_fallback": true}),
+                rationale: "fallback".to_string(),
+                retrieval_tier: Some("fallback".to_string()),
+                ..Default::default()
+            },
+        ];
+
+        maybe_append_first_person_episode_item(
+            &mut results,
+            &episode_items,
+            &selected_terms,
+            Some(query),
+            &query_terms,
+            1,
+        );
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fact_id, "episode_fallback:episode:profile");
+    }
+
+    #[test]
+    fn first_person_ranked_fact_rescue_uses_soft_question_terms() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling. What would you suggest?";
+        let query_terms = crate::service::query::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_results = vec![
+            ranked_fact_to_item(
+                RankedContextFact {
+                    fact: Fact {
+                        content: "User: I am exploring new artistic projects that feel authentic."
+                            .to_string(),
+                        ..create_ranked_test_fact(
+                            "fact:creative",
+                            "episode:creative",
+                            fact_time,
+                            1.0,
+                            5.0,
+                            0,
+                            &[],
+                        )
+                        .fact
+                    },
+                    ..create_ranked_test_fact(
+                        "fact:creative",
+                        "episode:creative",
+                        fact_time,
+                        1.0,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                },
+                fact_time,
+                decayed_confidence,
+            ),
+            ranked_fact_to_item(
+                RankedContextFact {
+                    fact: Fact {
+                        content: "User: Music production keeps me grounded in creativity."
+                            .to_string(),
+                        ..create_ranked_test_fact(
+                            "fact:music",
+                            "episode:music",
+                            fact_time,
+                            0.9,
+                            4.0,
+                            0,
+                            &[],
+                        )
+                        .fact
+                    },
+                    ..create_ranked_test_fact(
+                        "fact:music",
+                        "episode:music",
+                        fact_time,
+                        0.9,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                },
+                fact_time,
+                decayed_confidence,
+            ),
+        ];
+
+        let ranked_candidates = vec![
+            create_ranked_test_fact(
+                "fact:creative",
+                "episode:creative",
+                fact_time,
+                1.0,
+                5.0,
+                0,
+                &[],
+            ),
+            create_ranked_test_fact(
+                "fact:music",
+                "episode:music",
+                fact_time,
+                0.9,
+                4.0,
+                0,
+                &[],
+            ),
+            RankedContextFact {
+                fact: Fact {
+                    content: "User: It provided practical exercises and reflection prompts that encouraged me to think deeply about what I truly want in a romantic relationship."
+                        .to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:soft-overlap",
+                        "episode:soft-overlap",
+                        fact_time,
+                        0.2,
+                        1.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:soft-overlap",
+                    "episode:soft-overlap",
+                    fact_time,
+                    0.2,
+                    1.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let mut results = selected_results;
+        maybe_append_first_person_ranked_fact_item(
+            &mut results,
+            &ranked_candidates,
+            Some(query),
+            &query_terms,
+            2,
+            fact_time,
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].fact_id, "fact:soft-overlap");
+    }
+
+    #[test]
+    fn build_episode_rescue_log_result_reports_candidate_and_decision_counts() {
+        let result = build_episode_rescue_log_result(3, 2, true);
+
+        assert_eq!(
+            result
+                .get("episode_candidate_count")
+                .and_then(serde_json::Value::as_u64),
+            Some(3)
+        );
+        assert_eq!(
+            result
+                .get("selected_fact_count")
+                .and_then(serde_json::Value::as_u64),
+            Some(2)
+        );
+        assert_eq!(
+            result
+                .get("episode_rescue_used")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+    }
 }

@@ -8,7 +8,7 @@ pub async fn run(service: &MemoryService, args: ExplainArgs) -> Result<(), Memor
     let params = ExplainParams {
         context_items: args.context_items,
     };
-    let response = crate::tools::explain(service, params).await?;
+    let response = crate::tools::explain(&service.build_context(), params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;
     Ok(())
 }

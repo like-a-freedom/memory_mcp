@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, ExplainItem, ExplainRequest};
 use crate::service::MemoryError;
-use crate::service::MemoryService;
+use crate::service::capabilities::explain::ExplainCapability;
+use crate::service::service_context::ServiceContext;
 use crate::tools::params::ExplainParams;
 use crate::tools::parsers::parse_context_items;
 use crate::tools::request_id::next_request_id;
@@ -15,7 +16,7 @@ use crate::tools::response::ToolResponse;
 
 /// Explain context items with provenance-ready citations.
 pub async fn explain(
-    service: &MemoryService,
+    ctx: &ServiceContext,
     params: ExplainParams,
 ) -> Result<ToolResponse<Vec<ExplainItem>>, MemoryError> {
     let access = AccessPayload::default();
@@ -25,7 +26,7 @@ pub async fn explain(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    service.log_tool_event(
+    ctx.log_tool_event(
         "explain.start",
         json!({"count": request.context_pack.len()}),
         json!({}),
@@ -33,9 +34,9 @@ pub async fn explain(
         Some(&request_id),
     );
 
-    match service.explain(request, Some(access)).await {
+    match ExplainCapability::explain(ctx, request, Some(access)).await {
         Ok(explanations) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "explain.done",
                 json!({}),
                 json!({"count": explanations.len()}),
@@ -51,7 +52,7 @@ pub async fn explain(
             ))
         }
         Err(err) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "explain.error",
                 json!({}),
                 json!({"error": err.to_string()}),

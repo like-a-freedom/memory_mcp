@@ -5,6 +5,7 @@ dev/
 tests/models/
 .env
 AGENTS.md
+.agents/prompts
 
 # Cargo build artifacts
 /target/

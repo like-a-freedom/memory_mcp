@@ -16,7 +16,7 @@ pub async fn run(service: &MemoryService, args: IngestArgs) -> Result<(), Memory
         visibility_scope: args.visibility_scope,
         policy_tags: args.policy_tags,
     };
-    let response = crate::tools::ingest(service, params).await?;
+    let response = crate::tools::ingest(&service.build_context(), params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;
     Ok(())
 }

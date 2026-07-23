@@ -18,6 +18,7 @@ pub use capture::{AgentMemoryStoreBackend, LifecycleCapture, LifecycleCaptureRes
 pub use policy::CapturePolicy;
 pub use projection::run_projection_pass;
 pub use recall::{
-    MEMORY_IS_DATA_PREAMBLE, RecallDecision, RecallKey, SessionTraceRegistry, evaluate_recall,
+    LifecycleRecall, LifecycleRecallResult, MEMORY_IS_DATA_PREAMBLE, RecallDecision, RecallKey,
+    RecallPipeline, SessionTraceRegistry, evaluate_recall,
 };
 pub use worker::LifecycleWorkerRuntime;

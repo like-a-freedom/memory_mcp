@@ -49,7 +49,7 @@ fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
 }
 
 pub(crate) async fn collect_community_facts(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: CollectCommunityFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String, f64)>, MemoryError> {
     let matched_communities =
@@ -164,7 +164,7 @@ fn best_community_match<'a>(
 }
 
 async fn community_origin_factor_for_fact(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     cutoff_iso: &str,
     fact: &Fact,
@@ -193,7 +193,7 @@ async fn community_origin_factor_for_fact(
 }
 
 async fn entity_origin_factor(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     cutoff_iso: &str,
     entity_id: &str,
@@ -240,7 +240,7 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 }
 
 pub(crate) async fn find_matching_communities(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
@@ -536,6 +536,19 @@ mod tests {
             provenance: crate::models::Provenance::manual(),
             ft_score: 0.0,
         }
+    }
+
+    #[test]
+    fn stored_community_summary_from_value_handles_wrapped_ft_score_number() {
+        let summary = stored_community_summary_from_value(&serde_json::json!({
+            "community_id": "community:atlas",
+            "summary": "Atlas workstream",
+            "member_entities": ["entity:atlas"],
+            "ft_score": {"Number": 42.5}
+        }))
+        .expect("community summary");
+
+        assert_eq!(summary.ft_score, 42.5);
     }
 }
 

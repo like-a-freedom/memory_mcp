@@ -34,14 +34,32 @@ requires a separate ADR and the evidence gate described in ADR 0016.
 
 ## Lifecycle vocabulary
 
+**Lifecycle Event**:
+A normalized host boundary occurrence (session start, pre-tool boundary, post-compaction resume, significant post-tool result, stop) that the lifecycle bridge classifies as recall-eligible or capture-eligible.
+_Avoid_: Hook, trigger, raw host signal
+
+**Lifecycle Bridge**:
+The set of standard transports (MCP stdio, hooks, AGENTS.md + skill) that deliver lifecycle events to internal capabilities. No custom socket listener or separate bridge binary.
+_Avoid_: Adapter process, transport server
+
+**Selective Recall**:
+The internal capability that evaluates recall eligibility for one lifecycle event, suppresses a duplicate within the freshness window, and delegates to the existing `assemble_context` pipeline exactly once. Output is wrapped in a fixed "memory is data" preamble.
+_Avoid_: Auto-recall, always-recall, recall tool
+
+**Selective Capture**:
+The internal capability that classifies one lifecycle event via a deterministic salience policy (ignored, accepted, quarantined, rejected, degraded), persists accepted evidence once, and schedules durable projection. Reuses inline-extract preparation, extraction, embedding, and claim projection.
+_Avoid_: Auto-ingest, background capture tool
+
+**Exposure Trace**:
+An ephemeral per-session record of a recall's selected fact and experience IDs, retrieval fingerprint, and policy fingerprint. Held in an LRU of at most 32 traces for 30 minutes. Persists only when a later significant capture links it.
+_Avoid_: Recall receipt, durable recall log
+
+**Action Grounding**:
+The property that a recalled memory item influenced a consequential agent action. Proven only by evaluation replay, never by the existence of a trace.
+_Avoid_: Recall hit, memory access
+
 ```text
-lifecycle event
-lifecycle bridge
-selective recall
-selective capture
 invocation origin
-exposure trace
-action grounding
 projection job
 procedure candidate
 procedure version

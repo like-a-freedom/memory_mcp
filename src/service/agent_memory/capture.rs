@@ -45,6 +45,21 @@ pub enum LifecycleCaptureResult {
     Degraded,
 }
 
+/// Construct the default capture budget for a single lifecycle event.
+///
+/// Mirrors AD-8 defaults: 32 accepted captures and 256 KiB content per session,
+/// with a 1 MiB daily project quota. The budget is per-call; quota exhaustion
+/// is tracked durably by the store and reflected via the `exhausted` flag.
+#[must_use]
+pub(crate) fn default_capture_budget() -> crate::models::CaptureBudget {
+    crate::models::CaptureBudget {
+        remaining_session_captures: 32,
+        remaining_session_bytes: 256 * 1024,
+        remaining_project_daily_bytes: 1024 * 1024,
+        exhausted: false,
+    }
+}
+
 /// Internal selective-capture capability.
 ///
 /// Not registered in `tools/list` or as a CLI subcommand. Reuses the existing

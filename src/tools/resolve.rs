@@ -7,14 +7,15 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, EntityCandidate};
 use crate::service::MemoryError;
-use crate::service::MemoryService;
+use crate::service::capabilities::resolve::ResolveCapability;
+use crate::service::service_context::ServiceContext;
 use crate::tools::params::ResolveParams;
 use crate::tools::request_id::next_request_id;
 use crate::tools::response::ToolResponse;
 
 /// Resolve a canonical entity identifier for a name and its aliases.
 pub async fn resolve(
-    service: &MemoryService,
+    ctx: &ServiceContext,
     params: ResolveParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
     let access = AccessPayload::default();
@@ -26,7 +27,7 @@ pub async fn resolve(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    service.log_tool_event(
+    ctx.log_tool_event(
         "resolve.start",
         json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
         json!({}),
@@ -34,9 +35,9 @@ pub async fn resolve(
         Some(&request_id),
     );
 
-    match service.resolve(candidate, Some(access)).await {
+    match ResolveCapability::resolve(ctx, candidate, Some(access)).await {
         Ok(entity_id) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "resolve.done",
                 json!({}),
                 json!({"entity_id": &entity_id}),
@@ -50,7 +51,7 @@ pub async fn resolve(
             ))
         }
         Err(err) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "resolve.error",
                 json!({}),
                 json!({"error": err.to_string()}),

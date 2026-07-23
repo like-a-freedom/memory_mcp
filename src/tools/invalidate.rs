@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, InvalidateRequest};
 use crate::service::MemoryError;
-use crate::service::MemoryService;
+use crate::service::capabilities::invalidate::InvalidateCapability;
+use crate::service::service_context::ServiceContext;
 use crate::tools::params::InvalidateParams;
 use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
@@ -15,7 +16,7 @@ use crate::tools::response::ToolResponse;
 
 /// Invalidate a fact while preserving historical traceability.
 pub async fn invalidate(
-    service: &MemoryService,
+    ctx: &ServiceContext,
     params: InvalidateParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
     let access = AccessPayload::default();
@@ -38,7 +39,7 @@ pub async fn invalidate(
     let timer = Instant::now();
     let request_id = next_request_id();
     let fact_id = request.fact_id.clone();
-    service.log_tool_event(
+    ctx.log_tool_event(
         "invalidate.start",
         json!({"fact_id": &fact_id}),
         json!({}),
@@ -46,9 +47,9 @@ pub async fn invalidate(
         Some(&request_id),
     );
 
-    match service.invalidate(request, Some(access)).await {
+    match InvalidateCapability::invalidate(ctx, request, Some(access)).await {
         Ok(()) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "invalidate.done",
                 json!({"fact_id": &fact_id}),
                 json!({"status": "invalidated"}),
@@ -62,7 +63,7 @@ pub async fn invalidate(
             ))
         }
         Err(err) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "invalidate.error",
                 json!({"fact_id": &fact_id}),
                 json!({"error": err.to_string()}),

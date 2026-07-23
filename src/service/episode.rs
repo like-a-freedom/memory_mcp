@@ -580,7 +580,7 @@ mod tests {
         });
         tokio::task::yield_now().await;
 
-        let _ = extract_entities(&service, "Atlas project status", None)
+        let _ = extract_entities(&service.build_context(), "Atlas project status", None)
             .await
             .expect("extract entities");
         let tick_elapsed = ticker.await.expect("join ticker");
@@ -805,10 +805,13 @@ mod tests {
         )
         .unwrap();
 
-        let connected =
-            collect_connected_entity_component(&service, &["entity:alice".to_string()], "org")
-                .await
-                .unwrap();
+        let connected = collect_connected_entity_component(
+            &service.build_context(),
+            &["entity:alice".to_string()],
+            "org",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             connected,
@@ -1022,7 +1025,7 @@ mod tests {
         .unwrap();
 
         let _ = find_overlapping_communities(
-            &service,
+            &service.build_context(),
             "org",
             &["entity:alice".to_string(), "entity:bob".to_string()],
         )

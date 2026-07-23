@@ -57,12 +57,9 @@ impl InvalidateCapability {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
     use std::sync::Arc;
 
-    use lru::LruCache;
     use serde_json::json;
-    use tokio::sync::RwLock;
 
     use crate::models::{AccessPayload, InvalidateRequest};
     use crate::service::cache::{CacheKey, CacheView};
@@ -73,13 +70,7 @@ mod tests {
     use crate::service::util::RateLimiter;
 
     fn make_context(db: MockDbClient) -> ServiceContext {
-        ServiceContext {
-            db_client: Arc::new(db),
-            namespaces: vec!["org".to_string()],
-            rate_limiter: Arc::new(RateLimiter::new(100, 100)),
-            context_cache: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(64).unwrap()))),
-            claim_store: None,
-        }
+        super::super::test_support::make_context_base(db)
     }
 
     fn fact_request(fact_id: &str) -> InvalidateRequest {

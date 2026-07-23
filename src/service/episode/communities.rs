@@ -9,6 +9,7 @@ use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::now;
 use crate::service::parse_iso;
+use crate::service::service_context::ServiceContext;
 use crate::service::value_helpers::{string_from_value, unwrap_array_value};
 use crate::storage::GraphDirection;
 
@@ -62,7 +63,7 @@ fn stored_edge_version_for_community(record: &Value) -> Option<StoredEdgeVersion
 
 /// Update community memberships after entity changes.
 pub(crate) async fn update_communities(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     entity_ids: &[String],
     scope: &str,
 ) -> Result<(), MemoryError> {
@@ -127,7 +128,7 @@ pub(crate) async fn update_communities(
 
 /// BFS traversal over active edges to find all connected entities.
 pub(crate) async fn collect_connected_entity_component(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     entity_ids: &[String],
     namespace: &str,
 ) -> Result<Vec<String>, MemoryError> {
@@ -186,7 +187,7 @@ fn is_traversable_context_node(record_id: &str) -> bool {
 
 /// Build a human-readable summary of community members.
 pub(crate) async fn build_community_summary(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
@@ -237,7 +238,7 @@ fn condense_community_labels(labels: &[String]) -> String {
 }
 
 pub(crate) async fn find_overlapping_communities(
-    service: &crate::service::MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     member_entities: &[String],
 ) -> Result<Vec<StoredCommunity>, MemoryError> {

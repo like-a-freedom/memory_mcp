@@ -469,7 +469,7 @@ pub(crate) struct CollectTemporalFactsRequest<'a> {
 }
 
 pub(crate) async fn collect_temporal_facts(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: CollectTemporalFactsRequest<'_>,
 ) -> Result<Vec<crate::models::Fact>, crate::service::error::MemoryError> {
     use crate::service::query::search_query_terms;
@@ -1101,5 +1101,112 @@ mod tests {
         );
         assert_eq!(facts[0].fact_id, "f2"); // newer first
         assert_eq!(facts[1].fact_id, "f1");
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests relocated from context.rs — these mirror user-facing scenarios
+    // documented in the parent orchestrator's test suite.
+    // -----------------------------------------------------------------------
+
+    fn fixed_temporal_cutoff() -> DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-04-08T12:00:00Z")
+            .expect("cutoff")
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn infer_temporal_window_reuses_shared_year_for_adjacent_months() {
+        let window = infer_temporal_window(
+            "march april 2026 alpha suite decisions",
+            fixed_temporal_cutoff(),
+        )
+        .expect("temporal window");
+
+        assert_eq!(
+            window.start.date_naive(),
+            chrono::NaiveDate::from_ymd_opt(2026, 3, 1).expect("march start")
+        );
+        assert_eq!(
+            window.end.date_naive(),
+            chrono::NaiveDate::from_ymd_opt(2026, 4, 30).expect("april end")
+        );
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_extracts_month_year_and_residual_terms() {
+        let cutoff = chrono::DateTime::parse_from_rfc3339("2026-04-07T12:00:00Z")
+            .expect("cutoff")
+            .with_timezone(&Utc);
+
+        let expansion = expand_temporal_synonyms("march 2026 launch review", cutoff)
+            .expect("temporal expansion");
+
+        assert_eq!(
+            expansion.temporal_groups,
+            vec![vec!["march 2026".to_string(), "2026-03".to_string()]]
+        );
+        assert_eq!(expansion.residual_query.as_deref(), Some("launch review"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_weekday_to_date_relative_to_as_of() {
+        let expansion = expand_temporal_synonyms("monday planning", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        assert!(group.contains(&"2026-04-06".to_string()));
+        assert!(group.contains(&"april 2026".to_string()));
+        assert!(group.contains(&"2026-04".to_string()));
+        assert!(group.contains(&"monday".to_string()));
+        assert_eq!(expansion.residual_query.as_deref(), Some("planning"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_this_week_to_current_week_dates() {
+        let expansion = expand_temporal_synonyms("this week launch", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        for date in [
+            "2026-04-06",
+            "2026-04-07",
+            "2026-04-08",
+            "2026-04-09",
+            "2026-04-10",
+            "2026-04-11",
+            "2026-04-12",
+        ] {
+            assert!(
+                group.contains(&date.to_string()),
+                "expected current-week group to include {date}, got {group:?}"
+            );
+        }
+        assert_eq!(expansion.residual_query.as_deref(), Some("launch"));
+    }
+
+    #[test]
+    fn expand_temporal_synonyms_expands_quarter_to_current_year_month_range() {
+        let expansion = expand_temporal_synonyms("q1 closeout", fixed_temporal_cutoff())
+            .expect("temporal expansion");
+
+        assert_eq!(expansion.temporal_groups.len(), 1);
+        let group = &expansion.temporal_groups[0];
+        for term in [
+            "q1",
+            "january 2026",
+            "2026-01",
+            "february 2026",
+            "2026-02",
+            "march 2026",
+            "2026-03",
+        ] {
+            assert!(
+                group.contains(&term.to_string()),
+                "expected quarter group to include {term}, got {group:?}"
+            );
+        }
+        assert_eq!(expansion.residual_query.as_deref(), Some("closeout"));
     }
 }

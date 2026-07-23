@@ -204,7 +204,7 @@ fn apply_episode_time_window(
 }
 
 pub(crate) async fn build_facets_view(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     scope: &str,
     cutoff: DateTime<Utc>,
@@ -308,7 +308,7 @@ pub(crate) struct FactFilterParams<'a> {
 }
 
 pub(crate) async fn build_wake_up_view(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     params: FactFilterParams<'_>,
     budget: i32,
     decayed_fn: impl Fn(&crate::models::Fact, DateTime<Utc>) -> f64,
@@ -386,7 +386,7 @@ pub(crate) async fn build_wake_up_view(
 }
 
 pub(crate) async fn build_map_view(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     cutoff: DateTime<Utc>,
     budget: i32,

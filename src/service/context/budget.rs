@@ -5,8 +5,8 @@ use super::lexical;
 use super::params::DefaultContextParams;
 use super::ranking::{RankedContextFact, RetrievalTier, default_episode_fallback_rationale};
 use super::scoring::selected_fact_query_term_coverage;
-use crate::service::MemoryService;
 use crate::service::error::MemoryError;
+use crate::service::service_context::ServiceContext;
 
 fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> Vec<String> {
     if query_terms.is_empty() {
@@ -69,7 +69,7 @@ pub(super) fn should_prefer_episode_content(
 }
 
 pub(super) async fn collect_episode_fallback_items(
-    service: &MemoryService,
+    service: &ServiceContext,
     params: &DefaultContextParams<'_>,
     query: &str,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
@@ -281,5 +281,343 @@ mod tests {
     fn matched_terms_empty_query() {
         let terms = matched_query_terms_for_text("hello world", &[]);
         assert!(terms.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests relocated from context.rs — full scenario coverage for
+    // should_prefer_episode_content using realistic query/fact/episode inputs.
+    // -----------------------------------------------------------------------
+
+    fn create_test_fact(fact_id: &str, t_valid: chrono::DateTime<chrono::Utc>) -> Fact {
+        Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "note".to_string(),
+            content: "Test content".to_string(),
+            quote: "Test quote".to_string(),
+            source_episode: "episode:123".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    fn create_ranked_test_fact(
+        fact_id: &str,
+        source_episode: &str,
+        t_valid: chrono::DateTime<chrono::Utc>,
+        fusion_score: f64,
+        ft_score: f64,
+        access_count: i64,
+        index_keys: &[&str],
+    ) -> RankedContextFact {
+        let mut fact = create_test_fact(fact_id, t_valid);
+        fact.source_episode = source_episode.to_string();
+        fact.ft_score = ft_score;
+        fact.access_count = access_count;
+        fact.index_keys = index_keys.iter().map(|key| (*key).to_string()).collect();
+
+        RankedContextFact {
+            fact,
+            rationale: "test rationale".to_string(),
+            retrieval_tier: RetrievalTier::Direct,
+            fusion_score,
+            source_priority: 0,
+            decayed_confidence: 1.0,
+            query_alignment_factor: 1.0,
+            grounding_score: 1.0,
+            semantic_available: false,
+            matched_query_terms: Vec::new(),
+            graph_trace: None,
+        }
+    }
+
+    #[test]
+    fn should_prefer_episode_content_when_episode_overlap_is_stronger() {
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: Fact {
+                content: "July 2025 platform licensing notes for renewal workflow.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:noise",
+                    "episode:noise",
+                    fact_time,
+                    1.0,
+                    4.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:noise", "episode:noise", fact_time, 1.0, 4.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+            quote: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        assert!(should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_fact_overlap_is_equal_or_better() {
+        let query_terms =
+            crate::service::query::search_query_terms("platform planning notes july 2025");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: Fact {
+                content: "Platform planning notes July 2025 for release scope and integrations."
+                    .to_string(),
+                ..create_ranked_test_fact(
+                    "fact:strong",
+                    "episode:strong",
+                    fact_time,
+                    1.0,
+                    5.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:strong", "episode:strong", fact_time, 1.0, 5.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Platform notes July 2025 with rollout reminders.".to_string(),
+            quote: "Platform notes July 2025 with rollout reminders.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_over_graph_expanded_matches() {
+        let query_terms = crate::service::query::search_query_terms("bob jones");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: Fact {
+                content: "Prototype milestone is blocked.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:graph",
+                    "episode:graph",
+                    fact_time,
+                    1.0,
+                    0.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            retrieval_tier: RetrievalTier::GraphExpanded,
+            ..create_ranked_test_fact("fact:graph", "episode:graph", fact_time, 1.0, 0.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: "Alice Smith met Bob Jones to plan next steps.".to_string(),
+            quote: "Alice Smith met Bob Jones to plan next steps.".to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_fact_captures_best_matching_summary_line() {
+        let query_terms =
+            crate::service::query::search_query_terms("help kickoff naming localization alignment");
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![RankedContextFact {
+            fact: Fact {
+                content: "Help kickoff is open; naming and localization details need alignment across products.".to_string(),
+                ..create_ranked_test_fact(
+                    "fact:docs",
+                    "episode:docs",
+                    fact_time,
+                    1.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+                .fact
+            },
+            ..create_ranked_test_fact("fact:docs", "episode:docs", fact_time, 1.0, 6.0, 0, &[])
+        }];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:docs".to_string(),
+            content: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
+            quote: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open; naming and localization details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
+            source_episode: "episode:docs".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn should_not_prefer_episode_content_when_selected_facts_collectively_cover_query() {
+        let query_terms = crate::service::query::search_query_terms(
+            "suite alpha beta gamma shared platform q3 2026 roadmap rollout controls versioning graphical rules",
+        );
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+
+        let selected_facts = vec![
+            RankedContextFact {
+                fact: Fact {
+                    content: "Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:launch",
+                        "episode:launch-summary",
+                        fact_time,
+                        1.0,
+                        6.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:launch",
+                    "episode:launch-summary",
+                    fact_time,
+                    1.0,
+                    6.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: Fact {
+                    content: "Roadmap adds staged rollout controls and export automation in Q4 2026.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:roadmap",
+                        "episode:launch-summary",
+                        fact_time,
+                        0.9,
+                        5.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:roadmap",
+                    "episode:launch-summary",
+                    fact_time,
+                    0.9,
+                    5.0,
+                    0,
+                    &[],
+                )
+            },
+            RankedContextFact {
+                fact: Fact {
+                    content: "Following wave adds workflow versioning and graphical rules.".to_string(),
+                    ..create_ranked_test_fact(
+                        "fact:followup",
+                        "episode:launch-summary",
+                        fact_time,
+                        0.8,
+                        4.0,
+                        0,
+                        &[],
+                    )
+                    .fact
+                },
+                ..create_ranked_test_fact(
+                    "fact:followup",
+                    "episode:launch-summary",
+                    fact_time,
+                    0.8,
+                    4.0,
+                    0,
+                    &[],
+                )
+            },
+        ];
+
+        let episode_items = vec![AssembledContextItem {
+            fact_id: "episode_fallback:episode:launch-summary".to_string(),
+            content: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds staged rollout controls and export automation in Q4 2026.\n- Following wave adds workflow versioning and graphical rules.".to_string(),
+            quote: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds staged rollout controls and export automation in Q4 2026.\n- Following wave adds workflow versioning and graphical rules.".to_string(),
+            source_episode: "episode:launch-summary".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &selected_facts,
+            &episode_items,
+            &query_terms,
+        ));
     }
 }

@@ -69,7 +69,7 @@ pub(crate) fn expand_experience_query_terms(
 }
 
 pub(crate) async fn collect_recent_experience_facts(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: RecentExperienceRequest<'_>,
     query_terms: &[String],
     topical_terms: &[String],
@@ -143,7 +143,7 @@ pub(crate) async fn collect_recent_experience_facts(
 
 pub(crate) async fn append_recent_experience_items(
     results: &mut Vec<AssembledContextItem>,
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: RecentExperienceRequest<'_>,
 ) -> Result<usize, MemoryError> {
     let budget = request.budget.max(1) as usize;

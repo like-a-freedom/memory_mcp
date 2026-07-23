@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AssembleContextRequest, AssembledContextItem};
 use crate::service::MemoryError;
-use crate::service::MemoryService;
+use crate::service::capabilities::assemble_context::AssembleContextCapability;
+use crate::service::service_context::ServiceContext;
 use crate::tools::params::AssembleContextParams;
 use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
@@ -15,7 +16,7 @@ use crate::tools::response::ToolResponse;
 
 /// Assemble the most relevant active memory context for a query.
 pub async fn assemble_context(
-    service: &MemoryService,
+    ctx: &ServiceContext,
     params: AssembleContextParams,
 ) -> Result<ToolResponse<Vec<AssembledContextItem>>, MemoryError> {
     let as_of = if params.as_of.trim().is_empty() {
@@ -42,7 +43,7 @@ pub async fn assemble_context(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    service.log_tool_event(
+    ctx.log_tool_event(
         "assemble_context.start",
         json!({"scope": request.scope, "query": request.query}),
         json!({}),
@@ -50,9 +51,9 @@ pub async fn assemble_context(
         Some(&request_id),
     );
 
-    match service.assemble_context(request).await {
+    match AssembleContextCapability::assemble_context(ctx, request).await {
         Ok(results) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "assemble_context.done",
                 json!({}),
                 json!({"count": results.len()}),
@@ -68,7 +69,7 @@ pub async fn assemble_context(
             ))
         }
         Err(err) => {
-            service.log_tool_event_with_duration(
+            ctx.log_tool_event_with_duration(
                 "assemble_context.error",
                 json!({}),
                 json!({"error": err.to_string()}),

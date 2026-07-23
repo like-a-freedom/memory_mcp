@@ -15,7 +15,7 @@ pub async fn run(service: &MemoryService, args: ExtractArgs) -> Result<(), Memor
         scope: args.scope,
         zero_shot_labels: args.zero_shot_labels,
     };
-    let response = crate::tools::extract(service, params).await?;
+    let response = crate::tools::extract(&service.build_context(), params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;
     Ok(())
 }

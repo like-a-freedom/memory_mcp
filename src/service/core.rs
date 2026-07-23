@@ -3,22 +3,19 @@
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::sync::Arc;
-use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
-use crate::models::FactId;
 use crate::models::{
     AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
+use crate::storage::AppStore;
 use crate::storage::GraphDirection;
-use crate::storage::{AppStore, ContextAccessLog, ContextStore};
 
 use super::error::MemoryError;
-use super::util::validate_fact_input;
 use super::value_helpers::string_from_value;
 
 mod builder;
@@ -27,32 +24,45 @@ pub use builder::MemoryService;
 pub(crate) use helpers::*;
 
 impl MemoryService {
-    pub(crate) fn context_store(&self) -> &dyn ContextStore {
-        &self.db_client
-    }
-
-    pub(crate) fn context_access_log(&self) -> &dyn ContextAccessLog {
-        &self.db_client
-    }
-
     pub(crate) fn app_store(&self) -> &dyn AppStore {
         &self.db_client
     }
 
     /// Builds a `ServiceContext` from this service's fields.
     ///
-    /// Used by capability modules that need a narrow reference instead of `&self`.
-    pub(crate) fn build_context(&self) -> super::service_context::ServiceContext {
+    /// Used by capability modules and tools that need a narrow reference
+    /// instead of `&self`.
+    pub fn build_context(&self) -> super::service_context::ServiceContext {
         super::service_context::ServiceContext {
             db_client: self.db_client.clone(),
             namespaces: self.namespaces.clone(),
+            default_namespace: self.default_namespace.clone(),
+            logger: self.logger.clone(),
             rate_limiter: self.rate_limiter.clone(),
+            ingestion_service: self.ingestion_service.clone(),
+            explanation_service: self.explanation_service.clone(),
+            entity_resolver: self.entity_resolver.clone(),
+            entity_service: self.entity_service.clone(),
+            entity_extractor: self.entity_extractor.clone(),
+            embedding_provider: self.embedding_provider.clone(),
+            embedding_similarity_threshold: self.embedding_similarity_threshold,
+            current_embedding_signature: self.current_embedding_signature.clone(),
+            current_embedding_model: self.current_embedding_model.clone(),
+            current_embedding_dimension: self.current_embedding_dimension,
+            task_runner: self.task_runner.clone(),
+            fact_service: self.fact_service.clone(),
+            query_embedding_cache: self.query_embedding_cache.clone(),
+            triple_extractor: self.triple_extractor.clone(),
             context_cache: self.context_cache.clone(),
             claim_store: Some(self.claim_service.store.clone()),
+            query_logging_enabled: self.query_logging_enabled,
+            query_log_retention_days: self.query_log_retention_days,
+            claim_service: self.claim_service.clone(),
         }
     }
 
     /// Public helper for tool-level logging.
+    #[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
     pub(crate) fn log_tool_event(
         &self,
         op: &str,
@@ -66,6 +76,7 @@ impl MemoryService {
     }
 
     /// Public helper for tool-level logging with duration.
+    #[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
     pub(crate) fn log_tool_event_with_duration(
         &self,
         op: &str,
@@ -94,66 +105,6 @@ impl MemoryService {
         super::LifecyclePolicy::from(&self.lifecycle_config)
     }
 
-    pub(crate) fn insert_current_embedding_fields(
-        &self,
-        payload: &mut serde_json::Map<String, Value>,
-        embedding: Vec<f64>,
-    ) -> Result<(), MemoryError> {
-        let expected_dim = self
-            .current_embedding_dimension
-            .unwrap_or_else(|| self.embedding_provider.dimension());
-        if embedding.len() != expected_dim {
-            return Err(MemoryError::Validation(format!(
-                "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
-                embedding.len()
-            )));
-        }
-
-        payload.insert("embedding".to_string(), json!(embedding));
-        payload.insert(
-            "embedding_provider".to_string(),
-            json!(self.embedding_provider.provider_name()),
-        );
-        if let Some(model) = &self.current_embedding_model {
-            payload.insert("embedding_model".to_string(), json!(model));
-        }
-        payload.insert("embedding_dimension".to_string(), json!(expected_dim));
-        if let Some(signature) = &self.current_embedding_signature {
-            payload.insert("embedding_signature".to_string(), json!(signature));
-        }
-        payload.insert(
-            "embedding_updated_at".to_string(),
-            json!(super::normalize_dt(super::query::now())),
-        );
-
-        Ok(())
-    }
-
-    /// Validates embedding dimension and builds `EmbeddingPayload` for
-    /// passing to `FactService::create_fact`.
-    fn build_embedding_payload(
-        &self,
-        embedding: Vec<f64>,
-    ) -> Result<crate::service::fact::EmbeddingPayload, MemoryError> {
-        let expected_dim = self
-            .current_embedding_dimension
-            .unwrap_or_else(|| self.embedding_provider.dimension());
-        if embedding.len() != expected_dim {
-            return Err(MemoryError::Validation(format!(
-                "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
-                embedding.len()
-            )));
-        }
-        Ok(crate::service::fact::EmbeddingPayload {
-            embedding,
-            provider: self.embedding_provider.provider_name().to_string(),
-            model: self.current_embedding_model.clone(),
-            dimension: expected_dim,
-            signature: self.current_embedding_signature.clone(),
-            updated_at: super::normalize_dt(super::query::now()),
-        })
-    }
-
     /// Returns the total count of episodes.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
         let mut total = 0;
@@ -172,92 +123,64 @@ impl MemoryService {
     }
 
     /// Ingests a new episode.
+    ///
+    /// Thin delegator to [`IngestCapability::ingest`].
     pub async fn ingest(
         &self,
         request: IngestRequest,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        self.ingestion_service.ingest(request, access).await
+        let ctx = self.build_context();
+        super::capabilities::ingest::IngestCapability::ingest(&ctx, request, access).await
     }
 
     /// Provides explanations for context items with batched graph insights.
     ///
-    /// Delegates to `ExplanationService` — see `src/service/explanation.rs` for
-    /// the three-phase pipeline (episode/fact resolution → shared graph
-    /// insights → cached provenance assembly).
+    /// Thin delegator to [`ExplainCapability::explain`].
     pub async fn explain(
         &self,
         request: ExplainRequest,
         access: Option<AccessPayload>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
-        self.enforce_rate_limit(access.as_ref())?;
-        self.explanation_service.explain(request, access).await
+        let ctx = self.build_context();
+        super::capabilities::explain::ExplainCapability::explain(&ctx, request, access).await
     }
 
     /// Extracts entities and facts from an episode.
     ///
-    /// # Arguments
-    ///
-    /// * `episode_id` - The episode to extract from.
-    /// * `access` - Optional access context for authorization.
-    /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
-    ///   When provided, these labels override the default NER configuration.
+    /// Thin delegator to [`ExtractCapability::extract`].
     pub async fn extract(
         &self,
         episode_id: &str,
         access: Option<AccessPayload>,
         zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
-        self.enforce_rate_limit(access.as_ref())?;
-        let timer = Instant::now(); // extract
-        let (record, _) = self.find_episode_record(episode_id).await?;
-        if record.is_none() {
-            return Err(MemoryError::NotFound(format!(
-                "episode_id not found: {episode_id}"
-            )));
-        }
-        let episode = record.as_ref().and_then(super::episode_from_record);
-        let payload =
-            super::episode::extract_from_episode(self, episode_id, zero_shot_labels).await?;
-        self.logger.log(
-            log_event(
-                "extract",
-                log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
-                super::episode::build_extract_log_result(
-                    episode.as_ref(),
-                    payload.entities.len(),
-                    &payload.facts,
-                    payload.links.len(),
-                    payload.warnings.len(),
-                ),
-                access.as_ref(),
-                None,
-                None,
-            ),
-            LogLevel::Info,
-        );
-        Ok(payload)
+        let ctx = self.build_context();
+        super::capabilities::extract::ExtractCapability::extract(
+            &ctx,
+            episode_id,
+            access,
+            zero_shot_labels,
+        )
+        .await
     }
 
     /// Resolves an entity candidate.
     ///
-    /// Uses fuzzy matching via `EntityResolver` to deduplicate entities
-    /// with similar names (e.g., "Иван Петров" vs "I. Petrov").
+    /// Thin delegator to [`ResolveCapability::resolve`].
     pub async fn resolve(
         &self,
         candidate: EntityCandidate,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        self.enforce_rate_limit(access.as_ref())?;
-        let namespace = self.default_namespace.clone();
-        let (entity_id, _was_created) = self
-            .entity_resolver
-            .resolve_or_create(&self.entity_service, candidate, &namespace)
-            .await?;
-        Ok(entity_id)
+        let ctx = self.build_context();
+        super::capabilities::resolve::ResolveCapability::resolve(&ctx, candidate, access).await
     }
 
     /// Adds a new fact.
+    ///
+    /// Thin delegator to `ServiceContext::add_fact`. Kept for backward
+    /// compatibility with direct callers (e.g. `commit_ingestion_review`).
     #[allow(clippy::too_many_arguments)]
     pub async fn add_fact(
         &self,
@@ -272,161 +195,20 @@ impl MemoryService {
         policy_tags: Vec<String>,
         provenance: crate::models::Provenance,
     ) -> Result<String, MemoryError> {
-        validate_fact_input(fact_type, content, quote, source_episode, scope)?;
-
-        let namespace = self.namespace_for_scope(scope)?;
-        let project = self.project_for_source_episode(source_episode).await?;
-
-        // Pre-fetch entity records to avoid async closures.
-        let mut entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
-            std::collections::HashMap::new();
-        for entity_id in &entity_links {
-            let entity_record = self.find_entity_record_by_id(entity_id).await?;
-            if let Some(map) = entity_record.as_ref().and_then(Value::as_object) {
-                let canonical = map
-                    .get("canonical_name")
-                    .and_then(Value::as_str)
-                    .unwrap_or(entity_id.as_str())
-                    .to_string();
-                let aliases = map
-                    .get("aliases")
-                    .and_then(Value::as_array)
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(Value::as_str)
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                entity_map.insert(entity_id.clone(), (canonical, aliases));
-            }
-        }
-
-        // Pre-fetch episode source_id.
-        let (episode_record, _) = self.find_episode_record(source_episode).await?;
-        let episode_source_id = episode_record
-            .as_ref()
-            .and_then(|map| map.get("source_id"))
-            .and_then(string_from_value);
-
-        let entity_lookup = |entity_id: &str| Ok(entity_map.get(entity_id).cloned());
-        let source_reference_lookup = |_episode_id: &str| Ok(episode_source_id.clone());
-
-        let index_keys = self
-            .fact_service
-            .build_index_keys(
-                content,
-                source_episode,
-                &provenance,
-                &entity_links,
-                t_valid,
-                entity_lookup,
-                source_reference_lookup,
-            )
-            .await?;
-
-        // Prepare embedding input and generate or defer.
-        let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
-        let mut deferred_embedding_input = None;
-        let embedding_fields = match self.generate_embedding(&embedding_input).await {
-            Ok(Some(embedding)) => {
-                self.logger.log(
-                    std::collections::HashMap::from([
-                        ("op".to_string(), json!("embedding.generate.success")),
-                        (
-                            "provider".to_string(),
-                            json!(self.embedding_provider.provider_name()),
-                        ),
-                        ("fact_type".to_string(), json!(fact_type)),
-                    ]),
-                    LogLevel::Info,
-                );
-                Some(self.build_embedding_payload(embedding)?)
-            }
-            Ok(None) => None,
-            Err(err) => {
-                self.logger.log(
-                    std::collections::HashMap::from([
-                        ("op".to_string(), json!("embedding.write_skipped")),
-                        (
-                            "provider".to_string(),
-                            json!(self.embedding_provider.provider_name()),
-                        ),
-                        ("error".to_string(), json!(err.to_string())),
-                        ("fact_type".to_string(), json!(fact_type)),
-                    ]),
-                    LogLevel::Warn,
-                );
-                if self.should_defer_embedding_retry(&err) {
-                    deferred_embedding_input = Some(embedding_input.clone());
-                }
-                None
-            }
-        };
-
-        // Create fact record via FactService.
-        let fact_id = self
-            .fact_service
-            .create_fact(
-                fact_type,
-                content,
-                quote,
-                source_episode,
-                t_valid,
-                scope,
-                confidence,
-                &entity_links,
-                &policy_tags,
-                &provenance,
-                &namespace,
-                project.as_deref(),
-                embedding_fields,
-                index_keys,
-            )
-            .await?;
-
-        // Invalidate caches immediately after ingestion to ensure isolation.
-        super::cache::invalidate_cache_by_scope(&self.context_cache, scope).await;
-
-        // Background processes: triple extraction and pending embedding retries.
-        self.spawn_triple_extraction(&fact_id, content, &namespace);
-
-        // Synchronous claim projection for deterministic extract visibility.
-        let claim_svc = self.claim_service.clone();
-        let claim_fact_id = FactId::from(fact_id.clone());
-        let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
-        let claim_content = content.to_string();
-        let claim_scope = scope.to_string();
-        let claim_project = project.clone();
-        let claim_entity_links = entity_links.clone();
-        let claim_t_valid = t_valid;
-        let claim_params = crate::service::claims::project::FactPersistedParams {
-            namespace: &namespace,
-            fact_id: &claim_fact_id,
-            source_episode_id: &claim_episode_id,
-            content: &claim_content,
-            scope: &claim_scope,
-            project: claim_project.as_deref(),
-            entity_links: &claim_entity_links,
-            t_valid: claim_t_valid,
-        };
-        match claim_svc.after_fact_persisted(&claim_params).await {
-            Ok(summary) => claim_svc.record_post_fact_success(
-                &namespace,
-                &summary.fact_id,
-                summary.claims_projected,
-                summary.claims_skipped,
-            ),
-            Err(error) => claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error),
-        }
-
-        // Enqueue background embedding after claim projection to ensure test invariants.
-        if let Some(input) = deferred_embedding_input {
-            self.enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
-                .await;
-        }
-
-        Ok(fact_id)
+        let ctx = self.build_context();
+        ctx.add_fact(
+            fact_type,
+            content,
+            quote,
+            source_episode,
+            t_valid,
+            scope,
+            confidence,
+            entity_links,
+            policy_tags,
+            provenance,
+        )
+        .await
     }
 
     /// Start claim reconciliation workers and schedule backfill.
@@ -469,526 +251,78 @@ impl MemoryService {
         Some(super::agent_memory::capture::LifecycleCapture::new(backend))
     }
 
-    pub(crate) async fn record_fact_access(
-        &self,
-        fact_id: &str,
-        boost: i64,
-    ) -> Result<(), MemoryError> {
-        self.explanation_service
-            .record_fact_access(fact_id, boost)
-            .await
-    }
-
-    /// Spawn a fire-and-forget triple extraction task.
+    /// Capture a lifecycle event through the internal selective-capture path.
     ///
-    /// Extracts semantic triples from the fact content, persists each to the
-    /// `triple` table, and runs conflict resolution for singleton predicates.
-    /// Failures are swallowed: triple extraction is best-effort and must never
-    /// affect the fact write path.
-    fn spawn_triple_extraction(&self, fact_id: &str, content: &str, namespace: &str) {
-        let extractor = self.triple_extractor.clone();
-        let fact_id = fact_id.to_string();
-        let content = content.to_string();
-        let namespace = namespace.to_string();
-        let entity_service = self.entity_service.clone();
-
-        tokio::spawn(async move {
-            match extractor.extract(&content, &fact_id).await {
-                Ok(triples) => {
-                    for triple in &triples {
-                        // Persist the triple
-                        let sql = r#"
-                            CREATE TYPE::thing("triple", rand::guid()) SET
-                                namespace = $ns,
-                                subject = $subject,
-                                predicate = $predicate,
-                                object = $object,
-                                confidence = $confidence,
-                                source_fact_id = $source_fact_id
-                        "#;
-                        let vars = serde_json::json!({
-                            "ns": namespace,
-                            "subject": triple.subject,
-                            "predicate": triple.predicate,
-                            "object": triple.object,
-                            "confidence": triple.confidence,
-                            "source_fact_id": triple.source_fact_id,
-                        });
-                        let _ = entity_service.execute_query(sql, vars, &namespace).await;
-
-                        // Run conflict resolution for singleton predicates
-                        if crate::service::triple_extractor::is_singleton_predicate(
-                            &triple.predicate,
-                        ) {
-                            let _ =
-                                crate::service::conflict_resolver::resolve_conflicts_for_triple(
-                                    &entity_service,
-                                    &namespace,
-                                    triple,
-                                )
-                                .await;
-                        }
-                    }
-                }
-                Err(_) => {
-                    // Triple extraction failure is non-critical
-                }
-            }
-        });
+    /// This is the production wiring for `LifecycleCapture::execute()`. Hook
+    /// scripts call the ordinary `ingest` CLI; this method is invoked when the
+    /// server-side lifecycle path classifies the event as capture-eligible.
+    /// Returns `None` (no-op) when lifecycle integration is disabled.
+    pub async fn capture_lifecycle_event(
+        &self,
+        event: &crate::models::NormalizedHostEvent,
+        context: &crate::models::InvocationContext,
+    ) -> Result<Option<super::agent_memory::capture::LifecycleCaptureResult>, MemoryError> {
+        let Some(capture) = self.lifecycle_capture() else {
+            return Ok(None);
+        };
+        let budget = super::agent_memory::capture::default_capture_budget();
+        let result = capture
+            .execute(
+                event,
+                context,
+                &budget,
+                16 * 1024,
+                16,
+                &self.default_namespace,
+            )
+            .await?;
+        Ok(Some(result))
     }
 
+    /// Build a `LifecycleRecall` orchestrator for selective recall.
+    ///
+    /// Returns `None` if lifecycle integration is not enabled. The orchestrator
+    /// delegates to the existing `assemble_context` pipeline via the
+    /// `RecallPipeline` trait.
+    pub fn lifecycle_recall(&self) -> Option<super::agent_memory::recall::LifecycleRecall> {
+        if !self.lifecycle_config.enabled {
+            return None;
+        }
+        Some(
+            super::agent_memory::recall::LifecycleRecall::with_trace_registry(
+                self.trace_registry.clone(),
+            ),
+        )
+    }
+
+    /// Recall lifecycle context through the internal selective-recall path.
+    ///
+    /// This is the production wiring for `LifecycleRecall::execute()`. It
+    /// delegates to the existing `assemble_context` pipeline exactly once per
+    /// recall-eligible event, wrapping output in the "memory is data" preamble.
+    /// Returns `None` (no-op) when lifecycle integration is disabled.
+    pub async fn recall_lifecycle_event(
+        &self,
+        event: &crate::models::NormalizedHostEvent,
+        context: &crate::models::InvocationContext,
+    ) -> Result<Option<super::agent_memory::recall::LifecycleRecallResult>, MemoryError> {
+        let Some(recall) = self.lifecycle_recall() else {
+            return Ok(None);
+        };
+        let pipeline = ProductionRecallPipeline { service: self };
+        let now_secs = chrono::Utc::now().timestamp().max(0) as u64;
+        let result = recall.execute(&pipeline, event, context, now_secs).await?;
+        Ok(Some(result))
+    }
+
+    /// Generates an embedding vector for the supplied input.
+    ///
+    /// Thin delegator to `ServiceContext::generate_embedding`.
     pub(crate) async fn generate_embedding(
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        // Defensive truncation: no embedding model supports more than ~32000
-        // characters (≈8000 tokens for English, smaller for many other
-        // languages). Extremely long inputs cause remote APIs to return empty
-        // responses (e.g. OpenRouter missing data[0].embedding).
-        const MAX_EMBEDDING_INPUT_CHARS: usize = 8_000;
-        let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
-            let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
-            self.logger.log(
-                log_event(
-                    "embedding.input_truncated",
-                    json!({
-                        "original_chars": input.chars().count(),
-                        "truncated_chars": truncated.chars().count(),
-                        "limit": MAX_EMBEDDING_INPUT_CHARS,
-                    }),
-                    json!({}),
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Warn,
-            );
-            truncated
-        } else {
-            input.to_string()
-        };
-
-        let timer = Instant::now();
-        let provider = self.embedding_provider.provider_name();
-        let args = json!({
-            "provider": provider,
-            "input_chars": effective_input.chars().count(),
-        });
-
-        if !self.embedding_provider.is_enabled() {
-            let mut result = build_embedding_log_result(0, None);
-            if let Some(map) = result.as_object_mut() {
-                map.insert("status".to_string(), json!("disabled"));
-            }
-            self.logger.log(
-                log_event(
-                    "embedding.generate.skipped",
-                    log_args_with_duration(args, timer.elapsed()),
-                    result,
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Debug,
-            );
-            return Ok(None);
-        }
-
-        match self.embedding_provider.embed(&effective_input).await {
-            Ok(embedding) => {
-                self.logger.log(
-                    log_event(
-                        "embedding.generate.done",
-                        log_args_with_duration(args, timer.elapsed()),
-                        build_embedding_log_result(1, Some(embedding.len())),
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Info,
-                );
-                Ok(Some(embedding))
-            }
-            Err(err) => {
-                let mut result = build_embedding_log_result(0, None);
-                if let Some(map) = result.as_object_mut() {
-                    map.insert("error".to_string(), json!(err.to_string()));
-                }
-                self.logger.log(
-                    log_event(
-                        "embedding.generate.error",
-                        log_args_with_duration(args, timer.elapsed()),
-                        result,
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Warn,
-                );
-                Err(err)
-            }
-        }
-    }
-
-    pub(crate) async fn generate_query_embedding_with_background(
-        &self,
-        input: &str,
-    ) -> Result<Option<Vec<f64>>, MemoryError> {
-        if let Some(embedding) = self.cached_query_embedding(input).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.query_cache_hit")),
-                    (
-                        "provider".to_string(),
-                        json!(self.embedding_provider.provider_name()),
-                    ),
-                    ("input_chars".to_string(), json!(input.chars().count())),
-                ]),
-                LogLevel::Debug,
-            );
-            return Ok(Some(embedding));
-        }
-
-        let task_key = self.background_query_task_key(input);
-        if self.background_embedding_task_inflight(&task_key).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.query_deferred_inflight")),
-                    (
-                        "provider".to_string(),
-                        json!(self.embedding_provider.provider_name()),
-                    ),
-                    ("input_chars".to_string(), json!(input.chars().count())),
-                ]),
-                LogLevel::Debug,
-            );
-            return Ok(None);
-        }
-
-        match self.generate_embedding(input).await {
-            Ok(Some(embedding)) => {
-                self.store_query_embedding(input, embedding.clone()).await;
-                Ok(Some(embedding))
-            }
-            Ok(None) => Ok(None),
-            Err(err) if self.should_defer_embedding_retry(&err) => {
-                self.enqueue_background_query_embedding(input.to_string())
-                    .await;
-                Ok(None)
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    fn should_defer_embedding_retry(&self, err: &MemoryError) -> bool {
-        super::is_transient_embedding_error(err)
-            && super::is_remote_embedding_provider(self.embedding_provider.provider_name())
-    }
-
-    fn background_fact_task_key(&self, namespace: &str, fact_id: &str) -> String {
-        let signature = self
-            .current_embedding_signature
-            .as_deref()
-            .unwrap_or(self.embedding_provider.provider_name());
-        format!("fact:{signature}:{namespace}:{fact_id}")
-    }
-
-    fn background_query_task_key(&self, input: &str) -> String {
-        let signature = self
-            .current_embedding_signature
-            .as_deref()
-            .unwrap_or(self.embedding_provider.provider_name());
-        format!(
-            "query:{signature}:{}",
-            self.query_embedding_cache_key(input)
-        )
-    }
-
-    fn query_embedding_cache_key(&self, input: &str) -> String {
-        let signature = self
-            .current_embedding_signature
-            .as_deref()
-            .unwrap_or(self.embedding_provider.provider_name());
-        crate::service::hash_prefix(&format!(
-            "{signature}|{}",
-            crate::service::normalize_text(input)
-        ))
-    }
-
-    async fn cached_query_embedding(&self, input: &str) -> Option<Vec<f64>> {
-        let cache_key = self.query_embedding_cache_key(input);
-        let mut cache = self.query_embedding_cache.lock().await;
-        let now = std::time::Instant::now();
-        if let Some(entry) = cache.get(&cache_key).cloned() {
-            if entry.expires_at > now {
-                return Some(entry.embedding);
-            }
-            cache.pop(&cache_key);
-        }
-
-        None
-    }
-
-    async fn store_query_embedding(&self, input: &str, embedding: Vec<f64>) {
-        let cache_key = self.query_embedding_cache_key(input);
-        let mut cache = self.query_embedding_cache.lock().await;
-        cache.put(
-            cache_key,
-            super::CachedQueryEmbedding {
-                embedding,
-                expires_at: std::time::Instant::now() + super::query_embedding_cache_ttl(),
-            },
-        );
-    }
-
-    async fn background_embedding_task_inflight(&self, task_key: &str) -> bool {
-        self.task_runner.is_inflight(task_key).await
-    }
-
-    async fn try_reserve_background_embedding_task(&self, task_key: &str) -> bool {
-        self.task_runner.try_reserve(task_key).await
-    }
-
-    async fn release_background_embedding_task(&self, task_key: &str) {
-        self.task_runner.release(task_key).await;
-    }
-
-    async fn enqueue_background_fact_embedding(
-        &self,
-        namespace: String,
-        fact_id: String,
-        input: String,
-    ) {
-        let task_key = self.background_fact_task_key(&namespace, &fact_id);
-        if !self.try_reserve_background_embedding_task(&task_key).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_deduped")),
-                    ("kind".to_string(), json!("fact")),
-                    ("namespace".to_string(), json!(namespace)),
-                    ("fact_id".to_string(), json!(fact_id)),
-                ]),
-                LogLevel::Debug,
-            );
-            return;
-        }
-
-        self.logger.log(
-            std::collections::HashMap::from([
-                ("op".to_string(), json!("embedding.background_enqueued")),
-                ("kind".to_string(), json!("fact")),
-                ("namespace".to_string(), json!(namespace.clone())),
-                ("fact_id".to_string(), json!(fact_id.clone())),
-            ]),
-            LogLevel::Info,
-        );
-
-        let service = self.clone();
-        tokio::spawn(async move {
-            service
-                .run_background_fact_embedding_task(task_key, namespace, fact_id, input)
-                .await;
-        });
-    }
-
-    async fn enqueue_background_query_embedding(&self, input: String) {
-        let task_key = self.background_query_task_key(&input);
-        if !self.try_reserve_background_embedding_task(&task_key).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_deduped")),
-                    ("kind".to_string(), json!("query")),
-                    ("input_chars".to_string(), json!(input.chars().count())),
-                ]),
-                LogLevel::Debug,
-            );
-            return;
-        }
-
-        self.logger.log(
-            std::collections::HashMap::from([
-                ("op".to_string(), json!("embedding.background_enqueued")),
-                ("kind".to_string(), json!("query")),
-                ("input_chars".to_string(), json!(input.chars().count())),
-            ]),
-            LogLevel::Info,
-        );
-
-        let service = self.clone();
-        tokio::spawn(async move {
-            service
-                .run_background_query_embedding_task(task_key, input)
-                .await;
-        });
-    }
-
-    async fn run_background_fact_embedding_task(
-        &self,
-        task_key: String,
-        namespace: String,
-        fact_id: String,
-        input: String,
-    ) {
-        let outcome = self
-            .run_background_fact_embedding_task_inner(&namespace, &fact_id, &input)
-            .await;
-        self.release_background_embedding_task(&task_key).await;
-
-        if let Err(err) = outcome {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_failed")),
-                    ("kind".to_string(), json!("fact")),
-                    ("namespace".to_string(), json!(namespace)),
-                    ("fact_id".to_string(), json!(fact_id)),
-                    ("error".to_string(), json!(err.to_string())),
-                ]),
-                LogLevel::Warn,
-            );
-        }
-    }
-
-    async fn run_background_fact_embedding_task_inner(
-        &self,
-        namespace: &str,
-        fact_id: &str,
-        input: &str,
-    ) -> Result<(), MemoryError> {
-        for attempt in 1..=super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
-            match self.generate_embedding(input).await {
-                Ok(Some(embedding)) => {
-                    self.store_embedding_on_fact(namespace, fact_id, embedding)
-                        .await?;
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("embedding.background_succeeded")),
-                            ("kind".to_string(), json!("fact")),
-                            ("namespace".to_string(), json!(namespace)),
-                            ("fact_id".to_string(), json!(fact_id)),
-                            ("attempt".to_string(), json!(attempt)),
-                        ]),
-                        LogLevel::Info,
-                    );
-                    return Ok(());
-                }
-                Ok(None) => return Ok(()),
-                Err(err)
-                    if self.should_defer_embedding_retry(&err)
-                        && attempt < super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS =>
-                {
-                    let delay = super::background_embedding_retry_delay(attempt);
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("embedding.background_retry")),
-                            ("kind".to_string(), json!("fact")),
-                            ("namespace".to_string(), json!(namespace)),
-                            ("fact_id".to_string(), json!(fact_id)),
-                            ("attempt".to_string(), json!(attempt)),
-                            ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
-                            ("error".to_string(), json!(err.to_string())),
-                        ]),
-                        LogLevel::Warn,
-                    );
-                    tokio::time::sleep(delay).await;
-                }
-                Err(err) => return Err(err),
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn run_background_query_embedding_task(&self, task_key: String, input: String) {
-        let outcome = self.run_background_query_embedding_task_inner(&input).await;
-        self.release_background_embedding_task(&task_key).await;
-
-        if let Err(err) = outcome {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_failed")),
-                    ("kind".to_string(), json!("query")),
-                    ("input_chars".to_string(), json!(input.chars().count())),
-                    ("error".to_string(), json!(err.to_string())),
-                ]),
-                LogLevel::Warn,
-            );
-        }
-    }
-
-    async fn run_background_query_embedding_task_inner(
-        &self,
-        input: &str,
-    ) -> Result<(), MemoryError> {
-        for attempt in 1..=super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
-            match self.generate_embedding(input).await {
-                Ok(Some(embedding)) => {
-                    self.store_query_embedding(input, embedding).await;
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("embedding.background_succeeded")),
-                            ("kind".to_string(), json!("query")),
-                            ("input_chars".to_string(), json!(input.chars().count())),
-                            ("attempt".to_string(), json!(attempt)),
-                        ]),
-                        LogLevel::Info,
-                    );
-                    return Ok(());
-                }
-                Ok(None) => return Ok(()),
-                Err(err)
-                    if self.should_defer_embedding_retry(&err)
-                        && attempt < super::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS =>
-                {
-                    let delay = super::background_embedding_retry_delay(attempt);
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("embedding.background_retry")),
-                            ("kind".to_string(), json!("query")),
-                            ("input_chars".to_string(), json!(input.chars().count())),
-                            ("attempt".to_string(), json!(attempt)),
-                            ("delay_ms".to_string(), json!(delay.as_millis() as u64)),
-                            ("error".to_string(), json!(err.to_string())),
-                        ]),
-                        LogLevel::Warn,
-                    );
-                    tokio::time::sleep(delay).await;
-                }
-                Err(err) => return Err(err),
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn store_embedding_on_fact(
-        &self,
-        namespace: &str,
-        fact_id: &str,
-        embedding: Vec<f64>,
-    ) -> Result<(), MemoryError> {
-        let Some(Value::Object(mut record)) = self.db_client.select_one(fact_id, namespace).await?
-        else {
-            return Err(MemoryError::NotFound(format!(
-                "fact_id not found for background embedding: {fact_id}"
-            )));
-        };
-
-        if let Some(current_signature) = self.current_embedding_signature.as_deref()
-            && record.get("embedding_signature").and_then(Value::as_str) == Some(current_signature)
-        {
-            return Ok(());
-        }
-
-        let scope = record
-            .get("scope")
-            .and_then(string_from_value)
-            .unwrap_or_else(|| namespace.to_string());
-        self.insert_current_embedding_fields(&mut record, embedding)?;
-        self.db_client
-            .update(fact_id, Value::Object(record), namespace)
-            .await?;
-        super::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
-        Ok(())
+        self.build_context().generate_embedding(input).await
     }
 
     /// Invalidates a fact.
@@ -1006,11 +340,17 @@ impl MemoryService {
     }
 
     /// Assembles context for a query.
+    ///
+    /// Thin delegator to [`AssembleContextCapability::assemble_context`].
     pub async fn assemble_context(
         &self,
         request: AssembleContextRequest,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-        super::context::assemble_context(self, request).await
+        let ctx = self.build_context();
+        super::capabilities::assemble_context::AssembleContextCapability::assemble_context(
+            &ctx, request,
+        )
+        .await
     }
 
     /// Resolves an entity by its type and canonical name.
@@ -1051,7 +391,7 @@ impl MemoryService {
             t_invalid: None,
             t_invalid_ingested: None,
         };
-        super::episode::store_edge(self, &edge, &self.default_namespace).await
+        super::episode::store_edge(&self.build_context(), &edge, &self.default_namespace).await
     }
 
     /// Retrieves SurrealDB config.
@@ -1181,17 +521,6 @@ impl MemoryService {
         self.find_record_by_id(episode_id).await
     }
 
-    async fn project_for_source_episode(
-        &self,
-        source_episode: &str,
-    ) -> Result<Option<String>, MemoryError> {
-        let (record, _) = self.find_episode_record(source_episode).await?;
-        Ok(record
-            .as_ref()
-            .and_then(|map| map.get("project"))
-            .and_then(string_from_value))
-    }
-
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
@@ -1226,20 +555,7 @@ impl MemoryService {
             .and_then(|record| record.as_object().cloned()))
     }
 
-    async fn find_entity_record_by_id(
-        &self,
-        entity_id: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(entity_id, namespace).await?;
-            if record.is_some() {
-                return Ok(record);
-            }
-        }
-
-        Ok(None)
-    }
-
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn enforce_rate_limit(
         &self,
         access: Option<&AccessPayload>,
@@ -1262,6 +578,30 @@ impl MemoryService {
                 .and_then(string_from_value)
                 .or_else(|| map.get("id").and_then(string_from_value))
         }))
+    }
+}
+
+/// Production implementation of [`recall::RecallPipeline`] that delegates to
+/// the existing `assemble_context` path.
+///
+/// This is the bridge between the internal `LifecycleRecall` orchestrator and
+/// the real context pipeline. It exists only as a thin adapter so the
+/// orchestrator stays testable with a mock pipeline.
+pub(crate) struct ProductionRecallPipeline<'a> {
+    service: &'a MemoryService,
+}
+
+#[async_trait::async_trait]
+impl<'a> super::agent_memory::recall::RecallPipeline for ProductionRecallPipeline<'a> {
+    async fn assemble(
+        &self,
+        request: crate::models::AssembleContextRequest,
+    ) -> Result<Vec<crate::models::AssembledContextItem>, MemoryError> {
+        let ctx = self.service.build_context();
+        super::capabilities::assemble_context::AssembleContextCapability::assemble_context(
+            &ctx, request,
+        )
+        .await
     }
 }
 
@@ -2232,7 +1572,8 @@ mod tests {
         service.current_embedding_model = Some("test-model".to_string());
         service.current_embedding_dimension = Some(DEFAULT_EMBEDDING_DIMENSION);
 
-        let first = service
+        let ctx = service.build_context();
+        let first = ctx
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("transient failure should degrade to background mode");
@@ -2240,11 +1581,7 @@ mod tests {
 
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                if service
-                    .cached_query_embedding("salary raise")
-                    .await
-                    .is_some()
-                {
+                if ctx.cached_query_embedding("salary raise").await.is_some() {
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -2253,7 +1590,7 @@ mod tests {
         .await
         .expect("background query embedding should populate cache");
 
-        let second = service
+        let second = ctx
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("cached embedding");

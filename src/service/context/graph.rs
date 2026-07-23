@@ -71,7 +71,7 @@ fn insert_shortest_hop(
 }
 
 async fn resolve_query_anchor_entities(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     raw_query: &str,
     lexical_facts: &[Fact],
@@ -102,7 +102,7 @@ async fn resolve_query_anchor_entities(
 }
 
 async fn walk_anchor_entities(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     namespace: &str,
     cutoff_iso: &str,
     anchors: &BTreeMap<String, String>,
@@ -174,7 +174,7 @@ async fn walk_anchor_entities(
 }
 
 pub(crate) async fn collect_graph_facts(
-    service: &crate::service::MemoryService,
+    service: &crate::service::service_context::ServiceContext,
     request: CollectGraphFactsRequest<'_>,
 ) -> Result<Vec<GraphCandidate>, MemoryError> {
     if request.raw_query.trim().is_empty() || request.max_hops == 0 {
@@ -406,16 +406,18 @@ mod tests {
         };
         let cutoff_iso = crate::service::normalize_dt(cutoff);
 
-        let anchors = resolve_query_anchor_entities(&service, "org", "Alice Stone", &[])
-            .await
-            .expect("resolve anchors");
+        let anchors =
+            resolve_query_anchor_entities(&service.build_context(), "org", "Alice Stone", &[])
+                .await
+                .expect("resolve anchors");
         assert_eq!(
             anchors.get("entity:alice").map(String::as_str),
             Some("Alice Stone"),
             "expected Alice to be resolved as a graph anchor: {anchors:?}"
         );
 
-        let outgoing_neighbors = service
+        let ctx = service.build_context();
+        let outgoing_neighbors = ctx
             .context_store()
             .select_edge_neighbors("org", "entity:alice", &cutoff_iso, GraphDirection::Outgoing)
             .await
@@ -426,16 +428,17 @@ mod tests {
             "expected Alice to have one outgoing neighbor edge: {outgoing_neighbors:?}"
         );
 
-        let traces = walk_anchor_entities(&service, "org", &cutoff_iso, &anchors, 1)
-            .await
-            .expect("walk anchors");
+        let traces =
+            walk_anchor_entities(&service.build_context(), "org", &cutoff_iso, &anchors, 1)
+                .await
+                .expect("walk anchors");
         assert_eq!(
             traces.get("entity:bob").map(|trace| trace.hop_count),
             Some(1),
             "expected Bob to be discovered one hop away: {traces:?}"
         );
 
-        let raw_records = service
+        let raw_records = ctx
             .context_store()
             .select_facts_by_entity_links(
                 "org",
@@ -453,7 +456,7 @@ mod tests {
         );
 
         let candidates = collect_graph_facts(
-            &service,
+            &service.build_context(),
             CollectGraphFactsRequest {
                 namespace: "org",
                 scope: "org",

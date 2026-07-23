@@ -10,7 +10,9 @@ use serde_json::Value;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
 
-use crate::service::{MemoryError, MemoryService};
+use crate::service::MemoryError;
+use crate::service::MemoryService;
+use crate::service::service_context::ServiceContext;
 
 /// Spawns the community recomputation background task.
 pub fn spawn_community_worker(
@@ -65,6 +67,11 @@ pub fn spawn_community_worker(
 
 /// Rebuilds the community table from all currently active edges.
 pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize, MemoryError> {
+    let ctx = service.build_context();
+    run_community_rebuild_pass_inner(&ctx).await
+}
+
+async fn run_community_rebuild_pass_inner(service: &ServiceContext) -> Result<usize, MemoryError> {
     let cutoff = crate::service::normalize_dt(Utc::now());
     let updated_at = crate::service::normalize_dt(Utc::now());
     let mut rebuilt_total = 0;
@@ -89,7 +96,7 @@ pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize
 }
 
 async fn rebuild_namespace_communities(
-    service: &MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     cutoff: &str,
     updated_at: &str,
@@ -102,7 +109,7 @@ async fn rebuild_namespace_communities(
 }
 
 async fn rebuild_namespace_communities_with_batch_size(
-    service: &MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     cutoff: &str,
     updated_at: &str,
@@ -231,7 +238,7 @@ where
 }
 
 async fn build_communities_from_active_edges(
-    service: &MemoryService,
+    service: &ServiceContext,
     namespace: &str,
     edge_records: &[serde_json::Value],
 ) -> Result<Vec<RebuiltCommunity>, MemoryError> {

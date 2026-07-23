@@ -10,7 +10,6 @@ use crate::models::{
     ContradictionWarning, Edge, EdgeOrigin, Episode, ExtractResult, ExtractedEntity, ExtractedFact,
     ExtractedLink, FactType,
 };
-use crate::service::MemoryService;
 use crate::service::episode::communities::update_communities;
 use crate::service::episode::edges::store_edge;
 use crate::service::episode::entity_extraction::extract_entities;
@@ -21,6 +20,7 @@ use crate::service::episode::summary_parser::{
 };
 use crate::service::error::MemoryError;
 use crate::service::query::now;
+use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
 
 #[derive(Debug, Default)]
@@ -48,7 +48,7 @@ pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact
 }
 
 pub(super) async fn add_extracted_fact(
-    service: &MemoryService,
+    service: &ServiceContext,
     episode: &Episode,
     fact_type: &str,
     content: &str,
@@ -84,7 +84,7 @@ pub(super) async fn add_extracted_fact(
 
 /// Extract facts from an episode.
 pub async fn extract_facts(
-    service: &MemoryService,
+    service: &ServiceContext,
     episode: &Episode,
     entities: &[ExtractedEntity],
 ) -> Result<FactExtractionOutcome, MemoryError> {
@@ -225,7 +225,7 @@ pub async fn extract_facts(
 }
 
 pub(super) async fn detect_contradiction_warnings(
-    service: &MemoryService,
+    service: &ServiceContext,
     facts: &[ExtractedFact],
     namespace: &str,
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
@@ -234,7 +234,7 @@ pub(super) async fn detect_contradiction_warnings(
 
 /// Query claim relations for active contradictions involving the extracted facts.
 async fn claim_based_contradiction_warnings(
-    service: &MemoryService,
+    service: &ServiceContext,
     facts: &[ExtractedFact],
     namespace: &str,
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
@@ -337,7 +337,7 @@ async fn claim_based_contradiction_warnings(
 
 /// Extract entities and facts from an episode.
 pub async fn extract_from_episode(
-    service: &MemoryService,
+    service: &ServiceContext,
     episode_id: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<ExtractResult, MemoryError> {

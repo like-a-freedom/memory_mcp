@@ -4,7 +4,7 @@ use crate::storage::DbClient;
 use std::sync::Arc;
 
 pub(crate) const EMBEDDING_STATE_RECORD_ID: &str = "embedding_state:fact";
-pub(crate) const LEGACY_EMBEDDING_SAMPLE_SIZE: usize = 16;
+pub(crate) const STORED_EMBEDDING_SAMPLE_SIZE: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmbeddingActivationMode {
@@ -297,7 +297,7 @@ pub(crate) async fn resolve_embedding_startup(
         let namespace_states = load_embedding_states(db_client, namespaces).await?;
         let fact_counts = count_facts_per_namespace(db_client, namespaces).await?;
         let sample_dimensions =
-            sample_stored_embedding_dimensions(db_client, namespaces, LEGACY_EMBEDDING_SAMPLE_SIZE)
+            sample_stored_embedding_dimensions(db_client, namespaces, STORED_EMBEDDING_SAMPLE_SIZE)
                 .await?;
 
         let mut event = std::collections::HashMap::new();
