@@ -15,7 +15,7 @@ impl MemoryScope {
             "personal" => Ok(Self::Personal),
             "team" => Ok(Self::Team),
             "org" => Ok(Self::Org),
-            "private-domain" | "private_domain" => Ok(Self::PrivateDomain),
+            "private-domain" | "private_domain" | "private" => Ok(Self::PrivateDomain),
             other => Err(MemoryError::Validation(format!("unknown scope: {other}"))),
         }
     }
@@ -86,6 +86,14 @@ mod tests {
         assert_eq!(MemoryScope::parse("team").unwrap().as_str(), "team");
         assert_eq!(
             MemoryScope::parse("private-domain").unwrap().as_str(),
+            "private-domain"
+        );
+        assert_eq!(
+            MemoryScope::parse("private").unwrap().as_str(),
+            "private-domain"
+        );
+        assert_eq!(
+            MemoryScope::parse("private_domain").unwrap().as_str(),
             "private-domain"
         );
     }
