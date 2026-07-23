@@ -10,6 +10,7 @@
 
 pub mod capture;
 pub mod policy;
+pub mod recall;
 #[allow(dead_code)]
 pub mod worker;
 
@@ -19,12 +20,14 @@ pub use capture::{AgentMemoryStoreBackend, LifecycleCapture, LifecycleCaptureRes
 #[allow(unused_imports)]
 pub use policy::CapturePolicy;
 #[allow(unused_imports)]
+pub use recall::{
+    MEMORY_IS_DATA_PREAMBLE, RecallDecision, RecallKey, SessionTraceRegistry, evaluate_recall,
+};
+#[allow(unused_imports)]
 pub use worker::{run_projection_pass, spawn_projection_worker};
 
 /// Marker struct for the internal selective-recall capability.
 ///
-/// Not registered in `tools/list` or as a CLI subcommand. The implementation
-/// lands in Task 6; this declaration reserves the type so downstream modules
-/// can reference it.
+/// Not registered in `tools/list` or as a CLI subcommand.
 #[allow(dead_code)]
 pub(crate) struct LifecycleRecall;
