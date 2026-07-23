@@ -1,11 +1,15 @@
-# Agent Memory Discipline — Architecture and Implementation Plan
+# Agent Memory Discipline — Historical Architecture and Implementation Plan
 
-**Status:** Proposed, critically revised on 2026-07-18  
+**Status:** Superseded for implementation on 2026-07-23
 **Deliverable type:** Architecture and implementation plan only; no implementation is included  
 **Scope:** Make agents read from and write to memory continuously and automatically, primarily through MCP, without relying on the model to remember the workflow  
 **Research cutoff:** 2026-07-18  
 **Related design:** docs/CONTRADICTION_DETECTION_DESIGN.md, ADR-0002 through ADR-0015, and docs/superpowers/plans/2026-07-18-claim-reconciliation.md  
 **Supersedes:** the previous version of this file and docs/papers/Механизм взаимодействия memory_mcp с AI-агентами  план внедрения.md
+
+> **Canonical implementation plan:** `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`. This file remains design and research history. Do not execute its work packages independently; the canonical plan incorporates the completed claim-reconciliation baseline, the July 2026 cross-review, the decision to keep the public MCP/ordinary CLI surface unchanged, exact files, TDD steps, staged evaluations, capacity gates, and verification commands.
+>
+> The term “discipline” is retained here only as historical document vocabulary. The active plan uses explicit lifecycle terms: selective recall, selective capture, invocation origin, exposure trace, and host lifecycle bridge.
 
 ---
 
