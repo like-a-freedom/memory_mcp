@@ -13,6 +13,7 @@
 //! - `migrations`: Schema migration management and validation
 //! - `types`: Type definitions like [`GraphDirection`]
 
+mod agent_memory;
 mod client;
 mod helpers;
 mod migrations;
@@ -20,6 +21,9 @@ mod queries;
 mod types;
 
 // Re-export the public API
+pub use agent_memory::{
+    AgentMemoryStore, EventProjectionJobRecord, MemoryCaptureAuditRecord, MemoryEventRecord,
+};
 pub use client::{
     AppStore, ContextAccessLog, ContextFactQuery, ContextStore, DbClient, SurrealDbClient,
 };

@@ -20,6 +20,14 @@ pub enum MemoryError {
 
     #[error("validation error: {0}")]
     Validation(String),
+
+    /// A capture identity conflict: the event exists with a different identity.
+    #[error("conflict: {0}")]
+    Conflict(String),
+
+    /// The capture budget is exhausted before episode preparation.
+    #[error("budget exhausted: {0}")]
+    BudgetExhausted(String),
 }
 
 /// Returns `true` if the error is a transient database error that can be retried.

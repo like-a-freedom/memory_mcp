@@ -30,6 +30,7 @@ pub use apps::{
     LifecycleDefaults, LifecycleView, PrepareIngestionReviewRequest, RebuildCommunitiesOutcome,
     RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
+pub(crate) mod agent_memory;
 mod cache;
 mod conflict_resolver;
 mod context;

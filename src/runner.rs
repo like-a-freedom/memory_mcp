@@ -134,7 +134,9 @@ fn error_exit_code(err: &MemoryError) -> u8 {
         MemoryError::Storage(_)
         | MemoryError::Transient(_)
         | MemoryError::ConfigMissing(_)
-        | MemoryError::ConfigInvalid(_) => 1,
+        | MemoryError::ConfigInvalid(_)
+        | MemoryError::Conflict(_)
+        | MemoryError::BudgetExhausted(_) => 1,
     }
 }
 
@@ -147,6 +149,8 @@ fn error_kind(err: &MemoryError) -> &'static str {
         MemoryError::Transient(_) => "Transient",
         MemoryError::NotFound(_) => "NotFound",
         MemoryError::Validation(_) => "Validation",
+        MemoryError::Conflict(_) => "Conflict",
+        MemoryError::BudgetExhausted(_) => "BudgetExhausted",
     }
 }
 

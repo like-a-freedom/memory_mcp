@@ -80,8 +80,8 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
         },
         MigrationScript {
-            file_name: "026_cyrillic_fts_active.surql",
-            sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
+            file_name: "027_agent_memory_lifecycle.surql",
+            sql: include_str!("../../migrations/027_agent_memory_lifecycle.surql"),
         },
     ]
 }
@@ -194,6 +194,32 @@ mod tests {
             versioned_migrations()
                 .iter()
                 .any(|migration| migration.file_name == "026_cyrillic_fts_active.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_027_agent_memory_lifecycle() {
+        let migrations = versioned_migrations();
+        assert!(
+            migrations
+                .iter()
+                .any(|migration| migration.file_name == "027_agent_memory_lifecycle.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_have_no_duplicate_file_names() {
+        let mut names: Vec<&str> = versioned_migrations()
+            .iter()
+            .map(|migration| migration.file_name)
+            .collect();
+        names.sort_unstable();
+        let initial_len = names.len();
+        names.dedup();
+        assert_eq!(
+            names.len(),
+            initial_len,
+            "duplicate migration file names detected"
         );
     }
 
