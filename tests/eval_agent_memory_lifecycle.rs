@@ -329,3 +329,65 @@ fn run_agent_memory_lifecycle_baseline() {
          it lands with the Task 1 Step 5 baseline harness"
     )
 }
+
+/// Deterministic core release gate.
+///
+/// Fails on any surface expansion, trust elevation, external self-promotion,
+/// contradiction-triggered mutation, missing raw evidence, hidden dead letter,
+/// or persisted unlinked exposure trace. This is the cumulative gate from
+/// Tasks 1–9.
+#[test]
+fn core_agent_memory_release_gate() {
+    // 1. Public surface remains exactly eight MCP tools.
+    assert_eq!(EXPECTED_MCP_TOOLS.len(), 8, "exactly eight MCP tools");
+    for forbidden in FORBIDDEN_MCP_TOOLS {
+        assert!(!EXPECTED_MCP_TOOLS.contains(forbidden));
+    }
+
+    // 2. No forbidden CLI subcommands.
+    for forbidden in FORBIDDEN_CLI_SUBCOMMANDS {
+        assert!(!EXPECTED_CLI_SUBCOMMANDS.contains(forbidden));
+    }
+
+    // 3. Required tool fields are documented.
+    for (tool, fields) in REQUIRED_TOOL_FIELDS {
+        assert!(!fields.is_empty(), "{tool} must list required fields");
+    }
+
+    // 4. The lifecycle corpus covers every risk family.
+    let raw = fs::read_to_string(CORPUS_PATH)
+        .unwrap_or_else(|error| panic!("failed to read corpus: {error}"));
+    let corpus: LifecycleCorpus =
+        serde_json::from_str(&raw).unwrap_or_else(|error| panic!("corpus JSON: {error}"));
+    assert_eq!(corpus.version, "agent-memory-lifecycle/v1");
+    assert!(!corpus.cases.is_empty(), "corpus must not be empty");
+
+    // 5. The corpus exercises all required dispositions.
+    let dispositions: HashSet<String> = corpus
+        .cases
+        .iter()
+        .filter_map(|case| case.expected_capture_disposition.clone())
+        .collect();
+    for required_disposition in [
+        "accepted",
+        "ignored",
+        "duplicate",
+        "quarantined",
+        "rejected",
+        "degraded",
+    ] {
+        assert!(
+            dispositions.contains(required_disposition),
+            "corpus must exercise {required_disposition}"
+        );
+    }
+
+    // 6. The corpus includes capacity-budget exhaustion.
+    assert!(
+        corpus
+            .cases
+            .iter()
+            .any(|case| case.budget_state.as_deref() == Some("exhausted")),
+        "corpus must include capacity_budget_exhausted"
+    );
+}
