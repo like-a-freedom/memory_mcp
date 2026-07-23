@@ -315,6 +315,24 @@ Or inject a handcrafted summary directly:
 MEMORY_HOOK_CONTENT="Implemented watcher CLI and validated cli-watch tests" ./hooks/memory_stop_hook.sh
 ```
 
+
+## Internal lifecycle CLI subcommands
+
+In addition to the ordinary `ingest` path used by these hook scripts,
+the server exposes two hidden CLI subcommands for selective lifecycle
+capture and recall with policy classification:
+
+- `memory_mcp lifecycle-capture --event <json> --context <json>`
+- `memory_mcp lifecycle-recall --event <json> --context <json>`
+
+These are internal (hidden from `--help`) and consumed by hook scripts
+that need selective capture/recall with trust derivation, salience
+policy, and ephemeral trace management per ADR-0016 AD-4/AD-5. See
+`docs/agent_integration/CONTRACT.md` for the full hook examples.
+
+The ordinary `ingest` path used by the scripts in this directory is
+always available and works without lifecycle configuration.
+
 ## Notes
 
 - The scripts speak newline-delimited JSON-RPC over stdio and perform the minimal MCP handshake: `initialize` → `notifications/initialized` → `tools/call`.

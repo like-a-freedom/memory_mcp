@@ -22,15 +22,29 @@ requires a separate ADR and the evidence gate described in ADR 0016.
 - `src/models/` — domain values and typed records.
 - `src/service/agent_memory/` — internal lifecycle orchestration (policy,
   recall, capture, projection, worker). Not registered in `tools/list`.
-- `src/service/` — core business logic and capabilities.
+- `src/service/capabilities/` — protocol-agnostic capability modules
+  (ingest, extract, resolve, assemble_context, explain, invalidate).
+  Each takes `&ServiceContext` (the narrow seam) and delegates to
+  domain services. This is the deepening that replaced the god-object
+  `MemoryService`.
+- `src/service/embedding_service.rs` — embedding generation, query
+  embedding caching, and background retry logic. Holds the
+  `EmbeddingService` struct that owns embedding-specific concerns.
+- `src/service/` — core business logic, `ServiceContext` (narrow
+  shared infrastructure), `FactService`, `EmbeddingService`, lifecycle
+  workers, claim reconciliation.
 - `src/storage/` — `DbClient` and narrow stores. Backward compatible.
 - `src/storage/agent_memory.rs` — narrow store for lifecycle events and
   durable projection jobs.
 - `src/storage/claims.rs` — narrow store for the claim reconciliation
   pipeline.
-- `src/tools/` — protocol-agnostic tool implementations shared by MCP and CLI.
+- `src/tools/` — protocol-agnostic tool implementations shared by MCP
+  and CLI. Each tool delegates to its matching capability via
+  `ServiceContext`.
 - `src/mcp/` — MCP protocol handlers.
-- `src/cli/` — clap-based CLI surface.
+- `src/cli/` — clap-based CLI surface, including hidden internal
+  `lifecycle-capture` and `lifecycle-recall` subcommands consumed by
+  hook scripts.
 
 ## Lifecycle vocabulary
 
