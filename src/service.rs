@@ -30,6 +30,7 @@ pub use apps::{
     LifecycleDefaults, LifecycleView, PrepareIngestionReviewRequest, RebuildCommunitiesOutcome,
     RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
+pub mod agent_memory;
 mod cache;
 #[cfg(any(test, feature = "prometheus"))]
 pub mod claims;
@@ -39,6 +40,7 @@ mod conflict_resolver;
 mod content_extraction;
 mod context;
 mod core;
+pub(crate) mod durable_work;
 mod embedding;
 mod embedding_runtime;
 mod entity;
@@ -56,6 +58,8 @@ mod scope;
 mod startup;
 mod triple_extractor;
 mod util;
+
+pub mod procedures;
 
 pub(crate) mod capabilities;
 mod model_loader;

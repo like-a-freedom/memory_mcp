@@ -80,12 +80,20 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             sql: include_str!("../../migrations/026_cyrillic_fts_active.surql"),
         },
         MigrationScript {
-            file_name: "027_claim_reconciliation.surql",
-            sql: include_str!("../../migrations/027_claim_reconciliation.surql"),
+            file_name: "027_agent_memory_lifecycle.surql",
+            sql: include_str!("../../migrations/027_agent_memory_lifecycle.surql"),
         },
         MigrationScript {
-            file_name: "028_claim_reconciliation_hardening.surql",
-            sql: include_str!("../../migrations/028_claim_reconciliation_hardening.surql"),
+            file_name: "028_procedural_memory.surql",
+            sql: include_str!("../../migrations/028_procedural_memory.surql"),
+        },
+        MigrationScript {
+            file_name: "029_claim_reconciliation.surql",
+            sql: include_str!("../../migrations/029_claim_reconciliation.surql"),
+        },
+        MigrationScript {
+            file_name: "030_claim_reconciliation_hardening.surql",
+            sql: include_str!("../../migrations/030_claim_reconciliation_hardening.surql"),
         },
     ]
 }
@@ -198,6 +206,42 @@ mod tests {
             versioned_migrations()
                 .iter()
                 .any(|migration| migration.file_name == "026_cyrillic_fts_active.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_027_agent_memory_lifecycle() {
+        let migrations = versioned_migrations();
+        assert!(
+            migrations
+                .iter()
+                .any(|migration| migration.file_name == "027_agent_memory_lifecycle.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_028_procedural_memory() {
+        let migrations = versioned_migrations();
+        assert!(
+            migrations
+                .iter()
+                .any(|migration| migration.file_name == "028_procedural_memory.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_have_no_duplicate_file_names() {
+        let mut names: Vec<&str> = versioned_migrations()
+            .iter()
+            .map(|migration| migration.file_name)
+            .collect();
+        names.sort_unstable();
+        let initial_len = names.len();
+        names.dedup();
+        assert_eq!(
+            names.len(),
+            initial_len,
+            "duplicate migration file names detected"
         );
     }
 

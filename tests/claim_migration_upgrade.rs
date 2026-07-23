@@ -9,8 +9,8 @@ macro_rules! migration_sql {
 }
 
 #[test]
-fn migration_027_declares_all_five_tables() {
-    let sql = migration_sql!("027_claim_reconciliation.surql");
+fn migration_029_declares_all_five_tables() {
+    let sql = migration_sql!("029_claim_reconciliation.surql");
     assert!(sql.contains("DEFINE TABLE claim"), "claim table");
     assert!(
         sql.contains("DEFINE TABLE claim_relation"),
@@ -25,8 +25,8 @@ fn migration_027_declares_all_five_tables() {
 }
 
 #[test]
-fn migration_027_defines_expected_indexes() {
-    let sql = migration_sql!("027_claim_reconciliation.surql");
+fn migration_029_defines_expected_indexes() {
+    let sql = migration_sql!("029_claim_reconciliation.surql");
     assert!(sql.contains("claim_slot_cursor_idx"));
     assert!(sql.contains("claim_source_projection_idx"));
     assert!(sql.contains("claim_job_lease_idx"));
@@ -35,23 +35,23 @@ fn migration_027_defines_expected_indexes() {
 }
 
 #[test]
-fn migration_027_adds_invalidation_reason_to_fact() {
-    let sql = migration_sql!("027_claim_reconciliation.surql");
+fn migration_029_adds_invalidation_reason_to_fact() {
+    let sql = migration_sql!("029_claim_reconciliation.surql");
     assert!(sql.contains("invalidation_reason"));
     assert!(sql.contains("DEFINE FIELD invalidation_reason ON fact"));
 }
 
 #[test]
-fn migration_028_defines_hardening_indexes() {
-    let sql = migration_sql!("028_claim_reconciliation_hardening.surql");
+fn migration_030_defines_hardening_indexes() {
+    let sql = migration_sql!("030_claim_reconciliation_hardening.surql");
     assert!(sql.contains("claim_relation_left_fact_active_idx"));
     assert!(sql.contains("claim_relation_right_fact_active_idx"));
     assert!(sql.contains("claim_relation_schema_outcome_active_idx"));
 }
 
 #[test]
-fn migration_028_adds_relation_lookup_fields() {
-    let sql = migration_sql!("028_claim_reconciliation_hardening.surql");
+fn migration_030_adds_relation_lookup_fields() {
+    let sql = migration_sql!("030_claim_reconciliation_hardening.surql");
     assert!(sql.contains("schema_family"));
     assert!(sql.contains("schema_version"));
     assert!(sql.contains("left_fact_id"));
@@ -59,8 +59,8 @@ fn migration_028_adds_relation_lookup_fields() {
 }
 
 #[test]
-fn migration_028_defines_fields_on_claim_relation() {
-    let sql = migration_sql!("028_claim_reconciliation_hardening.surql");
+fn migration_030_defines_fields_on_claim_relation() {
+    let sql = migration_sql!("030_claim_reconciliation_hardening.surql");
     assert!(sql.contains("schema_family ON claim_relation"));
     assert!(sql.contains("schema_version ON claim_relation"));
     assert!(sql.contains("left_fact_id ON claim_relation"));

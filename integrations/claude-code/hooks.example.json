@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "session_start": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "session_start"]
+    },
+    "user_prompt": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "user_prompt"]
+    },
+    "pre_tool": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "pre_tool"]
+    },
+    "post_tool": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "post_tool"]
+    },
+    "pre_compaction": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "pre_compaction"]
+    },
+    "post_compaction": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "post_compaction"]
+    },
+    "task_stop": {
+      "command": "memory-mcp-host-bridge",
+      "args": ["--host", "claude_code", "--event", "task_stop"]
+    }
+  }
+}

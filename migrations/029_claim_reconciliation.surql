@@ -1,8 +1,13 @@
--- Migration 027: Claim reconciliation tables and indexes.
+-- Migration 029: Claim reconciliation tables and indexes.
 --
 -- Adds five append-only tables for the claim reconciliation pipeline:
 -- claim, claim_relation, claim_job, claim_key_alias, claim_policy.
 -- Also adds an invalidation_reason field to fact for future lifecycle use.
+--
+-- Note: numbered 029 instead of 027 because migrations 027-028 are reserved
+-- for the agent-memory lifecycle and procedural memory tables, which arrived
+-- first under append-only ordering. This migration remains additive and
+-- never edits earlier migrations.
 
 -- Add optional invalidation reason to existing fact table.
 DEFINE FIELD invalidation_reason ON fact TYPE option<string>;

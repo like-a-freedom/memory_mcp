@@ -439,6 +439,36 @@ impl MemoryService {
         runtime
     }
 
+    /// Start the agent-memory lifecycle projection worker.
+    ///
+    /// The worker drains `event_projection_job` records and projects accepted
+    /// lifecycle events into facts via the existing extraction path. It is a
+    /// no-op when no lifecycle events have been captured.
+    pub(crate) async fn start_lifecycle_worker(
+        &self,
+    ) -> super::agent_memory::worker::LifecycleWorkerRuntime {
+        let runtime = super::agent_memory::worker::LifecycleWorkerRuntime::new();
+        let poll_interval = super::agent_memory::worker::empty_poll_interval().as_secs();
+        runtime.spawn(self.clone(), poll_interval).await;
+        runtime
+    }
+
+    /// Build a `LifecycleCapture` wired to the production storage and ingestion
+    /// backends. Returns `None` if lifecycle integration is not enabled.
+    pub fn lifecycle_capture(&self) -> Option<super::agent_memory::capture::LifecycleCapture> {
+        if !self.lifecycle_config.enabled {
+            return None;
+        }
+        let store = std::sync::Arc::new(crate::storage::AgentMemoryStore::new(
+            self.db_client.clone(),
+        ));
+        let ingestion = std::sync::Arc::new(self.ingestion_service.clone());
+        let backend = std::sync::Arc::new(
+            super::agent_memory::capture::ProductionCaptureBackend::new(store, ingestion),
+        );
+        Some(super::agent_memory::capture::LifecycleCapture::new(backend))
+    }
+
     pub(crate) async fn record_fact_access(
         &self,
         fact_id: &str,

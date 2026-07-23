@@ -448,6 +448,15 @@ impl MemoryService {
         self
     }
 
+    /// Returns a copy of the service with lifecycle integration enabled or
+    /// disabled. This controls whether `lifecycle_capture` returns `Some` and
+    /// whether the projection worker is started.
+    #[must_use]
+    pub fn with_lifecycle_enabled(mut self, enabled: bool) -> Self {
+        self.lifecycle_config.enabled = enabled;
+        self
+    }
+
     /// Returns whether persisted query analytics are enabled.
     #[must_use]
     pub fn is_query_logging_enabled(&self) -> bool {

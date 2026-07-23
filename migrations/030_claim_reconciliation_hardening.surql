@@ -1,6 +1,10 @@
--- Migration 028: harden persisted claim relation lookups and metrics.
+-- Migration 030: harden persisted claim relation lookups and metrics.
 -- Adds fact-level lookup fields and schema-labeled relation counts.
--- Applies after 027; never edits earlier migrations.
+-- Applies after 029; never edits earlier migrations.
+--
+-- Note: numbered 030 instead of 028 because migrations 027-028 are reserved
+-- for the agent-memory lifecycle and procedural memory tables, which arrived
+-- first under append-only ordering.
 
 DEFINE FIELD schema_family ON claim_relation TYPE option<string>;
 DEFINE FIELD schema_version ON claim_relation TYPE option<int>;

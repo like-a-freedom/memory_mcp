@@ -8,8 +8,9 @@ EVAL_LOCOMO = cargo test --test eval_external_retrieval run_locomo_retrieval -- 
 EVAL_EXTRACTION = cargo test --test eval_extraction run_extraction_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_LATENCY = cargo test --test eval_latency run_latency_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_CLAIMS = cargo test --test eval_claim_reconciliation run_claim_reconciliation_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
+EVAL_AGENT_MEMORY_LIFECYCLE_SURFACE = cargo test --test eval_agent_memory_lifecycle public_surface_snapshot lifecycle_fixture_covers_core_risks -- --exact --nocapture
 
-.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention eval-claims
+.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention eval-claims eval-agent-memory-lifecycle-surface
 
 eval-baseline:
 	@$(EVAL_RETRIEVAL)
@@ -42,6 +43,8 @@ eval-ner-latency:
 eval-ner-contention:
 	cargo test --locked --release --test eval_ner_latency run_contention_eval -- --ignored --exact --nocapture --test-threads=1
 
-.PHONY: eval-claims
+eval-agent-memory-lifecycle-surface:
+	@$(EVAL_AGENT_MEMORY_LIFECYCLE_SURFACE)
+
 eval-claims:
 	@$(EVAL_CLAIMS)

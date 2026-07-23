@@ -71,6 +71,7 @@ pub async fn build_memory_service(
 pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
     let claim_worker = memory_service.start_claim_workers().await;
+    let lifecycle_worker = memory_service.start_lifecycle_worker().await;
     let server = MemoryMcp::new(memory_service);
 
     logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
@@ -92,6 +93,7 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
         .map_err(|err| log_and_return_error(logger, "main.error", err));
 
     claim_worker.shutdown().await;
+    lifecycle_worker.shutdown().await;
     result
 }
 
@@ -112,6 +114,7 @@ pub async fn run_watch_mode(
 
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
     let claim_worker = memory_service.start_claim_workers().await;
+    let lifecycle_worker = memory_service.start_lifecycle_worker().await;
 
     #[cfg(feature = "cli-watch")]
     {
@@ -125,6 +128,7 @@ pub async fn run_watch_mode(
         .await
         .map_err(|err| log_and_return_error(logger, "main.watch_failed", err));
         claim_worker.shutdown().await;
+        lifecycle_worker.shutdown().await;
         result
     }
 
@@ -132,6 +136,7 @@ pub async fn run_watch_mode(
     {
         let _ = (watch, memory_service);
         claim_worker.shutdown().await;
+        lifecycle_worker.shutdown().await;
         Err(Box::new(std::io::Error::other(
             "watch subcommand requires the cli-watch feature",
         )) as Box<dyn std::error::Error>)

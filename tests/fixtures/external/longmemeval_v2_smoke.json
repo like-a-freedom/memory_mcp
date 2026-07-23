@@ -1,0 +1,30 @@
+{
+  "version": "longmemeval_v2_smoke/v1",
+  "description": "Synthetic local fixture verifying the LongMemEval-V2 adapter insert/query shape, ordering, idempotency, and failure reporting without network access.",
+  "cases": [
+    {
+      "id": "smoke_insert_text_trajectory",
+      "trajectory": {
+        "messages": [
+          {"role": "user", "content": "What is the capital of France?"},
+          {"role": "assistant", "content": "The capital of France is Paris."}
+        ]
+      },
+      "query": "What is the capital of France?",
+      "expected_ability": "static_state_recall",
+      "supports_image": false
+    },
+    {
+      "id": "smoke_insert_workflow_knowledge",
+      "trajectory": {
+        "messages": [
+          {"role": "user", "content": "How do I deploy the service?"},
+          {"role": "assistant", "content": "Run make serve-release to deploy."}
+        ]
+      },
+      "query": "How do I deploy the service?",
+      "expected_ability": "workflow_knowledge",
+      "supports_image": false
+    }
+  ]
+}

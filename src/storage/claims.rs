@@ -650,30 +650,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migration_028_is_last_registered() {
+    fn migration_030_is_last_registered() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "028_claim_reconciliation_hardening.surql");
+        assert_eq!(last.file_name, "030_claim_reconciliation_hardening.surql");
     }
 
     #[test]
-    fn migration_028_is_registered_once() {
+    fn migration_030_is_registered_once() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let count = migrations
             .iter()
-            .filter(|m| m.file_name == "028_claim_reconciliation_hardening.surql")
+            .filter(|m| m.file_name == "030_claim_reconciliation_hardening.surql")
             .count();
-        assert_eq!(count, 1, "028 should be registered exactly once");
+        assert_eq!(count, 1, "030 should be registered exactly once");
     }
 
     #[test]
-    fn migration_028_defines_new_fields_and_indexes() {
+    fn migration_030_defines_new_fields_and_indexes() {
         let migrations = crate::storage::migrations::versioned_migrations();
-        let m028 = migrations
+        let m030 = migrations
             .iter()
-            .find(|m| m.file_name == "028_claim_reconciliation_hardening.surql")
-            .expect("028 not found");
-        let sql = m028.sql;
+            .find(|m| m.file_name == "030_claim_reconciliation_hardening.surql")
+            .expect("030 not found");
+        let sql = m030.sql;
         assert!(sql.contains("DEFINE FIELD schema_family ON claim_relation"));
         assert!(sql.contains("DEFINE FIELD left_fact_id ON claim_relation"));
         assert!(sql.contains("DEFINE FIELD right_fact_id ON claim_relation"));
@@ -683,32 +683,32 @@ mod tests {
     }
 
     #[test]
-    fn migration_027_is_still_registered() {
+    fn migration_029_is_still_registered() {
         let migrations = crate::storage::migrations::versioned_migrations();
-        let has_027 = migrations
+        let has_029 = migrations
             .iter()
-            .any(|m| m.file_name == "027_claim_reconciliation.surql");
-        assert!(has_027, "027 should still be registered");
+            .any(|m| m.file_name == "029_claim_reconciliation.surql");
+        assert!(has_029, "029 should still be registered");
     }
 
     #[test]
-    fn migration_027_is_registered_once() {
+    fn migration_029_is_registered_once() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let count = migrations
             .iter()
-            .filter(|m| m.file_name == "027_claim_reconciliation.surql")
+            .filter(|m| m.file_name == "029_claim_reconciliation.surql")
             .count();
-        assert_eq!(count, 1, "027 should be registered exactly once");
+        assert_eq!(count, 1, "029 should be registered exactly once");
     }
 
     #[test]
-    fn migration_027_defines_all_five_tables() {
+    fn migration_029_defines_all_five_tables() {
         let migrations = crate::storage::migrations::versioned_migrations();
-        let m027 = migrations
+        let m029 = migrations
             .iter()
-            .find(|m| m.file_name == "027_claim_reconciliation.surql")
-            .expect("027 not found");
-        let sql = m027.sql;
+            .find(|m| m.file_name == "029_claim_reconciliation.surql")
+            .expect("029 not found");
+        let sql = m029.sql;
         assert!(sql.contains("DEFINE TABLE claim SCHEMAFULL"));
         assert!(sql.contains("DEFINE TABLE claim_relation SCHEMAFULL"));
         assert!(sql.contains("DEFINE TABLE claim_job SCHEMAFULL"));
@@ -717,13 +717,13 @@ mod tests {
     }
 
     #[test]
-    fn migration_027_defines_expected_indexes() {
+    fn migration_029_defines_expected_indexes() {
         let migrations = crate::storage::migrations::versioned_migrations();
-        let m027 = migrations
+        let m029 = migrations
             .iter()
-            .find(|m| m.file_name == "027_claim_reconciliation.surql")
-            .expect("027 not found");
-        let sql = m027.sql;
+            .find(|m| m.file_name == "029_claim_reconciliation.surql")
+            .expect("029 not found");
+        let sql = m029.sql;
         assert!(sql.contains("claim_slot_cursor_idx"));
         assert!(sql.contains("claim_source_projection_idx"));
         assert!(sql.contains("claim_relation_left_active_idx"));
@@ -737,14 +737,14 @@ mod tests {
     }
 
     #[test]
-    fn migration_027_adds_invalidation_reason_to_fact() {
+    fn migration_029_adds_invalidation_reason_to_fact() {
         let migrations = crate::storage::migrations::versioned_migrations();
-        let m027 = migrations
+        let m029 = migrations
             .iter()
-            .find(|m| m.file_name == "027_claim_reconciliation.surql")
-            .expect("027 not found");
+            .find(|m| m.file_name == "029_claim_reconciliation.surql")
+            .expect("029 not found");
         assert!(
-            m027.sql
+            m029.sql
                 .contains("DEFINE FIELD invalidation_reason ON fact")
         );
     }

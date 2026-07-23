@@ -85,6 +85,20 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             });
             ErrorData::internal_error(err.to_string(), Some(data))
         }
+        MemoryError::Conflict(msg) => {
+            let data = json!({
+                "guidance": "A capture identity conflict occurred. The event exists with a different identity.",
+                "explanation": msg,
+            });
+            ErrorData::invalid_request(err.to_string(), Some(data))
+        }
+        MemoryError::BudgetExhausted(msg) => {
+            let data = json!({
+                "guidance": "The capture budget is exhausted before episode preparation.",
+                "explanation": msg,
+            });
+            ErrorData::invalid_request(err.to_string(), Some(data))
+        }
     }
 }
 
