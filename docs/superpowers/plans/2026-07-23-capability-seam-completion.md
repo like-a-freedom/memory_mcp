@@ -120,6 +120,16 @@ calls the matching capability. `tools/invalidate.rs` is the reference.
 
 ### Step 6 — Slim `MemoryService`
 
+> **Status: Deferred.** `MemoryService` methods (`ingest`, `extract`, `resolve`,
+> `explain`, `assemble_context`, `add_fact`) were kept as thin delegators
+> (`let ctx = self.build_context(); Capability::method(&ctx, ...).await`)
+> for backward compatibility with internal callers (`commit_ingestion_review`,
+> lifecycle worker, MCP handlers). The god-object surface did not collapse to
+> ~10 methods; it stayed at ~30. This is a defensible deviation — removing the
+> delegators would require updating all internal callers to use `build_context()`
+> + capability directly. File a follow-up to complete this if the method count
+> becomes a maintenance burden.
+
 After migration, `MemoryService` keeps only:
 - construction (`builder.rs`)
 - `build_context()` (the seam constructor)

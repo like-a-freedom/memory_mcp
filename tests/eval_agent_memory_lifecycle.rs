@@ -58,7 +58,9 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 /// Ordinary `memory_mcp` CLI subcommands that must remain stable.
 ///
 /// `Serve`, `Watch`, and `Reembed` are runtime modes; the remaining six are
-/// the ordinary CLI equivalents of the six core MCP tools.
+/// the ordinary CLI equivalents of the six core MCP tools. The two
+/// `lifecycle_*` entries are internal hidden subcommands consumed by hook
+/// scripts (ADR-0016 AD-4/AD-5) — not ordinary public tools.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
     "watch",
@@ -69,6 +71,8 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "invalidate",
     "explain",
     "assemble_context",
+    "lifecycle_capture",
+    "lifecycle_recall",
 ];
 
 /// Ordinary CLI subcommands that must never appear.
@@ -308,11 +312,14 @@ fn lifecycle_fixture_covers_core_risks() {
 /// cargo test --test eval_agent_memory_lifecycle run_agent_memory_lifecycle_baseline -- --ignored --exact --nocapture
 /// ```
 #[test]
-#[ignore = "baseline harness lands in Task 1 Step 5; run explicitly with --ignored"]
+#[ignore = "deferred per ADR-0017; run explicitly with --ignored"]
 fn run_agent_memory_lifecycle_baseline() {
-    // Modes: no_memory, bare_mcp, instructions_only, manual_existing_tools.
+    // The full multi-mode baseline simulation harness is deferred per ADR-0017.
+    // The lifecycle evidence gate is closed by `eval_action_grounding` and
+    // `core_agent_memory_release_gate` instead. See:
+    //   docs/adr/0017-defer-agent-memory-lifecycle-baseline-harness.md
     //
-    // The baseline reports per task family:
+    // If re-opened, the baseline would report per task family:
     // - eligible and performed recalls;
     // - eligible and performed captures;
     // - correct, unsafe, and duplicate captures;
@@ -322,11 +329,9 @@ fn run_agent_memory_lifecycle_baseline() {
     // - tool calls per intent;
     // - p50/p95 latency;
     // - new rows and bytes per 1,000 simulated host events.
-    //
-    // Do not assert improvement thresholds in the baseline task.
     panic!(
-        "run_agent_memory_lifecycle_baseline is not implemented yet; \
-         it lands with the Task 1 Step 5 baseline harness"
+        "run_agent_memory_lifecycle_baseline is deferred per ADR-0017; \
+         see docs/adr/0017-defer-agent-memory-lifecycle-baseline-harness.md"
     )
 }
 

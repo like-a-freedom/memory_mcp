@@ -67,3 +67,24 @@ impl ExtractCapability {
         Ok(payload)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::mock_db::MockDbClient;
+
+    #[tokio::test]
+    async fn extract_returns_error_for_missing_episode() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ExtractCapability::extract(&ctx, "episode:nonexistent", None, None).await;
+        assert!(result.is_err(), "extract must fail for missing episode");
+        match result {
+            Err(MemoryError::NotFound(msg)) => {
+                assert!(msg.contains("episode_id not found"));
+            }
+            other => panic!("expected NotFound, got {other:?}"),
+        }
+    }
+}

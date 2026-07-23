@@ -108,6 +108,22 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
                 .await
                 .map_err(report_cli_error)
         }
+        Some(Command::LifecycleCapture(args)) => {
+            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
+                .await
+                .map_err(boxed_to_failure)?;
+            commands::lifecycle_capture::run(&service, args)
+                .await
+                .map_err(report_cli_error)
+        }
+        Some(Command::LifecycleRecall(args)) => {
+            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
+                .await
+                .map_err(boxed_to_failure)?;
+            commands::lifecycle_recall::run(&service, args)
+                .await
+                .map_err(report_cli_error)
+        }
     }
 }
 
@@ -165,6 +181,8 @@ fn mode_label(cli: &Cli) -> &'static str {
         Some(Command::Invalidate(_)) => "cli.invalidate",
         Some(Command::Explain(_)) => "cli.explain",
         Some(Command::AssembleContext(_)) => "cli.assemble_context",
+        Some(Command::LifecycleCapture(_)) => "cli.lifecycle_capture",
+        Some(Command::LifecycleRecall(_)) => "cli.lifecycle_recall",
     }
 }
 

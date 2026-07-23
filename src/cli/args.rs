@@ -139,3 +139,31 @@ pub struct WatchArgs {
     #[arg(long, default_value_t = 2)]
     pub interval_secs: u64,
 }
+
+/// Internal lifecycle-capture args — consumed by hook scripts, not a public tool.
+///
+/// Hidden from `--help` via `#[command(hide = true)]` on the subcommand variant.
+/// See ADR-0016 AD-4 and `docs/agent_integration/CONTRACT.md`.
+#[derive(Debug, Args)]
+pub struct LifecycleCaptureArgs {
+    /// JSON-encoded `NormalizedHostEvent` (event_kind, task_fingerprint, scope, etc.)
+    #[arg(long)]
+    pub event: String,
+    /// JSON-encoded `InvocationContext` (origin, session_id, etc.)
+    #[arg(long)]
+    pub context: String,
+}
+
+/// Internal lifecycle-recall args — consumed by hook scripts, not a public tool.
+///
+/// Hidden from `--help` via `#[command(hide = true)]` on the subcommand variant.
+/// See ADR-0016 AD-5 and `docs/agent_integration/CONTRACT.md`.
+#[derive(Debug, Args)]
+pub struct LifecycleRecallArgs {
+    /// JSON-encoded `NormalizedHostEvent` (event_kind, task_fingerprint, scope, etc.)
+    #[arg(long)]
+    pub event: String,
+    /// JSON-encoded `InvocationContext` (origin, session_id, etc.)
+    #[arg(long)]
+    pub context: String,
+}

@@ -46,16 +46,38 @@ outcomes.
 ### 2. Hooks (supplementary, host-dependent)
 
 External shell scripts installed per-host. Hooks fire on lifecycle events
-(SessionStart, PostToolUse, Stop) and invoke the ordinary CLI:
+(SessionStart, PostToolUse, Stop) and invoke either the ordinary CLI (for
+agent-visible operations) or the internal lifecycle CLI (for selective
+capture/recall with policy classification):
 
 ```bash
-# SessionStart hook → recall
+# SessionStart hook → recall (ordinary CLI, agent-visible)
 memory_mcp assemble-context --query "$(cat /dev/stdin)" --scope org
 
-# PostToolUse hook → capture
+# PostToolUse hook → capture (ordinary CLI, agent-visible)
 memory_mcp ingest --source-type agent_lifecycle --source-id "$EVENT_ID" \
   --content "$(cat /dev/stdin)" --t-ref "$(date -u +%FT%TZ)" --scope org
+
+# PostToolUse hook → selective capture (internal, policy-classified)
+# Hidden subcommand — not in --help. Constructs NormalizedHostEvent +
+# InvocationContext and calls LifecycleCapture::execute().
+memory_mcp lifecycle-capture \
+  --event '{"event_kind":"post_tool_result","task_fingerprint":"$TASK_FP","normalized_task":"$TASK","scope":"org","content":"$CONTENT","capture_signal":"verified_success"}' \
+  --context '{"origin":{"kind":"lifecycle_adapter","adapter_id":"claude_code","adapter_version":"1","host_event":"post_tool_result"},"session_id":"$SESSION_ID"}'
+
+# SessionStart hook → selective recall (internal, policy-classified)
+# Hidden subcommand — not in --help. Constructs NormalizedHostEvent +
+# InvocationContext and calls LifecycleRecall::execute().
+memory_mcp lifecycle-recall \
+  --event '{"event_kind":"session_start","task_fingerprint":"$TASK_FP","normalized_task":"$TASK","scope":"org"}' \
+  --context '{"origin":{"kind":"lifecycle_adapter","adapter_id":"claude_code","adapter_version":"1","host_event":"session_start"},"session_id":"$SESSION_ID"}'
 ```
+
+The ordinary CLI path (`ingest`, `assemble-context`) is always available and
+works without lifecycle configuration. The internal `lifecycle-capture` and
+`lifecycle-recall` subcommands add selective policy classification, trust
+derivation, and ephemeral trace management per ADR-0016 AD-5/AD-6. They are
+hidden from `--help` and are not ordinary public tools.
 
 Hooks are agent-runtime-dependent: Claude Code supports them natively; Codex
 supports a subset; other harnesses may not support hooks at all. When hooks

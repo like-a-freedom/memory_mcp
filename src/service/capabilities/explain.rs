@@ -22,3 +22,26 @@ impl ExplainCapability {
         ctx.explanation_service.explain(request, access).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::mock_db::MockDbClient;
+
+    #[tokio::test]
+    async fn explain_returns_empty_for_empty_context_items() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let request = ExplainRequest {
+            context_pack: vec![],
+        };
+        let result = ExplainCapability::explain(&ctx, request, None).await;
+        assert!(result.is_ok(), "explain must succeed with empty items");
+        let items = result.unwrap();
+        assert!(
+            items.is_empty(),
+            "empty context_pack must produce empty explain"
+        );
+    }
+}

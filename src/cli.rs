@@ -64,4 +64,12 @@ pub enum Command {
     /// Searches stored facts matching `--query`, scoped by `--scope` (org/team/personal).
     /// Output: ToolResponse with ranked context_items. Next step: pipe items to `explain`.
     AssembleContext(args::AssembleContextArgs),
+    /// Internal: capture a lifecycle event (hidden from --help).
+    /// Consumed by hook scripts, not a public tool. See ADR-0016 AD-4.
+    #[command(hide = true)]
+    LifecycleCapture(args::LifecycleCaptureArgs),
+    /// Internal: recall lifecycle context (hidden from --help).
+    /// Consumed by hook scripts, not a public tool. See ADR-0016 AD-5.
+    #[command(hide = true)]
+    LifecycleRecall(args::LifecycleRecallArgs),
 }

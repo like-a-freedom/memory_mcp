@@ -8,6 +8,8 @@ pub mod explain;
 pub mod extract;
 pub mod ingest;
 pub mod invalidate;
+pub mod lifecycle_capture;
+pub mod lifecycle_recall;
 pub mod resolve;
 
 pub use assemble_context::run as run_assemble_context;
@@ -15,6 +17,8 @@ pub use explain::run as run_explain;
 pub use extract::run as run_extract;
 pub use ingest::run as run_ingest;
 pub use invalidate::run as run_invalidate;
+pub use lifecycle_capture::run as run_lifecycle_capture;
+pub use lifecycle_recall::run as run_lifecycle_recall;
 pub use resolve::run as run_resolve;
 
 /// Write a tool response as pretty JSON to stdout, followed by a trailing newline.

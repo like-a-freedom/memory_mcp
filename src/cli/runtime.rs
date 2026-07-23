@@ -176,7 +176,7 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 mod tests {
     use crate::cli::Command;
     use crate::cli::{Cli, args::WatchArgs};
-    use clap::Parser;
+    use clap::{CommandFactory, Parser};
 
     #[test]
     fn cli_defaults_to_stdio_serve_mode() {
@@ -304,5 +304,46 @@ mod tests {
     fn cli_assemble_context_subcommand() {
         let cli = Cli::parse_from(["memory_mcp", "assemble-context", "--query", "test"]);
         assert!(matches!(cli.command, Some(Command::AssembleContext(_))));
+    }
+
+    #[test]
+    fn cli_lifecycle_capture_subcommand_parses() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "lifecycle-capture",
+            "--event",
+            "{\"event_kind\":\"post_tool_result\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\",\"scope\":\"org\"}",
+            "--context",
+            "{\"origin\":{\"kind\":\"lifecycle_adapter\",\"adapter_id\":\"claude_code\",\"adapter_version\":\"1\",\"host_event\":\"post_tool_result\"}}",
+        ]);
+        assert!(matches!(cli.command, Some(Command::LifecycleCapture(_))));
+    }
+
+    #[test]
+    fn cli_lifecycle_recall_subcommand_parses() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "lifecycle-recall",
+            "--event",
+            "{\"event_kind\":\"session_start\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\",\"scope\":\"org\"}",
+            "--context",
+            "{\"origin\":{\"kind\":\"lifecycle_adapter\",\"adapter_id\":\"claude_code\",\"adapter_version\":\"1\",\"host_event\":\"session_start\"}}",
+        ]);
+        assert!(matches!(cli.command, Some(Command::LifecycleRecall(_))));
+    }
+
+    #[test]
+    fn cli_lifecycle_subcommands_are_hidden_from_help() {
+        // The hidden subcommands should not appear in --help output.
+        let help = Cli::command().render_help();
+        let help_str = help.to_string();
+        assert!(
+            !help_str.contains("lifecycle-capture"),
+            "hidden subcommand leaked into --help"
+        );
+        assert!(
+            !help_str.contains("lifecycle-recall"),
+            "hidden subcommand leaked into --help"
+        );
     }
 }

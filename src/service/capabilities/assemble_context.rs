@@ -25,3 +25,32 @@ impl AssembleContextCapability {
         crate::service::context::assemble_context(ctx, request).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::mock_db::MockDbClient;
+
+    #[tokio::test]
+    async fn assemble_context_returns_empty_for_empty_db() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let request = AssembleContextRequest {
+            query: "nonexistent query".to_string(),
+            scope: "org".to_string(),
+            project: None,
+            fact_types: vec![],
+            as_of: None,
+            budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+        };
+        let result = AssembleContextCapability::assemble_context(&ctx, request).await;
+        assert!(result.is_ok(), "assemble_context must succeed on empty db");
+        let items = result.unwrap();
+        assert!(items.is_empty(), "empty db must return empty context");
+    }
+}

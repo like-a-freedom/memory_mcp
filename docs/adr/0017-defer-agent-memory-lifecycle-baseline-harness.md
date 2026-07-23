@@ -1,6 +1,6 @@
 # Defer the Agent-Memory Lifecycle Baseline Simulation Harness
 
-Status: Proposed (2026-07-23)
+Status: Accepted (2026-07-23)
 
 ## Context
 

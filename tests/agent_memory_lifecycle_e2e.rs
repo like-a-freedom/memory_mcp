@@ -274,21 +274,35 @@ async fn recall_lifecycle_event_forces_after_compaction() {
 }
 
 #[tokio::test]
-async fn public_surface_unchanged_after_lifecycle_wiring() {
-    // The lifecycle wiring must not add any public tool or CLI subcommand.
-    // This is a smoke check; the full freeze is in eval_agent_memory_lifecycle.rs.
+async fn lifecycle_methods_do_not_leak_into_public_tool_registry() {
+    // The lifecycle wiring adds internal `capture_lifecycle_event` and
+    // `recall_lifecycle_event` methods on MemoryService. These must not
+    // register as MCP tools. The full surface freeze is in
+    // `eval_agent_memory_lifecycle.rs::public_surface_matches_live_tool_registry`.
+    // Here we assert the methods exist and return results (not None) when
+    // lifecycle is enabled — proving the wiring is live without re-asserting
+    // the tool registry.
     let service = lifecycle_service().await;
-
-    // capture_lifecycle_event and recall_lifecycle_event are pub(crate) —
-    // they must not be reachable as public tools. The service itself must
-    // still expose only the ordinary public methods.
     let event = accepted_event("task:surface", "content");
     let ctx = lifecycle_ctx("s1");
-    let _ = service.capture_lifecycle_event(&event, &ctx).await;
-    let _ = service.recall_lifecycle_event(&event, &ctx).await;
 
-    // If the wiring leaked a public tool, the MCP registry would have grown.
-    // The freeze test in eval_agent_memory_lifecycle.rs covers this fully.
+    let capture_result = service
+        .capture_lifecycle_event(&event, &ctx)
+        .await
+        .expect("capture");
+    assert!(
+        capture_result.is_some(),
+        "enabled lifecycle must return Some"
+    );
+
+    let recall_result = service
+        .recall_lifecycle_event(&event, &ctx)
+        .await
+        .expect("recall");
+    assert!(
+        recall_result.is_some(),
+        "enabled lifecycle must return Some"
+    );
 }
 
 #[tokio::test]
@@ -319,4 +333,84 @@ async fn capture_and_recall_full_cycle() {
         matches!(result, LifecycleRecallResult::Recalled { .. }),
         "first recall must perform"
     );
+}
+
+#[tokio::test]
+async fn lifecycle_cli_capture_entry_point_works() {
+    use memory_mcp::cli::args::LifecycleCaptureArgs;
+    use memory_mcp::cli::commands::lifecycle_capture;
+
+    let service = lifecycle_service().await;
+    let event_json = serde_json::json!({
+        "event_kind": "post_tool_result",
+        "task_fingerprint": "task:cli-capture",
+        "normalized_task": "Shipped OAuth.",
+        "scope": "org",
+        "project": "copper-palm",
+        "content": "OAuth login shipped with tests.",
+        "capture_signal": "verified_success",
+    });
+    let context_json = serde_json::json!({
+        "origin": {
+            "kind": "lifecycle_adapter",
+            "adapter_id": "claude_code",
+            "adapter_version": "1",
+            "host_event": "post_tool_result",
+        },
+        "session_id": "s1",
+    });
+    let args = LifecycleCaptureArgs {
+        event: event_json.to_string(),
+        context: context_json.to_string(),
+    };
+    // Should not error — the entry point is wired to capture_lifecycle_event.
+    lifecycle_capture::run(&service, args)
+        .await
+        .expect("CLI lifecycle-capture must succeed");
+}
+
+#[tokio::test]
+async fn lifecycle_cli_recall_entry_point_works() {
+    use memory_mcp::cli::args::LifecycleRecallArgs;
+    use memory_mcp::cli::commands::lifecycle_recall;
+
+    let service = lifecycle_service().await;
+    let event_json = serde_json::json!({
+        "event_kind": "session_start",
+        "task_fingerprint": "task:cli-recall",
+        "normalized_task": "Plan the next sprint.",
+        "scope": "org",
+        "project": "copper-palm",
+    });
+    let context_json = serde_json::json!({
+        "origin": {
+            "kind": "lifecycle_adapter",
+            "adapter_id": "claude_code",
+            "adapter_version": "1",
+            "host_event": "session_start",
+        },
+        "session_id": "s1",
+    });
+    let args = LifecycleRecallArgs {
+        event: event_json.to_string(),
+        context: context_json.to_string(),
+    };
+    // Should not error — the entry point is wired to recall_lifecycle_event.
+    lifecycle_recall::run(&service, args)
+        .await
+        .expect("CLI lifecycle-recall must succeed");
+}
+
+#[tokio::test]
+async fn lifecycle_cli_capture_rejects_invalid_json() {
+    use memory_mcp::cli::args::LifecycleCaptureArgs;
+    use memory_mcp::cli::commands::lifecycle_capture;
+
+    let service = lifecycle_service().await;
+    let args = LifecycleCaptureArgs {
+        event: "not valid json".to_string(),
+        context: "{}".to_string(),
+    };
+    let result = lifecycle_capture::run(&service, args).await;
+    assert!(result.is_err(), "invalid JSON must return an error");
 }
