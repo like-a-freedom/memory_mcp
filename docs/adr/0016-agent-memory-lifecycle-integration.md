@@ -30,10 +30,10 @@ mode, but model-selected calls cannot count as enforcement.
 
 ### AD-2 — Freeze the current public tool and ordinary CLI surface
 
-Internal capabilities (`LifecycleRecall`, `LifecycleCapture`) are not registered
-in `tools/list`, are not CLI subcommands, and have no public JSON schema. They
-call the same service/tool modules used by `assemble_context` and inline
-`extract`.
+Internal capabilities (`LifecycleCapture`, `LifecycleWorkerRuntime`) are not
+registered in `tools/list`, are not CLI subcommands, and have no public JSON
+schema. They call the same service/tool modules used by `assemble_context`
+and inline `extract`.
 
 ### AD-3 — Transport authority outside tool arguments
 
@@ -45,15 +45,36 @@ its identity.
 
 ### AD-4 — Host bridge mechanism
 
-Supported automatic integration uses one optional, feature-gated control-plane
-path: an authenticated local Unix-domain socket owned by the running
-`memory_mcp` service when lifecycle integration is enabled, and a small
-separate `memory-mcp-host-bridge` executable that forwards one versioned host
-event from stdin to that socket. The executable does not open the database,
-run retrieval, contain capture policy, or add a `memory_mcp` CLI subcommand.
-The shim is the only planned executable-surface addition, and it exists only
-because command-hook hosts can start a process but cannot call an internal
-Rust method.
+Supported automatic integration uses **standard transports only** — no
+custom Unix socket listener, no separate bridge binary. The lifecycle bridge
+operates through three complementary surfaces:
+
+1. **MCP stdio (primary)** — the existing `memory_mcp serve` path. The agent
+   calls `assemble_context` / `ingest` / `extract` through the standard MCP
+   protocol. This is the **default mechanism** and works with every
+   MCP-compatible host. `AGENTS.md` and the `memory-mcp` skill instruct the
+   agent when and how to use these tools.
+
+2. **Hooks (supplementary)** — external shell scripts (not part of the Rust
+   binary) installed per-host. Hooks fire on lifecycle events (SessionStart,
+   PostToolUse, Stop, etc.) and call the memory server through the **ordinary
+   CLI** (`memory_mcp ingest`, `memory_mcp assemble_context`) or a simple
+   HTTP endpoint if configured. Hooks are agent-runtime-dependent: Claude Code
+   supports them natively; Codex supports a subset; other harnesses may not
+   support hooks at all. When hooks are unavailable, the MCP stdio path
+   remains fully functional.
+
+3. **AGENTS.md + skill (instructive layer)** — `AGENTS.md` at the project
+   root and the `memory-mcp` skill provide the agent with clear instructions
+   on when to recall before significant work and when to capture outcomes.
+   This is the **primary, universal mechanism** — it works with every
+   agent that reads project instructions, without requiring hooks.
+
+The lifecycle integration operates through these three surfaces only — no
+bridge adapters, no host normalization code, no custom transport. Hook
+scripts call the ordinary CLI directly; the CLI enforces scope, trust, and
+policy through the existing path. Stable event identity and deduplication
+are handled by `LifecycleCapture` via `load_event` + `compute_event_id`.
 
 ### AD-5 — Selective recall over existing `assemble_context`
 

@@ -28,7 +28,6 @@ requires a separate ADR and the evidence gate described in ADR 0016.
   durable projection jobs.
 - `src/storage/claims.rs` — narrow store for the claim reconciliation
   pipeline.
-- `src/bridge/` — host normalization (lands in Task 7).
 - `src/tools/` — protocol-agnostic tool implementations shared by MCP and CLI.
 - `src/mcp/` — MCP protocol handlers.
 - `src/cli/` — clap-based CLI surface.

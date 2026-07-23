@@ -30,15 +30,53 @@ The `public_surface_snapshot` test in `tests/eval_agent_memory_lifecycle.rs`
 freezes this surface. A future proposal for a new public tool requires a
 separate ADR and the evidence gate described in ADR 0016.
 
+## Integration architecture
+
+The lifecycle bridge operates through three complementary surfaces. No custom
+Unix socket listener or separate bridge binary is required.
+
+### 1. MCP stdio (primary, universal)
+
+The existing `memory_mcp serve` path. The agent calls `assemble_context`,
+`ingest`, and `extract` through the standard MCP protocol. This works with
+every MCP-compatible host. `AGENTS.md` and the `memory-mcp` skill instruct
+the agent on when to recall before significant work and when to capture
+outcomes.
+
+### 2. Hooks (supplementary, host-dependent)
+
+External shell scripts installed per-host. Hooks fire on lifecycle events
+(SessionStart, PostToolUse, Stop) and invoke the ordinary CLI:
+
+```bash
+# SessionStart hook → recall
+memory_mcp assemble-context --query "$(cat /dev/stdin)" --scope org
+
+# PostToolUse hook → capture
+memory_mcp ingest --source-type agent_lifecycle --source-id "$EVENT_ID" \
+  --content "$(cat /dev/stdin)" --t-ref "$(date -u +%FT%TZ)" --scope org
+```
+
+Hooks are agent-runtime-dependent: Claude Code supports them natively; Codex
+supports a subset; other harnesses may not support hooks at all. When hooks
+are unavailable, the MCP stdio path remains fully functional.
+
+### 3. AGENTS.md + skill (instructive, universal)
+
+`AGENTS.md` at the project root and the `memory-mcp` skill tell the agent when
+and how to use memory tools. This is the **primary mechanism** for
+agent-initiated workflows and works without hooks.
+
 ## Internal lifecycle capabilities
 
-The integration uses two internal capabilities that are **not** registered in
+The integration uses internal capabilities that are **not** registered in
 `tools/list`, are **not** CLI subcommands, and have **no** public JSON schema:
 
-- `LifecycleRecall` — selective recall over the existing `assemble_context`
-  pipeline.
 - `LifecycleCapture` — selective capture over the existing inline `extract`
   preparation path.
+- `LifecycleWorkerRuntime` — durable projection worker for accepted events.
+- `ProductionCaptureBackend` — wires `AgentMemoryStore` + `IngestionService`
+  to the capture pipeline.
 
 They call the same service/tool modules used by the public tools.
 
@@ -85,9 +123,12 @@ Remembered content is never concatenated into system or developer instructions.
 
 ## Degraded behavior
 
-If the listener or server is unavailable, the bridge emits the configured
-degraded result and never pretends enforcement succeeded. An outage must
-produce a documented degraded event.
+If the memory server is unavailable (MCP connection dropped, CLI call failed),
+the hook script emits the configured degraded result (typically an empty
+string or a warning comment) and never pretends enforcement succeeded. An
+outage must produce a documented degraded event — the hook script writes a
+warning to stderr and exits with a non-zero code that the host treats as
+non-blocking.
 
 ## Rollout stages
 

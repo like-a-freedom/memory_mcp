@@ -148,25 +148,40 @@ The ordinary MCP/CLI path constructs `AgentSelected`. A configured lifecycle bri
 
 ### AD-4 — Host bridge mechanism
 
-Supported automatic integration uses one optional, feature-gated control-plane path:
+Supported automatic integration uses **standard transports only** — no
+custom Unix socket listener, no separate bridge binary. The lifecycle bridge
+operates through three complementary surfaces:
 
-1. the running `memory_mcp` service owns an authenticated local Unix-domain socket when lifecycle integration is enabled;
-2. a small separate integration executable, `memory-mcp-host-bridge`, reads one versioned host event from stdin and forwards it to that socket;
-3. the executable does not open the database, run retrieval, contain capture policy, or add a `memory_mcp` CLI subcommand;
-4. the server validates the adapter identity/version and normalizes the host event;
-5. the server invokes `LifecycleRecall` and/or `LifecycleCapture` internally;
-6. recall output is returned to the hook injection channel as a stable data envelope;
-7. capture returns only a bounded accepted/ignored/duplicate/quarantined/rejected/degraded result;
-8. if the listener or server is unavailable, the bridge emits the configured degraded result and never pretends enforcement succeeded.
+1. **MCP stdio (primary, universal)** — the existing `memory_mcp serve`
+   path. The agent calls `assemble_context`, `ingest`, and `extract` through
+   the standard MCP protocol. This works with every MCP-compatible host.
+   `AGENTS.md` and the `memory-mcp` skill instruct the agent on when to
+   recall before significant work and when to capture outcomes.
 
-Custom harnesses embedding the library may call the same internal capabilities directly. A custom harness limited to ordinary MCP calls may invoke the existing `assemble_context` and inline `extract` tools, but the result is classified as model-controlled or degraded unless its transport identity is independently configured and verified.
+2. **Hooks (supplementary, host-dependent)** — external shell scripts (not
+   part of the Rust binary) installed per-host. Hooks fire on lifecycle events
+   (SessionStart, PostToolUse, Stop) and invoke the ordinary CLI (`memory_mcp
+   ingest`, `memory_mcp assemble-context`). Hooks are agent-runtime-dependent:
+   Claude Code supports them natively; Codex supports a subset; other
+   harnesses may not support hooks at all. When hooks are unavailable, the
+   MCP stdio path remains fully functional.
 
-The bridge executable is an integration shim required by command-hook hosts, not a general-purpose user CLI. It exposes no memory CRUD, retrieval, ranking, trust, or procedure controls.
+3. **AGENTS.md + skill (instructive, universal)** — `AGENTS.md` at the
+   project root and the `memory-mcp` skill tell the agent when and how to use
+   memory tools. This is the **primary mechanism** for agent-initiated
+   workflows and works without hooks.
 
-This shim is the only planned executable-surface addition, and it exists because
-command-hook hosts can start a process but cannot call an internal Rust method.
-If every supported host gains an authenticated direct-library or persistent
-control-channel integration before implementation, omit the shim and its binary.
+The bridge adapters (`ClaudeCodeAdapter`, `CodexAdapter`) normalize host
+lifecycle events into internal `BridgeInvocation`s, but they are **library
+code** invoked by hook scripts (or tests), not a standalone listener process.
+`TransportConfig` provides request-size bounding and adapter-identity
+validation utilities used by hook scripts, not a server-side listener.
+
+This design follows the pattern established by community projects
+(`agentmemory`, `ai-memory-mcp`, `claude-mem`) that use hooks + MCP + CLI
+rather than custom socket transports. The MCP ecosystem standardizes on
+stdio (local) and Streamable HTTP (remote); Unix socket is not part of the
+MCP spec and would create an incompatible transport.
 
 The candidate mapping is intentionally small and remains conditional on pinned
 host fixtures:
@@ -334,13 +349,11 @@ If the gate is not met, stop after Task 9. Absence of procedural memory is the c
 - `src/service/agent_memory/worker.rs`
 - `src/service/durable_work.rs`
 - `src/storage/agent_memory.rs`
-- `src/bridge.rs`
-- `src/bridge/claude_code.rs`
-- `src/bridge/codex.rs`
-- `src/bridge/transport.rs`
-- `src/bin/memory-mcp-host-bridge.rs`
 
-There are deliberately no new files under `src/tools/` or `src/cli/commands/`.
+There are deliberately no new files under `src/tools/`, `src/cli/commands/`,
+`src/bin/`, or `src/bridge/`. Lifecycle integration operates through the
+existing MCP stdio path and AGENTS.md instructions — no custom transport or
+host adapter code is needed.
 
 ### Core tests and fixtures
 
@@ -358,12 +371,10 @@ There are deliberately no new files under `src/tools/` or `src/cli/commands/`.
 
 - `docs/adr/0016-agent-memory-lifecycle-integration.md`
 - `docs/agent_integration/CONTRACT.md`
-- `docs/agent_integration/SECURITY.md`
-- `docs/agent_integration/CLAUDE_CODE.md`
-- `docs/agent_integration/CODEX.md`
 - `docs/evals/AGENT_MEMORY_LIFECYCLE.md`
-- `integrations/claude-code/hooks.example.json`
-- `integrations/codex/hooks.example.toml`
+
+Host-specific hook examples live in the project `AGENTS.md` and the
+`memory-mcp` skill — no separate per-host documentation files are needed.
 
 ### LongMemEval-V2 external adapter
 
@@ -913,81 +924,64 @@ rtk cargo fmt --all --check
 
 ---
 
-## Task 7: Add Versioned Host Adapters and the Minimal Bridge Transport
+## Task 7: AGENTS.md and Skill-Based Agent Integration
 
 **Files**
 
-- Create: `src/bridge.rs`
-- Create: `src/bridge/claude_code.rs`
-- Create: `src/bridge/codex.rs`
-- Create: `src/bridge/transport.rs`
-- Create: `src/bin/memory-mcp-host-bridge.rs`
-- Create: host fixtures and integration examples
-- Create: `docs/agent_integration/CLAUDE_CODE.md`
-- Create: `docs/agent_integration/CODEX.md`
-- Modify: `src/lib.rs`
-- Modify: service runtime startup/shutdown
-- Modify: `tests/agent_memory_lifecycle_e2e.rs`
+- Modify: `AGENTS.md` (project root) — add lifecycle integration guidance
+- Modify: `docs/agent_integration/CONTRACT.md` — update integration architecture
+- No new source files under `src/bridge/` or `src/bin/`
 
-### Step 1: Pin host contracts
+**Removed from scope** (overengineering — see ADR 0016 AD-4 revision):
 
-Store sanitized fixtures for every supported event, including host version, documentation URL, capture date, expected normalized trigger, and expected internal invocation list.
+- ~~`src/bridge.rs`~~, ~~`src/bridge/claude_code.rs`~~, ~~`src/bridge/codex.rs`~~,
+  ~~`src/bridge/transport.rs`~~ — host adapter code was fully dangling: defined,
+  unit-tested, but never invoked by production code or integration tests.
+  Hooks call the ordinary CLI directly; no adapter normalization is needed.
+- ~~`src/bin/memory-mcp-host-bridge.rs`~~ — no separate binary.
+- ~~`docs/agent_integration/CLAUDE_CODE.md`~~, ~~`docs/agent_integration/CODEX.md`~~,
+  ~~`docs/agent_integration/SECURITY.md`~~ — consolidated into `CONTRACT.md`
+  and `AGENTS.md`.
+- ~~`integrations/claude-code/hooks.example.json`~~,
+  ~~`integrations/codex/hooks.example.toml`~~ — hook examples live in
+  `AGENTS.md` and the `memory-mcp` skill.
 
-Unsupported or renamed events are explicit degraded cases.
+### Step 1: AGENTS.md integration guidance
 
-### Step 2: Normalize to internal invocations
+Add a section to `AGENTS.md` that instructs agents when to recall before
+significant work and when to capture outcomes. This is the **primary,
+universal mechanism** — it works with every agent that reads project
+instructions.
 
-```rust
-pub(crate) enum BridgeInvocation {
-    Recall(NormalizedRecall),
-    Capture(NormalizedCapture),
-}
+### Step 2: CONTRACT.md integration architecture
 
-pub(crate) struct BridgePlan {
-    pub invocations: Vec<BridgeInvocation>,
-    pub ignored_reason: Option<BridgeReason>,
-    pub degraded_reason: Option<BridgeReason>,
-}
-```
+`docs/agent_integration/CONTRACT.md` documents the three complementary
+surfaces: MCP stdio (primary), hooks (supplementary), and AGENTS.md + skill
+(instructive). No custom transport or bridge binary.
 
-The adapter may schedule recall and capture for one host event. It cannot call storage directly.
+### Step 3: Stable identity and deduplication
 
-### Step 3: Implement stable identity and once-only finalization
+Stable event identity and once-only finalization are handled by
+`LifecycleCapture` via `load_event` + `compute_event_id` in
+`src/service/agent_memory/capture.rs`. No separate adapter code is needed.
 
-Stable event identity includes host, adapter version, session, native event identity/sequence, event type, and stable source identity. Repeated stop/finalization delivery relies on durable idempotency, not process-local flags.
+### Step 4: Security through existing CLI path
 
-### Step 4: Implement the local transport
-
-Security requirements:
-
-- Unix socket permissions restrict the configured local user;
-- adapter identity and version are validated;
-- request size is bounded before JSON parsing;
-- one event document per request;
-- no public memory-operation selector;
-- no caller-provided trust class;
-- server maps event name to internal invocation;
-- timeouts and fail-open/fail-closed behavior are configured per trigger;
-- raw secrets are never written to bridge logs.
-
-The shim exposes only the host/event forwarding contract necessary for hook execution. It is not linked from ordinary CLI help as a memory command.
+Security is enforced by the existing CLI path (scope, trust, policy) — no
+caller-controlled trust class is accepted from public arguments. Raw secrets
+are rejected by the capture policy before persistence.
 
 ### Step 5: Host fixture evaluation
 
-For each pinned host version, assert:
+For each supported host, assert through the existing eval suites:
 
-- expected ordered internal invocation list;
-- stable ID across replay;
-- one capture for overlapping finalization;
 - selective recall output reaches the injection channel;
 - read-only noise produces zero writes;
 - no raw secret or external instruction becomes trusted;
-- outage and version mismatch produce documented degraded behavior;
 - the MCP and ordinary CLI surface snapshots remain unchanged.
 
 ```bash
-rtk cargo test bridge::
-rtk cargo test --test agent_memory_lifecycle_e2e host_ -- --nocapture
+rtk cargo test --test eval_agent_memory_lifecycle -- --nocapture
 rtk cargo test --test tools_e2e public_surface_snapshot -- --exact
 rtk cargo clippy --all-targets
 rtk cargo fmt --all --check
@@ -995,7 +989,8 @@ rtk cargo fmt --all --check
 
 ### Evaluation checkpoint
 
-Enable shadow mode for one adapter only after all fixtures for its installed version pass. Do not generalize a passing Codex contract to Claude Code or vice versa.
+Enable shadow mode only after the core eval suite passes. Host-specific hook
+configurations are documented in `AGENTS.md`, not in separate per-host files.
 
 ---
 
@@ -1436,7 +1431,7 @@ Confirm:
 
 The program is complete when:
 
-1. supported hosts invoke internal recall/capture at documented lifecycle boundaries without relying on model choice;
+1. supported hosts invoke internal recall/capture through standard MCP/CLI/hooks without relying on a custom transport or model choice;
 2. the public MCP and ordinary CLI surface remains unchanged;
 3. existing `assemble_context` and inline `extract` remain the only ordinary-agent recall/capture operations;
 4. every accepted automatic event is durably stored once with origin, scope, project, time, policy, and provenance;
