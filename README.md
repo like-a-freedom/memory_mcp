@@ -883,3 +883,29 @@ Structured log events go to **stdout** (controlled by `RUST_LOG`). Error respons
 ## License
 
 This project is licensed under the **MIT** license. See [`LICENSE`](LICENSE) for details.
+
+## Agent Memory Lifecycle Integration
+
+`memory_mcp` supports agent-host lifecycle integration through an internal
+control plane that does not add new public tools. The eight-tool MCP surface
+and the ordinary CLI surface remain unchanged.
+
+- **Architecture:** A versioned host lifecycle bridge invokes internal
+  `LifecycleRecall` and `LifecycleCapture` capabilities, which reuse the
+  existing `assemble_context` and inline `extract` paths.
+- **Trust:** Derived from the invocation channel, never from public arguments.
+  External content cannot become privileged instruction, preference, policy,
+  retraction, or procedure.
+- **Growth control:** Ignored and duplicate events create zero durable rows.
+  Accepted content is stored once. Quotas prevent unbounded ingestion.
+- **Procedural memory:** Separately gated and projected through the existing
+  `FactType::Experience` seam. Currently shadow-only.
+
+See:
+- [ADR 0016](docs/adr/0016-agent-memory-lifecycle-integration.md)
+- [Integration Contract](docs/agent_integration/CONTRACT.md)
+- [Security Model](docs/agent_integration/SECURITY.md)
+- [Claude Code Integration](docs/agent_integration/CLAUDE_CODE.md)
+- [Codex Integration](docs/agent_integration/CODEX.md)
+- [Evaluation Results](docs/evals/AGENT_MEMORY_LIFECYCLE.md)
+- [Procedural Memory](docs/evals/PROCEDURAL_MEMORY.md)
