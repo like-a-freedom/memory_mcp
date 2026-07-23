@@ -1,0 +1,26 @@
+# Codex hooks example configuration.
+# Forwards versioned host events to the memory-mcp-host-bridge executable.
+
+[hooks.session_start]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "session_start"]
+
+[hooks.user_turn]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "user_turn"]
+
+[hooks.tool_call]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "tool_call"]
+
+[hooks.tool_result]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "tool_result"]
+
+[hooks.compaction]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "compaction"]
+
+[hooks.turn_complete]
+command = "memory-mcp-host-bridge"
+args = ["--host", "codex", "--event", "turn_complete"]
