@@ -83,6 +83,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "027_agent_memory_lifecycle.surql",
             sql: include_str!("../../migrations/027_agent_memory_lifecycle.surql"),
         },
+        MigrationScript {
+            file_name: "028_procedural_memory.surql",
+            sql: include_str!("../../migrations/028_procedural_memory.surql"),
+        },
     ]
 }
 
@@ -204,6 +208,16 @@ mod tests {
             migrations
                 .iter()
                 .any(|migration| migration.file_name == "027_agent_memory_lifecycle.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_028_procedural_memory() {
+        let migrations = versioned_migrations();
+        assert!(
+            migrations
+                .iter()
+                .any(|migration| migration.file_name == "028_procedural_memory.surql")
         );
     }
 

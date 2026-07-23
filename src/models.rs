@@ -8,6 +8,7 @@ mod domain;
 mod ids;
 mod lifecycle_trace;
 mod memory_event;
+mod procedure;
 mod provenance;
 mod request;
 
@@ -16,6 +17,7 @@ pub use domain::*;
 pub use ids::*;
 pub use lifecycle_trace::*;
 pub use memory_event::*;
+pub use procedure::*;
 pub use provenance::*;
 pub use request::*;
 
