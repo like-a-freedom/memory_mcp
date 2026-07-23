@@ -10,12 +10,16 @@
 
 pub mod capture;
 pub mod policy;
+#[allow(dead_code)]
+pub mod worker;
 
 // The full LifecycleRecall struct lands in Task 6.
 #[allow(unused_imports)]
 pub use capture::{AgentMemoryStoreBackend, LifecycleCapture, LifecycleCaptureResult};
 #[allow(unused_imports)]
 pub use policy::CapturePolicy;
+#[allow(unused_imports)]
+pub use worker::{run_projection_pass, spawn_projection_worker};
 
 /// Marker struct for the internal selective-recall capability.
 ///

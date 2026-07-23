@@ -35,6 +35,7 @@ mod cache;
 mod conflict_resolver;
 mod context;
 mod core;
+pub(crate) mod durable_work;
 mod embedding;
 mod embedding_runtime;
 mod entity;
