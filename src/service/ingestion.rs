@@ -20,7 +20,7 @@ pub struct IngestionService {
 }
 
 impl IngestionService {
-    pub fn new(
+    pub(crate) fn new(
         db_client: Arc<dyn crate::storage::DbClient>,
         namespaces: Vec<String>,
         logger: StdoutLogger,
