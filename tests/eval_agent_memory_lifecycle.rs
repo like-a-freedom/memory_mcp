@@ -178,6 +178,57 @@ fn public_surface_snapshot() {
     }
 }
 
+/// Introspect the live `MemoryMcp` tool registry and assert it matches the
+/// frozen surface exactly.
+///
+/// Unlike the self-referential `public_surface_snapshot`, this test catches a
+/// 9th `#[tool]` method added to `MemoryMcp` because it queries the actual
+/// `ToolRouter` populated by the `#[tool_router]` macro.
+#[tokio::test]
+async fn public_surface_matches_live_tool_registry() {
+    use memory_mcp::mcp::MemoryMcp;
+    use memory_mcp::service::MemoryService;
+    use memory_mcp::storage::SurrealDbClient;
+    use rmcp::handler::server::ServerHandler;
+    use std::sync::Arc;
+
+    let db_client = Arc::new(
+        SurrealDbClient::connect_in_memory("surface_freeze", "test", "warn")
+            .await
+            .expect("connect in-memory db"),
+    );
+    db_client
+        .apply_migrations_impl("test")
+        .await
+        .expect("apply migrations");
+
+    let service = MemoryService::new(
+        db_client,
+        vec!["test".to_string()],
+        "warn".to_string(),
+        50,
+        100,
+    )
+    .expect("create service");
+    let mcp = MemoryMcp::new(service);
+
+    // Every expected tool must exist in the live registry.
+    for tool_name in EXPECTED_MCP_TOOLS {
+        assert!(
+            mcp.get_tool(tool_name).is_some(),
+            "expected MCP tool {tool_name} not found in live registry"
+        );
+    }
+
+    // No forbidden tool may exist in the live registry.
+    for forbidden in FORBIDDEN_MCP_TOOLS {
+        assert!(
+            mcp.get_tool(forbidden).is_none(),
+            "forbidden MCP tool {forbidden} found in live registry — surface expanded"
+        );
+    }
+}
+
 /// Assert the lifecycle corpus covers every core release-gate risk family.
 #[test]
 fn lifecycle_fixture_covers_core_risks() {
