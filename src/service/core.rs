@@ -44,20 +44,26 @@ impl MemoryService {
             entity_resolver: self.entity_resolver.clone(),
             entity_service: self.entity_service.clone(),
             entity_extractor: self.entity_extractor.clone(),
-            embedding_provider: self.embedding_provider.clone(),
-            embedding_similarity_threshold: self.embedding_similarity_threshold,
-            current_embedding_signature: self.current_embedding_signature.clone(),
-            current_embedding_model: self.current_embedding_model.clone(),
-            current_embedding_dimension: self.current_embedding_dimension,
-            task_runner: self.task_runner.clone(),
+            embedding_service: super::embedding_service::EmbeddingService::new(
+                self.db_client.clone(),
+                self.logger.clone(),
+                self.embedding_provider.clone(),
+                self.embedding_similarity_threshold,
+                self.current_embedding_signature.clone(),
+                self.current_embedding_model.clone(),
+                self.current_embedding_dimension,
+                self.context_cache.clone(),
+                self.query_embedding_cache.clone(),
+                self.task_runner.clone(),
+            ),
             fact_service: self.fact_service.clone(),
-            query_embedding_cache: self.query_embedding_cache.clone(),
             triple_extractor: self.triple_extractor.clone(),
             context_cache: self.context_cache.clone(),
             claim_store: Some(self.claim_service.store.clone()),
             query_logging_enabled: self.query_logging_enabled,
             query_log_retention_days: self.query_log_retention_days,
             claim_service: self.claim_service.clone(),
+            triple_extraction_semaphore: self.triple_extraction_semaphore.clone(),
         }
     }
 
@@ -98,7 +104,7 @@ impl MemoryService {
         content: &str,
         quote: &str,
     ) -> String {
-        format!("{fact_type}\n{content}\n{quote}")
+        super::fact::FactService::build_fact_embedding_input(fact_type, content, quote)
     }
 
     pub(crate) fn lifecycle_policy(&self) -> super::LifecyclePolicy {
@@ -179,7 +185,7 @@ impl MemoryService {
 
     /// Adds a new fact.
     ///
-    /// Thin delegator to `ServiceContext::add_fact`. Kept for backward
+    /// Thin delegator to `FactService::add_fact`. Kept for backward
     /// compatibility with direct callers (e.g. `commit_ingestion_review`).
     #[allow(clippy::too_many_arguments)]
     pub async fn add_fact(
@@ -196,19 +202,21 @@ impl MemoryService {
         provenance: crate::models::Provenance,
     ) -> Result<String, MemoryError> {
         let ctx = self.build_context();
-        ctx.add_fact(
-            fact_type,
-            content,
-            quote,
-            source_episode,
-            t_valid,
-            scope,
-            confidence,
-            entity_links,
-            policy_tags,
-            provenance,
-        )
-        .await
+        ctx.fact_service
+            .add_fact(
+                &ctx,
+                fact_type,
+                content,
+                quote,
+                source_episode,
+                t_valid,
+                scope,
+                confidence,
+                entity_links,
+                policy_tags,
+                provenance,
+            )
+            .await
     }
 
     /// Start claim reconciliation workers and schedule backfill.
@@ -233,6 +241,18 @@ impl MemoryService {
         let poll_interval = super::agent_memory::worker::empty_poll_interval().as_secs();
         runtime.spawn(self.clone(), poll_interval).await;
         runtime
+    }
+
+    /// Shut down the lifecycle background workers (decay, archival, community).
+    ///
+    /// Cancels all worker tasks and joins them. Safe to call when no workers
+    /// were spawned (`None`) or when lifecycle is disabled (empty runtime).
+    /// Idempotent: a second call is a no-op (token already cancelled, handles
+    /// already drained).
+    pub async fn shutdown_lifecycle_background_workers(&self) {
+        if let Some(runtime) = &self.lifecycle_background_workers {
+            runtime.shutdown().await;
+        }
     }
 
     /// Build a `LifecycleCapture` wired to the production storage and ingestion
@@ -317,12 +337,15 @@ impl MemoryService {
 
     /// Generates an embedding vector for the supplied input.
     ///
-    /// Thin delegator to `ServiceContext::generate_embedding`.
+    /// Thin delegator to `EmbeddingService::generate_embedding`.
     pub(crate) async fn generate_embedding(
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        self.build_context().generate_embedding(input).await
+        self.build_context()
+            .embedding_service
+            .generate_embedding(input)
+            .await
     }
 
     /// Invalidates a fact.
@@ -1574,6 +1597,7 @@ mod tests {
 
         let ctx = service.build_context();
         let first = ctx
+            .embedding_service
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("transient failure should degrade to background mode");
@@ -1581,7 +1605,12 @@ mod tests {
 
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                if ctx.cached_query_embedding("salary raise").await.is_some() {
+                if ctx
+                    .embedding_service
+                    .cached_query_embedding("salary raise")
+                    .await
+                    .is_some()
+                {
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -1591,6 +1620,7 @@ mod tests {
         .expect("background query embedding should populate cache");
 
         let second = ctx
+            .embedding_service
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("cached embedding");

@@ -43,6 +43,7 @@ mod core;
 pub(crate) mod durable_work;
 mod embedding;
 mod embedding_runtime;
+mod embedding_service;
 mod entity;
 mod entity_extraction;
 mod entity_resolution;
@@ -79,6 +80,9 @@ pub use constants::*;
 mod constants {
     /// Default context cache size.
     pub const CONTEXT_CACHE_SIZE: usize = 512;
+    /// Maximum number of concurrent fire-and-forget triple extraction tasks.
+    /// Prevents unbounded task spawning under bursty fact creation load.
+    pub const TRIPLE_EXTRACTION_MAX_CONCURRENCY: usize = 4;
 }
 
 /// Re-export fact decay constants for backwards compatibility.
@@ -90,8 +94,9 @@ pub use content_extraction::watcher::FsWatcher;
 pub(crate) use episode::build_extract_log_result;
 pub use episode::{episode_from_record, fact_from_record};
 pub use lifecycle::{
-    run_archival_pass, run_community_rebuild_pass, run_decay_pass, spawn_archival_worker,
-    spawn_community_worker, spawn_decay_worker,
+    LifecycleBackgroundWorkerRuntime, run_archival_pass, run_community_rebuild_pass,
+    run_decay_pass, spawn_archival_worker, spawn_community_worker, spawn_decay_worker,
+    spawn_workers_from_config,
 };
 pub use query::{
     bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,

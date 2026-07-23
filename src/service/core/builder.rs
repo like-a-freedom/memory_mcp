@@ -59,6 +59,15 @@ pub struct MemoryService {
     /// Holds at most 32 traces per session for 30 minutes. Persists only when a
     /// later significant capture links a trace (ADR-0016 AD-7).
     pub(crate) trace_registry: Arc<super::super::agent_memory::recall::SessionTraceRegistry>,
+    /// Owned runtime for the lifecycle background workers (decay, archival,
+    /// community). `None` when constructed via the test builders that do not
+    /// spawn lifecycle workers; populated by `new_from_env_with_mode`.
+    pub(crate) lifecycle_background_workers:
+        Option<super::super::lifecycle::LifecycleBackgroundWorkerRuntime>,
+    /// Bounded-concurrency semaphore for fire-and-forget triple extraction
+    /// tasks. Limits in-flight extraction tasks to prevent unbounded task
+    /// spawning under load.
+    pub(crate) triple_extraction_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -280,7 +289,9 @@ impl MemoryService {
         }
 
         // Spawn lifecycle workers if enabled
-        super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
+        let lifecycle_background_workers =
+            super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
+        service.lifecycle_background_workers = Some(lifecycle_background_workers);
 
         Ok(service)
     }
@@ -439,6 +450,10 @@ impl MemoryService {
             trace_registry: Arc::new(
                 super::super::agent_memory::recall::SessionTraceRegistry::new(),
             ),
+            lifecycle_background_workers: None,
+            triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
+                crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
+            )),
         })
     }
 

@@ -54,6 +54,10 @@ _Avoid_: Auto-ingest, background capture tool
 An ephemeral per-session record of a recall's selected fact and experience IDs, retrieval fingerprint, and policy fingerprint. Held in an LRU of at most 32 traces for 30 minutes. Persists only when a later significant capture links it.
 _Avoid_: Recall receipt, durable recall log
 
+**Session Trace Registry**:
+The process-local store of exposure traces, keyed by session ID. Bounded to at most 256 active sessions. Expired traces are evicted on every record. Not persisted across process restarts.
+_Avoid_: Trace cache, recall state store
+
 **Action Grounding**:
 The property that a recalled memory item influenced a consequential agent action. Proven only by evaluation replay, never by the existence of a trace.
 _Avoid_: Recall hit, memory access

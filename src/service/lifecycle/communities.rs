@@ -9,15 +9,20 @@ use chrono::Utc;
 use serde_json::Value;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
+use tokio_util::sync::CancellationToken;
 
 use crate::service::MemoryError;
 use crate::service::MemoryService;
 use crate::service::service_context::ServiceContext;
 
 /// Spawns the community recomputation background task.
+///
+/// The task runs until `shutdown` is cancelled, at which point it exits
+/// cleanly after completing any in-flight pass.
 pub fn spawn_community_worker(
     service: MemoryService,
     interval_secs: u64,
+    shutdown: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
@@ -34,7 +39,10 @@ pub fn spawn_community_worker(
         service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = shutdown.cancelled() => break,
+                _ = interval.tick() => {}
+            }
             match run_community_rebuild_pass(&service).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();

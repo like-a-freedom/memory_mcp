@@ -106,7 +106,7 @@ pub(super) async fn collect_episode_fallback_items(
     Ok(build_episode_fallback_items(EpisodeFallbackParams {
         episodes,
         query_opt: Some(query),
-        semantic_available: service.embedding_provider.is_enabled(),
+        semantic_available: service.embedding_service.embedding_provider().is_enabled(),
         scope: params.scope,
         cutoff: params.cutoff,
         window_start: params.window_start,

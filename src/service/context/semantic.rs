@@ -26,6 +26,7 @@ pub(crate) async fn collect_semantic_facts(
     request: CollectSemanticFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String)>, MemoryError> {
     let query_embedding = match service
+        .embedding_service
         .generate_query_embedding_with_background(request.query)
         .await
     {
@@ -40,7 +41,12 @@ pub(crate) async fn collect_semantic_facts(
                     ),
                     (
                         "provider".to_string(),
-                        serde_json::json!(service.embedding_provider.provider_name()),
+                        serde_json::json!(
+                            service
+                                .embedding_service
+                                .embedding_provider()
+                                .provider_name()
+                        ),
                     ),
                     ("error".to_string(), serde_json::json!(err.to_string())),
                 ]),
@@ -102,7 +108,7 @@ pub(crate) async fn collect_semantic_facts(
                 }
             });
 
-        if similarity < service.embedding_similarity_threshold {
+        if similarity < service.embedding_service.embedding_similarity_threshold() {
             continue;
         }
 

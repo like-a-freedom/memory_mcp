@@ -5,16 +5,21 @@
 use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
+use tokio_util::sync::CancellationToken;
 
 use crate::service::{MemoryError, MemoryService};
 
 const ARCHIVAL_BATCH_LIMIT: i32 = 500;
 
 /// Spawns the archival worker background task.
+///
+/// The task runs until `shutdown` is cancelled, at which point it exits
+/// cleanly after completing any in-flight pass.
 pub fn spawn_archival_worker(
     service: MemoryService,
     interval_secs: u64,
     age_days: u32,
+    shutdown: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
@@ -35,7 +40,10 @@ pub fn spawn_archival_worker(
         service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = shutdown.cancelled() => break,
+                _ = interval.tick() => {}
+            }
             match run_archival_pass(&service, age_days).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();

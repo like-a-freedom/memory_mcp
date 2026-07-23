@@ -174,7 +174,7 @@ pub(crate) async fn append_recent_experience_items(
             quote: fact.quote,
             source_episode: fact.source_episode,
             confidence,
-            semantic_available: Some(service.embedding_provider.is_enabled()),
+            semantic_available: Some(service.embedding_service.embedding_provider().is_enabled()),
             provenance: fact.provenance.to_json_value(),
             rationale: format!(
                 "supplemental experience recent_t_ingested={}",

@@ -56,19 +56,24 @@ pub(crate) mod test_support {
                     .expect("regex extractor"),
             )
                 as Arc<dyn crate::service::entity_extraction::EntityExtractor>,
-            embedding_provider: Arc::new(DisabledEmbeddingProvider::new(0))
-                as Arc<dyn crate::service::embedding::EmbeddingProvider>,
-            embedding_similarity_threshold: 0.0,
-            current_embedding_signature: None,
-            current_embedding_model: None,
-            current_embedding_dimension: None,
-            task_runner: Arc::new(
-                crate::service::embedding::task_runner::BackgroundTaskRunner::new(),
+            embedding_service: crate::service::embedding_service::EmbeddingService::new(
+                db_client.clone(),
+                StdoutLogger::new("warn"),
+                Arc::new(DisabledEmbeddingProvider::new(0))
+                    as Arc<dyn crate::service::embedding::EmbeddingProvider>,
+                0.0,
+                None,
+                None,
+                None,
+                Arc::new(RwLock::new(LruCache::new(
+                    NonZeroUsize::new(64).expect("valid size"),
+                ))),
+                Arc::new(Mutex::new(LruCache::new(
+                    NonZeroUsize::new(64).expect("valid size"),
+                ))),
+                Arc::new(crate::service::embedding::task_runner::BackgroundTaskRunner::new()),
             ),
             fact_service: crate::service::fact::FactService::new(db_client.clone()),
-            query_embedding_cache: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(64).expect("valid size"),
-            ))),
             triple_extractor: Arc::new(RuleBasedTripleExtractor::new())
                 as Arc<dyn crate::service::triple_extractor::TripleExtractor>,
             context_cache: Arc::new(RwLock::new(LruCache::new(
@@ -79,6 +84,9 @@ pub(crate) mod test_support {
             query_log_retention_days: 7,
             claim_service: crate::service::claims::project::ClaimService::new(Arc::new(
                 SurrealClaimStore::new(db_client.clone()),
+            )),
+            triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
+                crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
             )),
         }
     }

@@ -5,16 +5,21 @@
 use chrono::Utc;
 use serde_json::json;
 use tokio::time::{self, Duration as TokioDuration};
+use tokio_util::sync::CancellationToken;
 
 use crate::service::value_helpers::{json_f64, json_i64};
 use crate::service::{MemoryError, MemoryService};
 
 /// Spawns the decay worker background task.
+///
+/// The task runs until `shutdown` is cancelled, at which point it exits
+/// cleanly after completing any in-flight pass.
 pub fn spawn_decay_worker(
     service: MemoryService,
     interval_secs: u64,
     threshold: f64,
     half_life_days: f64,
+    shutdown: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = time::interval(TokioDuration::from_secs(interval_secs));
@@ -33,7 +38,10 @@ pub fn spawn_decay_worker(
         service.logger.log(event, crate::logging::LogLevel::Info);
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = shutdown.cancelled() => break,
+                _ = interval.tick() => {}
+            }
             match run_decay_pass(&service, threshold, half_life_days).await {
                 Ok(count) => {
                     let mut event = std::collections::HashMap::new();

@@ -72,6 +72,9 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
     let claim_worker = memory_service.start_claim_workers().await;
     let lifecycle_worker = memory_service.start_lifecycle_worker().await;
+    // Keep a handle for background-worker shutdown. The runtime is shared via
+    // `Arc` internally, so the clone observes the same cancellation token.
+    let shutdown_service = memory_service.clone();
     let server = MemoryMcp::new(memory_service);
 
     logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
@@ -94,6 +97,9 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 
     claim_worker.shutdown().await;
     lifecycle_worker.shutdown().await;
+    shutdown_service
+        .shutdown_lifecycle_background_workers()
+        .await;
     result
 }
 
@@ -115,6 +121,8 @@ pub async fn run_watch_mode(
     let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
     let claim_worker = memory_service.start_claim_workers().await;
     let lifecycle_worker = memory_service.start_lifecycle_worker().await;
+    // Keep a handle for background-worker shutdown.
+    let shutdown_service = memory_service.clone();
 
     #[cfg(feature = "cli-watch")]
     {
@@ -129,6 +137,9 @@ pub async fn run_watch_mode(
         .map_err(|err| log_and_return_error(logger, "main.watch_failed", err));
         claim_worker.shutdown().await;
         lifecycle_worker.shutdown().await;
+        shutdown_service
+            .shutdown_lifecycle_background_workers()
+            .await;
         result
     }
 
@@ -137,6 +148,9 @@ pub async fn run_watch_mode(
         let _ = (watch, memory_service);
         claim_worker.shutdown().await;
         lifecycle_worker.shutdown().await;
+        shutdown_service
+            .shutdown_lifecycle_background_workers()
+            .await;
         Err(Box::new(std::io::Error::other(
             "watch subcommand requires the cli-watch feature",
         )) as Box<dyn std::error::Error>)
@@ -169,6 +183,7 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
         LogLevel::Info,
     );
 
+    memory_service.shutdown_lifecycle_background_workers().await;
     Ok(())
 }
 

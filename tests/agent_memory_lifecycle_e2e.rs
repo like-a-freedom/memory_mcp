@@ -414,3 +414,28 @@ async fn lifecycle_cli_capture_rejects_invalid_json() {
     let result = lifecycle_capture::run(&service, args).await;
     assert!(result.is_err(), "invalid JSON must return an error");
 }
+
+#[tokio::test]
+async fn lifecycle_background_workers_shutdown_cleanly() {
+    // The test-built service does not spawn lifecycle background workers
+    // (that path is in `new_from_env_with_mode`), so this verifies the
+    // no-op path does not panic or hang.
+    let service = lifecycle_service().await;
+    service.shutdown_lifecycle_background_workers().await;
+    // If we get here without hanging, the test passes.
+}
+
+#[tokio::test]
+async fn lifecycle_background_worker_runtime_spawns_and_shuts_down_cleanly() {
+    // Exercise the runtime directly to verify worker spawn + shutdown.
+    use memory_mcp::service::LifecycleBackgroundWorkerRuntime;
+
+    let service = lifecycle_service().await;
+    let runtime = LifecycleBackgroundWorkerRuntime::new();
+    runtime.spawn_decay(service.clone(), 3600, 0.1, 365.0);
+    runtime.spawn_archival(service.clone(), 3600, 90);
+    runtime.spawn_community(service, 3600);
+    // Shutdown should join all three workers without hanging.
+    runtime.shutdown().await;
+    // If we get here without hanging, the test passes.
+}

@@ -57,7 +57,9 @@ pub(super) async fn add_extracted_fact(
     extraction_strategy: &str,
 ) -> Result<ExtractedFact, MemoryError> {
     let fact_id = service
+        .fact_service
         .add_fact(
+            service,
             fact_type,
             content,
             quote,

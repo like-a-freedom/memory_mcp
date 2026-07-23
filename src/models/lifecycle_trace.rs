@@ -104,6 +104,15 @@ impl ExposureTraceStore {
         self.traces.is_empty()
     }
 
+    /// Returns the timestamp of the oldest trace, or `None` if empty.
+    ///
+    /// Used by `SessionTraceRegistry` to find the session with the oldest
+    /// trace when evicting sessions that exceed the registry cap.
+    #[must_use]
+    pub fn oldest_trace_secs(&self) -> Option<u64> {
+        self.traces.front().map(|t| t.created_at_secs)
+    }
+
     /// Evict traces older than `now_secs - ttl_secs`.
     pub fn evict_expired(&mut self, now_secs: u64, ttl_secs: u64) {
         let cutoff = now_secs.saturating_sub(ttl_secs);

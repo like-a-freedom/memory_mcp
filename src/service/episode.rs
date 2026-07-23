@@ -7,6 +7,7 @@ mod fact_extraction;
 mod record_parsing;
 mod statement_detection;
 mod summary_parser;
+pub(crate) mod triples;
 
 pub(crate) use communities::build_community_summary;
 pub(crate) use edges::store_edge;
