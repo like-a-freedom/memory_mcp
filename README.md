@@ -503,6 +503,13 @@ From the workspace during development:
 cargo run --quiet --bin memory_mcp -- reembed
 ```
 
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-failures N` | 10% of total (min 10) | Maximum failed facts before aborting. Use `0` for fail-fast behavior. |
+| `--retry-failed` | off | Retry only facts that failed in a previous run. |
+
 What the command does:
 
 1. Resolves the configured target signature and dimension.
@@ -510,32 +517,56 @@ What the command does:
 3. Marks each namespace as `rebuilding` in `embedding_state`.
 4. Rewrites **all** fact embeddings, including invalidated / historical facts.
 5. Stores fresh metadata on each fact (`embedding_provider`, `embedding_model`, `embedding_dimension`, `embedding_signature`, `embedding_updated_at`).
-6. Marks namespaces `ready` on success, or `failed` if the job stops on an error.
+6. Marks namespaces `ready` on success, or `failed` if the failure quota is exceeded.
 
 The job is **restart-safe** for the same target signature: if the process stops mid-run, invoking `memory_mcp reembed` again resumes from the persisted per-namespace cursor instead of starting from scratch.
 
+**Ctrl+C handling:** Pressing Ctrl+C interrupts the run gracefully. The current fact finishes, job state is persisted with status `interrupted`, and the exit code is 130. Resume with `memory_mcp reembed`.
+
+**Continue-on-error:** By default, the command continues processing after a fact failure. If the number of failures stays within the quota (10% of total, minimum 10), the run completes with status `completed_with_errors`. Use `--max-failures 0` to restore fail-fast behavior. After a run with errors, use `--retry-failed` to retry only the failed facts.
+
+See ADR-0018 for the full architectural rationale.
+
 #### Progress, status, and logging
 
-The maintenance flow is designed to be debuggable from logs alone.
+The maintenance flow supports two modes:
 
-Key structured events include:
+**TTY mode (interactive terminal):** When stderr is a TTY, a live progress bar shows:
 
-- `reembed.job_started`
-- `reembed.namespace_started`
-- `reembed.batch_fetched`
-- `reembed.progress`
-- `reembed.fact_failed`
-- `reembed.job_failed`
-- `main.reembed_completed`
+```
+Reembedding [org] ██████████░░░░░░░░ 1240/3000 (41%) eta 2m 15s | 38/s ✓1230 ✗10
+```
 
-Progress logs include counts and throughput data such as:
+- Percentage, processed/total, ETA in human-readable format, facts/sec
+- Success/failure counters (`✓1230 ✗10`)
+- Namespace label in the bar prefix
+- Spinner during service initialization
+- Redraw throttled to 10 Hz
 
-- processed / succeeded / failed facts
-- total facts
-- facts per second
-- ETA in seconds (when enough progress exists to estimate it)
+After completion, a compact summary is printed to stdout:
 
-At the end of a successful run, `main.reembed_completed` logs a compact summary with totals and elapsed time.
+```
+✓ Reembed completed (with errors)
+
+  Total:       3000 facts
+  Processed:   3000 (2990 succeeded, 10 failed)
+  Duration:    135.2s
+  Speed:       22 facts/sec
+
+  10 facts failed. Re-run with --retry-failed to retry only failures.
+```
+
+**Non-TTY mode (pipes, CI, scripts):** When stderr is not a TTY, the command falls back to structured log events:
+
+- `reembed.init_completed` — service initialized, ready to process
+- `reembed.namespace_started` / `reembed.namespace_completed`
+- `reembed.index_recreating` / `reembed.index_recreated`
+- `reembed.progress` — batch-level progress (every 100 facts)
+- `reembed.job_interrupted` — Ctrl+C received
+- `reembed.job_completed` — final outcome with `outcome` field
+- `main.reembed_completed` — compact summary with totals and elapsed time
+
+Job statuses persisted in the control-plane record: `running`, `completed`, `completed_with_errors`, `failed`, `interrupted`.
 
 #### Recommended procedure after switching
 
@@ -795,7 +826,7 @@ Every memory tool can be invoked directly from the command line. The CLI shares 
 |---------|-------------|
 | `serve` (default) | Run the stdio MCP server |
 | `watch <dir>` | Watch a directory and auto-ingest files (requires `cli-watch` feature) |
-| `reembed` | Rebuild all fact embeddings |
+| `reembed` | Rebuild all fact embeddings after a provider switch. Flags: `--max-failures N`, `--retry-failed` |
 | `ingest` | Store raw source material as an episode |
 | `extract` | Extract entities, facts, and relationships |
 | `resolve` | Resolve entity aliases to a canonical entity id |
