@@ -125,6 +125,20 @@ pub struct AssembleContextArgs {
     pub window_end: Option<String>,
 }
 
+/// Arguments for the `reembed` maintenance command.
+#[derive(Debug, Clone, Args)]
+pub struct ReembedArgs {
+    /// Maximum number of failed facts before aborting.
+    ///
+    /// Default: 10% of total (minimum 10). Use 0 for fail-fast behavior.
+    #[arg(long)]
+    pub max_failures: Option<usize>,
+
+    /// Retry only facts that failed in a previous reembed run.
+    #[arg(long)]
+    pub retry_failed: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct WatchArgs {
     /// Directory to watch for new files

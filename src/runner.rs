@@ -50,7 +50,9 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
         // MCP server. See Risk R8.
         None | Some(Command::Serve) => run_stdio_server(logger).await.map_err(boxed_to_failure),
 
-        Some(Command::Reembed) => run_reembed_mode(logger).await.map_err(boxed_to_failure),
+        Some(Command::Reembed(args)) => run_reembed_mode(logger, args)
+            .await
+            .map_err(boxed_to_failure),
 
         Some(Command::Watch(args)) => run_watch_mode(logger, watch_command_from_args(args))
             .await
@@ -174,7 +176,7 @@ fn mode_label(cli: &Cli) -> &'static str {
     match &cli.command {
         None | Some(Command::Serve) => "serve",
         Some(Command::Watch(_)) => "watch",
-        Some(Command::Reembed) => "reembed",
+        Some(Command::Reembed(_)) => "reembed",
         Some(Command::Ingest(_)) => "cli.ingest",
         Some(Command::Extract(_)) => "cli.extract",
         Some(Command::Resolve(_)) => "cli.resolve",

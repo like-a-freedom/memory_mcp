@@ -3,7 +3,7 @@
 /// Options controlling reembed behavior.
 ///
 /// Passed from CLI flags into `MemoryService::reembed_all_facts`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ReembedOptions {
     /// Maximum number of failed facts before aborting the run.
     ///
@@ -12,15 +12,6 @@ pub struct ReembedOptions {
     pub max_failures: Option<usize>,
     /// If true, retry only facts marked as failed in a previous run.
     pub retry_failed: bool,
-}
-
-impl Default for ReembedOptions {
-    fn default() -> Self {
-        Self {
-            max_failures: None,
-            retry_failed: false,
-        }
-    }
 }
 
 impl ReembedOptions {

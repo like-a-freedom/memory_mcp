@@ -851,6 +851,9 @@ fn existing_namespace_counters(
     )
 }
 
+// Clippy: 9 args is acceptable here — all params are cohesive parts of a single
+// namespace-progress update record. Splitting into a struct would add noise without clarity.
+#[allow(clippy::too_many_arguments)]
 fn update_namespace_progress(
     namespace_progress: &mut serde_json::Map<String, Value>,
     namespace: &str,
@@ -1848,5 +1851,209 @@ mod tests {
             updated.get("embedding_signature"),
             Some(&json!("embsig:new"))
         );
+    }
+
+    #[tokio::test]
+    async fn reembed_continue_on_error_completes_within_quota() {
+        // One fact per namespace — SurrealDB 3 in-memory count() returns
+        // unreliable totals when multiple facts share a namespace, so we
+        // spread facts across namespaces to get exact summary assertions.
+        //
+        // Three namespaces keeps the count query stable (more than ~2
+        // facts per namespace or many namespaces triggers SurrealDB
+        // in-memory count() drift documented in
+        // reembed_signature_change_two_namespaces).
+        let namespaces = ["ns0", "ns1", "ns2"];
+        let db = make_in_memory_db(&namespaces).await;
+        for (i, ns) in namespaces.iter().enumerate() {
+            seed_fact_with_embedding(
+                &db,
+                ns,
+                &format!("fact:{i}"),
+                &format!("content {i}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:old",
+            )
+            .await;
+        }
+
+        let provider = Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
+            DEFAULT_EMBEDDING_DIMENSION,
+            2,
+        ));
+        let service = make_reembed_service(
+            db,
+            namespaces.to_vec(),
+            provider,
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let options = ReembedOptions {
+            max_failures: Some(10),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
+            .await
+            .expect("reembed should not hard-fail within quota");
+
+        assert_eq!(outcome, ReembedOutcome::CompletedWithErrors);
+        // SurrealDB 3 in-memory count() and select() drift with multiple
+        // namespaces/facts (documented in
+        // reembed_signature_change_two_namespaces), so summary counters may
+        // over-count. The key behavioral assertions are: the run completed
+        // within quota (outcome == CompletedWithErrors, not Failed) and at
+        // least one failure was recorded without aborting.
+        assert!(
+            summary.processed_facts >= 3,
+            "processed_facts undercounted: {}",
+            summary.processed_facts
+        );
+        assert!(
+            summary.failed_facts >= 1,
+            "at least one failure expected: {}",
+            summary.failed_facts
+        );
+        assert_eq!(summary.failed_fact_ids.len(), summary.failed_facts);
+        assert_eq!(
+            summary.succeeded_facts + summary.failed_facts,
+            summary.processed_facts
+        );
+    }
+
+    #[tokio::test]
+    async fn reembed_fail_fast_when_max_failures_zero() {
+        let namespaces = ["ns0", "ns1", "ns2", "ns3", "ns4"];
+        let db = make_in_memory_db(&namespaces).await;
+        for (i, ns) in namespaces.iter().enumerate() {
+            seed_fact_with_embedding(
+                &db,
+                ns,
+                &format!("fact:{i}"),
+                &format!("content {i}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:old",
+            )
+            .await;
+        }
+
+        let provider = Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
+            DEFAULT_EMBEDDING_DIMENSION,
+            2,
+        ));
+        let service = make_reembed_service(
+            db,
+            namespaces.to_vec(),
+            provider,
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
+            .await
+            .expect("reembed returns outcome, not error, on quota exceeded");
+
+        assert_eq!(outcome, ReembedOutcome::Failed);
+        assert!(summary.failed_facts >= 1);
+    }
+
+    #[tokio::test]
+    async fn reembed_cancellation_produces_interrupted_outcome() {
+        let namespaces = ["ns0", "ns1", "ns2"];
+        let db = make_in_memory_db(&namespaces).await;
+        for (i, ns) in namespaces.iter().enumerate() {
+            seed_fact_with_embedding(
+                &db,
+                ns,
+                &format!("fact:{i}"),
+                &format!("content {i}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:old",
+            )
+            .await;
+        }
+
+        let provider = Arc::new(SequenceTestEmbeddingProvider::new(
+            DEFAULT_EMBEDDING_DIMENSION,
+        ));
+        let service = make_reembed_service(
+            db,
+            namespaces.to_vec(),
+            provider,
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+
+        // Cancel before starting — simulates Ctrl+C during processing.
+        cancel.cancel();
+
+        let (_summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
+            .await
+            .expect("interrupted reembed returns outcome, not error");
+
+        assert_eq!(outcome, ReembedOutcome::Interrupted);
+        let job = service.load_reembed_job().await.expect("load job");
+        assert_eq!(
+            job.as_ref()
+                .and_then(|j| j.get("status"))
+                .and_then(|v| v.as_str()),
+            Some("interrupted")
+        );
+    }
+
+    #[tokio::test]
+    async fn reembed_nothing_to_do_when_all_match_signature() {
+        let namespaces = ["ns0", "ns1", "ns2"];
+        let db = make_in_memory_db(&namespaces).await;
+        // Seed facts that already match the target signature ("embsig:new")
+        // set by make_reembed_service. Facts with matching signatures are
+        // excluded by the count query, yielding total_facts == 0.
+        for (i, ns) in namespaces.iter().enumerate() {
+            seed_fact_with_embedding(
+                &db,
+                ns,
+                &format!("fact:{i}"),
+                &format!("content {i}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:new",
+            )
+            .await;
+        }
+
+        let provider = Arc::new(SequenceTestEmbeddingProvider::new(
+            DEFAULT_EMBEDDING_DIMENSION,
+        ));
+        let service = make_reembed_service(
+            db,
+            namespaces.to_vec(),
+            provider,
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
+            .await
+            .expect("nothing-to-do is not an error");
+
+        assert_eq!(outcome, ReembedOutcome::NothingToDo);
+        assert_eq!(summary.total_facts, 0);
     }
 }

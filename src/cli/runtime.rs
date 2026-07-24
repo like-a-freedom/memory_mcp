@@ -5,6 +5,7 @@ use rmcp::ServiceExt;
 use rmcp::transport::io::stdio;
 use serde_json::json;
 
+use crate::cli::args::ReembedArgs;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::EmbeddingActivationMode;
 use crate::service::reembed_options::ReembedOptions;
@@ -160,7 +161,10 @@ pub async fn run_watch_mode(
     }
 }
 
-pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_reembed_mode(
+    logger: &StdoutLogger,
+    args: ReembedArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
     logger.log(
         event!("op" => json!("main.reembed_starting")),
         LogLevel::Info,
@@ -169,7 +173,10 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
     let memory_service =
         build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
     let started_at = std::time::Instant::now();
-    let options = ReembedOptions::default();
+    let options = ReembedOptions {
+        max_failures: args.max_failures,
+        retry_failed: args.retry_failed,
+    };
     let progress = NoopProgressReporter;
     let cancel = CancellationToken::new();
     let (summary, outcome) = memory_service
@@ -255,7 +262,25 @@ mod tests {
     #[test]
     fn cli_reembed_subcommand() {
         let cli = Cli::parse_from(["memory_mcp", "reembed"]);
-        assert!(matches!(cli.command, Some(Command::Reembed)));
+        assert!(matches!(cli.command, Some(Command::Reembed(_))));
+    }
+
+    #[test]
+    fn cli_reembed_with_flags() {
+        let cli = Cli::parse_from([
+            "memory_mcp",
+            "reembed",
+            "--max-failures",
+            "5",
+            "--retry-failed",
+        ]);
+        match cli.command {
+            Some(Command::Reembed(args)) => {
+                assert_eq!(args.max_failures, Some(5));
+                assert!(args.retry_failed);
+            }
+            _ => panic!("expected Reembed command"),
+        }
     }
 
     #[test]

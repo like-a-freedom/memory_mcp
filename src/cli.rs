@@ -38,7 +38,7 @@ pub enum Command {
     /// Watch a directory and auto-ingest files as they arrive.
     Watch(args::WatchArgs),
     /// Rebuild all fact embeddings for the current embedding provider/model.
-    Reembed,
+    Reembed(args::ReembedArgs),
     /// Store raw source material as an episode (source_type, source_id, content).
     /// Requires `--source-type`, `--source-id`, `--content`, `--t-ref` (ISO 8601).
     /// Output: ToolResponse with status, episode_id. Next step: `extract --episode-id <id>`.
