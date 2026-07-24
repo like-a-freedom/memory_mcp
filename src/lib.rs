@@ -43,4 +43,5 @@ pub mod storage;
 pub mod tools;
 
 pub use mcp::MemoryMcp;
+pub use service::reembed_options::{ReembedOptions, ReembedOutcome};
 pub use service::{MemoryError, MemoryService};

@@ -55,6 +55,7 @@ pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 mod query;
 mod reembed;
+pub mod reembed_options;
 mod scope;
 mod startup;
 mod triple_extractor;
