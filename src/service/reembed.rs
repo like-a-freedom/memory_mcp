@@ -1,7 +1,10 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use tokio_util::sync::CancellationToken;
 
+use super::reembed_options::{ReembedOptions, ReembedOutcome};
+use super::reembed_progress::ReembedProgressReporter;
 use super::startup::EMBEDDING_STATE_RECORD_ID;
 use super::{MemoryError, MemoryService, normalize_dt};
 use crate::logging::LogLevel;
@@ -103,7 +106,12 @@ impl MemoryService {
             .map(|_| ())
     }
 
-    pub async fn reembed_all_facts(&self) -> Result<ReembedSummary, MemoryError> {
+    pub async fn reembed_all_facts(
+        &self,
+        options: &ReembedOptions,
+        progress: &dyn ReembedProgressReporter,
+        cancel_token: &CancellationToken,
+    ) -> Result<(ReembedSummary, ReembedOutcome), MemoryError> {
         if !self.embedding_provider.is_enabled() {
             return Err(MemoryError::Validation(
                 "reembed requires an enabled embedding provider".to_string(),
@@ -135,6 +143,18 @@ impl MemoryService {
             ..ReembedSummary::default()
         };
 
+        // Nothing to do: all embeddings already match and no failed facts to retry.
+        if summary.total_facts == 0 && !options.retry_failed {
+            progress.on_job_completed(&ReembedOutcome::NothingToDo, &summary, Duration::ZERO);
+            return Ok((summary, ReembedOutcome::NothingToDo));
+        }
+
+        let resumed_count = namespace_progress
+            .values()
+            .filter_map(|v| v.get("processed_facts").and_then(json_i64))
+            .map(|n| n as usize)
+            .sum::<usize>();
+
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.job_started")),
@@ -156,6 +176,8 @@ impl MemoryService {
             ]),
             LogLevel::Info,
         );
+
+        progress.on_job_started(summary.total_facts, resumed, resumed_count);
 
         self.persist_reembed_job(
             &summary,
@@ -200,6 +222,7 @@ impl MemoryService {
                 ]),
                 LogLevel::Info,
             );
+            progress.on_namespace_started(namespace, 0);
 
             loop {
                 let batch = self
@@ -230,6 +253,25 @@ impl MemoryService {
                 }
 
                 for fact in batch {
+                    // Check for cancellation (Ctrl+C) before processing each fact.
+                    if cancel_token.is_cancelled() {
+                        progress.on_interrupted(&summary, started_at.elapsed());
+                        self.persist_reembed_job(
+                            &summary,
+                            &target_signature,
+                            target_dimension,
+                            &namespace_progress,
+                            Some(&started_at_rfc3339),
+                            Some(&chrono::Utc::now().to_rfc3339()),
+                            "interrupted",
+                            None,
+                            None,
+                            started_at.elapsed(),
+                        )
+                        .await?;
+                        return Ok((summary, ReembedOutcome::Interrupted));
+                    }
+
                     let fact_id = fact
                         .get("fact_id")
                         .and_then(json_string)
@@ -297,6 +339,13 @@ impl MemoryService {
                             );
                         }
                         Err(err) => {
+                            // Continue-on-error: record the failure and proceed.
+                            //
+                            // Do NOT advance `last_completed_fact_id` past the
+                            // failed fact — the cursor must point at the last
+                            // *succeeded* fact so a resume retries the failed
+                            // one. Advancing here would skip it on the next run
+                            // (the query uses `fact_id > cursor`).
                             summary.processed_facts += 1;
                             summary.failed_facts += 1;
                             namespace_processed += 1;
@@ -306,22 +355,12 @@ impl MemoryService {
                             update_namespace_progress(
                                 &mut namespace_progress,
                                 namespace,
-                                "failed",
+                                "running",
                                 namespace_processed,
                                 namespace_succeeded,
                                 namespace_failed,
                                 last_completed_fact_id.as_deref(),
                                 &namespace_failed_fact_ids,
-                            );
-                            self.write_embedding_state(
-                                namespace,
-                                "failed",
-                                None,
-                                Some(REEMBED_JOB_ID),
-                            )
-                            .await?;
-                            let error_message = format!(
-                                "reembed failed for fact {fact_id}; fix the provider and rerun `memory_mcp reembed`: {err}"
                             );
                             self.persist_reembed_job(
                                 &summary,
@@ -329,10 +368,10 @@ impl MemoryService {
                                 target_dimension,
                                 &namespace_progress,
                                 Some(&started_at_rfc3339),
-                                Some(&chrono::Utc::now().to_rfc3339()),
-                                "failed",
+                                None,
+                                "running",
                                 Some(namespace),
-                                Some(&error_message),
+                                None,
                                 started_at.elapsed(),
                             )
                             .await?;
@@ -345,52 +384,85 @@ impl MemoryService {
                                 ]),
                                 LogLevel::Warn,
                             );
-                            self.logger.log(
-                                std::collections::HashMap::from([
-                                    ("op".to_string(), json!("reembed.job_failed")),
-                                    (
-                                        "processed_facts".to_string(),
-                                        json!(summary.processed_facts),
-                                    ),
-                                    (
-                                        "succeeded_facts".to_string(),
-                                        json!(summary.succeeded_facts),
-                                    ),
-                                    ("failed_facts".to_string(), json!(summary.failed_facts)),
-                                    ("total_facts".to_string(), json!(summary.total_facts)),
-                                    (
-                                        "facts_per_second".to_string(),
-                                        json!(facts_per_second(
-                                            started_at.elapsed(),
-                                            summary.processed_facts
-                                        )),
-                                    ),
-                                    (
-                                        "duration_ms".to_string(),
-                                        json!(started_at.elapsed().as_millis() as u64),
-                                    ),
-                                    (
-                                        "provider".to_string(),
-                                        json!(self.embedding_provider.provider_name()),
-                                    ),
-                                    (
-                                        "model".to_string(),
-                                        json!(self.current_embedding_model.clone()),
-                                    ),
-                                    ("target_dimension".to_string(), json!(target_dimension)),
-                                    (
-                                        "target_signature".to_string(),
-                                        json!(target_signature.clone()),
-                                    ),
-                                    ("resumed".to_string(), json!(resumed)),
-                                ]),
-                                LogLevel::Warn,
-                            );
-                            return Err(MemoryError::Storage(format!(
-                                "reembed failed for fact {fact_id}: {err}"
-                            )));
+
+                            // Check quota: if failures exceed the limit, abort.
+                            let max_failures = options.effective_max_failures(summary.total_facts);
+                            if max_failures == 0 || summary.failed_facts > max_failures {
+                                self.write_embedding_state(
+                                    namespace,
+                                    "failed",
+                                    None,
+                                    Some(REEMBED_JOB_ID),
+                                )
+                                .await?;
+                                let error_message = format!(
+                                    "reembed exceeded max_failures ({max_failures}) after fact {fact_id}: {err}"
+                                );
+                                self.persist_reembed_job(
+                                    &summary,
+                                    &target_signature,
+                                    target_dimension,
+                                    &namespace_progress,
+                                    Some(&started_at_rfc3339),
+                                    Some(&chrono::Utc::now().to_rfc3339()),
+                                    "failed",
+                                    Some(namespace),
+                                    Some(&error_message),
+                                    started_at.elapsed(),
+                                )
+                                .await?;
+                                self.logger.log(
+                                    std::collections::HashMap::from([
+                                        ("op".to_string(), json!("reembed.job_failed")),
+                                        (
+                                            "processed_facts".to_string(),
+                                            json!(summary.processed_facts),
+                                        ),
+                                        (
+                                            "succeeded_facts".to_string(),
+                                            json!(summary.succeeded_facts),
+                                        ),
+                                        ("failed_facts".to_string(), json!(summary.failed_facts)),
+                                        ("total_facts".to_string(), json!(summary.total_facts)),
+                                        (
+                                            "facts_per_second".to_string(),
+                                            json!(facts_per_second(
+                                                started_at.elapsed(),
+                                                summary.processed_facts
+                                            )),
+                                        ),
+                                        (
+                                            "duration_ms".to_string(),
+                                            json!(started_at.elapsed().as_millis() as u64),
+                                        ),
+                                        (
+                                            "provider".to_string(),
+                                            json!(self.embedding_provider.provider_name()),
+                                        ),
+                                        (
+                                            "model".to_string(),
+                                            json!(self.current_embedding_model.clone()),
+                                        ),
+                                        ("target_dimension".to_string(), json!(target_dimension)),
+                                        (
+                                            "target_signature".to_string(),
+                                            json!(target_signature.clone()),
+                                        ),
+                                        ("resumed".to_string(), json!(resumed)),
+                                    ]),
+                                    LogLevel::Warn,
+                                );
+                                progress.on_job_completed(
+                                    &ReembedOutcome::Failed,
+                                    &summary,
+                                    started_at.elapsed(),
+                                );
+                                return Ok((summary, ReembedOutcome::Failed));
+                            }
                         }
                     }
+
+                    progress.on_fact_processed(namespace, &summary, started_at.elapsed());
                 }
 
                 self.log_reembed_progress(namespace, &summary, started_at.elapsed());
@@ -424,11 +496,18 @@ impl MemoryService {
                 ]),
                 LogLevel::Info,
             );
+            progress.on_namespace_completed(
+                namespace,
+                namespace_succeeded,
+                namespace_failed,
+                started_at.elapsed(),
+            );
         }
 
         // All facts rewritten successfully — recreate the HNSW index with
         // the new dimension.
         for namespace in &self.namespaces {
+            progress.on_index_recreating(namespace);
             self.define_embedding_index(namespace, target_dimension)
                 .await
                 .map_err(|err| {
@@ -444,7 +523,19 @@ impl MemoryService {
                 ]),
                 LogLevel::Info,
             );
+            progress.on_index_recreated(namespace);
         }
+
+        let outcome = if summary.failed_facts == 0 {
+            ReembedOutcome::Completed
+        } else {
+            ReembedOutcome::CompletedWithErrors
+        };
+        let final_status = if summary.failed_facts == 0 {
+            "completed"
+        } else {
+            "completed_with_errors"
+        };
 
         let finished_at = chrono::Utc::now().to_rfc3339();
         self.persist_reembed_job(
@@ -454,7 +545,7 @@ impl MemoryService {
             &namespace_progress,
             Some(&started_at_rfc3339),
             Some(&finished_at),
-            "completed",
+            final_status,
             None,
             None,
             started_at.elapsed(),
@@ -499,7 +590,9 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        Ok(summary)
+        progress.on_job_completed(&outcome, &summary, started_at.elapsed());
+
+        Ok((summary, outcome))
     }
 
     async fn load_reembed_job(&self) -> Result<Option<Value>, MemoryError> {
@@ -818,7 +911,11 @@ mod tests {
 
     use super::super::{EmbeddingProvider, MemoryError, MemoryService, normalize_dt};
     use crate::config::{DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD};
+    use crate::service::reembed_options::ReembedOptions;
+    use crate::service::reembed_options::ReembedOutcome;
+    use crate::service::reembed_progress::NoopProgressReporter;
     use crate::storage::{DbClient, SurrealDbClient};
+    use tokio_util::sync::CancellationToken;
 
     struct SequenceTestEmbeddingProvider {
         dimension: usize,
@@ -998,8 +1095,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed should succeed");
 
@@ -1059,10 +1159,17 @@ mod tests {
             )),
             DEFAULT_EMBEDDING_DIMENSION,
         );
-        interrupted
-            .reembed_all_facts()
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (_first_summary, first_outcome) = interrupted
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect_err("first run should stop after one fact");
+            .expect("first run should complete (with failure outcome)");
+        assert_eq!(first_outcome, ReembedOutcome::Failed);
 
         let resumed = make_reembed_service(
             db.clone(),
@@ -1072,8 +1179,11 @@ mod tests {
             )),
             DEFAULT_EMBEDDING_DIMENSION,
         );
-        let summary = resumed
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = resumed
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("resume should succeed");
 
@@ -1118,10 +1228,17 @@ mod tests {
             )),
             DEFAULT_EMBEDDING_DIMENSION,
         );
-        first
-            .reembed_all_facts()
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (_first_summary, first_outcome) = first
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect_err("first run should fail on second fact");
+            .expect("first run should complete (with failure outcome)");
+        assert_eq!(first_outcome, ReembedOutcome::Failed);
 
         let resumed = make_reembed_service(
             db.clone(),
@@ -1131,8 +1248,11 @@ mod tests {
             )),
             DEFAULT_EMBEDDING_DIMENSION,
         );
-        let summary = resumed
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = resumed
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("resume should succeed");
 
@@ -1170,12 +1290,19 @@ mod tests {
             )),
             DEFAULT_EMBEDDING_DIMENSION,
         );
-        let error = service
-            .reembed_all_facts()
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect_err("reembed should fail");
+            .expect("reembed should complete (with failure outcome)");
 
-        assert!(error.to_string().contains("reembed failed"));
+        assert_eq!(outcome, ReembedOutcome::Failed);
+        assert_eq!(summary.failed_facts, 1);
 
         let job = db
             .select_one("embedding_job:fact_reembed", "org")
@@ -1216,8 +1343,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed should succeed");
 
@@ -1282,8 +1412,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
         let err = service
-            .reembed_all_facts()
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect_err("reembed with disabled provider should fail");
 
@@ -1306,24 +1439,20 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed with no facts should succeed");
 
+        // No facts to reembed: the job short-circuits with NothingToDo.
+        assert_eq!(outcome, ReembedOutcome::NothingToDo);
         assert_eq!(summary.total_facts, 0);
         assert_eq!(summary.processed_facts, 0);
         assert_eq!(summary.succeeded_facts, 0);
         assert_eq!(summary.failed_facts, 0);
-
-        // Job should be marked completed even when there is nothing to do
-        let job = db
-            .select_one("embedding_job:fact_reembed", "org")
-            .await
-            .expect("select job")
-            .expect("stored job");
-        assert_eq!(job.get("status"), Some(&json!("completed")));
-        assert_eq!(job.get("total_facts"), Some(&json!(0)));
     }
 
     #[tokio::test]
@@ -1359,8 +1488,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed should succeed");
 
@@ -1438,15 +1570,19 @@ mod tests {
             384,
         );
 
-        let err = service
-            .reembed_all_facts()
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect_err("reembed should fail when provider dimension mismatches target");
+            .expect("reembed should complete (with failure outcome) when provider dimension mismatches target");
 
-        assert!(
-            err.to_string().contains("dimension mismatch"),
-            "error should mention dimension mismatch, got: {err}"
-        );
+        assert_eq!(outcome, ReembedOutcome::Failed);
+        assert_eq!(summary.failed_facts, 1);
 
         // Job should be marked failed
         let job = db
@@ -1488,8 +1624,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("multi-namespace signature change should succeed");
 
@@ -1588,8 +1727,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed should succeed");
 
@@ -1634,12 +1776,19 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let err = service
-            .reembed_all_facts()
+        let options = ReembedOptions {
+            max_failures: Some(0),
+            retry_failed: false,
+        };
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect_err("reembed should fail");
+            .expect("reembed should complete (with failure outcome)");
 
-        assert!(err.to_string().contains("reembed failed"));
+        assert_eq!(outcome, ReembedOutcome::Failed);
+        assert_eq!(summary.failed_facts, 1);
 
         // Index should NOT be recreated — job should be failed
         let job = db
@@ -1679,8 +1828,11 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
 
-        let summary = service
-            .reembed_all_facts()
+        let options = ReembedOptions::default();
+        let progress = NoopProgressReporter;
+        let cancel = CancellationToken::new();
+        let (summary, _outcome) = service
+            .reembed_all_facts(&options, &progress, &cancel)
             .await
             .expect("reembed with long content should succeed");
 

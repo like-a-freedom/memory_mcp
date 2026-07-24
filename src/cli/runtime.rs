@@ -7,7 +7,10 @@ use serde_json::json;
 
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::EmbeddingActivationMode;
+use crate::service::reembed_options::ReembedOptions;
+use crate::service::reembed_progress::NoopProgressReporter;
 use crate::{MemoryMcp, MemoryService};
+use tokio_util::sync::CancellationToken;
 
 /// Builds a structured log event map from key-value pairs.
 macro_rules! event {
@@ -166,8 +169,11 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
     let memory_service =
         build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
     let started_at = std::time::Instant::now();
-    let summary = memory_service
-        .reembed_all_facts()
+    let options = ReembedOptions::default();
+    let progress = NoopProgressReporter;
+    let cancel = CancellationToken::new();
+    let (summary, outcome) = memory_service
+        .reembed_all_facts(&options, &progress, &cancel)
         .await
         .map_err(|err| log_and_return_error(logger, "main.reembed_failed", err))?;
 
@@ -178,6 +184,7 @@ pub async fn run_reembed_mode(logger: &StdoutLogger) -> Result<(), Box<dyn std::
             "processed_facts" => json!(summary.processed_facts),
             "succeeded_facts" => json!(summary.succeeded_facts),
             "failed_facts" => json!(summary.failed_facts),
+            "outcome" => json!(outcome.exit_code()),
             "duration_ms" => json!(started_at.elapsed().as_millis() as u64),
         ),
         LogLevel::Info,
