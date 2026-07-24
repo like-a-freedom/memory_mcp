@@ -8,8 +8,11 @@ use serde_json::json;
 use crate::cli::args::ReembedArgs;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::EmbeddingActivationMode;
-use crate::service::reembed_options::ReembedOptions;
-use crate::service::reembed_progress::NoopProgressReporter;
+use crate::service::ReembedSummary;
+use crate::service::reembed_options::{ReembedOptions, ReembedOutcome};
+use crate::service::reembed_progress::{
+    IndicatifProgressReporter, LogProgressReporter, ReembedProgressReporter,
+};
 use crate::{MemoryMcp, MemoryService};
 use tokio_util::sync::CancellationToken;
 
@@ -170,19 +173,48 @@ pub async fn run_reembed_mode(
         LogLevel::Info,
     );
 
-    let memory_service =
-        build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
-    let started_at = std::time::Instant::now();
     let options = ReembedOptions {
         max_failures: args.max_failures,
         retry_failed: args.retry_failed,
     };
-    let progress = NoopProgressReporter;
-    let cancel = CancellationToken::new();
+
+    let is_tty = std::io::IsTerminal::is_terminal(&std::io::stderr());
+    let indicatif_reporter = if is_tty {
+        Some(IndicatifProgressReporter::new())
+    } else {
+        None
+    };
+    if let Some(ref indicatif) = indicatif_reporter {
+        indicatif.start_init_spinner("Initializing reembed service...");
+    }
+    let reporter: Box<dyn ReembedProgressReporter> = match indicatif_reporter {
+        Some(indicatif) => Box::new(indicatif),
+        None => Box::new(LogProgressReporter::new(logger.clone())),
+    };
+
+    let memory_service =
+        build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
+
+    // Note: indicatif_reporter was moved into `reporter`, so we can't call
+    // finish_init here. The spinner finishes inside on_job_started.
+    // For non-TTY, the logger handles init logging.
+
+    let cancel_token = CancellationToken::new();
+    let cancel_for_handler = cancel_token.clone();
+    tokio::spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            cancel_for_handler.cancel();
+        }
+    });
+
+    let started_at = std::time::Instant::now();
     let (summary, outcome) = memory_service
-        .reembed_all_facts(&options, &progress, &cancel)
+        .reembed_all_facts(&options, reporter.as_ref(), &cancel_token)
         .await
         .map_err(|err| log_and_return_error(logger, "main.reembed_failed", err))?;
+    let elapsed = started_at.elapsed();
+
+    print_reembed_summary(&outcome, &summary, elapsed);
 
     logger.log(
         event!(
@@ -191,14 +223,74 @@ pub async fn run_reembed_mode(
             "processed_facts" => json!(summary.processed_facts),
             "succeeded_facts" => json!(summary.succeeded_facts),
             "failed_facts" => json!(summary.failed_facts),
-            "outcome" => json!(outcome.exit_code()),
-            "duration_ms" => json!(started_at.elapsed().as_millis() as u64),
+            "outcome" => json!(format!("{outcome:?}")),
+            "duration_ms" => json!(elapsed.as_millis() as u64),
         ),
         LogLevel::Info,
     );
 
     memory_service.shutdown_lifecycle_background_workers().await;
+
+    if outcome.exit_code() != 0 {
+        return Err(Box::new(std::io::Error::other(format!(
+            "reembed exited with status: {outcome:?}"
+        ))));
+    }
     Ok(())
+}
+
+/// Prints a compact human-readable summary to stdout after reembed completes.
+///
+/// This remains visible after the progress bar clears.
+fn print_reembed_summary(
+    outcome: &ReembedOutcome,
+    summary: &ReembedSummary,
+    elapsed: std::time::Duration,
+) {
+    println!();
+    match outcome {
+        ReembedOutcome::Completed => println!("✓ Reembed completed"),
+        ReembedOutcome::CompletedWithErrors => println!("✓ Reembed completed (with errors)"),
+        ReembedOutcome::Failed => println!("✗ Reembed failed"),
+        ReembedOutcome::Interrupted => println!("⏹ Reembed interrupted"),
+        ReembedOutcome::NothingToDo => {
+            println!("✓ Nothing to do — all embeddings already match target signature");
+        }
+    }
+    println!();
+    println!("  Total:       {} facts", summary.total_facts);
+    println!(
+        "  Processed:   {} ({} succeeded, {} failed)",
+        summary.processed_facts, summary.succeeded_facts, summary.failed_facts
+    );
+    println!("  Duration:    {:.1}s", elapsed.as_secs_f64());
+    if summary.processed_facts > 0 && elapsed.as_secs_f64() > 0.0 {
+        println!(
+            "  Speed:       {:.0} facts/sec",
+            summary.processed_facts as f64 / elapsed.as_secs_f64()
+        );
+    }
+    println!();
+    if summary.failed_facts > 0 {
+        match outcome {
+            ReembedOutcome::CompletedWithErrors => {
+                println!(
+                    "  {} facts failed. Re-run with --retry-failed to retry only failures.",
+                    summary.failed_facts
+                );
+            }
+            ReembedOutcome::Failed => {
+                println!(
+                    "  {} facts failed (quota exceeded). Fix the provider and re-run with --retry-failed.",
+                    summary.failed_facts
+                );
+            }
+            ReembedOutcome::Interrupted => {
+                println!("  Resume with 'memory_mcp reembed' to continue from where it stopped.");
+            }
+            _ => {}
+        }
+    }
 }
 
 #[cfg(test)]
