@@ -17,6 +17,8 @@ pub struct ReembedSummary {
     pub processed_facts: usize,
     pub succeeded_facts: usize,
     pub failed_facts: usize,
+    /// IDs of facts that failed during this run (for `--retry-failed`).
+    pub failed_fact_ids: Vec<String>,
 }
 
 impl MemoryService {
@@ -182,6 +184,7 @@ impl MemoryService {
                 .and_then(|job| namespace_last_completed_fact_id(job, namespace));
             let (mut namespace_processed, mut namespace_succeeded, mut namespace_failed) =
                 existing_namespace_counters(&namespace_progress, namespace);
+            let mut namespace_failed_fact_ids: Vec<String> = Vec::new();
 
             self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
                 .await?;
@@ -265,6 +268,7 @@ impl MemoryService {
                                 namespace_succeeded,
                                 namespace_failed,
                                 last_completed_fact_id.as_deref(),
+                                &namespace_failed_fact_ids,
                             );
                             self.persist_reembed_job(
                                 &summary,
@@ -297,6 +301,8 @@ impl MemoryService {
                             summary.failed_facts += 1;
                             namespace_processed += 1;
                             namespace_failed += 1;
+                            namespace_failed_fact_ids.push(fact_id.clone());
+                            summary.failed_fact_ids.push(fact_id.clone());
                             update_namespace_progress(
                                 &mut namespace_progress,
                                 namespace,
@@ -305,6 +311,7 @@ impl MemoryService {
                                 namespace_succeeded,
                                 namespace_failed,
                                 last_completed_fact_id.as_deref(),
+                                &namespace_failed_fact_ids,
                             );
                             self.write_embedding_state(
                                 namespace,
@@ -397,6 +404,7 @@ impl MemoryService {
                 namespace_succeeded,
                 namespace_failed,
                 last_completed_fact_id.as_deref(),
+                &namespace_failed_fact_ids,
             );
             self.write_embedding_state(
                 namespace,
@@ -758,6 +766,7 @@ fn update_namespace_progress(
     succeeded_facts: usize,
     failed_facts: usize,
     last_completed_fact_id: Option<&str>,
+    failed_fact_ids: &[String],
 ) {
     namespace_progress.insert(
         namespace.to_string(),
@@ -767,6 +776,7 @@ fn update_namespace_progress(
             "succeeded_facts": succeeded_facts,
             "failed_facts": failed_facts,
             "last_completed_fact_id": last_completed_fact_id,
+            "failed_fact_ids": failed_fact_ids,
             "updated_at": chrono::Utc::now().to_rfc3339(),
         }),
     );
