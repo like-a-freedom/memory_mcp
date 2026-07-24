@@ -562,8 +562,10 @@ After completion, a compact summary is printed to stdout:
 - `reembed.namespace_started` / `reembed.namespace_completed`
 - `reembed.index_recreating` / `reembed.index_recreated`
 - `reembed.progress` — batch-level progress (every 100 facts)
+- `reembed.fact_failed` — a fact failed to re-embed (with error reason)
 - `reembed.job_interrupted` — Ctrl+C received
 - `reembed.job_completed` — final outcome with `outcome` field
+- `reembed.job_failed` — quota exceeded or unrecoverable error
 - `main.reembed_completed` — compact summary with totals and elapsed time
 
 Job statuses persisted in the control-plane record: `running`, `completed`, `completed_with_errors`, `failed`, `interrupted`.

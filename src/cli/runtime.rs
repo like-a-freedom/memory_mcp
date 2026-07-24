@@ -195,10 +195,6 @@ pub async fn run_reembed_mode(
     let memory_service =
         build_memory_service(logger, EmbeddingActivationMode::ForceEnabledForReembed).await?;
 
-    // Note: indicatif_reporter was moved into `reporter`, so we can't call
-    // finish_init here. The spinner finishes inside on_job_started.
-    // For non-TTY, the logger handles init logging.
-
     let cancel_token = CancellationToken::new();
     let cancel_for_handler = cancel_token.clone();
     tokio::spawn(async move {

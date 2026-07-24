@@ -138,13 +138,31 @@ impl MemoryService {
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
-        let mut summary = ReembedSummary {
-            total_facts: self.count_facts_needing_reembed(&target_signature).await?,
-            ..ReembedSummary::default()
+
+        // Collect failed fact IDs from prior run for --retry-failed mode.
+        let retry_failed_ids: std::collections::HashSet<String> = if options.retry_failed {
+            namespace_progress
+                .keys()
+                .flat_map(|ns| existing_failed_fact_ids(&namespace_progress, ns))
+                .collect()
+        } else {
+            std::collections::HashSet::new()
         };
 
-        // Nothing to do: all embeddings already match and no failed facts to retry.
-        if summary.total_facts == 0 && !options.retry_failed {
+        let mut summary = if options.retry_failed {
+            ReembedSummary {
+                total_facts: retry_failed_ids.len(),
+                ..ReembedSummary::default()
+            }
+        } else {
+            ReembedSummary {
+                total_facts: self.count_facts_needing_reembed(&target_signature).await?,
+                ..ReembedSummary::default()
+            }
+        };
+
+        // Nothing to do: all embeddings match and no failed facts to retry.
+        if summary.total_facts == 0 {
             progress.on_job_completed(&ReembedOutcome::NothingToDo, &summary, Duration::ZERO);
             return Ok((summary, ReembedOutcome::NothingToDo));
         }
@@ -225,6 +243,24 @@ impl MemoryService {
             progress.on_namespace_started(namespace, 0);
 
             loop {
+                // Check for cancellation between batches (Ctrl+C responsiveness).
+                if cancel_token.is_cancelled() {
+                    progress.on_interrupted(&summary, started_at.elapsed());
+                    self.persist_reembed_job(
+                        &summary,
+                        &target_signature,
+                        target_dimension,
+                        &namespace_progress,
+                        Some(&started_at_rfc3339),
+                        Some(&chrono::Utc::now().to_rfc3339()),
+                        "interrupted",
+                        None,
+                        None,
+                        started_at.elapsed(),
+                    )
+                    .await?;
+                    return Ok((summary, ReembedOutcome::Interrupted));
+                }
                 let batch = self
                     .db_client
                     .select_facts_needing_reembed(
@@ -250,6 +286,25 @@ impl MemoryService {
 
                 if batch.is_empty() {
                     break;
+                }
+
+                // In --retry-failed mode, filter batch to only failed fact IDs.
+                let batch: Vec<Value> = if options.retry_failed {
+                    batch
+                        .into_iter()
+                        .filter(|fact| {
+                            fact.get("fact_id")
+                                .and_then(json_string)
+                                .is_some_and(|id| retry_failed_ids.contains(id))
+                        })
+                        .collect()
+                } else {
+                    batch
+                };
+
+                if batch.is_empty() {
+                    // No retryable facts in this batch — continue to next batch.
+                    continue;
                 }
 
                 for fact in batch {
@@ -849,6 +904,26 @@ fn existing_namespace_counters(
         entry.get("succeeded_facts").and_then(json_i64).unwrap_or(0) as usize,
         entry.get("failed_facts").and_then(json_i64).unwrap_or(0) as usize,
     )
+}
+
+/// Extracts persisted `failed_fact_ids` for a namespace from a prior job record.
+///
+/// Used by `--retry-failed` to know which facts to re-process.
+fn existing_failed_fact_ids(
+    namespace_progress: &serde_json::Map<String, Value>,
+    namespace: &str,
+) -> Vec<String> {
+    namespace_progress
+        .get(namespace)
+        .and_then(Value::as_object)
+        .and_then(|entry| entry.get("failed_fact_ids"))
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(ToString::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 // Clippy: 9 args is acceptable here — all params are cohesive parts of a single

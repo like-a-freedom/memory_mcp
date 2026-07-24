@@ -70,6 +70,7 @@ impl IndicatifProgressReporter {
     /// Creates a new reporter with a progress bar drawn to stderr,
     /// throttled to 10 redraws per second.
     #[must_use]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let bar = indicatif::ProgressBar::new(0);
         bar.set_style(
@@ -96,17 +97,6 @@ impl IndicatifProgressReporter {
         self.spinner.set_message(message.to_string());
         self.spinner
             .enable_steady_tick(std::time::Duration::from_millis(100));
-    }
-
-    /// Finishes the init spinner with a completion message.
-    pub fn finish_init(&self, message: &str) {
-        self.spinner.finish_with_message(message.to_string());
-    }
-}
-
-impl Default for IndicatifProgressReporter {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
