@@ -14,6 +14,10 @@
     {
       "id": "claim-reconciliation",
       "expected_coverage": { "min_cases": 5 }
+    },
+    {
+      "id": "lifecycle",
+      "expected_coverage": { "min_cases": 4 }
     }
   ],
   "gates": [

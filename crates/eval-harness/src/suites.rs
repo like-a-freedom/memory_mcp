@@ -1,9 +1,17 @@
+pub mod action_grounding;
+pub mod capacity;
 pub mod claims;
 pub mod end_to_end;
 pub mod extraction;
+pub mod lifecycle;
+pub mod poisoning;
 pub mod retrieval;
 
+pub use action_grounding::ActionGroundingSuite;
+pub use capacity::CapacitySuite;
 pub use claims::ClaimReconciliationSuite;
 pub use end_to_end::EndToEndSuite;
 pub use extraction::ExtractionSuite;
+pub use lifecycle::LifecycleReleaseSuite;
+pub use poisoning::PoisoningSuite;
 pub use retrieval::LocalRetrievalSuite as RetrievalSuite;
