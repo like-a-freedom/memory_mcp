@@ -41,7 +41,7 @@ harness = false
 [[bench]]
 name = "ner_metal"
 harness = false
-required-features = ["metal"]
+required-features = []
 
 [[bench]]
 name = "contention"
