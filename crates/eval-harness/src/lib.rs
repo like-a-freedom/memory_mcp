@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod cli;
+pub mod corpus;
 pub mod domain;
 pub mod error;
 pub mod gate;
@@ -10,6 +11,7 @@ pub mod suites;
 pub mod test_support;
 
 pub use artifact::*;
+pub use corpus::*;
 pub use domain::*;
 pub use error::EvalError;
 pub use gate::*;
