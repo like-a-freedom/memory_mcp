@@ -1,8 +1,10 @@
+use std::collections::BTreeSet;
+
 use eval_harness::cli::{self, Command};
 use eval_harness::{
     ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest,
     DownstreamQaSuite, EndToEndSuite, ExtractionSuite, LifecycleReleaseSuite, PoisoningSuite,
-    ProfileManifest, RetrievalSuite, RunArtifact, Runner,
+    ProfileManifest, RetrievalSuite, RunArtifact, RunRequest, Runner, SuiteId,
 };
 
 #[tokio::main]
@@ -105,10 +107,20 @@ async fn cmd_run(
         return std::process::ExitCode::from(2);
     }
 
+    let suite_filter_set: BTreeSet<SuiteId> = suite_filter
+        .iter()
+        .filter_map(|s| SuiteId::parse(s).ok())
+        .collect();
+
     let runner = Runner::new(suites);
-    let result = runner
-        .run(manifest.profile, baseline_artifact.as_ref())
-        .await;
+    let request = RunRequest {
+        manifest,
+        manifest_path: profile,
+        artifact_path: artifact.clone(),
+        baseline: baseline_artifact,
+        suite_filter: suite_filter_set,
+    };
+    let result = runner.run(&request).await;
 
     match result {
         Ok(art) => {

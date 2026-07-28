@@ -119,6 +119,8 @@ pub struct RunArtifact {
     pub suite_summaries: Vec<SuiteSummary>,
     pub gates: Vec<GateDecision>,
     pub fingerprint: RunFingerprint,
+    #[serde(default)]
+    pub budget_status: Option<GateStatus>,
 }
 
 impl RunArtifact {
@@ -209,6 +211,7 @@ impl RunArtifact {
                 evaluator_versions: BTreeMap::new(),
                 profile_digest: "test".into(),
             },
+            budget_status: None,
         }
     }
 }

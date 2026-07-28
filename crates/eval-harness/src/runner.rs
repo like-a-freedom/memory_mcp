@@ -1,11 +1,25 @@
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use std::time::Instant;
+
 use async_trait::async_trait;
 
+use crate::artifact::GateStatus;
 use crate::domain::*;
 use crate::error::EvalError;
+use crate::profile::ProfileManifest;
 use crate::reducer::SuiteReducer;
 
 pub struct RunContext {
     pub profile: EvalProfile,
+}
+
+pub struct RunRequest {
+    pub manifest: ProfileManifest,
+    pub manifest_path: PathBuf,
+    pub artifact_path: PathBuf,
+    pub baseline: Option<crate::RunArtifact>,
+    pub suite_filter: BTreeSet<SuiteId>,
 }
 
 #[async_trait]
@@ -26,11 +40,9 @@ impl Runner {
         Self { suites }
     }
 
-    pub async fn run(
-        &self,
-        profile: EvalProfile,
-        baseline: Option<&crate::RunArtifact>,
-    ) -> Result<crate::RunArtifact, EvalError> {
+    pub async fn run(&self, request: &RunRequest) -> Result<crate::RunArtifact, EvalError> {
+        let started = Instant::now();
+        let profile = request.manifest.profile;
         let context = RunContext { profile };
 
         let mut all_outcomes = Vec::new();
@@ -38,6 +50,12 @@ impl Runner {
         let mut suite_summaries = Vec::new();
 
         for suite in &self.suites {
+            if !request.suite_filter.is_empty()
+                && !request.suite_filter.contains(&SuiteId::parse(suite.id())?)
+            {
+                continue;
+            }
+
             expected_ids.extend(suite.expected_case_ids().iter().cloned());
 
             let outcomes = suite.run(&context).await;
@@ -57,32 +75,36 @@ impl Runner {
         expected_ids.sort();
         expected_ids.dedup();
 
-        let profile_path = match profile {
-            EvalProfile::Pr => "evals/profiles/pr.json",
-            EvalProfile::Release => "evals/profiles/release.json",
-            EvalProfile::Nightly => "evals/profiles/nightly.json",
+        let duration_ms = started.elapsed().as_millis() as u64;
+
+        let budget_status = if request.manifest.time_budget_seconds > 0 {
+            let budget_ms = request.manifest.time_budget_seconds * 1000;
+            if duration_ms > budget_ms {
+                Some(GateStatus::Failed)
+            } else {
+                Some(GateStatus::Passed)
+            }
+        } else {
+            None
         };
 
-        let profile_manifest =
-            crate::ProfileManifest::load(std::path::Path::new(profile_path)).ok();
-
-        let gates = if let Some(ref manifest) = profile_manifest {
-            let artifact_so_far = crate::RunArtifact {
+        let gates = crate::evaluate_gates(
+            &request.manifest.gates,
+            &crate::RunArtifact {
                 schema_version: crate::EVAL_ARTIFACT_SCHEMA_V1.to_string(),
                 run_id: "pending".into(),
                 profile,
                 started_at: chrono::Utc::now(),
-                duration_ms: 0,
+                duration_ms,
                 expected_case_ids: expected_ids.clone(),
                 outcomes: all_outcomes.clone(),
                 suite_summaries: suite_summaries.clone(),
                 gates: vec![],
                 fingerprint: crate::RunFingerprint::capture(),
-            };
-            crate::evaluate_gates(&manifest.gates, &artifact_so_far, baseline)?
-        } else {
-            vec![]
-        };
+                budget_status: None,
+            },
+            request.baseline.as_ref(),
+        )?;
 
         let fingerprint = crate::RunFingerprint::capture();
 
@@ -91,12 +113,13 @@ impl Runner {
             run_id: format!("run-{}", chrono::Utc::now().timestamp()),
             profile,
             started_at: chrono::Utc::now(),
-            duration_ms: 0,
+            duration_ms,
             expected_case_ids: expected_ids,
             outcomes: all_outcomes,
             suite_summaries,
             gates,
             fingerprint,
+            budget_status,
         };
 
         artifact.validate()?;

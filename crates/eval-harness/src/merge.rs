@@ -150,6 +150,7 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
         suite_summaries,
         gates,
         fingerprint,
+        budget_status: None,
     };
 
     artifact.validate()?;
@@ -201,6 +202,7 @@ mod tests {
             }],
             gates: vec![],
             fingerprint: RunFingerprint::default_for_test(),
+            budget_status: None,
         }
     }
 
