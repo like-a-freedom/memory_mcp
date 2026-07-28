@@ -10,7 +10,7 @@ EVAL_LATENCY = cargo test --test eval_latency run_latency_evals -- --ignored --e
 EVAL_CLAIMS = cargo test --test eval_claim_reconciliation run_claim_reconciliation_evals -- --ignored --exact --nocapture --test-threads=$(TEST_THREADS)
 EVAL_AGENT_MEMORY_LIFECYCLE_SURFACE = cargo test --test eval_agent_memory_lifecycle public_surface_snapshot lifecycle_fixture_covers_core_risks -- --exact --nocapture
 
-.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention eval-claims eval-agent-memory-lifecycle-surface
+.PHONY: eval-baseline eval-quick eval-compare serve-release eval-ner-latency eval-ner-contention eval-claims eval-agent-memory-lifecycle-surface eval-pr
 
 eval-baseline:
 	@$(EVAL_RETRIEVAL)
@@ -48,3 +48,9 @@ eval-agent-memory-lifecycle-surface:
 
 eval-claims:
 	@$(EVAL_CLAIMS)
+
+eval-pr:
+	@mkdir -p target/evals
+	cargo run -p eval-harness --bin memory-eval -- run \
+		--profile evals/profiles/pr.json \
+		--artifact target/evals/pr.json
