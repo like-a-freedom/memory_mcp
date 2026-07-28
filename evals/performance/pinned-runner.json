@@ -1,0 +1,33 @@
+{
+  "schema_version": "memory-mcp-pinned-runner/v1",
+  "description": "Pinned runner configuration for absolute performance gates",
+  "os": "ubuntu-22.04",
+  "arch": "x86_64",
+  "cpu_class": "ci-medium",
+  "memory_gb": 16,
+  "rust_toolchain": "stable",
+  "build_flags": "--release",
+  "features": ["cli-watch", "mcp-apps"],
+  "provider": "local",
+  "model": "local-cpu",
+  "device": "cpu",
+  "power_policy": "performance",
+  "sample_settings": {
+    "warmup_seconds": 5,
+    "measurement_seconds": 30,
+    "min_samples": 30,
+    "confidence_level": 0.95
+  },
+  "hard_ceilings": {
+    "ingest_ms_p95": 500,
+    "extraction_ms_p95": 2000,
+    "retrieval_ms_p95": 1000,
+    "end_to_end_ms_p95": 5000
+  },
+  "regression_budgets": {
+    "ingest_ms_p95": 0.10,
+    "extraction_ms_p95": 0.15,
+    "retrieval_ms_p95": 0.10,
+    "end_to_end_ms_p95": 0.20
+  }
+}

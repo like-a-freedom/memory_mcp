@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-corpus/v1",
+  "corpus_id": "prefeval",
+  "source_url": "https://raw.githubusercontent.com/amazon-science/PrefEval/main/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json",
+  "revision": "main",
+  "sha256": "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256",
+  "license": "apache-2.0",
+  "byte_size": 0,
+  "case_count": 52,
+  "adapter_version": "1",
+  "data_file": "travel_hotel_overall300_topk_history_persona.bundle.json"
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-corpus/v1",
+  "corpus_id": "longmemeval-cleaned",
+  "source_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json",
+  "revision": "main",
+  "sha256": "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256",
+  "license": "cc-by-4.0",
+  "byte_size": 0,
+  "case_count": 500,
+  "adapter_version": "1",
+  "data_file": "longmemeval_s_cleaned.json"
+}

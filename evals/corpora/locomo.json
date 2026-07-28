@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-corpus/v1",
+  "corpus_id": "locomo",
+  "source_url": "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json",
+  "revision": "main",
+  "sha256": "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256",
+  "license": "mit",
+  "byte_size": 0,
+  "case_count": 1986,
+  "adapter_version": "1",
+  "data_file": "locomo10.json"
+}
