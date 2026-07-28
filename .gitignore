@@ -6,6 +6,10 @@ tests/models/
 .env
 AGENTS.md
 .agents/prompts
+.mimocode/
+.commandcode/
+.vscode/
+.zed/
 docs/BACKLOG.md
 
 # Cargo build artifacts
