@@ -402,6 +402,19 @@ impl EvalSuite for ClaimReconciliationSuite {
 
             let case_passed = metrics_result.isolation_violations == 0;
 
+            let tp = metrics_result.matched_warnings as u64;
+            let fp = (metrics_result.predicted_warnings as u64).saturating_sub(tp);
+            let fn_ = (metrics_result.expected_contradictions as u64).saturating_sub(tp);
+            let tn = 0u64;
+
+            let mut evidence_map = std::collections::BTreeMap::new();
+            if metrics_result.expected_contradictions > 0 || metrics_result.predicted_warnings > 0 {
+                evidence_map.insert(
+                    "classification".to_string(),
+                    MetricEvidence::classification(tp, fp, fn_, tn),
+                );
+            }
+
             outcomes.push(EvalCaseOutcome {
                 case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                 mode: EvalMode::EndToEnd,
@@ -413,7 +426,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                     CaseStatus::QualityFailed
                 },
                 metrics: metric_map,
-                evidence: std::collections::BTreeMap::new(),
+                evidence: evidence_map,
                 invalid_reason: None,
                 failures: if !case_passed {
                     vec![format!(
