@@ -152,23 +152,23 @@ impl RunArtifact {
         for outcome in &self.outcomes {
             outcome.validate()?;
 
-            if !seen_expected.contains(outcome.case_id.as_str()) {
+            if !seen_expected.contains(outcome.case_id().as_str()) {
                 return Err(EvalError::InvalidInput(format!(
                     "outcome for unexpected case ID: {}",
-                    outcome.case_id.as_str()
+                    outcome.case_id().as_str()
                 )));
             }
 
-            if !seen_outcomes.insert(outcome.case_id.as_str()) {
+            if !seen_outcomes.insert(outcome.case_id().as_str()) {
                 return Err(EvalError::InvalidInput(format!(
                     "duplicate outcome for case ID: {}",
-                    outcome.case_id.as_str()
+                    outcome.case_id().as_str()
                 )));
             }
         }
 
         let outcome_ids: std::collections::HashSet<&str> =
-            self.outcomes.iter().map(|o| o.case_id.as_str()).collect();
+            self.outcomes.iter().map(|o| o.case_id().as_str()).collect();
         for id in &self.expected_case_ids {
             if !outcome_ids.contains(id.as_str()) {
                 return Err(EvalError::InvalidInput(format!(
@@ -238,19 +238,14 @@ mod tests {
     use super::*;
 
     fn passed_fixture(case_id: &str) -> EvalCaseOutcome {
-        EvalCaseOutcome {
-            case_id: EvalCaseId::parse(case_id).unwrap(),
-            suite_id: "test-suite".into(),
-            mode: EvalMode::RetrievalOnly,
-            split: CorpusSplit::Development,
-            label_trust: LabelTrust::Official,
-            status: CaseStatus::Passed,
-            metrics: BTreeMap::new(),
-            invalid_reason: None,
-            failures: vec![],
-            duration_ms: 100,
-            attempts: 1,
-        }
+        EvalCaseOutcome::new(
+            "test-suite",
+            case_id,
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Development,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        )
     }
 
     #[test]

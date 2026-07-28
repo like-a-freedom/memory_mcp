@@ -157,13 +157,13 @@ impl LocalRetrievalSuite {
                 .await
             {
                 return EvalCaseOutcome {
-                    case_id,
-                    suite_id: "local-retrieval".into(),
+                    case_key: CaseKey::parse("local-retrieval", case_id.as_str()).unwrap(),
                     mode: EvalMode::RetrievalOnly,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(format!("failed to seed edge: {err}")),
                     failures: vec![],
                     duration_ms: start.elapsed().as_millis() as u64,
@@ -176,13 +176,13 @@ impl LocalRetrievalSuite {
                 Ok(t) => t,
                 Err(err) => {
                     return EvalCaseOutcome {
-                        case_id,
-                        suite_id: "local-retrieval".into(),
+                        case_key: CaseKey::parse("local-retrieval", case_id.as_str()).unwrap(),
                         mode: EvalMode::RetrievalOnly,
                         split: CorpusSplit::Development,
                         label_trust: LabelTrust::Official,
                         status: CaseStatus::Invalid,
                         metrics: std::collections::BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
                         invalid_reason: Some(format!("invalid community timestamp: {err}")),
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
@@ -205,13 +205,13 @@ impl LocalRetrievalSuite {
                 Ok(t) => t,
                 Err(err) => {
                     return EvalCaseOutcome {
-                        case_id,
-                        suite_id: "local-retrieval".into(),
+                        case_key: CaseKey::parse("local-retrieval", case_id.as_str()).unwrap(),
                         mode: EvalMode::RetrievalOnly,
                         split: CorpusSplit::Development,
                         label_trust: LabelTrust::Official,
                         status: CaseStatus::Invalid,
                         metrics: std::collections::BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
                         invalid_reason: Some(format!("invalid fact timestamp: {err}")),
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
@@ -250,13 +250,13 @@ impl LocalRetrievalSuite {
             Ok(items) => items,
             Err(err) => {
                 return EvalCaseOutcome {
-                    case_id,
-                    suite_id: "local-retrieval".into(),
+                    case_key: CaseKey::parse("local-retrieval", case_id.as_str()).unwrap(),
                     mode: EvalMode::RetrievalOnly,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(format!("assemble_context failed: {err}")),
                     failures: vec![],
                     duration_ms: start.elapsed().as_millis() as u64,
@@ -306,13 +306,13 @@ impl LocalRetrievalSuite {
         };
 
         EvalCaseOutcome {
-            case_id,
-            suite_id: "local-retrieval".into(),
+            case_key: CaseKey::parse("local-retrieval", case_id.as_str()).unwrap(),
             mode: EvalMode::RetrievalOnly,
             split: CorpusSplit::Development,
             label_trust: LabelTrust::Official,
             status,
             metrics: metric_map,
+            evidence: std::collections::BTreeMap::new(),
             invalid_reason: None,
             failures: if !meets_recall {
                 vec![format!(
@@ -349,13 +349,13 @@ impl EvalSuite for LocalRetrievalSuite {
             Ok(cases) => cases,
             Err(err) => {
                 return vec![EvalCaseOutcome {
-                    case_id: EvalCaseId::parse("fixture-load-error").unwrap(),
-                    suite_id: "local-retrieval".into(),
+                    case_key: CaseKey::parse("local-retrieval", "fixture-load-error").unwrap(),
                     mode: EvalMode::RetrievalOnly,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(err.to_string()),
                     failures: vec![],
                     duration_ms: 0,
@@ -405,7 +405,7 @@ mod tests {
         let cases = load_cases().unwrap();
         let case = &cases[0];
         let outcome = LocalRetrievalSuite::run_case(case).await;
-        assert_eq!(outcome.suite_id, "local-retrieval");
+        assert_eq!(outcome.suite_id(), "local-retrieval");
         assert!(outcome.duration_ms > 0);
     }
 }

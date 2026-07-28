@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::EvalError;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct EvalCaseId(String);
 
@@ -19,6 +19,107 @@ impl EvalCaseId {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SuiteId(String);
+
+impl SuiteId {
+    pub fn parse(raw: impl Into<String>) -> Result<Self, EvalError> {
+        let value = raw.into();
+        if value.trim().is_empty() {
+            return Err(EvalError::InvalidConfig(
+                "suite id must not be empty".into(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CaseKey {
+    pub suite_id: SuiteId,
+    pub case_id: EvalCaseId,
+}
+
+impl CaseKey {
+    pub fn parse(
+        suite_id: impl Into<String>,
+        case_id: impl Into<String>,
+    ) -> Result<Self, EvalError> {
+        Ok(Self {
+            suite_id: SuiteId::parse(suite_id)?,
+            case_id: EvalCaseId::parse(case_id)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MetricEvidence {
+    Retrieval {
+        relevant: u64,
+        hits_at_k: u64,
+        first_relevant_rank: Option<u32>,
+        cutoff: u32,
+    },
+    Classification {
+        true_positives: u64,
+        false_positives: u64,
+        false_negatives: u64,
+        true_negatives: u64,
+    },
+    Count {
+        value: u64,
+    },
+    Ratio {
+        numerator: u64,
+        denominator: u64,
+    },
+    Duration {
+        nanoseconds: u64,
+    },
+}
+
+impl MetricEvidence {
+    pub fn retrieval(
+        relevant: u64,
+        hits_at_k: u64,
+        first_relevant_rank: Option<u32>,
+        cutoff: u32,
+    ) -> Self {
+        Self::Retrieval {
+            relevant,
+            hits_at_k,
+            first_relevant_rank,
+            cutoff,
+        }
+    }
+
+    pub fn classification(tp: u64, fp: u64, fn_: u64, tn: u64) -> Self {
+        Self::Classification {
+            true_positives: tp,
+            false_positives: fp,
+            false_negatives: fn_,
+            true_negatives: tn,
+        }
+    }
+
+    pub fn count(value: u64) -> Self {
+        Self::Count { value }
+    }
+
+    pub fn ratio(numerator: u64, denominator: u64) -> Self {
+        Self::Ratio {
+            numerator,
+            denominator,
+        }
     }
 }
 
@@ -92,14 +193,15 @@ impl RunCompleteness {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvalCaseOutcome {
-    pub case_id: EvalCaseId,
-    pub suite_id: String,
+    pub case_key: CaseKey,
     pub mode: EvalMode,
     pub split: CorpusSplit,
     pub label_trust: LabelTrust,
     pub status: CaseStatus,
     #[serde(default)]
     pub metrics: BTreeMap<String, f64>,
+    #[serde(default)]
+    pub evidence: BTreeMap<String, MetricEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invalid_reason: Option<String>,
     #[serde(default)]
@@ -111,24 +213,58 @@ pub struct EvalCaseOutcome {
 }
 
 impl EvalCaseOutcome {
+    /// Construct an outcome with explicit case key.
+    pub fn new(
+        suite_id: impl Into<String>,
+        case_id: impl Into<String>,
+        mode: EvalMode,
+        split: CorpusSplit,
+        label_trust: LabelTrust,
+        status: CaseStatus,
+    ) -> Self {
+        Self {
+            case_key: CaseKey::parse(suite_id, case_id).expect("valid case key"),
+            mode,
+            split,
+            label_trust,
+            status,
+            metrics: BTreeMap::new(),
+            evidence: BTreeMap::new(),
+            invalid_reason: None,
+            failures: vec![],
+            duration_ms: 0,
+            attempts: 1,
+        }
+    }
+
+    /// Backward-compatible accessor for suite_id.
+    pub fn suite_id(&self) -> &str {
+        self.case_key.suite_id.as_str()
+    }
+
+    /// Backward-compatible accessor for case_id.
+    pub fn case_id(&self) -> &EvalCaseId {
+        &self.case_key.case_id
+    }
+
     pub fn validate(&self) -> Result<(), EvalError> {
         if self.status == CaseStatus::Invalid && self.invalid_reason.is_none() {
             return Err(EvalError::InvalidInput(format!(
                 "case {} has Invalid status but no invalid_reason",
-                self.case_id.as_str()
+                self.case_key.case_id.as_str()
             )));
         }
         if self.status != CaseStatus::Invalid && self.invalid_reason.is_some() {
             return Err(EvalError::InvalidInput(format!(
                 "case {} has non-Invalid status but carries an invalid_reason",
-                self.case_id.as_str()
+                self.case_key.case_id.as_str()
             )));
         }
         for (key, value) in &self.metrics {
             if !value.is_finite() {
                 return Err(EvalError::InvalidInput(format!(
                     "case {} has non-finite metric {} = {value}",
-                    self.case_id.as_str(),
+                    self.case_key.case_id.as_str(),
                     key
                 )));
             }
@@ -253,13 +389,13 @@ mod tests {
     #[test]
     fn case_outcome_invalid_requires_reason() {
         let outcome = EvalCaseOutcome {
-            case_id: EvalCaseId::parse("case-1").unwrap(),
-            suite_id: "test".into(),
+            case_key: CaseKey::parse("test", "case-1").unwrap(),
             mode: EvalMode::RetrievalOnly,
             split: CorpusSplit::Development,
             label_trust: LabelTrust::Official,
             status: CaseStatus::Invalid,
             metrics: BTreeMap::new(),
+            evidence: BTreeMap::new(),
             invalid_reason: None,
             failures: vec![],
             duration_ms: 0,
@@ -271,13 +407,13 @@ mod tests {
     #[test]
     fn case_outcome_passed_rejects_reason() {
         let outcome = EvalCaseOutcome {
-            case_id: EvalCaseId::parse("case-1").unwrap(),
-            suite_id: "test".into(),
+            case_key: CaseKey::parse("test", "case-1").unwrap(),
             mode: EvalMode::RetrievalOnly,
             split: CorpusSplit::Development,
             label_trust: LabelTrust::Official,
             status: CaseStatus::Passed,
             metrics: BTreeMap::new(),
+            evidence: BTreeMap::new(),
             invalid_reason: Some("should not be here".into()),
             failures: vec![],
             duration_ms: 0,
@@ -291,18 +427,67 @@ mod tests {
         let mut metrics = BTreeMap::new();
         metrics.insert("recall".to_string(), f64::NAN);
         let outcome = EvalCaseOutcome {
-            case_id: EvalCaseId::parse("case-1").unwrap(),
-            suite_id: "test".into(),
+            case_key: CaseKey::parse("test", "case-1").unwrap(),
             mode: EvalMode::RetrievalOnly,
             split: CorpusSplit::Development,
             label_trust: LabelTrust::Official,
             status: CaseStatus::Passed,
             metrics,
+            evidence: BTreeMap::new(),
             invalid_reason: None,
             failures: vec![],
             duration_ms: 0,
             attempts: 1,
         };
         assert!(outcome.validate().is_err());
+    }
+
+    #[test]
+    fn same_local_id_in_two_suites_is_not_a_duplicate() {
+        let first = CaseKey::parse("retrieval", "case-1").unwrap();
+        let second = CaseKey::parse("claims", "case-1").unwrap();
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn empty_suite_or_case_id_is_rejected() {
+        assert!(CaseKey::parse("", "case-1").is_err());
+        assert!(CaseKey::parse("retrieval", "").is_err());
+    }
+
+    #[test]
+    fn suite_id_rejects_empty_string() {
+        assert!(SuiteId::parse("").is_err());
+        assert!(SuiteId::parse("  ").is_err());
+    }
+
+    #[test]
+    fn suite_id_accepts_valid_string() {
+        let id = SuiteId::parse("local-retrieval").unwrap();
+        assert_eq!(id.as_str(), "local-retrieval");
+    }
+
+    #[test]
+    fn case_key_same_in_both_suites_is_duplicate() {
+        let first = CaseKey::parse("retrieval", "case-1").unwrap();
+        let second = CaseKey::parse("retrieval", "case-1").unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn metric_evidence_retrieval_serializes() {
+        let evidence = MetricEvidence::retrieval(5, 3, Some(2), 5);
+        let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"kind\":\"retrieval\""));
+        assert!(json.contains("\"relevant\":5"));
+        assert!(json.contains("\"hits_at_k\":3"));
+    }
+
+    #[test]
+    fn metric_evidence_classification_serializes() {
+        let evidence = MetricEvidence::classification(10, 2, 1, 87);
+        let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"kind\":\"classification\""));
+        assert!(json.contains("\"true_positives\":10"));
     }
 }

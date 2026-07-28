@@ -247,13 +247,13 @@ impl EvalSuite for ClaimReconciliationSuite {
             Ok(cases) => cases,
             Err(err) => {
                 return vec![EvalCaseOutcome {
-                    case_id: EvalCaseId::parse("fixture-load-error").unwrap(),
-                    suite_id: "claim-reconciliation".into(),
+                    case_key: CaseKey::parse("claim-reconciliation", "fixture-load-error").unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(err.to_string()),
                     failures: vec![],
                     duration_ms: 0,
@@ -302,13 +302,13 @@ impl EvalSuite for ClaimReconciliationSuite {
 
             if setup_failed {
                 outcomes.push(EvalCaseOutcome {
-                    case_id,
-                    suite_id: "claim-reconciliation".into(),
+                    case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: corpus_split,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(setup_error),
                     failures: vec![],
                     duration_ms: start.elapsed().as_millis() as u64,
@@ -334,13 +334,13 @@ impl EvalSuite for ClaimReconciliationSuite {
                 Ok(result) => result,
                 Err(err) => {
                     outcomes.push(EvalCaseOutcome {
-                        case_id,
-                        suite_id: "claim-reconciliation".into(),
+                        case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                         mode: EvalMode::EndToEnd,
                         split: corpus_split,
                         label_trust: LabelTrust::Official,
                         status: CaseStatus::Invalid,
                         metrics: std::collections::BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
                         invalid_reason: Some(format!("source extraction failed: {err}")),
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
@@ -392,8 +392,7 @@ impl EvalSuite for ClaimReconciliationSuite {
             let case_passed = metrics_result.isolation_violations == 0;
 
             outcomes.push(EvalCaseOutcome {
-                case_id,
-                suite_id: "claim-reconciliation".into(),
+                case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
                 mode: EvalMode::EndToEnd,
                 split: corpus_split,
                 label_trust: LabelTrust::Official,
@@ -403,6 +402,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                     CaseStatus::QualityFailed
                 },
                 metrics: metric_map,
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: None,
                 failures: if !case_passed {
                     vec![format!(

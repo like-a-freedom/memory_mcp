@@ -55,13 +55,13 @@ impl ExternalRetrievalSuite {
                 Ok(t) => t,
                 Err(err) => {
                     return EvalCaseOutcome {
-                        case_id,
-                        suite_id: "external-retrieval".into(),
+                        case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                         mode: EvalMode::RetrievalOnly,
                         split: CorpusSplit::Test,
                         label_trust: LabelTrust::Official,
                         status: CaseStatus::Invalid,
                         metrics: BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
                         invalid_reason: Some(format!("invalid timestamp: {err}")),
                         failures: vec![],
                         duration_ms: start.elapsed().as_millis() as u64,
@@ -125,8 +125,7 @@ impl ExternalRetrievalSuite {
                 metric_map.insert("query_ms".into(), query_ms as f64);
 
                 EvalCaseOutcome {
-                    case_id,
-                    suite_id: "external-retrieval".into(),
+                    case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                     mode: EvalMode::RetrievalOnly,
                     split: CorpusSplit::Test,
                     label_trust: LabelTrust::Official,
@@ -136,6 +135,7 @@ impl ExternalRetrievalSuite {
                         CaseStatus::QualityFailed
                     },
                     metrics: metric_map,
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: None,
                     failures: if !meets_recall {
                         vec![format!(
@@ -150,13 +150,13 @@ impl ExternalRetrievalSuite {
                 }
             }
             Err(err) => EvalCaseOutcome {
-                case_id,
-                suite_id: "external-retrieval".into(),
+                case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                 mode: EvalMode::RetrievalOnly,
                 split: CorpusSplit::Test,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("assemble_context failed: {err}")),
                 failures: vec![],
                 duration_ms: total_ms,
@@ -204,7 +204,7 @@ impl EvalSuite for ExternalRetrievalSuite {
             }
         }
 
-        outcomes.sort_by(|a, b| a.case_id.cmp(&b.case_id));
+        outcomes.sort_by(|a, b| a.case_id().cmp(b.case_id()));
         outcomes
     }
 }

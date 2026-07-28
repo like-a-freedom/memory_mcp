@@ -120,13 +120,13 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         .await
         {
             return EvalCaseOutcome {
-                case_id,
-                suite_id: "extraction".into(),
+                case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
                 mode: EvalMode::EndToEnd,
                 split: CorpusSplit::Development,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("setup episode failed: {err}")),
                 failures: vec![],
                 duration_ms: start.elapsed().as_millis() as u64,
@@ -147,13 +147,13 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         Ok(result) => result,
         Err(err) => {
             return EvalCaseOutcome {
-                case_id,
-                suite_id: "extraction".into(),
+                case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
                 mode: EvalMode::EndToEnd,
                 split: CorpusSplit::Development,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("extraction failed: {err}")),
                 failures: vec![],
                 duration_ms: start.elapsed().as_millis() as u64,
@@ -272,13 +272,13 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
     }
 
     EvalCaseOutcome {
-        case_id,
-        suite_id: "extraction".into(),
+        case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
         mode: EvalMode::EndToEnd,
         split: CorpusSplit::Development,
         label_trust: LabelTrust::Official,
         status,
         metrics,
+        evidence: std::collections::BTreeMap::new(),
         invalid_reason: None,
         failures,
         duration_ms: start.elapsed().as_millis() as u64,
@@ -320,13 +320,13 @@ impl EvalSuite for ExtractionSuite {
             Ok(cases) => cases,
             Err(err) => {
                 return vec![EvalCaseOutcome {
-                    case_id: EvalCaseId::parse("fixture-load-error").unwrap(),
-                    suite_id: "extraction".into(),
+                    case_key: CaseKey::parse("extraction", "fixture-load-error").unwrap(),
                     mode: EvalMode::EndToEnd,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(err.to_string()),
                     failures: vec![],
                     duration_ms: 0,
@@ -358,7 +358,7 @@ mod tests {
         let cases = load_cases().unwrap();
         let case = &cases[0];
         let outcome = run_case(case).await;
-        assert_eq!(outcome.suite_id, "extraction");
+        assert_eq!(outcome.suite_id(), "extraction");
         assert!(outcome.duration_ms > 0);
     }
 

@@ -67,13 +67,13 @@ impl CapacitySuite {
                 metrics.insert("episode_created".into(), 1.0);
 
                 EvalCaseOutcome {
-                    case_id,
-                    suite_id: "capacity".into(),
+                    case_key: CaseKey::parse("capacity", case_id.as_str()).unwrap(),
                     mode: EvalMode::Lifecycle,
                     split: CorpusSplit::Test,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Passed,
                     metrics,
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: None,
                     failures: vec![],
                     duration_ms,
@@ -81,13 +81,13 @@ impl CapacitySuite {
                 }
             }
             Err(err) => EvalCaseOutcome {
-                case_id,
-                suite_id: "capacity".into(),
+                case_key: CaseKey::parse("capacity", case_id.as_str()).unwrap(),
                 mode: EvalMode::Lifecycle,
                 split: CorpusSplit::Test,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("ingest failed: {err}")),
                 failures: vec![],
                 duration_ms,
@@ -137,7 +137,7 @@ mod tests {
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 3);
         for outcome in &outcomes {
-            assert_eq!(outcome.suite_id, "capacity");
+            assert_eq!(outcome.suite_id(), "capacity");
         }
     }
 }

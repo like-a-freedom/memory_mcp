@@ -82,13 +82,13 @@ impl EvalSuite for DownstreamQaSuite {
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
         if self.reader_contract.is_none() {
             return vec![EvalCaseOutcome {
-                case_id: EvalCaseId::parse("qa-diagnostic").unwrap(),
-                suite_id: "downstream-qa".into(),
+                case_key: CaseKey::parse("downstream-qa", "qa-diagnostic").unwrap(),
                 mode: EvalMode::Performance,
                 split: CorpusSplit::Development,
                 label_trust: LabelTrust::Weak,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some("no reader contract provided".into()),
                 failures: vec![],
                 duration_ms: 0,
@@ -118,13 +118,13 @@ impl EvalSuite for DownstreamQaSuite {
             Ok(id) => id,
             Err(err) => {
                 return vec![EvalCaseOutcome {
-                    case_id: EvalCaseId::parse("qa-diagnostic").unwrap(),
-                    suite_id: "downstream-qa".into(),
+                    case_key: CaseKey::parse("downstream-qa", "qa-diagnostic").unwrap(),
                     mode: EvalMode::Performance,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Weak,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(format!("ingest failed: {err}")),
                     failures: vec![],
                     duration_ms: 0,
@@ -166,13 +166,13 @@ impl EvalSuite for DownstreamQaSuite {
                 metrics.insert("diagnostic_only".into(), 1.0);
 
                 vec![EvalCaseOutcome {
-                    case_id: EvalCaseId::parse("qa-diagnostic").unwrap(),
-                    suite_id: "downstream-qa".into(),
+                    case_key: CaseKey::parse("downstream-qa", "qa-diagnostic").unwrap(),
                     mode: EvalMode::Performance,
                     split: CorpusSplit::Development,
                     label_trust: LabelTrust::Weak,
                     status: CaseStatus::Passed,
                     metrics,
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: None,
                     failures: vec![],
                     duration_ms,
@@ -180,13 +180,13 @@ impl EvalSuite for DownstreamQaSuite {
                 }]
             }
             Err(err) => vec![EvalCaseOutcome {
-                case_id: EvalCaseId::parse("qa-diagnostic").unwrap(),
-                suite_id: "downstream-qa".into(),
+                case_key: CaseKey::parse("downstream-qa", "qa-diagnostic").unwrap(),
                 mode: EvalMode::Performance,
                 split: CorpusSplit::Development,
                 label_trust: LabelTrust::Weak,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("assemble_context failed: {err}")),
                 failures: vec![],
                 duration_ms,

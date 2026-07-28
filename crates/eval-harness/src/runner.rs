@@ -71,7 +71,11 @@ impl Runner {
             all_outcomes.extend(outcomes);
         }
 
-        all_outcomes.sort_by(|a, b| a.suite_id.cmp(&b.suite_id).then(a.case_id.cmp(&b.case_id)));
+        all_outcomes.sort_by(|a, b| {
+            a.suite_id()
+                .cmp(b.suite_id())
+                .then(a.case_id().cmp(b.case_id()))
+        });
 
         expected_ids.sort();
         expected_ids.dedup();

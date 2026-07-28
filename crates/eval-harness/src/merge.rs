@@ -9,7 +9,7 @@ fn compute_suite_summaries(outcomes: &[EvalCaseOutcome]) -> Vec<SuiteSummary> {
         std::collections::BTreeMap::new();
     for outcome in outcomes {
         by_suite
-            .entry(outcome.suite_id.clone())
+            .entry(outcome.suite_id().to_string())
             .or_default()
             .push(outcome);
     }
@@ -97,15 +97,15 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
 
     let mut seen_ids = BTreeSet::new();
     for outcome in &all_outcomes {
-        if !seen_ids.insert(outcome.case_id.as_str()) {
+        if !seen_ids.insert(outcome.case_id().as_str()) {
             return Err(EvalError::InvalidInput(format!(
                 "duplicate case ID in merged shards: {}",
-                outcome.case_id.as_str()
+                outcome.case_id().as_str()
             )));
         }
     }
 
-    let outcome_ids: BTreeSet<&str> = all_outcomes.iter().map(|o| o.case_id.as_str()).collect();
+    let outcome_ids: BTreeSet<&str> = all_outcomes.iter().map(|o| o.case_id().as_str()).collect();
 
     for id in &all_expected {
         if !outcome_ids.contains(*id) {
@@ -115,7 +115,11 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
         }
     }
 
-    all_outcomes.sort_by(|a, b| a.suite_id.cmp(&b.suite_id).then(a.case_id.cmp(&b.case_id)));
+    all_outcomes.sort_by(|a, b| {
+        a.suite_id()
+            .cmp(b.suite_id())
+            .then(a.case_id().cmp(b.case_id()))
+    });
 
     let mut expected_ids: Vec<EvalCaseId> = all_expected
         .into_iter()
@@ -161,18 +165,15 @@ mod tests {
     fn make_shard(shard_idx: u32, case_ids: Vec<&str>) -> RunArtifact {
         let outcomes: Vec<EvalCaseOutcome> = case_ids
             .iter()
-            .map(|id| EvalCaseOutcome {
-                case_id: EvalCaseId::parse(*id).unwrap(),
-                suite_id: "test-suite".into(),
-                mode: EvalMode::RetrievalOnly,
-                split: CorpusSplit::Development,
-                label_trust: LabelTrust::Official,
-                status: CaseStatus::Passed,
-                metrics: std::collections::BTreeMap::new(),
-                invalid_reason: None,
-                failures: vec![],
-                duration_ms: 100,
-                attempts: 1,
+            .map(|id| {
+                EvalCaseOutcome::new(
+                    "test-suite",
+                    *id,
+                    EvalMode::RetrievalOnly,
+                    CorpusSplit::Development,
+                    LabelTrust::Official,
+                    CaseStatus::Passed,
+                )
             })
             .collect();
 

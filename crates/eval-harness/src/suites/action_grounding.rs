@@ -59,13 +59,13 @@ impl ActionGroundingSuite {
             Ok(id) => id,
             Err(err) => {
                 return EvalCaseOutcome {
-                    case_id,
-                    suite_id: "action-grounding".into(),
+                    case_key: CaseKey::parse("action-grounding", case_id.as_str()).unwrap(),
                     mode: EvalMode::Lifecycle,
                     split: CorpusSplit::Test,
                     label_trust: LabelTrust::Official,
                     status: CaseStatus::Invalid,
                     metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: Some(format!("ingest failed: {err}")),
                     failures: vec![],
                     duration_ms: start.elapsed().as_millis() as u64,
@@ -111,8 +111,7 @@ impl ActionGroundingSuite {
                 metrics.insert("context_items".into(), items.len() as f64);
 
                 EvalCaseOutcome {
-                    case_id,
-                    suite_id: "action-grounding".into(),
+                    case_key: CaseKey::parse("action-grounding", case_id.as_str()).unwrap(),
                     mode: EvalMode::Lifecycle,
                     split: CorpusSplit::Test,
                     label_trust: LabelTrust::Official,
@@ -122,6 +121,7 @@ impl ActionGroundingSuite {
                         CaseStatus::QualityFailed
                     },
                     metrics,
+                    evidence: std::collections::BTreeMap::new(),
                     invalid_reason: None,
                     failures: if !has_relevant {
                         vec!["no relevant context returned".into()]
@@ -133,13 +133,13 @@ impl ActionGroundingSuite {
                 }
             }
             Err(err) => EvalCaseOutcome {
-                case_id,
-                suite_id: "action-grounding".into(),
+                case_key: CaseKey::parse("action-grounding", case_id.as_str()).unwrap(),
                 mode: EvalMode::Lifecycle,
                 split: CorpusSplit::Test,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
+                evidence: std::collections::BTreeMap::new(),
                 invalid_reason: Some(format!("assemble_context failed: {err}")),
                 failures: vec![],
                 duration_ms,
@@ -189,7 +189,7 @@ mod tests {
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 3);
         for outcome in &outcomes {
-            assert_eq!(outcome.suite_id, "action-grounding");
+            assert_eq!(outcome.suite_id(), "action-grounding");
             assert!(outcome.duration_ms > 0 || outcome.status == CaseStatus::Invalid);
         }
     }

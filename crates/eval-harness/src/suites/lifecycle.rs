@@ -53,8 +53,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             .iter()
             .all(|o| o.status == CaseStatus::Passed);
         outcomes.push(EvalCaseOutcome {
-            case_id: EvalCaseId::parse("lifecycle-action-grounding").unwrap(),
-            suite_id: "lifecycle".into(),
+            case_key: CaseKey::parse("lifecycle", "lifecycle-action-grounding").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
@@ -75,6 +74,7 @@ impl EvalSuite for LifecycleReleaseSuite {
                 );
                 m
             },
+            evidence: std::collections::BTreeMap::new(),
             invalid_reason: None,
             failures: if !grounding_pass {
                 vec!["action grounding sub-suite failed".into()]
@@ -91,8 +91,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             .iter()
             .all(|o| o.status != CaseStatus::QualityFailed);
         outcomes.push(EvalCaseOutcome {
-            case_id: EvalCaseId::parse("lifecycle-capacity").unwrap(),
-            suite_id: "lifecycle".into(),
+            case_key: CaseKey::parse("lifecycle", "lifecycle-capacity").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
@@ -102,6 +101,7 @@ impl EvalSuite for LifecycleReleaseSuite {
                 CaseStatus::QualityFailed
             },
             metrics: std::collections::BTreeMap::new(),
+            evidence: std::collections::BTreeMap::new(),
             invalid_reason: None,
             failures: if !capacity_pass {
                 vec!["capacity sub-suite failed".into()]
@@ -118,8 +118,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             .iter()
             .all(|o| o.status == CaseStatus::Passed);
         outcomes.push(EvalCaseOutcome {
-            case_id: EvalCaseId::parse("lifecycle-poisoning").unwrap(),
-            suite_id: "lifecycle".into(),
+            case_key: CaseKey::parse("lifecycle", "lifecycle-poisoning").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
@@ -140,6 +139,7 @@ impl EvalSuite for LifecycleReleaseSuite {
                 );
                 m
             },
+            evidence: std::collections::BTreeMap::new(),
             invalid_reason: None,
             failures: if !poisoning_pass {
                 vec!["poisoning sub-suite failed".into()]
@@ -171,8 +171,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             )
         };
         outcomes.push(EvalCaseOutcome {
-            case_id: EvalCaseId::parse("lifecycle-public-surface").unwrap(),
-            suite_id: "lifecycle".into(),
+            case_key: CaseKey::parse("lifecycle", "lifecycle-public-surface").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
@@ -182,6 +181,7 @@ impl EvalSuite for LifecycleReleaseSuite {
                 CaseStatus::QualityFailed
             },
             metrics: std::collections::BTreeMap::new(),
+            evidence: std::collections::BTreeMap::new(),
             invalid_reason: None,
             failures: if public_surface_pass {
                 vec![]
@@ -209,7 +209,7 @@ mod tests {
         let outcomes = suite.run(&context).await;
         assert_eq!(outcomes.len(), 4);
         for outcome in &outcomes {
-            assert_eq!(outcome.suite_id, "lifecycle");
+            assert_eq!(outcome.suite_id(), "lifecycle");
             assert_eq!(outcome.mode, EvalMode::Lifecycle);
         }
     }
