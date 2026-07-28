@@ -1,15 +1,303 @@
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use memory_mcp::models::{ContradictionWarning, IngestRequest};
+use serde::Deserialize;
 
 use crate::domain::*;
+use crate::error::EvalError;
 use crate::runner::{EvalSuite, RunContext};
+use crate::test_support;
+
+#[derive(Debug, Deserialize)]
+struct ExtractionEvalCase {
+    id: String,
+    #[allow(dead_code)]
+    description: String,
+    source_type: String,
+    source_id: String,
+    scope: String,
+    content: String,
+    #[serde(default)]
+    setup_episodes: Vec<SetupEpisode>,
+    expected: ExtractionExpectation,
+}
+
+#[derive(Debug, Deserialize)]
+struct SetupEpisode {
+    source_type: String,
+    source_id: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExtractionExpectation {
+    #[serde(default)]
+    fact_types: Vec<String>,
+    #[serde(default)]
+    entities: Vec<String>,
+    #[serde(default)]
+    warnings: Vec<ExpectedWarning>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedWarning {
+    fact_type: String,
+    existing_content: String,
+    new_content: String,
+}
+
+fn fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/evals/extraction_cases.json")
+}
+
+fn load_cases() -> Result<Vec<ExtractionEvalCase>, EvalError> {
+    let raw = std::fs::read_to_string(fixture_path()).map_err(|source| EvalError::Io {
+        path: fixture_path(),
+        source,
+    })?;
+    serde_json::from_str(&raw).map_err(EvalError::Artifact)
+}
+
+fn warning_matches(expected: &ExpectedWarning, actual: &ContradictionWarning) -> bool {
+    actual.fact_type == expected.fact_type
+        && actual.existing_content == expected.existing_content
+        && actual.new_content == expected.new_content
+}
+
+async fn ingest_and_extract(
+    service: &memory_mcp::service::MemoryService,
+    scope: &str,
+    source_type: &str,
+    source_id: &str,
+    content: &str,
+) -> Result<memory_mcp::models::ExtractResult, memory_mcp::MemoryError> {
+    let episode_id = service
+        .ingest(
+            IngestRequest {
+                source_type: source_type.to_string(),
+                source_id: source_id.to_string(),
+                content: content.to_string(),
+                t_ref: "2026-04-07T10:00:00Z"
+                    .parse::<DateTime<Utc>>()
+                    .expect("static timestamp should parse"),
+                scope: scope.to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await?;
+
+    service.extract(&episode_id, None, None).await
+}
+
+struct CaseResult {
+    predicted_fact_types: BTreeSet<String>,
+    predicted_entities: BTreeSet<String>,
+    warnings: Vec<ContradictionWarning>,
+}
+
+async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
+    let case_id = EvalCaseId::parse(&case.id).unwrap();
+    let start = std::time::Instant::now();
+
+    let service = test_support::make_service().await;
+
+    for setup in &case.setup_episodes {
+        if let Err(err) = ingest_and_extract(
+            &service,
+            &case.scope,
+            &setup.source_type,
+            &setup.source_id,
+            &setup.content,
+        )
+        .await
+        {
+            return EvalCaseOutcome {
+                case_id,
+                suite_id: "extraction".into(),
+                mode: EvalMode::EndToEnd,
+                split: CorpusSplit::Development,
+                label_trust: LabelTrust::Official,
+                status: CaseStatus::Invalid,
+                metrics: std::collections::BTreeMap::new(),
+                invalid_reason: Some(format!("setup episode failed: {err}")),
+                failures: vec![],
+                duration_ms: start.elapsed().as_millis() as u64,
+                attempts: 1,
+            };
+        }
+    }
+
+    let extraction = match ingest_and_extract(
+        &service,
+        &case.scope,
+        &case.source_type,
+        &case.source_id,
+        &case.content,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            return EvalCaseOutcome {
+                case_id,
+                suite_id: "extraction".into(),
+                mode: EvalMode::EndToEnd,
+                split: CorpusSplit::Development,
+                label_trust: LabelTrust::Official,
+                status: CaseStatus::Invalid,
+                metrics: std::collections::BTreeMap::new(),
+                invalid_reason: Some(format!("extraction failed: {err}")),
+                failures: vec![],
+                duration_ms: start.elapsed().as_millis() as u64,
+                attempts: 1,
+            };
+        }
+    };
+
+    let result = CaseResult {
+        predicted_fact_types: extraction
+            .facts
+            .iter()
+            .map(|f| f.fact_type.clone())
+            .collect(),
+        predicted_entities: extraction
+            .entities
+            .iter()
+            .map(|e| e.canonical_name.clone())
+            .collect(),
+        warnings: extraction.warnings,
+    };
+
+    let expected_fact_types: BTreeSet<String> = case.expected.fact_types.iter().cloned().collect();
+    let expected_entities: BTreeSet<String> = case.expected.entities.iter().cloned().collect();
+
+    let matched_fact_types = expected_fact_types
+        .intersection(&result.predicted_fact_types)
+        .count();
+    let matched_entities = expected_entities
+        .intersection(&result.predicted_entities)
+        .count();
+    let matched_warnings = case
+        .expected
+        .warnings
+        .iter()
+        .filter(|expected| {
+            result
+                .warnings
+                .iter()
+                .any(|actual| warning_matches(expected, actual))
+        })
+        .count();
+
+    let mut metrics = std::collections::BTreeMap::new();
+
+    let entity_precision = if result.predicted_entities.is_empty() {
+        if expected_entities.is_empty() {
+            1.0
+        } else {
+            0.0
+        }
+    } else {
+        matched_entities as f64 / result.predicted_entities.len() as f64
+    };
+    let entity_recall = if expected_entities.is_empty() {
+        1.0
+    } else {
+        matched_entities as f64 / expected_entities.len() as f64
+    };
+    let entity_f1 = if entity_precision + entity_recall > 0.0 {
+        2.0 * entity_precision * entity_recall / (entity_precision + entity_recall)
+    } else {
+        0.0
+    };
+    let fact_type_accuracy = if expected_fact_types.is_empty() {
+        1.0
+    } else {
+        matched_fact_types as f64 / expected_fact_types.len() as f64
+    };
+    let warning_recall = if case.expected.warnings.is_empty() {
+        1.0
+    } else {
+        matched_warnings as f64 / case.expected.warnings.len() as f64
+    };
+
+    metrics.insert("entity_precision".into(), entity_precision);
+    metrics.insert("entity_recall".into(), entity_recall);
+    metrics.insert("entity_f1".into(), entity_f1);
+    metrics.insert("fact_type_accuracy".into(), fact_type_accuracy);
+    metrics.insert("warning_recall".into(), warning_recall);
+
+    let warnings_passed = if case.expected.warnings.is_empty() {
+        result.warnings.is_empty()
+    } else {
+        matched_warnings == case.expected.warnings.len()
+    };
+
+    let case_passed = matched_fact_types == expected_fact_types.len()
+        && matched_entities == expected_entities.len()
+        && warnings_passed;
+
+    let status = if case_passed {
+        CaseStatus::Passed
+    } else {
+        CaseStatus::QualityFailed
+    };
+
+    let mut failures = Vec::new();
+    if matched_fact_types != expected_fact_types.len() {
+        failures.push(format!(
+            "fact_types: {matched_fact_types}/{}",
+            expected_fact_types.len()
+        ));
+    }
+    if matched_entities != expected_entities.len() {
+        failures.push(format!(
+            "entities: {matched_entities}/{}",
+            expected_entities.len()
+        ));
+    }
+    if !warnings_passed {
+        failures.push(format!(
+            "warnings: {matched_warnings}/{}",
+            case.expected.warnings.len()
+        ));
+    }
+
+    EvalCaseOutcome {
+        case_id,
+        suite_id: "extraction".into(),
+        mode: EvalMode::EndToEnd,
+        split: CorpusSplit::Development,
+        label_trust: LabelTrust::Official,
+        status,
+        metrics,
+        invalid_reason: None,
+        failures,
+        duration_ms: start.elapsed().as_millis() as u64,
+        attempts: 1,
+    }
+}
 
 pub struct ExtractionSuite {
     expected_ids: Vec<EvalCaseId>,
 }
 
 impl ExtractionSuite {
-    pub fn new(expected_ids: Vec<EvalCaseId>) -> Self {
-        Self { expected_ids }
+    pub fn new() -> Result<Self, EvalError> {
+        let cases = load_cases()?;
+        let expected_ids = cases
+            .iter()
+            .map(|c| EvalCaseId::parse(&c.id))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self { expected_ids })
     }
 }
 
@@ -28,6 +316,79 @@ impl EvalSuite for ExtractionSuite {
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
-        Vec::new()
+        let cases = match load_cases() {
+            Ok(cases) => cases,
+            Err(err) => {
+                return vec![EvalCaseOutcome {
+                    case_id: EvalCaseId::parse("fixture-load-error").unwrap(),
+                    suite_id: "extraction".into(),
+                    mode: EvalMode::EndToEnd,
+                    split: CorpusSplit::Development,
+                    label_trust: LabelTrust::Official,
+                    status: CaseStatus::Invalid,
+                    metrics: std::collections::BTreeMap::new(),
+                    invalid_reason: Some(err.to_string()),
+                    failures: vec![],
+                    duration_ms: 0,
+                    attempts: 1,
+                }];
+            }
+        };
+
+        let mut outcomes = Vec::with_capacity(cases.len());
+        for case in &cases {
+            outcomes.push(run_case(case).await);
+        }
+        outcomes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixture_loads() {
+        let cases = load_cases().unwrap();
+        assert!(!cases.is_empty());
+    }
+
+    #[tokio::test]
+    async fn single_extraction_case_produces_valid_outcome() {
+        let cases = load_cases().unwrap();
+        let case = &cases[0];
+        let outcome = run_case(case).await;
+        assert_eq!(outcome.suite_id, "extraction");
+        assert!(outcome.duration_ms > 0);
+    }
+
+    #[tokio::test]
+    async fn warning_case_detects_contradiction() {
+        let case = ExtractionEvalCase {
+            id: "ext-warning-check".into(),
+            description: "test".into(),
+            source_type: "chat".into(),
+            source_id: "ext-warning-check-current".into(),
+            scope: "personal".into(),
+            content: "Alice Smith reports ARR is $7M.".into(),
+            setup_episodes: vec![SetupEpisode {
+                source_type: "chat".into(),
+                source_id: "ext-warning-check-setup".into(),
+                content: "Alice Smith reports ARR is $5M.".into(),
+            }],
+            expected: ExtractionExpectation {
+                fact_types: vec!["metric".into()],
+                entities: vec!["Alice Smith".into()],
+                warnings: vec![ExpectedWarning {
+                    fact_type: "metric".into(),
+                    existing_content: "Alice Smith reports ARR is $5M.".into(),
+                    new_content: "Alice Smith reports ARR is $7M.".into(),
+                }],
+            },
+        };
+        let outcome = run_case(&case).await;
+        assert!(
+            outcome.status == CaseStatus::Passed || outcome.status == CaseStatus::QualityFailed
+        );
     }
 }

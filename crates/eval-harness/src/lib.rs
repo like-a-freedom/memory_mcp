@@ -6,6 +6,7 @@ pub mod metrics;
 pub mod profile;
 pub mod runner;
 pub mod suites;
+pub mod test_support;
 
 pub use artifact::*;
 pub use domain::*;
