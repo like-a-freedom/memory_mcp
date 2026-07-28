@@ -32,3 +32,11 @@ tempfile = "3"
 [[bench]]
 name = "pipeline"
 harness = false
+
+[[bench]]
+name = "ner_cpu"
+harness = false
+
+[[bench]]
+name = "contention"
+harness = false
