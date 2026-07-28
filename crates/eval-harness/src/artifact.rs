@@ -25,6 +25,48 @@ pub struct RunFingerprint {
     pub profile_digest: String,
 }
 
+impl RunFingerprint {
+    pub fn capture() -> Self {
+        Self {
+            rust_version: env!("CARGO_PKG_RUST_VERSION", "unknown").to_string(),
+            os_arch: std::env::consts::OS.to_string() + "/" + std::env::consts::ARCH,
+            package_version: env!("CARGO_PKG_VERSION").to_string(),
+            build_profile: if cfg!(debug_assertions) {
+                "debug"
+            } else {
+                "release"
+            }
+            .to_string(),
+            enabled_features: vec![],
+            provider: None,
+            model: None,
+            device: None,
+            configuration_hash: "uncomputed".to_string(),
+            git_commit: option_env!("GIT_COMMIT").map(String::from),
+            evaluator_versions: BTreeMap::new(),
+            profile_digest: "uncomputed".to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn default_for_test() -> Self {
+        Self {
+            rust_version: "test".into(),
+            os_arch: "test".into(),
+            package_version: "0.0.0".into(),
+            build_profile: "test".into(),
+            enabled_features: vec![],
+            provider: None,
+            model: None,
+            device: None,
+            configuration_hash: "test".into(),
+            git_commit: None,
+            evaluator_versions: BTreeMap::new(),
+            profile_digest: "test".into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuiteSummary {
     pub suite_id: String,

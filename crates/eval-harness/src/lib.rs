@@ -4,6 +4,8 @@ pub mod error;
 pub mod gate;
 pub mod metrics;
 pub mod profile;
+pub mod runner;
+pub mod suites;
 
 pub use artifact::*;
 pub use domain::*;
@@ -11,3 +13,5 @@ pub use error::EvalError;
 pub use gate::*;
 pub use metrics::*;
 pub use profile::*;
+pub use runner::*;
+pub use suites::*;
