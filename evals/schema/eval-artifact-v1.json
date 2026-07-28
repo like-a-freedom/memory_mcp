@@ -1,0 +1,223 @@
+{
+  "$id": "https://memory-mcp.dev/schemas/eval-artifact-v1.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Memory MCP Evaluation Artifact v1",
+  "description": "Versioned machine-readable evaluation artifact containing all case outcomes, metrics, gates, and fingerprints for one evaluation run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "profile",
+    "started_at",
+    "duration_ms",
+    "expected_case_ids",
+    "outcomes",
+    "suite_summaries",
+    "gates",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "memory-mcp-eval/v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "$ref": "#/definitions/EvalProfile"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_case_ids": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/EvalCaseId" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "outcomes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/EvalCaseOutcome" },
+      "minItems": 1
+    },
+    "suite_summaries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/SuiteSummary" }
+    },
+    "gates": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/GateDecision" }
+    },
+    "fingerprint": { "$ref": "#/definitions/RunFingerprint" }
+  },
+  "definitions": {
+    "EvalCaseId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "EvalProfile": {
+      "type": "string",
+      "enum": ["pr", "release", "nightly"]
+    },
+    "EvalMode": {
+      "type": "string",
+      "enum": ["retrieval_only", "end_to_end", "lifecycle", "performance"]
+    },
+    "CorpusSplit": {
+      "type": "string",
+      "enum": ["development", "test"]
+    },
+    "LabelTrust": {
+      "type": "string",
+      "enum": ["official", "reviewed", "weak"]
+    },
+    "CaseStatus": {
+      "type": "string",
+      "enum": ["passed", "quality_failed", "invalid"]
+    },
+    "EvalCaseOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "suite_id",
+        "mode",
+        "split",
+        "label_trust",
+        "status",
+        "metrics",
+        "failures",
+        "duration_ms",
+        "attempts"
+      ],
+      "properties": {
+        "case_id": { "$ref": "#/definitions/EvalCaseId" },
+        "suite_id": { "type": "string" },
+        "mode": { "$ref": "#/definitions/EvalMode" },
+        "split": { "$ref": "#/definitions/CorpusSplit" },
+        "label_trust": { "$ref": "#/definitions/LabelTrust" },
+        "status": { "$ref": "#/definitions/CaseStatus" },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "invalid_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failures": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "SuiteSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "mode",
+        "total",
+        "passed",
+        "quality_failed",
+        "invalid",
+        "metrics"
+      ],
+      "properties": {
+        "suite_id": { "type": "string" },
+        "mode": { "$ref": "#/definitions/EvalMode" },
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "quality_failed": { "type": "integer", "minimum": 0 },
+        "invalid": { "type": "integer", "minimum": 0 },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        }
+      }
+    },
+    "GateStatus": {
+      "type": "string",
+      "enum": ["passed", "failed", "invalid"]
+    },
+    "GateFailureReason": {
+      "type": "string",
+      "enum": [
+        "hard_floor_not_met",
+        "regression_budget_exceeded",
+        "missing_baseline",
+        "incompatible_baseline",
+        "none"
+      ]
+    },
+    "GateDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "observed",
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "metric": { "type": "string" },
+        "observed": { "type": "number" },
+        "hard_floor": { "type": "number" },
+        "baseline": { "type": "number" },
+        "regression_budget": { "type": "number" },
+        "status": { "$ref": "#/definitions/GateStatus" },
+        "reason": { "$ref": "#/definitions/GateFailureReason" }
+      }
+    },
+    "RunFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rust_version",
+        "os_arch",
+        "package_version",
+        "build_profile",
+        "enabled_features",
+        "configuration_hash",
+        "evaluator_versions",
+        "profile_digest"
+      ],
+      "properties": {
+        "rust_version": { "type": "string" },
+        "os_arch": { "type": "string" },
+        "package_version": { "type": "string" },
+        "build_profile": { "type": "string" },
+        "enabled_features": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "device": { "type": "string" },
+        "configuration_hash": { "type": "string" },
+        "git_commit": { "type": "string" },
+        "evaluator_versions": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "profile_digest": { "type": "string" }
+      }
+    }
+  }
+}
