@@ -62,6 +62,7 @@ prometheus = ["dep:metrics-exporter-prometheus"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
 
 [dev-dependencies]
+eval-harness = { path = "crates/eval-harness" }
 serde_json = "1.0.150"
 tempfile = "3.27.0"
 csv = "1.4.0"

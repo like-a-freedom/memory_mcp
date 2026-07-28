@@ -566,3 +566,220 @@ async fn run_retrieval_evals() {
     );
     assert_retrieval_targets(&summary);
 }
+
+/// Diagnostic-only sibling of `run_retrieval_evals`.
+///
+/// The canonical runner above intentionally panics on the first failing case
+/// (fail-fast in CI). That makes the suite pass/fail boundary crisp, but the
+/// printed summary is never reached when any case fails, so we cannot report
+/// an objective breakdown (pass rate, MRR, recall@5, per-tier pass rate) for
+/// the whole fixture.
+///
+/// This test mirrors the loop body exactly but does **not** assert — it logs
+/// per-case failures via `eprintln!` and continues, then prints the same
+/// summary line at the end. It is `#[ignore]`d by default to preserve the
+/// canonical CI contract; run it explicitly with `--ignored` to collect
+/// diagnostic metrics.
+#[tokio::test]
+#[ignore]
+async fn run_retrieval_evals_diagnostic() {
+    let cases = load_cases();
+    let mut summary = RetrievalSuiteSummary::default();
+
+    for case in cases {
+        let as_of = case_as_of(&case);
+        let (service, db_client) = common::make_service_with_client().await;
+        for entity in &case.entities {
+            common::seed_entity(
+                &db_client,
+                &case.scope,
+                &entity.entity_id,
+                &entity.entity_type,
+                &entity.canonical_name,
+                &entity.aliases,
+            )
+            .await;
+        }
+        for edge in &case.edges {
+            if let Err(err) = service
+                .relate(&edge.from_id, &edge.relation, &edge.to_id)
+                .await
+            {
+                eprintln!(
+                    "[skip] case {}: failed to seed edge {} - {} -> {}: {err}",
+                    case.id, edge.relation, edge.from_id, edge.to_id
+                );
+            }
+        }
+        for community in &case.communities {
+            let updated_at = community
+                .updated_at
+                .parse::<DateTime<Utc>>()
+                .expect("community timestamp should parse");
+            common::seed_community(
+                &db_client,
+                &case.scope,
+                &community.community_id,
+                &community.member_entities,
+                &community.summary,
+                updated_at,
+            )
+            .await;
+        }
+        for fact in &case.facts {
+            let t_valid = fact
+                .t_valid
+                .parse::<DateTime<Utc>>()
+                .expect("fixture timestamp should parse");
+            common::seed_fact_with_links_and_project(
+                &service,
+                &case.scope,
+                &fact.content,
+                t_valid,
+                fact.entity_links.clone(),
+                fact.project.as_deref(),
+                fact.source_id.as_deref(),
+            )
+            .await;
+        }
+
+        let items = match service
+            .assemble_context(AssembleContextRequest {
+                query: case.query.clone(),
+                scope: case.scope.clone(),
+                as_of: Some(as_of),
+                budget: case.budget,
+                project: case.project.clone(),
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            })
+            .await
+        {
+            Ok(items) => items,
+            Err(err) => {
+                eprintln!("[skip] case {}: assemble_context error: {err}", case.id);
+                continue;
+            }
+        };
+
+        let matched_hits = case
+            .expected
+            .must_contain
+            .iter()
+            .filter(|needle| {
+                items
+                    .iter()
+                    .any(|item| item.content.contains(needle.as_str()))
+            })
+            .count();
+        let unexpected_hits = case
+            .expected
+            .must_not_contain
+            .iter()
+            .filter(|needle| {
+                items
+                    .iter()
+                    .any(|item| item.content.contains(needle.as_str()))
+            })
+            .count();
+        let actual_tiers = items
+            .iter()
+            .filter_map(|item| item.retrieval_tier.as_deref())
+            .collect::<Vec<_>>();
+        let retrieved_contents = items
+            .iter()
+            .map(|item| item.content.as_str())
+            .collect::<Vec<_>>();
+        let source_episode_refs = items
+            .iter()
+            .map(|item| item.source_episode.as_str())
+            .collect::<Vec<_>>();
+        let first_relevant_rank =
+            first_relevant_rank(&retrieved_contents, &case.expected.must_contain);
+
+        let recall_passed = record_retrieval_case(
+            &mut summary,
+            &case.expected.tier,
+            &case.tags,
+            matched_hits,
+            case.expected.must_contain.len(),
+            case.expected.min_recall_at_k,
+            RetrievalCaseDiagnostics {
+                actual_tiers: &actual_tiers,
+                first_relevant_rank,
+                source_episodes: &source_episode_refs,
+                min_unique_source_episodes: case
+                    .expected
+                    .diversity
+                    .as_ref()
+                    .and_then(|expectation| expectation.min_unique_source_episodes),
+                max_source_episode_share: case
+                    .expected
+                    .diversity
+                    .as_ref()
+                    .and_then(|expectation| expectation.max_source_episode_share),
+            },
+        );
+        let passed = recall_passed && unexpected_hits == 0;
+        if recall_passed && unexpected_hits > 0 {
+            revoke_retrieval_case_pass(&mut summary, &case.expected.tier, &case.tags);
+        }
+
+        if !passed {
+            eprintln!(
+                "[fail] case {} ({}) matched_hits={} expected_hits={} unexpected_hits={} first_relevant_rank={:?}",
+                case.id,
+                case.description,
+                matched_hits,
+                case.expected.must_contain.len(),
+                unexpected_hits,
+                first_relevant_rank,
+            );
+        }
+    }
+
+    print_retrieval_summary("eval_retrieval", &summary);
+}
+
+/// Thin launcher that delegates to the eval-harness retrieval suite.
+/// Run with: cargo test --test eval_retrieval harness_retrieval_suite -- --ignored --exact
+#[tokio::test]
+#[ignore]
+async fn harness_retrieval_suite() {
+    use eval_harness::{EvalProfile, EvalSuite, RetrievalSuite, RunContext};
+
+    let suite = RetrievalSuite::new().expect("load retrieval suite");
+    let context = RunContext {
+        profile: EvalProfile::Pr,
+    };
+    let outcomes = suite.run(&context).await;
+
+    let passed = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::Passed)
+        .count();
+    let failed = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::QualityFailed)
+        .count();
+    let invalid = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::Invalid)
+        .count();
+
+    eprintln!(
+        "harness_retrieval: total={} passed={} failed={} invalid={}",
+        outcomes.len(),
+        passed,
+        failed,
+        invalid
+    );
+
+    assert!(
+        invalid == 0,
+        "harness retrieval suite has {invalid} invalid cases"
+    );
+}

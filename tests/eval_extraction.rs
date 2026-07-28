@@ -383,3 +383,142 @@ async fn run_extraction_evals() {
         summary.warning_recall(),
     );
 }
+
+/// Diagnostic-only sibling of `run_extraction_evals`.
+///
+/// The canonical runner above intentionally panics on the first failing case
+/// (fail-fast in CI). That makes the suite pass/fail boundary crisp, but it
+/// also means the printed summary is never reached when any case fails, so we
+/// cannot report an objective breakdown (entity precision/recall/F1, fact-type
+/// accuracy, warning recall) for the whole fixture.
+///
+/// This test mirrors the loop body exactly but does **not** assert — instead it
+/// logs which cases failed via `eprintln!` and continues, then prints the same
+/// summary line at the end. It is `#[ignore]`d by default to preserve the
+/// canonical CI contract; run it explicitly with `--ignored` to collect
+/// diagnostic metrics.
+#[tokio::test]
+#[ignore]
+async fn run_extraction_evals_diagnostic() {
+    let cases = load_cases();
+    let mut summary = ExtractionSummary::default();
+
+    for case in cases {
+        summary.total_cases += 1;
+        let outcome = run_case(&case).await;
+        let expected_fact_types = case
+            .expected
+            .fact_types
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let expected_entities = case
+            .expected
+            .entities
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let matched_warnings = case
+            .expected
+            .warnings
+            .iter()
+            .filter(|expected| {
+                outcome
+                    .warnings
+                    .iter()
+                    .any(|actual| warning_matches(expected, actual))
+            })
+            .count();
+
+        let matched_fact_types = expected_fact_types
+            .intersection(&outcome.predicted_fact_types)
+            .count();
+        let matched_entities = expected_entities
+            .intersection(&outcome.predicted_entities)
+            .count();
+
+        summary.expected_fact_types += expected_fact_types.len();
+        summary.matched_fact_types += matched_fact_types;
+        summary.expected_entities += expected_entities.len();
+        summary.matched_entities += matched_entities;
+        summary.predicted_entities += outcome.predicted_entities.len();
+        summary.expected_warnings += case.expected.warnings.len();
+        summary.matched_warnings += matched_warnings;
+
+        let warnings_passed = if case.expected.warnings.is_empty() {
+            outcome.warnings.is_empty()
+        } else {
+            matched_warnings == case.expected.warnings.len()
+        };
+
+        let case_passed = matched_fact_types == expected_fact_types.len()
+            && matched_entities == expected_entities.len()
+            && warnings_passed;
+        if case_passed {
+            summary.passed_cases += 1;
+        } else {
+            eprintln!(
+                "[fail] case {} ({}) matched_fact_types={}/{} matched_entities={}/{} matched_warnings={}/{}",
+                case.id,
+                case.description,
+                matched_fact_types,
+                expected_fact_types.len(),
+                matched_entities,
+                expected_entities.len(),
+                matched_warnings,
+                case.expected.warnings.len(),
+            );
+        }
+    }
+
+    println!(
+        "suite=eval_extraction total={} passed={} entity_precision={:.2} entity_recall={:.2} entity_f1={:.2} fact_type_accuracy={:.2} warning_recall={:.2}",
+        summary.total_cases,
+        summary.passed_cases,
+        summary.entity_precision(),
+        summary.entity_recall(),
+        summary.entity_f1(),
+        summary.fact_type_accuracy(),
+        summary.warning_recall(),
+    );
+}
+
+/// Thin launcher that delegates to the eval-harness extraction suite.
+/// Run with: cargo test --test eval_extraction harness_extraction_suite -- --ignored --exact
+#[tokio::test]
+#[ignore]
+async fn harness_extraction_suite() {
+    use eval_harness::{EvalProfile, EvalSuite, ExtractionSuite, RunContext};
+
+    let suite = ExtractionSuite::new().expect("load extraction suite");
+    let context = RunContext {
+        profile: EvalProfile::Pr,
+    };
+    let outcomes = suite.run(&context).await;
+
+    let passed = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::Passed)
+        .count();
+    let failed = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::QualityFailed)
+        .count();
+    let invalid = outcomes
+        .iter()
+        .filter(|o| o.status == eval_harness::CaseStatus::Invalid)
+        .count();
+
+    eprintln!(
+        "harness_extraction: total={} passed={} failed={} invalid={}",
+        outcomes.len(),
+        passed,
+        failed,
+        invalid
+    );
+
+    assert!(
+        invalid == 0,
+        "harness extraction suite has {invalid} invalid cases"
+    );
+}
