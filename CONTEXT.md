@@ -118,6 +118,53 @@ sources.
 - Never let recall or a background worker manufacture a corrective fact as a
   retrieval side effect.
 
+## Evaluation domain language
+
+This section defines the language used by evaluation ADRs, profiles, artifacts,
+and implementation plans.
+
+**Eval Profile**:
+A named execution and gating policy for a particular feedback horizon:
+`pr`, `release`, or `nightly`. It declares suites, modes, corpus coverage,
+resources, and a time budget.
+_Avoid_: Test group, ad hoc Make target
+
+**Eval Mode**:
+The system path whose behavior is being measured: `retrieval-only`,
+`end-to-end`, `lifecycle`, or `performance`. Results from different modes are
+reported separately.
+_Avoid_: Benchmark type, hidden setup variant
+
+**Eval Case Outcome**:
+Exactly one of `passed`, `quality_failed`, or `invalid`. Invalid means that the
+intended measurement could not be made; it never means skipped or passed.
+_Avoid_: Skipped failure, infrastructure pass
+
+**Evaluation Corpus**:
+An immutable dataset revision identified by a manifest containing its source,
+revision, digest, license, size, case count, and adapter version.
+_Avoid_: Latest dataset, downloaded fixture
+
+**Label Trust**:
+The provenance class of expected evidence: `official`, `reviewed`, or `weak`.
+Weak labels are diagnostic and cannot contribute to a release gate.
+_Avoid_: Confidence score, implicit oracle
+
+**Evaluation Artifact**:
+A versioned machine-readable report containing all case outcomes, metrics,
+coverage, thresholds, fingerprints, retries, and durations for one run.
+_Avoid_: Console log, stdout baseline
+
+**Quality Gate**:
+A declared release decision combining use-case-derived hard floors with an
+allowed regression budget against an approved baseline.
+_Avoid_: Printed target, best-effort threshold
+
+**Baseline**:
+An approved Evaluation Artifact used for typed regression comparison. Replacing
+it requires review, before/after evidence, and a reason.
+_Avoid_: Previous stdout, latest local run
+
 ## Memory domain language
 
 This section defines the language used to represent durable knowledge,

@@ -1904,6 +1904,7 @@ dependencies = [
  "criterion",
  "hex",
  "memory_mcp",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2 0.11.0",

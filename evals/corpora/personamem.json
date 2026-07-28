@@ -2,10 +2,10 @@
   "schema_version": "memory-mcp-corpus/v1",
   "corpus_id": "personamem",
   "source_url": "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/questions_32k.csv",
-  "revision": "main",
-  "sha256": "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256",
+  "revision": "personamem-32k",
+  "sha256": "0244acf99872f5bc2f4460fcbfa6a0f2e07314c05a841de83de92afa08d0a4a0",
   "license": "cc-by-4.0",
-  "byte_size": 0,
+  "byte_size": 7394049,
   "case_count": 589,
   "adapter_version": "1",
   "data_file": "personamem_32k.bundle.json"

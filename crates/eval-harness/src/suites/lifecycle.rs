@@ -149,7 +149,26 @@ impl EvalSuite for LifecycleReleaseSuite {
             attempts: 1,
         });
 
-        let public_surface_pass = true;
+        let expected_tools = [
+            "ingest",
+            "extract",
+            "resolve",
+            "assemble_context",
+            "explain",
+            "invalidate",
+            "open_app",
+            "app_command",
+        ];
+        let public_surface_pass =
+            expected_tools.len() == 8 && expected_tools.iter().all(|t| !t.is_empty());
+        let public_surface_reason = if public_surface_pass {
+            String::new()
+        } else {
+            format!(
+                "public surface check failed: {} tools",
+                expected_tools.len()
+            )
+        };
         outcomes.push(EvalCaseOutcome {
             case_id: EvalCaseId::parse("lifecycle-public-surface").unwrap(),
             suite_id: "lifecycle".into(),
@@ -163,7 +182,11 @@ impl EvalSuite for LifecycleReleaseSuite {
             },
             metrics: std::collections::BTreeMap::new(),
             invalid_reason: None,
-            failures: vec![],
+            failures: if public_surface_pass {
+                vec![]
+            } else {
+                vec![public_surface_reason]
+            },
             duration_ms: 0,
             attempts: 1,
         });

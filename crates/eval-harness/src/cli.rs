@@ -21,6 +21,19 @@ pub enum Command {
         #[arg(long = "suite")]
         suites: Vec<String>,
     },
+    PrepareCorpus {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        output_root: PathBuf,
+    },
+    Merge {
+        #[arg(long)]
+        profile: PathBuf,
+        #[arg(long)]
+        artifact: PathBuf,
+        shards: Vec<PathBuf>,
+    },
 }
 
 pub fn parse() -> Cli {

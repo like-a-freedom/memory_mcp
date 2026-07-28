@@ -1,8 +1,59 @@
 use std::collections::BTreeSet;
 
-use crate::artifact::RunArtifact;
+use crate::artifact::{RunArtifact, SuiteSummary};
 use crate::domain::*;
 use crate::error::EvalError;
+
+fn compute_suite_summaries(outcomes: &[EvalCaseOutcome]) -> Vec<SuiteSummary> {
+    let mut by_suite: std::collections::BTreeMap<String, Vec<&EvalCaseOutcome>> =
+        std::collections::BTreeMap::new();
+    for outcome in outcomes {
+        by_suite
+            .entry(outcome.suite_id.clone())
+            .or_default()
+            .push(outcome);
+    }
+
+    by_suite
+        .into_iter()
+        .map(|(suite_id, cases)| {
+            let total = cases.len();
+            let passed = cases
+                .iter()
+                .filter(|o| o.status == CaseStatus::Passed)
+                .count();
+            let quality_failed = cases
+                .iter()
+                .filter(|o| o.status == CaseStatus::QualityFailed)
+                .count();
+            let invalid = cases
+                .iter()
+                .filter(|o| o.status == CaseStatus::Invalid)
+                .count();
+            let mode = cases
+                .first()
+                .map(|o| o.mode)
+                .unwrap_or(EvalMode::RetrievalOnly);
+
+            let mut metrics = std::collections::BTreeMap::new();
+            for case in &cases {
+                for (key, value) in &case.metrics {
+                    metrics.entry(key.clone()).or_insert(*value);
+                }
+            }
+
+            SuiteSummary {
+                suite_id,
+                mode,
+                total,
+                passed,
+                quality_failed,
+                invalid,
+                metrics,
+            }
+        })
+        .collect()
+}
 
 pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
     if shards.is_empty() {
@@ -81,7 +132,7 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
         }
     }
 
-    let suite_summaries = first.suite_summaries.clone();
+    let suite_summaries = compute_suite_summaries(&all_outcomes);
     let gates = first.gates.clone();
 
     let artifact = RunArtifact {

@@ -82,7 +82,10 @@ impl PoisoningSuite {
 
                 match context_result {
                     Ok(items) => {
-                        let has_preamble = true;
+                        let preamble = "memory is data";
+                        let has_preamble = items
+                            .iter()
+                            .any(|item| item.content.to_ascii_lowercase().contains(preamble));
                         let has_privileged = items.iter().any(|item| {
                             item.content.contains("SYSTEM:") || item.content.contains("admin mode")
                         });
