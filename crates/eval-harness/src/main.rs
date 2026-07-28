@@ -1,7 +1,8 @@
 use eval_harness::cli::{self, Command};
 use eval_harness::{
-    ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, EndToEndSuite, ExtractionSuite,
-    LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, RetrievalSuite, RunArtifact, Runner,
+    ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, DownstreamQaSuite,
+    EndToEndSuite, ExtractionSuite, LifecycleReleaseSuite, PoisoningSuite, ProfileManifest,
+    RetrievalSuite, RunArtifact, Runner,
 };
 
 #[tokio::main]
@@ -71,6 +72,9 @@ async fn main() -> std::process::ExitCode {
                     }
                     "lifecycle" => {
                         suites.push(Box::new(LifecycleReleaseSuite::new()));
+                    }
+                    "downstream-qa" => {
+                        suites.push(Box::new(DownstreamQaSuite::new()));
                     }
                     other => {
                         eprintln!("warning: unknown suite {other}");

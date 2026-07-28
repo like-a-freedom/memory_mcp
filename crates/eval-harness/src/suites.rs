@@ -1,6 +1,7 @@
 pub mod action_grounding;
 pub mod capacity;
 pub mod claims;
+pub mod downstream_qa;
 pub mod end_to_end;
 pub mod extraction;
 pub mod lifecycle;
@@ -10,6 +11,7 @@ pub mod retrieval;
 pub use action_grounding::ActionGroundingSuite;
 pub use capacity::CapacitySuite;
 pub use claims::ClaimReconciliationSuite;
+pub use downstream_qa::{DownstreamQaSuite, ReaderContract};
 pub use end_to_end::EndToEndSuite;
 pub use extraction::ExtractionSuite;
 pub use lifecycle::LifecycleReleaseSuite;
