@@ -1,8 +1,20 @@
-# Eval Metrics Report — 2026-07-23
+# Eval Metrics Report — 2026-07-23 (Historical)
 
-> Generated after architecture audit #2 (commits `e744950f`..`2787cfd7`).
-> All evals run with `TEST_THREADS=1` unless noted. Release-mode evals (NER
-> latency, document ingest, external datasets) are marked as ignored.
+> **This document is a historical snapshot** from before the evaluation system
+> redesign (2026-07-28). The current evaluation system uses the `eval-harness`
+> crate with profile-driven evaluation, typed artifacts, and truthful metrics.
+>
+> **Current evaluation:**
+> - Design spec: `docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`
+> - PR profile: `make eval-pr`
+> - Release profile: `make eval-release`
+> - Nightly profile: `make eval-nightly`
+>
+> The metrics below are retained for historical reference only.
+
+Generated after architecture audit #2 (commits `e744950f`..`2787cfd7`).
+All evals run with `TEST_THREADS=1` unless noted. Release-mode evals (NER
+latency, document ingest, external datasets) are marked as ignored.
 
 ## Summary
 

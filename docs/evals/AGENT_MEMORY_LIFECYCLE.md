@@ -25,17 +25,20 @@ risk family:
 
 Every release-gate expectation is human reviewed.
 
-## Verified baseline (Task 1)
+## Verified baseline
 
-**Repository baseline:** `3d7cef63` (tag v1.7.0, master) on 2026-07-23.
+The lifecycle evaluation is now part of the `eval-harness` profile-driven
+system. The `LifecycleReleaseSuite` implements the ADR-0017 release gate
+through wired `LifecycleCapture` and `LifecycleRecall` entry points.
 
-This is the actual `master` HEAD of the worktree; it does not match the
-plan's referenced baseline `86d2bb96` because the plan was written against a
-fork that was 41 commits ahead and contained migrations 027/028, claim
-reconciliation, `CONTEXT.md`, and ADRs 0002–0015. Those artifacts are not
-present in this worktree. The lifecycle integration is implemented against the
-actual `master` state; later tasks that reference migrations 027/028 will
-renumber or adapt as needed.
+**Current baseline:** `fa57d49b` (master) on 2026-07-28.
+
+The lifecycle suite exercises:
+- Action grounding through all three modes (always_recall, selective_shadow, selective_enforced)
+- Persisted capacity measurements (rows, bytes, zero growth for ignored/duplicate)
+- Poisoning replay from capture through attempted action
+- Trust non-elevation and boundary invariants
+- Bounded envelope with `MEMORY_IS_DATA_PREAMBLE`
 
 ### Surface freeze
 
@@ -55,31 +58,20 @@ cargo test --test eval_agent_memory_lifecycle lifecycle_fixture_covers_core_risk
 
 Asserts every required risk family is represented.
 
-### Baseline modes (Task 1 Step 5)
+### Evaluation modes
 
-Modes:
+The lifecycle evaluation exercises three agent modes:
 
 ```text
-no_memory
-bare_mcp
-instructions_only
-manual_existing_tools
+always_recall        — forced recall on every eligible boundary
+selective_shadow     — selective decision recorded, always-recall envelope used
+selective_enforced   — selective decision applied
 ```
 
-The baseline harness (`run_agent_memory_lifecycle_baseline`, `#[ignore]`)
-reports per task family:
-
-- eligible and performed recalls;
-- eligible and performed captures;
-- correct, unsafe, and duplicate captures;
-- grounded actions;
-- stale influence and leakage;
-- MCP tool-selection accuracy;
-- tool calls per intent;
-- p50/p95 latency;
-- new rows and bytes per 1,000 simulated host events.
-
-Improvement thresholds are **not** asserted in the baseline task.
+The `ActionGroundingSuite` records recall calls, suppressions, context items,
+action outcomes, latency, and evidence IDs for every case. Action grounding
+is determined from an observed consequential action outcome, never by a recall
+trace alone.
 
 ## Vocabulary
 
@@ -116,13 +108,7 @@ The core release gate (Task 9) fails on any:
 
 ## Procedure gate
 
-Tasks 10–11 do not start until:
-
-- the core gate passes;
-- at least three independent task families have successful and failed outcomes;
-- one repeated lesson candidate has at least three independent trusted outcomes;
-- the operator-review workflow has an owner and retention policy;
-- the projected 365-day storage remains within the configured project budget.
-
-If the gate is not met, stop after Task 9. Absence of procedural memory is the
-correct result.
+Procedural memory is separately gated and does not affect the lifecycle
+release gate. See `docs/evals/PROCEDURAL_MEMORY.md` for the procedure gate
+requirements. Absence of procedural memory is the correct result until its
+gate is met.

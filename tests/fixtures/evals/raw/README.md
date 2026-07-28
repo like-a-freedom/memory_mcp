@@ -1,24 +1,22 @@
 # External eval raw fixtures
 
-This directory holds **full upstream benchmark datasets** downloaded by
-`scripts/convert_external_evals.py`.
+This directory holds **full upstream benchmark datasets** used by the
+`eval-harness` corpus preparation pipeline.
 
-## Single source of truth
+## How preparation works
 
-All eval tests read from these raw fixtures. There are no separate "sample" or
-"trimmed" copies — the full datasets are the only source. Sampling is controlled
-at runtime via the `MEMORY_MCP_EVAL_SAMPLE_PCT` environment variable:
+Corpus data is never downloaded during evaluation. A separate preparation
+command fetches, validates, and stages the data:
 
 ```bash
-# Run with full datasets (default)
-cargo test --test eval_external_retrieval run_longmemeval_retrieval -- --ignored
-
-# Run with 10 % of cases for faster iteration
-MEMORY_MCP_EVAL_SAMPLE_PCT=10 cargo test --test eval_external_retrieval run_longmemeval_retrieval -- --ignored
-
-# Run with just 1 case
-MEMORY_MCP_EVAL_SAMPLE_PCT=1 cargo test --test eval_external_retrieval run_longmemeval_retrieval -- --ignored
+# Prepare a specific corpus
+cargo run -p eval-harness --bin memory-eval -- prepare-corpus \
+  --manifest evals/corpora/longmemeval.json \
+  --output-root data/corpora
 ```
+
+Preparation pins an immutable revision, verifies SHA-256, and writes data
+to a prepared location outside the measured run.
 
 ## Dataset inventory
 
@@ -48,27 +46,18 @@ MEMORY_MCP_EVAL_SAMPLE_PCT=1 cargo test --test eval_external_retrieval run_longm
   - URL: <https://raw.githubusercontent.com/amazon-science/PrefEval/main/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json>
   - PrefEval retrieval track for travel/hotel queries
 
-## Full dataset cache
+## Corpus manifests
 
-Multi-source datasets (PersonaMem, PrefEval) are bundled at load time and cached
-under `tests/fixtures/evals/full/` (git-ignored) for faster subsequent runs.
+Immutable corpus manifests live in `evals/corpora/` and declare the source URL,
+revision, SHA-256 digest, license, byte size, case count, and adapter version
+for each dataset. See:
 
-## Reproducible verification
+- `evals/corpora/longmemeval.json`
+- `evals/corpora/locomo.json`
+- `evals/corpora/personamem.json`
+- `evals/corpora/prefeval.json`
 
-Provenance tests verify fixture metadata:
+## License obligations
 
-```bash
-cargo test --test eval_external_provenance declares_full_dataset_metadata -- --nocapture
-```
-
-Raw fixture existence test:
-
-```bash
-cargo test --test eval_external_provenance raw_fixture_files_exist -- --nocapture
-```
-
-## Regenerating fixtures
-
-```bash
-python scripts/convert_external_evals.py
-```
+Each manifest records the dataset license. Preparation respects these licenses.
+Review the manifest before redistributing prepared corpus data.

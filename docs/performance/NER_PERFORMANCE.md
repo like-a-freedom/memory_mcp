@@ -33,20 +33,21 @@ returned exactly the same ordered default-label and zero-shot candidates.
 
 ## Reproduction
 
+Performance measurements now use Criterion benchmarks under `crates/eval-harness/benches/`.
+The old `eval_ner_latency` and `eval_latency` integration tests have been removed.
+
 ```bash
-# Accepted production configuration
-NER_BENCH_BATCH_SIZE=1 cargo test --locked --release \
-  --test eval_ner_latency run_gliner_latency_eval -- \
-  --ignored --exact --nocapture --test-threads=1
+# NER CPU benchmarks (one-window and multi-window)
+cargo bench -p eval-harness --bench ner_cpu -- --noplot
 
-# Four clients contending for one inference permit
-NER_BENCH_BATCH_SIZE=1 cargo test --locked --release \
-  --test eval_ner_latency run_contention_eval -- \
-  --ignored --exact --nocapture --test-threads=1
+# NER Metal benchmarks (macOS only, requires --features metal)
+cargo bench -p eval-harness --features metal --bench ner_metal -- --noplot
 
-# Makefile aliases
-make eval-ner-latency
-make eval-ner-contention
+# Contention benchmarks (multi-client concurrency)
+cargo bench -p eval-harness --bench contention -- --noplot
+
+# Full pipeline benchmarks (ingest, extraction, claims, retrieval, end-to-end)
+cargo bench -p eval-harness --bench pipeline -- --noplot
 ```
 
 Run without another model workload and with stable machine power/thermal settings.
@@ -138,6 +139,9 @@ This is a stability/oversubscription tradeoff, not a throughput gain. Raising
   cap, and actual maximum padded tokens.
 - Per-call custom labels are used when decoding scores; they no longer fall back to
   the extractor's default label list.
+- Criterion benchmarks under `crates/eval-harness/benches/ner_cpu.rs` record
+  candidate signatures, expected entities, and deterministic windowing as unit
+  tests that pass without measuring milliseconds.
 
 The CPU tolerance is not an acceptance threshold for Metal. Metal needs its own
 candidate, quality, latency, contention, and memory measurements.

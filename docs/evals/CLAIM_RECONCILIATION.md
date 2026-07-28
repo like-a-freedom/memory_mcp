@@ -34,15 +34,19 @@ Each case exercises at least one of the four built-in schemas:
 
 ## Evaluation Runner
 
+Claim reconciliation is evaluated as part of the `eval-harness` profile-driven
+system. The harness implements a `ClaimReconciliationSuite` that runs all
+fixture cases and reports per-split confusion counts and case outcomes.
+
 ```bash
-# Full held-out evaluation
-TEST_THREADS=1 cargo test --test eval_claim_reconciliation run_held_out_eval -- --ignored --exact --nocapture
+# Run claim reconciliation as part of the PR profile
+make eval-pr
 
-# Quick smoke test (development split only)
-TEST_THREADS=1 cargo test --test eval_claim_reconciliation run_development_eval -- --ignored --exact --nocapture
+# Run claim reconciliation suite directly
+cargo test -p eval-harness suites::claims
 
-# Baseline (all evals)
-make eval-baseline
+# Run the thin compatibility launcher
+cargo test --test eval_claim_reconciliation
 ```
 
 ## Promotion Gate

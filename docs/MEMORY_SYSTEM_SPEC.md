@@ -1074,6 +1074,7 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 - `docs/CONTRADICTION_DETECTION_DESIGN.md` — deterministic claim-reconciliation target architecture
 - `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — retrieval target-state specification
 - `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` — adaptive-memory target-state specification
+- `docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md` — evaluation architecture and design
 - [Memory Agent](/.github/agents/memory.agent.md) — Full 1100+ line agent specification
 - [PDM Agent](/.github/agents/pdm.agent.md) — Product Manager Agent
 
@@ -1106,6 +1107,7 @@ These documents are superseded by this specification:
 
 **Changelog:**
 
+- **2026-07-28**: Added reference to the truthful evaluation system design spec (`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`). The evaluation harness is a private workspace crate (`eval-harness`) that provides profile-driven evaluation, typed artifacts, and truthful metrics. It is never linked into the production binary.
 - **2026-07-17**: Added the accepted Claim/ClaimRelation reconciliation design and corrected previous fact-level supersession, migration, observability, compatibility, and acceptance-test claims that no longer represented the target model.
 
 - **2026-03-27**: Linked this runtime spec to the new adaptive-memory target-state design doc, clarifying that SOTA alignment work is tracked separately from shipped behavior and should preserve the simplified lexical/BM25 + graph retrieval direction.

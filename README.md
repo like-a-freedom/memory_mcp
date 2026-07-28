@@ -715,18 +715,27 @@ cargo clippy -- -D warnings
 cargo doc --no-deps
 ```
 
-### NER latency benchmark
+### Performance benchmarks
+
+Performance measurements live under `crates/eval-harness/benches/` and use
+Criterion. They are not part of `cargo test`.
 
 ```bash
-make eval-ner-latency
+# Pipeline stages (ingest, extraction, claims, retrieval, end-to-end)
+cargo bench -p eval-harness --bench pipeline -- --noplot
+
+# NER on CPU
+cargo bench -p eval-harness --bench ner_cpu -- --noplot
+
+# NER on Metal (macOS only)
+cargo bench -p eval-harness --features metal --bench ner_metal -- --noplot
+
+# Contention
+cargo bench -p eval-harness --bench contention -- --noplot
 ```
 
-Requires the local GLiNER model at `tests/models/ner/urchade--gliner_multi-v2.1/`.
-On the measured Apple M2 Pro CPU profile, vectorized span scoring is 20.6–23.8×
-faster and the complete 520-word `extract_candidates` call is 3.45–3.53× faster.
-`NER_BATCH_SIZE=1` is the measured CPU default; larger batches require a
-workload-specific benchmark. See `docs/performance/NER_PERFORMANCE.md` for raw
-samples, contention results, and limitations.
+See `docs/performance/NER_PERFORMANCE.md` for raw samples, contention results,
+and the Criterion reproduction contract.
 
 ### MCP Tasks (optional)
 
@@ -771,12 +780,6 @@ cargo test --test service_acceptance
 cargo test --test tools_e2e
 ```
 
-Verified in this remediation pass:
-
-- `cargo test semantic_scaffolding --test service_integration` → `2 passed; 0 failed`
-- `cargo test --test service_acceptance` → `11 passed; 0 failed`
-- `cargo test --test service_integration` → `11 passed; 0 failed`
-
 Coverage output is stored under `coverage/` when generated with Tarpaulin.
 
 ## Project layout
@@ -784,10 +787,19 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 ```text
 .
 ├── AGENTS.md
-├── Cargo.toml
-├── README.md
+├── Cargo.toml              # workspace root
+├── Makefile                # thin eval profile adapters
+├── crates/
+│   └── eval-harness/       # private evaluation harness (not linked into production binary)
+│       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
+│       └── benches/        # Criterion benchmark families
+├── evals/
+│   ├── baselines/          # reviewed comparison artifacts
+│   ├── corpora/            # immutable corpus manifests
+│   ├── performance/        # pinned-runner config
+│   ├── profiles/           # pr.json, release.json, nightly.json
+│   └── schema/             # eval-artifact-v1.json
 ├── docs/
-├── scripts/
 ├── src/
 │   ├── mcp/
 │   ├── service/
@@ -800,9 +812,36 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 └── tests/
 ```
 
+## Evaluation
+
+The `eval-harness` crate (`memory-eval` binary) provides a profile-driven,
+truthful evaluation system. It is never linked into the production binary.
+
+```bash
+# PR profile (target 10 min)
+make eval-pr
+
+# Release profile (target 20 min)
+make eval-release
+
+# Nightly profile (full end-to-end)
+make eval-nightly
+
+# Corpus preparation (one-time, requires network)
+cargo run -p eval-harness --bin memory-eval -- prepare-corpus \
+  --manifest evals/corpora/longmemeval.json \
+  --output-root data/corpora
+```
+
+Profiles, modes, outcome semantics, artifact schema, and baseline governance
+are documented in the design spec at
+`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`
+and the supporting ADRs under `docs/adr/`.
+
 ## Documentation
 
 - [`docs/MEMORY_SYSTEM_SPEC.md`](docs/MEMORY_SYSTEM_SPEC.md) — full system specification
+- [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
 - [`docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`](docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md) — target-state spec for the upcoming breaking search simplification
 - [`docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md`](docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md) — curated references for intent- and skills-driven MCP design
 - [`docs/security-hardening-roadmap.md`](docs/security-hardening-roadmap.md) — current query-surface inventory, deployment assumptions, and remaining hardening work
