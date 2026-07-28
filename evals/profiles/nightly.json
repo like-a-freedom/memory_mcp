@@ -1,0 +1,20 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "nightly",
+  "time_budget_seconds": 3600,
+  "suites": [
+    {
+      "id": "local-retrieval"
+    },
+    {
+      "id": "extraction"
+    },
+    {
+      "id": "claim-reconciliation"
+    },
+    {
+      "id": "end-to-end"
+    }
+  ],
+  "gates": []
+}
