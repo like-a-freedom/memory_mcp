@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -8,7 +6,6 @@ use serde::Deserialize;
 
 use crate::domain::*;
 use crate::error::EvalError;
-use crate::metrics::{self, RetrievalObservation};
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
 
@@ -265,8 +262,23 @@ impl LocalRetrievalSuite {
             }
         };
 
-        let ranked_ids: Vec<String> = items.iter().map(|item| item.content.clone()).collect();
-        let relevant_ids: BTreeSet<String> = case.expected.must_contain.iter().cloned().collect();
+        let mut hits_at_k: u64 = 0;
+        let mut first_relevant_rank: Option<u32> = None;
+        let relevant_count = case.expected.must_contain.len() as u64;
+
+        for (idx, item) in items.iter().take(5).enumerate() {
+            let rank = (idx + 1) as u32;
+            let matched = case.expected.must_contain.iter().any(|needle| {
+                item.content.contains(needle.as_str())
+                    || item.source_episode.contains(needle.as_str())
+            });
+            if matched {
+                hits_at_k += 1;
+                if first_relevant_rank.is_none() {
+                    first_relevant_rank = Some(rank);
+                }
+            }
+        }
 
         let unexpected: Vec<String> = case
             .expected
@@ -280,22 +292,33 @@ impl LocalRetrievalSuite {
             .cloned()
             .collect();
 
+        let recall_at_k = if relevant_count > 0 {
+            hits_at_k as f64 / relevant_count as f64
+        } else {
+            0.0
+        };
+        let mrr = if let Some(rank) = first_relevant_rank {
+            1.0 / rank as f64
+        } else {
+            0.0
+        };
+        let top_1_hit_rate = if first_relevant_rank == Some(1) {
+            1.0
+        } else {
+            0.0
+        };
+
         let mut metric_map = std::collections::BTreeMap::new();
+        metric_map.insert("recall_at_5".into(), recall_at_k);
+        metric_map.insert("mrr".into(), mrr);
+        metric_map.insert("top_1_hit_rate".into(), top_1_hit_rate);
 
-        if !relevant_ids.is_empty() && !ranked_ids.is_empty() {
-            let obs = RetrievalObservation {
-                relevant_ids: relevant_ids.clone(),
-                ranked_ids: ranked_ids.clone(),
-            };
-            let cutoff = NonZeroUsize::new(5).unwrap_or(NonZeroUsize::new(1).unwrap());
-            if let Ok(m) = metrics::retrieval_metrics(&[obs], cutoff) {
-                metric_map.insert("recall_at_5".into(), m.recall_at_k);
-                metric_map.insert("mrr".into(), m.mrr);
-                metric_map.insert("top_1_hit_rate".into(), m.top_1_hit_rate);
-            }
-        }
+        let mut evidence_map = std::collections::BTreeMap::new();
+        evidence_map.insert(
+            "retrieval".to_string(),
+            MetricEvidence::retrieval(relevant_count, hits_at_k, first_relevant_rank, 5),
+        );
 
-        let recall_at_k = metric_map.get("recall_at_5").copied().unwrap_or(0.0);
         let meets_recall = recall_at_k >= case.expected.min_recall_at_k;
         let no_unexpected = unexpected.is_empty();
 
@@ -312,7 +335,7 @@ impl LocalRetrievalSuite {
             label_trust: LabelTrust::Official,
             status,
             metrics: metric_map,
-            evidence: std::collections::BTreeMap::new(),
+            evidence: evidence_map,
             invalid_reason: None,
             failures: if !meets_recall {
                 vec![format!(
