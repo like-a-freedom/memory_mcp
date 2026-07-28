@@ -22,32 +22,50 @@
   ],
   "gates": [
     {
-      "metric": "recall_at_5",
+      "target": {
+        "suite_id": "local-retrieval",
+        "metric": "recall_at_5"
+      },
       "hard_floor": 0.90,
       "regression_budget": 0.05
     },
     {
-      "metric": "mrr",
+      "target": {
+        "suite_id": "local-retrieval",
+        "metric": "mrr"
+      },
       "hard_floor": 0.85,
       "regression_budget": 0.05
     },
     {
-      "metric": "top_1_hit_rate",
+      "target": {
+        "suite_id": "local-retrieval",
+        "metric": "top_1_hit_rate"
+      },
       "hard_floor": 0.80,
       "regression_budget": 0.05
     },
     {
-      "metric": "entity_f1",
+      "target": {
+        "suite_id": "extraction",
+        "metric": "entity_f1"
+      },
       "hard_floor": 0.70,
       "regression_budget": 0.10
     },
     {
-      "metric": "claim_precision",
+      "target": {
+        "suite_id": "claim-reconciliation",
+        "metric": "claim_precision"
+      },
       "hard_floor": 0.50,
       "regression_budget": 0.10
     },
     {
-      "metric": "claim_recall",
+      "target": {
+        "suite_id": "claim-reconciliation",
+        "metric": "claim_recall"
+      },
       "hard_floor": 0.50,
       "regression_budget": 0.10
     }

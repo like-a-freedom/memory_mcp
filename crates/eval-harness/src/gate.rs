@@ -2,6 +2,19 @@ use crate::artifact::{GateDecision, GateFailureReason, GateStatus, RunArtifact};
 use crate::error::EvalError;
 use crate::profile::GateDecl;
 
+fn find_observed_metric(
+    artifact: &RunArtifact,
+    target: &crate::profile::GateTarget,
+) -> Option<f64> {
+    artifact
+        .suite_summaries
+        .iter()
+        .filter(|s| s.suite_id == target.suite_id)
+        .flat_map(|s| s.metrics.get(&target.metric))
+        .copied()
+        .next()
+}
+
 pub fn evaluate_gates(
     gate_decls: &[GateDecl],
     artifact: &RunArtifact,
@@ -10,16 +23,11 @@ pub fn evaluate_gates(
     let mut decisions = Vec::new();
 
     for decl in gate_decls {
-        let observed = artifact
-            .suite_summaries
-            .iter()
-            .flat_map(|s| s.metrics.get(&decl.metric))
-            .copied()
-            .next();
+        let observed = find_observed_metric(artifact, &decl.target);
 
         let Some(observed) = observed else {
             decisions.push(GateDecision {
-                metric: decl.metric.clone(),
+                metric: decl.target.metric.clone(),
                 observed: 0.0,
                 hard_floor: decl.hard_floor,
                 baseline: None,
@@ -30,19 +38,26 @@ pub fn evaluate_gates(
             continue;
         };
 
-        let baseline_value = baseline.and_then(|b| {
-            b.suite_summaries
-                .iter()
-                .flat_map(|s| s.metrics.get(&decl.metric))
-                .copied()
-                .next()
-        });
+        let baseline_value = baseline.and_then(|b| find_observed_metric(b, &decl.target));
+
+        if decl.baseline_required && baseline_value.is_none() {
+            decisions.push(GateDecision {
+                metric: decl.target.metric.clone(),
+                observed,
+                hard_floor: decl.hard_floor,
+                baseline: None,
+                regression_budget: decl.regression_budget,
+                status: GateStatus::Invalid,
+                reason: GateFailureReason::MissingBaseline,
+            });
+            continue;
+        }
 
         if let Some(floor) = decl.hard_floor
             && observed < floor
         {
             decisions.push(GateDecision {
-                metric: decl.metric.clone(),
+                metric: decl.target.metric.clone(),
                 observed,
                 hard_floor: Some(floor),
                 baseline: baseline_value,
@@ -57,7 +72,7 @@ pub fn evaluate_gates(
             && baseline_val - observed > budget
         {
             decisions.push(GateDecision {
-                metric: decl.metric.clone(),
+                metric: decl.target.metric.clone(),
                 observed,
                 hard_floor: decl.hard_floor,
                 baseline: Some(baseline_val),
@@ -69,7 +84,7 @@ pub fn evaluate_gates(
         }
 
         decisions.push(GateDecision {
-            metric: decl.metric.clone(),
+            metric: decl.target.metric.clone(),
             observed,
             hard_floor: decl.hard_floor,
             baseline: baseline_value,

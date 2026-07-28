@@ -36,11 +36,24 @@ pub struct ExpectedCoverage {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GateDecl {
-    pub metric: String,
+    pub target: GateTarget,
     pub hard_floor: Option<f64>,
     pub regression_budget: Option<f64>,
     #[serde(default)]
+    pub baseline_required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GateTarget {
+    pub suite_id: String,
+    pub metric: String,
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
     pub split: Option<String>,
+    #[serde(default)]
+    pub label_trust: Option<Vec<String>>,
 }
 
 impl ProfileManifest {
@@ -94,15 +107,20 @@ impl ProfileManifest {
         }
 
         for gate in &self.gates {
-            if gate.metric.is_empty() {
+            if gate.target.metric.is_empty() {
                 return Err(EvalError::InvalidConfig(
                     "gate metric must not be empty".into(),
+                ));
+            }
+            if gate.target.suite_id.is_empty() {
+                return Err(EvalError::InvalidConfig(
+                    "gate suite_id must not be empty".into(),
                 ));
             }
             if gate.hard_floor.is_none() && gate.regression_budget.is_none() {
                 return Err(EvalError::InvalidConfig(format!(
                     "gate for {} must declare at least one of hard_floor or regression_budget",
-                    gate.metric
+                    gate.target.metric
                 )));
             }
         }
@@ -127,7 +145,7 @@ mod tests {
                 }
             ],
             "gates": [
-                { "metric": "recall_at_5", "hard_floor": 0.90 }
+                { "target": { "suite_id": "local-retrieval", "metric": "recall_at_5" }, "hard_floor": 0.90 }
             ]
         }"#
     }
@@ -183,7 +201,7 @@ mod tests {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
             "time_budget_seconds":600,
             "suites":[{"id":"s1","expected_coverage":{"min_cases":1}}],
-            "gates":[{"metric":"recall"}]}"#;
+            "gates":[{"target":{"suite_id":"s1","metric":"recall"}}]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }
 
