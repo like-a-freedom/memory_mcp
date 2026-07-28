@@ -344,6 +344,17 @@ impl EvalSuite for LocalRetrievalSuite {
         &self.expected_ids
     }
 
+    fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
+        use std::sync::OnceLock;
+        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
+        *R.get_or_init(|| {
+            &*Box::leak(Box::new(crate::reducer::RetrievalReducer::new(
+                "local-retrieval",
+                5,
+            )))
+        })
+    }
+
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
         let cases = match load_cases() {
             Ok(cases) => cases,

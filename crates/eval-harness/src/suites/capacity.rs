@@ -111,6 +111,12 @@ impl EvalSuite for CapacitySuite {
         &self.expected_ids
     }
 
+    fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
+        use std::sync::OnceLock;
+        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
+        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("capacity"))))
+    }
+
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
         let mut outcomes = Vec::new();
         for (id, scenario) in [

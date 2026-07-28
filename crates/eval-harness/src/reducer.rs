@@ -199,6 +199,48 @@ impl SuiteReducer for ClassificationReducer {
     }
 }
 
+/// Reducer for suites that only need pass/fail/invalid counts (no custom metrics).
+pub struct CountReducer {
+    suite_id: SuiteId,
+}
+
+impl CountReducer {
+    pub fn new(suite_id: impl Into<String>) -> Self {
+        Self {
+            suite_id: SuiteId::parse(suite_id).expect("suite_id must not be empty"),
+        }
+    }
+}
+
+impl SuiteReducer for CountReducer {
+    fn suite_id(&self) -> &SuiteId {
+        &self.suite_id
+    }
+
+    fn reduce(&self, outcomes: &[EvalCaseOutcome]) -> Result<Vec<SuiteSummary>, EvalError> {
+        let mut passed = 0usize;
+        let mut quality_failed = 0usize;
+        let mut invalid = 0usize;
+
+        for outcome in outcomes {
+            match outcome.status {
+                CaseStatus::Passed => passed += 1,
+                CaseStatus::QualityFailed => quality_failed += 1,
+                CaseStatus::Invalid => invalid += 1,
+            }
+        }
+
+        Ok(vec![SuiteSummary {
+            suite_id: self.suite_id.as_str().to_string(),
+            mode: outcomes.first().map_or(EvalMode::RetrievalOnly, |o| o.mode),
+            total: outcomes.len(),
+            passed,
+            quality_failed,
+            invalid,
+            metrics: std::collections::BTreeMap::new(),
+        }])
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

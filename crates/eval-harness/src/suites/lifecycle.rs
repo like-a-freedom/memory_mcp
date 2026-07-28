@@ -43,6 +43,12 @@ impl EvalSuite for LifecycleReleaseSuite {
         &self.expected_ids
     }
 
+    fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
+        use std::sync::OnceLock;
+        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
+        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("lifecycle"))))
+    }
+
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let mut outcomes = Vec::new();
         let suite_start = std::time::Instant::now();

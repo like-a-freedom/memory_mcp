@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::*;
 use crate::error::EvalError;
+use crate::reducer::SuiteReducer;
 
 pub struct RunContext {
     pub profile: EvalProfile,
@@ -12,6 +13,7 @@ pub trait EvalSuite: Send + Sync {
     fn id(&self) -> &str;
     fn mode(&self) -> EvalMode;
     fn expected_case_ids(&self) -> &[EvalCaseId];
+    fn reducer(&self) -> &dyn SuiteReducer;
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome>;
 }
 
@@ -40,33 +42,8 @@ impl Runner {
 
             let outcomes = suite.run(&context).await;
 
-            let mut passed = 0;
-            let mut quality_failed = 0;
-            let mut invalid = 0;
-            for outcome in &outcomes {
-                match outcome.status {
-                    CaseStatus::Passed => passed += 1,
-                    CaseStatus::QualityFailed => quality_failed += 1,
-                    CaseStatus::Invalid => invalid += 1,
-                }
-            }
-
-            let mut metrics = std::collections::BTreeMap::new();
-            for outcome in &outcomes {
-                for (key, value) in &outcome.metrics {
-                    metrics.entry(key.clone()).or_insert(*value);
-                }
-            }
-
-            suite_summaries.push(crate::artifact::SuiteSummary {
-                suite_id: suite.id().to_string(),
-                mode: suite.mode(),
-                total: outcomes.len(),
-                passed,
-                quality_failed,
-                invalid,
-                metrics,
-            });
+            let summaries = suite.reducer().reduce(&outcomes)?;
+            suite_summaries.extend(summaries);
 
             all_outcomes.extend(outcomes);
         }
