@@ -45,6 +45,7 @@ impl EvalSuite for LifecycleReleaseSuite {
 
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
         let mut outcomes = Vec::new();
+        let suite_start = std::time::Instant::now();
 
         let grounding_suite = ActionGroundingSuite::new();
         let grounding_outcomes = grounding_suite.run(context).await;
@@ -80,7 +81,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             } else {
                 vec![]
             },
-            duration_ms: 0,
+            duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
         });
 
@@ -107,7 +108,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             } else {
                 vec![]
             },
-            duration_ms: 0,
+            duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
         });
 
@@ -145,7 +146,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             } else {
                 vec![]
             },
-            duration_ms: 0,
+            duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
         });
 
@@ -187,7 +188,7 @@ impl EvalSuite for LifecycleReleaseSuite {
             } else {
                 vec![public_surface_reason]
             },
-            duration_ms: 0,
+            duration_ms: suite_start.elapsed().as_millis() as u64,
             attempts: 1,
         });
 

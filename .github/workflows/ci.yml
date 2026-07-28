@@ -108,7 +108,8 @@ jobs:
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval -- run \
             --profile evals/profiles/pr.json \
-            --artifact target/evals/pr.json || true
+            --artifact target/evals/pr.json
+        continue-on-error: true
 
       - name: Upload eval artifact
         if: always()

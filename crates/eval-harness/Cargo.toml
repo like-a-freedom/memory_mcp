@@ -39,5 +39,10 @@ name = "ner_cpu"
 harness = false
 
 [[bench]]
+name = "ner_metal"
+harness = false
+required-features = ["metal"]
+
+[[bench]]
 name = "contention"
 harness = false
