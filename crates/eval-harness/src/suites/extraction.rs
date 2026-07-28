@@ -235,6 +235,19 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
     metrics.insert("fact_type_accuracy".into(), fact_type_accuracy);
     metrics.insert("warning_recall".into(), warning_recall);
 
+    let entity_tp = matched_entities as u64;
+    let entity_fp = (result.predicted_entities.len() as u64).saturating_sub(entity_tp);
+    let entity_fn = (expected_entities.len() as u64).saturating_sub(entity_tp);
+    let entity_tn = 0u64;
+
+    let mut evidence_map = std::collections::BTreeMap::new();
+    if !expected_entities.is_empty() || !result.predicted_entities.is_empty() {
+        evidence_map.insert(
+            "classification".to_string(),
+            MetricEvidence::classification(entity_tp, entity_fp, entity_fn, entity_tn),
+        );
+    }
+
     let warnings_passed = if case.expected.warnings.is_empty() {
         result.warnings.is_empty()
     } else {
@@ -278,7 +291,7 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         label_trust: LabelTrust::Official,
         status,
         metrics,
-        evidence: std::collections::BTreeMap::new(),
+        evidence: evidence_map,
         invalid_reason: None,
         failures,
         duration_ms: start.elapsed().as_millis() as u64,
