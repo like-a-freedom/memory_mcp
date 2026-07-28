@@ -1,0 +1,57 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "pr",
+  "time_budget_seconds": 600,
+  "suites": [
+    {
+      "id": "local-retrieval",
+      "expected_coverage": {
+        "min_cases": 50
+      }
+    },
+    {
+      "id": "extraction",
+      "expected_coverage": {
+        "min_cases": 5
+      }
+    },
+    {
+      "id": "claim-reconciliation",
+      "expected_coverage": {
+        "min_cases": 5
+      }
+    }
+  ],
+  "gates": [
+    {
+      "metric": "recall_at_5",
+      "hard_floor": 0.90,
+      "regression_budget": 0.05
+    },
+    {
+      "metric": "mrr",
+      "hard_floor": 0.85,
+      "regression_budget": 0.05
+    },
+    {
+      "metric": "top_1_hit_rate",
+      "hard_floor": 0.80,
+      "regression_budget": 0.05
+    },
+    {
+      "metric": "entity_f1",
+      "hard_floor": 0.70,
+      "regression_budget": 0.10
+    },
+    {
+      "metric": "claim_precision",
+      "hard_floor": 0.50,
+      "regression_budget": 0.10
+    },
+    {
+      "metric": "claim_recall",
+      "hard_floor": 0.50,
+      "regression_budget": 0.10
+    }
+  ]
+}
