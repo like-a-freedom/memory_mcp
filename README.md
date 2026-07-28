@@ -27,7 +27,7 @@ It is designed for workflows where agents need more than short-lived chat contex
 
 ## Overview
 
-Memory MCP implements a memory system for AI agents with a few core goals:
+Memory MCP implements a memory system for AI agents with core goals:
 
 - preserve important source material as episodes
 - extract entities, facts, and links in a deterministic way
@@ -35,7 +35,7 @@ Memory MCP implements a memory system for AI agents with a few core goals:
 - assemble compact, relevant context for downstream reasoning
 - support scope-aware retrieval and access filtering
 
-In practice, that means an agent can ingest content such as emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
+In practice, an agent can ingest emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
 
 ## What it provides
 
@@ -129,9 +129,9 @@ cargo run --quiet --bin memory_mcp
 
 ### Filesystem watch mode (optional)
 
-The watch mode turns a directory into a **passive memory intake pipe**: drop or save files and the server auto-ingests them into memory without any manual tool calls.
+The watch mode turns a directory into a **passive memory intake pipe**: drop or save files and the server auto-ingests them without manual tool calls.
 
-**Why this exists** In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
+In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
 
 **What it does**
 
@@ -190,7 +190,7 @@ echo "# Air-gapped deployment requirement..." > ~/projects/atlas/inbox/airgap_re
 cp ~/Documents/hw_sizing.xlsx ~/projects/atlas/inbox/
 ```
 
-Within `--interval` seconds, each file is:
+Each file is processed within `--interval` seconds:
 1. Detected by the watcher
 2. Parsed (format-specific extraction)
 3. Ingested as an episode with `source_id = "watch:<path>"`
@@ -275,7 +275,7 @@ Example with `--interval 5`:
 12:00:06 — note.md modified again → ingested ✓ (6s ≥ 5s)
 ```
 
-The `--interval` flag serves **dual purposes**: it controls both the poll frequency (how often notify scans the directory) **and** the dedup window (minimum time between ingests of the same file).
+The `--interval` flag controls both the poll frequency (how often notify scans the directory) **and** the dedup window (minimum time between ingests of the same file).
 </details>
 
 **Command-line reference**
@@ -297,9 +297,9 @@ Optional:
 
 Important notes:
 - The `watch` subcommand requires the `cli-watch` feature. Without it, the binary returns an error.
-- The watcher is **fail-fast**: any ingest error terminates the entire watch loop.
-- The watcher **does not diff content** — every qualifying event triggers a full re-ingest of the file.
-- `Remove`, `Access`, and `Metadata` change events are ignored.
+The watcher is **fail-fast**: any ingest error terminates the entire watch loop.
+The watcher **does not diff content** — every qualifying event triggers a full re-ingest of the file.
+`Remove`, `Access`, and `Metadata` change events are ignored.
 </details>
 
 **Logging during watch**
@@ -462,23 +462,23 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 
 #### How it works at startup
 
-1. The server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
-2. That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
-3. In normal `serve` / `watch` startup, every configured namespace is checked before semantic retrieval is enabled.
-4. If a namespace is already marked `ready` for the same signature, semantic retrieval starts normally.
-5. If a namespace is missing state but is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
-6. If any namespace is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
+At startup the server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
+That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
+In normal `serve` / `watch` startup, every configured namespace is checked before semantic retrieval is enabled.
+If a namespace is already marked `ready` for the same signature, semantic retrieval starts normally.
+If a namespace is missing state but is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
+If any namespace is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
 
-That last point is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
+That is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
 
 #### What happens when you switch providers
 
-To switch, change the environment variables and restart the process. The server does **not** silently rewrite old vectors during normal startup.
+To switch, change the environment variables and restart. The server does **not** silently rewrite old vectors during normal startup.
 
-Instead, the runtime now separates two modes:
+The runtime now separates two modes:
 
-- **Normal mode** (`memory_mcp` or `memory_mcp watch ...`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
-- **Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
+**Normal mode** (`memory_mcp` or `memory_mcp watch ...`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
+**Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
 
 This keeps the public MCP tool surface unchanged while giving operators a deterministic recovery path after provider changes.
 
@@ -574,10 +574,10 @@ Job statuses persisted in the control-plane record: `running`, `completed`, `com
 
 To restore semantic retrieval safely after a provider change:
 
-1. Change the embedding environment variables.
-2. Run `memory_mcp reembed` (or `cargo run --quiet --bin memory_mcp -- reembed`).
-3. Wait for the maintenance run to complete successfully.
-4. Start the normal MCP server again.
+Change the embedding environment variables.
+Run `memory_mcp reembed` (or `cargo run --quiet --bin memory_mcp -- reembed`).
+Wait for the maintenance run to complete successfully.
+Start the normal MCP server again.
 
 Until step 3 completes, the server may intentionally run with semantic retrieval disabled while lexical and graph-based retrieval continue to work.
 
@@ -593,11 +593,11 @@ Bounded retries with backoff are applied automatically for:
 
 If those retries still do not recover the provider:
 
-- **write-paths** keep the fact write and schedule an **in-memory background retry** to fill in the missing embedding later;
-- **query-time semantic retrieval** falls back to lexical / graph-only results for the current request and schedules a background warm-up of a short-lived query embedding cache for repeated identical queries;
-- **`memory_mcp reembed`** still stops after bounded retries and keeps the maintenance job in a failed state so operators can fix the provider and rerun it explicitly.
+**write-paths** keep the fact write and schedule an **in-memory background retry** to fill in the missing embedding later;
+**query-time semantic retrieval** falls back to lexical / graph-only results for the current request and schedules a background warm-up of a short-lived query embedding cache for repeated identical queries;
+**`memory_mcp reembed`** still stops after bounded retries and keeps the maintenance job in a failed state so operators can fix the provider and rerun it explicitly.
 
-Important limitation: the deferred background path is intentionally **in-memory only** right now. If the process restarts before a background retry succeeds, those deferred retries are lost and will be attempted again only when a new request hits the same path.
+Important limitation: the deferred background path is intentionally **in-memory only**. If the process restarts before a background retry succeeds, those deferred retries are lost and will be attempted again only when a new request hits the same path.
 
 #### Similarity threshold
 
@@ -937,8 +937,5 @@ and the ordinary CLI surface remain unchanged.
 See:
 - [ADR 0016](docs/adr/0016-agent-memory-lifecycle-integration.md)
 - [Integration Contract](docs/agent_integration/CONTRACT.md)
-- [Security Model](docs/agent_integration/SECURITY.md)
-- [Claude Code Integration](docs/agent_integration/CLAUDE_CODE.md)
-- [Codex Integration](docs/agent_integration/CODEX.md)
 - [Evaluation Results](docs/evals/AGENT_MEMORY_LIFECYCLE.md)
 - [Procedural Memory](docs/evals/PROCEDURAL_MEMORY.md)

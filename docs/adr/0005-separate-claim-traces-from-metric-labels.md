@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Claim reconciliation needs enough detail to explain individual extraction and comparison decisions. Comparison keys and object identifiers are unbounded, however, and using them as Prometheus labels would create uncontrolled time-series cardinality.
+Comparison keys and object identifiers are unbounded. Using them as Prometheus labels creates uncontrolled time-series cardinality.
 
 ## Decision
 

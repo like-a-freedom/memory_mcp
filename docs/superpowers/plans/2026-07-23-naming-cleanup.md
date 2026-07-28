@@ -5,8 +5,7 @@
 
 ## Context
 
-The audit found code that lies about itself. This is the smallest and safest of
-the four candidates — mechanical cleanup with no architectural impact.
+The audit found code that misrepresents itself. This is the smallest and safest of the four candidates — mechanical cleanup with no architectural impact.
 
 ## Plan
 

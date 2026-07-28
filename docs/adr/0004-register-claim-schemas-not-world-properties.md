@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-A closed registry of properties such as ARR, email, or project status would cover only a small fraction of real-world knowledge. Allowing unrestricted predicate strings would provide breadth but make comparison and contradiction detection unpredictable.
+A closed registry of properties (ARR, email, project status) covers a small fraction of real-world knowledge. Unrestricted predicate strings give breadth but make comparison and contradiction detection unpredictable.
 
 ## Decision
 

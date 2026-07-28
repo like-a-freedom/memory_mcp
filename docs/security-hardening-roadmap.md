@@ -1,6 +1,6 @@
 # Security hardening roadmap
 
-This note records the current hardening posture after the remediation waves and the remaining work needed before treating `memory_mcp` as a broadly deployable network service.
+Records the hardening posture after remediation waves, and the work remaining before `memory_mcp` can serve as a network-deployable service.
 
 ## 1. Query-surface inventory
 

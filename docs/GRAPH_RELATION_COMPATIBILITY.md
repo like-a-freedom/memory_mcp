@@ -2,7 +2,7 @@
 
 ## Intent
 
-Task 5 upgrades graph persistence from flat edge rows to native SurrealDB relation records without breaking the existing MCP/service APIs.
+Task 5 upgrades graph persistence from flat edge rows to native SurrealDB relation records. The existing MCP and service APIs stay intact.
 
 ## Naming strategy
 

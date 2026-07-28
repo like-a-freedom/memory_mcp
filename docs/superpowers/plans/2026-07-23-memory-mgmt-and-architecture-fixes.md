@@ -5,11 +5,7 @@
 
 ## Context
 
-After the capability-seam migration and lifecycle wiring (commit `e744950f` +
-`456e3de9`), a second audit found four new issues: a real memory leak in the
-session-trace registry, a god-object regression on `ServiceContext`, detached
-tokio tasks, and missing memory-management tests. This plan addresses all four
-in priority order.
+After the capability-seam migration and lifecycle wiring (`e744950f`, `456e3de9`), a second audit found four new issues: a memory leak in the session-trace registry, a `ServiceContext` god-object regression, detached `tokio::spawn` tasks, and missing memory-management tests. This plan fixes all four in priority order.
 
 ## Candidate 1 — Fix SessionTraceRegistry memory leak
 

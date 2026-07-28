@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-`DbClient` is the infrastructure adapter for all SurrealDB operations. Context Assembly needs only a subset of those operations, while MCP Apps need domain mutations and typed state transitions. Passing the universal database interface through every caller made retrieval code depend on unrelated writes, migrations, and maintenance operations. The MCP handler also contained lifecycle confirmation policy and ingestion-review status transitions.
+`DbClient` adapts all SurrealDB operations. Context Assembly needs only a subset; MCP Apps need domain mutations and typed state transitions. Passing the universal interface through every caller made retrieval code depend on unrelated writes, migrations, and maintenance operations. The MCP handler also held lifecycle confirmation policy and ingestion-review status transitions.
 
 ## Decision
 

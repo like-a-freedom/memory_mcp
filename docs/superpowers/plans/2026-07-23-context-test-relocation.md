@@ -6,10 +6,7 @@
 ## Context
 
 The audit reported `context.rs` as a 5686-line monolith. On closer inspection,
-the production code is **already decomposed**: 18 submodules (`pipeline`,
-`ranking`, `scoring`, `semantic`, `lexical`, `graph`, `temporal`, `community`,
-`rescue`, `experience`, `views`, …) hold the logic, and `context.rs` is a thin
-orchestrator:
+On closer inspection, the production code is already decomposed: 18 submodules (`pipeline`, `ranking`, `scoring`, `semantic`, `lexical`, `graph`, `temporal`, `community`, `rescue`, `experience`, `views`, …) hold the logic, and `context.rs` is a thin orchestrator.
 
 | Section | Lines |
 |---------|-------|

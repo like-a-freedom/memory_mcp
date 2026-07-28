@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The default server must work with zero configuration and minimal dependence on external services, language models, or downloaded model artifacts. Extracting arbitrary structured propositions from unrestricted text would otherwise require probabilistic inference and would introduce false contradictions.
+Extracting arbitrary structured propositions from unrestricted text requires probabilistic inference and introduces false contradictions. The default server must run with zero configuration and minimal dependence on external services or downloaded models.
 
 ## Decision
 

@@ -6,13 +6,7 @@
 
 ## Context
 
-The agent-memory lifecycle integration plan declares 12 tasks and a Definition of
-Done with 14 criteria. Git history records commits for Tasks 1–12, and most
-planned files exist. However, an audit against the plan and against
-`CONTEXT.md` reveals that several tasks were committed in a **partially
-complete** state: the internal capabilities are built and unit-tested, but the
-production wiring and the evidence gate that the Definition of Done requires
-were not delivered.
+The agent-memory lifecycle integration plan declares 12 tasks and a Definition of Done with 14 criteria. Git history records commits for Tasks 1–12, and most planned files exist. However, an audit against the plan and `CONTEXT.md` reveals that several tasks were committed **partially complete**: the internal capabilities are built and unit-tested, but the production wiring and evidence gate the Definition of Done requires were not delivered.
 
 This plan closes those gaps. It does **not** introduce new public tools, CLI
 subcommands, or caller-controlled trust (frozen by ADR-0016 AD-2). It completes

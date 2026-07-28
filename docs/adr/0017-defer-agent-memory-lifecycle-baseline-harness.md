@@ -4,12 +4,7 @@ Status: Accepted (2026-07-23)
 
 ## Context
 
-Task 1 Step 5 of the agent-memory lifecycle integration plan
-(`docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`)
-calls for a `run_agent_memory_lifecycle_baseline` harness that simulates
-multiple modes (`no_memory`, `bare_mcp`, `instructions_only`,
-`manual_existing_tools`) across task families and reports per-mode metrics
-(recalls, captures, grounded actions, latency, rows/bytes per 1,000 events).
+Task 1 Step 5 of the agent-memory lifecycle integration plan (`docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`) calls for a `run_agent_memory_lifecycle_baseline` harness that simulates multiple modes (`no_memory`, `bare_mcp`, `instructions_only`, `manual_existing_tools`) across task families and reports per-mode metrics (recalls, captures, grounded actions, latency, rows/bytes per 1,000 events).
 
 The test exists today as a `panic!` stub marked `#[ignore]`. Building the full
 simulation is a large effort that is orthogonal to closing the wiring gap

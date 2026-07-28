@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Memory can receive incompatible statements from different sources as well as legitimate updates describing how the world changed over time. Treating both cases as replacement would hide source disagreement and corrupt historical answers.
+Memory receives incompatible statements from different sources, plus legitimate updates describing how the world changed. Treating both as replacement hides source disagreement and corrupts historical answers.
 
 ## Decision
 

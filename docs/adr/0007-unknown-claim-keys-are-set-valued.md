@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Many real-world attributes and relations can hold several simultaneous values, including employment, contact methods, roles, and organizational relationships. Inferring single cardinality from a relation name would cause valid concurrent claims to invalidate one another.
+Many real-world attributes (employment, contact methods, roles, organizational relationships) hold several simultaneous values. Inferring single cardinality from a relation name would cause valid concurrent claims to invalidate one another.
 
 ## Decision
 

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The current warning detector scans a fixed set of active facts and uses fact type plus overlapping entity IDs. This can compare unrelated statements, miss relevant older records, and cross project boundaries. Fuzzy comparison also makes automatic behavior difficult to explain and unsafe for private or multi-tenant memory.
+The current warning detector scans a fixed set of active facts and uses fact type plus overlapping entity IDs. This can compare unrelated statements, miss relevant older records, and cross project boundaries. Fuzzy comparison makes automatic behavior difficult to explain and unsafe for private or multi-tenant memory.
 
 ## Decision
 

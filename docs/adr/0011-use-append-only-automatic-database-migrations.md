@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Installed databases may have been created by older application versions and contain durable user memory. The current startup path applies pending migrations to every configured namespace and records each applied script with a checksum. Editing an already applied script causes checksum validation to fail and can prevent the application from starting.
+Installed databases may have been created by older application versions and contain durable user memory. The current startup path applies pending migrations to every configured namespace, recording each applied script with a checksum. Editing an already applied script causes checksum validation to fail and can prevent the application from starting.
 
 ## Decision
 

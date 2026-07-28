@@ -6,9 +6,9 @@
 
 ## 1. Outcome
 
-Contradiction detection is implemented as a derived claim-reconciliation subsystem, not as string comparison between facts. Facts remain immutable provenance-bearing evidence. Deterministically extracted claims are the units of comparison, temporal change, targeted correction, and contradiction.
+Contradiction detection is a derived claim-reconciliation subsystem — not string comparison between facts. Facts stay immutable, provenance-bearing evidence. Deterministically extracted claims are the units of comparison, temporal change, targeted correction, and contradiction.
 
-The default path runs in process, requires no LLM or external service, and deliberately prefers high precision over broad coverage. Unsupported facts remain fully retrievable but do not participate in automatic reconciliation.
+Runs in-process, requires no LLM or external service, and favors high precision over broad coverage. Unsupported facts stay fully retrievable; they just don't participate in automatic reconciliation.
 
 ## 2. Current State and Replacement Boundary
 

@@ -5,16 +5,12 @@
 
 ## Context
 
-The `memory_mcp reembed` command rewrites all fact embeddings after an embedding
-provider switch. Prior to this ADR, the command:
+The `memory_mcp reembed` command rewrites all fact embeddings after an embedding provider switch. Prior to this ADR, the command:
 
-1. Logged structured events to stderr, but with no live progress bar — the
-   process appeared to "go silent" and users could not tell if it had started.
-2. Failed fast on the first fact error, stopping the entire run even for
-   transient remote-provider failures.
-3. Had no Ctrl+C handling — interrupting the process left the HNSW index
-   dropped and embedding states in "rebuilding" with no clear recovery path.
-4. Only logged ETA as a raw `eta_seconds` integer inside a JSON-ish log line.
+Logged structured events to stderr, but with no live progress bar — the process appeared to "go silent" and users could not tell if it had started.
+Failed fast on the first fact error, stopping the entire run even for transient remote-provider failures.
+Had no Ctrl+C handling — interrupting the process left the HNSW index dropped and embedding states in "rebuilding" with no clear recovery path.
+Only logged ETA as a raw `eta_seconds` integer inside a JSON-ish log line.
 
 After switching providers, operators reported confusion: "the app went to the
 background and it's unclear whether reembed started or what the status is."

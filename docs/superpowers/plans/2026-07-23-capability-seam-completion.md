@@ -6,12 +6,7 @@
 
 ## Context
 
-`MemoryService` is a 22-field struct with 231 pub/pub(crate) methods spread
-across `core.rs`, `reembed.rs`, `core/builder.rs`, plus free functions in
-`context.rs`, `episode.rs`, `fact.rs`, `ingestion.rs`, `explanation.rs` that
-accept `&MemoryService`. Every tool in `src/tools/` takes `&MemoryService`
-directly — except `tools/invalidate.rs`, which already delegates to
-`InvalidateCapability::invalidate(&ServiceContext, ...)`.
+`MemoryService` is a 22-field struct with 231 pub/pub(crate) methods across `core.rs`, `reembed.rs`, `core/builder.rs`, plus free functions in `context.rs`, `episode.rs`, `fact.rs`, `ingestion.rs`, `explanation.rs` that accept `&MemoryService`. Every tool in `src/tools/` takes `&MemoryService` directly — except `tools/invalidate.rs`, which already delegates to `InvalidateCapability::invalidate(&ServiceContext, ...)`.
 
 `ServiceContext` is the intended seam: a narrow struct holding only the
 infrastructure a capability needs. Its doc says it exists "to avoid exposing

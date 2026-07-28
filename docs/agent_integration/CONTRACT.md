@@ -1,8 +1,6 @@
 # Agent Integration Contract
 
-> Canonical contract for agent-host lifecycle integration with `memory_mcp`.
-> This document is the authority on what the integration does and does not
-> promise. Host-specific mappings live in `CLAUDE_CODE.md` and `CODEX.md`.
+Canonical contract for agent-host lifecycle integration with `memory_mcp`. Host-specific mappings live in `CLAUDE_CODE.md` and `CODEX.md`.
 
 ## Public surface (frozen)
 

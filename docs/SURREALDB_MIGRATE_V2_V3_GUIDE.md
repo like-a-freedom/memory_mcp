@@ -1,6 +1,6 @@
 # Upgrading from `2.x` to `3.x` 
 
-This guide consolidates all breaking changes when upgrading from SurrealDB `2.x` to `3.x`, organised by severity level. If you are using Surrealist, you can use the [migration diagnostics](/docs/surrealist) to automatically see your data. This will also provide you with a list of actions you need to take to migrate your data.
+Consolidates all SurrealDB `2.x` → `3.x` breaking changes by severity. Surrealist provides built-in migration diagnostics for data inspection and action lists.
 
 ## Migration diagnostics in Surrealist
 

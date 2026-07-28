@@ -5,7 +5,7 @@
 
 ## Overview
 
-Entity resolution in Memory MCP provides deterministic alias-based lookup with normalization at write time. This guide explains how entity names and aliases are handled throughout the ingestion and retrieval pipeline.
+Entity resolution provides deterministic alias-based lookup with normalization at write time. This guide covers how names and aliases move through ingestion and retrieval.
 
 ## Key Design Decisions
 
@@ -222,7 +222,7 @@ println!("{:?}", candidates);
 
 ### Batch vs Sequential
 
-**Always prefer batch lookup for N > 1 entities:**
+Always prefer batch lookup for N > 1.
 
 ```rust
 // ✅ Good: O(1) DB round-trip

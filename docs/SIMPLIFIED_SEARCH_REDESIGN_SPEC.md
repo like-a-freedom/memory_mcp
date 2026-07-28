@@ -3,7 +3,7 @@
 **Status:** Mostly implemented — Waves 1-4 complete, Wave 5 mostly complete
 **Date:** 2026-03-26 (updated 2026-04-12)
 **Scope:** Search and retrieval only
-**Precedence:** This document defines the intended target design for the next implementation wave. It does **not** claim that the current runtime already matches this design.
+**Precedence:** This spec defines the target design for the next wave. It does not claim the current runtime already matches it.
 
 > Companion note: this document covers **retrieval only**. The broader adaptive-memory target state that incorporates SOTA-aligned lifecycle, reflection, and evaluation work is documented separately in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
 
@@ -50,7 +50,7 @@ Recent retrieval literature supports this simplification:
 - graph expansion is especially valuable once relevant entities are identified,
 - temporal graph memory is useful when time and relationships are first-class.
 
-Therefore, the target design shifts from **"lexical + graph + dormant semantic branch"** to **"lexical/BM25 primary retrieval + graph expansion + deterministic fusion"**, with embeddings removed from the runtime entirely.
+Target: lexical/BM25 + graph expansion + deterministic fusion, with embeddings removed entirely from the runtime.
 
 ---
 

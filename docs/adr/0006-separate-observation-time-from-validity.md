@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The timestamp of an email, meeting, or imported document shows when a claim was observed, but often does not show when the described state began or ended. Treating every source timestamp as the start of validity would turn ordinary observations into false temporal transitions.
+An email, meeting, or imported document carries a timestamp showing when a claim was observed — not when the described state began or ended. Treating every source timestamp as the start of validity turns ordinary observations into false temporal transitions.
 
 ## Decision
 

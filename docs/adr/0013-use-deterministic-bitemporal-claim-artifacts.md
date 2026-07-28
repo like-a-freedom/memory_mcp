@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Projection, retry, backfill, and re-evaluation can process the same fact or claim pair many times. Random identifiers would create duplicates, while overwriting records would erase the extraction and reconciliation history. Claim truth in the world must also remain distinct from the period during which a particular derived representation was current in the system.
+Projection, retry, backfill, and re-evaluation can process the same fact or claim pair many times. Random identifiers create duplicates; overwriting records erases extraction and reconciliation history. Claim truth in the world must remain distinct from the period during which a particular derived representation was current in the system.
 
 ## Decision
 

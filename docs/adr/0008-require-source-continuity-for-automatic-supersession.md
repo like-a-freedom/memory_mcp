@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Claims from official systems, documents, conversations, and informal observations can disagree. A newer observation is not necessarily more trustworthy, and allowing ingestion order to determine truth would let an unrelated or low-authority source rewrite established memory.
+Claims from official systems, documents, conversations, and informal observations can disagree. A newer observation is not necessarily more trustworthy; letting ingestion order determine truth would let an unrelated or low-authority source rewrite established memory.
 
 ## Decision
 

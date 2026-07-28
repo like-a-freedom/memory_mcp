@@ -8,13 +8,12 @@ Status: Proposed (2026-07-23)
 `assemble_context`, `explain`, `invalidate`, `open_app`, `app_command`) and the
 ordinary CLI equivalents of the six core tools. Whether and when an agent host
 actually calls `assemble_context` before consequential work, or captures a
-significant outcome after it occurs, is currently left to model choice. That
-choice is unreliable: it depends on the model remembering the workflow across
-compaction and restarts, and it cannot be enforced by the server.
+significant outcome after it occurs, is currently left to model choice. That choice is unreliable: it depends on the model remembering the workflow across
+compaction and restarts, and the server cannot enforce it.
 
 This ADR records the architectural decisions that let supported agent hosts
-consult `memory_mcp` at lifecycle boundaries without adding a new public tool,
-a new ordinary CLI subcommand, or any caller-controlled trust argument.
+consult `memory_mcp` at lifecycle boundaries without a new public tool, a new
+ordinary CLI subcommand, or any caller-controlled trust argument.
 
 The decision is grounded in the implementation plan
 `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`,
@@ -25,8 +24,8 @@ which is the single active implementation plan for this scope.
 ### AD-1 — Lifecycle enforcement is a control plane, not agent UI
 
 A supported host adapter observes lifecycle boundaries and invokes internal
-capabilities. MCP instructions and tool descriptions remain useful in bare-MCP
-mode, but model-selected calls cannot count as enforcement.
+MCP instructions and tool descriptions remain useful in bare-MCP mode. They do
+not enforce; only the host adapter does.
 
 ### AD-2 — Freeze the current public tool and ordinary CLI surface
 
@@ -37,8 +36,8 @@ and inline `extract`.
 
 ### AD-3 — Transport authority outside tool arguments
 
-Trust is derived from the invocation channel and configured server policy.
-Public MCP and CLI arguments never set final trust. The ordinary path constructs
+Trust is derived from the invocation channel and configured server policy; public
+MCP and CLI arguments never set final trust. The ordinary path constructs
 `InvocationOrigin::AgentSelected`; a configured lifecycle bridge constructs
 `InvocationOrigin::LifecycleAdapter`. The model cannot choose either type or
 its identity.
@@ -70,11 +69,11 @@ operates through three complementary surfaces:
    This is the **primary, universal mechanism** — it works with every
    agent that reads project instructions, without requiring hooks.
 
-The lifecycle integration operates through these three surfaces only — no
-bridge adapters, no host normalization code, no custom transport. Hook
-scripts call the ordinary CLI directly; the CLI enforces scope, trust, and
-policy through the existing path. Stable event identity and deduplication
-are handled by `LifecycleCapture` via `load_event` + `compute_event_id`.
+The lifecycle integration uses these three surfaces only — no bridge adapters,
+no host normalization code, no custom transport. Hook scripts call the ordinary
+CLI directly; the CLI enforces scope, trust, and policy through the existing
+path. Stable event identity and deduplication are handled by `LifecycleCapture`
+via `load_event` + `compute_event_id`.
 
 ### AD-5 — Selective recall over existing `assemble_context`
 
@@ -99,16 +98,16 @@ projection and return promptly.
 ### AD-7 — Exposure traces are ephemeral by default
 
 There is no durable receipt row for every recall. A per-session LRU holds at
-most 32 traces for 30 minutes. A significant captured event may copy a bounded
-trace link. This proves exposure, not causal use.
+most 32 traces for 30 minutes, and a significant captured event may copy a
+bounded trace link. This proves exposure, not causal use.
 
 ### AD-8 — Immutable evidence implies controlled, not zero, growth
 
-The database remains append-oriented for evidence and facts. Growth is
-controlled at ingestion: ignored and duplicate events create zero new durable
-rows; accepted content is stored once; lifecycle content is bounded; quotas and
-project daily budgets prevent unbounded automatic ingestion while honestly
-preserving immutable-domain growth.
+The database stays append-oriented for evidence and facts. Growth is controlled
+at ingestion: ignored and duplicate events create zero new durable rows;
+accepted content is stored once; lifecycle content is bounded; quotas and
+project daily budgets prevent unbounded automatic ingestion while preserving
+immutable-domain growth.
 
 ## Consequences
 

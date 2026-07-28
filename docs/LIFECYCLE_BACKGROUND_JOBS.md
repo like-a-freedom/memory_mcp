@@ -5,13 +5,13 @@
 
 ## Overview
 
-The Memory MCP server includes optional background workers that maintain memory hygiene:
+Memory MCP includes optional background workers that maintain memory hygiene. Disabled by default; enable with `LIFECYCLE_ENABLED=true`.
 
 1. **Confidence Decay Worker** - marks stale facts as invalid
 2. **Episode Archival Worker** - archives old episodes without active facts
 3. **Community Rebuild Worker** - refreshes `community` components from active graph edges
 
-These workers are **disabled by default** and must be explicitly enabled via environment variables.
+These workers are disabled by default. Enable via `LIFECYCLE_ENABLED=true`.
 
 ## Implemented Features
 
@@ -31,10 +31,7 @@ The following lifecycle jobs are now fully implemented:
   - **Age threshold:** `LIFECYCLE_ARCHIVAL_AGE_DAYS` (default: 90 days)
   - **Heat-aware:** Skips episodes with facts accessed within `LIFECYCLE_ARCHIVAL_AGE_DAYS / 2`
 
-- **embedding backfill** (REMOVED from scope)
-  - ~~Populate missing embeddings after a real provider is enabled~~
-  - ~~Reindex vector fields after dimension or provider changes~~
-  - **Status:** Superseded by `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — embeddings removed from runtime
+- Embedding backfill (REMOVED) — superseded by `SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` (embeddings removed from runtime)
 
 - **community recomputation**
   - Rebuilds `community` records from the currently active edge graph
