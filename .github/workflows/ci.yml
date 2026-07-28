@@ -90,6 +90,34 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --lib --bins --tests
 
+  eval-pr:
+    name: Evaluation PR profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Run PR evaluation
+        run: |
+          mkdir -p target/evals
+          cargo run -p eval-harness --bin memory-eval -- run \
+            --profile evals/profiles/pr.json \
+            --artifact target/evals/pr.json || true
+
+      - name: Upload eval artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-pr-artifact
+          path: target/evals/pr.json
+          retention-days: 30
+
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
