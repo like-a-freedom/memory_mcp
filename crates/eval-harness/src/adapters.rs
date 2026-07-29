@@ -55,16 +55,43 @@ pub fn validate_canonical_facts(facts: &[CanonicalFact]) -> Result<(), EvalError
     Ok(())
 }
 
-pub fn import_canonical_facts(facts: &[CanonicalFact]) -> Result<ImportResult, EvalError> {
+pub async fn import_canonical_facts(
+    service: &memory_mcp::service::MemoryService,
+    facts: &[CanonicalFact],
+) -> Result<ImportResult, EvalError> {
     validate_canonical_facts(facts)?;
 
-    let imported: Vec<ImportedFact> = facts
-        .iter()
-        .map(|f| ImportedFact {
-            fact_id: f.fact_id.clone(),
-            episode_id: f.episode_id.clone(),
-        })
-        .collect();
+    let mut imported = Vec::with_capacity(facts.len());
+
+    for fact in facts {
+        let t_valid = fact
+            .t_valid
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .map_err(|e| {
+                EvalError::InvalidInput(format!("invalid t_valid for {}: {e}", fact.fact_id))
+            })?;
+
+        let _fact_id = service
+            .add_fact(
+                "note",
+                &fact.content,
+                &fact.content,
+                &fact.episode_id,
+                t_valid,
+                &fact.scope,
+                0.9,
+                vec![],
+                vec![],
+                memory_mcp::models::Provenance::agent_observation(&fact.episode_id),
+            )
+            .await
+            .map_err(|e| EvalError::Suite(format!("add_fact failed for {}: {e}", fact.fact_id)))?;
+
+        imported.push(ImportedFact {
+            fact_id: fact.fact_id.clone(),
+            episode_id: fact.episode_id.clone(),
+        });
+    }
 
     Ok(ImportResult {
         total_imported: imported.len(),
@@ -168,7 +195,7 @@ mod tests {
             embedding_provider: None,
             embedding_dimension: None,
         }];
-        assert!(import_canonical_facts(&facts).is_err());
+        assert!(validate_canonical_facts(&facts).is_err());
     }
 
     #[test]
@@ -185,11 +212,12 @@ mod tests {
             embedding_provider: None,
             embedding_dimension: Some(3),
         }];
-        assert!(import_canonical_facts(&facts).is_err());
+        assert!(validate_canonical_facts(&facts).is_err());
     }
 
-    #[test]
-    fn importer_accepts_valid_facts() {
+    #[tokio::test]
+    async fn importer_persists_valid_facts() {
+        let service = crate::test_support::make_service().await;
         let facts = vec![CanonicalFact {
             fact_id: "f1".into(),
             episode_id: "e1".into(),
@@ -202,8 +230,43 @@ mod tests {
             embedding_provider: Some("test".into()),
             embedding_dimension: Some(2),
         }];
-        let result = import_canonical_facts(&facts).unwrap();
+        let result = import_canonical_facts(&service, &facts).await.unwrap();
         assert_eq!(result.total_imported, 1);
         assert_eq!(result.facts[0].fact_id, "f1");
+    }
+
+    #[tokio::test]
+    async fn imported_fact_is_visible_to_retrieval() {
+        let service = crate::test_support::make_service().await;
+        let facts = vec![CanonicalFact {
+            fact_id: "f1".into(),
+            episode_id: "e1".into(),
+            content: "Alice works at Orbital Labs".into(),
+            scope: "org".into(),
+            project: None,
+            t_valid: "2026-01-01T00:00:00Z".into(),
+            embedding: None,
+            embedding_model: None,
+            embedding_provider: None,
+            embedding_dimension: None,
+        }];
+        import_canonical_facts(&service, &facts).await.unwrap();
+
+        let items = service
+            .assemble_context(memory_mcp::models::AssembleContextRequest {
+                query: "Alice Orbital".into(),
+                scope: "org".into(),
+                as_of: Some(chrono::Utc::now()),
+                budget: 5,
+                project: None,
+                fact_types: vec![],
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+            })
+            .await
+            .unwrap();
+        assert!(!items.is_empty(), "imported fact should be retrievable");
     }
 }
