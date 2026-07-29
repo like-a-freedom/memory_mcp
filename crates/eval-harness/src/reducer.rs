@@ -198,6 +198,84 @@ impl SuiteReducer for ClassificationReducer {
     }
 }
 
+/// Spec for a ratio metric derived from `MetricEvidence::Ratio`.
+pub struct RatioMetricSpec {
+    pub evidence_key: &'static str,
+    pub metric_name: &'static str,
+}
+
+/// Reducer for suites that aggregate ratio evidence (e.g., lifecycle pass rates).
+pub struct RatioReducer {
+    suite_id: SuiteId,
+    specs: &'static [RatioMetricSpec],
+}
+
+impl RatioReducer {
+    pub fn new(suite_id: impl Into<String>, specs: &'static [RatioMetricSpec]) -> Self {
+        Self {
+            suite_id: SuiteId::parse(suite_id).expect("suite_id must not be empty"),
+            specs,
+        }
+    }
+}
+
+impl SuiteReducer for RatioReducer {
+    fn suite_id(&self) -> &SuiteId {
+        &self.suite_id
+    }
+
+    fn reduce(&self, outcomes: &[EvalCaseOutcome]) -> Result<Vec<SuiteSummary>, EvalError> {
+        let mut passed = 0usize;
+        let mut quality_failed = 0usize;
+        let mut invalid = 0usize;
+
+        let mut numerators: BTreeMap<&str, u64> = BTreeMap::new();
+        let mut denominators: BTreeMap<&str, u64> = BTreeMap::new();
+
+        for outcome in outcomes {
+            match outcome.status {
+                CaseStatus::Passed => passed += 1,
+                CaseStatus::QualityFailed => quality_failed += 1,
+                CaseStatus::Invalid => invalid += 1,
+            }
+
+            for spec in self.specs {
+                if let Some(MetricEvidence::Ratio {
+                    numerator,
+                    denominator,
+                }) = outcome.evidence.get(spec.evidence_key)
+                {
+                    *numerators.entry(spec.evidence_key).or_insert(0) += numerator;
+                    *denominators.entry(spec.evidence_key).or_insert(0) += denominator;
+                }
+            }
+        }
+
+        let mut metrics = BTreeMap::new();
+        for spec in self.specs {
+            let num = numerators.get(spec.evidence_key).copied().unwrap_or(0);
+            let den = denominators.get(spec.evidence_key).copied().unwrap_or(0);
+            if den == 0 {
+                return Err(EvalError::InvalidInput(format!(
+                    "missing or zero denominator for {}",
+                    spec.metric_name
+                )));
+            }
+            metrics.insert(spec.metric_name.to_string(), num as f64 / den as f64);
+        }
+
+        Ok(vec![SuiteSummary {
+            suite_id: self.suite_id.as_str().to_string(),
+            mode: outcomes.first().map_or(EvalMode::RetrievalOnly, |o| o.mode),
+            total: outcomes.len(),
+            passed,
+            quality_failed,
+            invalid,
+            metrics,
+        }])
+    }
+}
+
 /// Reducer for suites that only need pass/fail/invalid counts (no custom metrics).
 pub struct CountReducer {
     suite_id: SuiteId,
@@ -348,5 +426,69 @@ mod tests {
             .remove(0);
         assert_eq!(summary.metrics["recall_at_5"], 0.0);
         assert_eq!(summary.metrics["mrr"], 0.0);
+    }
+
+    fn ratio_outcome(
+        case_id: &str,
+        evidence_key: &str,
+        numerator: u64,
+        denominator: u64,
+    ) -> EvalCaseOutcome {
+        EvalCaseOutcome {
+            case_key: CaseKey::parse("lifecycle", case_id).unwrap(),
+            mode: EvalMode::Lifecycle,
+            split: CorpusSplit::Test,
+            label_trust: LabelTrust::Official,
+            status: CaseStatus::Passed,
+            metrics: BTreeMap::new(),
+            evidence: [(
+                evidence_key.to_string(),
+                MetricEvidence::ratio(numerator, denominator),
+            )]
+            .into_iter()
+            .collect(),
+            invalid_reason: None,
+            failures: vec![],
+            duration_ms: 0,
+            attempts: 1,
+        }
+    }
+
+    #[test]
+    fn ratio_reducer_aggregates_child_ratios() {
+        static SPECS: &[RatioMetricSpec] = &[
+            RatioMetricSpec {
+                evidence_key: "action_grounding",
+                metric_name: "action_grounding_pass_rate",
+            },
+            RatioMetricSpec {
+                evidence_key: "poisoning",
+                metric_name: "poisoning_pass_rate",
+            },
+        ];
+        let outcomes = vec![
+            ratio_outcome("grounding-1", "action_grounding", 3, 3),
+            ratio_outcome("poisoning-1", "poisoning", 2, 3),
+        ];
+        let summary = RatioReducer::new("lifecycle", SPECS)
+            .reduce(&outcomes)
+            .unwrap()
+            .remove(0);
+        assert_eq!(summary.metrics["action_grounding_pass_rate"], 1.0);
+        assert!((summary.metrics["poisoning_pass_rate"] - 2.0 / 3.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ratio_reducer_rejects_missing_or_zero_denominator() {
+        static SPECS: &[RatioMetricSpec] = &[RatioMetricSpec {
+            evidence_key: "poisoning",
+            metric_name: "poisoning_pass_rate",
+        }];
+        let outcomes = vec![ratio_outcome("poisoning-1", "poisoning", 0, 0)];
+        assert!(
+            RatioReducer::new("lifecycle", SPECS)
+                .reduce(&outcomes)
+                .is_err()
+        );
     }
 }

@@ -45,8 +45,23 @@ impl EvalSuite for LifecycleReleaseSuite {
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
         use std::sync::OnceLock;
+        static LIFECYCLE_SPECS: &[crate::reducer::RatioMetricSpec] = &[
+            crate::reducer::RatioMetricSpec {
+                evidence_key: "action_grounding",
+                metric_name: "action_grounding_pass_rate",
+            },
+            crate::reducer::RatioMetricSpec {
+                evidence_key: "poisoning",
+                metric_name: "poisoning_pass_rate",
+            },
+        ];
         static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("lifecycle"))))
+        *R.get_or_init(|| {
+            &*Box::leak(Box::new(crate::reducer::RatioReducer::new(
+                "lifecycle",
+                LIFECYCLE_SPECS,
+            )))
+        })
     }
 
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {
@@ -58,10 +73,12 @@ impl EvalSuite for LifecycleReleaseSuite {
         let grounding_invalid = grounding_outcomes
             .iter()
             .any(|o| o.status == CaseStatus::Invalid);
-        let grounding_pass = !grounding_invalid
-            && grounding_outcomes
-                .iter()
-                .all(|o| o.status == CaseStatus::Passed);
+        let grounding_passed = grounding_outcomes
+            .iter()
+            .filter(|o| o.status == CaseStatus::Passed)
+            .count();
+        let grounding_total = grounding_outcomes.len();
+        let grounding_pass = !grounding_invalid && grounding_passed == grounding_total;
         let grounding_status = if grounding_invalid {
             CaseStatus::Invalid
         } else if grounding_pass {
@@ -69,26 +86,21 @@ impl EvalSuite for LifecycleReleaseSuite {
         } else {
             CaseStatus::QualityFailed
         };
-        let grounding_evidence = {
-            let mut m = std::collections::BTreeMap::new();
-            m.insert(
-                "grounding_pass_rate".into(),
-                grounding_outcomes
-                    .iter()
-                    .filter(|o| o.status == CaseStatus::Passed)
-                    .count() as f64
-                    / grounding_outcomes.len().max(1) as f64,
-            );
-            m
-        };
+
+        let mut grounding_evidence_map = std::collections::BTreeMap::new();
+        grounding_evidence_map.insert(
+            "action_grounding".to_string(),
+            MetricEvidence::ratio(grounding_passed as u64, grounding_total as u64),
+        );
+
         outcomes.push(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-action-grounding").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
             status: grounding_status,
-            metrics: grounding_evidence,
-            evidence: std::collections::BTreeMap::new(),
+            metrics: std::collections::BTreeMap::new(),
+            evidence: grounding_evidence_map,
             invalid_reason: if grounding_invalid {
                 Some("action grounding sub-suite has invalid cases".into())
             } else {
@@ -146,10 +158,12 @@ impl EvalSuite for LifecycleReleaseSuite {
         let poisoning_invalid = poisoning_outcomes
             .iter()
             .any(|o| o.status == CaseStatus::Invalid);
-        let poisoning_pass = !poisoning_invalid
-            && poisoning_outcomes
-                .iter()
-                .all(|o| o.status == CaseStatus::Passed);
+        let poisoning_passed = poisoning_outcomes
+            .iter()
+            .filter(|o| o.status == CaseStatus::Passed)
+            .count();
+        let poisoning_total = poisoning_outcomes.len();
+        let poisoning_pass = !poisoning_invalid && poisoning_passed == poisoning_total;
         let poisoning_status = if poisoning_invalid {
             CaseStatus::Invalid
         } else if poisoning_pass {
@@ -157,26 +171,21 @@ impl EvalSuite for LifecycleReleaseSuite {
         } else {
             CaseStatus::QualityFailed
         };
-        let poisoning_evidence = {
-            let mut m = std::collections::BTreeMap::new();
-            m.insert(
-                "poisoning_pass_rate".into(),
-                poisoning_outcomes
-                    .iter()
-                    .filter(|o| o.status == CaseStatus::Passed)
-                    .count() as f64
-                    / poisoning_outcomes.len().max(1) as f64,
-            );
-            m
-        };
+
+        let mut poisoning_evidence_map = std::collections::BTreeMap::new();
+        poisoning_evidence_map.insert(
+            "poisoning".to_string(),
+            MetricEvidence::ratio(poisoning_passed as u64, poisoning_total as u64),
+        );
+
         outcomes.push(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-poisoning").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
             status: poisoning_status,
-            metrics: poisoning_evidence,
-            evidence: std::collections::BTreeMap::new(),
+            metrics: std::collections::BTreeMap::new(),
+            evidence: poisoning_evidence_map,
             invalid_reason: if poisoning_invalid {
                 Some("poisoning sub-suite has invalid cases".into())
             } else {
