@@ -1,0 +1,36 @@
+[
+  {
+    "id": "e2e-pipeline-completes",
+    "description": "Ingest, extract, and retrieve a simple fact through the production pipeline",
+    "sources": [
+      {
+        "source_type": "note",
+        "source_id": "e2e-fact-001",
+        "content": "The quarterly revenue report shows $5.2M in ARR for Q2 2026.",
+        "scope": "org",
+        "t_ref": "2026-07-01T10:00:00Z"
+      }
+    ],
+    "query": "quarterly revenue",
+    "expected_evidence": ["$5.2M", "ARR", "Q2 2026"],
+    "min_context_items": 1,
+    "label_trust": "official"
+  },
+  {
+    "id": "e2e-entity-extraction",
+    "description": "Verify entity extraction produces expected entities from structured content",
+    "sources": [
+      {
+        "source_type": "email",
+        "source_id": "e2e-entity-001",
+        "content": "Alice Smith from Acme Corp presented the API design review. Bob Johnson from Beta Inc attended and provided feedback on the authentication module.",
+        "scope": "team",
+        "t_ref": "2026-07-15T14:00:00Z"
+      }
+    ],
+    "query": "API design review attendees",
+    "expected_evidence": ["Alice Smith", "Acme Corp", "Bob Johnson"],
+    "min_context_items": 1,
+    "label_trust": "official"
+  }
+]
