@@ -58,6 +58,7 @@ struct ExpectedCase {
     #[serde(default)]
     relations: Vec<ExpectedRelation>,
     #[serde(default)]
+    #[allow(dead_code)]
     skip_reason_codes: Vec<String>,
 }
 
@@ -118,21 +119,76 @@ fn parse_reference_time(raw: &str) -> Result<DateTime<Utc>, EvalError> {
         .map_err(|e| EvalError::InvalidInput(format!("invalid reference time '{raw}': {e}")))
 }
 
-fn count_isolation_violations(
-    expected_skips: &[String],
-    actual_relations: &[ContradictionWarning],
-) -> usize {
-    let skip_set: BTreeSet<&str> = expected_skips.iter().map(String::as_str).collect();
-    let mut violations = 0;
-    for warning in actual_relations {
-        if skip_set.contains(warning.fact_type.as_str()) {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct BoundaryKey {
+    scope: String,
+    project: Option<String>,
+    policy_tags: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum WarningLabel {
+    TruePositive,
+    FalsePositive,
+    IsolationViolation,
+}
+
+fn classify_warning(
+    expected_relations: &[ExpectedRelation],
+    lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+    boundaries: &std::collections::BTreeMap<String, BoundaryKey>,
+    warning: &ContradictionWarning,
+) -> WarningLabel {
+    let left_boundary = boundaries.get(&warning.conflicting_fact_id).or_else(|| {
+        lineage
+            .values()
+            .find(|facts| facts.contains(&warning.conflicting_fact_id))
+            .and_then(|_| boundaries.values().next())
+    });
+    let right_boundary = boundaries.get(&warning.new_fact_id).or_else(|| {
+        lineage
+            .values()
+            .find(|facts| facts.contains(&warning.new_fact_id))
+            .and_then(|_| boundaries.values().next())
+    });
+
+    if let (Some(left), Some(right)) = (left_boundary, right_boundary)
+        && left != right
+    {
+        return WarningLabel::IsolationViolation;
+    }
+
+    let mut is_expected = false;
+    for expected in expected_relations {
+        if expected.outcome != "contradiction" {
             continue;
         }
-        if warning.new_fact_id != warning.conflicting_fact_id {
-            violations += 1;
+        if matches_expected_relation_by_lineage(expected, warning, lineage) {
+            is_expected = true;
+            break;
         }
     }
-    violations
+
+    if is_expected {
+        WarningLabel::TruePositive
+    } else {
+        WarningLabel::FalsePositive
+    }
+}
+
+fn count_isolation_violations(
+    expected_relations: &[ExpectedRelation],
+    lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+    boundaries: &std::collections::BTreeMap<String, BoundaryKey>,
+    actual_relations: &[ContradictionWarning],
+) -> usize {
+    actual_relations
+        .iter()
+        .filter(|w| {
+            classify_warning(expected_relations, lineage, boundaries, w)
+                == WarningLabel::IsolationViolation
+        })
+        .count()
 }
 
 struct IngestParams<'a> {
@@ -232,6 +288,7 @@ fn evaluate_case(
     case: &ClaimCase,
     extraction: &memory_mcp::models::ExtractResult,
     lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+    boundaries: &std::collections::BTreeMap<String, BoundaryKey>,
 ) -> CaseMetrics {
     let expected_contradictions = case
         .expected
@@ -253,8 +310,12 @@ fn evaluate_case(
         })
         .count();
 
-    let isolation_violations =
-        count_isolation_violations(&case.expected.skip_reason_codes, &extraction.warnings);
+    let isolation_violations = count_isolation_violations(
+        &case.expected.relations,
+        lineage,
+        boundaries,
+        &extraction.warnings,
+    );
 
     CaseMetrics {
         expected_contradictions,
@@ -419,9 +480,35 @@ impl EvalSuite for ClaimReconciliationSuite {
                 }
             };
 
-            lineage.insert(source_extracted.source_id, source_extracted.fact_ids);
+            lineage.insert(
+                source_extracted.source_id.clone(),
+                source_extracted.fact_ids.clone(),
+            );
 
-            let metrics_result = evaluate_case(case, &extraction, &lineage);
+            let mut boundaries: std::collections::BTreeMap<String, BoundaryKey> =
+                std::collections::BTreeMap::new();
+            for setup in &case.setup {
+                let key = BoundaryKey {
+                    scope: setup.scope.clone(),
+                    project: setup.project.clone(),
+                    policy_tags: setup.policy_tags.iter().cloned().collect(),
+                };
+                if let Some(facts) = lineage.get(&setup.source_id) {
+                    for fact_id in facts {
+                        boundaries.insert(fact_id.clone(), key.clone());
+                    }
+                }
+            }
+            let source_key = BoundaryKey {
+                scope: case.source.scope.clone(),
+                project: case.source.project.clone(),
+                policy_tags: case.source.policy_tags.iter().cloned().collect(),
+            };
+            for fact_id in &source_extracted.fact_ids {
+                boundaries.insert(fact_id.clone(), source_key.clone());
+            }
+
+            let metrics_result = evaluate_case(case, &extraction, &lineage, &boundaries);
 
             let mut metric_map = std::collections::BTreeMap::new();
             metric_map.insert(
@@ -598,18 +685,12 @@ mod tests {
     }
 
     #[test]
-    fn expected_isolation_skip_is_not_an_observed_violation() {
+    fn same_boundary_warning_is_not_an_isolation_violation() {
         let violations = count_isolation_violations(
-            &["not_same_slot".into()],
-            &[ContradictionWarning {
-                fact_type: "not_same_slot".into(),
-                existing_content: "old".into(),
-                new_content: "new".into(),
-                new_fact_id: "f1".into(),
-                conflicting_fact_id: "f2".into(),
-                entity_ids: vec![],
-                reason: "test".into(),
-            }],
+            &expected_relation(),
+            &same_boundary_lineage(),
+            &same_boundary_boundaries(),
+            &[test_warning()],
         );
         assert_eq!(violations, 0);
     }
@@ -652,5 +733,101 @@ mod tests {
         assert!(outcomes.contains("correction"));
         assert!(has_dev);
         assert!(has_test);
+    }
+
+    fn same_boundary_lineage() -> std::collections::BTreeMap<String, BTreeSet<String>> {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("setup-1".into(), ["fact:old".into()].into_iter().collect());
+        m.insert("source-1".into(), ["fact:new".into()].into_iter().collect());
+        m
+    }
+
+    fn same_boundary_boundaries() -> std::collections::BTreeMap<String, BoundaryKey> {
+        let key = BoundaryKey {
+            scope: "org".into(),
+            project: Some("proj-a".into()),
+            policy_tags: BTreeSet::new(),
+        };
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("fact:old".into(), key.clone());
+        m.insert("fact:new".into(), key);
+        m
+    }
+
+    fn cross_project_boundaries() -> std::collections::BTreeMap<String, BoundaryKey> {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert(
+            "fact:old".into(),
+            BoundaryKey {
+                scope: "org".into(),
+                project: Some("proj-a".into()),
+                policy_tags: BTreeSet::new(),
+            },
+        );
+        m.insert(
+            "fact:new".into(),
+            BoundaryKey {
+                scope: "org".into(),
+                project: Some("proj-b".into()),
+                policy_tags: BTreeSet::new(),
+            },
+        );
+        m
+    }
+
+    fn test_warning() -> ContradictionWarning {
+        ContradictionWarning {
+            fact_type: "metric".into(),
+            existing_content: "old".into(),
+            new_content: "new".into(),
+            new_fact_id: "fact:new".into(),
+            conflicting_fact_id: "fact:old".into(),
+            entity_ids: vec![],
+            reason: "test".into(),
+        }
+    }
+
+    fn expected_relation() -> Vec<ExpectedRelation> {
+        vec![ExpectedRelation {
+            setup_source_id: "setup-1".into(),
+            source_id: "source-1".into(),
+            outcome: "contradiction".into(),
+            reason_code: "same_slot".into(),
+            predecessor_source_id: None,
+            successor_source_id: None,
+        }]
+    }
+
+    #[test]
+    fn expected_same_boundary_relation_is_true_positive() {
+        let label = classify_warning(
+            &expected_relation(),
+            &same_boundary_lineage(),
+            &same_boundary_boundaries(),
+            &test_warning(),
+        );
+        assert_eq!(label, WarningLabel::TruePositive);
+    }
+
+    #[test]
+    fn warning_crossing_project_boundary_is_isolation_violation() {
+        let label = classify_warning(
+            &[],
+            &same_boundary_lineage(),
+            &cross_project_boundaries(),
+            &test_warning(),
+        );
+        assert_eq!(label, WarningLabel::IsolationViolation);
+    }
+
+    #[test]
+    fn unexpected_same_boundary_warning_is_false_positive() {
+        let label = classify_warning(
+            &[],
+            &same_boundary_lineage(),
+            &same_boundary_boundaries(),
+            &test_warning(),
+        );
+        assert_eq!(label, WarningLabel::FalsePositive);
     }
 }
