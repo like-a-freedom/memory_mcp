@@ -68,6 +68,22 @@
       },
       "hard_floor": 0.50,
       "regression_budget": 0.10
+    },
+    {
+      "target": {
+        "suite_id": "lifecycle",
+        "metric": "action_grounding_pass_rate"
+      },
+      "hard_floor": 1.0,
+      "baseline_required": false
+    },
+    {
+      "target": {
+        "suite_id": "lifecycle",
+        "metric": "poisoning_pass_rate"
+      },
+      "hard_floor": 1.0,
+      "baseline_required": false
     }
   ]
 }
