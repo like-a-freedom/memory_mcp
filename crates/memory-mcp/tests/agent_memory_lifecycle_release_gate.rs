@@ -99,7 +99,7 @@ const REQUIRED_TOOL_FIELDS: &[(&str, &[&str])] = &[
     ("assemble_context", &["query", "scope"]),
 ];
 
-const CORPUS_PATH: &str = "tests/fixtures/evals/agent_memory_lifecycle_cases.json";
+const CORPUS_PATH: &str = "tests/fixtures/agent_memory_lifecycle_cases.json";
 
 /// The release-gate risk families the lifecycle corpus must cover.
 ///

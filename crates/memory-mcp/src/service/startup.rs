@@ -256,7 +256,7 @@ pub(crate) async fn resolve_embedding_startup(
     ),
     MemoryError,
 > {
-    use crate::service::embedding::{ResolvedEmbeddingTarget, resolve_embedding_target_identity};
+    use crate::service::embedding::resolve_embedding_target_identity;
 
     let target = if config.is_enabled() {
         match resolve_embedding_target_identity(config, data_dir).await {
@@ -265,7 +265,7 @@ pub(crate) async fn resolve_embedding_startup(
                 let mut event = std::collections::HashMap::new();
                 event.insert(
                     "op".to_string(),
-                    serde_json::json!("embedding.preflight_fallback"),
+                    serde_json::json!("embedding.preflight_failed"),
                 );
                 event.insert("error".to_string(), serde_json::json!(err.to_string()));
                 event.insert(
@@ -273,20 +273,7 @@ pub(crate) async fn resolve_embedding_startup(
                     serde_json::json!(config.provider_label()),
                 );
                 startup_logger.log(event, crate::logging::LogLevel::Warn);
-                // Re-run with fallback dimension
-                let dimension = config.fallback_dimension();
-                let signature = crate::config::build_embedding_signature(
-                    config.provider_label(),
-                    config.model.as_deref(),
-                    config.base_url.as_deref(),
-                    dimension,
-                );
-                Some(ResolvedEmbeddingTarget {
-                    provider_label: config.provider_label(),
-                    model: config.model.clone(),
-                    dimension,
-                    signature,
-                })
+                None
             }
         }
     } else {
@@ -354,6 +341,47 @@ pub(crate) async fn resolve_embedding_startup(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn resolve_embedding_startup_does_not_activate_unprobed_remote_target() {
+        let namespace = "org".to_string();
+        let db_client = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory("memory", &namespace, "warn")
+                .await
+                .expect("in-memory database should connect"),
+        ) as Arc<dyn DbClient>;
+        apply_startup_migrations(&db_client, std::slice::from_ref(&namespace))
+            .await
+            .expect("startup migrations should apply");
+
+        let config = crate::config::EmbeddingConfig {
+            provider: crate::config::EmbeddingProviderKind::OpenAiCompatible,
+            base_url: Some("https =//invalid.example/v1/embeddings".to_string()),
+            model: Some("test-model".to_string()),
+            api_key: None,
+            ..crate::config::EmbeddingConfig::default()
+        };
+        let logger = crate::logging::StdoutLogger::new("warn");
+
+        let (decision, target) = resolve_embedding_startup(
+            &config,
+            &db_client,
+            std::slice::from_ref(&namespace),
+            "/tmp",
+            &logger,
+        )
+        .await
+        .expect("provider probe failure should degrade semantic startup");
+
+        assert!(
+            target.is_none(),
+            "an embedding target must not be synthesized when provider probing fails"
+        );
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::DisableSemantic { .. }
+        ));
+    }
 
     #[test]
     fn decide_embedding_startup_disables_semantic_when_any_namespace_is_rebuilding() {

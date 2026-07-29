@@ -68,8 +68,7 @@ struct SourceSpec {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/evals/end_to_end_cases.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/end_to_end_cases.json")
 }
 
 fn load_cases() -> Result<Vec<EndToEndCase>, EvalError> {

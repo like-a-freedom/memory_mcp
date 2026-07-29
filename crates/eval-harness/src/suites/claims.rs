@@ -96,8 +96,7 @@ struct ExpectedRelation {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/evals/claim_reconciliation_cases.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/claim_reconciliation_cases.json")
 }
 
 fn load_cases() -> Result<Vec<ClaimCase>, EvalError> {

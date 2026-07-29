@@ -345,7 +345,9 @@ If you run the server directly from this workspace, a stdio host configuration c
 }
 ```
 
-After `cargo build --release` or `cargo install --path .`, you can switch `command` to `./target/release/memory_mcp` or `memory_mcp` respectively.
+After `cargo build --release` or
+`cargo install --path crates/memory-mcp --locked`, you can switch `command` to
+`./target/release/memory_mcp` or `memory_mcp` respectively.
 
 ## Configuration
 
@@ -760,16 +762,24 @@ NER_DEVICE=auto cargo run --release --features metal -- serve
 
 ### Binary entry points
 
-- `src/main.rs` — main MCP server binary
+- `crates/memory-mcp/src/main.rs` — main MCP server binary
 
-MCP input/output schemas are exposed by the server itself through the protocol's tool metadata and remain regression-covered by the schema tests under `src/mcp/`.
+MCP input/output schemas are exposed by the server itself through the protocol's
+tool metadata and remain regression-covered by the schema tests under
+`crates/memory-mcp/src/mcp/`.
 
 ## Testing
 
-Run the full test suite:
+Run the production crate's test suite:
 
 ```bash
 cargo test
+```
+
+Run every workspace member, including the private evaluation harness:
+
+```bash
+cargo test --workspace
 ```
 
 Useful narrower runs:
@@ -790,26 +800,21 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 ├── Cargo.toml              # workspace root
 ├── Makefile                # thin eval profile adapters
 ├── crates/
-│   └── eval-harness/       # private evaluation harness (not linked into production binary)
+│   ├── memory-mcp/         # production package
+│   │   ├── migrations/
+│   │   ├── src/            # library, thin binary, MCP and domain services
+│   │   └── tests/          # production integration and release-gate tests
+│   └── eval-harness/       # private evaluation package
+│       ├── benches/        # Criterion benchmark families
 │       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
-│       └── benches/        # Criterion benchmark families
+│       └── tests/          # harness integration tests and fixtures
 ├── evals/
 │   ├── baselines/          # reviewed comparison artifacts
 │   ├── corpora/            # immutable corpus manifests
 │   ├── performance/        # pinned-runner config
 │   ├── profiles/           # pr.json, release.json, nightly.json
 │   └── schema/             # eval-artifact-v1.json
-├── docs/
-├── src/
-│   ├── mcp/
-│   ├── service/
-│   ├── config.rs
-│   ├── lib.rs
-│   ├── logging.rs
-│   ├── main.rs
-│   ├── models.rs
-│   └── storage.rs
-└── tests/
+└── docs/
 ```
 
 ## Evaluation

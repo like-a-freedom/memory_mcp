@@ -2,7 +2,7 @@
 data/
 dev/
 /models/
-tests/models/
+/crates/memory-mcp/tests/models/
 .env
 AGENTS.md
 .agents/prompts
@@ -48,15 +48,15 @@ rust-project.json
 
 # Benchmarking
 /criterion/
-/tests/fixtures/evals/full/
+/crates/memory-mcp/tests/fixtures/evals/full/
 
 # Large raw dataset files (downloaded by scripts/convert_external_evals.py)
 # These are full upstream benchmarks — use MEMORY_MCP_EVAL_SAMPLE_PCT to limit at runtime.
-tests/fixtures/evals/raw/longmemeval/longmemeval_s_cleaned.json
-tests/fixtures/evals/raw/locomo/locomo10.json
-tests/fixtures/evals/raw/personamem/questions_32k.csv
-tests/fixtures/evals/raw/prefeval/travel_hotel_overall300_topk_history_persona.json
-tests/fixtures/evals/raw/personamem/shared_contexts_32k.jsonl
+crates/eval-harness/tests/fixtures/raw/longmemeval/longmemeval_s_cleaned.json
+crates/eval-harness/tests/fixtures/raw/locomo/locomo10.json
+crates/eval-harness/tests/fixtures/raw/personamem/questions_32k.csv
+crates/eval-harness/tests/fixtures/raw/prefeval/travel_hotel_overall300_topk_history_persona.json
+crates/eval-harness/tests/fixtures/raw/personamem/shared_contexts_32k.jsonl
 
 # Code coverage
 tarpaulin-report.html

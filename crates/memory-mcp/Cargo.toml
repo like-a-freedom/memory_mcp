@@ -1,0 +1,56 @@
+[package]
+name = "memory_mcp"
+version = "1.7.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anno.workspace = true
+async-trait.workspace = true
+candle-core.workspace = true
+candle-nn.workspace = true
+candle-transformers.workspace = true
+chrono.workspace = true
+clap.workspace = true
+hex.workspace = true
+hf-hub.workspace = true
+indicatif.workspace = true
+lopdf.workspace = true
+lru.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus = { workspace = true, optional = true }
+notify = { workspace = true, optional = true }
+regex.workspace = true
+reqwest.workspace = true
+rmcp.workspace = true
+roxmltree.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+strsim.workspace = true
+surrealdb.workspace = true
+thiserror.workspace = true
+tokenizers.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+unicode-normalization.workspace = true
+zip.workspace = true
+
+[features]
+default = []
+cli-watch = ["notify"]
+mcp-apps = []
+prometheus = ["dep:metrics-exporter-prometheus"]
+metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+eval-support = []
+
+[dev-dependencies]
+csv.workspace = true
+mockall.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

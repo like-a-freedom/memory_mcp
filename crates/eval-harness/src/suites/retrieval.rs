@@ -89,8 +89,7 @@ fn default_min_recall_at_k() -> f64 {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/evals/retrieval_cases.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/retrieval_cases.json")
 }
 
 fn load_cases() -> Result<Vec<RetrievalEvalCase>, EvalError> {

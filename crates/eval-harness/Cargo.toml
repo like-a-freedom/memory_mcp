@@ -1,7 +1,8 @@
 [package]
 name = "eval-harness"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
 publish = false
 
 [lib]
@@ -13,22 +14,25 @@ name = "memory-eval"
 path = "src/main.rs"
 
 [dependencies]
-memory_mcp = { path = "../.." }
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde", "clock"] }
-clap = { version = "4.6", features = ["derive"] }
-hex = "0.4"
-reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-sha2 = "0.11"
-thiserror = "2.0"
-tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "sync", "time"] }
+memory_mcp = { path = "../memory-mcp" }
+async-trait.workspace = true
+chrono.workspace = true
+clap.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
-serde_json = "1.0"
-tempfile = "3"
+criterion.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
 
 [[bench]]
 name = "pipeline"

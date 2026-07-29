@@ -50,8 +50,7 @@ struct ExpectedWarning {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/evals/extraction_cases.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/extraction_cases.json")
 }
 
 fn load_cases() -> Result<Vec<ExtractionEvalCase>, EvalError> {

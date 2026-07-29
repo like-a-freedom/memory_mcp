@@ -27,7 +27,6 @@ fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
-        .join("evals")
         .join("retrieval_cases.json")
 }
 
