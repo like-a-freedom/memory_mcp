@@ -55,34 +55,46 @@ impl EvalSuite for LifecycleReleaseSuite {
 
         let grounding_suite = ActionGroundingSuite::new();
         let grounding_outcomes = grounding_suite.run(context).await;
-        let grounding_pass = grounding_outcomes
+        let grounding_invalid = grounding_outcomes
             .iter()
-            .all(|o| o.status == CaseStatus::Passed);
+            .any(|o| o.status == CaseStatus::Invalid);
+        let grounding_pass = !grounding_invalid
+            && grounding_outcomes
+                .iter()
+                .all(|o| o.status == CaseStatus::Passed);
+        let grounding_status = if grounding_invalid {
+            CaseStatus::Invalid
+        } else if grounding_pass {
+            CaseStatus::Passed
+        } else {
+            CaseStatus::QualityFailed
+        };
+        let grounding_evidence = {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "grounding_pass_rate".into(),
+                grounding_outcomes
+                    .iter()
+                    .filter(|o| o.status == CaseStatus::Passed)
+                    .count() as f64
+                    / grounding_outcomes.len().max(1) as f64,
+            );
+            m
+        };
         outcomes.push(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-action-grounding").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
-            status: if grounding_pass {
-                CaseStatus::Passed
-            } else {
-                CaseStatus::QualityFailed
-            },
-            metrics: {
-                let mut m = std::collections::BTreeMap::new();
-                m.insert(
-                    "grounding_pass_rate".into(),
-                    grounding_outcomes
-                        .iter()
-                        .filter(|o| o.status == CaseStatus::Passed)
-                        .count() as f64
-                        / grounding_outcomes.len().max(1) as f64,
-                );
-                m
-            },
+            status: grounding_status,
+            metrics: grounding_evidence,
             evidence: std::collections::BTreeMap::new(),
-            invalid_reason: None,
-            failures: if !grounding_pass {
+            invalid_reason: if grounding_invalid {
+                Some("action grounding sub-suite has invalid cases".into())
+            } else {
+                None
+            },
+            failures: if !grounding_invalid && !grounding_pass {
                 vec!["action grounding sub-suite failed".into()]
             } else {
                 vec![]
@@ -93,23 +105,34 @@ impl EvalSuite for LifecycleReleaseSuite {
 
         let capacity_suite = CapacitySuite::new();
         let capacity_outcomes = capacity_suite.run(context).await;
-        let capacity_pass = capacity_outcomes
+        let capacity_invalid = capacity_outcomes
             .iter()
-            .all(|o| o.status != CaseStatus::QualityFailed);
+            .any(|o| o.status == CaseStatus::Invalid);
+        let capacity_pass = !capacity_invalid
+            && capacity_outcomes
+                .iter()
+                .all(|o| o.status != CaseStatus::QualityFailed);
+        let capacity_status = if capacity_invalid {
+            CaseStatus::Invalid
+        } else if capacity_pass {
+            CaseStatus::Passed
+        } else {
+            CaseStatus::QualityFailed
+        };
         outcomes.push(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-capacity").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
-            status: if capacity_pass {
-                CaseStatus::Passed
-            } else {
-                CaseStatus::QualityFailed
-            },
+            status: capacity_status,
             metrics: std::collections::BTreeMap::new(),
             evidence: std::collections::BTreeMap::new(),
-            invalid_reason: None,
-            failures: if !capacity_pass {
+            invalid_reason: if capacity_invalid {
+                Some("capacity sub-suite has invalid cases".into())
+            } else {
+                None
+            },
+            failures: if !capacity_invalid && !capacity_pass {
                 vec!["capacity sub-suite failed".into()]
             } else {
                 vec![]
@@ -120,34 +143,46 @@ impl EvalSuite for LifecycleReleaseSuite {
 
         let poisoning_suite = PoisoningSuite::new();
         let poisoning_outcomes = poisoning_suite.run(context).await;
-        let poisoning_pass = poisoning_outcomes
+        let poisoning_invalid = poisoning_outcomes
             .iter()
-            .all(|o| o.status == CaseStatus::Passed);
+            .any(|o| o.status == CaseStatus::Invalid);
+        let poisoning_pass = !poisoning_invalid
+            && poisoning_outcomes
+                .iter()
+                .all(|o| o.status == CaseStatus::Passed);
+        let poisoning_status = if poisoning_invalid {
+            CaseStatus::Invalid
+        } else if poisoning_pass {
+            CaseStatus::Passed
+        } else {
+            CaseStatus::QualityFailed
+        };
+        let poisoning_evidence = {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "poisoning_pass_rate".into(),
+                poisoning_outcomes
+                    .iter()
+                    .filter(|o| o.status == CaseStatus::Passed)
+                    .count() as f64
+                    / poisoning_outcomes.len().max(1) as f64,
+            );
+            m
+        };
         outcomes.push(EvalCaseOutcome {
             case_key: CaseKey::parse("lifecycle", "lifecycle-poisoning").unwrap(),
             mode: EvalMode::Lifecycle,
             split: CorpusSplit::Test,
             label_trust: LabelTrust::Official,
-            status: if poisoning_pass {
-                CaseStatus::Passed
-            } else {
-                CaseStatus::QualityFailed
-            },
-            metrics: {
-                let mut m = std::collections::BTreeMap::new();
-                m.insert(
-                    "poisoning_pass_rate".into(),
-                    poisoning_outcomes
-                        .iter()
-                        .filter(|o| o.status == CaseStatus::Passed)
-                        .count() as f64
-                        / poisoning_outcomes.len().max(1) as f64,
-                );
-                m
-            },
+            status: poisoning_status,
+            metrics: poisoning_evidence,
             evidence: std::collections::BTreeMap::new(),
-            invalid_reason: None,
-            failures: if !poisoning_pass {
+            invalid_reason: if poisoning_invalid {
+                Some("poisoning sub-suite has invalid cases".into())
+            } else {
+                None
+            },
+            failures: if !poisoning_invalid && !poisoning_pass {
                 vec!["poisoning sub-suite failed".into()]
             } else {
                 vec![]
