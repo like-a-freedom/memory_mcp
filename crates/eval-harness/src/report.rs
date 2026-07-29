@@ -9,6 +9,12 @@ pub fn render_markdown(artifact: &RunArtifact) -> Result<String, EvalError> {
         format!("{:?}", artifact.profile).to_lowercase()
     ));
 
+    let verdict_str = match artifact.verdict {
+        crate::domain::RunVerdict::Passed => "PASSED",
+        crate::domain::RunVerdict::QualityFailed => "QUALITY FAILED",
+        crate::domain::RunVerdict::Invalid => "INVALID",
+    };
+    out.push_str(&format!("**Verdict:** {verdict_str}\n"));
     out.push_str(&format!("**Schema:** `{}`\n", artifact.schema_version));
     out.push_str(&format!("**Run ID:** `{}`\n", artifact.run_id));
     out.push_str(&format!("**Duration:** {}ms\n", artifact.duration_ms));

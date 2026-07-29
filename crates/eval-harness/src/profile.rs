@@ -30,7 +30,7 @@ pub struct SuiteDecl {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExpectedCoverage {
-    pub min_cases: usize,
+    pub exact_cases: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -141,7 +141,7 @@ mod tests {
             "suites": [
                 {
                     "id": "local-retrieval",
-                    "expected_coverage": { "min_cases": 50 }
+                    "expected_coverage": { "exact_cases": 50 }
                 }
             ],
             "gates": [
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn pr_profile_rejects_zero_budget() {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
-            "time_budget_seconds":0,"suites":[{"id":"s1","expected_coverage":{"min_cases":1}}],"gates":[]}"#;
+            "time_budget_seconds":0,"suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],"gates":[]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }
 
@@ -175,8 +175,8 @@ mod tests {
     fn pr_profile_rejects_duplicate_suite_ids() {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
             "time_budget_seconds":600,"suites":[
-                {"id":"s1","expected_coverage":{"min_cases":1}},
-                {"id":"s1","expected_coverage":{"min_cases":1}}
+                {"id":"s1","expected_coverage":{"exact_cases":1}},
+                {"id":"s1","expected_coverage":{"exact_cases":1}}
             ],"gates":[]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn pr_profile_rejects_unknown_fields() {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
-            "time_budget_seconds":600,"suites":[{"id":"s1","expected_coverage":{"min_cases":1}}],
+            "time_budget_seconds":600,"suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
             "gates":[],"unexpected":1}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn pr_profile_rejects_wrong_schema_version() {
         let raw = r#"{"schema_version":"wrong","profile":"pr",
-            "time_budget_seconds":600,"suites":[{"id":"s1","expected_coverage":{"min_cases":1}}],"gates":[]}"#;
+            "time_budget_seconds":600,"suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],"gates":[]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }
 
@@ -200,7 +200,7 @@ mod tests {
     fn gate_requires_floor_or_budget() {
         let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
             "time_budget_seconds":600,
-            "suites":[{"id":"s1","expected_coverage":{"min_cases":1}}],
+            "suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
             "gates":[{"target":{"suite_id":"s1","metric":"recall"}}]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
     }

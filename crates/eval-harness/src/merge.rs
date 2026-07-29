@@ -146,11 +146,14 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
         started_at: first.started_at,
         duration_ms: shards.iter().map(|s| s.duration_ms).sum(),
         expected_case_ids: expected_ids,
+        expected_cases: vec![],
         outcomes: all_outcomes,
         suite_summaries,
         gates,
         fingerprint,
         budget_status: None,
+        verdict: crate::domain::RunVerdict::default(),
+        issues: vec![],
     };
 
     artifact.validate()?;
@@ -190,6 +193,7 @@ mod tests {
             started_at: chrono::Utc::now(),
             duration_ms: 100,
             expected_case_ids: expected_ids,
+            expected_cases: vec![],
             outcomes,
             suite_summaries: vec![SuiteSummary {
                 suite_id: "test-suite".into(),
@@ -203,6 +207,8 @@ mod tests {
             gates: vec![],
             fingerprint: RunFingerprint::default_for_test(),
             budget_status: None,
+            verdict: crate::domain::RunVerdict::default(),
+            issues: vec![],
         }
     }
 

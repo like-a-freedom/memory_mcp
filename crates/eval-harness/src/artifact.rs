@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use crate::domain::*;
 use crate::error::EvalError;
 
+pub use crate::domain::derive_run_verdict;
+
 pub const EVAL_ARTIFACT_SCHEMA_V1: &str = "memory-mcp-eval/v1";
+pub const EVAL_ARTIFACT_SCHEMA_V2: &str = "memory-mcp-eval/v2";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunFingerprint {
@@ -115,23 +118,31 @@ pub struct RunArtifact {
     pub started_at: DateTime<Utc>,
     pub duration_ms: u64,
     pub expected_case_ids: Vec<EvalCaseId>,
+    #[serde(default)]
+    pub expected_cases: Vec<CaseKey>,
     pub outcomes: Vec<EvalCaseOutcome>,
     pub suite_summaries: Vec<SuiteSummary>,
     pub gates: Vec<GateDecision>,
     pub fingerprint: RunFingerprint,
     #[serde(default)]
     pub budget_status: Option<GateStatus>,
+    #[serde(default)]
+    pub verdict: RunVerdict,
+    #[serde(default)]
+    pub issues: Vec<RunIssue>,
 }
 
 impl RunArtifact {
     pub fn validate(&self) -> Result<(), EvalError> {
-        if self.schema_version != EVAL_ARTIFACT_SCHEMA_V1 {
+        if self.schema_version != EVAL_ARTIFACT_SCHEMA_V1
+            && self.schema_version != EVAL_ARTIFACT_SCHEMA_V2
+        {
             return Err(EvalError::InvalidInput(format!(
                 "unsupported schema version: {}",
                 self.schema_version
             )));
         }
-        if self.expected_case_ids.is_empty() {
+        if self.expected_case_ids.is_empty() && self.expected_cases.is_empty() {
             return Err(EvalError::InvalidInput(
                 "expected case IDs must not be empty".into(),
             ));
@@ -150,15 +161,36 @@ impl RunArtifact {
             }
         }
 
+        let mut seen_case_keys = std::collections::HashSet::new();
+        for case_key in &self.expected_cases {
+            let key_str = format!(
+                "{}::{}",
+                case_key.suite_id.as_str(),
+                case_key.case_id.as_str()
+            );
+            if !seen_case_keys.insert(key_str.clone()) {
+                return Err(EvalError::InvalidInput(format!(
+                    "duplicate expected case key: {key_str}"
+                )));
+            }
+        }
+
         let mut seen_outcomes = std::collections::HashSet::new();
         for outcome in &self.outcomes {
             outcome.validate()?;
 
             if !seen_expected.contains(outcome.case_id().as_str()) {
-                return Err(EvalError::InvalidInput(format!(
-                    "outcome for unexpected case ID: {}",
-                    outcome.case_id().as_str()
-                )));
+                let key_str = format!(
+                    "{}::{}",
+                    outcome.case_key.suite_id.as_str(),
+                    outcome.case_key.case_id.as_str()
+                );
+                if !seen_expected.contains(key_str.as_str()) {
+                    return Err(EvalError::InvalidInput(format!(
+                        "outcome for unexpected case: {}",
+                        outcome.case_id().as_str()
+                    )));
+                }
             }
 
             if !seen_outcomes.insert(outcome.case_id().as_str()) {
@@ -180,12 +212,26 @@ impl RunArtifact {
             }
         }
 
+        if self.schema_version == EVAL_ARTIFACT_SCHEMA_V2 {
+            let budget = self.budget_status.clone().unwrap_or(GateStatus::Invalid);
+            let recomputed = derive_run_verdict(&self.outcomes, &self.gates, budget, &self.issues);
+            if self.verdict != recomputed {
+                return Err(EvalError::InvalidInput(format!(
+                    "stored verdict {:?} differs from recomputed {:?}",
+                    self.verdict, recomputed
+                )));
+            }
+        }
+
         Ok(())
     }
 
     #[cfg(test)]
     pub fn fixture(outcomes: Vec<EvalCaseOutcome>, expected: Vec<EvalCaseId>) -> Self {
         use std::collections::BTreeMap;
+
+        let budget_val = GateStatus::Passed;
+        let verdict = derive_run_verdict(&outcomes, &[], budget_val.clone(), &[]);
 
         RunArtifact {
             schema_version: EVAL_ARTIFACT_SCHEMA_V1.to_string(),
@@ -194,6 +240,7 @@ impl RunArtifact {
             started_at: Utc::now(),
             duration_ms: 0,
             expected_case_ids: expected,
+            expected_cases: vec![],
             outcomes,
             suite_summaries: vec![],
             gates: vec![],
@@ -211,7 +258,9 @@ impl RunArtifact {
                 evaluator_versions: BTreeMap::new(),
                 profile_digest: "test".into(),
             },
-            budget_status: None,
+            budget_status: Some(budget_val),
+            verdict,
+            issues: vec![],
         }
     }
 }

@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 
-use crate::artifact::GateStatus;
+use crate::artifact::{GateStatus, derive_run_verdict};
 use crate::domain::*;
 use crate::error::EvalError;
 use crate::profile::ProfileManifest;
@@ -20,6 +20,7 @@ pub struct RunRequest {
     pub artifact_path: PathBuf,
     pub baseline: Option<crate::RunArtifact>,
     pub suite_filter: BTreeSet<SuiteId>,
+    pub issues: Vec<RunIssue>,
 }
 
 #[async_trait]
@@ -97,29 +98,38 @@ impl Runner {
                 started_at: chrono::Utc::now(),
                 duration_ms,
                 expected_case_ids: expected_ids.clone(),
+                expected_cases: vec![],
                 outcomes: all_outcomes.clone(),
                 suite_summaries: suite_summaries.clone(),
                 gates: vec![],
                 fingerprint: crate::RunFingerprint::capture(),
                 budget_status: None,
+                verdict: crate::domain::RunVerdict::default(),
+                issues: vec![],
             },
             request.baseline.as_ref(),
         )?;
 
         let fingerprint = crate::RunFingerprint::capture();
 
+        let budget = budget_status.unwrap_or(GateStatus::Invalid);
+        let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &request.issues);
+
         let artifact = crate::RunArtifact {
-            schema_version: crate::EVAL_ARTIFACT_SCHEMA_V1.to_string(),
+            schema_version: crate::EVAL_ARTIFACT_SCHEMA_V2.to_string(),
             run_id: format!("run-{}", chrono::Utc::now().timestamp()),
             profile,
             started_at: chrono::Utc::now(),
             duration_ms,
             expected_case_ids: expected_ids,
+            expected_cases: vec![],
             outcomes: all_outcomes,
             suite_summaries,
             gates,
             fingerprint,
-            budget_status,
+            budget_status: Some(budget),
+            verdict,
+            issues: request.issues.clone(),
         };
 
         artifact.validate()?;

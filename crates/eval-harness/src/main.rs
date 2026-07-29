@@ -119,36 +119,35 @@ async fn cmd_run(
         artifact_path: artifact.clone(),
         baseline: baseline_artifact,
         suite_filter: suite_filter_set,
+        issues: vec![],
     };
     let result = runner.run(&request).await;
 
     match result {
         Ok(art) => {
-            let has_failed_gate = art
-                .gates
-                .iter()
-                .any(|g| g.status == eval_harness::GateStatus::Failed);
-            let has_invalid = art
-                .outcomes
-                .iter()
-                .any(|o| o.status == eval_harness::CaseStatus::Invalid);
-
             if let Err(e) = eval_harness::write_artifact(&artifact, &art) {
                 eprintln!("error: failed to write artifact: {e}");
                 return std::process::ExitCode::from(2);
             }
 
+            let report = eval_harness::render_markdown(&art).unwrap_or_default();
+            println!("{report}");
+
             print_summary(&art);
 
-            if has_invalid {
-                eprintln!("RESULT: INVALID");
-                std::process::ExitCode::from(2)
-            } else if has_failed_gate {
-                eprintln!("RESULT: GATE FAILED");
-                std::process::ExitCode::from(1)
-            } else {
-                eprintln!("RESULT: PASSED");
-                std::process::ExitCode::SUCCESS
+            match art.verdict {
+                eval_harness::RunVerdict::Passed => {
+                    eprintln!("RESULT: PASSED");
+                    std::process::ExitCode::SUCCESS
+                }
+                eval_harness::RunVerdict::QualityFailed => {
+                    eprintln!("RESULT: QUALITY FAILED");
+                    std::process::ExitCode::from(1)
+                }
+                eval_harness::RunVerdict::Invalid => {
+                    eprintln!("RESULT: INVALID");
+                    std::process::ExitCode::from(2)
+                }
             }
         }
         Err(e) => {

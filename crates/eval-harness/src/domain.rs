@@ -131,6 +131,90 @@ pub enum CaseStatus {
     Invalid,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunVerdict {
+    #[default]
+    Passed,
+    QualityFailed,
+    Invalid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunStage {
+    SuiteLoad,
+    SuiteRun,
+    Coverage,
+    Gate,
+    Budget,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunIssue {
+    pub stage: RunStage,
+    pub suite_id: Option<SuiteId>,
+    pub message: String,
+}
+
+impl RunIssue {
+    pub fn empty_suite(suite_id: &str) -> Self {
+        Self {
+            stage: RunStage::SuiteLoad,
+            suite_id: Some(SuiteId::parse(suite_id).expect("suite_id must not be empty")),
+            message: format!("suite '{suite_id}' failed to load"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateDirection {
+    AtLeast,
+    AtMost,
+}
+
+pub fn derive_run_verdict(
+    outcomes: &[EvalCaseOutcome],
+    gate_decisions: &[crate::artifact::GateDecision],
+    budget_status: crate::artifact::GateStatus,
+    issues: &[RunIssue],
+) -> RunVerdict {
+    if !issues.is_empty() {
+        return RunVerdict::Invalid;
+    }
+    if budget_status == crate::artifact::GateStatus::Invalid {
+        return RunVerdict::Invalid;
+    }
+    if outcomes.iter().any(|o| o.status == CaseStatus::Invalid) {
+        return RunVerdict::Invalid;
+    }
+    if gate_decisions
+        .iter()
+        .any(|g| g.status == crate::artifact::GateStatus::Invalid)
+    {
+        return RunVerdict::Invalid;
+    }
+
+    if budget_status == crate::artifact::GateStatus::Failed {
+        return RunVerdict::QualityFailed;
+    }
+    if outcomes
+        .iter()
+        .any(|o| o.status == CaseStatus::QualityFailed)
+    {
+        return RunVerdict::QualityFailed;
+    }
+    if gate_decisions
+        .iter()
+        .any(|g| g.status == crate::artifact::GateStatus::Failed)
+    {
+        return RunVerdict::QualityFailed;
+    }
+
+    RunVerdict::Passed
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvalProfile {

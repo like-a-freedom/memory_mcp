@@ -5,19 +5,19 @@
   "suites": [
     {
       "id": "local-retrieval",
-      "expected_coverage": { "min_cases": 50 }
+      "expected_coverage": { "exact_cases": 50 }
     },
     {
       "id": "extraction",
-      "expected_coverage": { "min_cases": 5 }
+      "expected_coverage": { "exact_cases": 5 }
     },
     {
       "id": "claim-reconciliation",
-      "expected_coverage": { "min_cases": 5 }
+      "expected_coverage": { "exact_cases": 5 }
     },
     {
       "id": "lifecycle",
-      "expected_coverage": { "min_cases": 4 }
+      "expected_coverage": { "exact_cases": 4 }
     }
   ],
   "gates": [

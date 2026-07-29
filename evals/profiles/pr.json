@@ -6,19 +6,19 @@
     {
       "id": "local-retrieval",
       "expected_coverage": {
-        "min_cases": 50
+        "exact_cases": 50
       }
     },
     {
       "id": "extraction",
       "expected_coverage": {
-        "min_cases": 5
+        "exact_cases": 5
       }
     },
     {
       "id": "claim-reconciliation",
       "expected_coverage": {
-        "min_cases": 5
+        "exact_cases": 5
       }
     }
   ],
