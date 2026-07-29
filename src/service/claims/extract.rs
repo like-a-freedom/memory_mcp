@@ -53,6 +53,7 @@ mod tests {
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content: "test content",
+            fact_type: "experience",
             structured_fields: Box::leak(Box::new(fields)),
             assertions: EMPTY_ASSERTIONS,
         }
@@ -66,6 +67,7 @@ mod tests {
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content,
+            fact_type: "experience",
             structured_fields: Box::leak(Box::new(fields)),
             assertions: EMPTY_ASSERTIONS,
         }

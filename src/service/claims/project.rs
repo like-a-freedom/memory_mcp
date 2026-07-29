@@ -37,6 +37,7 @@ pub(crate) struct FactPersistedParams<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
     pub source_episode_id: &'a EpisodeId,
+    pub fact_type: &'a str,
     pub content: &'a str,
     pub scope: &'a str,
     pub project: Option<&'a str>,
@@ -105,6 +106,7 @@ impl ClaimService {
             subject,
             t_ref: params.t_valid,
             content: params.content,
+            fact_type: params.fact_type,
             structured_fields: &structured_fields,
             assertions: &assertions,
         };
@@ -403,6 +405,7 @@ mod tests {
             namespace: "ns",
             fact_id,
             source_episode_id: Box::leak(Box::new(EpisodeId::from("ep:test"))),
+            fact_type: "experience",
             content,
             scope: "personal",
             project: None,

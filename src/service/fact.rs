@@ -349,6 +349,7 @@ impl FactService {
             namespace: &namespace,
             fact_id: &claim_fact_id,
             source_episode_id: &claim_episode_id,
+            fact_type,
             content: &claim_content,
             scope: &claim_scope,
             project: claim_project.as_deref(),

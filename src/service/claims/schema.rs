@@ -25,6 +25,8 @@ pub(crate) struct ClaimProjectionInput<'a> {
     pub t_ref: chrono::DateTime<chrono::Utc>,
     /// The raw source content text.
     pub content: &'a str,
+    /// The fact type from extraction (e.g. "promise", "metric", "experience").
+    pub fact_type: &'a str,
     /// Structured fields parsed from connector/record sources.
     pub structured_fields: &'a BTreeMap<String, String>,
     /// Pre-parsed structural assertions from the content.
@@ -510,6 +512,61 @@ impl ClaimSchema for RelationV1 {
     }
 }
 
+struct CommitmentSentence {
+    subject: String,
+    action: String,
+    target: String,
+    deadline: String,
+}
+
+fn parse_commitment_sentence(content: &str) -> Option<CommitmentSentence> {
+    let content = content.trim().trim_end_matches('.');
+    let will_pos = content.find(" will ")?;
+    let by_pos = content.rfind(" by ")?;
+
+    if by_pos <= will_pos {
+        return None;
+    }
+
+    let subject = content[..will_pos].trim().to_string();
+    let after_will = content[will_pos + 6..by_pos].trim();
+
+    let action_end = after_will.find(' ')?;
+    let action = after_will[..action_end].trim().to_string();
+    let target = after_will[action_end + 1..].trim().to_string();
+    let deadline = content[by_pos + 4..].trim().to_string();
+
+    if subject.is_empty() || action.is_empty() || target.is_empty() || deadline.is_empty() {
+        return None;
+    }
+
+    Some(CommitmentSentence {
+        subject,
+        action,
+        target,
+        deadline,
+    })
+}
+
+fn commitment_key(action: &str, target: &str) -> Result<ComparisonKey, MemoryError> {
+    let mut components = BTreeMap::new();
+    components.insert(
+        "action_role".to_string(),
+        NormalizedText::new(action).to_string(),
+    );
+    components.insert(
+        "target_role".to_string(),
+        NormalizedText::new(target).to_string(),
+    );
+    ComparisonKey::new(
+        ClaimSchemaRef {
+            family: ClaimSchemaFamily::Commitment,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        },
+        components,
+    )
+}
+
 struct CommitmentV1;
 
 impl ClaimSchema for CommitmentV1 {
@@ -552,6 +609,30 @@ impl ClaimSchema for CommitmentV1 {
                 comparison_key: key,
                 qualifiers: BTreeMap::new(),
                 value,
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: None,
+            });
+        } else if input.fact_type == "promise"
+            && let Some(parsed) = parse_commitment_sentence(input.content)
+        {
+            let key = commitment_key(&parsed.action, &parsed.target)?;
+            let mut qualifiers = BTreeMap::new();
+            qualifiers.insert(
+                "deadline".to_string(),
+                NormalizedText::new(&parsed.deadline).to_string(),
+            );
+
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: parsed.subject,
+                comparison_key: key,
+                qualifiers,
+                value: ClaimValue::Boolean(true),
                 cardinality: ClaimCardinality::SingleValued,
                 observed_at: input.t_ref,
                 valid_from: None,
@@ -647,6 +728,7 @@ mod tests {
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content: "test content",
+            fact_type: "experience",
             structured_fields: Box::leak(Box::new(fields)),
             assertions: EMPTY_ASSERTIONS,
         }
@@ -660,6 +742,22 @@ mod tests {
             subject: "entity:subject1",
             t_ref: chrono::Utc::now(),
             content,
+            fact_type: "experience",
+            structured_fields: Box::leak(Box::new(fields)),
+            assertions: EMPTY_ASSERTIONS,
+        }
+    }
+
+    fn test_input_with_fact_type(
+        fields: BTreeMap<String, String>,
+        content: &'static str,
+        fact_type: &'static str,
+    ) -> ClaimProjectionInput<'static> {
+        ClaimProjectionInput {
+            subject: "entity:subject1",
+            t_ref: chrono::Utc::now(),
+            content,
+            fact_type,
             structured_fields: Box::leak(Box::new(fields)),
             assertions: EMPTY_ASSERTIONS,
         }
@@ -1099,5 +1197,62 @@ mod tests {
         )
         .unwrap();
         assert_ne!(k1, k2);
+    }
+
+    #[test]
+    fn parse_commitment_sentence_extracts_fields() {
+        let parsed =
+            parse_commitment_sentence("Alice Smith will send Bob Jones the prototype by Friday.")
+                .unwrap();
+        assert_eq!(parsed.subject, "Alice Smith");
+        assert_eq!(parsed.action, "send");
+        assert_eq!(parsed.target, "Bob Jones the prototype");
+        assert_eq!(parsed.deadline, "Friday");
+    }
+
+    #[test]
+    fn shifted_deadline_keeps_same_comparison_key() {
+        let friday = commitment_key("send", "Bob Jones the prototype").unwrap();
+        let monday = commitment_key("send", "Bob Jones the prototype").unwrap();
+        assert_eq!(friday, monday);
+    }
+
+    #[test]
+    fn promise_sentence_projects_through_commitment_v1() {
+        let input = test_input_with_fact_type(
+            BTreeMap::new(),
+            "Alice Smith will send Bob Jones the prototype by Friday.",
+            "promise",
+        );
+        let schema = CommitmentV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].schema_ref,
+            schema_ref(ClaimSchemaFamily::Commitment)
+        );
+        assert_eq!(output[0].qualifiers.get("deadline").unwrap(), "friday");
+    }
+
+    #[test]
+    fn non_promise_fact_does_not_use_commitment_fallback() {
+        let input = test_input_with_fact_type(
+            BTreeMap::new(),
+            "Alice Smith will send Bob Jones the prototype by Friday.",
+            "experience",
+        );
+        let schema = CommitmentV1;
+        let mut output = Vec::new();
+        let mut skips = Vec::new();
+        schema.project(&input, &mut output, &mut skips).unwrap();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn promise_without_deadline_is_not_invented() {
+        let parsed = parse_commitment_sentence("Alice Smith will send Bob Jones the prototype.");
+        assert!(parsed.is_none());
     }
 }
