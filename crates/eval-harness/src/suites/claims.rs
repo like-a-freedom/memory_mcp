@@ -147,7 +147,7 @@ struct IngestParams<'a> {
 async fn ingest_and_extract(
     service: &memory_mcp::service::MemoryService,
     params: &IngestParams<'_>,
-) -> Result<memory_mcp::models::ExtractResult, EvalError> {
+) -> Result<(memory_mcp::models::ExtractResult, ExtractedSource), EvalError> {
     let t_ref_datetime = parse_reference_time(params.t_ref)?;
 
     let episode_id = service
@@ -168,10 +168,27 @@ async fn ingest_and_extract(
         .await
         .map_err(|e| EvalError::Suite(format!("ingest failed for {}: {e}", params.source_id)))?;
 
-    service
+    let extraction = service
         .extract(&episode_id, None, None)
         .await
-        .map_err(|e| EvalError::Suite(format!("extract failed for {}: {e}", params.source_id)))
+        .map_err(|e| EvalError::Suite(format!("extract failed for {}: {e}", params.source_id)))?;
+
+    let fact_ids: BTreeSet<String> = extraction.facts.iter().map(|f| f.fact_id.clone()).collect();
+
+    let extracted = ExtractedSource {
+        source_id: params.source_id.to_string(),
+        episode_id,
+        fact_ids,
+    };
+
+    Ok((extraction, extracted))
+}
+
+struct ExtractedSource {
+    source_id: String,
+    #[allow(dead_code)]
+    episode_id: String,
+    fact_ids: BTreeSet<String>,
 }
 
 struct CaseMetrics {
@@ -181,7 +198,11 @@ struct CaseMetrics {
     isolation_violations: usize,
 }
 
-fn evaluate_case(case: &ClaimCase, extraction: &memory_mcp::models::ExtractResult) -> CaseMetrics {
+fn evaluate_case(
+    case: &ClaimCase,
+    extraction: &memory_mcp::models::ExtractResult,
+    _lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+) -> CaseMetrics {
     let expected_contradictions = case
         .expected
         .relations
@@ -287,8 +308,10 @@ impl EvalSuite for ClaimReconciliationSuite {
 
             let mut setup_failed = false;
             let mut setup_error = String::new();
+            let mut lineage: std::collections::BTreeMap<String, BTreeSet<String>> =
+                std::collections::BTreeMap::new();
             for setup in &case.setup {
-                if let Err(err) = ingest_and_extract(
+                match ingest_and_extract(
                     &service,
                     &IngestParams {
                         scope: &setup.scope,
@@ -302,12 +325,17 @@ impl EvalSuite for ClaimReconciliationSuite {
                 )
                 .await
                 {
-                    setup_failed = true;
-                    setup_error = format!(
-                        "setup {source_id} failed: {err}",
-                        source_id = setup.source_id
-                    );
-                    break;
+                    Ok((_extraction, extracted)) => {
+                        lineage.insert(extracted.source_id, extracted.fact_ids);
+                    }
+                    Err(err) => {
+                        setup_failed = true;
+                        setup_error = format!(
+                            "setup {source_id} failed: {err}",
+                            source_id = setup.source_id
+                        );
+                        break;
+                    }
                 }
             }
 
@@ -328,7 +356,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                 continue;
             }
 
-            let extraction = match ingest_and_extract(
+            let (extraction, source_extracted) = match ingest_and_extract(
                 &service,
                 &IngestParams {
                     scope: &case.source.scope,
@@ -361,7 +389,9 @@ impl EvalSuite for ClaimReconciliationSuite {
                 }
             };
 
-            let metrics_result = evaluate_case(case, &extraction);
+            lineage.insert(source_extracted.source_id, source_extracted.fact_ids);
+
+            let metrics_result = evaluate_case(case, &extraction, &lineage);
 
             let mut metric_map = std::collections::BTreeMap::new();
             metric_map.insert(

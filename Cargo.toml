@@ -60,6 +60,7 @@ cli-watch = ["notify"]
 mcp-apps = []
 prometheus = ["dep:metrics-exporter-prometheus"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+eval-support = []
 
 [dev-dependencies]
 eval-harness = { path = "crates/eval-harness" }

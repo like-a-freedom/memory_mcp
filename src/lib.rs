@@ -42,6 +42,10 @@ pub mod service;
 pub mod storage;
 pub mod tools;
 
+#[cfg(feature = "eval-support")]
+#[doc(hidden)]
+pub mod eval_support;
+
 pub use mcp::MemoryMcp;
 pub use service::reembed_options::{ReembedOptions, ReembedOutcome};
 pub use service::{MemoryError, MemoryService};
