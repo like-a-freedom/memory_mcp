@@ -13,12 +13,31 @@ struct EndToEndCase {
     id: String,
     #[allow(dead_code)]
     description: String,
+    scope: String,
+    #[serde(default)]
+    project: Option<String>,
     sources: Vec<SourceSpec>,
     query: String,
-    expected_evidence: Vec<String>,
+    #[serde(default)]
+    expected_entities: Vec<EntityExpectation>,
+    #[serde(default)]
+    expected_context: Vec<ContextExpectation>,
     min_context_items: usize,
     #[allow(dead_code)]
     label_trust: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EntityExpectation {
+    canonical_name: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    entity_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContextExpectation {
+    content_contains: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,8 +45,6 @@ struct SourceSpec {
     source_type: String,
     source_id: String,
     content: String,
-    scope: String,
-    t_ref: String,
 }
 
 fn fixture_path() -> PathBuf {
@@ -116,35 +133,18 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     let start = std::time::Instant::now();
     let service = test_support::make_service().await;
 
-    for source in &case.sources {
-        let t_ref = match source.t_ref.parse::<chrono::DateTime<chrono::Utc>>() {
-            Ok(t) => t,
-            Err(err) => {
-                return EvalCaseOutcome {
-                    case_key: CaseKey::parse("end-to-end", &case.id).unwrap(),
-                    mode: EvalMode::EndToEnd,
-                    split: CorpusSplit::Development,
-                    label_trust: LabelTrust::Official,
-                    status: CaseStatus::Invalid,
-                    metrics: std::collections::BTreeMap::new(),
-                    evidence: std::collections::BTreeMap::new(),
-                    invalid_reason: Some(format!("invalid timestamp: {err}")),
-                    failures: vec![],
-                    duration_ms: start.elapsed().as_millis() as u64,
-                    attempts: 1,
-                };
-            }
-        };
+    let mut all_entities: Vec<String> = Vec::new();
 
+    for source in &case.sources {
         let episode_id = match service
             .ingest(
                 memory_mcp::models::IngestRequest {
                     source_type: source.source_type.clone(),
                     source_id: source.source_id.clone(),
                     content: source.content.clone(),
-                    t_ref,
-                    scope: source.scope.clone(),
-                    project: None,
+                    t_ref: chrono::Utc::now(),
+                    scope: case.scope.clone(),
+                    project: case.project.clone(),
                     t_ingested: None,
                     visibility_scope: None,
                     policy_tags: vec![],
@@ -171,31 +171,39 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             }
         };
 
-        if let Err(err) = service.extract(&episode_id, None, None).await {
-            return EvalCaseOutcome {
-                case_key: CaseKey::parse("end-to-end", &case.id).unwrap(),
-                mode: EvalMode::EndToEnd,
-                split: CorpusSplit::Development,
-                label_trust: LabelTrust::Official,
-                status: CaseStatus::Invalid,
-                metrics: std::collections::BTreeMap::new(),
-                evidence: std::collections::BTreeMap::new(),
-                invalid_reason: Some(format!("extraction failed: {err}")),
-                failures: vec![],
-                duration_ms: start.elapsed().as_millis() as u64,
-                attempts: 1,
-            };
+        match service.extract(&episode_id, None, None).await {
+            Ok(extraction) => {
+                all_entities.extend(extraction.entities.iter().map(|e| e.canonical_name.clone()));
+            }
+            Err(err) => {
+                return EvalCaseOutcome {
+                    case_key: CaseKey::parse("end-to-end", &case.id).unwrap(),
+                    mode: EvalMode::EndToEnd,
+                    split: CorpusSplit::Development,
+                    label_trust: LabelTrust::Official,
+                    status: CaseStatus::Invalid,
+                    metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
+                    invalid_reason: Some(format!("extraction failed: {err}")),
+                    failures: vec![],
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    attempts: 1,
+                };
+            }
         }
     }
 
     let query_start = std::time::Instant::now();
+    let as_of = "2026-07-15T14:00:01Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
     let context_result = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),
-            scope: "org".into(),
-            as_of: Some(chrono::Utc::now()),
+            scope: case.scope.clone(),
+            as_of: Some(as_of),
             budget: 5,
-            project: None,
+            project: case.project.clone(),
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -208,36 +216,58 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
 
     match context_result {
         Ok(items) => {
-            let matched = case
-                .expected_evidence
-                .iter()
-                .filter(|needle| {
-                    items
-                        .iter()
-                        .any(|item| item.content.contains(needle.as_str()))
-                })
-                .count();
-
-            let all_matched = matched == case.expected_evidence.len();
-            let enough_items = items.len() >= case.min_context_items;
+            let mut failures = Vec::new();
 
             let mut metrics = std::collections::BTreeMap::new();
             metrics.insert("context_items_returned".into(), items.len() as f64);
-            metrics.insert("evidence_matched".into(), matched as f64);
-            metrics.insert("evidence_total".into(), case.expected_evidence.len() as f64);
 
-            let status = if all_matched && enough_items {
-                CaseStatus::Passed
-            } else {
-                CaseStatus::QualityFailed
-            };
+            let mut entity_tp = 0u64;
+            let mut entity_fn = 0u64;
+            for expected in &case.expected_entities {
+                let matched = all_entities
+                    .iter()
+                    .any(|e| e.to_lowercase() == expected.canonical_name.to_lowercase());
+                if matched {
+                    entity_tp += 1;
+                } else {
+                    entity_fn += 1;
+                    failures.push(format!("missing entity: {}", expected.canonical_name));
+                }
+            }
+            let entity_fp = (all_entities.len() as u64).saturating_sub(entity_tp);
 
-            let mut failures = Vec::new();
-            if !all_matched {
+            if !case.expected_entities.is_empty() {
+                metrics.insert("entity_tp".into(), entity_tp as f64);
+                metrics.insert("entity_fp".into(), entity_fp as f64);
+                metrics.insert("entity_fn".into(), entity_fn as f64);
+            }
+
+            let mut evidence_map = std::collections::BTreeMap::new();
+            if !case.expected_entities.is_empty() || !all_entities.is_empty() {
+                evidence_map.insert(
+                    "classification".to_string(),
+                    MetricEvidence::classification(entity_tp, entity_fp, entity_fn, 0),
+                );
+            }
+
+            let context_matched = case
+                .expected_context
+                .iter()
+                .filter(|exp| {
+                    items
+                        .iter()
+                        .any(|item| item.content.contains(&exp.content_contains))
+                })
+                .count();
+
+            let context_all_matched = context_matched == case.expected_context.len();
+            let enough_items = items.len() >= case.min_context_items;
+
+            if !context_all_matched {
                 failures.push(format!(
-                    "evidence: {}/{}",
-                    matched,
-                    case.expected_evidence.len()
+                    "context: {}/{}",
+                    context_matched,
+                    case.expected_context.len()
                 ));
             }
             if !enough_items {
@@ -248,14 +278,20 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                 ));
             }
 
+            let all_passed = entity_fn == 0 && context_all_matched && enough_items;
+
             EvalCaseOutcome {
                 case_key: CaseKey::parse("end-to-end", &case.id).unwrap(),
                 mode: EvalMode::EndToEnd,
                 split: CorpusSplit::Development,
                 label_trust: LabelTrust::Official,
-                status,
+                status: if all_passed {
+                    CaseStatus::Passed
+                } else {
+                    CaseStatus::QualityFailed
+                },
                 metrics,
-                evidence: std::collections::BTreeMap::new(),
+                evidence: evidence_map,
                 invalid_reason: None,
                 failures,
                 duration_ms: query_ms,

@@ -2,34 +2,46 @@
   {
     "id": "e2e-pipeline-completes",
     "description": "Ingest, extract, and retrieve a simple fact through the production pipeline",
+    "scope": "org",
+    "project": null,
     "sources": [
       {
         "source_type": "note",
         "source_id": "e2e-fact-001",
-        "content": "The quarterly revenue report shows $5.2M in ARR for Q2 2026.",
-        "scope": "org",
-        "t_ref": "2026-07-01T10:00:00Z"
+        "content": "The quarterly revenue report shows $5.2M in ARR for Q2 2026."
       }
     ],
     "query": "quarterly revenue",
-    "expected_evidence": ["$5.2M", "ARR", "Q2 2026"],
+    "expected_entities": [],
+    "expected_context": [
+      {"content_contains": "$5.2M"},
+      {"content_contains": "ARR"},
+      {"content_contains": "Q2 2026"}
+    ],
     "min_context_items": 1,
     "label_trust": "official"
   },
   {
     "id": "e2e-entity-extraction",
     "description": "Verify entity extraction produces expected entities from structured content",
+    "scope": "team",
+    "project": null,
     "sources": [
       {
         "source_type": "email",
         "source_id": "e2e-entity-001",
-        "content": "Alice Smith from Acme Corp presented the API design review. Bob Johnson from Beta Inc attended and provided feedback on the authentication module.",
-        "scope": "team",
-        "t_ref": "2026-07-15T14:00:00Z"
+        "content": "Alice Smith from Acme Corp presented the API design review. Bob Johnson from Beta Inc attended and provided feedback on the authentication module."
       }
     ],
     "query": "API design review attendees",
-    "expected_evidence": ["Alice Smith", "Acme Corp", "Bob Johnson"],
+    "expected_entities": [
+      {"canonical_name": "Alice Smith", "entity_type": "person"},
+      {"canonical_name": "Acme Corp", "entity_type": "organization"},
+      {"canonical_name": "Bob Johnson", "entity_type": "person"}
+    ],
+    "expected_context": [
+      {"content_contains": "API design review"}
+    ],
     "min_context_items": 1,
     "label_trust": "official"
   }
