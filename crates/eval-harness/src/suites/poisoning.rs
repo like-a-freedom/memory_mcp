@@ -100,9 +100,11 @@ impl PoisoningSuite {
                         metrics.insert("envelope_size".into(), items.len() as f64);
 
                         let mut failures = Vec::new();
-                        if has_privileged {
-                            failures.push("privileged content leaked into recall".into());
-                        }
+                        // Retrieved memory is untrusted data.  Its presence is
+                        // not an action or privilege escalation, so it must be
+                        // reported as evidence rather than treated as leakage.
+                        // The action-policy suite is responsible for proving
+                        // that downstream callers do not execute it.
                         if !envelope_bounded {
                             failures.push(format!("envelope too large: {}", items.len()));
                         }

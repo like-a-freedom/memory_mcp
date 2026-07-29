@@ -210,9 +210,68 @@ impl ClaimSchemaRef {
 
 // ─── Claim Value ──────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ClaimValue {
+    Boolean(bool),
+    Integer(i64),
+    Decimal(CanonicalDecimal),
+    Text(NormalizedText),
+    DateTime(chrono::DateTime<chrono::Utc>),
+    Duration(CanonicalDuration),
+    Entity(String),
+    Quantity {
+        value: CanonicalDecimal,
+        unit: CanonicalUnit,
+    },
+}
+
+impl<'de> Deserialize<'de> for ClaimValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let kind = raw
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| serde::de::Error::custom("claim value kind must be a string"))?;
+        let value = raw.get("value").cloned().unwrap_or(serde_json::Value::Null);
+
+        fn surreal_scalar(value: serde_json::Value, key: &str) -> serde_json::Value {
+            value
+                .as_object()
+                .and_then(|object| object.get(key).cloned())
+                .unwrap_or(value)
+        }
+
+        let normalized = match kind {
+            "boolean" => serde_json::json!({
+                "kind": kind,
+                "value": surreal_scalar(value, "Bool")
+            }),
+            "integer" => serde_json::json!({
+                "kind": kind,
+                "value": surreal_scalar(value, "Int")
+            }),
+            _ => serde_json::json!({"kind": kind, "value": value}),
+        };
+
+        let raw: RawClaimValue =
+            serde_json::from_value(normalized).map_err(serde::de::Error::custom)?;
+        Ok(match raw {
+            RawClaimValue::Boolean(value) => Self::Boolean(value),
+            RawClaimValue::Integer(value) => Self::Integer(value),
+            RawClaimValue::Decimal(value) => Self::Decimal(value),
+            RawClaimValue::Text(value) => Self::Text(value),
+            RawClaimValue::DateTime(value) => Self::DateTime(value),
+            RawClaimValue::Duration(value) => Self::Duration(value),
+            RawClaimValue::Entity(value) => Self::Entity(value),
+            RawClaimValue::Quantity { value, unit } => Self::Quantity { value, unit },
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+enum RawClaimValue {
     Boolean(bool),
     Integer(i64),
     Decimal(CanonicalDecimal),
@@ -674,13 +733,14 @@ pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
         PolicyFingerprint::compute(input.scope, input.project, input.policy_tags);
     let project_identity = input.project.unwrap_or("__none__").to_string();
     let slot_fingerprint = format!(
-        "{}:{}:{}:{}:{}:{}",
+        "{}:{}:{}:{}:{}:{}:{}",
         input.namespace,
         input.scope,
         project_identity,
         draft.schema_ref.version.get(),
         draft.subject.subject_key,
         comparison_key_hash.0,
+        access_policy_fingerprint.0,
     );
 
     Ok(Claim {
@@ -730,6 +790,16 @@ pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn claim_value_accepts_surreal_boolean_wrapper() {
+        let value: ClaimValue = serde_json::from_value(serde_json::json!({
+            "kind": "boolean",
+            "value": {"Bool": true}
+        }))
+        .unwrap();
+        assert_eq!(value, ClaimValue::Boolean(true));
+    }
     use proptest::prelude::*;
 
     #[test]

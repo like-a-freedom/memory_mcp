@@ -6,19 +6,26 @@
     {
       "id": "local-retrieval",
       "expected_coverage": {
-        "exact_cases": 50
+        "exact_cases": 66
       }
     },
     {
       "id": "extraction",
       "expected_coverage": {
-        "exact_cases": 5
+        "exact_cases": 9
       }
     },
     {
       "id": "claim-reconciliation",
       "expected_coverage": {
-        "exact_cases": 5
+        "exact_cases": 42
+      }
+    },
+    {
+      "id": "external-retrieval",
+      "corpus_root": "evals/corpora/eval-mini",
+      "expected_coverage": {
+        "exact_cases": 2
       }
     }
   ],
@@ -70,6 +77,13 @@
       },
       "hard_floor": 0.90,
       "regression_budget": 0.10
+    },
+    {
+      "target": {
+        "suite_id": "external-retrieval",
+        "metric": "recall_at_5"
+      },
+      "hard_floor": 0.90
     }
   ]
 }

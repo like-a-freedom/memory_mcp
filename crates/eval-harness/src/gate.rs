@@ -26,15 +26,10 @@ pub fn evaluate_gates(
         let observed = find_observed_metric(artifact, &decl.target);
 
         let Some(observed) = observed else {
-            decisions.push(GateDecision {
-                metric: decl.target.metric.clone(),
-                observed: 0.0,
-                hard_floor: decl.hard_floor,
-                baseline: None,
-                regression_budget: decl.regression_budget,
-                status: GateStatus::Invalid,
-                reason: GateFailureReason::None,
-            });
+            let mut decision = evaluate_missing_metric(&decl.target.suite_id, &decl.target.metric);
+            decision.hard_floor = decl.hard_floor;
+            decision.regression_budget = decl.regression_budget;
+            decisions.push(decision);
             continue;
         };
 
@@ -42,6 +37,7 @@ pub fn evaluate_gates(
 
         if decl.baseline_required && baseline_value.is_none() {
             decisions.push(GateDecision {
+                suite_id: decl.target.suite_id.clone(),
                 metric: decl.target.metric.clone(),
                 observed,
                 hard_floor: decl.hard_floor,
@@ -57,6 +53,7 @@ pub fn evaluate_gates(
             && observed < floor
         {
             decisions.push(GateDecision {
+                suite_id: decl.target.suite_id.clone(),
                 metric: decl.target.metric.clone(),
                 observed,
                 hard_floor: Some(floor),
@@ -72,6 +69,7 @@ pub fn evaluate_gates(
             && baseline_val - observed > budget
         {
             decisions.push(GateDecision {
+                suite_id: decl.target.suite_id.clone(),
                 metric: decl.target.metric.clone(),
                 observed,
                 hard_floor: decl.hard_floor,
@@ -84,6 +82,7 @@ pub fn evaluate_gates(
         }
 
         decisions.push(GateDecision {
+            suite_id: decl.target.suite_id.clone(),
             metric: decl.target.metric.clone(),
             observed,
             hard_floor: decl.hard_floor,
@@ -97,8 +96,9 @@ pub fn evaluate_gates(
     Ok(decisions)
 }
 
-pub fn evaluate_missing_metric(_suite_id: &str, metric: &str) -> GateDecision {
+pub fn evaluate_missing_metric(suite_id: &str, metric: &str) -> GateDecision {
     GateDecision {
+        suite_id: suite_id.to_string(),
         metric: metric.to_string(),
         observed: 0.0,
         hard_floor: None,
@@ -119,6 +119,7 @@ pub fn evaluate_metric_gate(
         && observed < floor
     {
         return GateDecision {
+            suite_id: String::new(),
             metric: String::new(),
             observed,
             hard_floor: Some(floor),
@@ -133,6 +134,7 @@ pub fn evaluate_metric_gate(
         && base - observed > budget
     {
         return GateDecision {
+            suite_id: String::new(),
             metric: String::new(),
             observed,
             hard_floor,
@@ -144,6 +146,7 @@ pub fn evaluate_metric_gate(
     }
 
     GateDecision {
+        suite_id: String::new(),
         metric: String::new(),
         observed,
         hard_floor,
@@ -194,5 +197,12 @@ mod tests {
     fn baseline_without_budget_ignores_regression() {
         let decision = evaluate_metric_gate(0.50, Some(0.40), Some(0.98), None);
         assert_eq!(decision.status, GateStatus::Passed);
+    }
+
+    #[test]
+    fn missing_metric_is_explicitly_invalid() {
+        let decision = evaluate_missing_metric("end-to-end", "context_match_rate");
+        assert_eq!(decision.status, GateStatus::Invalid);
+        assert_eq!(decision.reason, GateFailureReason::MissingMetric);
     }
 }

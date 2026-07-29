@@ -50,6 +50,9 @@ pub fn is_promise_statement(content: &str) -> bool {
 /// Detects metric-related content using word-boundary matching.
 pub fn is_metric_statement(content: &str) -> bool {
     METRIC_RE.is_match(content)
+        || ["ARR", "MRR", "NRR", "ROI", "LTV", "CAC", "NPS", "EBITDA"]
+            .iter()
+            .any(|marker| content.contains(marker))
 }
 
 /// Detects preference/profile statements that should be stored as experience facts.
@@ -127,4 +130,14 @@ pub fn is_low_value_summary_candidate(content: &str) -> bool {
     let roster_dominated = email_lines > 0 && !has_sentence_punctuation && alpha_terms < 6;
 
     header_dominated || roster_dominated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metric_detection_handles_acronym_adjacent_to_cjk_text() {
+        assert!(is_metric_statement("张三报告ARR为500万美元。"));
+    }
 }

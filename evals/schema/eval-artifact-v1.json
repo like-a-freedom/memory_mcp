@@ -170,12 +170,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "suite_id",
         "metric",
         "observed",
         "status",
         "reason"
       ],
       "properties": {
+        "suite_id": { "type": "string" },
         "metric": { "type": "string" },
         "observed": { "type": "number" },
         "hard_floor": { "type": "number" },

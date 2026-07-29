@@ -116,9 +116,18 @@ impl EvalSuite for EndToEndSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
+        static SPECS: &[crate::reducer::RatioMetricSpec] = &[crate::reducer::RatioMetricSpec {
+            evidence_key: "context_match",
+            metric_name: "context_match_rate",
+        }];
         use std::sync::OnceLock;
         static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("end-to-end"))))
+        *R.get_or_init(|| {
+            &*Box::leak(Box::new(crate::reducer::RatioReducer::new(
+                "end-to-end",
+                SPECS,
+            )))
+        })
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
@@ -182,7 +191,10 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                     t_ref: case.t_ref,
                     scope: case.scope.clone(),
                     project: case.project.clone(),
-                    t_ingested: None,
+                    // Keep transaction time inside the fixture's as_of window;
+                    // leaving this unset would use Utc::now() and hide the fact
+                    // from a deterministic historical query.
+                    t_ingested: Some(case.t_ref),
                     visibility_scope: None,
                     policy_tags: vec![],
                 },

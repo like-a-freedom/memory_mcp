@@ -86,7 +86,7 @@ async fn ingest_and_extract(
                     .expect("static timestamp should parse"),
                 scope: scope.to_string(),
                 project: None,
-                t_ingested: None,
+                t_ingested: Some("2026-04-07T10:00:00Z".parse().expect("static timestamp")),
                 visibility_scope: None,
                 policy_tags: vec![],
             },

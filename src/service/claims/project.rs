@@ -41,6 +41,7 @@ pub(crate) struct FactPersistedParams<'a> {
     pub content: &'a str,
     pub scope: &'a str,
     pub project: Option<&'a str>,
+    pub policy_tags: &'a [String],
     pub entity_links: &'a [String],
     pub t_valid: chrono::DateTime<chrono::Utc>,
 }
@@ -122,7 +123,7 @@ impl ClaimService {
             let comparison_key_hash = ComparisonKeyHash::compute(&draft.comparison_key);
             let qualifier_hash = QualifierHash::compute(&draft.qualifiers);
             let access_policy_fingerprint =
-                PolicyFingerprint::compute(params.scope, params.project, &[]);
+                PolicyFingerprint::compute(params.scope, params.project, params.policy_tags);
             let project_identity = params.project.unwrap_or("__none__").to_string();
 
             let subject_slot = ClaimSlot {
@@ -156,7 +157,7 @@ impl ClaimService {
                 source_episode_id: params.source_episode_id,
                 scope: params.scope,
                 project: params.project,
-                policy_tags: &[],
+                policy_tags: params.policy_tags,
                 draft: claim_draft,
                 extractor_fingerprint: fingerprint,
                 t_ingested,
@@ -409,6 +410,7 @@ mod tests {
             content,
             scope: "personal",
             project: None,
+            policy_tags: &[],
             entity_links: &[],
             t_valid: chrono::Utc::now(),
         }

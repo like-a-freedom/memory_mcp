@@ -2,9 +2,10 @@ use std::collections::BTreeSet;
 
 use eval_harness::cli::{self, Command};
 use eval_harness::{
-    ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest,
-    DownstreamQaSuite, EndToEndSuite, ExtractionSuite, LifecycleReleaseSuite, PoisoningSuite,
-    ProfileManifest, RetrievalSuite, RunArtifact, RunRequest, Runner, SuiteId,
+    ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest, DatasetKind,
+    DownstreamQaSuite, EndToEndSuite, ExternalRetrievalSuite, ExtractionSuite,
+    LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, RetrievalSuite, RunArtifact,
+    RunRequest, Runner, SuiteId,
 };
 
 #[tokio::main]
@@ -50,6 +51,7 @@ async fn cmd_run(
     });
 
     let mut suites: Vec<Box<dyn eval_harness::runner::EvalSuite>> = Vec::new();
+    let mut issues = Vec::new();
 
     for suite_decl in &manifest.suites {
         if !suite_filter.is_empty() && !suite_filter.contains(&suite_decl.id) {
@@ -59,27 +61,56 @@ async fn cmd_run(
         match suite_decl.id.as_str() {
             "local-retrieval" => match RetrievalSuite::new() {
                 Ok(s) => suites.push(Box::new(s)),
-                Err(e) => eprintln!(
-                    "warning: failed to load {suite}: {e}",
-                    suite = suite_decl.id
-                ),
+                Err(e) => {
+                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                }
             },
             "extraction" => match ExtractionSuite::new() {
                 Ok(s) => suites.push(Box::new(s)),
-                Err(e) => eprintln!(
-                    "warning: failed to load {suite}: {e}",
-                    suite = suite_decl.id
-                ),
+                Err(e) => {
+                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                }
             },
             "claim-reconciliation" => match ClaimReconciliationSuite::new() {
                 Ok(s) => suites.push(Box::new(s)),
-                Err(e) => eprintln!(
-                    "warning: failed to load {suite}: {e}",
-                    suite = suite_decl.id
-                ),
+                Err(e) => {
+                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                }
             },
             "end-to-end" => {
                 suites.push(Box::new(EndToEndSuite::new()));
+            }
+            "external-retrieval" => {
+                let Some(root) = suite_decl.corpus_root.as_deref() else {
+                    eprintln!("warning: external-retrieval requires corpus_root");
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                    continue;
+                };
+                let root = std::path::PathBuf::from(root);
+                let manifest_path = root.join("manifest.json");
+                let loaded = std::fs::read_to_string(&manifest_path)
+                    .map_err(|e| format!("read {}: {e}", manifest_path.display()))
+                    .and_then(|raw| CorpusManifest::parse(&raw).map_err(|e| e.to_string()))
+                    .and_then(|manifest| {
+                        let kind = DatasetKind::parse_name(&manifest.corpus_id)
+                            .ok_or_else(|| format!("unsupported corpus {}", manifest.corpus_id))?;
+                        let prepared = manifest.validate_at(&root).map_err(|e| e.to_string())?;
+                        eval_harness::corpus::adapters::load_and_normalize(kind, &prepared)
+                            .map(|cases| (kind, cases))
+                            .map_err(|e| e.to_string())
+                    });
+                match loaded {
+                    Ok((kind, cases)) => {
+                        suites.push(Box::new(ExternalRetrievalSuite::new(kind, cases)))
+                    }
+                    Err(e) => {
+                        eprintln!("warning: failed to load external corpus: {e}");
+                        issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                    }
+                }
             }
             "action-grounding" => {
                 suites.push(Box::new(ActionGroundingSuite::new()));
@@ -98,6 +129,7 @@ async fn cmd_run(
             }
             other => {
                 eprintln!("warning: unknown suite {other}");
+                issues.push(eval_harness::RunIssue::empty_suite(other));
             }
         }
     }
@@ -119,7 +151,7 @@ async fn cmd_run(
         artifact_path: artifact.clone(),
         baseline: baseline_artifact,
         suite_filter: suite_filter_set,
-        issues: vec![],
+        issues,
     };
     let result = runner.run(&request).await;
 
@@ -286,7 +318,8 @@ fn print_summary(art: &RunArtifact) {
 
     for gate in &art.gates {
         println!(
-            "gate={} observed={:.4} status={}",
+            "gate={}/{} observed={:.4} status={}",
+            gate.suite_id,
             gate.metric,
             gate.observed,
             format!("{:?}", gate.status).to_lowercase(),

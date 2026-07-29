@@ -108,7 +108,18 @@ pub fn load_and_normalize(
         source,
     })?;
     let adapter = adapter_for(kind);
-    adapter.normalize(&raw)
+    let cases = adapter.normalize(&raw)?;
+    for case in &cases {
+        adapter.validate_case(case)?;
+        crate::domain::EvalCaseId::parse(&case.id).map_err(|error| {
+            EvalError::InvalidInput(format!(
+                "invalid {} case id '{}': {error}",
+                kind.dataset_name(),
+                case.id
+            ))
+        })?;
+    }
+    Ok(cases)
 }
 
 // ─── LongMemEval Adapter ─────────────────────────────────────────────────────

@@ -1,0 +1,20 @@
+[
+  {
+    "question_id": "eval-mini-001",
+    "question_type": "single-session-fact",
+    "question": "What was the Q1 revenue?",
+    "answer": "Q1 revenue was $10M.",
+    "question_date": "2026/04/02 (Thu) 12:00",
+    "haystack_dates": ["2026/04/01 (Wed) 10:00"],
+    "haystack_sessions": [[{"content": "Q1 revenue was $10M."}]]
+  },
+  {
+    "question_id": "eval-mini-002",
+    "question_type": "single-session-fact",
+    "question": "Which database is used for the memory service?",
+    "answer": "The memory service uses SurrealDB.",
+    "question_date": "2026/04/03 (Fri) 12:00",
+    "haystack_dates": ["2026/04/02 (Thu) 10:00"],
+    "haystack_sessions": [[{"content": "The memory service uses SurrealDB."}]]
+  }
+]

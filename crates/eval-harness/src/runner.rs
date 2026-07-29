@@ -49,6 +49,7 @@ impl Runner {
         let mut all_outcomes = Vec::new();
         let mut expected_ids = Vec::new();
         let mut suite_summaries = Vec::new();
+        let mut issues = request.issues.clone();
 
         for suite in &self.suites {
             if !request.suite_filter.is_empty()
@@ -60,6 +61,26 @@ impl Runner {
             expected_ids.extend(suite.expected_case_ids().iter().cloned());
 
             let outcomes = suite.run(&context).await;
+
+            if let Some(decl) = request
+                .manifest
+                .suites
+                .iter()
+                .find(|decl| decl.id == suite.id())
+                && let Some(expected) = decl.expected_coverage.as_ref()
+                && outcomes.len() != expected.exact_cases
+            {
+                issues.push(RunIssue {
+                    stage: RunStage::Coverage,
+                    suite_id: Some(SuiteId::parse(suite.id())?),
+                    message: format!(
+                        "suite '{}' produced {} cases, expected exactly {}",
+                        suite.id(),
+                        outcomes.len(),
+                        expected.exact_cases
+                    ),
+                });
+            }
 
             let summaries = suite.reducer().reduce(&outcomes)?;
             suite_summaries.extend(summaries);
@@ -89,8 +110,23 @@ impl Runner {
             None
         };
 
+        let selected_gates: Vec<_> = request
+            .manifest
+            .gates
+            .iter()
+            .filter(|gate| {
+                if request.suite_filter.is_empty() {
+                    return true;
+                }
+                let Ok(suite_id) = SuiteId::parse(&gate.target.suite_id) else {
+                    return false;
+                };
+                request.suite_filter.contains(&suite_id)
+            })
+            .cloned()
+            .collect();
         let gates = crate::evaluate_gates(
-            &request.manifest.gates,
+            &selected_gates,
             &crate::RunArtifact {
                 schema_version: crate::EVAL_ARTIFACT_SCHEMA_V1.to_string(),
                 run_id: "pending".into(),
@@ -113,7 +149,7 @@ impl Runner {
         let fingerprint = crate::RunFingerprint::capture();
 
         let budget = budget_status.unwrap_or(GateStatus::Invalid);
-        let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &request.issues);
+        let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &issues);
 
         let artifact = crate::RunArtifact {
             schema_version: crate::EVAL_ARTIFACT_SCHEMA_V2.to_string(),
@@ -129,7 +165,7 @@ impl Runner {
             fingerprint,
             budget_status: Some(budget),
             verdict,
-            issues: request.issues.clone(),
+            issues,
         };
 
         artifact.validate()?;

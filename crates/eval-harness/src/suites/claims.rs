@@ -131,6 +131,7 @@ enum WarningLabel {
     TruePositive,
     FalsePositive,
     IsolationViolation,
+    UnresolvedLineage,
 }
 
 fn classify_warning(
@@ -139,23 +140,20 @@ fn classify_warning(
     boundaries: &std::collections::BTreeMap<String, BoundaryKey>,
     warning: &ContradictionWarning,
 ) -> WarningLabel {
-    let left_boundary = boundaries.get(&warning.conflicting_fact_id).or_else(|| {
-        lineage
-            .values()
-            .find(|facts| facts.contains(&warning.conflicting_fact_id))
-            .and_then(|_| boundaries.values().next())
-    });
-    let right_boundary = boundaries.get(&warning.new_fact_id).or_else(|| {
-        lineage
-            .values()
-            .find(|facts| facts.contains(&warning.new_fact_id))
-            .and_then(|_| boundaries.values().next())
-    });
+    // Boundary ownership must come from the exact persisted fact ID.  Guessing
+    // from the first boundary would turn missing lineage into a false pass or
+    // false isolation violation.
+    let left_boundary = boundaries.get(&warning.conflicting_fact_id);
+    let right_boundary = boundaries.get(&warning.new_fact_id);
 
     if let (Some(left), Some(right)) = (left_boundary, right_boundary)
         && left != right
     {
         return WarningLabel::IsolationViolation;
+    }
+
+    if left_boundary.is_none() || right_boundary.is_none() {
+        return WarningLabel::UnresolvedLineage;
     }
 
     let mut is_expected = false;
@@ -216,7 +214,7 @@ async fn ingest_and_extract(
                 t_ref: t_ref_datetime,
                 scope: params.scope.to_string(),
                 project: params.project.map(str::to_string),
-                t_ingested: None,
+                t_ingested: Some(t_ref_datetime),
                 visibility_scope: None,
                 policy_tags: params.policy_tags.to_vec(),
             },
@@ -253,6 +251,7 @@ struct CaseMetrics {
     matched_warnings: usize,
     predicted_warnings: usize,
     isolation_violations: usize,
+    unresolved_lineage: usize,
 }
 
 fn matches_expected_relation_by_lineage(
@@ -316,12 +315,21 @@ fn evaluate_case(
         boundaries,
         &extraction.warnings,
     );
+    let unresolved_lineage = extraction
+        .warnings
+        .iter()
+        .filter(|warning| {
+            classify_warning(&case.expected.relations, lineage, boundaries, warning)
+                == WarningLabel::UnresolvedLineage
+        })
+        .count();
 
     CaseMetrics {
         expected_contradictions,
         matched_warnings,
         predicted_warnings: extraction.warnings.len(),
         isolation_violations,
+        unresolved_lineage,
     }
 }
 
@@ -527,6 +535,10 @@ impl EvalSuite for ClaimReconciliationSuite {
                 "isolation_violations".into(),
                 metrics_result.isolation_violations as f64,
             );
+            metric_map.insert(
+                "unresolved_lineage".into(),
+                metrics_result.unresolved_lineage as f64,
+            );
 
             let precision = if metrics_result.predicted_warnings == 0 {
                 if metrics_result.expected_contradictions == 0 {
@@ -547,7 +559,12 @@ impl EvalSuite for ClaimReconciliationSuite {
             metric_map.insert("claim_precision".into(), precision);
             metric_map.insert("claim_recall".into(), recall);
 
-            let case_passed = metrics_result.isolation_violations == 0;
+            let exact_claim_quality = metrics_result.matched_warnings
+                == metrics_result.expected_contradictions
+                && metrics_result.predicted_warnings == metrics_result.expected_contradictions;
+            let case_invalid = metrics_result.unresolved_lineage > 0;
+            let case_passed =
+                !case_invalid && metrics_result.isolation_violations == 0 && exact_claim_quality;
 
             let tp = metrics_result.matched_warnings as u64;
             let fp = (metrics_result.predicted_warnings as u64).saturating_sub(tp);
@@ -567,18 +584,28 @@ impl EvalSuite for ClaimReconciliationSuite {
                 mode: EvalMode::EndToEnd,
                 split: corpus_split,
                 label_trust: LabelTrust::Official,
-                status: if case_passed {
+                status: if case_invalid {
+                    CaseStatus::Invalid
+                } else if case_passed {
                     CaseStatus::Passed
                 } else {
                     CaseStatus::QualityFailed
                 },
                 metrics: metric_map,
                 evidence: evidence_map,
-                invalid_reason: None,
-                failures: if !case_passed {
+                invalid_reason: case_invalid.then(|| {
+                    format!(
+                        "unresolved claim lineage for {} warning(s)",
+                        metrics_result.unresolved_lineage
+                    )
+                }),
+                failures: if !case_passed && !case_invalid {
                     vec![format!(
-                        "isolation_violations={}",
-                        metrics_result.isolation_violations
+                        "claim_quality mismatch: expected={}, matched={}, predicted={}, isolation_violations={}",
+                        metrics_result.expected_contradictions,
+                        metrics_result.matched_warnings,
+                        metrics_result.predicted_warnings,
+                        metrics_result.isolation_violations,
                     )]
                 } else {
                     vec![]

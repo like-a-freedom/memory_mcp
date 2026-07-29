@@ -74,6 +74,12 @@ pub enum UnsupportedDevice {
     Metal,
 }
 
+/// Metadata/device capability probe used by benchmark setup.
+///
+/// The measured NER paths live in the Criterion benches and call the
+/// production `MemoryService::extract` pipeline directly.  This helper is
+/// intentionally not an inference runner; returning an error prevents tests
+/// from accidentally publishing synthetic entity counts as latency evidence.
 pub struct NerRunner;
 
 impl NerRunner {
@@ -92,14 +98,10 @@ impl NerRunner {
 
     pub fn extract(&self, input: &str) -> Result<NerOutput, EvalError> {
         let _ = input;
-        Ok(NerOutput {
-            entities: vec![NerEntity {
-                text: "Alice Smith".into(),
-                label: "person".into(),
-                start: 0,
-                end: 11,
-            }],
-        })
+        Err(EvalError::Suite(
+            "NerRunner is metadata-only; use the production extraction path for measurements"
+                .into(),
+        ))
     }
 }
 

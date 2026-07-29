@@ -35,7 +35,10 @@ impl ExternalRetrievalSuite {
     pub fn new(dataset: crate::corpus::adapters::DatasetKind, cases: Vec<ExternalCase>) -> Self {
         let expected_ids: Vec<EvalCaseId> = cases
             .iter()
-            .filter_map(|c| EvalCaseId::parse(&c.id).ok())
+            .map(|c| {
+                EvalCaseId::parse(&c.id)
+                    .expect("external corpus is validated before suite construction")
+            })
             .collect();
         Self {
             cases,
@@ -112,6 +115,16 @@ impl ExternalRetrievalSuite {
                 let relevant_ids: std::collections::BTreeSet<String> =
                     case.expected.must_contain.iter().cloned().collect();
 
+                let hits_at_k = ranked_ids
+                    .iter()
+                    .take(5)
+                    .filter(|id| relevant_ids.contains(*id))
+                    .count() as u64;
+                let first_relevant_rank = ranked_ids
+                    .iter()
+                    .position(|id| relevant_ids.contains(id))
+                    .map(|rank| (rank + 1) as u32);
+
                 let mut metric_map = BTreeMap::new();
                 if !relevant_ids.is_empty() && !ranked_ids.is_empty() {
                     let obs = metrics::RetrievalObservation {
@@ -141,7 +154,17 @@ impl ExternalRetrievalSuite {
                         CaseStatus::QualityFailed
                     },
                     metrics: metric_map,
-                    evidence: std::collections::BTreeMap::new(),
+                    evidence: [(
+                        "retrieval".to_string(),
+                        MetricEvidence::retrieval(
+                            relevant_ids.len() as u64,
+                            hits_at_k,
+                            first_relevant_rank,
+                            5,
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
                     invalid_reason: None,
                     failures: if !meets_recall {
                         vec![format!(
@@ -190,8 +213,9 @@ impl EvalSuite for ExternalRetrievalSuite {
         use std::sync::OnceLock;
         static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
         *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::CountReducer::new(
+            &*Box::leak(Box::new(crate::reducer::RetrievalReducer::new(
                 "external-retrieval",
+                5,
             )))
         })
     }

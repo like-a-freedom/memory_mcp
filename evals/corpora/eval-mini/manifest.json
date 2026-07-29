@@ -1,0 +1,12 @@
+{
+  "schema_version": "memory-mcp-corpus/v1",
+  "corpus_id": "longmemeval-cleaned",
+  "source_url": "https://example.invalid/memory-mcp-eval-mini",
+  "revision": "eval-mini-v1",
+  "sha256": "ecb25f75f720bd88b3522ac326427b855ca8e65904dd5126a0c18326833cde66",
+  "license": "internal-evaluation-fixture",
+  "byte_size": 719,
+  "case_count": 2,
+  "adapter_version": "1",
+  "data_file": "longmemeval_s_cleaned.json"
+}

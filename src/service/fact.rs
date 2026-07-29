@@ -353,6 +353,7 @@ impl FactService {
             content: &claim_content,
             scope: &claim_scope,
             project: claim_project.as_deref(),
+            policy_tags: &policy_tags,
             entity_links: &claim_entity_links,
             t_valid: claim_t_valid,
         };

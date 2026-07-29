@@ -290,6 +290,55 @@ impl ClaimSchema for AttributeV1 {
 
 struct QuantityV1;
 
+fn parse_multilingual_quantity(content: &str) -> Option<(String, String, String, String)> {
+    let content = content.trim().trim_end_matches(['.', '。']);
+
+    if let Some(measure_start) = content.find(" сообщает, что ") {
+        let subject = content[..measure_start].trim().to_string();
+        let rest = &content[measure_start + " сообщает, что ".len()..];
+        let value_start = rest.find(" составляет ")?;
+        let measure = rest[..value_start].trim().to_string();
+        let raw_value = rest[value_start + " составляет ".len()..].trim();
+        let number = raw_value.split_whitespace().next()?.parse::<u64>().ok()?;
+        let multiplier = if raw_value.contains("миллион") {
+            1_000_000
+        } else {
+            1
+        };
+        let unit = if raw_value.contains("доллар") {
+            "usd"
+        } else {
+            ""
+        };
+        return Some((
+            subject,
+            measure,
+            (number * multiplier).to_string(),
+            unit.to_string(),
+        ));
+    }
+
+    if let Some(measure_start) = content.find("报告") {
+        let subject = content[..measure_start].trim().to_string();
+        let rest = &content[measure_start + "报告".len()..];
+        let value_start = rest.find('为')?;
+        let measure = rest[..value_start].trim().to_string();
+        let raw_value = rest[value_start + '为'.len_utf8()..].trim();
+        let digits: String = raw_value.chars().take_while(char::is_ascii_digit).collect();
+        let number = digits.parse::<u64>().ok()?;
+        let multiplier = if raw_value.contains('万') { 10_000 } else { 1 };
+        let unit = if raw_value.contains('美') { "usd" } else { "" };
+        return Some((
+            subject,
+            measure,
+            (number * multiplier).to_string(),
+            unit.to_string(),
+        ));
+    }
+
+    None
+}
+
 impl ClaimSchema for QuantityV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
@@ -349,6 +398,37 @@ impl ClaimSchema for QuantityV1 {
                     });
                 }
             }
+            return Ok(());
+        }
+
+        if let Some((_subject, measure, value, unit)) = parse_multilingual_quantity(input.content) {
+            let mut components = BTreeMap::new();
+            components.insert(
+                "measure".to_string(),
+                NormalizedText::new(&measure).to_string(),
+            );
+            components.insert("unit_family".to_string(), unit.clone());
+            let key = ComparisonKey::new(self.schema_ref(), components)?;
+            output.push(ClaimDraftCandidate {
+                schema_ref: self.schema_ref(),
+                subject: input.subject.to_string(),
+                comparison_key: key,
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Quantity {
+                    value: CanonicalDecimal::parse(&value)?,
+                    unit: CanonicalUnit {
+                        family: unit.clone(),
+                        symbol: unit,
+                    },
+                },
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: input.t_ref,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: None,
+            });
             return Ok(());
         }
 
@@ -522,19 +602,24 @@ struct CommitmentSentence {
 fn parse_commitment_sentence(content: &str) -> Option<CommitmentSentence> {
     let content = content.trim().trim_end_matches('.');
     let will_pos = content.find(" will ")?;
-    let by_pos = content.rfind(" by ")?;
-
-    if by_pos <= will_pos {
-        return None;
-    }
-
     let subject = content[..will_pos].trim().to_string();
-    let after_will = content[will_pos + 6..by_pos].trim();
+    let after_will = &content[will_pos + 6..];
+    let (action_target, deadline) = if let Some(by_pos) = after_will.rfind(" by ") {
+        (&after_will[..by_pos], &after_will[by_pos + 4..])
+    } else {
+        let marker = [" tomorrow", " next week", " today"]
+            .iter()
+            .filter_map(|marker| after_will.rfind(marker).map(|pos| (pos, *marker)))
+            .max_by_key(|(pos, _)| *pos)?;
+        (&after_will[..marker.0], &after_will[marker.0 + 1..])
+    };
+    let after_will = action_target.trim();
+    let deadline = deadline.trim();
 
     let action_end = after_will.find(' ')?;
     let action = after_will[..action_end].trim().to_string();
     let target = after_will[action_end + 1..].trim().to_string();
-    let deadline = content[by_pos + 4..].trim().to_string();
+    let deadline = deadline.to_string();
 
     if subject.is_empty() || action.is_empty() || target.is_empty() || deadline.is_empty() {
         return None;
@@ -722,6 +807,35 @@ mod tests {
     use super::*;
 
     const EMPTY_ASSERTIONS: &[StructuralAssertion] = &[];
+
+    #[test]
+    fn quantity_v1_parses_russian_arr_sentence() {
+        let parsed = parse_multilingual_quantity(
+            "Алиса Смит сообщает, что ARR составляет 5 миллионов долларов.",
+        )
+        .unwrap();
+        assert_eq!(parsed.1, "ARR");
+        assert_eq!(parsed.2, "5000000");
+        assert_eq!(parsed.3, "usd");
+    }
+
+    #[test]
+    fn quantity_v1_parses_chinese_arr_sentence() {
+        let parsed = parse_multilingual_quantity("张三报告ARR为500万美元。").unwrap();
+        assert_eq!(parsed.1, "ARR");
+        assert_eq!(parsed.2, "5000000");
+        assert_eq!(parsed.3, "usd");
+    }
+
+    #[test]
+    fn commitment_parser_accepts_relative_deadline_without_by() {
+        let parsed = parse_commitment_sentence(
+            "Mina Patel will send Omar Khan the rollout checklist next week.",
+        )
+        .unwrap();
+        assert_eq!(parsed.deadline, "next week");
+        assert_eq!(parsed.action, "send");
+    }
 
     fn test_input(fields: BTreeMap<String, String>) -> ClaimProjectionInput<'static> {
         ClaimProjectionInput {

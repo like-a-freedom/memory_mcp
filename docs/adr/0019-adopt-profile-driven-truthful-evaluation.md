@@ -1,6 +1,6 @@
 # ADR-0019: Adopt Profile-Driven Truthful Evaluation
 
-> Status: Proposed (2026-07-28)
+> Status: Accepted (2026-07-29)
 > Related: ADR-0017 (agent-memory lifecycle release evidence)
 
 ## Context
@@ -105,4 +105,3 @@ The decision is satisfied when the acceptance criteria in
 `docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md` are
 met, including complete artifact coverage, separate mode metrics, wired
 lifecycle evidence, and the declared PR and release budgets.
-

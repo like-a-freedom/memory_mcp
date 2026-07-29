@@ -68,7 +68,7 @@ pub(super) async fn add_extracted_fact(
             &episode.scope,
             0.7,
             entity_links.to_vec(),
-            Vec::new(),
+            episode.policy_tags.clone(),
             crate::models::Provenance::extraction(
                 &episode.episode_id,
                 &episode.source_type,

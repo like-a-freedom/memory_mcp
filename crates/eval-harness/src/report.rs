@@ -109,8 +109,8 @@ pub fn render_markdown(artifact: &RunArtifact) -> Result<String, EvalError> {
 
     if !artifact.gates.is_empty() {
         out.push_str("\n## Gates\n\n");
-        out.push_str("| Metric | Observed | Floor | Baseline | Budget | Status |\n");
-        out.push_str("|--------|----------|-------|----------|--------|--------|\n");
+        out.push_str("| Suite | Metric | Observed | Floor | Baseline | Budget | Status |\n");
+        out.push_str("|-------|--------|----------|-------|----------|--------|--------|\n");
         for gate in &artifact.gates {
             let floor = gate
                 .hard_floor
@@ -120,7 +120,8 @@ pub fn render_markdown(artifact: &RunArtifact) -> Result<String, EvalError> {
                 .regression_budget
                 .map_or("-".to_string(), |b| format!("{b:.4}"));
             out.push_str(&format!(
-                "| {} | {:.4} | {floor} | {baseline} | {budget} | {} |\n",
+                "| {} | {} | {:.4} | {floor} | {baseline} | {budget} | {} |\n",
+                gate.suite_id,
                 gate.metric,
                 gate.observed,
                 format!("{:?}", gate.status).to_lowercase()

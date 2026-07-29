@@ -5,19 +5,24 @@
   "suites": [
     {
       "id": "local-retrieval",
-      "expected_coverage": { "exact_cases": 50 }
+      "expected_coverage": { "exact_cases": 66 }
     },
     {
       "id": "extraction",
-      "expected_coverage": { "exact_cases": 5 }
+      "expected_coverage": { "exact_cases": 9 }
     },
     {
       "id": "claim-reconciliation",
-      "expected_coverage": { "exact_cases": 5 }
+      "expected_coverage": { "exact_cases": 42 }
     },
     {
       "id": "lifecycle",
       "expected_coverage": { "exact_cases": 4 }
+    },
+    {
+      "id": "external-retrieval",
+      "corpus_root": "evals/corpora/eval-mini",
+      "expected_coverage": { "exact_cases": 2 }
     }
   ],
   "gates": [
@@ -84,6 +89,13 @@
       },
       "hard_floor": 1.0,
       "baseline_required": false
+    },
+    {
+      "target": {
+        "suite_id": "external-retrieval",
+        "metric": "recall_at_5"
+      },
+      "hard_floor": 0.90
     }
   ]
 }

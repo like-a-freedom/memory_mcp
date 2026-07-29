@@ -14,6 +14,10 @@
     },
     {
       "id": "end-to-end"
+    },
+    {
+      "id": "external-retrieval",
+      "corpus_root": "evals/corpora/eval-mini"
     }
   ],
   "gates": [

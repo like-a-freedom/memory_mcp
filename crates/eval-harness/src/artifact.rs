@@ -83,6 +83,7 @@ pub struct SuiteSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GateDecision {
+    pub suite_id: String,
     pub metric: String,
     pub observed: f64,
     pub hard_floor: Option<f64>,
