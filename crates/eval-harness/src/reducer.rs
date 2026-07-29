@@ -14,7 +14,6 @@ pub trait SuiteReducer: Send + Sync {
 /// from per-case `MetricEvidence::Retrieval` data.
 pub struct RetrievalReducer {
     suite_id: SuiteId,
-    #[allow(dead_code)]
     cutoff: u32,
 }
 
@@ -90,7 +89,7 @@ impl SuiteReducer for RetrievalReducer {
         };
 
         let mut metrics = BTreeMap::new();
-        metrics.insert("recall_at_5".to_string(), recall_at_k);
+        metrics.insert(format!("recall_at_{}", self.cutoff), recall_at_k);
         metrics.insert("mrr".to_string(), mrr);
         metrics.insert("top_1_hit_rate".to_string(), top_1_hit_rate);
 
@@ -312,6 +311,17 @@ mod tests {
         assert!((summary.metrics["recall_at_5"] - 0.5).abs() < 1e-12);
         assert!((summary.metrics["mrr"] - 0.5).abs() < 1e-12);
         assert!((summary.metrics["top_1_hit_rate"] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn retrieval_cutoff_appears_in_metric_key() {
+        let outcomes = vec![retrieval_outcome("a", 1, 1, Some(1), CaseStatus::Passed)];
+        let summary = RetrievalReducer::new("test", 10)
+            .reduce(&outcomes)
+            .unwrap()
+            .remove(0);
+        assert!(summary.metrics.contains_key("recall_at_10"));
+        assert!(!summary.metrics.contains_key("recall_at_5"));
     }
 
     #[test]
