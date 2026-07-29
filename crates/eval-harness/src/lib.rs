@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod artifact;
+pub mod benchmark;
 pub mod cli;
 pub mod corpus;
 pub mod domain;
