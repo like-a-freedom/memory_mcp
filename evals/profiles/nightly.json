@@ -16,5 +16,14 @@
       "id": "end-to-end"
     }
   ],
-  "gates": []
+  "gates": [
+    {
+      "target": {
+        "suite_id": "end-to-end",
+        "metric": "context_match_rate"
+      },
+      "hard_floor": 1.0,
+      "baseline_required": false
+    }
+  ]
 }

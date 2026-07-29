@@ -26,12 +26,44 @@ pub fn render_markdown(artifact: &RunArtifact) -> Result<String, EvalError> {
         ));
     }
 
+    let failed_cases = artifact
+        .outcomes
+        .iter()
+        .filter(|o| o.status == crate::domain::CaseStatus::QualityFailed)
+        .count();
+    let invalid_cases = artifact
+        .outcomes
+        .iter()
+        .filter(|o| o.status == crate::domain::CaseStatus::Invalid)
+        .count();
+    let failed_gates = artifact
+        .gates
+        .iter()
+        .filter(|g| g.status == crate::artifact::GateStatus::Failed)
+        .count();
+    let invalid_gates = artifact
+        .gates
+        .iter()
+        .filter(|g| g.status == crate::artifact::GateStatus::Invalid)
+        .count();
+
     out.push_str("\n## Coverage\n\n");
     out.push_str(&format!(
         "**Expected cases:** {}\n",
         artifact.expected_case_ids.len()
     ));
-    out.push_str(&format!("**Outcomes:** {}\n\n", artifact.outcomes.len()));
+    out.push_str(&format!(
+        "**Outcomes:** {} (failed: {}, invalid: {})\n\n",
+        artifact.outcomes.len(),
+        failed_cases,
+        invalid_cases
+    ));
+    out.push_str(&format!(
+        "**Gates:** {} (failed: {}, invalid: {})\n\n",
+        artifact.gates.len(),
+        failed_gates,
+        invalid_gates
+    ));
 
     let passed = artifact
         .outcomes

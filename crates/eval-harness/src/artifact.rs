@@ -107,6 +107,7 @@ pub enum GateFailureReason {
     RegressionBudgetExceeded,
     MissingBaseline,
     IncompatibleBaseline,
+    MissingMetric,
     None,
 }
 

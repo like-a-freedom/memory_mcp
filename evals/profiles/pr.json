@@ -60,7 +60,7 @@
         "suite_id": "claim-reconciliation",
         "metric": "claim_precision"
       },
-      "hard_floor": 0.50,
+      "hard_floor": 0.80,
       "regression_budget": 0.10
     },
     {
@@ -68,7 +68,7 @@
         "suite_id": "claim-reconciliation",
         "metric": "claim_recall"
       },
-      "hard_floor": 0.50,
+      "hard_floor": 0.90,
       "regression_budget": 0.10
     }
   ]

@@ -97,6 +97,18 @@ pub fn evaluate_gates(
     Ok(decisions)
 }
 
+pub fn evaluate_missing_metric(_suite_id: &str, metric: &str) -> GateDecision {
+    GateDecision {
+        metric: metric.to_string(),
+        observed: 0.0,
+        hard_floor: None,
+        baseline: None,
+        regression_budget: None,
+        status: GateStatus::Invalid,
+        reason: GateFailureReason::MissingMetric,
+    }
+}
+
 pub fn evaluate_metric_gate(
     observed: f64,
     hard_floor: Option<f64>,
