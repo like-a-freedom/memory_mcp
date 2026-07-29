@@ -4,6 +4,12 @@ use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageUsage {
+    pub rows: u64,
+    pub serialized_bytes: u64,
+}
+
 pub struct CapacitySuite {
     expected_ids: Vec<EvalCaseId>,
 }

@@ -1,14 +1,45 @@
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionDisposition {
+    Execute,
+    RequireLiveVerification,
+    Refuse,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionOutcome {
     Correct { evidence_ids: Vec<String> },
     Incorrect { reason: String },
     Refused { reason: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptedAction {
+    pub kind: String,
+    pub arguments: BTreeMap<String, String>,
+    pub risk: ActionRisk,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionRisk {
+    Low,
+    Medium,
+    High,
+}
+
+pub fn evaluate_attempt(has_relevant_context: bool, action: &AttemptedAction) -> ActionDisposition {
+    match action.risk {
+        ActionRisk::Low if has_relevant_context => ActionDisposition::Execute,
+        ActionRisk::Low => ActionDisposition::RequireLiveVerification,
+        ActionRisk::Medium | ActionRisk::High => ActionDisposition::RequireLiveVerification,
+    }
 }
 
 pub struct ActionGroundingSuite {
@@ -189,6 +220,42 @@ impl EvalSuite for ActionGroundingSuite {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn low_risk_with_context_executes() {
+        let action = AttemptedAction {
+            kind: "deploy".into(),
+            arguments: BTreeMap::new(),
+            risk: ActionRisk::Low,
+        };
+        assert_eq!(evaluate_attempt(true, &action), ActionDisposition::Execute);
+    }
+
+    #[test]
+    fn low_risk_without_context_requires_verification() {
+        let action = AttemptedAction {
+            kind: "deploy".into(),
+            arguments: BTreeMap::new(),
+            risk: ActionRisk::Low,
+        };
+        assert_eq!(
+            evaluate_attempt(false, &action),
+            ActionDisposition::RequireLiveVerification
+        );
+    }
+
+    #[test]
+    fn high_risk_always_requires_verification() {
+        let action = AttemptedAction {
+            kind: "delete_repository".into(),
+            arguments: BTreeMap::new(),
+            risk: ActionRisk::High,
+        };
+        assert_eq!(
+            evaluate_attempt(true, &action),
+            ActionDisposition::RequireLiveVerification
+        );
+    }
 
     #[tokio::test]
     async fn action_grounding_produces_outcomes() {
