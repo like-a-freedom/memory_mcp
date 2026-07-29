@@ -4,6 +4,8 @@
     "description": "Ingest, extract, and retrieve a simple fact through the production pipeline",
     "scope": "org",
     "project": null,
+    "t_ref": "2026-07-15T14:00:00Z",
+    "as_of": "2026-07-15T14:00:01Z",
     "sources": [
       {
         "source_type": "note",
@@ -26,6 +28,8 @@
     "description": "Verify entity extraction produces expected entities from structured content",
     "scope": "team",
     "project": null,
+    "t_ref": "2026-07-15T14:00:00Z",
+    "as_of": "2026-07-15T14:00:01Z",
     "sources": [
       {
         "source_type": "email",

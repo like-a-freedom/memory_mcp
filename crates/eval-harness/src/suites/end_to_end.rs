@@ -16,6 +16,8 @@ struct EndToEndCase {
     scope: String,
     #[serde(default)]
     project: Option<String>,
+    t_ref: chrono::DateTime<chrono::Utc>,
+    as_of: chrono::DateTime<chrono::Utc>,
     sources: Vec<SourceSpec>,
     query: String,
     #[serde(default)]
@@ -25,6 +27,24 @@ struct EndToEndCase {
     min_context_items: usize,
     #[allow(dead_code)]
     label_trust: String,
+}
+
+impl EndToEndCase {
+    fn validate_timeline(&self) -> Result<(), crate::error::EvalError> {
+        if self.as_of <= self.t_ref {
+            return Err(crate::error::EvalError::InvalidInput(format!(
+                "case {}: as_of {:?} precedes t_ref {:?}",
+                self.id, self.as_of, self.t_ref
+            )));
+        }
+        if self.expected_context.is_empty() {
+            return Err(crate::error::EvalError::InvalidInput(format!(
+                "case {}: expected_context must not be empty",
+                self.id
+            )));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +151,23 @@ impl EvalSuite for EndToEndSuite {
 
 async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     let start = std::time::Instant::now();
+
+    if let Err(err) = case.validate_timeline() {
+        return EvalCaseOutcome {
+            case_key: CaseKey::parse("end-to-end", &case.id).unwrap(),
+            mode: EvalMode::EndToEnd,
+            split: CorpusSplit::Development,
+            label_trust: LabelTrust::Official,
+            status: CaseStatus::Invalid,
+            metrics: std::collections::BTreeMap::new(),
+            evidence: std::collections::BTreeMap::new(),
+            invalid_reason: Some(err.to_string()),
+            failures: vec![],
+            duration_ms: start.elapsed().as_millis() as u64,
+            attempts: 1,
+        };
+    }
+
     let service = test_support::make_service().await;
 
     let mut all_entities: Vec<String> = Vec::new();
@@ -142,7 +179,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                     source_type: source.source_type.clone(),
                     source_id: source.source_id.clone(),
                     content: source.content.clone(),
-                    t_ref: chrono::Utc::now(),
+                    t_ref: case.t_ref,
                     scope: case.scope.clone(),
                     project: case.project.clone(),
                     t_ingested: None,
@@ -194,14 +231,11 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     }
 
     let query_start = std::time::Instant::now();
-    let as_of = "2026-07-15T14:00:01Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
     let context_result = service
         .assemble_context(memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),
             scope: case.scope.clone(),
-            as_of: Some(as_of),
+            as_of: Some(case.as_of),
             budget: 5,
             project: case.project.clone(),
             fact_types: vec![],
@@ -260,15 +294,26 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                 })
                 .count();
 
-            let context_all_matched = context_matched == case.expected_context.len();
+            let context_total = case.expected_context.len();
+            let context_all_matched = context_matched == context_total;
             let enough_items = items.len() >= case.min_context_items;
 
+            metrics.insert(
+                "context_match_rate".into(),
+                if context_total > 0 {
+                    context_matched as f64 / context_total as f64
+                } else {
+                    0.0
+                },
+            );
+
+            evidence_map.insert(
+                "context_match".into(),
+                MetricEvidence::ratio(context_matched as u64, context_total as u64),
+            );
+
             if !context_all_matched {
-                failures.push(format!(
-                    "context: {}/{}",
-                    context_matched,
-                    case.expected_context.len()
-                ));
+                failures.push(format!("context: {}/{}", context_matched, context_total));
             }
             if !enough_items {
                 failures.push(format!(
