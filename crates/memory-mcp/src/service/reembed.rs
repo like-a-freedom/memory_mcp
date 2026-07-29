@@ -106,6 +106,33 @@ impl MemoryService {
             .map(|_| ())
     }
 
+    async fn restore_semantic_readiness(
+        &self,
+        target_signature: &str,
+        target_dimension: usize,
+    ) -> Result<(), MemoryError> {
+        for namespace in &self.namespaces {
+            self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
+                .await?;
+            self.remove_embedding_index(namespace).await?;
+            self.define_embedding_index(namespace, target_dimension)
+                .await
+                .map_err(|err| {
+                    MemoryError::Storage(format!(
+                        "failed to restore embedding index in namespace {namespace}: {err}"
+                    ))
+                })?;
+            self.write_embedding_state(
+                namespace,
+                "ready",
+                Some(target_signature),
+                Some(REEMBED_JOB_ID),
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     pub async fn reembed_all_facts(
         &self,
         options: &ReembedOptions,
@@ -163,6 +190,8 @@ impl MemoryService {
 
         // Nothing to do: all embeddings match and no failed facts to retry.
         if summary.total_facts == 0 {
+            self.restore_semantic_readiness(&target_signature, target_dimension)
+                .await?;
             progress.on_job_completed(&ReembedOutcome::NothingToDo, &summary, Duration::ZERO);
             return Ok((summary, ReembedOutcome::NothingToDo));
         }
@@ -2130,5 +2159,116 @@ mod tests {
 
         assert_eq!(outcome, ReembedOutcome::NothingToDo);
         assert_eq!(summary.total_facts, 0);
+    }
+
+    #[tokio::test]
+    async fn reembed_counts_every_stale_fact_in_one_namespace() {
+        let db = make_in_memory_db(&["org"]).await;
+        for index in 0..3 {
+            seed_fact_with_embedding(
+                &db,
+                "org",
+                &format!("fact:stale_{index}"),
+                &format!("stale fact {index}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:old",
+            )
+            .await;
+        }
+
+        let service = make_reembed_service(
+            db,
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+        let (summary, outcome) = service
+            .reembed_all_facts(
+                &ReembedOptions::default(),
+                &NoopProgressReporter,
+                &CancellationToken::new(),
+            )
+            .await
+            .expect("reembed should process every stale fact");
+
+        assert_eq!(outcome, ReembedOutcome::Completed);
+        assert_eq!(summary.total_facts, 3);
+        assert_eq!(summary.processed_facts, 3);
+        assert_eq!(summary.succeeded_facts, 3);
+    }
+
+    #[tokio::test]
+    async fn reembed_nothing_to_do_restores_semantic_readiness() {
+        use crate::service::startup::EMBEDDING_STATE_RECORD_ID;
+
+        let db = make_in_memory_db(&["org"]).await;
+        seed_fact_with_embedding(
+            &db,
+            "org",
+            "fact:up_to_date",
+            "already uses the target embedding",
+            vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+            "embsig:new",
+        )
+        .await;
+        db.create(
+            EMBEDDING_STATE_RECORD_ID,
+            json!({
+                "status": "ready",
+                "active_signature": "embsig:old",
+                "dimension": DEFAULT_EMBEDDING_DIMENSION,
+                "updated_at": normalize_dt(Utc::now()),
+            }),
+            "org",
+        )
+        .await
+        .expect("seed stale embedding state");
+
+        let service = make_reembed_service(
+            db.clone(),
+            vec!["org"],
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+        service
+            .remove_embedding_index("org")
+            .await
+            .expect("simulate an interrupted run before index recreation");
+
+        let (summary, outcome) = service
+            .reembed_all_facts(
+                &ReembedOptions::default(),
+                &NoopProgressReporter,
+                &CancellationToken::new(),
+            )
+            .await
+            .expect("nothing-to-do reembed should restore semantic readiness");
+
+        assert_eq!(outcome, ReembedOutcome::NothingToDo);
+        assert_eq!(summary.total_facts, 0);
+
+        let state = db
+            .select_one(EMBEDDING_STATE_RECORD_ID, "org")
+            .await
+            .expect("select embedding state")
+            .expect("stored embedding state");
+        assert_eq!(state.get("status"), Some(&json!("ready")));
+        assert_eq!(state.get("active_signature"), Some(&json!("embsig:new")));
+
+        let matches = db
+            .select_facts_ann(
+                "org",
+                "org",
+                &normalize_dt(Utc::now()),
+                &vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                1,
+            )
+            .await
+            .expect("restored index should support semantic retrieval");
+        assert_eq!(matches.len(), 1);
     }
 }

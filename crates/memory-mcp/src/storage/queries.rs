@@ -279,7 +279,7 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
 
 pub fn build_count_facts_needing_reembed_query(target_signature: &str) -> (String, Value) {
     (
-        "SELECT count() AS count FROM fact WHERE embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature".to_string(),
+        "SELECT count() AS count FROM fact WHERE embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature GROUP ALL".to_string(),
         json!({"target_signature": target_signature}),
     )
 }
