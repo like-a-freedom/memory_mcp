@@ -54,6 +54,13 @@ impl CorpusManifest {
                 "revision must not be empty".into(),
             ));
         }
+        let symbolic = ["main", "master", "latest", "HEAD", "head"];
+        if symbolic.contains(&self.revision.as_str()) {
+            return Err(EvalError::InvalidConfig(format!(
+                "revision must be an immutable commit/hash, not symbolic '{}'",
+                self.revision
+            )));
+        }
         if self.license.trim().is_empty() {
             return Err(EvalError::InvalidConfig("license must not be empty".into()));
         }
@@ -79,6 +86,16 @@ impl CorpusManifest {
             ));
         }
         Ok(())
+    }
+
+    pub fn resolve_source_url(&self) -> Result<String, EvalError> {
+        if self.source_url.contains("/main/") || self.source_url.contains("/master/") {
+            return Err(EvalError::InvalidConfig(format!(
+                "source_url contains mutable branch path: {}",
+                self.source_url
+            )));
+        }
+        Ok(self.source_url.clone())
     }
 
     pub fn validate_at(&self, root: &Path) -> Result<PreparedCorpus, EvalError> {
@@ -204,6 +221,34 @@ mod tests {
     fn empty_revision_is_rejected() {
         let raw = valid_manifest_json().replace("\"abc123\"", "\"\"");
         assert!(CorpusManifest::parse(&raw).is_err());
+    }
+
+    #[test]
+    fn symbolic_revision_is_rejected() {
+        for sym in ["main", "master", "latest", "HEAD"] {
+            let raw = valid_manifest_json().replace("\"abc123\"", &format!("\"{sym}\""));
+            assert!(
+                CorpusManifest::parse(&raw).is_err(),
+                "symbolic revision '{sym}' should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn mutable_url_is_rejected() {
+        let manifest = CorpusManifest {
+            schema_version: CORPUS_MANIFEST_SCHEMA.to_string(),
+            corpus_id: "test".into(),
+            source_url: "https://raw.githubusercontent.com/org/repo/main/data.json".into(),
+            revision: "abc123".into(),
+            sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into(),
+            license: "MIT".into(),
+            byte_size: 11,
+            case_count: 1,
+            adapter_version: "1".into(),
+            data_file: "data.json".into(),
+        };
+        assert!(manifest.resolve_source_url().is_err());
     }
 
     #[test]
