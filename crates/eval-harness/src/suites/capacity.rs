@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use crate::domain::*;
@@ -8,6 +10,25 @@ use crate::test_support;
 pub struct StorageUsage {
     pub rows: u64,
     pub serialized_bytes: u64,
+}
+
+async fn measure_storage(db_client: &Arc<memory_mcp::storage::SurrealDbClient>) -> StorageUsage {
+    use memory_mcp::storage::DbClient;
+    let result = db_client.query("SELECT * FROM fact", None, "org").await;
+    let rows = match result {
+        Ok(val) => {
+            if let Some(arr) = val.as_array() {
+                arr.len() as u64
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+    StorageUsage {
+        rows,
+        serialized_bytes: rows * 256,
+    }
 }
 
 pub struct CapacitySuite {
@@ -35,7 +56,9 @@ impl CapacitySuite {
         let case_id = EvalCaseId::parse(case_id).unwrap();
         let start = std::time::Instant::now();
 
-        let service = test_support::make_service().await;
+        let (service, db_client) = test_support::make_service_with_client().await;
+
+        let before_usage = measure_storage(&db_client).await;
 
         let content = match scenario {
             "accepted" => "Important: The deployment window is March 20-22.",
@@ -68,9 +91,15 @@ impl CapacitySuite {
                 let extraction = service.extract(&episode_id, None, None).await;
                 let fact_count = extraction.as_ref().map(|e| e.facts.len()).unwrap_or(0) as f64;
 
+                let after_usage = measure_storage(&db_client).await;
+                let rows_growth = after_usage.rows.saturating_sub(before_usage.rows);
+
                 let mut metrics = std::collections::BTreeMap::new();
                 metrics.insert("facts_extracted".into(), fact_count);
                 metrics.insert("episode_created".into(), 1.0);
+                metrics.insert("rows_before".into(), before_usage.rows as f64);
+                metrics.insert("rows_after".into(), after_usage.rows as f64);
+                metrics.insert("rows_growth".into(), rows_growth as f64);
 
                 EvalCaseOutcome {
                     case_key: CaseKey::parse("capacity", case_id.as_str()).unwrap(),

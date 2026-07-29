@@ -107,6 +107,7 @@ fn load_cases() -> Result<Vec<ClaimCase>, EvalError> {
     serde_json::from_str(&raw).map_err(EvalError::Artifact)
 }
 
+#[cfg(test)]
 fn warning_matches_exact(expected: &ExpectedRelation, actual: &ContradictionWarning) -> bool {
     actual.new_fact_id == expected.source_id
         || actual.conflicting_fact_id == expected.setup_source_id
@@ -198,10 +199,39 @@ struct CaseMetrics {
     isolation_violations: usize,
 }
 
+fn matches_expected_relation_by_lineage(
+    expected: &ExpectedRelation,
+    actual: &memory_mcp::models::ContradictionWarning,
+    lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+) -> bool {
+    let setup_facts = lineage.get(&expected.setup_source_id);
+    let source_facts = lineage.get(&expected.source_id);
+
+    let setup_matches = setup_facts
+        .map(|f| f.contains(&actual.conflicting_fact_id))
+        .unwrap_or(false);
+    let source_matches = source_facts
+        .map(|f| f.contains(&actual.new_fact_id))
+        .unwrap_or(false);
+
+    if setup_matches && source_matches {
+        return true;
+    }
+
+    let setup_matches_rev = setup_facts
+        .map(|f| f.contains(&actual.new_fact_id))
+        .unwrap_or(false);
+    let source_matches_rev = source_facts
+        .map(|f| f.contains(&actual.conflicting_fact_id))
+        .unwrap_or(false);
+
+    setup_matches_rev && source_matches_rev
+}
+
 fn evaluate_case(
     case: &ClaimCase,
     extraction: &memory_mcp::models::ExtractResult,
-    _lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+    lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
 ) -> CaseMetrics {
     let expected_contradictions = case
         .expected
@@ -219,7 +249,7 @@ fn evaluate_case(
             extraction
                 .warnings
                 .iter()
-                .any(|actual| warning_matches_exact(expected, actual))
+                .any(|actual| matches_expected_relation_by_lineage(expected, actual, lineage))
         })
         .count();
 
@@ -499,6 +529,66 @@ mod tests {
                 entity_ids: vec![],
                 reason: "test".into(),
             }
+        ));
+    }
+
+    #[test]
+    fn lineage_matches_expected_relation_by_fact_ids() {
+        let mut lineage = std::collections::BTreeMap::new();
+        lineage.insert("setup-1".into(), ["fact:old".into()].into_iter().collect());
+        lineage.insert("source-1".into(), ["fact:new".into()].into_iter().collect());
+
+        let expected = ExpectedRelation {
+            setup_source_id: "setup-1".into(),
+            source_id: "source-1".into(),
+            outcome: "contradiction".into(),
+            reason_code: "same_slot".into(),
+            predecessor_source_id: None,
+            successor_source_id: None,
+        };
+
+        let actual = ContradictionWarning {
+            fact_type: "metric".into(),
+            existing_content: "old".into(),
+            new_content: "new".into(),
+            new_fact_id: "fact:new".into(),
+            conflicting_fact_id: "fact:old".into(),
+            entity_ids: vec![],
+            reason: "test".into(),
+        };
+
+        assert!(matches_expected_relation_by_lineage(
+            &expected, &actual, &lineage
+        ));
+    }
+
+    #[test]
+    fn lineage_rejects_mismatched_fact_ids() {
+        let mut lineage = std::collections::BTreeMap::new();
+        lineage.insert("setup-1".into(), ["fact:old".into()].into_iter().collect());
+        lineage.insert("source-1".into(), ["fact:new".into()].into_iter().collect());
+
+        let expected = ExpectedRelation {
+            setup_source_id: "setup-1".into(),
+            source_id: "source-1".into(),
+            outcome: "contradiction".into(),
+            reason_code: "same_slot".into(),
+            predecessor_source_id: None,
+            successor_source_id: None,
+        };
+
+        let actual = ContradictionWarning {
+            fact_type: "metric".into(),
+            existing_content: "old".into(),
+            new_content: "new".into(),
+            new_fact_id: "fact:wrong".into(),
+            conflicting_fact_id: "fact:old".into(),
+            entity_ids: vec![],
+            reason: "test".into(),
+        };
+
+        assert!(!matches_expected_relation_by_lineage(
+            &expected, &actual, &lineage
         ));
     }
 
