@@ -25,6 +25,7 @@ impl Default for WorkerPolicy {
 
 pub struct ExternalRetrievalSuite {
     cases: Vec<ExternalCase>,
+    expected_ids: Vec<EvalCaseId>,
     #[allow(dead_code)]
     dataset: String,
     worker_policy: WorkerPolicy,
@@ -32,8 +33,13 @@ pub struct ExternalRetrievalSuite {
 
 impl ExternalRetrievalSuite {
     pub fn new(dataset: crate::corpus::adapters::DatasetKind, cases: Vec<ExternalCase>) -> Self {
+        let expected_ids: Vec<EvalCaseId> = cases
+            .iter()
+            .filter_map(|c| EvalCaseId::parse(&c.id).ok())
+            .collect();
         Self {
             cases,
+            expected_ids,
             dataset: dataset.dataset_name().to_string(),
             worker_policy: WorkerPolicy::default(),
         }
@@ -177,7 +183,7 @@ impl EvalSuite for ExternalRetrievalSuite {
     }
 
     fn expected_case_ids(&self) -> &[EvalCaseId] {
-        &[]
+        &self.expected_ids
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
@@ -209,8 +215,24 @@ impl EvalSuite for ExternalRetrievalSuite {
         }
 
         for handle in handles {
-            if let Ok(outcome) = handle.await {
-                outcomes.push(outcome);
+            match handle.await {
+                Ok(outcome) => outcomes.push(outcome),
+                Err(join_err) => {
+                    let case_key = CaseKey::parse("external-retrieval", "join-error").unwrap();
+                    outcomes.push(EvalCaseOutcome {
+                        case_key,
+                        mode: EvalMode::RetrievalOnly,
+                        split: CorpusSplit::Test,
+                        label_trust: LabelTrust::Official,
+                        status: CaseStatus::Invalid,
+                        metrics: BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
+                        invalid_reason: Some(format!("task panicked: {join_err}")),
+                        failures: vec![],
+                        duration_ms: 0,
+                        attempts: 1,
+                    });
+                }
             }
         }
 
@@ -228,6 +250,53 @@ mod tests {
         let policy = WorkerPolicy::default();
         assert_eq!(policy.context_workers.get(), 3);
         assert_eq!(policy.query_workers_per_context.get(), 4);
+    }
+
+    #[test]
+    fn external_suite_expected_ids_equal_loaded_cases() {
+        let cases = vec![
+            ExternalCase {
+                id: "ext-1".into(),
+                dataset: "test".into(),
+                description: "test".into(),
+                query: "query".into(),
+                scope: "org".into(),
+                budget: 5,
+                facts: vec![crate::corpus::adapters::SeedFact {
+                    content: "fact".into(),
+                    t_valid: "2026-01-01T00:00:00Z".into(),
+                }],
+                expected: crate::corpus::adapters::RetrievalExpectation {
+                    tier: "direct".into(),
+                    must_contain: vec!["fact".into()],
+                    min_recall_at_k: 1.0,
+                },
+                metadata: serde_json::json!({}),
+            },
+            ExternalCase {
+                id: "ext-2".into(),
+                dataset: "test".into(),
+                description: "test".into(),
+                query: "query".into(),
+                scope: "org".into(),
+                budget: 5,
+                facts: vec![crate::corpus::adapters::SeedFact {
+                    content: "fact".into(),
+                    t_valid: "2026-01-01T00:00:00Z".into(),
+                }],
+                expected: crate::corpus::adapters::RetrievalExpectation {
+                    tier: "direct".into(),
+                    must_contain: vec!["fact".into()],
+                    min_recall_at_k: 1.0,
+                },
+                metadata: serde_json::json!({}),
+            },
+        ];
+        let suite = ExternalRetrievalSuite::new(
+            crate::corpus::adapters::DatasetKind::LongMemEvalCleaned,
+            cases,
+        );
+        assert_eq!(suite.expected_case_ids().len(), 2);
     }
 
     #[test]
