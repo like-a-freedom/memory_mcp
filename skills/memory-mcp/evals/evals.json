@@ -1,0 +1,23 @@
+{
+  "skill_name": "memory-mcp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Через подключенный Memory MCP сохрани подтвержденное решение из сообщения, затем сообщи, что именно попало в долговременную память.",
+      "expected_output": "Agent chooses the capture SOP, uses host-qualified ingest then extract, inspects facts, and reports verified, episode-only, or pending with identifiers.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Вспомни, какое решение мы принимали по индексации, и дай ответ с источником. Ничего не записывай.",
+      "expected_output": "Agent uses only qualified assemble_context and explain tools, states the retrieval boundary, cites provenance, and never calls resolve or another write tool.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Объедини подтвержденные алиасы Alice Smith и A. Smith в одну сущность через Memory MCP.",
+      "expected_output": "Agent selects canonicalize, treats resolve as a mutation, uses the fully qualified resolve tool, and reports the canonical entity ID without claiming unsupported merges.",
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "skill_name": "memory-cli",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Сделай shell-последовательность для сохранения проверенного решения через memory_mcp и честно определи итоговый статус.",
+      "expected_output": "Agent uses ingest then extract with explicit scope, separates stdout, stderr, and exit status, and classifies the structured result as verified, episode-only, or pending.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Через CLI найди прошлое решение и подготовь подтвержденный источником ответ. Команды записи запрещены.",
+      "expected_output": "Agent uses assemble-context then explain, parses JSON, and does not call resolve, ingest, extract, or invalidate.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "После смены embedding model запусти reembed; если процесс прервется, не называй работу завершенной.",
+      "expected_output": "Agent selects the re-embed workflow, chooses failure controls deliberately, monitors the terminal state, and treats interrupted or failed as unfinished.",
+      "files": []
+    }
+  ]
+}
