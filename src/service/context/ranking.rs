@@ -739,19 +739,6 @@ fn fact_matches_all_query_terms(fact: &RankedContextFact, required_terms: &[Stri
         .all(|term| matched_terms.contains(term.as_str()))
 }
 
-fn supports_explicit_temporal_focus(
-    fact: &RankedContextFact,
-    temporal_focus: &TemporalWindow,
-    query_terms: &[String],
-) -> bool {
-    if fact_is_within_temporal_focus(fact, temporal_focus) {
-        return true;
-    }
-
-    let required_temporal_terms = temporal_query_terms(query_terms);
-    fact_matches_all_query_terms(fact, &required_temporal_terms)
-}
-
 fn focused_ranked_relevance_score(
     fact: &RankedContextFact,
     temporal_focus: Option<&TemporalWindow>,
@@ -1115,12 +1102,28 @@ pub(crate) fn select_ranked_context_facts(
 
     let temporal_focus_ref = temporal_focus.as_ref();
     let anchor_terms = derive_query_anchor_terms(&facts, &query_terms);
-    if let Some(temporal_focus) = temporal_focus_ref {
-        facts.retain(|candidate| {
-            supports_explicit_temporal_focus(candidate, temporal_focus, &query_terms)
-        });
 
-        if facts.is_empty() {
+    if let Some(temporal_focus) = temporal_focus_ref {
+        let required_temporal_terms = temporal_query_terms(&query_terms);
+
+        let mut in_window: Vec<RankedContextFact> = Vec::new();
+        let mut textual_fallback: Vec<RankedContextFact> = Vec::new();
+
+        for candidate in facts {
+            if fact_is_within_temporal_focus(&candidate, temporal_focus) {
+                in_window.push(candidate);
+            } else if !required_temporal_terms.is_empty()
+                && fact_matches_all_query_terms(&candidate, &required_temporal_terms)
+            {
+                textual_fallback.push(candidate);
+            }
+        }
+
+        if !in_window.is_empty() {
+            facts = in_window;
+        } else if !textual_fallback.is_empty() {
+            facts = textual_fallback;
+        } else {
             return Vec::new();
         }
     }
