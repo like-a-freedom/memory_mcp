@@ -45,6 +45,21 @@ shrink `DbClient` to connection machinery plus core record operations
 `FactService`, `EmbeddingService`, and lifecycle workers move onto their
 narrow seam; the public tool interface is unchanged.
 
+## End-state shape
+
+The target after this refactor is:
+
+- `storage/client.rs` keeps only connection setup + core record ops:
+  `connect`, `connect_in_memory*`, `create`, `update`, `select_one`, `select_table`, `query`, `apply_migrations`, plus `DbEngine` and its helpers.
+- `storage/claims.rs` (already correct), `storage/agent_memory.rs`, `storage/procedures.rs` — narrow struct stores wrapping `Arc<dyn DbClient>`; unchanged.
+- New narrow structs in `storage/` for the remaining domains, each owning its queries:
+  - `storage/context_store.rs` — `FactQueryStore`, `EpisodeQueryStore`, `CommunityQueryStore`, `EntityQueryStore`, `AccessLogStore`;
+  - `storage/app_store.rs` — `AppSessionStore`, `IngestionReviewStore`;
+  - `storage/fact_store.rs` — fact CRUD + reembed counters.
+- `service/context/*.rs`, `service/apps/*.rs`, `service/fact.rs` consume their domain's narrow struct(s) — never `DbClient`.
+- `service/mock_db.rs` shrinks from implementing ~40 trait methods to the core record ops only; per-capability test doubles sit beside their capability tests.
+- `ClaimStore` in `storage/claims.rs` drops `#[allow(dead_code)]`.
+
 ## Consequences
 
 - A new query lives in exactly one place (the owning struct), not ~5.
@@ -66,6 +81,17 @@ them real, not to delete them.
 
 Rejected — premature module split; same crate, narrower traits, is sufficient
 locality.
+
+## Migration order (what to touch first)
+
+1. Extract `core.rs`'s app-graph BFS (`find_intro_chain`, `bfs_path`, `build_intro_chain_from_start`) to `service/apps/graph.rs` next to existing graph expansion.
+2. Split `service/mock_db.rs` down to a plain in-memory record store exposing only the core record ops.
+3. Migrate `service/context/*.rs` off `ContextStore` onto a `storage/context_store.rs` of concrete structs; delete the forwarding trait impls in `storage/client.rs`.
+4. Migrate `service/apps/*.rs` off `AppStore` onto a `storage/app_store.rs`; delete the forwarding impls.
+5. Migrate `service/fact.rs` off direct `DbClient` onto a `storage/fact_store.rs`; delete the forwarding impls.
+6. After all consumers are on narrow structs, drop `ContextStore`/`AppStore` traits and move`DbClient`'s capability methods into their owning structs. Re-export only the core record ops from `storage/client.rs`.
+
+Each step is independently verifiable and PR-gated.
 
 ## Verification
 

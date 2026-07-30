@@ -1,8 +1,8 @@
 # ADR-0022: Ship Compact Responses as Default for LLM Consumers
 
-> **Status:** Draft (awaiting Phase B data)
+> **Status:** Accepted (2026-07-30)
 > **Date:** 2026-07-30
-> **Related:** [Design Spec](../superpowers/specs/2026-07-30-token-efficient-responses-design.md)
+> **Related:** [Design Spec](../superpowers/specs/2026-07-30-token-efficient-responses-design.md); completed by [2026-07-30 Architecture Hardening plan](../superpowers/plans/2026-07-30-architecture-hardening.md)
 
 ## Context
 
@@ -58,11 +58,11 @@ All fields remain in struct definitions and JSON schema. They are skipped at *se
 - Future debug-only or duplicate fields should follow the same pattern: populate under `compact=false`, skip under `compact=true`.
 - Pipeline perf (ingest, extract, NER, context assembly) is not affected — `compact` is serialization-only.
 
-## Validation
+## Validation — completed 2026-07-30
 
-- [ ] Phase B `response-size` profile confirms ≥30% byte reduction for `assemble_context`, ≥20% for `explain`.
-- [ ] PR profile (`evals/profiles/pr.json`) passes with identical 7/7 gates and 119/119 cases.
-- [ ] Release profile (`evals/profiles/release.json`) passes with identical 9/9 gates and 123/123 cases.
-- [ ] Nightly profile (`evals/profiles/nightly.json`) passes with identical 1/1 gate and 121/121 cases.
-- [ ] Pipeline benchmarks (`benches/pipeline.rs`) show no regression.
-- [ ] `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` passes with zero warnings.
+- [x] Phase B `response-size` profile confirms **39.5% mean byte reduction overall** (min 31.8%, p95 44.8%, max 45.7%) — exceeds the ≥30% `assemble_context` / ≥20% `explain` targets. Artifact: `target/evals/response-size-run.json` (run `run-1785442426`).
+- [x] PR profile (`evals/profiles/pr.json`) passes with identical 7/7 gates and 119/119 cases.
+- [x] Release profile (`evals/profiles/release.json`) passes with identical 9/9 gates and 123/123 cases.
+- [x] Nightly profile (`evals/profiles/nightly.json`) passes with identical 1/1 gate and 121/121 cases.
+- [x] Pipeline benchmarks (`benches/pipeline.rs`) show no regression.
+- [x] `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` passes with zero warnings.

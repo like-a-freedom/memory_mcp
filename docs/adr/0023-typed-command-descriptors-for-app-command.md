@@ -39,6 +39,44 @@ Replace the per-arm match with a **typed command executor** in
 4. Logging, request-ID threading, timing, and `refresh_required` semantics
    are centralized in the executor — visible once, not per-arm.
 
+## Concrete end-state (for the executing plan)
+
+```rust
+// crates/memory-mcp/src/service/apps/dispatch.rs
+pub enum AppCommand {
+    ApproveItems { item_ids: Vec<String> },
+    RejectItems { item_ids: Vec<String>, reason: String },
+    EditItem { item_id: String, patch: Value },
+    ArchiveCandidates,
+    RestoreArchived,
+    RecomputeDecay,
+    RebuildCommunities,
+    GraphExpand,
+    DiffExport,
+    // …
+}
+
+pub struct AppCommandDescriptor {
+    pub names: &'static [&'static str],
+    pub app: &'static str,
+    pub requires_confirmation: bool,
+    pub execute: fn(&AppContext, &AppCommand)
+        -> futures::future::BoxFuture<'_, Result<AppCommandOutcome, MemoryError>>,
+}
+
+pub const COMMAND_TABLE: &[AppCommandDescriptor] = &[ … ];
+
+pub async fn app_command(
+    handler: &MemoryMcp,
+    params: AppCommandParams,
+) -> Result<Json<ToolResponse<AppCommandResult>>, ErrorData> {
+    // parse → authorize → confirm-gate → lookup descriptor → execute → shape → log
+}
+```
+
+The handler's ~700-line match block is replaced by the ~50 lines above; each
+existing arm becomes one `AppCommandDescriptor` row in `COMMAND_TABLE`.
+
 ## Consequences
 
 - Adding a lifecycle/app command adds one descriptor row in `service/apps`,
