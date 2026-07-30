@@ -47,6 +47,7 @@ mod tests {
             window_start: None,
             window_end: None,
             access: None,
+            compact: crate::tools::parsers::default_compact(),
         };
         let result = AssembleContextCapability::assemble_context(&ctx, request).await;
         assert!(result.is_ok(), "assemble_context must succeed on empty db");

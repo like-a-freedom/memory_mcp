@@ -719,6 +719,7 @@ impl AssembleContextRequestBuilder {
             window_start: self.window_start,
             window_end: self.window_end,
             access: self.access,
+            compact: crate::tools::parsers::default_compact(),
         })
     }
 }

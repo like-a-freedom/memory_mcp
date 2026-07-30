@@ -48,6 +48,7 @@ async fn test_ingest_extract_and_assemble() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -165,6 +166,7 @@ async fn test_invalidate_and_explain() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -189,6 +191,7 @@ async fn test_invalidate_and_explain() {
                     decayed_confidence: None,
                     ingestion_method: None,
                 }],
+                compact: false,
             },
             None,
         )
@@ -236,6 +239,7 @@ async fn test_policy_tag_filtering() {
                 content_type: None,
                 cross_scope_allow: None,
             }),
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -405,6 +409,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
                     decayed_confidence: None,
                     ingestion_method: None,
                 }],
+                compact: false,
             },
             None,
         )
@@ -566,6 +571,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -627,6 +633,7 @@ async fn test_rate_limit_determinism() {
                 content_type: None,
                 cross_scope_allow: None,
             }),
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -650,6 +657,7 @@ async fn test_rate_limit_determinism() {
                 content_type: None,
                 cross_scope_allow: None,
             }),
+            compact: false,
         })
         .await
         .expect("assemble");
@@ -722,6 +730,7 @@ async fn test_multiword_query_retrieval_quality() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble Delta Enrollment");
@@ -743,6 +752,7 @@ async fn test_multiword_query_retrieval_quality() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble mobile checklist");
@@ -763,7 +773,8 @@ async fn test_multiword_query_retrieval_quality() {
             window_start: None,
             window_end: None,
             access: None,
-        })
+        compact: false,
+})
         .await
         .expect("assemble Module changelog");
     assert!(
@@ -837,6 +848,7 @@ async fn test_short_natural_language_query_uses_term_fallback() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble short natural-language query");
@@ -877,6 +889,7 @@ async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context with metadata");
@@ -976,6 +989,7 @@ async fn test_assemble_context_graph_results_include_anchor_and_hop_trace() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context");
@@ -1048,6 +1062,7 @@ async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble low-grounding query");
@@ -1091,6 +1106,7 @@ async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_t
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble temporal context with metadata");
@@ -1178,6 +1194,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble temporal requirement query");
@@ -1233,6 +1250,7 @@ async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temp
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble explicit month/year query");
@@ -1296,6 +1314,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context");
@@ -1370,6 +1389,7 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context for documentation query");
@@ -1441,6 +1461,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context for launch query");
@@ -1466,6 +1487,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context for development query");
@@ -1531,6 +1553,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context for thematic summary query");
@@ -1593,7 +1616,8 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
             window_start: None,
             window_end: None,
             access: None,
-        })
+        compact: false,
+})
         .await
         .expect("assemble context for broad presentation summary query");
 
@@ -1674,6 +1698,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble anchor-aware context");

@@ -5,6 +5,7 @@
 //! module imports from `crate::mcp` or from `clap`.
 
 pub mod assemble_context;
+pub mod compact;
 pub mod explain;
 pub mod extract;
 pub mod ingest;

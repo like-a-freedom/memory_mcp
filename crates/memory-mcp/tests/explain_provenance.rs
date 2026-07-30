@@ -61,6 +61,7 @@ async fn explain_returns_direct_provenance_source() {
             decayed_confidence: None,
             ingestion_method: None,
         }],
+        compact: false,
     };
 
     let result = service
@@ -130,6 +131,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             decayed_confidence: None,
             ingestion_method: None,
         }],
+        compact: false,
     };
 
     let result = service
@@ -189,6 +191,7 @@ async fn explain_populates_all_sources_field() {
             decayed_confidence: None,
             ingestion_method: None,
         }],
+        compact: false,
     };
 
     let result = service
@@ -348,6 +351,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             decayed_confidence: None,
             ingestion_method: None,
         }],
+        compact: false,
     };
 
     let result = service
@@ -411,6 +415,7 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
                     decayed_confidence: None,
                     ingestion_method: None,
                 }],
+                compact: false,
             },
             None,
         )
@@ -454,6 +459,7 @@ async fn explain_with_empty_source_episode_returns_validation_error() {
             decayed_confidence: None,
             ingestion_method: None,
         }],
+        compact: false,
     };
 
     let result = service.explain(request, None).await;
@@ -508,6 +514,7 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
                 ingestion_method: None,
             },
         ],
+        compact: false,
     };
 
     let result = service.explain(request, None).await;
@@ -633,6 +640,7 @@ async fn explain_batch_shares_graph_insights() {
                         ..Default::default()
                     },
                 ],
+                compact: false,
             },
             None,
         )
@@ -739,6 +747,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
                         ..Default::default()
                     },
                 ],
+                compact: false,
             },
             None,
         )
@@ -766,6 +775,7 @@ async fn explain_empty_context_pack() {
         .explain(
             ExplainRequest {
                 context_pack: vec![],
+                compact: false,
             },
             None,
         )
@@ -795,6 +805,7 @@ async fn explain_skips_unknown_episode() {
                     ingestion_method: None,
                     ..Default::default()
                 }],
+                compact: false,
             },
             None,
         )

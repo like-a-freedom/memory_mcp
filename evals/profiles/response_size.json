@@ -1,0 +1,14 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "response_size",
+  "time_budget_seconds": 300,
+  "suites": [
+    {
+      "id": "response-size",
+      "expected_coverage": {
+        "exact_cases": 66
+      }
+    }
+  ],
+  "gates": []
+}

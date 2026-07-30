@@ -58,6 +58,27 @@ impl<T> ToolResponse<T> {
             next_offset: None,
         }
     }
+
+    /// Complete-list response in compact mode.
+    ///
+    /// `has_more` and `total_count` are set to `None` so the existing
+    /// `skip_serializing_if = "Option::is_none"` omits them from the wire,
+    /// cutting the redundant `has_more: false` / `total_count == len` metadata
+    /// from compact payloads.
+    pub(crate) fn complete_list_compact(
+        result: T,
+        _total_count: usize,
+        guidance: impl Into<String>,
+    ) -> Self {
+        Self {
+            status: "success".to_string(),
+            result,
+            guidance: Some(guidance.into()),
+            has_more: None,
+            total_count: None,
+            next_offset: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -96,5 +117,30 @@ mod tests {
         assert!(json.get("has_more").is_none());
         assert!(json.get("total_count").is_none());
         assert!(json.get("next_offset").is_none());
+    }
+
+    #[test]
+    fn complete_list_compact_omits_pagination_metadata() {
+        let response = ToolResponse::complete_list_compact(vec!["a", "b"], 2, "done");
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["status"], "success");
+        assert!(json.get("has_more").is_none(), "compact omits has_more");
+        assert!(
+            json.get("total_count").is_none(),
+            "compact omits total_count"
+        );
+        assert!(json.get("next_offset").is_none());
+        assert!(
+            json["guidance"].as_str().unwrap().contains("done"),
+            "guidance must survive compact mode"
+        );
+    }
+
+    #[test]
+    fn complete_list_non_compact_keeps_pagination() {
+        let response = ToolResponse::complete_list(vec!["a"], 1, "done");
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["has_more"], false);
+        assert_eq!(json["total_count"], 1);
     }
 }

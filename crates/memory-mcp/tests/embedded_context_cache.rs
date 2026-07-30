@@ -42,6 +42,7 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
             content_type: None,
             cross_scope_allow: None,
         }),
+        compact: false,
     };
 
     let first = service.assemble_context(request.clone()).await?;

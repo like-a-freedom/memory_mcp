@@ -33,6 +33,7 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("context should assemble");
@@ -61,6 +62,7 @@ async fn assemble_context_when_question_is_unanswerable_then_returns_empty() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("context should assemble");
@@ -101,6 +103,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("historical context should assemble");
@@ -116,6 +119,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("future context should assemble");
@@ -160,6 +164,7 @@ async fn assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("context should assemble");
@@ -191,6 +196,7 @@ async fn assemble_context_when_direct_fact_lookup_then_returns_exact_evidence() 
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("context should assemble");

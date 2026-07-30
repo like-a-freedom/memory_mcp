@@ -608,6 +608,7 @@ async fn memory_service_persists_real_local_candle_embeddings() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble_context should succeed");
@@ -683,6 +684,7 @@ async fn memory_service_assemble_context_uses_real_local_candle_embeddings() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble_context should succeed with local Candle embeddings");

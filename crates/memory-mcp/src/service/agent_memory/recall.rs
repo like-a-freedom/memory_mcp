@@ -345,6 +345,7 @@ impl LifecycleRecall {
             window_start: None,
             window_end: None,
             access: None,
+            compact: crate::tools::parsers::default_compact(),
         };
 
         // 7. Call the pipeline exactly once.

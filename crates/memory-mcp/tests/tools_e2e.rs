@@ -8,6 +8,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use tempfile::TempDir;
 
 use memory_mcp::mcp::MemoryMcp;
+use memory_mcp::models::{AssembleContextRequest, ExplainRequest};
 
 mod common;
 
@@ -193,19 +194,19 @@ async fn test_mcp_tools_flow() {
     let extraction = extraction.result;
     assert!(extraction.facts.len() >= 2);
 
-    let assemble_params = serde_json::json!({
+    let assemble_request: AssembleContextRequest = serde_json::from_value(serde_json::json!({
         "query": "ARR",
         "scope": "org",
         "as_of": Utc::now().to_rfc3339(),
-        "budget": 5
-    });
+        "budget": 5,
+        "compact": false,
+    }))
+    .unwrap();
     let context = mcp
-        .assemble_context(Parameters(serde_json::from_value(assemble_params).unwrap()))
+        .service()
+        .assemble_context(assemble_request)
         .await
-        .expect("assemble")
-        .0;
-    assert_eq!(context.status, "success");
-    let context = context.result;
+        .expect("assemble");
     assert!(!context.is_empty());
 
     // Verify rounding of f64 fields in assemble_context response
@@ -229,14 +230,17 @@ async fn test_mcp_tools_flow() {
         "source_episode": episode_id.clone()
     })])
     .unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let context_pack = memory_mcp::tools::parsers::parse_context_items(&context_items)
+        .expect("parse context_items for explain");
+    let explain_request = ExplainRequest {
+        context_pack,
+        compact: false,
+    };
     let explanation = mcp
-        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .service()
+        .explain(explain_request, None)
         .await
-        .expect("explain")
-        .0;
-    assert_eq!(explanation.status, "success");
-    let explanation = explanation.result;
+        .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
 
     // Verify rounding of decayed_confidence in explain response
@@ -269,15 +273,17 @@ async fn test_mcp_tools_flow() {
 
     let context_items_ids =
         serde_json::to_string(&vec![episode_id.clone(), episode_id2.clone()]).unwrap();
-    let explain_params_ids = serde_json::json!({"context_items": context_items_ids});
+    let context_pack_ids = memory_mcp::tools::parsers::parse_context_items(&context_items_ids)
+        .expect("parse context_items for explain ids");
+    let explain_request_ids = ExplainRequest {
+        context_pack: context_pack_ids,
+        compact: false,
+    };
     let explanation_ids = mcp
-        .explain(Parameters(
-            serde_json::from_value(explain_params_ids).unwrap(),
-        ))
+        .service()
+        .explain(explain_request_ids, None)
         .await
-        .expect("explain ids")
-        .0
-        .result;
+        .expect("explain ids");
     assert_eq!(explanation_ids[0].source_episode, episode_id);
     assert_eq!(explanation_ids[1].source_episode, episode_id2);
 }
@@ -577,25 +583,33 @@ async fn test_mcp_full_flow_end_to_end() {
     assert!(facts.iter().any(|f| f.fact_type == "metric"));
     assert!(facts.iter().any(|f| f.fact_type == "promise"));
 
-    let assemble_params = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
+    let assemble_request: AssembleContextRequest = serde_json::from_value(serde_json::json!({
+        "query": "ARR",
+        "scope": "org",
+        "as_of": Utc::now().to_rfc3339(),
+        "budget": 5,
+        "compact": false,
+    }))
+    .unwrap();
     let context = mcp
-        .assemble_context(Parameters(
-            serde_json::from_value(assemble_params.clone()).unwrap(),
-        ))
+        .service()
+        .assemble_context(assemble_request)
         .await
-        .expect("assemble")
-        .0
-        .result;
+        .expect("assemble");
     assert!(!context.is_empty());
 
     let context_items = serde_json::to_string(&vec![serde_json::json!({"content": "ARR $1M","quote": "ARR $1M","source_episode": episode_id.clone()})]).unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let context_pack = memory_mcp::tools::parsers::parse_context_items(&context_items)
+        .expect("parse context_items for explain");
+    let explain_request = ExplainRequest {
+        context_pack,
+        compact: false,
+    };
     let explanation = mcp
-        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .service()
+        .explain(explain_request, None)
         .await
-        .expect("explain")
-        .0
-        .result;
+        .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
 
     let fact_id = context[0].fact_id.clone();
@@ -607,15 +621,20 @@ async fn test_mcp_full_flow_end_to_end() {
         .await
         .expect("invalidate");
 
-    let assemble_params_after = serde_json::json!({"query": "ARR", "scope": "org", "as_of": Utc::now().to_rfc3339(), "budget": 5});
+    let assemble_request_after: AssembleContextRequest =
+        serde_json::from_value(serde_json::json!({
+            "query": "ARR",
+            "scope": "org",
+            "as_of": Utc::now().to_rfc3339(),
+            "budget": 5,
+            "compact": false,
+        }))
+        .unwrap();
     let context_after = mcp
-        .assemble_context(Parameters(
-            serde_json::from_value(assemble_params_after).unwrap(),
-        ))
+        .service()
+        .assemble_context(assemble_request_after)
         .await
-        .expect("assemble")
-        .0
-        .result;
+        .expect("assemble");
     assert!(
         !context_after
             .iter()
@@ -734,13 +753,17 @@ async fn test_mcp_explain_mixed_array() {
         serde_json::json!({"content":"info","source_episode":"task:obj"}),
     ])
     .unwrap();
-    let explain_params = serde_json::json!({"context_items": context_items});
+    let context_pack = memory_mcp::tools::parsers::parse_context_items(&context_items)
+        .expect("parse context_items for explain mixed array");
+    let explain_request = ExplainRequest {
+        context_pack,
+        compact: false,
+    };
     let explanation = mcp
-        .explain(Parameters(serde_json::from_value(explain_params).unwrap()))
+        .service()
+        .explain(explain_request, None)
         .await
-        .expect("explain with mixed array should not fail")
-        .0
-        .result;
+        .expect("explain with mixed array should not fail");
     assert_eq!(explanation.len(), 2);
     assert_eq!(explanation[0].source_episode, "episode:plain-id");
     assert_eq!(explanation[1].source_episode, "task:obj");
@@ -773,14 +796,17 @@ async fn test_mcp_explain_loads_episode_context() {
     })])
     .unwrap();
 
+    let context_pack = memory_mcp::tools::parsers::parse_context_items(&context_items)
+        .expect("parse context_items for explain loaded episode context");
+    let explain_request = ExplainRequest {
+        context_pack,
+        compact: false,
+    };
     let explanation = mcp
-        .explain(Parameters(
-            serde_json::from_value(serde_json::json!({"context_items": context_items})).unwrap(),
-        ))
+        .service()
+        .explain(explain_request, None)
         .await
-        .expect("explain with loaded episode context")
-        .0
-        .result;
+        .expect("explain with loaded episode context");
 
     assert_eq!(explanation.len(), 1);
     assert_eq!(explanation[0].source_episode, episode_id);
@@ -835,15 +861,16 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
         "budget": 10,
         "view_mode": "timeline",
         "window_start": "2026-02-01T00:00:00Z",
-        "window_end": "2026-02-28T23:59:59Z"
+        "window_end": "2026-02-28T23:59:59Z",
+        "compact": false,
     });
 
+    let assemble_request: AssembleContextRequest = serde_json::from_value(params).unwrap();
     let context = mcp
-        .assemble_context(Parameters(serde_json::from_value(params).unwrap()))
+        .service()
+        .assemble_context(assemble_request)
         .await
-        .expect("assemble timeline")
-        .0
-        .result;
+        .expect("assemble timeline");
 
     assert_eq!(context.len(), 1);
     assert_eq!(context[0].content, "Atlas budget increased");

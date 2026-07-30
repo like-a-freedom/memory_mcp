@@ -62,6 +62,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
     assert!(!context_before.is_empty());
@@ -90,6 +91,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
     assert!(context_after.is_empty());

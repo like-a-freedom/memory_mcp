@@ -52,6 +52,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -77,6 +78,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -97,6 +99,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -140,6 +143,7 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -185,6 +189,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -205,6 +210,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -248,6 +254,7 @@ async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn s
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 
@@ -480,6 +487,7 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await?;
 

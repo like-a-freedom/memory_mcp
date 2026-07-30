@@ -254,6 +254,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await;
 

@@ -221,6 +221,7 @@ pub enum EvalProfile {
     Pr,
     Release,
     Nightly,
+    ResponseSize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

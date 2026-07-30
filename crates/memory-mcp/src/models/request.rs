@@ -26,6 +26,13 @@ pub struct IngestRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ExplainRequest {
     pub context_pack: Vec<ExplainItem>,
+    /// Request compact (token-efficient) response. Defaults to true.
+    #[serde(
+        default = "crate::tools::parsers::default_compact",
+        skip_serializing_if = "is_default_true"
+    )]
+    #[schemars(skip)]
+    pub compact: bool,
 }
 
 /// A single item to explain.
@@ -35,6 +42,11 @@ pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_id: Option<String>,
     pub content: String,
+    /// Exact source text. Omitted under compact=true because it duplicates `content`.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::tools::compact::skip_if_compact"
+    )]
     pub quote: String,
     pub source_episode: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -164,6 +176,18 @@ pub struct AssembleContextRequest {
     #[serde(skip_serializing, default)]
     #[schemars(skip)]
     pub access: Option<AccessPayload>,
+    /// Request compact (token-efficient) response. Defaults to true.
+    #[serde(
+        default = "crate::tools::parsers::default_compact",
+        skip_serializing_if = "is_default_true"
+    )]
+    #[schemars(skip)]
+    pub compact: bool,
+}
+
+// `skip_serializing_if` target for `compact` — skips when the value is the default `true`.
+fn is_default_true(b: &bool) -> bool {
+    *b
 }
 
 /// A compact extracted entity returned by the MCP `extract` tool.
@@ -278,6 +302,11 @@ pub struct ClaimRelationSummary {
 pub struct AssembledContextItem {
     pub fact_id: String,
     pub content: String,
+    /// Exact source text. Omitted under compact=true because it duplicates `content`.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::tools::compact::skip_if_compact"
+    )]
     pub quote: String,
     pub source_episode: String,
     #[serde(serialize_with = "super::rounding::round_2")]
@@ -297,6 +326,8 @@ pub struct AssembledContextItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semantic_available: Option<bool>,
     pub provenance: serde_json::Value,
+    /// Rationale for ranking. Under compact=true, serialized as `tier=<tier>` only.
+    #[serde(serialize_with = "crate::tools::compact::serialize_rationale")]
     pub rationale: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval_tier: Option<String>,
@@ -378,6 +409,85 @@ mod tests {
         assert_eq!(val["confidence"], json!(1.23));
         assert_eq!(val["relevance"], json!(0.56));
         assert_eq!(val["grounding"], json!(0.0));
+    }
+
+    // --- Compact-mode serialization (guarded responses) ---
+
+    #[test]
+    fn assembled_context_item_compact_omits_quote() {
+        let mut item = AssembledContextItem {
+            fact_id: "fact:a".to_string(),
+            content: "The system scales.".to_string(),
+            quote: "The system scales.".to_string(),
+            rationale: "tier=direct ...".to_string(),
+            ..Default::default()
+        };
+        {
+            let _guard = crate::tools::compact::set_compact(true);
+            let val = serde_json::to_value(&item).unwrap();
+            assert!(
+                val.get("quote").is_none(),
+                "compact serialization must omit quote"
+            );
+        }
+        // Guard dropped — verbose path must show quote again:
+        item.quote = "The system scales.".to_string();
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["quote"].as_str().unwrap(), "The system scales.");
+    }
+
+    #[test]
+    fn assembled_context_item_compact_slims_rationale_to_tier() {
+        let item = AssembledContextItem {
+            rationale: "tier=direct fts=0.85 access_count=3 confidence=0.92 semantic=enabled"
+                .to_string(),
+            ..Default::default()
+        };
+        let _guard = crate::tools::compact::set_compact(true);
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["rationale"].as_str().unwrap(), "tier=direct");
+    }
+
+    #[test]
+    fn assembled_context_item_verbose_keeps_full_rationale() {
+        let full = "tier=direct fts=0.85 access_count=3 confidence=0.92".to_string();
+        let item = AssembledContextItem {
+            rationale: full.clone(),
+            ..Default::default()
+        };
+        let _guard = crate::tools::compact::set_compact(false);
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["rationale"].as_str().unwrap(), full.as_str());
+    }
+
+    #[test]
+    fn explain_item_compact_omits_quote() {
+        let item = ExplainItem {
+            content: "Budget $2M.".to_string(),
+            quote: "Budget $2M.".to_string(),
+            source_episode: "episode:budget".to_string(),
+            ..Default::default()
+        };
+        let _guard = crate::tools::compact::set_compact(true);
+        let val = serde_json::to_value(&item).unwrap();
+        assert!(val.get("quote").is_none(), "compact must omit quote");
+        assert_eq!(val["content"].as_str().unwrap(), "Budget $2M.");
+    }
+
+    #[test]
+    fn explain_item_compact_keeps_citation_and_sources() {
+        let item = ExplainItem {
+            content: "Budget $2M.".to_string(),
+            source_episode: "episode:budget".to_string(),
+            citation_context: Some("Full budget breakdown ...".to_string()),
+            ..Default::default()
+        };
+        let _guard = crate::tools::compact::set_compact(true);
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            val["citation_context"].as_str().unwrap(),
+            "Full budget breakdown ..."
+        );
     }
 
     // --- ExplainItem serialization ---

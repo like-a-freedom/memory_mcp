@@ -209,6 +209,7 @@ async fn tools_assemble_context_returns_empty_for_empty_db() {
         view_mode: None,
         window_start: None,
         window_end: None,
+        compact: false,
     };
 
     let response = memory_mcp::tools::assemble_context(&service.build_context(), params)
@@ -216,7 +217,11 @@ async fn tools_assemble_context_returns_empty_for_empty_db() {
         .expect("assemble_context should succeed");
     assert_eq!(response.status, "success");
     assert_eq!(response.total_count, Some(0));
-    assert!(response.result.is_empty());
+    assert!(
+        response.result.as_array().is_none_or(Vec::is_empty),
+        "expected empty result array, got: {}",
+        response.result
+    );
 }
 
 #[tokio::test]
@@ -225,6 +230,7 @@ async fn tools_explain_rejects_bad_json() {
 
     let params = ExplainParams {
         context_items: "not valid json".to_string(),
+        compact: false,
     };
 
     let result = memory_mcp::tools::explain(&service.build_context(), params).await;

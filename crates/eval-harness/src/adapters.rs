@@ -264,6 +264,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: false,
             })
             .await
             .unwrap();

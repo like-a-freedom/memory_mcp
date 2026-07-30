@@ -152,6 +152,7 @@ async fn test_service_add_fact_and_assemble_context() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
 
     let context = service.assemble_context(request).await.unwrap();
@@ -488,6 +489,7 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -588,6 +590,7 @@ async fn test_service_fact_invalidation() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let context_before = service.assemble_context(request_before).await.unwrap();
     assert!(context_before.iter().any(|f| f.fact_id == fact_id));
@@ -616,6 +619,7 @@ async fn test_service_fact_invalidation() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let context_after = service.assemble_context(request_after).await.unwrap();
     assert!(!context_after.iter().any(|f| f.fact_id == fact_id));
@@ -654,6 +658,7 @@ async fn test_service_cache_behavior() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let result1 = service.assemble_context(request.clone()).await.unwrap();
     assert!(!result1.is_empty());
@@ -694,6 +699,7 @@ async fn test_service_assemble_context_records_fact_access_heat() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -746,6 +752,7 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
 
     let first_items = service.assemble_context(request.clone()).await.unwrap();
@@ -815,6 +822,7 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -860,6 +868,7 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -936,6 +945,7 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context");
@@ -992,6 +1002,7 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
 
     let first = service.assemble_context(request.clone()).await.unwrap();
@@ -1065,6 +1076,7 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1137,6 +1149,7 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1216,6 +1229,7 @@ async fn test_service_scope_isolation() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let org_results = service.assemble_context(request_org).await.unwrap();
     assert!(org_results.iter().all(|r| { r.content.contains("Org") }));
@@ -1259,6 +1273,7 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
             window_start: Some(Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap()),
             window_end: Some(Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap()),
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1311,6 +1326,7 @@ async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mod
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context");
@@ -1363,6 +1379,7 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .expect("assemble context");
@@ -1476,6 +1493,7 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             access: None,
             project: Some("atlas".to_string()),
             fact_types: vec!["metric".to_string()],
+            compact: false,
         })
         .await
         .unwrap();
@@ -1557,6 +1575,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             access: None,
             project: None,
             fact_types: vec![],
+            compact: false,
         })
         .await
         .unwrap();
@@ -1645,6 +1664,7 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
             access: None,
             project: None,
             fact_types: vec![],
+            compact: false,
         })
         .await
         .unwrap();
@@ -1735,6 +1755,7 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             access: None,
             project: None,
             fact_types: vec![],
+            compact: false,
         })
         .await
         .unwrap();
@@ -1787,6 +1808,7 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1846,6 +1868,7 @@ async fn test_service_assemble_context_map_view_includes_communities() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1914,6 +1937,7 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -1956,6 +1980,7 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
 
     // First call: cache miss, computes and stores in cache.
@@ -2045,6 +2070,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -2093,6 +2119,7 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -2205,6 +2232,7 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let cached = service.assemble_context(request.clone()).await.unwrap();
     assert!(cached.iter().any(|item| item.fact_id == fact_id));
@@ -2234,6 +2262,7 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         window_start: None,
         window_end: None,
         access: None,
+        compact: false,
     };
     let after = service.assemble_context(after_request).await.unwrap();
     assert!(
@@ -2329,6 +2358,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
                     decayed_confidence: None,
                     ingestion_method: None,
                 }],
+                compact: false,
             },
             None,
         )
@@ -2411,6 +2441,7 @@ async fn test_service_multi_namespace_scope_isolation() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -2441,6 +2472,7 @@ async fn test_service_multi_namespace_scope_isolation() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();
@@ -2493,6 +2525,7 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
             window_start: None,
             window_end: None,
             access: None,
+            compact: false,
         })
         .await
         .unwrap();

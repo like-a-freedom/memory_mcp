@@ -7,6 +7,7 @@ pub mod external_retrieval;
 pub mod extraction;
 pub mod lifecycle;
 pub mod poisoning;
+pub mod response_size;
 pub mod retrieval;
 
 pub use action_grounding::ActionGroundingSuite;
@@ -18,4 +19,5 @@ pub use external_retrieval::{ExternalRetrievalSuite, WorkerPolicy};
 pub use extraction::ExtractionSuite;
 pub use lifecycle::LifecycleReleaseSuite;
 pub use poisoning::PoisoningSuite;
+pub use response_size::ResponseSizeSuite;
 pub use retrieval::LocalRetrievalSuite as RetrievalSuite;

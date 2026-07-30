@@ -558,6 +558,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -789,6 +790,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -1047,6 +1049,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -1084,6 +1087,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -1326,6 +1330,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -1590,6 +1595,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -1868,6 +1874,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -2117,6 +2124,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -2332,6 +2340,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -2579,6 +2588,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await
@@ -2874,6 +2884,7 @@ mod tests {
                 window_start: None,
                 window_end: None,
                 access: None,
+                compact: crate::tools::parsers::default_compact(),
             },
         )
         .await

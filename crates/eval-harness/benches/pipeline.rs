@@ -105,6 +105,7 @@ fn bench_retrieval(c: &mut Criterion) {
                         window_start: None,
                         window_end: None,
                         access: None,
+                        compact: false,
                     })
                     .await
                     .unwrap();

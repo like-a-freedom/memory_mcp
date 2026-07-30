@@ -204,6 +204,18 @@ pub fn default_budget() -> i32 {
     5
 }
 
+/// Default for compact mode — true (token-efficient by default).
+#[must_use]
+pub fn default_compact() -> bool {
+    true
+}
+
+/// Skips serializing `compact` when it holds the default value (true),
+/// keeping the wire format minimal.
+pub fn is_default_true(b: &bool) -> bool {
+    *b
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

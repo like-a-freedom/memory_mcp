@@ -15,6 +15,7 @@ pub async fn run(service: &MemoryService, args: AssembleContextArgs) -> Result<(
         view_mode: args.view_mode,
         window_start: args.window_start,
         window_end: args.window_end,
+        compact: crate::tools::parsers::default_compact(),
     };
     let response = crate::tools::assemble_context(&service.build_context(), params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;

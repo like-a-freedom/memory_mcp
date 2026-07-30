@@ -21,7 +21,9 @@ use serde_json::{Value, json};
 
 #[cfg(feature = "mcp-apps")]
 use crate::logging::LogLevel;
-use crate::models::{AssembledContextItem, ExplainItem, ExtractResult};
+use crate::models::ExtractResult;
+#[cfg(test)]
+use crate::models::{AssembledContextItem, ExplainItem};
 use crate::service::MemoryService;
 #[cfg(feature = "mcp-apps")]
 use crate::service::{
@@ -360,7 +362,7 @@ impl MemoryMcp {
     pub async fn explain(
         &self,
         params: Parameters<ExplainParams>,
-    ) -> Result<Json<ToolResponse<Vec<ExplainItem>>>, ErrorData> {
+    ) -> Result<Json<ToolResponse<serde_json::Value>>, ErrorData> {
         crate::tools::explain(&self.service.build_context(), params.0)
             .await
             .map(Json)
@@ -1201,7 +1203,7 @@ impl MemoryMcp {
     pub async fn assemble_context(
         &self,
         params: Parameters<AssembleContextParams>,
-    ) -> Result<Json<ToolResponse<Vec<AssembledContextItem>>>, ErrorData> {
+    ) -> Result<Json<ToolResponse<serde_json::Value>>, ErrorData> {
         crate::tools::assemble_context(&self.service.build_context(), params.0)
             .await
             .map(Json)

@@ -5,7 +5,7 @@ use std::time::Instant;
 use serde_json::json;
 
 use crate::logging::LogLevel;
-use crate::models::{AssembleContextRequest, AssembledContextItem};
+use crate::models::AssembleContextRequest;
 use crate::service::MemoryError;
 use crate::service::capabilities::assemble_context::AssembleContextCapability;
 use crate::service::service_context::ServiceContext;
@@ -15,10 +15,16 @@ use crate::tools::request_id::next_request_id;
 use crate::tools::response::ToolResponse;
 
 /// Assemble the most relevant active memory context for a query.
+///
+/// The result field is serialized to [`serde_json::Value`] inside this
+/// function while the compact-mode guard is alive, and the outer
+/// `ToolResponse<Value>` envelope is returned. Serialize happens on the same
+/// thread and task as the guard; the guard is dropped before this returns.
 pub async fn assemble_context(
     ctx: &ServiceContext,
     params: AssembleContextParams,
-) -> Result<ToolResponse<Vec<AssembledContextItem>>, MemoryError> {
+) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
+    let compact = params.compact;
     let as_of = if params.as_of.trim().is_empty() {
         None
     } else {
@@ -39,6 +45,7 @@ pub async fn assemble_context(
         window_start,
         window_end,
         access: None,
+        compact,
     };
 
     let timer = Instant::now();
@@ -62,11 +69,27 @@ pub async fn assemble_context(
                 Some(&request_id),
             );
             let count = results.len();
-            Ok(ToolResponse::complete_list(
-                results,
-                count,
-                "Call explain if you need provenance-ready citations for selected items.",
-            ))
+            // Under compact mode, omit `quote` and slim `rationale` via the
+            // serde adapters reading the thread-local CompactGuard. The guard
+            // is held across serialization; `value` contains the compact form.
+            let value = {
+                let _guard = crate::tools::compact::set_compact(compact);
+                serde_json::to_value(&results)
+                    .map_err(|e| MemoryError::Transient(format!("serialize context items: {e}")))?
+            };
+            if compact {
+                Ok(ToolResponse::complete_list_compact(
+                    value,
+                    count,
+                    "Call explain if you need provenance-ready citations for selected items.",
+                ))
+            } else {
+                Ok(ToolResponse::complete_list(
+                    value,
+                    count,
+                    "Call explain if you need provenance-ready citations for selected items.",
+                ))
+            }
         }
         Err(err) => {
             ctx.log_tool_event_with_duration(

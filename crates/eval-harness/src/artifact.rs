@@ -31,7 +31,9 @@ pub struct RunFingerprint {
 impl RunFingerprint {
     pub fn capture() -> Self {
         Self {
-            rust_version: env!("CARGO_PKG_RUST_VERSION", "unknown").to_string(),
+            rust_version: option_env!("CARGO_PKG_RUST_VERSION")
+                .unwrap_or("unknown")
+                .to_string(),
             os_arch: std::env::consts::OS.to_string() + "/" + std::env::consts::ARCH,
             package_version: env!("CARGO_PKG_VERSION").to_string(),
             build_profile: if cfg!(debug_assertions) {

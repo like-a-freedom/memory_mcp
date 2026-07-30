@@ -42,6 +42,9 @@ pub struct ExplainParams {
     /// - objects with snake_case keys such as `content`, `quote`, `fact_id`, and `source_episode`
     /// - plain source ID strings such as `episode:abc123`
     pub context_items: String,
+    /// Request compact (token-efficient) response. Defaults to true.
+    #[serde(default = "crate::tools::parsers::default_compact")]
+    pub compact: bool,
 }
 
 /// Parameters for the `extract` tool.
@@ -116,6 +119,10 @@ pub struct AssembleContextParams {
     pub window_start: Option<String>,
     /// Optional upper bound for result timestamps (ISO 8601 format)
     pub window_end: Option<String>,
+    /// Request compact (token-efficient) response. Defaults to true.
+    /// Set to false for verbose debug output including full rationale strings.
+    #[serde(default = "crate::tools::parsers::default_compact")]
+    pub compact: bool,
 }
 
 #[cfg(test)]
@@ -192,6 +199,22 @@ mod tests {
         let schema = schema_json::<ExplainParams>();
         assert_eq!(schema["properties"]["context_items"]["type"], "string");
         assert!(schema["properties"].get("contextItems").is_none());
+        assert_eq!(schema["properties"]["compact"]["type"], "boolean");
+    }
+
+    #[test]
+    fn explain_params_compact_defaults_true_when_omitted() {
+        let params: ExplainParams =
+            serde_json::from_value(serde_json::json!({"context_items": "[]"})).unwrap();
+        assert!(params.compact, "compact must default to true");
+    }
+
+    #[test]
+    fn explain_params_compact_explicit_false() {
+        let params: ExplainParams =
+            serde_json::from_value(serde_json::json!({"context_items": "[]", "compact": false}))
+                .unwrap();
+        assert!(!params.compact);
     }
 
     #[test]
@@ -297,5 +320,23 @@ mod tests {
                 "unexpected camelCase property {key}"
             );
         }
+
+        // compact is an optional boolean (not required).
+        assert_eq!(properties["compact"]["type"], "boolean");
+        let required = schema["required"].as_array().cloned().unwrap_or_default();
+        assert!(
+            !required.iter().any(|v| v.as_str() == Some("compact")),
+            "compact must not be a required property"
+        );
+    }
+
+    #[test]
+    fn assemble_context_params_compact_defaults_true_when_omitted() {
+        let params: AssembleContextParams = serde_json::from_value(serde_json::json!({
+            "query": "q",
+            "scope": "org"
+        }))
+        .unwrap();
+        assert!(params.compact, "compact must default to true");
     }
 }

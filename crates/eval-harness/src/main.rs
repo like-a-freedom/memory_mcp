@@ -4,8 +4,8 @@ use eval_harness::cli::{self, Command};
 use eval_harness::{
     ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest, DatasetKind,
     DownstreamQaSuite, EndToEndSuite, ExternalRetrievalSuite, ExtractionSuite,
-    LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, RetrievalSuite, RunArtifact,
-    RunRequest, Runner, SuiteId,
+    LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, ResponseSizeSuite, RetrievalSuite,
+    RunArtifact, RunRequest, Runner, SuiteId,
 };
 
 #[tokio::main]
@@ -127,6 +127,13 @@ async fn cmd_run(
             "downstream-qa" => {
                 suites.push(Box::new(DownstreamQaSuite::new()));
             }
+            "response-size" => match ResponseSizeSuite::new() {
+                Ok(s) => suites.push(Box::new(s)),
+                Err(e) => {
+                    eprintln!("warning: failed to load response-size: {e}");
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                }
+            },
             other => {
                 eprintln!("warning: unknown suite {other}");
                 issues.push(eval_harness::RunIssue::empty_suite(other));

@@ -35,6 +35,7 @@ mod tests {
         let ctx = make_context_base(db);
         let request = ExplainRequest {
             context_pack: vec![],
+            compact: crate::tools::parsers::default_compact(),
         };
         let result = ExplainCapability::explain(&ctx, request, None).await;
         assert!(result.is_ok(), "explain must succeed with empty items");
