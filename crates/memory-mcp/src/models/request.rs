@@ -56,7 +56,11 @@ pub struct ExplainItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fact_age_days: Option<i64>,
     /// Confidence after applying time-based decay.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "super::rounding::round_2_opt"
+    )]
     pub decayed_confidence: Option<f64>,
     /// How this fact entered the memory system (e.g. "manual", "extraction").
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -276,10 +280,19 @@ pub struct AssembledContextItem {
     pub content: String,
     pub quote: String,
     pub source_episode: String,
+    #[serde(serialize_with = "super::rounding::round_2")]
     pub confidence: f64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "super::rounding::round_2_opt"
+    )]
     pub relevance: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "super::rounding::round_2_opt"
+    )]
     pub grounding: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semantic_available: Option<bool>,
@@ -289,4 +302,126 @@ pub struct AssembledContextItem {
     pub retrieval_tier: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciliation: Option<ClaimReconciliationMetadata>,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    // --- AssembledContextItem serialization ---
+
+    #[test]
+    fn assembled_context_item_rounds_confidence_to_two_dp() {
+        let item = AssembledContextItem {
+            confidence: 0.8500000000000001,
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["confidence"], json!(0.85));
+    }
+
+    #[test]
+    fn assembled_context_item_omits_relevance_when_none() {
+        let item = AssembledContextItem {
+            confidence: 0.9,
+            relevance: None,
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("relevance"));
+    }
+
+    #[test]
+    fn assembled_context_item_rounds_relevance_when_some() {
+        let item = AssembledContextItem {
+            confidence: 0.9,
+            relevance: Some(0.3333333333333333),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["relevance"], json!(0.33));
+    }
+
+    #[test]
+    fn assembled_context_item_omits_grounding_when_none() {
+        let item = AssembledContextItem {
+            confidence: 0.9,
+            grounding: None,
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("grounding"));
+    }
+
+    #[test]
+    fn assembled_context_item_rounds_grounding_when_some() {
+        let item = AssembledContextItem {
+            confidence: 0.9,
+            grounding: Some(0.999999999),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["grounding"], json!(1.0));
+    }
+
+    #[test]
+    fn assembled_context_item_rounds_all_f64_fields_together() {
+        let item = AssembledContextItem {
+            confidence: 1.23456789,
+            relevance: Some(0.555555555),
+            grounding: Some(0.0049999999),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["confidence"], json!(1.23));
+        assert_eq!(val["relevance"], json!(0.56));
+        assert_eq!(val["grounding"], json!(0.0));
+    }
+
+    // --- ExplainItem serialization ---
+
+    #[test]
+    fn explain_item_rounds_decayed_confidence_when_some() {
+        let item = ExplainItem {
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "ep:1".to_string(),
+            decayed_confidence: Some(0.123456789),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(val["decayed_confidence"], json!(0.12));
+    }
+
+    #[test]
+    fn explain_item_omits_decayed_confidence_when_none() {
+        let item = ExplainItem {
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "ep:1".to_string(),
+            decayed_confidence: None,
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("decayed_confidence"));
+    }
+
+    #[test]
+    fn explain_item_rounds_decayed_confidence_full_precision() {
+        let item = ExplainItem {
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "ep:1".to_string(),
+            decayed_confidence: Some(0.8999999999999999),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            val["decayed_confidence"].as_f64().unwrap(),
+            0.9,
+            "0.8999999999999999 should round to 0.9"
+        );
+    }
 }

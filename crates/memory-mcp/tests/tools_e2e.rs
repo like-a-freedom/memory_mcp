@@ -208,6 +208,21 @@ async fn test_mcp_tools_flow() {
     let context = context.result;
     assert!(!context.is_empty());
 
+    // Verify rounding of f64 fields in assemble_context response
+    let context_json = serde_json::to_value(&context).unwrap();
+    if let Some(items) = context_json.as_array() {
+        for (i, item) in items.iter().enumerate() {
+            let conf = item["confidence"]
+                .as_f64()
+                .unwrap_or_else(|| panic!("item[{i}] missing 'confidence'"));
+            let rounded = (conf * 100.0).round() / 100.0;
+            assert!(
+                (conf - rounded).abs() < f64::EPSILON,
+                "item[{i}] confidence {conf} is not rounded to 2dp (would be {rounded})"
+            );
+        }
+    }
+
     let context_items = serde_json::to_string(&vec![serde_json::json!({
         "content": "ARR $2M",
         "quote": "ARR $2M",
@@ -223,6 +238,20 @@ async fn test_mcp_tools_flow() {
     assert_eq!(explanation.status, "success");
     let explanation = explanation.result;
     assert_eq!(explanation[0].source_episode, episode_id);
+
+    // Verify rounding of decayed_confidence in explain response
+    let explain_json = serde_json::to_value(&explanation).unwrap();
+    if let Some(items) = explain_json.as_array() {
+        for (i, item) in items.iter().enumerate() {
+            if let Some(decayed) = item["decayed_confidence"].as_f64() {
+                let rounded = (decayed * 100.0).round() / 100.0;
+                assert!(
+                    (decayed - rounded).abs() < f64::EPSILON,
+                    "explain item[{i}] decayed_confidence {decayed} is not rounded to 2dp"
+                );
+            }
+        }
+    }
 
     let ingest_params2 = serde_json::json!({
         "source_type": "email",

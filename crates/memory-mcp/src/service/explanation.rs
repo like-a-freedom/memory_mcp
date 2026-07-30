@@ -232,10 +232,7 @@ impl ExplanationService {
                         crate::models::Fact::DEFAULT_HALF_LIFE_DAYS
                     };
                     let decay = 2.0_f64.powf(-age as f64 / half_life_days);
-                    decayed_confidence = Some(
-                        (conf * decay * crate::models::Fact::CONFIDENCE_SCALE).round()
-                            / crate::models::Fact::CONFIDENCE_SCALE,
-                    );
+                    decayed_confidence = Some(conf * decay);
                 }
             }
 

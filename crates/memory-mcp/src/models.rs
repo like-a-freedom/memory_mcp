@@ -12,6 +12,7 @@ mod memory_event;
 mod procedure;
 mod provenance;
 mod request;
+pub(crate) mod rounding;
 
 pub use access::*;
 pub use domain::*;
