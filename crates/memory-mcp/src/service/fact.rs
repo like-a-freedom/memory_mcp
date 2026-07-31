@@ -6,6 +6,7 @@
 //! fact record lifecycle.
 
 use std::collections::HashSet;
+#[cfg(test)]
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -16,7 +17,8 @@ use crate::models::{FactId, Provenance};
 use crate::service::cache::invalidate_cache_by_scope;
 use crate::service::error::MemoryError;
 use crate::service::util::{deterministic_fact_id, validate_fact_input};
-use crate::storage::DbClient;
+#[cfg(test)]
+use crate::storage::FactStoreClient;
 
 use super::{normalize_dt, normalize_text, now};
 
@@ -35,12 +37,12 @@ pub(crate) struct EmbeddingPayload {
 /// Handles fact record CRUD: validation, ID generation, index key building, and persistence.
 #[derive(Clone)]
 pub struct FactService {
-    db_client: Arc<dyn DbClient>,
+    db: crate::storage::FactStoreClient,
 }
 
 impl FactService {
-    pub fn new(db_client: Arc<dyn DbClient>) -> Self {
-        Self { db_client }
+    pub fn new(db_client: crate::storage::FactStoreClient) -> Self {
+        Self { db: db_client }
     }
 
     /// Creates a new fact record if it does not already exist.
@@ -72,7 +74,7 @@ impl FactService {
         validate_fact_input(fact_type, content, quote, source_episode, scope)?;
 
         let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
-        let existing = self.db_client.select_one(&fact_id, namespace).await?;
+        let existing = self.db.select_one(&fact_id, namespace).await?;
         if existing.is_some() {
             return Ok(fact_id);
         }
@@ -111,7 +113,7 @@ impl FactService {
         }
 
         let created = self
-            .db_client
+            .db
             .create(&fact_id, Value::Object(payload), namespace)
             .await?;
         if created.is_null() {
@@ -445,7 +447,7 @@ mod tests {
             &fact_id,
             json!({"fact_id": fact_id.clone(), "status": "ok"}),
         );
-        let svc = FactService::new(Arc::new(db));
+        let svc = FactService::new(FactStoreClient::new(Arc::new(db)));
         let provenance = Provenance::agent_observation("episode:test");
 
         let fact_id = svc
@@ -477,7 +479,7 @@ mod tests {
         let fact_id = deterministic_fact_id("note", "dup", "episode:test", t);
         let db = MockDbClient::new()
             .expect_select_one(&fact_id, Some(json!({"fact_id": fact_id.clone()})));
-        let svc = FactService::new(Arc::new(db));
+        let svc = FactService::new(FactStoreClient::new(Arc::new(db)));
         let provenance = Provenance::agent_observation("episode:test");
 
         let result = svc

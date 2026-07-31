@@ -20,6 +20,7 @@ pub(crate) mod app_store;
 pub(crate) mod claims;
 mod client;
 pub(crate) mod context_store;
+pub(crate) mod fact_store;
 mod helpers;
 mod migrations;
 mod procedures;
@@ -34,6 +35,7 @@ pub use agent_memory::{
 pub use app_store::AppStoreClient;
 pub use client::{AppStore, ContextFactQuery, DbClient, SurrealDbClient};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
+pub use fact_store::FactStoreClient;
 pub use helpers::is_missing_index_error;
 pub use procedures::ProcedureStore;
 pub use queries::{

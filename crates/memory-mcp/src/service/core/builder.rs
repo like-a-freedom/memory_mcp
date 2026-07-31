@@ -403,7 +403,9 @@ impl MemoryService {
             rate_limiter.clone(),
         );
         let entity_service = super::super::entity::EntityService::new(db_client.clone());
-        let fact_service = super::super::fact::FactService::new(db_client.clone());
+        let fact_service = super::super::fact::FactService::new(
+            crate::storage::FactStoreClient::new(db_client.clone()),
+        );
         let explanation_service = super::super::explanation::ExplanationService::new(
             db_client.clone(),
             logger.clone(),

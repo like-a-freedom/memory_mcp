@@ -73,7 +73,9 @@ pub(crate) mod test_support {
                 ))),
                 Arc::new(crate::service::embedding::task_runner::BackgroundTaskRunner::new()),
             ),
-            fact_service: crate::service::fact::FactService::new(db_client.clone()),
+            fact_service: crate::service::fact::FactService::new(
+                crate::storage::FactStoreClient::new(db_client.clone()),
+            ),
             triple_extractor: Arc::new(RuleBasedTripleExtractor::new())
                 as Arc<dyn crate::service::triple_extractor::TripleExtractor>,
             context_cache: Arc::new(RwLock::new(LruCache::new(
