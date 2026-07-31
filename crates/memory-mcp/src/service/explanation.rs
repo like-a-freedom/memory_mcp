@@ -57,8 +57,8 @@ impl ExplanationService {
 }
 
 impl GraphContext for ExplanationService {
-    fn app_store(&self) -> &dyn crate::storage::AppStore {
-        &self.db_client
+    fn app_store(&self) -> crate::storage::AppStoreClient {
+        crate::storage::AppStoreClient::new(self.db_client.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger

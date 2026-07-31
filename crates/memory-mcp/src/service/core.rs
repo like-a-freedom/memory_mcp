@@ -11,7 +11,7 @@ use crate::models::{
     AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
-use crate::storage::AppStore;
+
 #[cfg(test)]
 use crate::storage::GraphDirection;
 
@@ -25,8 +25,8 @@ pub use builder::MemoryService;
 pub(crate) use helpers::*;
 
 impl MemoryService {
-    pub(crate) fn app_store(&self) -> &dyn AppStore {
-        &self.db_client
+    pub(crate) fn app_store(&self) -> crate::storage::AppStoreClient {
+        crate::storage::AppStoreClient::new(self.db_client.clone())
     }
 
     /// Builds a `ServiceContext` from this service's fields.

@@ -7,19 +7,19 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::SurprisingConnection;
 use crate::service::value_helpers::string_from_value;
 use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
-use crate::storage::{AppStore, GraphDirection};
+use crate::storage::{AppStoreClient, GraphDirection};
 
 /// Minimal context required by graph traversal functions.
 /// Allows `ExplanationService` (and future services) to call graph
 /// operations without depending on `MemoryService` directly.
 pub(crate) trait GraphContext: Send + Sync {
-    fn app_store(&self) -> &dyn AppStore;
+    fn app_store(&self) -> AppStoreClient;
     fn logger(&self) -> &StdoutLogger;
 }
 
 impl GraphContext for MemoryService {
-    fn app_store(&self) -> &dyn AppStore {
-        MemoryService::app_store(self)
+    fn app_store(&self) -> AppStoreClient {
+        AppStoreClient::new(self.db_client.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
@@ -700,7 +700,7 @@ pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String
 
 /// Returns a JSON snapshot of an entity (entity_id + canonical_name).
 pub async fn entity_snapshot(
-    store: &dyn AppStore,
+    store: &AppStoreClient,
     namespace: &str,
     entity_id: &str,
 ) -> Result<Value, MemoryError> {
@@ -721,7 +721,7 @@ pub async fn entity_snapshot(
 
 /// BFS path finding between two entities in the knowledge graph.
 pub async fn graph_path_snapshot(
-    store: &dyn AppStore,
+    store: &AppStoreClient,
     namespace: &str,
     from_entity_id: &str,
     to_entity_id: &str,
@@ -795,7 +795,7 @@ pub async fn graph_path_snapshot(
 
 /// BFS neighbor expansion from a target entity.
 pub async fn graph_neighbor_expansion(
-    store: &dyn AppStore,
+    store: &AppStoreClient,
     namespace: &str,
     target_id: &str,
     direction: &str,
@@ -857,7 +857,7 @@ pub async fn graph_neighbor_expansion(
 
 /// Builds the full graph payload: path + neighbor expansion for both endpoints.
 pub async fn graph_payload(
-    store: &dyn AppStore,
+    store: &AppStoreClient,
     namespace: &str,
     from_entity_id: &str,
     to_entity_id: &str,

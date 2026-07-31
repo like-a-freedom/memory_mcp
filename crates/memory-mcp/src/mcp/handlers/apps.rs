@@ -297,13 +297,9 @@ impl MemoryMcp {
         depth: i32,
         cutoff: DateTime<Utc>,
     ) -> Result<Value, ErrorData> {
+        let store = self.service.app_store();
         crate::service::graph_neighbor_expansion(
-            self.service.app_store(),
-            namespace,
-            target_id,
-            direction,
-            depth,
-            cutoff,
+            &store, namespace, target_id, direction, depth, cutoff,
         )
         .await
         .map_err(mcp_error)
@@ -319,8 +315,9 @@ impl MemoryMcp {
     ) -> Result<Value, ErrorData> {
         let namespace = self.service.namespace_for_scope(scope).map_err(mcp_error)?;
         let cutoff = as_of.and_then(parse_datetime).unwrap_or_else(Utc::now);
+        let store = self.service.app_store();
         crate::service::graph_payload(
-            self.service.app_store(),
+            &store,
             &namespace,
             from_entity_id,
             to_entity_id,

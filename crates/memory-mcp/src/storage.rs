@@ -16,6 +16,7 @@
 //! - `types`: Type definitions like [`GraphDirection`]
 
 mod agent_memory;
+pub(crate) mod app_store;
 pub(crate) mod claims;
 mod client;
 pub(crate) mod context_store;
@@ -30,6 +31,7 @@ pub use agent_memory::{
     AgentMemoryStore, EventProjectionJobRecord, MemoryCaptureAuditRecord, MemoryEventRecord,
     disposition_str, origin_kind_str, reason_codes_str, source_kind_str, trust_class_str,
 };
+pub use app_store::AppStoreClient;
 pub use client::{AppStore, ContextFactQuery, DbClient, SurrealDbClient};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use helpers::is_missing_index_error;
