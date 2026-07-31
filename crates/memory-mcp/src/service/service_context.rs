@@ -176,13 +176,13 @@ impl ServiceContext {
     }
 
     /// Returns the context store handle (the db client).
-    pub(crate) fn context_store(&self) -> &dyn crate::storage::ContextStore {
-        &self.db_client
+    pub(crate) fn context_store(&self) -> crate::storage::ContextStoreClient {
+        crate::storage::ContextStoreClient::new(self.db_client.clone())
     }
 
     /// Returns the context access log handle (the db client).
-    pub(crate) fn context_access_log(&self) -> &dyn crate::storage::ContextAccessLog {
-        &self.db_client
+    pub(crate) fn context_access_log(&self) -> crate::storage::ContextAccessLogClient {
+        crate::storage::ContextAccessLogClient::new(self.db_client.clone())
     }
 
     /// Finds an entity record by ID across all namespaces.
