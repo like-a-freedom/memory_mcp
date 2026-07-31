@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::SurprisingConnection;
+use crate::service::value_helpers::string_from_value;
 use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
 use crate::storage::{AppStore, GraphDirection};
 
@@ -331,6 +332,9 @@ pub(crate) async fn find_surprising_connections(
                         break;
                     }
                 }
+                if !is_traversable_graph_node(&neighbor) {
+                    continue;
+                }
 
                 if visited.insert(neighbor.clone()) && next_depth < max_depth as usize {
                     frontier.push_back((neighbor, next_path, next_depth));
@@ -498,6 +502,169 @@ fn is_entity_id(record_id: &str) -> bool {
 
 fn is_traversable_graph_node(record_id: &str) -> bool {
     is_entity_id(record_id) || record_id.starts_with("episode:") || record_id.starts_with("fact:")
+}
+
+// ---------------------------------------------------------------------------
+// Introduction-chain traversal (moved from service/core.rs, ADR-0024 step 1)
+// ---------------------------------------------------------------------------
+
+/// Builds an introduction-chain path from a BFS next-hop map.
+///
+/// Returns the entity-id path from `start_id` back toward `target_id`,
+/// following the discovered predecessor links. Returns `None` when the chain
+/// breaks before reaching the target.
+pub(crate) fn intro_chain_from_start(
+    start_id: &str,
+    target_id: &str,
+    next_hop: &HashMap<String, String>,
+) -> Option<Vec<String>> {
+    let mut path = vec![start_id.to_string()];
+    let mut current = start_id;
+
+    while let Some(next) = next_hop.get(current) {
+        path.push(next.clone());
+        if next == target_id {
+            return Some(path);
+        }
+        current = next;
+    }
+
+    None
+}
+
+/// Finds the best introduction chain to an entity named `target_name` by
+/// walking `GraphDirection::Incoming` edges inward from the target and
+/// returning the smallest discovered chain to any starting entity.
+///
+/// Free function (not a method on `MemoryService`) so later stages of ADR-0024
+/// can supply any context that exposes an `AppStore`, without dragging a
+/// `MemoryService` construction into the call.
+pub(crate) async fn find_intro_chain(
+    ctx: &impl GraphContext,
+    namespaces: &[String],
+    default_namespace: &str,
+    target_name: &str,
+    max_hops: i32,
+    as_of: Option<DateTime<Utc>>,
+) -> Result<Vec<String>, MemoryError> {
+    let target_id = find_entity_id_by_name(ctx, default_namespace, namespaces, target_name).await?;
+    let Some(target_id) = target_id else {
+        return Ok(vec![]);
+    };
+
+    let cutoff = as_of.unwrap_or_else(crate::service::now);
+    let cutoff_iso = normalize_dt(cutoff);
+
+    let mut frontier = vec![target_id.clone()];
+    let mut visited = HashSet::from([target_id.clone()]);
+    let mut next_hop: HashMap<String, String> = HashMap::new();
+    let mut discovered_nodes = HashSet::new();
+    let mut nodes_with_predecessors = HashSet::new();
+
+    for _ in 0..max_hops {
+        let mut next_frontier = Vec::new();
+
+        for node_id in &frontier {
+            for namespace in namespaces {
+                for record in ctx
+                    .app_store()
+                    .select_graph_neighbors(
+                        namespace,
+                        node_id,
+                        &cutoff_iso,
+                        GraphDirection::Incoming,
+                    )
+                    .await?
+                {
+                    if let Value::Object(map) = record
+                        && let (Some(in_id), Some(out_id)) = (
+                            map.get("in").and_then(string_from_value),
+                            map.get("out").and_then(string_from_value),
+                        )
+                        && visited.insert(in_id.clone())
+                    {
+                        next_hop.insert(in_id.clone(), out_id);
+                        discovered_nodes.insert(in_id.clone());
+                        nodes_with_predecessors.insert(node_id.clone());
+                        next_frontier.push(in_id);
+                    }
+                }
+            }
+        }
+
+        if next_frontier.is_empty() {
+            break;
+        }
+
+        next_frontier.sort();
+        next_frontier.dedup();
+        frontier = next_frontier;
+    }
+
+    let mut candidate_paths = discovered_nodes
+        .into_iter()
+        .filter(|node_id| !nodes_with_predecessors.contains(node_id))
+        .filter_map(|start_id| intro_chain_from_start(&start_id, &target_id, &next_hop))
+        .collect::<Vec<_>>();
+
+    candidate_paths
+        .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+
+    let Some(best_path) = candidate_paths.into_iter().next() else {
+        return Ok(vec![]);
+    };
+
+    Ok(best_path)
+}
+
+/// Resolves an entity name to its `entity_id`. Tries the indexed lookup via
+/// `select_entity_lookup` in the default namespace first, then falls back to
+/// scanning entities across all namespaces. Returns `None` when the name is
+/// unknown in every namespace.
+async fn find_entity_id_by_name(
+    ctx: &impl GraphContext,
+    default_namespace: &str,
+    namespaces: &[String],
+    target_name: &str,
+) -> Result<Option<String>, MemoryError> {
+    let normalized_name = crate::service::normalize_text(target_name);
+
+    // Prefer the indexed lookup in the default namespace.
+    if let Some(record) = ctx
+        .app_store()
+        .select_entity_lookup(default_namespace, &normalized_name)
+        .await?
+        .and_then(|value| value.as_object().cloned())
+    {
+        return Ok(record
+            .get("entity_id")
+            .and_then(string_from_value)
+            .or_else(|| record.get("id").and_then(string_from_value)));
+    }
+
+    for namespace in namespaces {
+        for record in ctx.app_store().select_entities(namespace).await? {
+            let Some(map) = record.as_object() else {
+                continue;
+            };
+            let entity_name = map
+                .get("canonical_name")
+                .and_then(string_from_value)
+                .or_else(|| map.get("name").and_then(string_from_value));
+            let Some(name) = entity_name else {
+                continue;
+            };
+            if crate::service::normalize_text(&name) != normalized_name {
+                continue;
+            }
+            return Ok(map
+                .get("entity_id")
+                .and_then(string_from_value)
+                .or_else(|| map.get("id").and_then(string_from_value)));
+        }
+    }
+
+    Ok(None)
 }
 
 fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {

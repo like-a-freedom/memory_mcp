@@ -482,6 +482,12 @@ pub trait AppStore: Send + Sync {
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError>;
 
+    async fn select_entity_lookup(
+        &self,
+        namespace: &str,
+        normalized_name: &str,
+    ) -> Result<Option<Value>, MemoryError>;
+
     async fn select_active_facts(
         &self,
         namespace: &str,
@@ -681,6 +687,14 @@ impl<T: DbClient + ?Sized> AppStore for Arc<T> {
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
         DbClient::select_edge_neighbors(self.as_ref(), namespace, node_id, cutoff, direction).await
+    }
+
+    async fn select_entity_lookup(
+        &self,
+        namespace: &str,
+        normalized_name: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        DbClient::select_entity_lookup(self.as_ref(), namespace, normalized_name).await
     }
 
     async fn select_active_facts(

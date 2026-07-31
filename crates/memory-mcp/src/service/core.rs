@@ -1,6 +1,5 @@
 //! MemoryService implementation - core service orchestration.
 
-use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::sync::Arc;
 
@@ -13,9 +12,11 @@ use crate::models::{
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 use crate::storage::AppStore;
+#[cfg(test)]
 use crate::storage::GraphDirection;
 
 use super::error::MemoryError;
+#[cfg(test)]
 use super::value_helpers::string_from_value;
 
 mod builder;
@@ -425,80 +426,25 @@ impl MemoryService {
     }
 
     /// Finds an introduction chain.
+    ///
+    /// Graph traversal lives in `service/apps/graph.rs` per ADR-0024 step 1;
+    /// this method is kept only to preserve the public `MemoryService`
+    /// interface while consumers migrate.
     pub async fn find_intro_chain(
         &self,
         target_name: &str,
         max_hops: i32,
         as_of: Option<DateTime<Utc>>,
     ) -> Result<Vec<String>, MemoryError> {
-        let target_id = self.find_entity_by_name(target_name).await?;
-        let Some(target_id) = target_id else {
-            return Ok(vec![]);
-        };
-
-        let cutoff = as_of.unwrap_or_else(super::query::now);
-        let cutoff_iso = super::normalize_dt(cutoff);
-
-        let mut frontier = vec![target_id.clone()];
-        let mut visited = HashSet::from([target_id.clone()]);
-        let mut next_hop: HashMap<String, String> = HashMap::new();
-        let mut discovered_nodes = HashSet::new();
-        let mut nodes_with_predecessors = HashSet::new();
-
-        for _ in 0..max_hops {
-            let mut next_frontier = Vec::new();
-
-            for node_id in &frontier {
-                for namespace in &self.namespaces {
-                    for record in self
-                        .db_client
-                        .select_edge_neighbors(
-                            namespace,
-                            node_id,
-                            &cutoff_iso,
-                            GraphDirection::Incoming,
-                        )
-                        .await?
-                    {
-                        if let Value::Object(map) = record
-                            && let (Some(in_id), Some(out_id)) = (
-                                map.get("in").and_then(string_from_value),
-                                map.get("out").and_then(string_from_value),
-                            )
-                            && visited.insert(in_id.clone())
-                        {
-                            next_hop.insert(in_id.clone(), out_id);
-                            discovered_nodes.insert(in_id.clone());
-                            nodes_with_predecessors.insert(node_id.clone());
-                            next_frontier.push(in_id);
-                        }
-                    }
-                }
-            }
-
-            if next_frontier.is_empty() {
-                break;
-            }
-
-            next_frontier.sort();
-            next_frontier.dedup();
-            frontier = next_frontier;
-        }
-
-        let mut candidate_paths = discovered_nodes
-            .into_iter()
-            .filter(|node_id| !nodes_with_predecessors.contains(node_id))
-            .filter_map(|start_id| build_intro_chain_from_start(&start_id, &target_id, &next_hop))
-            .collect::<Vec<_>>();
-
-        candidate_paths
-            .sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
-
-        let Some(best_path) = candidate_paths.into_iter().next() else {
-            return Ok(vec![]);
-        };
-
-        Ok(best_path)
+        super::apps::graph::find_intro_chain(
+            self,
+            &self.namespaces,
+            &self.default_namespace,
+            target_name,
+            max_hops,
+            as_of,
+        )
+        .await
     }
 
     /// Invalidates a superseded metric.
@@ -565,19 +511,6 @@ impl MemoryService {
         Ok((None, None))
     }
 
-    async fn find_entity_record(
-        &self,
-        name: &str,
-        namespace: &str,
-    ) -> Result<Option<serde_json::Map<String, Value>>, MemoryError> {
-        let normalized = super::normalize_text(name);
-        Ok(self
-            .db_client
-            .select_entity_lookup(namespace, &normalized)
-            .await?
-            .and_then(|record| record.as_object().cloned()))
-    }
-
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn enforce_rate_limit(
         &self,
@@ -590,17 +523,6 @@ impl MemoryService {
             return Err(MemoryError::Validation("rate limit exceeded".into()));
         }
         Ok(())
-    }
-
-    async fn find_entity_by_name(&self, name: &str) -> Result<Option<String>, MemoryError> {
-        let record = self
-            .find_entity_record(name, &self.default_namespace)
-            .await?;
-        Ok(record.and_then(|map| {
-            map.get("entity_id")
-                .and_then(string_from_value)
-                .or_else(|| map.get("id").and_then(string_from_value))
-        }))
     }
 }
 
@@ -709,87 +631,6 @@ mod tests {
         assert!(serialized.get("transport").is_some());
         assert!(serialized.get("content_type").is_some());
         assert!(serialized.get("cross_scope_allow").is_some());
-    }
-
-    #[test]
-    fn string_from_value_handles_string() {
-        let value = json!("test");
-        assert_eq!(string_from_value(&value), Some("test".to_string()));
-    }
-
-    #[test]
-    fn string_from_value_handles_strand() {
-        let value = json!({"Strand": "test"});
-        assert_eq!(string_from_value(&value), Some("test".to_string()));
-    }
-
-    #[test]
-    fn string_from_value_handles_nested_strand() {
-        let value = json!({"Strand": {"String": "test"}});
-        assert_eq!(string_from_value(&value), Some("test".to_string()));
-    }
-
-    #[test]
-    fn string_from_value_handles_record_id() {
-        let value = json!({"RecordId": {"table": "entity", "key": "alice"}});
-        assert_eq!(string_from_value(&value), Some("entity:alice".to_string()));
-    }
-
-    #[test]
-    fn string_from_value_returns_none_for_other_types() {
-        assert_eq!(string_from_value(&json!(123)), None);
-        assert_eq!(string_from_value(&json!(true)), None);
-        assert_eq!(string_from_value(&json!(null)), None);
-        assert_eq!(string_from_value(&json!([1, 2, 3])), None);
-    }
-
-    #[test]
-    fn bfs_path_finds_direct_connection() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec!["B".to_string()]);
-        graph.insert("B".to_string(), vec![]);
-
-        let path = bfs_path(&graph, "A", "B", 5);
-        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
-    }
-
-    #[test]
-    fn bfs_path_finds_indirect_connection() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec!["B".to_string()]);
-        graph.insert("B".to_string(), vec!["C".to_string()]);
-        graph.insert("C".to_string(), vec![]);
-
-        let path = bfs_path(&graph, "A", "C", 5);
-        assert_eq!(
-            path,
-            Some(vec!["A".to_string(), "B".to_string(), "C".to_string()])
-        );
-    }
-
-    #[test]
-    fn bfs_path_respects_max_hops() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec!["B".to_string()]);
-        graph.insert("B".to_string(), vec!["C".to_string()]);
-        graph.insert("C".to_string(), vec!["D".to_string()]);
-
-        let path = bfs_path(&graph, "A", "D", 1);
-        assert_eq!(path, None);
-
-        let path = bfs_path(&graph, "A", "D", 3);
-        assert!(path.is_some());
-    }
-
-    #[test]
-    fn bfs_path_returns_none_for_unreachable() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec!["B".to_string()]);
-        graph.insert("B".to_string(), vec![]);
-        graph.insert("C".to_string(), vec![]); // Unreachable from A
-
-        let path = bfs_path(&graph, "A", "C", 5);
-        assert_eq!(path, None);
     }
 
     #[test]
@@ -1049,15 +890,6 @@ mod tests {
                 "private".to_string(),
             ]
         );
-    }
-
-    #[test]
-    fn bfs_path_returns_single_element_for_same_node() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec![]);
-
-        let path = bfs_path(&graph, "A", "A", 5);
-        assert_eq!(path, Some(vec!["A".to_string()]));
     }
 
     #[test]
@@ -1795,67 +1627,6 @@ mod tests {
         assert!(service.enforce_rate_limit(Some(&user1)).is_err());
 
         assert!(service.enforce_rate_limit(Some(&user2)).is_ok());
-    }
-
-    #[test]
-    fn build_intro_chain_from_start_builds_correct_path() {
-        let mut next_hop = HashMap::new();
-        next_hop.insert("A".to_string(), "B".to_string());
-        next_hop.insert("B".to_string(), "C".to_string());
-        next_hop.insert("C".to_string(), "D".to_string());
-
-        let path = build_intro_chain_from_start("A", "D", &next_hop);
-        assert_eq!(
-            path,
-            Some(vec![
-                "A".to_string(),
-                "B".to_string(),
-                "C".to_string(),
-                "D".to_string()
-            ])
-        );
-    }
-
-    #[test]
-    fn build_intro_chain_from_start_returns_none_for_unreachable() {
-        let mut next_hop = HashMap::new();
-        next_hop.insert("A".to_string(), "B".to_string());
-        next_hop.insert("B".to_string(), "C".to_string());
-
-        let path = build_intro_chain_from_start("A", "Z", &next_hop);
-        assert_eq!(path, None);
-    }
-
-    #[test]
-    fn build_intro_chain_from_start_handles_direct_connection() {
-        let mut next_hop = HashMap::new();
-        next_hop.insert("A".to_string(), "B".to_string());
-
-        let path = build_intro_chain_from_start("A", "B", &next_hop);
-        assert_eq!(path, Some(vec!["A".to_string(), "B".to_string()]));
-    }
-
-    #[test]
-    fn bfs_path_handles_empty_graph() {
-        let graph: HashMap<String, Vec<String>> = HashMap::new();
-        let path = bfs_path(&graph, "A", "B", 5);
-        assert_eq!(path, None);
-    }
-
-    #[test]
-    fn bfs_path_finds_shortest_path_in_complex_graph() {
-        let mut graph = HashMap::new();
-        graph.insert("A".to_string(), vec!["B".to_string(), "C".to_string()]);
-        graph.insert("B".to_string(), vec!["D".to_string()]);
-        graph.insert("C".to_string(), vec!["D".to_string(), "E".to_string()]);
-        graph.insert("D".to_string(), vec!["F".to_string()]);
-        graph.insert("E".to_string(), vec!["F".to_string()]);
-        graph.insert("F".to_string(), vec![]);
-
-        let path = bfs_path(&graph, "A", "F", 10);
-        assert!(path.is_some());
-        let path = path.unwrap();
-        assert!(path.len() <= 4);
     }
 
     #[tokio::test]
