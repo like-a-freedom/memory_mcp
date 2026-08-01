@@ -33,6 +33,19 @@ ADR-0022 (compact responses) is already Draft — card 5 closes its Phase B.
 - `cargo fmt --all --check` — zero diff
 - Benchmark non-regression: run the eval profile(s) whose gates cover the card's blast radius, compare observed values to v5.
 
+## Execution status (2026-07-30)
+
+| Card | Status | Notes |
+|------|--------|-------|
+| 5 | ✅ complete | ADR-0022 Accepted on Phase B data (39.5% mean reduction, 66/66) |
+| 2 | ✅ complete | Six commits land the capability narrowing: stores in `storage/{context_store,app_store,fact_store,episode_store}.rs`; PR gates at v5 parity across every step |
+| 6 | ✅ partial | Builders moved to `models/request.rs`. Eval corpora move deliberately deferred: ADR-0020 pins digests on the current path; moving requires re-pinning across all profiles |
+| 1 | ⏸  blocked | Needs the full 14-variant command table against each arm's shape contract + confirmation policy. Descriptor table is in ADR-0023; implementation is the next focused step |
+| 3 | ⏸  planned | ADR-0025 defines the renderer; implementation touches every suite's evidence path across eval-harness (one follow-on PR) |
+| 4 | ⏸  blocked on 1 | Requires Card 1's dispatch so the MCP-layer trigger matrix is clean first |
+
+Card 2 verified end-to-end: `cargo test --workspace --all-targets --features cli-watch,mcp-apps` passes; PR profile matches v5 observed values for every gate (7/7, 119/119).
+
 ## Card 5 details (executed now)
 
 1. **Delete `service/claims/normalize.rs`** — 1-line stub module. Remove the file and the `pub(crate) mod normalize;` line in `service/claims.rs`.
