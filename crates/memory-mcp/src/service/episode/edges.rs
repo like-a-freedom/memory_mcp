@@ -54,7 +54,10 @@ pub(crate) async fn store_edge(
     let edge_id =
         ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
 
-    let existing = service.db_client.select_one(&edge_id, namespace).await?;
+    let existing = service
+        .episode_store()
+        .select_one(&edge_id, namespace)
+        .await?;
     if existing.is_some() {
         return Ok(());
     }
@@ -64,13 +67,13 @@ pub(crate) async fn store_edge(
     let payload = build_edge_payload(edge, &edge_id);
 
     service
-        .db_client
+        .episode_store()
         .relate_edge(
-            namespace,
             &edge_id,
             &edge.in_id,
             &edge.out_id,
             Value::Object(payload),
+            namespace,
         )
         .await?;
 
@@ -96,7 +99,7 @@ async fn invalidate_conflicting_edges(
     namespace: &str,
 ) -> Result<(), MemoryError> {
     let existing_edges = service
-        .db_client
+        .episode_store()
         .select_edges_for_triple(
             namespace,
             &new_edge.in_id,
@@ -111,7 +114,7 @@ async fn invalidate_conflicting_edges(
         .filter(|existing| edge_versions_conflict(existing, new_edge))
     {
         service
-            .db_client
+            .episode_store()
             .update(
                 &existing.edge_id,
                 json!({

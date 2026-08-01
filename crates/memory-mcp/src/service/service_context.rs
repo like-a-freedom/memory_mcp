@@ -185,6 +185,11 @@ impl ServiceContext {
         crate::storage::ContextAccessLogClient::new(self.db_client.clone())
     }
 
+    /// Returns the episode store handle (the db client).
+    pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
+        crate::storage::EpisodeStoreClient::new(self.db_client.clone())
+    }
+
     /// Finds an entity record by ID across all namespaces.
     pub(crate) async fn find_entity_record_by_id(
         &self,

@@ -94,17 +94,17 @@ pub(crate) async fn update_communities(
     });
 
     let existing = service
-        .db_client
+        .episode_store()
         .select_one(&community_id, &namespace)
         .await?;
     if existing.is_some() {
         service
-            .db_client
+            .episode_store()
             .update(&community_id, payload, &namespace)
             .await?;
     } else {
         service
-            .db_client
+            .episode_store()
             .create(&community_id, payload, &namespace)
             .await?;
     }
@@ -114,7 +114,7 @@ pub(crate) async fn update_communities(
         .filter(|c| c.community_id != community_id)
     {
         service
-            .db_client
+            .episode_store()
             .query(
                 "DELETE type::record($community_id);",
                 Some(json!({"community_id": stale.community_id})),
@@ -150,7 +150,7 @@ pub(crate) async fn collect_connected_entity_component(
 
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             let edges = service
-                .db_client
+                .episode_store()
                 .select_edge_neighbors(namespace, &current, &cutoff, direction)
                 .await?;
 
@@ -192,7 +192,7 @@ pub(crate) async fn build_community_summary(
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
     let records = service
-        .db_client
+        .episode_store()
         .select_entities_by_ids(namespace, member_entities)
         .await?;
     let mut names = records
@@ -245,7 +245,7 @@ pub(crate) async fn find_overlapping_communities(
     let member_set: HashSet<_> = member_entities.iter().cloned().collect();
 
     let communities = service
-        .db_client
+        .episode_store()
         .select_communities_by_member_entities(namespace, member_entities)
         .await?;
 
