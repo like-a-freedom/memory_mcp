@@ -2,7 +2,10 @@
 //! community/entity lookups community helpers use.
 //!
 //! Replaces direct `DbClient` consumption in `service/episode/` per
-//! ADR-0024 step 6.
+//! ADR-0024 step 6. The store owns which query is being issued; the SQL
+//! text itself still lives in `SurrealDbClient` (the single engine
+//! implementation). Pulling SQL construction up to this layer is out of
+//! scope for this refactor.
 
 use std::sync::Arc;
 

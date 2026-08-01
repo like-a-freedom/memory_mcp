@@ -29,7 +29,7 @@ pub struct ExplainRequest {
     /// Request compact (token-efficient) response. Defaults to true.
     #[serde(
         default = "crate::tools::parsers::default_compact",
-        skip_serializing_if = "is_default_true"
+        skip_serializing_if = "crate::tools::parsers::is_default_true"
     )]
     #[schemars(skip)]
     pub compact: bool,
@@ -179,15 +179,10 @@ pub struct AssembleContextRequest {
     /// Request compact (token-efficient) response. Defaults to true.
     #[serde(
         default = "crate::tools::parsers::default_compact",
-        skip_serializing_if = "is_default_true"
+        skip_serializing_if = "crate::tools::parsers::is_default_true"
     )]
     #[schemars(skip)]
     pub compact: bool,
-}
-
-// `skip_serializing_if` target for `compact` — skips when the value is the default `true`.
-fn is_default_true(b: &bool) -> bool {
-    *b
 }
 
 /// A compact extracted entity returned by the MCP `extract` tool.

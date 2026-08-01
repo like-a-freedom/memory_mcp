@@ -1,3 +1,8 @@
+// PINNED-DEFERRED per ADR-0019: the downstream QA diagnostic suite is
+// intentionally parked until its model, prompt, parameters, provider, and
+// evaluator are pinned. Do not register this suite into PR/Release/Nightly
+// profiles until that pinning happens.
+
 use async_trait::async_trait;
 
 use crate::domain::*;

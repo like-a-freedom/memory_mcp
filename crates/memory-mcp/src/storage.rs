@@ -34,7 +34,7 @@ pub use agent_memory::{
     disposition_str, origin_kind_str, reason_codes_str, source_kind_str, trust_class_str,
 };
 pub use app_store::AppStoreClient;
-pub use client::{AppStore, ContextFactQuery, DbClient, SurrealDbClient};
+pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
