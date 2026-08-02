@@ -1,6 +1,6 @@
 //! Claim reconciliation telemetry — bounded metrics and redacted trace events.
 //!
-//! Six Prometheus metric families with bounded enum labels (ADR-0005).
+//! Five Prometheus metric families with bounded enum labels (ADR-0005).
 //! Raw namespace, project, subject, comparison-key, fact, claim, relation,
 //! and job identifiers never become metric labels. Trace events carry the
 //! full structurally-redacted key; metrics aggregate only by schema,
@@ -11,11 +11,13 @@ use crate::models::claim::ClaimSchemaFamily;
 // ─── Bounded label enums ─────────────────────────────────────────────────────
 
 /// Stage of the claim pipeline. Never derived from a free-form string.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ClaimMetricStage {
     Project,
     Reconcile,
+    /// Reserved for future backfill-stage pipeline_total emission; emitted
+    /// today via `record_backfill_fact` on the dedicated backfill counter.
+    #[allow(dead_code)]
     Backfill,
 }
 
@@ -86,10 +88,12 @@ pub(crate) fn reason_label(reason_code: &str) -> &'static str {
 }
 
 /// Match mode used during candidate selection.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ClaimMatchMode {
     Exact,
+    /// Reserved for a future alias-match candidate path; today candidates are
+    /// looked up by exact slot fingerprint only.
+    #[allow(dead_code)]
     Alias,
 }
 
@@ -103,7 +107,6 @@ impl ClaimMatchMode {
 }
 
 // ─── Metric name constants ────────────────────────────────────────────────────
-// ─── Metric name constants ────────────────────────────────────────────────────────────────────────────────────────────────────
 //
 // Constants and helper functions below are part of the public observability surface. They are
 // exercised by the `tests/prometheus_claim_metrics.rs` integration test under the `prometheus` feature.
@@ -111,23 +114,15 @@ impl ClaimMatchMode {
 // `metric_names_use_memory_prefix` references each constant directly to catch drift.
 
 /// Total claim pipeline events by stage, schema, outcome, reason.
-#[allow(dead_code)]
 pub const METRIC_PIPELINE_TOTAL: &str = "memory_claim_pipeline_total";
 /// Pipeline stage duration in seconds.
-#[allow(dead_code)]
 pub const METRIC_PIPELINE_DURATION_SECONDS: &str = "memory_claim_pipeline_duration_seconds";
 /// Number of candidates considered for a claim slot.
-#[allow(dead_code)]
 pub const METRIC_CANDIDATE_COUNT: &str = "memory_claim_candidate_count";
 /// Currently active claim relations by schema and outcome.
-#[allow(dead_code)]
 pub const METRIC_RELATIONS_ACTIVE: &str = "memory_claim_relations_active";
 /// Total backfilled facts by outcome and reason.
-#[allow(dead_code)]
 pub const METRIC_BACKFILL_FACTS_TOTAL: &str = "memory_claim_backfill_facts_total";
-/// Age in seconds of the oldest fact lacking the current extractor fingerprint.
-#[allow(dead_code)]
-pub const METRIC_BACKFILL_LAG: &str = "memory_claim_backfill_lag";
 
 // ─── Metric emission helpers (no-op without a recorder) ──────────────────────
 
@@ -149,7 +144,6 @@ pub(crate) fn record_pipeline_event(
 }
 
 /// Record `memory_claim_pipeline_duration_seconds{stage,schema,outcome}`.
-#[allow(dead_code)]
 pub(crate) fn record_pipeline_duration(
     stage: ClaimMetricStage,
     schema: ClaimSchemaFamily,
@@ -180,7 +174,6 @@ pub(crate) fn record_candidate_count(
 }
 
 /// Set `memory_claim_relations_active{schema,outcome}` to `value`.
-#[allow(dead_code)]
 pub(crate) fn set_active_relations(schema: ClaimSchemaFamily, outcome: &str, value: f64) {
     metrics::gauge!(
         METRIC_RELATIONS_ACTIVE,
@@ -200,17 +193,12 @@ pub(crate) fn record_backfill_fact(outcome: &str, reason_code: &str) {
     .increment(1);
 }
 
-/// Set `memory_claim_backfill_lag` to the age in seconds of the oldest
-/// unprojected fact, or zero when none remains.
-pub(crate) fn set_backfill_lag(age_seconds: f64) {
-    metrics::gauge!(METRIC_BACKFILL_LAG).set(age_seconds);
-}
-
 // ─── Forbidden-label guard ────────────────────────────────────────────────────
 
-// Label keys banned from Prometheus metrics by ADR-0005. Unit test asserts
-// no metric emitted by this module ever uses one of them.
-#[allow(dead_code)]
+// Label keys banned from Prometheus metrics by ADR-0005. The unit test
+// `forbidden_label_keys_are_complete` asserts no metric emitted by this
+// module ever uses one of them; the constant itself is test-only state.
+#[cfg(test)]
 pub(crate) const FORBIDDEN_LABEL_KEYS: &[&str] = &[
     "namespace",
     "project",
@@ -287,13 +275,12 @@ mod tests {
     #[test]
     fn metric_names_use_memory_prefix() {
         // Completion plan Task 8 step 2 mandates the `memory_` prefix for
-        // all six families so dashboards can filter by prefix.
+        // the five families so dashboards can filter by prefix.
         assert!(METRIC_PIPELINE_TOTAL.starts_with("memory_claim_"));
         assert!(METRIC_PIPELINE_DURATION_SECONDS.starts_with("memory_claim_"));
         assert!(METRIC_CANDIDATE_COUNT.starts_with("memory_claim_"));
         assert!(METRIC_RELATIONS_ACTIVE.starts_with("memory_claim_"));
         assert!(METRIC_BACKFILL_FACTS_TOTAL.starts_with("memory_claim_"));
-        assert!(METRIC_BACKFILL_LAG.starts_with("memory_claim_"));
     }
 
     #[test]
@@ -330,10 +317,5 @@ mod tests {
     #[test]
     fn record_backfill_fact_is_safe_without_recorder() {
         record_backfill_fact("completed", "completed");
-    }
-
-    #[test]
-    fn set_backfill_lag_is_safe_without_recorder() {
-        set_backfill_lag(0.0);
     }
 }

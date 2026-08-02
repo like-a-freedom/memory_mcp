@@ -104,13 +104,11 @@ pub trait DbClient: Send + Sync {
     /// on the fact table.
     async fn select_facts_by_triple(
         &self,
-        _namespace: &str,
-        _query_text: &str,
-        _cutoff: &str,
-        _limit: usize,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(vec![])
-    }
+        namespace: &str,
+        query_text: &str,
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects nearest-neighbor facts via HNSW ANN index.
     ///
@@ -189,24 +187,20 @@ pub trait DbClient: Send + Sync {
     /// Returns all entities whose `entity_id` is in the supplied list.
     async fn select_entities_by_ids(
         &self,
-        _namespace: &str,
-        _entity_ids: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects edges matching a specific (in, relation, out) triple.
     ///
     /// Used for targeted invalidation without full table scans.
     async fn select_edges_for_triple(
         &self,
-        _namespace: &str,
-        _in_id: &str,
-        _relation: &str,
-        _out_id: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        in_id: &str,
+        relation: &str,
+        out_id: &str,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects active (non-invalidated) facts with an optional limit.
     ///
@@ -221,22 +215,18 @@ pub trait DbClient: Send + Sync {
     /// Counts facts whose embedding metadata does not match the target signature.
     async fn count_facts_needing_reembed(
         &self,
-        _namespace: &str,
-        _target_signature: &str,
-    ) -> Result<usize, MemoryError> {
-        Ok(0)
-    }
+        namespace: &str,
+        target_signature: &str,
+    ) -> Result<usize, MemoryError>;
 
     /// Selects facts needing rewrite in stable `fact_id` order, optionally after a cursor.
     async fn select_facts_needing_reembed(
         &self,
-        _namespace: &str,
-        _target_signature: &str,
-        _last_completed_fact_id: Option<&str>,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        target_signature: &str,
+        last_completed_fact_id: Option<&str>,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects episodes eligible for archival.
     ///
@@ -266,14 +256,12 @@ pub trait DbClient: Send + Sync {
     /// that has not yet produced searchable facts.
     async fn select_episodes_by_content(
         &self,
-        _namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        _query_contains: Option<&str>,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(Vec::new())
-    }
+        namespace: &str,
+        scope: &str,
+        cutoff: &str,
+        query_contains: Option<&str>,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects episodes whose raw content matches the supplied query with an optional project filter.
     async fn select_episodes_by_content_advanced(

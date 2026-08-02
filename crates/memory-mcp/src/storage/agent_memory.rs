@@ -243,7 +243,6 @@ impl AgentMemoryStore {
 
 /// Serialize a disposition for storage.
 #[must_use]
-#[allow(dead_code)]
 pub fn disposition_str(d: &CaptureDisposition) -> &'static str {
     match d {
         CaptureDisposition::Accepted => "accepted",
@@ -257,7 +256,6 @@ pub fn disposition_str(d: &CaptureDisposition) -> &'static str {
 
 /// Serialize a trust class for storage.
 #[must_use]
-#[allow(dead_code)]
 pub fn trust_class_str(t: &TrustClass) -> &'static str {
     match t {
         TrustClass::AgentInference => "agent_inference",
@@ -270,7 +268,6 @@ pub fn trust_class_str(t: &TrustClass) -> &'static str {
 
 /// Serialize a source kind for storage.
 #[must_use]
-#[allow(dead_code)]
 pub fn source_kind_str(s: &SourceKind) -> &'static str {
     match s {
         SourceKind::AgentOutput => "agent_output",
@@ -284,7 +281,6 @@ pub fn source_kind_str(s: &SourceKind) -> &'static str {
 
 /// Serialize reason codes for storage.
 #[must_use]
-#[allow(dead_code)]
 pub fn reason_codes_str(codes: &[CaptureReasonCode]) -> Vec<&'static str> {
     codes
         .iter()
@@ -312,7 +308,6 @@ pub fn reason_codes_str(codes: &[CaptureReasonCode]) -> Vec<&'static str> {
 
 /// Serialize the invocation origin kind for storage.
 #[must_use]
-#[allow(dead_code)]
 pub fn origin_kind_str(origin: &InvocationOrigin) -> &'static str {
     match origin {
         InvocationOrigin::AgentSelected => "agent_selected",

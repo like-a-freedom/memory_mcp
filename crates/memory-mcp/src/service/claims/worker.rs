@@ -194,6 +194,7 @@ async fn reconcile_page_with_owning(
     job: &ClaimJob,
     owning: crate::models::claim::Claim,
 ) -> Result<(), MemoryError> {
+    let page_start = std::time::Instant::now();
     let namespace = &job.namespace;
     let slot_fp = owning.slot_fingerprint.clone();
 
@@ -226,6 +227,17 @@ async fn reconcile_page_with_owning(
             .store
             .commit_reconciliation_page(request)
             .await?;
+        super::telemetry::record_pipeline_duration(
+            super::telemetry::ClaimMetricStage::Reconcile,
+            owning.schema_family,
+            "skipped",
+            page_start.elapsed(),
+        );
+        super::telemetry::record_candidate_count(
+            owning.schema_family,
+            super::telemetry::ClaimMatchMode::Exact,
+            0,
+        );
         return Ok(());
     }
 
@@ -330,6 +342,17 @@ async fn reconcile_page_with_owning(
         .await?;
 
     // Reconciliation metrics (no-op without a recorder).
+    let page_outcome = if relations.is_empty() {
+        "skipped"
+    } else {
+        "persisted"
+    };
+    super::telemetry::record_pipeline_duration(
+        super::telemetry::ClaimMetricStage::Reconcile,
+        owning.schema_family,
+        page_outcome,
+        page_start.elapsed(),
+    );
     super::telemetry::record_candidate_count(
         owning.schema_family,
         super::telemetry::ClaimMatchMode::Exact,
@@ -343,6 +366,26 @@ async fn reconcile_page_with_owning(
             &rel.outcome.to_string(),
             rel.reason_code.as_str(),
         );
+    }
+
+    // Refresh the active-relations gauge now that the page's relations are
+    // durable. Failures here surface as errors so they are visible rather
+    // than silently skipped.
+    let counts = claim_service
+        .store
+        .count_active_relations(namespace)
+        .await?;
+    for c in counts {
+        let family = match c.schema_family.as_deref() {
+            Some("attribute") => Some(crate::models::claim::ClaimSchemaFamily::Attribute),
+            Some("quantity") => Some(crate::models::claim::ClaimSchemaFamily::Quantity),
+            Some("relation") => Some(crate::models::claim::ClaimSchemaFamily::Relation),
+            Some("commitment") => Some(crate::models::claim::ClaimSchemaFamily::Commitment),
+            _ => None,
+        };
+        if let (Some(family), Some(outcome)) = (family, c.outcome.as_deref()) {
+            super::telemetry::set_active_relations(family, outcome, c.count as f64);
+        }
     }
     Ok(())
 }

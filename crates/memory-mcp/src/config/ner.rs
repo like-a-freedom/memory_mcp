@@ -188,12 +188,8 @@ fn default_ner_labels() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
 
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    use super::super::env_lock;
 
     fn with_ner_env(vars: &[(&str, Option<&str>)], test: impl FnOnce()) {
         let _guard = env_lock().lock().expect("NER env lock");

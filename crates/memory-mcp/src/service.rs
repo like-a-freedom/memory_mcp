@@ -6,8 +6,6 @@
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
 
-#[cfg(feature = "mcp-apps")]
-pub(crate) use apps::{apply_ingestion_review_edit, apply_ingestion_review_status};
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
 pub use entity_extraction::{
@@ -17,9 +15,7 @@ pub use entity_extraction::{
 pub use error::MemoryError;
 pub use error::is_transient_db_error;
 
-mod apps;
-#[cfg(feature = "mcp-apps")]
-pub(crate) use apps::execute_lifecycle_command;
+pub(crate) mod apps;
 #[cfg(feature = "mcp-apps")]
 pub(crate) use apps::{AppCommand, AppCommandInput};
 pub use apps::{
@@ -76,7 +72,9 @@ pub(crate) use scope::{LifecyclePolicy, MemoryScope};
 
 #[cfg(test)]
 pub(crate) use apps::edge_neighbor;
-pub(crate) use apps::{graph_neighbor_expansion, graph_payload};
+#[cfg(feature = "mcp-apps")]
+pub(crate) use apps::graph_neighbor_expansion;
+pub(crate) use apps::graph_payload;
 
 pub use constants::*;
 mod constants {

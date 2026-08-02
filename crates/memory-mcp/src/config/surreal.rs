@@ -329,14 +329,9 @@ impl SurrealConfigBuilder {
 mod tests {
     use std::env;
     use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
 
+    use super::super::env_lock;
     use super::*;
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     #[test]
     fn builder_sets_all_fields() {

@@ -1,16 +1,12 @@
 #![cfg_attr(not(feature = "mcp-apps"), allow(dead_code, unused_imports))]
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use rmcp::ErrorData;
 use rmcp::model::ResourceContents;
 use rmcp::model::{
     ListResourceTemplatesResult, ListResourcesResult, ReadResourceRequestParams, ReadResourceResult,
 };
 use serde_json::{Value, json};
-
-#[cfg(feature = "mcp-apps")]
-use crate::service::apply_ingestion_review_status;
-use crate::service::{IngestionReviewItem, IngestionReviewSummary};
 
 use super::super::error::mcp_error;
 use super::super::params::OpenAppParams;
@@ -28,47 +24,6 @@ pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
         object.insert(key.to_string(), value);
     }
-}
-
-#[cfg(feature = "mcp-apps")]
-pub(super) async fn update_ingestion_item_statuses(
-    service: &MemoryMcp,
-    session_id: &str,
-    item_ids: &[String],
-    status: &str,
-    reason: Option<String>,
-    session_payload: Value,
-) -> Result<serde_json::Value, ErrorData> {
-    let mut payload = session_payload;
-    let summary = if let Some(items) = payload.get_mut("items").and_then(Value::as_array_mut) {
-        let mut typed_items: Vec<IngestionReviewItem> =
-            serde_json::from_value(Value::Array(items.clone())).map_err(|error| {
-                session::internal_error(format!("invalid ingestion review items: {error}"))
-            })?;
-        let summary =
-            apply_ingestion_review_status(&mut typed_items, item_ids, status, reason.as_deref());
-        *items = serde_json::to_value(&typed_items)
-            .map_err(|error| {
-                session::internal_error(format!("failed to encode ingestion review items: {error}"))
-            })?
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        serde_json::to_value(summary).map_err(|error| {
-            session::internal_error(format!(
-                "failed to encode ingestion review summary: {error}"
-            ))
-        })?
-    } else {
-        serde_json::to_value(IngestionReviewSummary::from_items(&[])).map_err(|error| {
-            session::internal_error(format!(
-                "failed to encode ingestion review summary: {error}"
-            ))
-        })?
-    };
-    upsert_json_field(&mut payload, "summary", summary.clone());
-    let updated = service.replace_session_payload(session_id, payload).await?;
-    Ok(updated.payload["summary"].clone())
 }
 
 #[cfg(test)]
@@ -139,16 +94,6 @@ impl MemoryMcp {
             "graph" | "graph_path" => Some("graph"),
             _ => None,
         }
-    }
-
-    pub(super) fn enrich_session_payload(
-        app: &str,
-        session_id: &str,
-        scope: &str,
-        ttl_seconds: Option<i64>,
-        payload: Value,
-    ) -> Value {
-        session::enrich_session_payload(app, session_id, scope, ttl_seconds, payload)
     }
 
     pub(super) async fn session(
@@ -287,22 +232,6 @@ impl MemoryMcp {
                 .map_err(mcp_error)?,
         )
         .map_err(|error| Self::internal_error(error.to_string()))
-    }
-
-    pub(super) async fn graph_neighbor_expansion(
-        &self,
-        namespace: &str,
-        target_id: &str,
-        direction: &str,
-        depth: i32,
-        cutoff: DateTime<Utc>,
-    ) -> Result<Value, ErrorData> {
-        let store = self.service.app_store();
-        crate::service::graph_neighbor_expansion(
-            &store, namespace, target_id, direction, depth, cutoff,
-        )
-        .await
-        .map_err(mcp_error)
     }
 
     async fn graph_payload(

@@ -222,12 +222,8 @@ impl EmbeddingConfig {
 mod tests {
     use super::*;
     use std::panic::{self, AssertUnwindSafe};
-    use std::sync::{Mutex, OnceLock};
 
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    use super::super::env_lock;
 
     fn with_env_vars(vars: &[(&str, Option<&str>)], test: impl FnOnce()) {
         let _guard = env_lock().lock().expect("env lock");

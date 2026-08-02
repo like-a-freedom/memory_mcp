@@ -65,7 +65,6 @@ pub(crate) async fn run_backfill_page(
     let facts = claim_service.store.select_facts_for_backfill(query).await?;
 
     if facts.is_empty() {
-        super::telemetry::set_backfill_lag(0.0);
         return Ok(None);
     }
 

@@ -13,16 +13,11 @@ use serde_json::json;
 
 use crate::service::MemoryError;
 use crate::service::MemoryService;
+use crate::service::durable_work;
 use crate::storage::EventProjectionJobRecord;
 
 /// Maximum number of jobs leased per projection pass.
 pub(crate) const PROJECTION_BATCH_LIMIT: i32 = 50;
-
-/// Default lease duration in seconds before a job can be re-acquired.
-pub(crate) const DEFAULT_LEASE_SECS: u64 = 120;
-
-/// Maximum retry attempts before a job enters the dead letter.
-pub(crate) const DEFAULT_MAX_ATTEMPTS: i64 = 5;
 
 /// Runs a single projection pass: lease pending jobs, project, complete.
 ///
@@ -31,7 +26,7 @@ pub async fn run_projection_pass(service: &MemoryService) -> Result<usize, Memor
     let mut projected = 0;
     let now_str = crate::service::normalize_dt(chrono::Utc::now());
     let lease_expires = crate::service::normalize_dt(
-        chrono::Utc::now() + chrono::Duration::seconds(DEFAULT_LEASE_SECS as i64),
+        chrono::Utc::now() + chrono::Duration::seconds(durable_work::DEFAULT_LEASE_SECS as i64),
     );
 
     for namespace in &service.namespaces {
@@ -173,7 +168,7 @@ async fn increment_attempts(
         .as_ref()
         .and_then(|v| v.get("max_attempts"))
         .and_then(serde_json::Value::as_i64)
-        .unwrap_or(DEFAULT_MAX_ATTEMPTS);
+        .unwrap_or(durable_work::DEFAULT_MAX_ATTEMPTS);
 
     let status = if attempts >= max_attempts {
         "dead_letter"
@@ -204,7 +199,7 @@ async fn handle_job_failure(
 ) -> Result<(), MemoryError> {
     let record_id = format!("event_projection_job:{}", job.job_id);
     let attempts = job.attempts + 1;
-    let max_attempts = job.max_attempts.max(DEFAULT_MAX_ATTEMPTS);
+    let max_attempts = job.max_attempts.max(durable_work::DEFAULT_MAX_ATTEMPTS);
     let status = if attempts >= max_attempts {
         "dead_letter"
     } else {
@@ -255,7 +250,7 @@ mod tests {
 
     #[test]
     fn default_max_attempts_is_bounded() {
-        let attempts = DEFAULT_MAX_ATTEMPTS;
+        let attempts = durable_work::DEFAULT_MAX_ATTEMPTS;
         assert!((1..=10).contains(&attempts));
     }
 

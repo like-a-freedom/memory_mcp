@@ -795,6 +795,63 @@ mod tests {
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
+
+            async fn select_facts_by_triple(
+                &self,
+                _namespace: &str,
+                _query_text: &str,
+                _cutoff: &str,
+                _limit: usize,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_entities_by_ids(
+                &self,
+                _namespace: &str,
+                _entity_ids: &[String],
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(Vec::new())
+            }
+
+            async fn select_edges_for_triple(
+                &self,
+                _namespace: &str,
+                _in_id: &str,
+                _relation: &str,
+                _out_id: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(Vec::new())
+            }
+
+            async fn count_facts_needing_reembed(
+                &self,
+                _namespace: &str,
+                _target_signature: &str,
+            ) -> Result<usize, MemoryError> {
+                Ok(0)
+            }
+
+            async fn select_facts_needing_reembed(
+                &self,
+                _namespace: &str,
+                _target_signature: &str,
+                _last_completed_fact_id: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(Vec::new())
+            }
+
+            async fn select_episodes_by_content(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
         }
 
         let service = crate::service::MemoryService::new(
@@ -1013,6 +1070,55 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
+            }
+
+            async fn select_facts_by_triple(
+                &self,
+                _namespace: &str,
+                _query_text: &str,
+                _cutoff: &str,
+                _limit: usize,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            async fn select_edges_for_triple(
+                &self,
+                _namespace: &str,
+                _in_id: &str,
+                _relation: &str,
+                _out_id: &str,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(Vec::new())
+            }
+
+            async fn count_facts_needing_reembed(
+                &self,
+                _namespace: &str,
+                _target_signature: &str,
+            ) -> Result<usize, MemoryError> {
+                Ok(0)
+            }
+
+            async fn select_facts_needing_reembed(
+                &self,
+                _namespace: &str,
+                _target_signature: &str,
+                _last_completed_fact_id: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(Vec::new())
+            }
+
+            async fn select_episodes_by_content(
+                &self,
+                _namespace: &str,
+                _scope: &str,
+                _cutoff: &str,
+                _query_contains: Option<&str>,
+                _limit: i32,
+            ) -> Result<Vec<serde_json::Value>, MemoryError> {
+                Ok(vec![])
             }
         }
 

@@ -127,12 +127,7 @@ mod tests {
 
     #[test]
     fn lifecycle_config_from_env() {
-        use std::sync::{Mutex, OnceLock};
-
-        fn env_lock() -> &'static Mutex<()> {
-            static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-            LOCK.get_or_init(|| Mutex::new(()))
-        }
+        use super::super::env_lock;
 
         let _guard = env_lock().lock().expect("env lock");
 

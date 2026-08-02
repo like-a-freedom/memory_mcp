@@ -1,6 +1,6 @@
 //! Integration tests for Prometheus metric recording in claim reconciliation.
 //!
-//! Verifies the six metric families from completion plan Task 8 render
+//! Verifies the five metric families from completion plan Task 8 render
 //! correctly when the `prometheus` feature is enabled, and that no
 //! forbidden identifier (ADR-0005) appears as a Prometheus label.
 
@@ -14,8 +14,8 @@ use metrics::histogram;
 use metrics_exporter_prometheus::PrometheusBuilder;
 
 use memory_mcp::service::claims::telemetry::{
-    METRIC_BACKFILL_FACTS_TOTAL, METRIC_BACKFILL_LAG, METRIC_CANDIDATE_COUNT,
-    METRIC_PIPELINE_DURATION_SECONDS, METRIC_PIPELINE_TOTAL, METRIC_RELATIONS_ACTIVE,
+    METRIC_BACKFILL_FACTS_TOTAL, METRIC_CANDIDATE_COUNT, METRIC_PIPELINE_DURATION_SECONDS,
+    METRIC_PIPELINE_TOTAL, METRIC_RELATIONS_ACTIVE,
 };
 
 fn render_handle() -> &'static metrics_exporter_prometheus::PrometheusHandle {
@@ -28,7 +28,7 @@ fn render_handle() -> &'static metrics_exporter_prometheus::PrometheusHandle {
 }
 
 #[test]
-fn all_six_metric_families_appear() {
+fn all_five_metric_families_appear() {
     let handle = render_handle();
 
     // Family 1: memory_claim_pipeline_total{stage,schema,outcome,reason_code}
@@ -88,9 +88,6 @@ fn all_six_metric_families_appear() {
     )
     .increment(42);
 
-    // Family 6: memory_claim_backfill_lag
-    gauge!(METRIC_BACKFILL_LAG).set(3600.0);
-
     let output = handle.render();
 
     // pipeline_total — exact label set, regardless of order.
@@ -144,12 +141,6 @@ fn all_six_metric_families_appear() {
             && output.contains("outcome=\"skipped\"")
             && output.contains("reason_code=\"skipped\""),
         "backfill skipped count: {output}"
-    );
-
-    // backfill lag
-    assert!(
-        output.contains("memory_claim_backfill_lag"),
-        "backfill lag gauge: {output}"
     );
 }
 

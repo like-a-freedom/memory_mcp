@@ -13,3 +13,9 @@ pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_sign
 pub use lifecycle::LifecycleConfig;
 pub use ner::{NerConfig, NerDeviceKind, NerProviderKind};
 pub use surreal::{SurrealConfig, SurrealConfigBuilder};
+
+#[cfg(test)]
+pub(crate) fn env_lock() -> &'static std::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}

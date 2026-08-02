@@ -11,11 +11,9 @@ use tokio::time::{self, Duration as TokioDuration};
 use tokio_util::sync::CancellationToken;
 
 use crate::service::MemoryService;
+use crate::service::durable_work;
 
 use super::projection::run_projection_pass;
-
-const EMPTY_POLL_INTERVAL_SECS: u64 = 10;
-const TRANSIENT_BACKOFF_SECS: u64 = 5;
 
 /// Bounded worker runtime for lifecycle event projection.
 ///
@@ -108,16 +106,18 @@ impl Default for LifecycleWorkerRuntime {
 // extraction delegation) lives in `projection.rs`. The worker runtime calls
 // `projection::run_projection_pass` on each poll tick.
 
-/// Shared worker mechanics: empty-poll backoff.
+/// Shared worker mechanics: empty-poll backoff. Delegates to
+/// `service::durable_work::empty_poll_backoff` (ADR-0026 single timing home).
 #[must_use]
 pub fn empty_poll_interval() -> std::time::Duration {
-    std::time::Duration::from_secs(EMPTY_POLL_INTERVAL_SECS)
+    durable_work::empty_poll_backoff()
 }
 
-/// Shared worker mechanics: transient-error backoff.
+/// Shared worker mechanics: transient-error backoff. Delegates to
+/// `service::durable_work::transient_error_backoff` (ADR-0026 single timing home).
 #[must_use]
 pub fn transient_backoff() -> std::time::Duration {
-    std::time::Duration::from_secs(TRANSIENT_BACKOFF_SECS)
+    durable_work::transient_error_backoff()
 }
 
 #[cfg(test)]
@@ -128,18 +128,12 @@ mod tests {
 
     #[test]
     fn empty_poll_interval_returns_configured_default() {
-        assert_eq!(
-            empty_poll_interval(),
-            Duration::from_secs(EMPTY_POLL_INTERVAL_SECS)
-        );
+        assert_eq!(empty_poll_interval(), durable_work::empty_poll_backoff());
     }
 
     #[test]
     fn transient_backoff_returns_configured_default() {
-        assert_eq!(
-            transient_backoff(),
-            Duration::from_secs(TRANSIENT_BACKOFF_SECS)
-        );
+        assert_eq!(transient_backoff(), durable_work::transient_error_backoff());
     }
 
     #[tokio::test]
