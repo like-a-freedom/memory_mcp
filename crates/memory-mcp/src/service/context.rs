@@ -498,14 +498,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -690,14 +682,6 @@ mod tests {
                     })],
                     _ => vec![],
                 })
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn create(
@@ -890,21 +874,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                self.community_lookup_calls.fetch_add(1, Ordering::SeqCst);
-                assert_eq!(query, "alice atlas");
-
-                Ok(vec![json!({
-                    "community_id": "community:atlas",
-                    "summary": "Alice and the Atlas project team",
-                    "member_entities": ["entity:alice"]
-                })])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -925,10 +894,24 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the indexed community lookup through
+                // the core `query` op; serve it here so the test can assert the
+                // DB-side search path is used (not a full `select_table` scan).
+                if sql.contains("FROM community") {
+                    self.community_lookup_calls.fetch_add(1, Ordering::SeqCst);
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["query"], json!("alice atlas"));
+                    }
+                    return Ok(json!([{
+                        "community_id": "community:atlas",
+                        "summary": "Alice and the Atlas project team",
+                        "member_entities": ["entity:alice"]
+                    }]));
+                }
                 Ok(Value::Null)
             }
 
@@ -1139,19 +1122,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(query, "atlas launch");
-                Ok(vec![json!({
-                    "community_id": "community:atlas",
-                    "summary": "Atlas launch workstream",
-                    "member_entities": ["entity:atlas"]
-                })])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1357,28 +1327,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(query, "launch workstream");
-                Ok(vec![
-                    json!({
-                        "community_id": "community:alpha",
-                        "summary": "Alpha launch workstream",
-                        "member_entities": ["entity:alpha"],
-                        "ft_score": 20.0
-                    }),
-                    json!({
-                        "community_id": "community:beta",
-                        "summary": "Beta launch workstream",
-                        "member_entities": ["entity:beta"],
-                        "ft_score": 10.0
-                    }),
-                ])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1399,10 +1347,29 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
+                sql: &str,
                 _vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store runs the indexed community lookup through the
+                // core `query` op; serve ranked communities here so the ranking
+                // pipeline can order their member facts by summary relevance.
+                if sql.contains("FROM community") {
+                    return Ok(json!([
+                        {
+                            "community_id": "community:alpha",
+                            "summary": "Alpha launch workstream",
+                            "member_entities": ["entity:alpha"],
+                            "ft_score": 20.0
+                        },
+                        {
+                            "community_id": "community:beta",
+                            "summary": "Beta launch workstream",
+                            "member_entities": ["entity:beta"],
+                            "ft_score": 10.0
+                        }
+                    ]));
+                }
                 Ok(Value::Null)
             }
 
@@ -1597,28 +1564,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(query, "launch workstream");
-                Ok(vec![
-                    json!({
-                        "community_id": "community:beta",
-                        "summary": "Beta launch workstream",
-                        "member_entities": ["entity:beta"],
-                        "ft_score": 20.0
-                    }),
-                    json!({
-                        "community_id": "community:alpha",
-                        "summary": "Alpha launch workstream",
-                        "member_entities": ["entity:alpha"],
-                        "ft_score": 10.0
-                    }),
-                ])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1639,10 +1584,29 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
+                sql: &str,
                 _vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store runs the indexed community lookup through the
+                // core `query` op; serve the communities with the inferred one
+                // ranked first so the origin-weighting can flip the order.
+                if sql.contains("FROM community") {
+                    return Ok(json!([
+                        {
+                            "community_id": "community:beta",
+                            "summary": "Beta launch workstream",
+                            "member_entities": ["entity:beta"],
+                            "ft_score": 20.0
+                        },
+                        {
+                            "community_id": "community:alpha",
+                            "summary": "Alpha launch workstream",
+                            "member_entities": ["entity:alpha"],
+                            "ft_score": 10.0
+                        }
+                    ]));
+                }
                 Ok(Value::Null)
             }
 
@@ -1795,14 +1759,6 @@ mod tests {
                 _normalized_name: &str,
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn create(
@@ -1989,22 +1945,6 @@ mod tests {
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                vec![json!({
-                    "community_id": "community:orphan",
-                    "summary": "Orphan community with no facts",
-                    "member_entities": ["entity:nobody"],
-                    "ft_score": 1.0
-                })]
-                .into_iter()
-                .map(Ok)
-                .collect::<Result<Vec<_>, _>>()
             }
 
             async fn create(

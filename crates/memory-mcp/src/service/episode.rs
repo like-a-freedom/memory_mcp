@@ -707,14 +707,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -874,14 +866,6 @@ mod tests {
                 _cutoff: &str,
                 _query_vec: &[f64],
                 _limit: i32,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
             ) -> Result<Vec<serde_json::Value>, MemoryError> {
                 Ok(vec![])
             }

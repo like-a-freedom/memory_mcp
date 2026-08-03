@@ -28,12 +28,12 @@ use super::migrations::{
     validate_applied_migration, versioned_migrations,
 };
 use super::queries::{
-    active_edge_scan_limit, build_create_query, build_select_communities_matching_summary_query,
-    build_select_edge_neighbors_query, build_select_edges_filtered_page_query,
-    build_select_edges_filtered_query, build_select_entity_lookup_alias_query,
-    build_select_entity_lookup_canonical_query, build_select_episodes_by_content_query,
-    build_select_facts_ann_query, build_select_facts_by_entity_links_query,
-    build_select_facts_filtered_query, build_select_one_query, build_update_query,
+    active_edge_scan_limit, build_create_query, build_select_edge_neighbors_query,
+    build_select_edges_filtered_page_query, build_select_edges_filtered_query,
+    build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
+    build_select_episodes_by_content_query, build_select_facts_ann_query,
+    build_select_facts_by_entity_links_query, build_select_facts_filtered_query,
+    build_select_one_query, build_update_query,
 };
 use super::types::GraphDirection;
 
@@ -146,13 +146,6 @@ pub trait DbClient: Send + Sync {
         query_contains: Option<&str>,
         limit: i32,
         project: Option<&str>,
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects communities whose summaries match the supplied query using DB-side search.
-    async fn select_communities_matching_summary(
-        &self,
-        namespace: &str,
-        query: &str,
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Creates a new record.
@@ -1267,41 +1260,6 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_episodes_by_content.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_communities_matching_summary(
-        &self,
-        namespace: &str,
-        query: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_communities_matching_summary",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("query", Value::String(query.to_string())),
-            ],
-        );
-
-        let (sql, vars) = build_select_communities_matching_summary_query(query);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_communities_matching_summary.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),

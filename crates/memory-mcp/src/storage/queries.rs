@@ -306,13 +306,6 @@ pub fn build_select_entity_lookup_alias_query(normalized_name: &str) -> (String,
     )
 }
 
-pub fn build_select_communities_matching_summary_query(query: &str) -> (String, Value) {
-    (
-        "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ $query ORDER BY ft_score DESC, summary ASC LIMIT 25".to_string(),
-        json!({"query": query}),
-    )
-}
-
 pub fn build_select_communities_by_member_entities_query(
     member_entities: &[String],
 ) -> (String, Value) {

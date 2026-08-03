@@ -1280,14 +1280,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1502,14 +1494,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1718,14 +1702,6 @@ mod tests {
                 _normalized_name: &str,
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
-            }
-
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn create(

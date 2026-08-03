@@ -157,9 +157,14 @@ impl ContextStoreClient {
         namespace: &str,
         query: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_communities_matching_summary(namespace, query)
-            .await
+        let sql = "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ $query \
+                   ORDER BY ft_score DESC, summary ASC LIMIT 25";
+        let vars = json!({ "query": query });
+        match self.db.query(sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Full table scan (used by graph views and the occasional admin operation).

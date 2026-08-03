@@ -37,7 +37,6 @@ pub struct MockDbClient {
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     entity_lookup_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    communities_matching_summary_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     query_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
@@ -66,7 +65,6 @@ impl MockDbClient {
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             entity_lookup_responses: Mutex::new(HashMap::new()),
             episodes_by_content_responses: Mutex::new(HashMap::new()),
-            communities_matching_summary_responses: Mutex::new(HashMap::new()),
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
             query_responses: Mutex::new(HashMap::new()),
@@ -231,14 +229,6 @@ impl MockDbClient {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .insert(key.to_string(), Ok(rows));
-        self
-    }
-
-    pub fn expect_communities_matching_summary(self, query: &str, rows: Vec<Value>) -> Self {
-        self.communities_matching_summary_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(query.to_string(), Ok(rows));
         self
     }
 
@@ -457,23 +447,6 @@ impl DbClient for MockDbClient {
             .unwrap_or_else(|p| p.into_inner())
         {
             return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_communities_matching_summary(
-        &self,
-        _namespace: &str,
-        query: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(resp) = self
-            .communities_matching_summary_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(query)
-            .cloned()
-        {
-            return resp;
         }
         Ok(vec![])
     }

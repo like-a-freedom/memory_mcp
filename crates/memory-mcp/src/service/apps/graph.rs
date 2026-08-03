@@ -1127,14 +1127,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_matching_summary(
-                &self,
-                _namespace: &str,
-                _query: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
