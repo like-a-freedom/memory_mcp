@@ -980,6 +980,7 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
     };
 
+    use crate::storage::SurrealDbClient;
     use async_trait::async_trait;
     use serde_json::Value;
 
@@ -1199,5 +1200,205 @@ mod tests {
             "neighbor queries should stop at the configured traversal budget"
         );
         assert!(connections.len() <= GraphTraversalBudget::FULL.max_results);
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_uses_db_side_neighbor_lookups() {
+        use std::sync::Arc;
+
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
+
+        let service = MemoryService::new(
+            Arc::new(db),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:openai".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
+        use std::sync::Arc;
+
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
+
+        let service = MemoryService::new(
+            Arc::new(db),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec!["entity:carol".to_string(), "entity:openai".to_string()],
+            "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
+        );
+    }
+
+    #[tokio::test]
+    async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
+        use std::sync::Arc;
+
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_edge_neighbors(
+                "entity:openai",
+                vec![
+                    json!({"in": "entity:bob", "out": "entity:openai"}),
+                    json!({"in": "entity:carol", "out": "entity:openai"}),
+                ],
+            )
+            .expect_edge_neighbors(
+                "entity:bob",
+                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
+            )
+            .expect_edge_neighbors(
+                "entity:carol",
+                vec![json!({"in": "entity:diana", "out": "entity:carol"})],
+            )
+            .expect_edge_neighbors(
+                "entity:alice",
+                vec![json!({"in": "entity:erin", "out": "entity:alice"})],
+            )
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
+
+        let service = MemoryService::new(
+            Arc::new(db),
+            vec!["org".to_string()],
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let chain = service.find_intro_chain("OpenAI", 4, None).await.unwrap();
+
+        assert_eq!(
+            chain,
+            vec![
+                "entity:diana".to_string(),
+                "entity:carol".to_string(),
+                "entity:openai".to_string(),
+            ],
+            "the traversal should keep the shorter diamond branch instead of returning the deeper alternative"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_entity_by_type_delegates_to_resolve() {
+        let namespaces = vec!["org".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "resolve_entity_test",
+                &namespaces,
+                "warn",
+            )
+            .await
+            .expect("connect in-memory test db"),
+        );
+        for ns in &namespaces {
+            db_client
+                .apply_migrations(ns)
+                .await
+                .expect("apply migrations");
+        }
+        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+            .expect("create test service");
+
+        // Resolve the same entity via different typed methods
+        let id1 = service
+            .resolve_entity("person", "Alice Smith")
+            .await
+            .expect("resolve person");
+        let id2 = service
+            .resolve_entity("person", "Alice Smith")
+            .await
+            .expect("resolve person again");
+        assert_eq!(id1, id2);
+
+        let id3 = service
+            .resolve_entity("company", "Acme Corp")
+            .await
+            .expect("resolve company");
+        assert_ne!(id1, id3);
+    }
+
+    #[tokio::test]
+    async fn relate_creates_edge_between_entities() {
+        let namespaces = vec!["org".to_string()];
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces("relate_test", &namespaces, "warn")
+                .await
+                .expect("connect in-memory test db"),
+        );
+        for ns in &namespaces {
+            db_client
+                .apply_migrations(ns)
+                .await
+                .expect("apply migrations");
+        }
+        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+            .expect("create test service");
+
+        let from_id = service
+            .resolve_entity("person", "Alice Relate")
+            .await
+            .expect("resolve alice");
+        let to_id = service
+            .resolve_entity("company", "Acme Relate")
+            .await
+            .expect("resolve acme");
+
+        service
+            .relate(&from_id, "works_at", &to_id)
+            .await
+            .expect("relate entities");
     }
 }
