@@ -688,14 +688,6 @@ mod tests {
                 })
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -849,14 +841,6 @@ mod tests {
                 _direction: crate::storage::GraphDirection,
             ) -> Result<Vec<serde_json::Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<serde_json::Value>, MemoryError> {
-                Ok(None)
             }
 
             async fn select_facts_ann(

@@ -35,7 +35,6 @@ pub struct MockDbClient {
     facts_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    entity_lookup_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
@@ -51,7 +50,6 @@ pub struct MockDbClient {
     fallback_facts_filtered: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_by_entity_links: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_ann: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_entity_lookup: Mutex<Option<Box<SelectOneFn>>>,
     fallback_episodes_by_content: Mutex<Option<Box<SelectTableFn>>>,
 }
 
@@ -63,7 +61,6 @@ impl MockDbClient {
             facts_filtered_responses: Mutex::new(HashMap::new()),
             facts_entity_links_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
-            entity_lookup_responses: Mutex::new(HashMap::new()),
             episodes_by_content_responses: Mutex::new(HashMap::new()),
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
@@ -79,7 +76,6 @@ impl MockDbClient {
             fallback_facts_filtered: Mutex::new(None),
             fallback_facts_by_entity_links: Mutex::new(None),
             fallback_facts_ann: Mutex::new(None),
-            fallback_entity_lookup: Mutex::new(None),
             fallback_episodes_by_content: Mutex::new(None),
         }
     }
@@ -132,14 +128,6 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_entity_lookup(self, normalized_name: &str, result: Option<Value>) -> Self {
-        self.entity_lookup_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(normalized_name.to_string(), Ok(result));
-        self
-    }
-
     pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
         self.edge_neighbors_responses
             .lock()
@@ -181,14 +169,6 @@ impl MockDbClient {
 
     pub fn expect_edges_filtered_panic(self) -> Self {
         self.expect_edges_filtered_with(|_| panic!("select_edges_filtered should not be called"))
-    }
-
-    pub fn expect_entity_lookup_with(
-        mut self,
-        f: impl Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync + 'static,
-    ) -> Self {
-        self.fallback_entity_lookup = Mutex::new(Some(Box::new(f)));
-        self
     }
 
     pub fn expect_migration_handler(
@@ -406,30 +386,6 @@ impl DbClient for MockDbClient {
             return f(node_id, _direction);
         }
         Ok(vec![])
-    }
-
-    async fn select_entity_lookup(
-        &self,
-        _namespace: &str,
-        normalized_name: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        if let Some(resp) = self
-            .entity_lookup_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(normalized_name)
-            .cloned()
-        {
-            return resp;
-        }
-        if let Some(ref f) = *self
-            .fallback_entity_lookup
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f(normalized_name);
-        }
-        Ok(None)
     }
 
     async fn select_episodes_by_content(

@@ -765,14 +765,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1006,8 +998,10 @@ mod tests {
                 "entity:bob",
                 vec![json!({"in": "entity:alice", "out": "entity:bob"})],
             )
-            .expect_entity_lookup("dima ivanov", Some(json!({"entity_id": "entity:existing"})))
-            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:existing"}]),
+            );
 
         let service = MemoryService::new(
             Arc::new(db),
@@ -1047,7 +1041,10 @@ mod tests {
                 "entity:bob",
                 vec![json!({"in": "entity:alice", "out": "entity:bob"})],
             )
-            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
 
         let service = MemoryService::new(
             Arc::new(db),
@@ -1087,7 +1084,10 @@ mod tests {
                 "entity:bob",
                 vec![json!({"in": "entity:alice", "out": "entity:bob"})],
             )
-            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
 
         let service = MemoryService::new(
             Arc::new(db),
@@ -1132,7 +1132,10 @@ mod tests {
                 "entity:alice",
                 vec![json!({"in": "entity:erin", "out": "entity:alice"})],
             )
-            .expect_entity_lookup("openai", Some(json!({"entity_id": "entity:openai"})));
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([{"entity_id": "entity:openai"}]),
+            );
 
         let service = MemoryService::new(
             Arc::new(db),

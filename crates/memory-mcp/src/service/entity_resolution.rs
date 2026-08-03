@@ -189,9 +189,9 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_or_create_returns_existing_on_exact_match() {
-        let db = MockDbClient::new().expect_entity_lookup(
-            "alice smith",
-            Some(json!({"entity_id": "entity:person:alice"})),
+        let db = MockDbClient::new().expect_query(
+            "SELECT * FROM entity WHERE canonical_name_normalized",
+            json!([{"entity_id": "entity:person:alice"}]),
         );
         let (svc, resolver) = make_service(db);
         let candidate = EntityCandidate {
@@ -210,7 +210,11 @@ mod tests {
     #[tokio::test]
     async fn resolve_or_create_creates_new_when_not_found() {
         let db = MockDbClient::new()
-            .expect_entity_lookup("ivan petrov", None)
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([]),
+            )
+            .expect_query("SELECT * FROM entity WHERE aliases CONTAINS", json!([]))
             .expect_query("SELECT entity_id FROM entity", json!([]))
             .expect_query("SELECT entity_id, canonical_name", json!([]))
             .expect_create(
@@ -235,8 +239,12 @@ mod tests {
     async fn resolve_or_create_fuzzy_matches_cyrillic_near_duplicate() {
         let db = MockDbClient::new()
             // Step 1: exact lookup — returns None
-            .expect_entity_lookup("иван петров", None)
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([]),
+            )
             // Step 2: alias lookup — returns None
+            .expect_query("SELECT * FROM entity WHERE aliases CONTAINS", json!([]))
             .expect_query(
                 "SELECT entity_id FROM entity WHERE aliases CONTAINS",
                 json!([]),
@@ -265,7 +273,11 @@ mod tests {
     #[tokio::test]
     async fn resolve_or_create_below_threshold_creates_new() {
         let db = MockDbClient::new()
-            .expect_entity_lookup("bob jones", None)
+            .expect_query(
+                "SELECT * FROM entity WHERE canonical_name_normalized",
+                json!([]),
+            )
+            .expect_query("SELECT * FROM entity WHERE aliases CONTAINS", json!([]))
             .expect_query(
                 "SELECT entity_id FROM entity WHERE aliases CONTAINS",
                 json!([]),

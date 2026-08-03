@@ -292,20 +292,6 @@ pub fn build_select_edges_filtered_page_query(
     )
 }
 
-pub fn build_select_entity_lookup_canonical_query(normalized_name: &str) -> (String, Value) {
-    (
-        "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1".to_string(),
-        json!({"name": normalized_name}),
-    )
-}
-
-pub fn build_select_entity_lookup_alias_query(normalized_name: &str) -> (String, Value) {
-    (
-        "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1".to_string(),
-        json!({"name": normalized_name}),
-    )
-}
-
 pub fn build_select_communities_by_member_entities_query(
     member_entities: &[String],
 ) -> (String, Value) {

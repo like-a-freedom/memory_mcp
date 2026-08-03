@@ -490,14 +490,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -649,14 +641,6 @@ mod tests {
                 _direction: GraphDirection,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
             }
 
             async fn select_episodes_by_content(
@@ -864,14 +848,6 @@ mod tests {
                 _direction: GraphDirection,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
             }
 
             async fn create(
@@ -1114,14 +1090,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1317,14 +1285,6 @@ mod tests {
                 _direction: GraphDirection,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
             }
 
             async fn create(
@@ -1556,14 +1516,6 @@ mod tests {
                 })
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1753,14 +1705,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1926,14 +1870,6 @@ mod tests {
                 _direction: GraphDirection,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
             }
 
             async fn select_facts_ann(

@@ -71,9 +71,40 @@ impl AppStoreClient {
         namespace: &str,
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError> {
-        self.db
-            .select_entity_lookup(namespace, normalized_name)
+        // Canonical-name index lookup first (fast path), then alias lookup.
+        let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
+        let canonical_result = match self
+            .db
+            .query(
+                canonical_sql,
+                Some(json!({ "name": normalized_name })),
+                namespace,
+            )
             .await
+        {
+            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => None,
+            Err(err) => return Err(err),
+        };
+
+        if canonical_result.is_some() {
+            return Ok(canonical_result);
+        }
+
+        let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
+        match self
+            .db
+            .query(
+                alias_sql,
+                Some(json!({ "name": normalized_name })),
+                namespace,
+            )
+            .await
+        {
+            Ok(value) => Ok(value.as_array().and_then(|arr| arr.first()).cloned()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn select_active_facts(

@@ -9,6 +9,13 @@ use super::query::normalize_text;
 use super::util::{deterministic_entity_id, validate_entity_candidate};
 use super::value_helpers::string_from_value;
 
+/// Mirrors the storage-layer check for a missing table so service code can
+/// degrade gracefully without reaching into the private `storage::helpers`.
+fn is_missing_table_error(message: &str) -> bool {
+    let lowered = message.to_lowercase();
+    lowered.contains("does not exist") && lowered.contains("table")
+}
+
 /// Resolves and persists entities. Extracted from `MemoryService::resolve`.
 #[derive(Clone)]
 pub struct EntityService {
@@ -29,15 +36,45 @@ impl EntityService {
         normalized_name: &str,
         namespace: &str,
     ) -> Result<Option<String>, MemoryError> {
-        Ok(self
+        // Canonical-name index lookup first (fast path), then alias lookup.
+        let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
+        let canonical_result = match self
             .db_client
-            .select_entity_lookup(namespace, normalized_name)
-            .await?
-            .and_then(|record| {
-                record
-                    .as_object()
-                    .and_then(|map| map.get("entity_id").and_then(string_from_value))
-            }))
+            .query(
+                canonical_sql,
+                Some(json!({ "name": normalized_name })),
+                namespace,
+            )
+            .await
+        {
+            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
+            Err(MemoryError::Storage(msg)) if is_missing_table_error(&msg) => None,
+            Err(err) => return Err(err),
+        };
+
+        if let Some(record) = canonical_result {
+            return Ok(record
+                .as_object()
+                .and_then(|map| map.get("entity_id").and_then(string_from_value)));
+        }
+
+        let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
+        let result = match self
+            .db_client
+            .query(
+                alias_sql,
+                Some(json!({ "name": normalized_name })),
+                namespace,
+            )
+            .await
+        {
+            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
+            Err(MemoryError::Storage(msg)) if is_missing_table_error(&msg) => None,
+            Err(err) => return Err(err),
+        };
+        Ok(result
+            .and_then(|record| record.as_object().cloned())
+            .and_then(|map| map.get("entity_id").and_then(string_from_value)))
     }
 
     /// Find an entity ID by searching aliases.

@@ -30,7 +30,6 @@ use super::migrations::{
 use super::queries::{
     active_edge_scan_limit, build_create_query, build_select_edge_neighbors_query,
     build_select_edges_filtered_page_query, build_select_edges_filtered_query,
-    build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
     build_select_episodes_by_content_query, build_select_facts_ann_query,
     build_select_facts_by_entity_links_query, build_select_facts_filtered_query,
     build_select_one_query, build_update_query,
@@ -126,13 +125,6 @@ pub trait DbClient: Send + Sync {
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects one entity by canonical name or alias using a parameterized lookup path.
-    async fn select_entity_lookup(
-        &self,
-        namespace: &str,
-        normalized_name: &str,
-    ) -> Result<Option<Value>, MemoryError>;
 
     /// Selects episodes whose raw content matches the supplied query, with an optional project filter.
     ///
@@ -1165,65 +1157,6 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(results)
-    }
-
-    async fn select_entity_lookup(
-        &self,
-        namespace: &str,
-        normalized_name: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        self.log_op(
-            "db.select_entity_lookup",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("name", Value::String(normalized_name.to_string())),
-            ],
-        );
-
-        let (canonical_sql, canonical_vars) =
-            build_select_entity_lookup_canonical_query(normalized_name);
-        let canonical_result = match self
-            .execute_query(&canonical_sql, Some(canonical_vars), namespace)
-            .await
-        {
-            Ok(value) => {
-                let normalized = surreal_to_json(value);
-                extract_first_record(normalized)
-            }
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(None);
-            }
-            Err(err) => return Err(err),
-        };
-
-        if canonical_result.is_some() {
-            self.log_op(
-                "db.select_entity_lookup.result",
-                vec![("found", Value::Bool(true))],
-            );
-            return Ok(canonical_result);
-        }
-
-        let (alias_sql, alias_vars) = build_select_entity_lookup_alias_query(normalized_name);
-        let surreal_val = match self
-            .execute_query(&alias_sql, Some(alias_vars), namespace)
-            .await
-        {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(None);
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let result = extract_first_record(normalized);
-
-        self.log_op(
-            "db.select_entity_lookup.result",
-            vec![("found", Value::Bool(result.is_some()))],
-        );
-
-        Ok(result)
     }
 
     async fn select_episodes_by_content(

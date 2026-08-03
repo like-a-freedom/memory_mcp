@@ -1119,14 +1119,6 @@ mod tests {
                 Ok(vec![next_edge])
             }
 
-            async fn select_entity_lookup(
-                &self,
-                _namespace: &str,
-                _normalized_name: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
