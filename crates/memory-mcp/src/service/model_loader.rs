@@ -17,11 +17,9 @@ use download::{download_file, log_message};
 pub const MODEL_REQUIRED_FILES: &[&str] = &["tokenizer.json", "config.json", "model.safetensors"];
 
 /// Required model files for GLiNER (tokenizer is fetched separately).
-#[allow(dead_code)]
 pub const GLINER_MODEL_FILES: &[&str] = &["model.safetensors", "gliner_config.json"];
 
 /// Direct URL for GLiNER tokenizer (the model repo doesn't include it).
-#[allow(dead_code)]
 pub const GLINER_TOKENIZER_URL: &str =
     "https://huggingface.co/juampahc/gliner_multi-v2.1-onnx/resolve/main/tokenizer.json";
 

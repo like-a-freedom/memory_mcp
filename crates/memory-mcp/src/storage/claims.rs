@@ -14,6 +14,10 @@ use crate::service::MemoryError;
 // ─── ClaimStore Trait ─────────────────────────────────────────────────────────
 
 /// Narrow storage capability for the claim reconciliation pipeline.
+///
+// TODO(adr-0027): `load_projection_source`, `select_source_evidence`, and
+// `upsert_compiled_policies` have no production caller; removing the allow
+// surfaces dead-method warnings under `-D warnings`.
 #[async_trait]
 #[allow(dead_code)]
 pub(crate) trait ClaimStore: Send + Sync {
@@ -45,8 +49,6 @@ pub(crate) trait ClaimStore: Send + Sync {
         &self,
         query: ClaimCandidateQuery<'_>,
     ) -> Result<Vec<Claim>, MemoryError>;
-
-    async fn commit_relation(&self, request: CommitRelationRequest<'_>) -> Result<(), MemoryError>;
 
     async fn select_claims_for_facts(
         &self,
@@ -113,6 +115,8 @@ pub(crate) struct LeaseJobRequest<'a> {
 }
 
 /// Persist projection output (claims + jobs).
+// TODO(adr-0027): wire or delete — several fields are never read by the store
+// implementation; removing the allow surfaces dead-field warnings.
 #[allow(dead_code)]
 pub(crate) struct PersistProjectionRequest<'a> {
     pub namespace: &'a str,
@@ -135,14 +139,6 @@ pub(crate) struct ClaimCandidateQuery<'a> {
     pub limit: usize,
 }
 
-/// Commit a relation between two claims.
-pub(crate) struct CommitRelationRequest<'a> {
-    pub namespace: &'a str,
-    pub relation: ClaimRelation,
-    #[allow(dead_code)]
-    pub lifecycle_mutation: Option<&'a str>,
-}
-
 /// Query for claims belonging to specific facts.
 pub(crate) struct ClaimsForFactsQuery<'a> {
     pub namespace: &'a str,
@@ -156,13 +152,18 @@ pub(crate) struct RelationsForFactsQuery<'a> {
 }
 
 /// Query for source evidence of a fact's claims.
+// TODO(adr-0027): wire or delete — never constructed; `select_source_evidence`
+// is not yet called by any worker.
+#[allow(dead_code)]
 pub(crate) struct SourceEvidenceQuery<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
 }
 
 /// A source evidence record for citation.
+// TODO(adr-0027): wire or delete — never constructed; see `SourceEvidenceQuery`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct SourceEvidenceRecord {
     pub claim_id: String,
     pub source_episode_id: String,
@@ -193,7 +194,10 @@ pub(crate) struct RetractFactAndClaimsRequest<'a> {
 }
 
 /// A compiled policy record for storage.
+// TODO(adr-0027): wire or delete — never constructed; policy persistence is
+// not yet wired to a caller.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct ClaimPolicyRecord {
     pub policy_id: String,
     pub schema_family: String,
@@ -424,17 +428,6 @@ impl ClaimStore for SurrealClaimStore {
                     .map_err(|e| MemoryError::Storage(format!("claim deser: {e}")))
             })
             .collect()
-    }
-
-    async fn commit_relation(&self, request: CommitRelationRequest<'_>) -> Result<(), MemoryError> {
-        let content = Self::serialize(&request.relation)?;
-        let sql = Self::upsert_one_sql(
-            "claim_relation",
-            request.relation.claim_relation_id.as_ref(),
-        )?;
-        let vars = serde_json::json!({"content": content});
-        self.db.query(&sql, Some(vars), request.namespace).await?;
-        Ok(())
     }
 
     async fn select_claims_for_facts(

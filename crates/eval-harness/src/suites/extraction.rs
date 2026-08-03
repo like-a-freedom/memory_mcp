@@ -196,27 +196,24 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         })
         .count();
 
-    let mut metrics = std::collections::BTreeMap::new();
+    let entity_tp = matched_entities as u64;
+    let entity_fp = (result.predicted_entities.len() as u64).saturating_sub(entity_tp);
+    let entity_fn = (expected_entities.len() as u64).saturating_sub(entity_tp);
+    let entity_tn = 0u64;
 
-    let entity_precision = if result.predicted_entities.is_empty() {
-        if expected_entities.is_empty() {
-            1.0
-        } else {
-            0.0
-        }
-    } else {
-        matched_entities as f64 / result.predicted_entities.len() as f64
-    };
-    let entity_recall = if expected_entities.is_empty() {
-        1.0
-    } else {
-        matched_entities as f64 / expected_entities.len() as f64
-    };
-    let entity_f1 = if entity_precision + entity_recall > 0.0 {
-        2.0 * entity_precision * entity_recall / (entity_precision + entity_recall)
-    } else {
-        0.0
-    };
+    let classification = MetricEvidence::classification(entity_tp, entity_fp, entity_fn, entity_tn);
+    // entity_precision / entity_recall / entity_f1 are gate-adjacent
+    // diagnostics rendered from the classification evidence through the
+    // shared formula path (guarantees parity with the reducer aggregate).
+    // The renderer's vacuity convention matches the pre-ADR-0025 manual
+    // formulas: empty prediction with empty expectation ⇒ 1.0/1.0/1.0;
+    // empty prediction with missed positives ⇒ precision 0.0.
+    let mut metrics = crate::metrics::render_case_metrics(
+        &classification,
+        &crate::metrics::CaseMetricNames::classification("entity"),
+    );
+    // Diagnostic-only (not gate-consumed, no evidence arm carries them):
+    // fact_type_accuracy and warning_recall remain suite-local diagnostics.
     let fact_type_accuracy = if expected_fact_types.is_empty() {
         1.0
     } else {
@@ -227,24 +224,12 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
     } else {
         matched_warnings as f64 / case.expected.warnings.len() as f64
     };
-
-    metrics.insert("entity_precision".into(), entity_precision);
-    metrics.insert("entity_recall".into(), entity_recall);
-    metrics.insert("entity_f1".into(), entity_f1);
     metrics.insert("fact_type_accuracy".into(), fact_type_accuracy);
     metrics.insert("warning_recall".into(), warning_recall);
 
-    let entity_tp = matched_entities as u64;
-    let entity_fp = (result.predicted_entities.len() as u64).saturating_sub(entity_tp);
-    let entity_fn = (expected_entities.len() as u64).saturating_sub(entity_tp);
-    let entity_tn = 0u64;
-
     let mut evidence_map = std::collections::BTreeMap::new();
     if !expected_entities.is_empty() || !result.predicted_entities.is_empty() {
-        evidence_map.insert(
-            "classification".to_string(),
-            MetricEvidence::classification(entity_tp, entity_fp, entity_fn, entity_tn),
-        );
+        evidence_map.insert("classification".to_string(), classification);
     }
 
     let warnings_passed = if case.expected.warnings.is_empty() {

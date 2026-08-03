@@ -912,6 +912,9 @@ impl GlinerEntityExtractor {
         Ok((word_tensor, word_offsets))
     }
 
+    /// Single-window forward pass used by `batching::tests` to assert
+    /// batched/unbatched equivalence; deliberately not wired into
+    /// production (which uses `run_forward_batch`).
     #[allow(dead_code)]
     fn run_forward(&self, input_ids: &[u32]) -> Result<Tensor, MemoryError> {
         let attention_mask = vec![1u32; input_ids.len()];

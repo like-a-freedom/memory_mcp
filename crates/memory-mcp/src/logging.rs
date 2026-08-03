@@ -83,7 +83,13 @@ impl StdoutLogger {
     /// (controlled by `every_nth`, default 10).
     pub fn log_warn_dedup(&self, event: HashMap<String, Value>, dedup_key: &str, every_nth: u64) {
         let count = {
-            let mut counts = self.warn_tracker.counts.lock().expect("warn tracker lock");
+            // Logging must never panic on a poisoned counter; the count map
+            // remains valid to increment after recovery.
+            let mut counts = self
+                .warn_tracker
+                .counts
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
             let c = counts.entry(dedup_key.to_string()).or_insert(0);
             *c += 1;
             *c

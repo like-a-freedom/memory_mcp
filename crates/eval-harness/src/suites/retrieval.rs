@@ -292,32 +292,15 @@ impl LocalRetrievalSuite {
             .cloned()
             .collect();
 
-        let recall_at_k = if relevant_count > 0 {
-            hits_at_k as f64 / relevant_count as f64
-        } else {
-            0.0
-        };
-        let mrr = if let Some(rank) = first_relevant_rank {
-            1.0 / rank as f64
-        } else {
-            0.0
-        };
-        let top_1_hit_rate = if first_relevant_rank == Some(1) {
-            1.0
-        } else {
-            0.0
-        };
-
-        let mut metric_map = std::collections::BTreeMap::new();
-        metric_map.insert("recall_at_5".into(), recall_at_k);
-        metric_map.insert("mrr".into(), mrr);
-        metric_map.insert("top_1_hit_rate".into(), top_1_hit_rate);
+        let evidence = MetricEvidence::retrieval(relevant_count, hits_at_k, first_relevant_rank, 5);
+        let metric_map = crate::metrics::render_case_metrics(
+            &evidence,
+            &crate::metrics::CaseMetricNames::default(),
+        );
+        let recall_at_k = metric_map.get("recall_at_5").copied().unwrap_or(0.0);
 
         let mut evidence_map = std::collections::BTreeMap::new();
-        evidence_map.insert(
-            "retrieval".to_string(),
-            MetricEvidence::retrieval(relevant_count, hits_at_k, first_relevant_rank, 5),
-        );
+        evidence_map.insert("retrieval".to_string(), evidence);
 
         let meets_recall = recall_at_k >= case.expected.min_recall_at_k;
         let no_unexpected = unexpected.is_empty();

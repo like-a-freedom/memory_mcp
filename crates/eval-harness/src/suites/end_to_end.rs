@@ -264,9 +264,6 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
         Ok(items) => {
             let mut failures = Vec::new();
 
-            let mut metrics = std::collections::BTreeMap::new();
-            metrics.insert("context_items_returned".into(), items.len() as f64);
-
             let mut entity_tp = 0u64;
             let mut entity_fn = 0u64;
             for expected in &case.expected_entities {
@@ -281,12 +278,6 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                 }
             }
             let entity_fp = (all_entities.len() as u64).saturating_sub(entity_tp);
-
-            if !case.expected_entities.is_empty() {
-                metrics.insert("entity_tp".into(), entity_tp as f64);
-                metrics.insert("entity_fp".into(), entity_fp as f64);
-                metrics.insert("entity_fn".into(), entity_fn as f64);
-            }
 
             let mut evidence_map = std::collections::BTreeMap::new();
             if !case.expected_entities.is_empty() || !all_entities.is_empty() {
@@ -310,19 +301,25 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             let context_all_matched = context_matched == context_total;
             let enough_items = items.len() >= case.min_context_items;
 
-            metrics.insert(
-                "context_match_rate".into(),
-                if context_total > 0 {
-                    context_matched as f64 / context_total as f64
-                } else {
-                    0.0
-                },
+            let context_match_evidence =
+                MetricEvidence::ratio(context_matched as u64, context_total as u64);
+            // context_match_rate duplicates the RatioReducer's n/d formula;
+            // render the per-case diagnostic from the same evidence arm so
+            // the two cannot drift.
+            let mut metrics = crate::metrics::render_case_metrics(
+                &context_match_evidence,
+                &crate::metrics::CaseMetricNames::named("context_match_rate"),
             );
+            evidence_map.insert("context_match".into(), context_match_evidence);
 
-            evidence_map.insert(
-                "context_match".into(),
-                MetricEvidence::ratio(context_matched as u64, context_total as u64),
-            );
+            // Diagnostic-only counts (no reducer consumes these keys):
+            // returned-item count and the raw entity confusion counts.
+            metrics.insert("context_items_returned".into(), items.len() as f64);
+            if !case.expected_entities.is_empty() {
+                metrics.insert("entity_tp".into(), entity_tp as f64);
+                metrics.insert("entity_fp".into(), entity_fp as f64);
+                metrics.insert("entity_fn".into(), entity_fn as f64);
+            }
 
             if !context_all_matched {
                 failures.push(format!("context: {}/{}", context_matched, context_total));

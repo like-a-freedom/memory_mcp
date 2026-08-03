@@ -150,9 +150,14 @@ impl SessionTraceRegistry {
     }
 
     /// Get or create the trace store for a session.
-    pub fn store_for(&self, session_id: &str) -> ExposureTraceStore {
-        let mut sessions = self.sessions.lock().expect("trace registry lock");
-        sessions.entry(session_id.to_string()).or_default().clone()
+    ///
+    /// Returns [`MemoryError::Storage`] if the registry mutex is poisoned.
+    pub fn store_for(&self, session_id: &str) -> Result<ExposureTraceStore, MemoryError> {
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| MemoryError::Storage("session trace registry lock poisoned".into()))?;
+        Ok(sessions.entry(session_id.to_string()).or_default().clone())
     }
 
     /// Record a trace for a session.
@@ -160,8 +165,11 @@ impl SessionTraceRegistry {
     /// Performs amortized eviction of expired traces across all sessions,
     /// then enforces the `MAX_SESSIONS` cap by evicting the session with the
     /// oldest trace.
-    pub fn record(&self, session_id: &str, trace: ExposureTrace) {
-        let mut sessions = self.sessions.lock().expect("trace registry lock");
+    pub fn record(&self, session_id: &str, trace: ExposureTrace) -> Result<(), MemoryError> {
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| MemoryError::Storage("session trace registry lock poisoned".into()))?;
 
         // Amortized eviction: clean expired traces before adding new ones.
         let now = trace.created_at_secs;
@@ -187,11 +195,16 @@ impl SessionTraceRegistry {
 
         let store = sessions.entry(session_id.to_string()).or_default();
         store.push(trace);
+        Ok(())
     }
 
     /// Evict expired traces for all sessions.
     pub fn evict_expired(&self, now_secs: u64) {
-        let mut sessions = self.sessions.lock().expect("trace registry lock");
+        // Test/diagnostic accessor: recover from poison rather than panic.
+        let mut sessions = self
+            .sessions
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         for store in sessions.values_mut() {
             store.evict_expired(now_secs, TRACE_TTL_SECS);
         }
@@ -201,7 +214,11 @@ impl SessionTraceRegistry {
     /// Returns the number of sessions currently tracked.
     #[must_use]
     pub fn session_count(&self) -> usize {
-        self.sessions.lock().expect("trace registry lock").len()
+        // Test/diagnostic accessor: recover from poison rather than panic.
+        self.sessions
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .len()
     }
 }
 
@@ -305,7 +322,7 @@ impl LifecycleRecall {
             .as_deref()
             .filter(|s| !s.is_empty())
             .unwrap_or("default");
-        let traces = self.trace_registry.store_for(session_id);
+        let traces = self.trace_registry.store_for(session_id)?;
 
         // 4. Evaluate the recall policy.
         let decision = evaluate_recall(
@@ -376,7 +393,7 @@ impl LifecycleRecall {
             policy_fingerprint: key.policy_fingerprint.clone(),
             created_at_secs: now_secs,
         };
-        self.trace_registry.record(session_id, trace);
+        self.trace_registry.record(session_id, trace)?;
 
         Ok(LifecycleRecallResult::Recalled { items, decision })
     }
@@ -657,7 +674,10 @@ mod orchestrator_tests {
         assert!(result.is_ok());
 
         // The trace registry now holds a trace for s1 with the selected fact IDs.
-        let store = recall.trace_registry.store_for("s1");
+        let store = recall
+            .trace_registry
+            .store_for("s1")
+            .expect("registry lock in test");
         assert_eq!(store.len(), 1, "exactly one trace should be recorded");
 
         // Build the key the same way the orchestrator does to look it up.
@@ -681,7 +701,10 @@ mod orchestrator_tests {
         assert!(!trace.retrieval_fingerprint.is_empty());
 
         // The trace is session-scoped: a different session has no trace.
-        let other = recall.trace_registry.store_for("s2");
+        let other = recall
+            .trace_registry
+            .store_for("s2")
+            .expect("registry lock in test");
         assert!(other.is_empty(), "traces must not leak across sessions");
     }
 }
@@ -830,8 +853,8 @@ mod tests {
             policy_fingerprint: "p".to_string(),
             created_at_secs: 1000,
         };
-        registry.record("s1", trace);
-        let store = registry.store_for("s1");
+        registry.record("s1", trace).expect("registry lock in test");
+        let store = registry.store_for("s1").expect("registry lock in test");
         assert_eq!(store.len(), 1);
         assert!(store.get("key1").is_some());
     }
@@ -839,18 +862,20 @@ mod tests {
     #[test]
     fn registry_isolates_sessions() {
         let registry = SessionTraceRegistry::new();
-        registry.record(
-            "s1",
-            ExposureTrace {
-                recall_key: "key1".to_string(),
-                retrieval_fingerprint: "fp".to_string(),
-                selected_fact_ids: vec![],
-                selected_experience_ids: vec![],
-                policy_fingerprint: "p".to_string(),
-                created_at_secs: 1000,
-            },
-        );
-        let store2 = registry.store_for("s2");
+        registry
+            .record(
+                "s1",
+                ExposureTrace {
+                    recall_key: "key1".to_string(),
+                    retrieval_fingerprint: "fp".to_string(),
+                    selected_fact_ids: vec![],
+                    selected_experience_ids: vec![],
+                    policy_fingerprint: "p".to_string(),
+                    created_at_secs: 1000,
+                },
+            )
+            .expect("registry lock in test");
+        let store2 = registry.store_for("s2").expect("registry lock in test");
         assert!(store2.is_empty());
     }
 
@@ -894,17 +919,19 @@ mod memory_tests {
         let registry = SessionTraceRegistry::new();
         for i in 0..300 {
             let session_id = format!("session-{i}");
-            registry.record(
-                &session_id,
-                ExposureTrace {
-                    recall_key: format!("key-{i}"),
-                    retrieval_fingerprint: "fp".to_string(),
-                    selected_fact_ids: vec![format!("fact:{i}")],
-                    selected_experience_ids: vec![],
-                    policy_fingerprint: "p".to_string(),
-                    created_at_secs: 1000 + i as u64,
-                },
-            );
+            registry
+                .record(
+                    &session_id,
+                    ExposureTrace {
+                        recall_key: format!("key-{i}"),
+                        retrieval_fingerprint: "fp".to_string(),
+                        selected_fact_ids: vec![format!("fact:{i}")],
+                        selected_experience_ids: vec![],
+                        policy_fingerprint: "p".to_string(),
+                        created_at_secs: 1000 + i as u64,
+                    },
+                )
+                .expect("registry lock in test");
         }
         assert!(
             registry.session_count() <= MAX_SESSIONS,
@@ -918,63 +945,75 @@ mod memory_tests {
     fn registry_evicts_oldest_session_when_cap_exceeded() {
         let registry = SessionTraceRegistry::new();
         for i in 0..MAX_SESSIONS {
-            registry.record(
-                &format!("session-{i}"),
+            registry
+                .record(
+                    &format!("session-{i}"),
+                    ExposureTrace {
+                        recall_key: format!("key-{i}"),
+                        retrieval_fingerprint: "fp".to_string(),
+                        selected_fact_ids: vec![],
+                        selected_experience_ids: vec![],
+                        policy_fingerprint: "p".to_string(),
+                        created_at_secs: 1000 + i as u64,
+                    },
+                )
+                .expect("registry lock in test");
+        }
+        assert_eq!(registry.session_count(), MAX_SESSIONS);
+        registry
+            .record(
+                "session-new",
                 ExposureTrace {
-                    recall_key: format!("key-{i}"),
+                    recall_key: "key-new".to_string(),
                     retrieval_fingerprint: "fp".to_string(),
                     selected_fact_ids: vec![],
                     selected_experience_ids: vec![],
                     policy_fingerprint: "p".to_string(),
-                    created_at_secs: 1000 + i as u64,
+                    created_at_secs: 2000,
                 },
-            );
-        }
+            )
+            .expect("registry lock in test");
         assert_eq!(registry.session_count(), MAX_SESSIONS);
-        registry.record(
-            "session-new",
-            ExposureTrace {
-                recall_key: "key-new".to_string(),
-                retrieval_fingerprint: "fp".to_string(),
-                selected_fact_ids: vec![],
-                selected_experience_ids: vec![],
-                policy_fingerprint: "p".to_string(),
-                created_at_secs: 2000,
-            },
-        );
-        assert_eq!(registry.session_count(), MAX_SESSIONS);
-        let store = registry.store_for("session-0");
+        let store = registry
+            .store_for("session-0")
+            .expect("registry lock in test");
         assert!(store.is_empty(), "oldest session must be evicted");
-        let store = registry.store_for("session-new");
+        let store = registry
+            .store_for("session-new")
+            .expect("registry lock in test");
         assert!(!store.is_empty(), "new session must be retained");
     }
 
     #[test]
     fn registry_evicts_expired_traces_on_record() {
         let registry = SessionTraceRegistry::new();
-        registry.record(
-            "s1",
-            ExposureTrace {
-                recall_key: "key-old".to_string(),
-                retrieval_fingerprint: "fp".to_string(),
-                selected_fact_ids: vec![],
-                selected_experience_ids: vec![],
-                policy_fingerprint: "p".to_string(),
-                created_at_secs: 1000,
-            },
-        );
-        registry.record(
-            "s1",
-            ExposureTrace {
-                recall_key: "key-new".to_string(),
-                retrieval_fingerprint: "fp".to_string(),
-                selected_fact_ids: vec![],
-                selected_experience_ids: vec![],
-                policy_fingerprint: "p".to_string(),
-                created_at_secs: 1000 + (31 * 60),
-            },
-        );
-        let store = registry.store_for("s1");
+        registry
+            .record(
+                "s1",
+                ExposureTrace {
+                    recall_key: "key-old".to_string(),
+                    retrieval_fingerprint: "fp".to_string(),
+                    selected_fact_ids: vec![],
+                    selected_experience_ids: vec![],
+                    policy_fingerprint: "p".to_string(),
+                    created_at_secs: 1000,
+                },
+            )
+            .expect("registry lock in test");
+        registry
+            .record(
+                "s1",
+                ExposureTrace {
+                    recall_key: "key-new".to_string(),
+                    retrieval_fingerprint: "fp".to_string(),
+                    selected_fact_ids: vec![],
+                    selected_experience_ids: vec![],
+                    policy_fingerprint: "p".to_string(),
+                    created_at_secs: 1000 + (31 * 60),
+                },
+            )
+            .expect("registry lock in test");
+        let store = registry.store_for("s1").expect("registry lock in test");
         assert!(
             store.get("key-old").is_none(),
             "expired trace must be evicted"
@@ -989,19 +1028,21 @@ mod memory_tests {
     fn repeated_recall_same_session_caps_at_32_traces() {
         let registry = SessionTraceRegistry::new();
         for i in 0..100 {
-            registry.record(
-                "s1",
-                ExposureTrace {
-                    recall_key: format!("key-{i}"),
-                    retrieval_fingerprint: "fp".to_string(),
-                    selected_fact_ids: vec![],
-                    selected_experience_ids: vec![],
-                    policy_fingerprint: "p".to_string(),
-                    created_at_secs: 1000 + i as u64,
-                },
-            );
+            registry
+                .record(
+                    "s1",
+                    ExposureTrace {
+                        recall_key: format!("key-{i}"),
+                        retrieval_fingerprint: "fp".to_string(),
+                        selected_fact_ids: vec![],
+                        selected_experience_ids: vec![],
+                        policy_fingerprint: "p".to_string(),
+                        created_at_secs: 1000 + i as u64,
+                    },
+                )
+                .expect("registry lock in test");
         }
-        let store = registry.store_for("s1");
+        let store = registry.store_for("s1").expect("registry lock in test");
         assert_eq!(
             store.len(),
             MAX_TRACES_PER_SESSION,

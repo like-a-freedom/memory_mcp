@@ -126,20 +126,19 @@ impl ExternalRetrievalSuite {
                     .position(|id| relevant_ids.contains(id))
                     .map(|rank| (rank + 1) as u32);
 
-                let mut metric_map = BTreeMap::new();
-                if !relevant_ids.is_empty() && !ranked_ids.is_empty() {
-                    let obs = metrics::RetrievalObservation {
-                        relevant_ids: relevant_ids.clone(),
-                        ranked_ids: ranked_ids.clone(),
-                    };
-                    let cutoff = NonZeroUsize::new(5).unwrap_or(NonZeroUsize::new(1).unwrap());
-                    if let Ok(m) = metrics::retrieval_metrics(&[obs], cutoff) {
-                        metric_map.insert("recall_at_5".into(), m.recall_at_k);
-                        metric_map.insert("mrr".into(), m.mrr);
-                        metric_map.insert("top_1_hit_rate".into(), m.top_1_hit_rate);
-                    }
-                }
+                let evidence = MetricEvidence::retrieval(
+                    relevant_ids.len() as u64,
+                    hits_at_k,
+                    first_relevant_rank,
+                    5,
+                );
 
+                // Diagnostic metric values come from the shared renderer so
+                // case display and reducer aggregation share one formula path.
+                // `query_ms` stays manual: it is a timing diagnostic, not a
+                // gate metric, and is not part of `MetricEvidence`.
+                let mut metric_map =
+                    metrics::render_case_metrics(&evidence, &metrics::CaseMetricNames::default());
                 let recall = metric_map.get("recall_at_5").copied().unwrap_or(0.0);
                 let meets_recall = recall >= case.expected.min_recall_at_k;
                 metric_map.insert("query_ms".into(), query_ms as f64);
@@ -155,17 +154,7 @@ impl ExternalRetrievalSuite {
                         CaseStatus::QualityFailed
                     },
                     metrics: metric_map,
-                    evidence: [(
-                        "retrieval".to_string(),
-                        MetricEvidence::retrieval(
-                            relevant_ids.len() as u64,
-                            hits_at_k,
-                            first_relevant_rank,
-                            5,
-                        ),
-                    )]
-                    .into_iter()
-                    .collect(),
+                    evidence: [("retrieval".to_string(), evidence)].into_iter().collect(),
                     invalid_reason: None,
                     failures: if !meets_recall {
                         vec![format!(

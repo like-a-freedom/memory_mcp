@@ -518,6 +518,10 @@ impl EvalSuite for ClaimReconciliationSuite {
             let metrics_result = evaluate_case(case, &extraction, &lineage, &boundaries);
 
             let mut metric_map = std::collections::BTreeMap::new();
+            // Diagnostic-only counts (not gate-consumed): expected/matched/
+            // predicted warnings, isolation violations, unresolved lineage.
+            // They explain *why* a case failed and do not share a formula
+            // with any gate metric, so they stay as explicit diagnostics.
             metric_map.insert(
                 "expected_contradictions".into(),
                 metrics_result.expected_contradictions as f64,
@@ -539,25 +543,6 @@ impl EvalSuite for ClaimReconciliationSuite {
                 metrics_result.unresolved_lineage as f64,
             );
 
-            let precision = if metrics_result.predicted_warnings == 0 {
-                if metrics_result.expected_contradictions == 0 {
-                    1.0
-                } else {
-                    0.0
-                }
-            } else {
-                metrics_result.matched_warnings as f64 / metrics_result.predicted_warnings as f64
-            };
-            let recall = if metrics_result.expected_contradictions == 0 {
-                1.0
-            } else {
-                metrics_result.matched_warnings as f64
-                    / metrics_result.expected_contradictions as f64
-            };
-
-            metric_map.insert("claim_precision".into(), precision);
-            metric_map.insert("claim_recall".into(), recall);
-
             let exact_claim_quality = metrics_result.matched_warnings
                 == metrics_result.expected_contradictions
                 && metrics_result.predicted_warnings == metrics_result.expected_contradictions;
@@ -570,12 +555,15 @@ impl EvalSuite for ClaimReconciliationSuite {
             let fn_ = (metrics_result.expected_contradictions as u64).saturating_sub(tp);
             let tn = 0u64;
 
+            let classification = MetricEvidence::classification(tp, fp, fn_, tn);
+            // Per-case diagnostics stay as counts only. Gate metric keys
+            // (`claim_precision`, `claim_recall`) belong to the reducer
+            // surface that aggregates evidence across all cases in this
+            // suite; per ADR-0025 they are not rendered per-case here.
+
             let mut evidence_map = std::collections::BTreeMap::new();
             if metrics_result.expected_contradictions > 0 || metrics_result.predicted_warnings > 0 {
-                evidence_map.insert(
-                    "classification".to_string(),
-                    MetricEvidence::classification(tp, fp, fn_, tn),
-                );
+                evidence_map.insert("classification".to_string(), classification);
             }
 
             outcomes.push(EvalCaseOutcome {

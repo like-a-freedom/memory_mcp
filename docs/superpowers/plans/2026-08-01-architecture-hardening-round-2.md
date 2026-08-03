@@ -151,15 +151,14 @@ ADR-0022 Accepted on Phase B data. Verified present in tree at HEAD.
 
 ## Execution status
 
-_All cards planned. Execution begins on Card 1 + Card 2 in parallel after
-this file is committed._
+_Landed 2026-08-01 → 2026-08-02 in the order: Card 1 → Card 3 → Card 2 stage 1 → Card 4 (+ Card 5 panic hygiene)._
 
 | Card | Status | Notes |
 |------|--------|-------|
-| 1 | ⏸ planned | ADR-0023 recorded; parse-half exists in workflow.rs |
-| 2 | ⏸ planned | ADR-0027 recorded with full evidence |
-| 3 | ⏸ planned | durable_work + telemetry wire-up table in card details |
-| 4 | ⏸ planned | suite metric_map sites enumerated above |
-| 5 | ⏸ planned | wire/delete table; panic-hygiene group included |
-| 6 | ⏸ planned | blocked on 1+2; consumer migration enumerated |
-| 7 | ⏸ planned | blocked on 2; design-it-twice gate before lock |
+| 1 | ✅ complete | ADR-0023 landed — `service/apps/dispatch.rs`, 14 descriptors, 0 `unreachable!()`; `Redundant auth checks deleted 9x`; 3 unit tests for descriptor↔parse alignment |
+| 2 | 🔶 stage 1 | ADR-0027 stage 1 landed: 6 `Ok(vec![])`/`Ok(0)` stub defaults removed from `DbClient`, MockDbClient extended, 19 test doubles made explicit; stage 2 (SQL moves into narrow stores + mock shrink) is the deep restructure still ahead |
+| 3 | ✅ complete | ADR-0026 landed — `durable_work` wired into `agent_memory/{worker,projection}.rs`; `claims::telemetry` 4 dark metrics wired into `reconcile_page_with_owning` + `backfill`; `METRIC_BACKFILL_LAG` deleted |
+| 4 | ✅ complete | ADR-0025 landed — `render_case_metrics` + `CaseMetricNames` added to `metrics.rs`; five suites (retrieval, external_retrieval, claims, extraction, end_to_end) emit typed evidence and render per-case maps through it; pattern-scan regression tests added in `suites.rs`; PR/Release/Nightly at v5 byte-parity. Remaining string-key writes are schemaless diagnostics ADR-0025 allows (`query_ms`, `rows_*`). |
+| 5 | ✅ complete | Panic hygiene (Mutex poison → Err everywhere), mock_db .unwrap → poison-recovery, shared env_lock, `CommitRelationRequest`/`commit_relation` removed, TODO list narrowed to genuinely dangling methods (`CommitRelationRequest` and its `commit_relation` gone); ClaimStore allow covers remaining |
+| 6 | ⏸ blocked on 2 stage 2 | Service -> capability direct wiring and core split must precede delegate removal; blocks follow once stage 2 completes |
+| 7 | ⏸ blocked on 2 stage 2 | pipeline.rs unit tests + test-block redistribution follow Card 6 |

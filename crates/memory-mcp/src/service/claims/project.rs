@@ -336,12 +336,6 @@ mod tests {
         ) -> Result<Vec<crate::models::claim::Claim>, MemoryError> {
             Ok(vec![])
         }
-        async fn commit_relation(
-            &self,
-            _req: crate::storage::claims::CommitRelationRequest<'_>,
-        ) -> Result<(), MemoryError> {
-            Ok(())
-        }
         async fn select_claims_for_facts(
             &self,
             _q: crate::storage::claims::ClaimsForFactsQuery<'_>,

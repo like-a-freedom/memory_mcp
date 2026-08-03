@@ -70,7 +70,6 @@ macro_rules! define_validated_id {
 
             /// Internal constructor from a pre-validated string (must include prefix).
             /// Only callable within the crate.
-            #[allow(dead_code)]
             pub(crate) fn from_raw(raw: String) -> Self {
                 Self(raw)
             }
