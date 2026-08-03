@@ -30,8 +30,8 @@ use super::migrations::{
 use super::queries::{
     active_edge_scan_limit, build_create_query, build_select_edge_neighbors_query,
     build_select_edges_filtered_page_query, build_select_edges_filtered_query,
-    build_select_facts_ann_query, build_select_facts_by_entity_links_query,
-    build_select_facts_filtered_query, build_select_one_query, build_update_query,
+    build_select_facts_ann_query, build_select_facts_filtered_query, build_select_one_query,
+    build_update_query,
 };
 use super::types::GraphDirection;
 
@@ -59,16 +59,6 @@ pub trait DbClient: Send + Sync {
         limit: i32,
         project: Option<&str>,
         fact_types: &[String],
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects facts that mention any of the supplied entity links using DB-side filtering.
-    async fn select_facts_by_entity_links(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        entity_links: &[String],
-        limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects nearest-neighbor facts via HNSW ANN index.
@@ -903,52 +893,6 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_facts_filtered.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_facts_by_entity_links(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        entity_links: &[String],
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_facts_by_entity_links",
-            vec![
-                ("scope", Value::String(scope.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-                (
-                    "entity_link_count",
-                    Value::Number(serde_json::Number::from(entity_links.len())),
-                ),
-            ],
-        );
-
-        let (sql, vars) =
-            build_select_facts_by_entity_links_query(scope, cutoff, entity_links, limit);
-
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_facts_by_entity_links.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),

@@ -365,17 +365,6 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn select_facts_by_entity_links(
-            &self,
-            _namespace: &str,
-            _scope: &str,
-            _cutoff: &str,
-            _entity_links: &[String],
-            _limit: i32,
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
-
         async fn select_facts_ann(
             &self,
             _namespace: &str,

@@ -33,7 +33,6 @@ pub struct MockDbClient {
     select_one_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     select_table_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     facts_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
@@ -47,7 +46,6 @@ pub struct MockDbClient {
     fallback_edges_filtered: Mutex<Option<Box<SelectTableFn>>>,
     fallback_edge_neighbors: Mutex<Option<Box<EdgeNeighborsFn>>>,
     fallback_facts_filtered: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_facts_by_entity_links: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_ann: Mutex<Option<Box<SelectTableFn>>>,
 }
 
@@ -57,7 +55,6 @@ impl MockDbClient {
             select_one_responses: Mutex::new(HashMap::new()),
             select_table_responses: Mutex::new(HashMap::new()),
             facts_filtered_responses: Mutex::new(HashMap::new()),
-            facts_entity_links_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
@@ -71,7 +68,6 @@ impl MockDbClient {
             fallback_edges_filtered: Mutex::new(None),
             fallback_edge_neighbors: Mutex::new(None),
             fallback_facts_filtered: Mutex::new(None),
-            fallback_facts_by_entity_links: Mutex::new(None),
             fallback_facts_ann: Mutex::new(None),
         }
     }
@@ -192,14 +188,6 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_facts_by_entity_links(self, key: &str, rows: Vec<Value>) -> Self {
-        self.facts_entity_links_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(key.to_string(), Ok(rows));
-        self
-    }
-
     pub fn expect_migration_result(mut self, result: Result<(), MemoryError>) -> Self {
         self.migration_result = Mutex::new(result);
         self
@@ -281,34 +269,6 @@ impl DbClient for MockDbClient {
         }
         if let Some(ref f) = *self
             .fallback_facts_filtered
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_facts_by_entity_links(
-        &self,
-        _namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        entity_links: &[String],
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        let key = entity_links.join(",");
-        if let Some(resp) = self
-            .facts_entity_links_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(&key)
-            .cloned()
-        {
-            return resp;
-        }
-        if let Some(ref f) = *self
-            .fallback_facts_by_entity_links
             .lock()
             .unwrap_or_else(|p| p.into_inner())
         {

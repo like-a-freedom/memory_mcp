@@ -63,9 +63,17 @@ impl ContextStoreClient {
         entity_links: &[String],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_facts_by_entity_links(namespace, scope, cutoff, entity_links, limit)
-            .await
+        let (sql, vars) = crate::storage::queries::build_select_facts_by_entity_links_query(
+            scope,
+            cutoff,
+            entity_links,
+            limit,
+        );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Facts matching a subject-predicate-object triple pattern.

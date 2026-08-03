@@ -450,17 +450,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -587,17 +576,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -761,47 +739,6 @@ mod tests {
                 }
             }
 
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                self.entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
-                assert_eq!(entity_links, &["entity:alice".to_string()]);
-
-                Ok(vec![
-                    json!({
-                        "fact_id": "fact:community",
-                        "fact_type": "note",
-                        "content": "Alice works on project Atlas",
-                        "quote": "Alice works on project Atlas",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-15T10:30:00Z",
-                        "t_ingested": "2026-01-15T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:alice"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:1"}
-                    }),
-                    json!({
-                        "fact_id": "fact:other",
-                        "fact_type": "note",
-                        "content": "Mallory works elsewhere",
-                        "quote": "Mallory works elsewhere",
-                        "source_episode": "episode:2",
-                        "t_valid": "2026-01-15T10:30:00Z",
-                        "t_ingested": "2026-01-15T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:mallory"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:2"}
-                    }),
-                ])
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -855,9 +792,9 @@ mod tests {
                 vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
-                // The context store now runs the indexed community lookup through
-                // the core `query` op; serve it here so the test can assert the
-                // DB-side search path is used (not a full `select_table` scan).
+                // The context store now runs the indexed community lookup and the
+                // entity-link fact expansion through the core `query` op; serve
+                // both here so the test can assert the DB-side paths are used.
                 if sql.contains("FROM community") {
                     self.community_lookup_calls.fetch_add(1, Ordering::SeqCst);
                     if let Some(vars) = vars {
@@ -868,6 +805,40 @@ mod tests {
                         "summary": "Alice and the Atlas project team",
                         "member_entities": ["entity:alice"]
                     }]));
+                }
+                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
+                    self.entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["entity_links"], json!(["entity:alice"]));
+                    }
+                    return Ok(json!([
+                        {
+                            "fact_id": "fact:community",
+                            "fact_type": "note",
+                            "content": "Alice works on project Atlas",
+                            "quote": "Alice works on project Atlas",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-15T10:30:00Z",
+                            "t_ingested": "2026-01-15T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:alice"],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:1"}
+                        },
+                        {
+                            "fact_id": "fact:other",
+                            "fact_type": "note",
+                            "content": "Mallory works elsewhere",
+                            "quote": "Mallory works elsewhere",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-15T10:30:00Z",
+                            "t_ingested": "2026-01-15T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:mallory"],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:2"}
+                        }
+                    ]));
                 }
                 Ok(Value::Null)
             }
@@ -1006,30 +977,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(entity_links, &["entity:atlas".to_string()]);
-                Ok(vec![json!({
-                    "fact_id": "fact:community",
-                    "fact_type": "note",
-                    "content": "Atlas team sync moved to Friday.",
-                    "quote": "Atlas team sync moved to Friday.",
-                    "source_episode": "episode:community",
-                    "t_valid": "2026-01-15T10:30:00Z",
-                    "t_ingested": "2026-01-15T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": ["entity:atlas"],
-                    "policy_tags": [],
-                    "provenance": {"source_episode": "episode:community"}
-                })])
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1079,10 +1026,30 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the entity-link fact expansion through
+                // the core `query` op; serve the community-linked fact here.
+                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["entity_links"], json!(["entity:atlas"]));
+                    }
+                    return Ok(json!([{
+                        "fact_id": "fact:community",
+                        "fact_type": "note",
+                        "content": "Atlas team sync moved to Friday.",
+                        "quote": "Atlas team sync moved to Friday.",
+                        "source_episode": "episode:community",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": ["entity:atlas"],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:community"}
+                    }]));
+                }
                 Ok(Value::Null)
             }
 
@@ -1172,49 +1139,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(
-                    entity_links,
-                    &["entity:alpha".to_string(), "entity:beta".to_string()]
-                );
-
-                Ok(vec![
-                    json!({
-                        "fact_id": "fact:beta",
-                        "fact_type": "note",
-                        "content": "Beta launch note.",
-                        "quote": "Beta launch note.",
-                        "source_episode": "episode:beta",
-                        "t_valid": "2026-01-20T10:30:00Z",
-                        "t_ingested": "2026-01-20T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:beta"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:beta"}
-                    }),
-                    json!({
-                        "fact_id": "fact:alpha",
-                        "fact_type": "note",
-                        "content": "Alpha launch note.",
-                        "quote": "Alpha launch note.",
-                        "source_episode": "episode:alpha",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:alpha"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:alpha"}
-                    }),
-                ])
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1265,7 +1189,7 @@ mod tests {
             async fn query(
                 &self,
                 sql: &str,
-                _vars: Option<Value>,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
                 // The context store runs the indexed community lookup through the
@@ -1284,6 +1208,39 @@ mod tests {
                             "summary": "Beta launch workstream",
                             "member_entities": ["entity:beta"],
                             "ft_score": 10.0
+                        }
+                    ]));
+                }
+                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["entity_links"], json!(["entity:alpha", "entity:beta"]));
+                    }
+                    return Ok(json!([
+                        {
+                            "fact_id": "fact:beta",
+                            "fact_type": "note",
+                            "content": "Beta launch note.",
+                            "quote": "Beta launch note.",
+                            "source_episode": "episode:beta",
+                            "t_valid": "2026-01-20T10:30:00Z",
+                            "t_ingested": "2026-01-20T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:beta"],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:beta"}
+                        },
+                        {
+                            "fact_id": "fact:alpha",
+                            "fact_type": "note",
+                            "content": "Alpha launch note.",
+                            "quote": "Alpha launch note.",
+                            "source_episode": "episode:alpha",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:alpha"],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:alpha"}
                         }
                     ]));
                 }
@@ -1365,51 +1322,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                entity_links: &[String],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(
-                    entity_links,
-                    &["entity:alpha".to_string(), "entity:beta".to_string()]
-                );
-
-                Ok(vec![
-                    json!({
-                        "fact_id": "fact:beta",
-                        "fact_type": "note",
-                        "content": "Beta launch note.",
-                        "quote": "Beta launch note.",
-                        "source_episode": "episode:beta",
-                        "t_valid": "2026-01-15T10:30:00Z",
-                        "t_ingested": "2026-01-15T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:beta"],
-                        "policy_tags": [],
-                        "confidence": 1.0,
-                        "provenance": {"source_episode": "episode:beta"}
-                    }),
-                    json!({
-                        "fact_id": "fact:alpha",
-                        "fact_type": "note",
-                        "content": "Alpha launch note.",
-                        "quote": "Alpha launch note.",
-                        "source_episode": "episode:alpha",
-                        "t_valid": "2026-01-15T10:30:00Z",
-                        "t_ingested": "2026-01-15T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:alpha"],
-                        "policy_tags": [],
-                        "confidence": 1.0,
-                        "provenance": {"source_episode": "episode:alpha"}
-                    }),
-                ])
-            }
-
             async fn select_facts_ann(
                 &self,
                 _namespace: &str,
@@ -1482,7 +1394,7 @@ mod tests {
             async fn query(
                 &self,
                 sql: &str,
-                _vars: Option<Value>,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
                 // The context store runs the indexed community lookup through the
@@ -1501,6 +1413,41 @@ mod tests {
                             "summary": "Alpha launch workstream",
                             "member_entities": ["entity:alpha"],
                             "ft_score": 10.0
+                        }
+                    ]));
+                }
+                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["entity_links"], json!(["entity:alpha", "entity:beta"]));
+                    }
+                    return Ok(json!([
+                        {
+                            "fact_id": "fact:beta",
+                            "fact_type": "note",
+                            "content": "Beta launch note.",
+                            "quote": "Beta launch note.",
+                            "source_episode": "episode:beta",
+                            "t_valid": "2026-01-15T10:30:00Z",
+                            "t_ingested": "2026-01-15T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:beta"],
+                            "policy_tags": [],
+                            "confidence": 1.0,
+                            "provenance": {"source_episode": "episode:beta"}
+                        },
+                        {
+                            "fact_id": "fact:alpha",
+                            "fact_type": "note",
+                            "content": "Alpha launch note.",
+                            "quote": "Alpha launch note.",
+                            "source_episode": "episode:alpha",
+                            "t_valid": "2026-01-15T10:30:00Z",
+                            "t_ingested": "2026-01-15T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:alpha"],
+                            "policy_tags": [],
+                            "confidence": 1.0,
+                            "provenance": {"source_episode": "episode:alpha"}
                         }
                     ]));
                 }
@@ -1605,17 +1552,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1760,17 +1696,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_by_entity_links(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _entity_links: &[String],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
