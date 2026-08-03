@@ -8,9 +8,11 @@
 
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::service::MemoryError;
+use crate::storage::helpers::is_missing_table_error;
+use crate::storage::queries::BI_TEMPORAL_WHERE;
 use crate::storage::{ContextFactQuery, DbClient, GraphDirection};
 
 /// Read-side context assembly store. Holds the `DbClient` adapter and owns
@@ -67,6 +69,9 @@ impl ContextStoreClient {
     }
 
     /// Facts matching a subject-predicate-object triple pattern.
+    ///
+    /// Searches the `triple` table for rows whose subject, predicate, or
+    /// object matches `query_text`, then retrieves the linked `fact` records.
     pub async fn select_facts_by_triple(
         &self,
         namespace: &str,
@@ -74,9 +79,29 @@ impl ContextStoreClient {
         cutoff: &str,
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_facts_by_triple(namespace, query_text, cutoff, limit)
-            .await
+        let sql = format!(
+            "SELECT * FROM fact \
+             WHERE fact_id IN ( \
+               SELECT source_fact_id FROM triple \
+               WHERE namespace = $ns \
+                 AND (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
+             ) \
+               AND {BI_TEMPORAL_WHERE} \
+             LIMIT $limit"
+        );
+        let mut vars = json!({
+            "ns": "__placeholder__",
+            "query": query_text,
+            "cutoff": cutoff,
+            "limit": limit,
+        });
+        vars.as_object_mut()
+            .map(|map| map.insert("ns".to_string(), json!(namespace)));
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Approximate nearest-neighbour facts for an embedding query.

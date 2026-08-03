@@ -78,7 +78,16 @@ impl EpisodeStoreClient {
         namespace: &str,
         entity_ids: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_entities_by_ids(namespace, entity_ids).await
+        if entity_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
+        let vars = json!({ "entity_ids": entity_ids });
+        match self.db.query(sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Active (not-yet-invalidated) facts linked to an episode.
@@ -113,6 +122,8 @@ impl EpisodeStoreClient {
     }
 
     /// Edges whose `in`/`out`/`relation` matches this triple query.
+    ///
+    /// Used for targeted invalidation without full table scans.
     pub async fn select_edges_for_triple(
         &self,
         namespace: &str,
@@ -120,9 +131,14 @@ impl EpisodeStoreClient {
         relation: &str,
         out_id: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_edges_for_triple(namespace, in_id, relation, out_id)
-            .await
+        let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
+                   AND out = <record> $out_id";
+        let vars = json!({ "in_id": in_id, "relation": relation, "out_id": out_id });
+        match self.db.query(sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Link two records through an edge.

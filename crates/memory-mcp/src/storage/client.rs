@@ -34,8 +34,8 @@ use super::queries::{
     build_select_edges_filtered_page_query, build_select_edges_filtered_query,
     build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
     build_select_episodes_by_content_query, build_select_facts_ann_query,
-    build_select_facts_by_entity_links_query, build_select_facts_by_triple_query,
-    build_select_facts_filtered_query, build_select_one_query, build_update_query,
+    build_select_facts_by_entity_links_query, build_select_facts_filtered_query,
+    build_select_one_query, build_update_query,
 };
 use super::types::GraphDirection;
 
@@ -73,20 +73,6 @@ pub trait DbClient: Send + Sync {
         cutoff: &str,
         entity_links: &[String],
         limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects facts linked via triples matching a search term.
-    ///
-    /// Searches the `triple` table for rows whose subject, predicate, or object
-    /// matches `query_text`, then retrieves the linked `fact` records via
-    /// `source_fact_id`. Applies the standard bi-temporal visibility filter
-    /// on the fact table.
-    async fn select_facts_by_triple(
-        &self,
-        namespace: &str,
-        query_text: &str,
-        cutoff: &str,
-        limit: usize,
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects nearest-neighbor facts via HNSW ANN index.
@@ -150,7 +136,7 @@ pub trait DbClient: Send + Sync {
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError>;
 
-    /// Batch entity lookup by multiple normalized names.
+    /// Batch entity lookup by multiple normalized names (alias-resolution hot path).
     ///
     /// Returns all entities whose `canonical_name_normalized` matches any
     /// of the supplied names, or whose `aliases` contain any of them.
@@ -158,27 +144,7 @@ pub trait DbClient: Send + Sync {
     async fn select_entities_batch(
         &self,
         namespace: &str,
-        names: &[String],
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects entities by their IDs in a single batch query.
-    ///
-    /// Returns all entities whose `entity_id` is in the supplied list.
-    async fn select_entities_by_ids(
-        &self,
-        namespace: &str,
-        entity_ids: &[String],
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects edges matching a specific (in, relation, out) triple.
-    ///
-    /// Used for targeted invalidation without full table scans.
-    async fn select_edges_for_triple(
-        &self,
-        namespace: &str,
-        in_id: &str,
-        relation: &str,
-        out_id: &str,
+        normalized_names: &[String],
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects active (non-invalidated) facts with an optional limit.
@@ -1063,48 +1029,6 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_facts_by_triple(
-        &self,
-        namespace: &str,
-        query_text: &str,
-        cutoff: &str,
-        limit: usize,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_facts_by_triple",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-            ],
-        );
-
-        let (sql, mut vars) = build_select_facts_by_triple_query(cutoff, query_text, limit);
-        if let Some(obj) = vars.as_object_mut() {
-            obj.insert("ns".to_string(), json!(namespace));
-        }
-
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_facts_by_triple.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
     async fn select_facts_ann(
         &self,
         namespace: &str,
@@ -1392,71 +1316,6 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(results)
-    }
-
-    async fn select_entities_by_ids(
-        &self,
-        namespace: &str,
-        entity_ids: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        if entity_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        self.log_op(
-            "db.select_entities_by_ids",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(entity_ids.len())),
-            )],
-        );
-
-        let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
-        let vars = json!({"entity_ids": entity_ids});
-
-        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        Ok(extract_records(normalized))
-    }
-
-    async fn select_edges_for_triple(
-        &self,
-        namespace: &str,
-        in_id: &str,
-        relation: &str,
-        out_id: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_edges_for_triple",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("in_id", Value::String(in_id.to_string())),
-                ("relation", Value::String(relation.to_string())),
-            ],
-        );
-
-        let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation AND out = <record> $out_id";
-        let vars = json!({
-            "in_id": in_id,
-            "relation": relation,
-            "out_id": out_id,
-        });
-
-        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        Ok(extract_records(normalized))
     }
 
     async fn select_active_facts(

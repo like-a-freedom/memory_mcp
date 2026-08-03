@@ -36,7 +36,6 @@ pub struct MockDbClient {
     facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     entity_lookup_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
-    entities_by_ids_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     active_facts_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     communities_by_members_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
@@ -71,7 +70,6 @@ impl MockDbClient {
             facts_entity_links_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             entity_lookup_responses: Mutex::new(HashMap::new()),
-            entities_by_ids_responses: Mutex::new(HashMap::new()),
             active_facts_responses: Mutex::new(HashMap::new()),
             episodes_by_content_responses: Mutex::new(HashMap::new()),
             communities_by_members_responses: Mutex::new(HashMap::new()),
@@ -648,44 +646,6 @@ impl DbClient for MockDbClient {
             return f();
         }
         Ok(Value::Null)
-    }
-
-    async fn select_entities_by_ids(
-        &self,
-        _namespace: &str,
-        entity_ids: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        let key = entity_ids.join(",");
-        if let Some(resp) = self
-            .entities_by_ids_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(&key)
-            .cloned()
-        {
-            return resp;
-        }
-        Ok(vec![])
-    }
-
-    async fn select_facts_by_triple(
-        &self,
-        _namespace: &str,
-        _query_text: &str,
-        _cutoff: &str,
-        _limit: usize,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(vec![])
-    }
-
-    async fn select_edges_for_triple(
-        &self,
-        _namespace: &str,
-        _in_id: &str,
-        _relation: &str,
-        _out_id: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(vec![])
     }
 
     async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {

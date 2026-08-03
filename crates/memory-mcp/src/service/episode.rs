@@ -781,34 +781,6 @@ mod tests {
                 Ok(())
             }
 
-            async fn select_facts_by_triple(
-                &self,
-                _namespace: &str,
-                _query_text: &str,
-                _cutoff: &str,
-                _limit: usize,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_entities_by_ids(
-                &self,
-                _namespace: &str,
-                _entity_ids: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn select_edges_for_triple(
-                &self,
-                _namespace: &str,
-                _in_id: &str,
-                _relation: &str,
-                _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
             async fn select_episodes_by_content(
                 &self,
                 _namespace: &str,
@@ -1004,14 +976,6 @@ mod tests {
                 Ok(serde_json::Value::Null)
             }
 
-            async fn select_entities_by_ids(
-                &self,
-                _namespace: &str,
-                _ids: &[String],
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_active_facts(
                 &self,
                 _namespace: &str,
@@ -1022,26 +986,6 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
-            }
-
-            async fn select_facts_by_triple(
-                &self,
-                _namespace: &str,
-                _query_text: &str,
-                _cutoff: &str,
-                _limit: usize,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edges_for_triple(
-                &self,
-                _namespace: &str,
-                _in_id: &str,
-                _relation: &str,
-                _out_id: &str,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(Vec::new())
             }
 
             async fn select_episodes_by_content(
