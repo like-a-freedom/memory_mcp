@@ -433,28 +433,6 @@ impl MemoryService {
         }))
     }
 
-    /// Finds an introduction chain.
-    ///
-    /// Graph traversal lives in `service/apps/graph.rs` per ADR-0024 step 1;
-    /// this method is kept only to preserve the public `MemoryService`
-    /// interface while consumers migrate.
-    pub async fn find_intro_chain(
-        &self,
-        target_name: &str,
-        max_hops: i32,
-        as_of: Option<DateTime<Utc>>,
-    ) -> Result<Vec<String>, MemoryError> {
-        super::apps::graph::find_intro_chain(
-            self,
-            &self.namespaces,
-            &self.default_namespace,
-            target_name,
-            max_hops,
-            as_of,
-        )
-        .await
-    }
-
     /// Invalidates a superseded metric.
     pub async fn invalidate_metric_if_superseded(
         &self,

@@ -26,6 +26,30 @@ impl GraphContext for MemoryService {
     }
 }
 
+impl MemoryService {
+    /// Finds an introduction chain.
+    ///
+    /// Graph traversal lives in this module per ADR-0024 step 1; the method is
+    /// exposed on `MemoryService` so callers can use it without reaching into
+    /// the internal graph API.
+    pub async fn find_intro_chain(
+        &self,
+        target_name: &str,
+        max_hops: i32,
+        as_of: Option<DateTime<Utc>>,
+    ) -> Result<Vec<String>, MemoryError> {
+        find_intro_chain(
+            self,
+            &self.namespaces,
+            &self.default_namespace,
+            target_name,
+            max_hops,
+            as_of,
+        )
+        .await
+    }
+}
+
 const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;
 const MAX_HUB_CANDIDATE_SCAN: usize = 64;
 const MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS: usize = 64;
