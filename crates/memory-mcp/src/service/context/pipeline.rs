@@ -33,6 +33,7 @@ use super::scoring::{ranked_fact_to_item, selected_fact_matched_terms};
 use super::semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
 use super::temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
 use super::triple::collect_triple_facts;
+use super::types::RankedContextFact;
 use crate::service::cache::{CacheKey, CacheView};
 
 // ─── Parameter preparation and cache operations ──────────────────────────
@@ -187,6 +188,49 @@ pub(super) fn log_context_start(
 ///
 /// Tiers: lexical BM25 → temporal → alias expansion → experience → community → semantic ANN.
 /// Falls back to episode search if no facts match.
+/// The tier-fallback outcome for the default context pipeline.
+///
+/// When the episode-content rescue tier and the ranked-fact tiers compete for
+/// the response, this records which side wins. `assemble_default_context`
+/// returns episode items on [`FallbackDecision::UseEpisodes`] and otherwise
+/// builds the response from the ranked facts (with episodes appended only when
+/// they earn a slot via the first-person heuristics).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum FallbackDecision {
+    /// Episode content replaces the ranked-fact tiers.
+    UseEpisodes,
+    /// Ranked facts win; episode content may still be appended opportunistically.
+    UseRanked,
+}
+
+/// Strategy object for the episode-rescue tier fallback.
+///
+/// Encapsulates the decision `assemble_default_context` makes when the
+/// episode-content tier should replace the ranked-fact tiers: when episode
+/// overlap out-scores every ranked candidate (see
+/// [`super::budget::should_prefer_episode_content`]). The companion decision —
+/// ranking produced nothing for a query — is guarded in the pipeline before
+/// selection; both branches of the fallback are covered by this strategy's
+/// unit tests.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct EpisodeFallbackStrategy;
+
+impl EpisodeFallbackStrategy {
+    /// Decides whether episode content should replace the ranked facts.
+    pub(super) fn decide(
+        &self,
+        selected_ranked: &[RankedContextFact],
+        episode_fallback_items: &[AssembledContextItem],
+        query_terms: &[String],
+    ) -> FallbackDecision {
+        if should_prefer_episode_content(selected_ranked, episode_fallback_items, query_terms) {
+            FallbackDecision::UseEpisodes
+        } else {
+            FallbackDecision::UseRanked
+        }
+    }
+}
+
 pub(super) async fn assemble_default_context(
     service: &ServiceContext,
     params: DefaultContextParams<'_>,
@@ -490,11 +534,12 @@ pub(super) async fn assemble_default_context(
         )
     };
 
-    let prefer_episode_content = should_prefer_episode_content(
+    let strategy = EpisodeFallbackStrategy;
+    let prefer_episode_content = strategy.decide(
         &selected_ranked,
         &episode_fallback_items,
         params.query_terms,
-    );
+    ) == FallbackDecision::UseEpisodes;
 
     if params.query_opt.is_some() {
         use crate::logging::LogLevel;
@@ -546,4 +591,152 @@ pub(super) async fn assemble_default_context(
     );
 
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Fact;
+
+    fn create_test_fact(
+        fact_id: &str,
+        content: &str,
+        t_valid: chrono::DateTime<chrono::Utc>,
+    ) -> Fact {
+        Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "note".to_string(),
+            content: content.to_string(),
+            quote: content.to_string(),
+            source_episode: "episode:test".to_string(),
+            t_valid,
+            t_ingested: t_valid,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    fn create_ranked_test_fact(
+        fact_id: &str,
+        content: &str,
+        tier: RetrievalTier,
+        t_valid: chrono::DateTime<chrono::Utc>,
+    ) -> RankedContextFact {
+        RankedContextFact {
+            fact: create_test_fact(fact_id, content, t_valid),
+            rationale: "test rationale".to_string(),
+            retrieval_tier: tier,
+            fusion_score: 1.0,
+            source_priority: 0,
+            decayed_confidence: 1.0,
+            query_alignment_factor: 1.0,
+            grounding_score: 1.0,
+            semantic_available: false,
+            matched_query_terms: Vec::new(),
+            graph_trace: None,
+        }
+    }
+
+    fn episode_item(content: &str) -> AssembledContextItem {
+        AssembledContextItem {
+            fact_id: "episode_fallback:episode:july".to_string(),
+            content: content.to_string(),
+            quote: content.to_string(),
+            source_episode: "episode:july".to_string(),
+            confidence: 1.0,
+            provenance: serde_json::json!({"episode_fallback": true}),
+            rationale: "fallback".to_string(),
+            retrieval_tier: Some("fallback".to_string()),
+            ..Default::default()
+        }
+    }
+
+    fn query_terms() -> Vec<String> {
+        crate::service::query::search_query_terms("platform planning notes july 2025")
+    }
+
+    #[test]
+    fn decide_uses_episodes_when_episode_overlap_is_stronger() {
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+        // The ranked fact has no lexical overlap with the query terms.
+        let selected = vec![create_ranked_test_fact(
+            "fact:noise",
+            "Acme Corp quarterly renewal workflow.",
+            RetrievalTier::Direct,
+            fact_time,
+        )];
+        let episodes = vec![episode_item(
+            "Platform planning notes July 2025: release scope, integrations, and response workflow updates.",
+        )];
+
+        let decision = EpisodeFallbackStrategy.decide(&selected, &episodes, &query_terms());
+        assert_eq!(decision, FallbackDecision::UseEpisodes);
+    }
+
+    #[test]
+    fn decide_uses_ranked_when_fact_overlap_is_equal_or_better() {
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+        // The ranked fact directly matches the query terms.
+        let selected = vec![create_ranked_test_fact(
+            "fact:strong",
+            "Platform planning notes July 2025 for release scope and integrations.",
+            RetrievalTier::Direct,
+            fact_time,
+        )];
+        let episodes = vec![episode_item(
+            "Platform notes July 2025 with rollout reminders.",
+        )];
+
+        let decision = EpisodeFallbackStrategy.decide(&selected, &episodes, &query_terms());
+        assert_eq!(decision, FallbackDecision::UseRanked);
+    }
+
+    #[test]
+    fn decide_uses_ranked_when_no_episode_items_exist() {
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+        let selected = vec![create_ranked_test_fact(
+            "fact:weak",
+            "Acme Corp quarterly renewal workflow.",
+            RetrievalTier::Direct,
+            fact_time,
+        )];
+
+        let decision = EpisodeFallbackStrategy.decide(&selected, &[], &query_terms());
+        assert_eq!(decision, FallbackDecision::UseRanked);
+    }
+
+    #[test]
+    fn decide_uses_ranked_when_graph_tier_is_present() {
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2025-07-13T10:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+        // Graph-expanded facts block the episode rescue regardless of overlap.
+        let selected = vec![create_ranked_test_fact(
+            "fact:graph",
+            "Acme Corp quarterly renewal workflow.",
+            RetrievalTier::GraphExpanded,
+            fact_time,
+        )];
+        let episodes = vec![episode_item(
+            "Platform planning notes July 2025: release scope, integrations, and response workflow updates.",
+        )];
+
+        let decision = EpisodeFallbackStrategy.decide(&selected, &episodes, &query_terms());
+        assert_eq!(decision, FallbackDecision::UseRanked);
+    }
 }

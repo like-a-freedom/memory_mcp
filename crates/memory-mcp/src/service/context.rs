@@ -31,6 +31,7 @@ mod scoring;
 mod semantic;
 mod temporal;
 mod triple;
+mod types;
 mod views;
 
 use experience::{RecentExperienceRequest, append_recent_experience_items};

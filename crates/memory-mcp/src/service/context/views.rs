@@ -14,7 +14,7 @@ use crate::service::value_helpers::json_string;
 use super::filtering::{
     episode_record_allowed, fact_is_active_at, filter_facts_by_constraints, raw_object,
 };
-use super::ranking::RetrievalTier;
+use super::types::RetrievalTier;
 
 /// Parameters for building context items from episode fallback records.
 pub(crate) struct EpisodeFallbackParams<'a, F> {

@@ -562,9 +562,9 @@ mod tests {
     // -----------------------------------------------------------------------
 
     use crate::models::{AssembledContextItem, Fact};
-    use crate::service::context::ranking::{RankedContextFact, RetrievalTier};
     use crate::service::context::scoring::ranked_fact_to_item;
     use crate::service::context::scoring::selected_fact_matched_terms;
+    use crate::service::context::types::{RankedContextFact, RetrievalTier};
     use crate::service::decayed_confidence;
     use serde_json::json;
 

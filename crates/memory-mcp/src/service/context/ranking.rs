@@ -37,43 +37,10 @@ const MIN_QUERY_GROUNDING_RATIO: f64 = 0.25;
 const TWO_HOP_GRAPH_WEIGHT: f64 = 0.72;
 const DEEP_GRAPH_WEIGHT: f64 = 0.55;
 
-#[derive(Debug, Clone)]
-pub(crate) struct RankedContextFact {
-    pub(crate) fact: Fact,
-    pub(crate) rationale: String,
-    pub(crate) retrieval_tier: RetrievalTier,
-    pub(crate) fusion_score: f64,
-    pub(crate) source_priority: u8,
-    pub(crate) decayed_confidence: f64,
-    pub(crate) query_alignment_factor: f64,
-    pub(crate) grounding_score: f64,
-    pub(crate) semantic_available: bool,
-    pub(crate) matched_query_terms: Vec<String>,
-    pub(crate) graph_trace: Option<crate::service::context::graph::GraphTrace>,
-}
-
-impl RankedContextFact {
-    /// Merges scoring-related fields into self using element-wise `max`.
-    /// This is the common merge path used across all retrieval tiers.
-    fn merge_scoring_fields(
-        &mut self,
-        confidence: f64,
-        alignment: f64,
-        grounding: f64,
-        terms: &[String],
-    ) {
-        self.decayed_confidence = self.decayed_confidence.max(confidence);
-        self.query_alignment_factor = self.query_alignment_factor.max(alignment);
-        self.grounding_score = self.grounding_score.max(grounding);
-        merge_matched_query_terms(&mut self.matched_query_terms, terms);
-    }
-}
-
-fn merge_matched_query_terms(existing: &mut Vec<String>, incoming: &[String]) {
-    existing.extend(incoming.iter().cloned());
-    existing.sort();
-    existing.dedup();
-}
+// Shared candidate types live in `types` so collectors depend on types, not on
+// the ranker module (Card 7). Re-exported here for the ranking module's own use
+// and for any caller that historically imported through `ranking`.
+pub(crate) use super::types::{RankedContextFact, RetrievalTier};
 
 fn merge_graph_trace(
     existing: &mut Option<crate::service::context::graph::GraphTrace>,
@@ -94,40 +61,6 @@ fn merge_graph_trace(
 
     if should_replace {
         *existing = Some(incoming);
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RetrievalTier {
-    Direct,
-    AliasExpanded,
-    TemporalExpanded,
-    GraphExpanded,
-    SemanticExpanded,
-    EpisodeFallback,
-}
-
-impl RetrievalTier {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Direct => "direct",
-            Self::AliasExpanded => "alias",
-            Self::TemporalExpanded => "temporal",
-            Self::GraphExpanded => "graph",
-            Self::SemanticExpanded => "semantic",
-            Self::EpisodeFallback => "fallback",
-        }
-    }
-
-    pub(crate) fn precedence(self) -> u8 {
-        match self {
-            Self::Direct => 0,
-            Self::EpisodeFallback => 1,
-            Self::AliasExpanded => 2,
-            Self::TemporalExpanded => 3,
-            Self::GraphExpanded => 4,
-            Self::SemanticExpanded => 5,
-        }
     }
 }
 

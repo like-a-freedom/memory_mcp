@@ -16,7 +16,7 @@ use crate::storage::ContextFactQuery;
 use super::filtering::{
     fact_record_matches_project, fact_record_matches_type, raw_array, raw_object,
 };
-use super::ranking::RetrievalTier;
+use super::types::RetrievalTier;
 
 #[derive(Debug)]
 pub(crate) struct LexicalQueryResult {

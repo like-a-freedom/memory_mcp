@@ -3,8 +3,9 @@ use crate::models::AssembledContextItem;
 use super::filtering;
 use super::lexical;
 use super::params::DefaultContextParams;
-use super::ranking::{RankedContextFact, RetrievalTier, default_episode_fallback_rationale};
+use super::ranking::default_episode_fallback_rationale;
 use super::scoring::selected_fact_query_term_coverage;
+use super::types::{RankedContextFact, RetrievalTier};
 use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 
@@ -121,7 +122,7 @@ pub(super) async fn collect_episode_fallback_items(
 mod tests {
     use super::*;
     use crate::models::Fact;
-    use crate::service::context::ranking::{RankedContextFact, RetrievalTier};
+    use crate::service::context::types::{RankedContextFact, RetrievalTier};
 
     fn make_fact(content: &str) -> Fact {
         Fact {
