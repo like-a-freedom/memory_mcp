@@ -1,6 +1,6 @@
 # Capability Seam Completion Plan
 
-> Status: Proposed (2026-07-23)
+> Status: ✅ Executed (2026-08-03) via Card 6 of `2026-08-01-architecture-hardening-round-2.md` — capabilities are now `pub`, all consumers call capability structs directly, and the `MemoryService` delegates are removed.
 > Related: ADR-0016 AD-2 (frozen public surface)
 > Audit candidate: 1 (finish the capability seam)
 

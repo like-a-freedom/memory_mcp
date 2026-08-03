@@ -1,6 +1,6 @@
 # Context Module Test Relocation Plan
 
-> Status: Proposed (2026-07-23)
+> Status: ✅ Executed (2026-08-03) — tier-local tests relocated to their tier files; only cross-tier `assemble_context` integration tests remain in `context.rs` (per this plan's Step 1 rule). Final touch-ups landed via Card 7 of `2026-08-01-architecture-hardening-round-2.md`.
 > Audit candidate: 3 (deepen `context.rs`)
 
 ## Context
