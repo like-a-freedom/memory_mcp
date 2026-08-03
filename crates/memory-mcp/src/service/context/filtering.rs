@@ -72,9 +72,6 @@ pub(crate) fn filter_facts_by_constraints(
     facts
 }
 
-// TODO(adr-0027): wire into selective-recall or delete — production-only caller
-// is missing; only `filtering::tests` exercise this helper.
-#[allow(dead_code)]
 pub(crate) fn fact_record_allowed(
     record: &Value,
     access: &AccessPayload,
