@@ -618,6 +618,7 @@ mod tests {
                 Ok(vec![])
             }
 
+            #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
                 _namespace: &str,
@@ -625,6 +626,8 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
+                _fact_types: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -849,6 +852,7 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -911,6 +915,7 @@ mod tests {
                 Ok(vec![])
             }
 
+            #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
                 _namespace: &str,
@@ -918,6 +923,8 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
+                _fact_types: &[String],
             ) -> Result<Vec<serde_json::Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1117,6 +1124,7 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
             ) -> Result<Vec<serde_json::Value>, MemoryError> {
                 Ok(vec![])
             }

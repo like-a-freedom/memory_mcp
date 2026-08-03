@@ -134,17 +134,8 @@ pub fn build_update_query(
     }
 }
 
-pub fn build_select_facts_filtered_query(
-    scope: &str,
-    cutoff: &str,
-    query_contains: Option<&str>,
-    limit: i32,
-) -> (String, Value) {
-    build_select_facts_filtered_advanced_query(scope, cutoff, query_contains, limit, None, &[])
-}
-
 #[allow(clippy::too_many_arguments)]
-pub fn build_select_facts_filtered_advanced_query(
+pub fn build_select_facts_filtered_query(
     scope: &str,
     cutoff: &str,
     query_contains: Option<&str>,
@@ -333,15 +324,6 @@ pub fn build_select_episodes_by_content_query(
     cutoff: &str,
     query_contains: Option<&str>,
     limit: i32,
-) -> (String, Value) {
-    build_select_episodes_by_content_advanced_query(scope, cutoff, query_contains, limit, None)
-}
-
-pub fn build_select_episodes_by_content_advanced_query(
-    scope: &str,
-    cutoff: &str,
-    query_contains: Option<&str>,
-    limit: i32,
     project: Option<&str>,
 ) -> (String, Value) {
     let mut where_clauses = vec![
@@ -373,55 +355,6 @@ pub fn build_select_episodes_by_content_advanced_query(
     };
 
     (sql, Value::Object(vars))
-}
-
-pub fn filter_records_by_project_and_fact_types(
-    records: Vec<Value>,
-    project: Option<&str>,
-    fact_types: &[String],
-) -> Vec<Value> {
-    records
-        .into_iter()
-        .filter(|record| record_matches_project(record, project))
-        .filter(|record| record_matches_fact_type(record, fact_types))
-        .collect()
-}
-
-pub fn filter_records_by_project(records: Vec<Value>, project: Option<&str>) -> Vec<Value> {
-    records
-        .into_iter()
-        .filter(|record| record_matches_project(record, project))
-        .collect()
-}
-
-fn record_matches_project(record: &Value, project: Option<&str>) -> bool {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return true;
-    };
-
-    record_object(record)
-        .and_then(|map| map.get("project"))
-        .and_then(crate::service::value_helpers::json_string)
-        .is_some_and(|value| value == project)
-}
-
-fn record_matches_fact_type(record: &Value, fact_types: &[String]) -> bool {
-    if fact_types.is_empty() {
-        return true;
-    }
-
-    record_object(record)
-        .and_then(|map| map.get("fact_type"))
-        .and_then(crate::service::value_helpers::json_string)
-        .is_some_and(|value| fact_types.iter().any(|fact_type| fact_type == value))
-}
-
-fn record_object(record: &Value) -> Option<&serde_json::Map<String, Value>> {
-    if let Some(map) = record.as_object() {
-        Some(map)
-    } else {
-        record.get("Object").and_then(Value::as_object)
-    }
 }
 
 pub fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {

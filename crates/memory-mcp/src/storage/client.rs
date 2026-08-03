@@ -34,12 +34,10 @@ use super::queries::{
     build_select_communities_matching_summary_query, build_select_edge_neighbors_query,
     build_select_edges_filtered_page_query, build_select_edges_filtered_query,
     build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
-    build_select_episodes_by_content_advanced_query, build_select_episodes_by_content_query,
-    build_select_episodes_for_archival_query, build_select_facts_ann_query,
-    build_select_facts_by_entity_links_query, build_select_facts_by_triple_query,
-    build_select_facts_filtered_advanced_query, build_select_facts_filtered_query,
+    build_select_episodes_by_content_query, build_select_episodes_for_archival_query,
+    build_select_facts_ann_query, build_select_facts_by_entity_links_query,
+    build_select_facts_by_triple_query, build_select_facts_filtered_query,
     build_select_facts_needing_reembed_query, build_select_one_query, build_update_query,
-    filter_records_by_project, filter_records_by_project_and_fact_types,
 };
 use super::types::GraphDirection;
 
@@ -56,19 +54,9 @@ pub trait DbClient: Send + Sync {
     /// Selects all records from a table.
     async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects facts with DB-side filtering for bi-temporal queries.
-    async fn select_facts_filtered(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        query_contains: Option<&str>,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects facts with optional project and fact-type filters.
+    /// Selects facts with DB-side filtering for bi-temporal, project, and fact-type queries.
     #[allow(clippy::too_many_arguments)]
-    async fn select_facts_filtered_advanced(
+    async fn select_facts_filtered(
         &self,
         namespace: &str,
         scope: &str,
@@ -77,14 +65,7 @@ pub trait DbClient: Send + Sync {
         limit: i32,
         project: Option<&str>,
         fact_types: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        let records = self
-            .select_facts_filtered(namespace, scope, cutoff, query_contains, limit)
-            .await?;
-        Ok(filter_records_by_project_and_fact_types(
-            records, project, fact_types,
-        ))
-    }
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects facts that mention any of the supplied entity links using DB-side filtering.
     async fn select_facts_by_entity_links(
@@ -250,7 +231,7 @@ pub trait DbClient: Send + Sync {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError>;
 
-    /// Selects episodes whose raw content matches the supplied query.
+    /// Selects episodes whose raw content matches the supplied query, with an optional project filter.
     ///
     /// Used as a last-resort retrieval fallback for freshly ingested content
     /// that has not yet produced searchable facts.
@@ -261,23 +242,8 @@ pub trait DbClient: Send + Sync {
         cutoff: &str,
         query_contains: Option<&str>,
         limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects episodes whose raw content matches the supplied query with an optional project filter.
-    async fn select_episodes_by_content_advanced(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        query_contains: Option<&str>,
-        limit: i32,
         project: Option<&str>,
-    ) -> Result<Vec<Value>, MemoryError> {
-        let records = self
-            .select_episodes_by_content(namespace, scope, cutoff, query_contains, limit)
-            .await?;
-        Ok(filter_records_by_project(records, project))
-    }
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects communities whose summaries match the supplied query using DB-side search.
     async fn select_communities_matching_summary(
@@ -1035,49 +1001,8 @@ impl DbClient for SurrealDbClient {
         Ok(results)
     }
 
-    async fn select_facts_filtered(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        query_contains: Option<&str>,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_facts_filtered",
-            vec![
-                ("scope", Value::String(scope.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-            ],
-        );
-
-        let (sql, vars) = build_select_facts_filtered_query(scope, cutoff, query_contains, limit);
-
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_facts_filtered.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
     #[allow(clippy::too_many_arguments)]
-    async fn select_facts_filtered_advanced(
+    async fn select_facts_filtered(
         &self,
         namespace: &str,
         scope: &str,
@@ -1088,7 +1013,7 @@ impl DbClient for SurrealDbClient {
         fact_types: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         self.log_op(
-            "db.select_facts_filtered_advanced",
+            "db.select_facts_filtered",
             vec![
                 ("scope", Value::String(scope.to_string())),
                 ("cutoff", Value::String(cutoff.to_string())),
@@ -1102,7 +1027,7 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_select_facts_filtered_advanced_query(
+        let (sql, vars) = build_select_facts_filtered_query(
             scope,
             cutoff,
             query_contains,
@@ -1122,7 +1047,7 @@ impl DbClient for SurrealDbClient {
         let results = extract_records(normalized);
 
         self.log_op(
-            "db.select_facts_filtered_advanced.result",
+            "db.select_facts_filtered.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),
@@ -1785,6 +1710,7 @@ impl DbClient for SurrealDbClient {
         cutoff: &str,
         query_contains: Option<&str>,
         limit: i32,
+        project: Option<&str>,
     ) -> Result<Vec<Value>, MemoryError> {
         self.log_op(
             "db.select_episodes_by_content",
@@ -1793,11 +1719,12 @@ impl DbClient for SurrealDbClient {
                 ("scope", Value::String(scope.to_string())),
                 ("cutoff", Value::String(cutoff.to_string())),
                 ("limit", Value::Number(serde_json::Number::from(limit))),
+                ("project", json!(project)),
             ],
         );
 
         let (sql, vars) =
-            build_select_episodes_by_content_query(scope, cutoff, query_contains, limit);
+            build_select_episodes_by_content_query(scope, cutoff, query_contains, limit, project);
         let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
@@ -1810,54 +1737,6 @@ impl DbClient for SurrealDbClient {
 
         self.log_op(
             "db.select_episodes_by_content.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_episodes_by_content_advanced(
-        &self,
-        namespace: &str,
-        scope: &str,
-        cutoff: &str,
-        query_contains: Option<&str>,
-        limit: i32,
-        project: Option<&str>,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_episodes_by_content_advanced",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("scope", Value::String(scope.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-                ("project", json!(project)),
-            ],
-        );
-
-        let (sql, vars) = build_select_episodes_by_content_advanced_query(
-            scope,
-            cutoff,
-            query_contains,
-            limit,
-            project,
-        );
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_episodes_by_content_advanced.result",
             vec![(
                 "count",
                 Value::Number(serde_json::Number::from(results.len())),

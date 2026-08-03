@@ -332,6 +332,7 @@ impl DbClient for MockDbClient {
         Ok(vec![])
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn select_facts_filtered(
         &self,
         _namespace: &str,
@@ -339,6 +340,8 @@ impl DbClient for MockDbClient {
         _cutoff: &str,
         query_contains: Option<&str>,
         _limit: i32,
+        _project: Option<&str>,
+        _fact_types: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         let key = format!("{}/{}", scope, query_contains.unwrap_or(""));
         if let Some(resp) = self
@@ -541,6 +544,7 @@ impl DbClient for MockDbClient {
         _cutoff: &str,
         _query_contains: Option<&str>,
         _limit: i32,
+        _project: Option<&str>,
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self
             .fallback_episodes_by_content

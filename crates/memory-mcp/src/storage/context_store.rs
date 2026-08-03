@@ -25,8 +25,8 @@ impl ContextStoreClient {
         Self { db }
     }
 
-    /// Facts matching a query at query-time with bi-temporal and scope filters.
-    pub async fn select_facts_filtered_advanced(
+    /// Facts matching a query at query-time with bi-temporal, scope, project, and fact-type filters.
+    pub async fn select_facts_filtered(
         &self,
         query: ContextFactQuery<'_>,
     ) -> Result<Vec<Value>, MemoryError> {
@@ -40,7 +40,7 @@ impl ContextStoreClient {
             fact_types,
         } = query;
         self.db
-            .select_facts_filtered_advanced(
+            .select_facts_filtered(
                 namespace,
                 scope,
                 cutoff,
@@ -139,7 +139,7 @@ impl ContextStoreClient {
     }
 
     /// Episode contents matching a query, bi-temporally scoped.
-    pub async fn select_episodes_by_content_advanced(
+    pub async fn select_episodes_by_content(
         &self,
         namespace: &str,
         scope: &str,
@@ -149,7 +149,7 @@ impl ContextStoreClient {
         project: Option<&str>,
     ) -> Result<Vec<Value>, MemoryError> {
         self.db
-            .select_episodes_by_content_advanced(namespace, scope, cutoff, query, limit, project)
+            .select_episodes_by_content(namespace, scope, cutoff, query, limit, project)
             .await
     }
 

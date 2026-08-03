@@ -531,7 +531,7 @@ pub(crate) async fn collect_temporal_facts(
         for temporal_query in temporal_group {
             let records = service
                 .context_store()
-                .select_facts_filtered_advanced(ContextFactQuery {
+                .select_facts_filtered(ContextFactQuery {
                     namespace: request.namespace,
                     scope: request.scope,
                     cutoff: request.cutoff_iso,

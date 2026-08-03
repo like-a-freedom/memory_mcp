@@ -43,7 +43,7 @@ pub(crate) async fn select_fact_records_for_query(
 
     let initial = service
         .context_store()
-        .select_facts_filtered_advanced(ContextFactQuery {
+        .select_facts_filtered(ContextFactQuery {
             namespace: params.namespace,
             scope: params.scope,
             cutoff: params.cutoff_iso,
@@ -69,7 +69,7 @@ pub(crate) async fn select_fact_records_for_query(
     for term in &fallback_terms {
         let term_records = service
             .context_store()
-            .select_facts_filtered_advanced(ContextFactQuery {
+            .select_facts_filtered(ContextFactQuery {
                 namespace: params.namespace,
                 scope: params.scope,
                 cutoff: params.cutoff_iso,
@@ -809,9 +809,7 @@ pub(crate) async fn select_episode_records_for_query(
 ) -> Result<Vec<Value>, MemoryError> {
     let initial = service
         .context_store()
-        .select_episodes_by_content_advanced(
-            namespace, scope, cutoff_iso, query_opt, limit, project,
-        )
+        .select_episodes_by_content(namespace, scope, cutoff_iso, query_opt, limit, project)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
@@ -833,7 +831,7 @@ pub(crate) async fn select_episode_records_for_query(
     for term in fallback_terms {
         let term_records = service
             .context_store()
-            .select_episodes_by_content_advanced(
+            .select_episodes_by_content(
                 namespace,
                 scope,
                 cutoff_iso,
@@ -1163,6 +1161,7 @@ mod tests {
                 Ok(vec![])
             }
 
+            #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
                 _namespace: &str,
@@ -1170,6 +1169,8 @@ mod tests {
                 _cutoff: &str,
                 query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
+                _fact_types: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(match query_contains {
                     Some("atlas launch checklist") => vec![],
@@ -1424,6 +1425,7 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1491,6 +1493,7 @@ mod tests {
                 Ok(vec![])
             }
 
+            #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
                 _namespace: &str,
@@ -1498,6 +1501,8 @@ mod tests {
                 _cutoff: &str,
                 query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
+                _fact_types: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(match query_contains {
                     Some("lgbtq support group") => vec![json!({
@@ -1742,6 +1747,7 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1802,6 +1808,7 @@ mod tests {
                 Ok(vec![])
             }
 
+            #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
                 _namespace: &str,
@@ -1809,6 +1816,8 @@ mod tests {
                 _cutoff: &str,
                 query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
+                _fact_types: &[String],
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(match query_contains {
                     Some("What degree did I graduate with?") => vec![],
@@ -2056,6 +2065,7 @@ mod tests {
                 _cutoff: &str,
                 _query_contains: Option<&str>,
                 _limit: i32,
+                _project: Option<&str>,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
