@@ -138,9 +138,17 @@ impl ContextStoreClient {
         namespace: &str,
         normalized_names: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_entities_batch(namespace, normalized_names)
-            .await
+        if normalized_names.is_empty() {
+            return Ok(Vec::new());
+        }
+        let sql = "SELECT * FROM entity WHERE canonical_name_normalized IN $names \
+                   OR aliases CONTAINSANY $names";
+        let vars = json!({ "names": normalized_names });
+        match self.db.query(sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Communities whose summary matches a free-text hint.
@@ -184,7 +192,15 @@ impl ContextStoreClient {
         namespace: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_active_facts(namespace, limit).await
+        let (sql, vars) = crate::storage::queries::build_select_active_facts_query(
+            &crate::service::normalize_dt(crate::service::now()),
+            limit,
+        );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 }
 

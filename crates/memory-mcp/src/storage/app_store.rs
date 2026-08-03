@@ -81,7 +81,15 @@ impl AppStoreClient {
         namespace: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_active_facts(namespace, limit).await
+        let (sql, vars) = crate::storage::queries::build_select_active_facts_query(
+            &crate::service::normalize_dt(crate::service::now()),
+            limit,
+        );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn select_episodes_for_archival(

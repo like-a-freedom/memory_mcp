@@ -1280,14 +1280,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_by_member_entities(
                 &self,
                 _namespace: &str,
@@ -1340,14 +1332,6 @@ mod tests {
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
@@ -1537,14 +1521,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_by_member_entities(
                 &self,
                 _namespace: &str,
@@ -1597,14 +1573,6 @@ mod tests {
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
@@ -1790,14 +1758,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_entities_batch(
-                &self,
-                _namespace: &str,
-                _names: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_by_member_entities(
                 &self,
                 _namespace: &str,
@@ -1850,14 +1810,6 @@ mod tests {
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
-            }
-
-            async fn select_active_facts(
-                &self,
-                _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {

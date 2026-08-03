@@ -427,22 +427,6 @@ mod tests {
             Ok(None)
         }
 
-        async fn select_entities_batch(
-            &self,
-            _namespace: &str,
-            _names: &[String],
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
-
-        async fn select_active_facts(
-            &self,
-            _namespace: &str,
-            _limit: i32,
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
-
         async fn select_communities_matching_summary(
             &self,
             _namespace: &str,

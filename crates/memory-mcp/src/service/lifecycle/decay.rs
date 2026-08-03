@@ -85,7 +85,7 @@ pub async fn run_decay_pass(
 
     for namespace in &service.namespaces {
         let facts = service
-            .db_client
+            .app_store()
             .select_active_facts(namespace, DECAY_BATCH_LIMIT)
             .await?;
 

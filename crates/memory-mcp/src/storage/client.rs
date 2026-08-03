@@ -29,7 +29,7 @@ use super::migrations::{
 };
 use super::queries::{
     active_edge_scan_limit, build_create_query, build_relate_edge_query,
-    build_select_active_facts_query, build_select_communities_by_member_entities_query,
+    build_select_communities_by_member_entities_query,
     build_select_communities_matching_summary_query, build_select_edge_neighbors_query,
     build_select_edges_filtered_page_query, build_select_edges_filtered_query,
     build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
@@ -135,27 +135,6 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError>;
-
-    /// Batch entity lookup by multiple normalized names (alias-resolution hot path).
-    ///
-    /// Returns all entities whose `canonical_name_normalized` matches any
-    /// of the supplied names, or whose `aliases` contain any of them.
-    /// Deduplicates by entity_id.
-    async fn select_entities_batch(
-        &self,
-        namespace: &str,
-        normalized_names: &[String],
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects active (non-invalidated) facts with an optional limit.
-    ///
-    /// Returns facts where `t_invalid IS NULL`, ordered by `t_valid ASC`.
-    /// This avoids full table scans in lifecycle workers.
-    async fn select_active_facts(
-        &self,
-        namespace: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Selects episodes whose raw content matches the supplied query, with an optional project filter.
     ///
@@ -1272,86 +1251,6 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(result)
-    }
-
-    async fn select_entities_batch(
-        &self,
-        namespace: &str,
-        names: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        if names.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        self.log_op(
-            "db.select_entities_batch",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                (
-                    "names_count",
-                    Value::Number(serde_json::Number::from(names.len())),
-                ),
-            ],
-        );
-
-        let sql = "SELECT * FROM entity WHERE canonical_name_normalized IN $names OR aliases CONTAINSANY $names";
-        let vars = json!({"names": names});
-
-        let surreal_val = match self.execute_query(sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_entities_batch.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_active_facts(
-        &self,
-        namespace: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_active_facts",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-            ],
-        );
-
-        let cutoff = crate::service::normalize_dt(crate::service::now());
-        let (sql, vars) = build_select_active_facts_query(&cutoff, limit);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_active_facts.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
     }
 
     async fn select_episodes_by_content(

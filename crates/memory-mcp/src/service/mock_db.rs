@@ -36,7 +36,6 @@ pub struct MockDbClient {
     facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     entity_lookup_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
-    active_facts_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     communities_by_members_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     communities_matching_summary_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
@@ -56,8 +55,6 @@ pub struct MockDbClient {
     fallback_facts_by_entity_links: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_ann: Mutex<Option<Box<SelectTableFn>>>,
     fallback_entity_lookup: Mutex<Option<Box<SelectOneFn>>>,
-    fallback_entities_batch: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_active_facts: Mutex<Option<Box<SelectTableFn>>>,
     fallback_episodes_by_content: Mutex<Option<Box<SelectTableFn>>>,
 }
 
@@ -70,7 +67,6 @@ impl MockDbClient {
             facts_entity_links_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             entity_lookup_responses: Mutex::new(HashMap::new()),
-            active_facts_responses: Mutex::new(HashMap::new()),
             episodes_by_content_responses: Mutex::new(HashMap::new()),
             communities_by_members_responses: Mutex::new(HashMap::new()),
             communities_matching_summary_responses: Mutex::new(HashMap::new()),
@@ -90,8 +86,6 @@ impl MockDbClient {
             fallback_facts_by_entity_links: Mutex::new(None),
             fallback_facts_ann: Mutex::new(None),
             fallback_entity_lookup: Mutex::new(None),
-            fallback_entities_batch: Mutex::new(None),
-            fallback_active_facts: Mutex::new(None),
             fallback_episodes_by_content: Mutex::new(None),
         }
     }
@@ -230,14 +224,6 @@ impl MockDbClient {
 
     pub fn expect_facts_by_entity_links(self, key: &str, rows: Vec<Value>) -> Self {
         self.facts_entity_links_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(key.to_string(), Ok(rows));
-        self
-    }
-
-    pub fn expect_active_facts(self, key: &str, rows: Vec<Value>) -> Self {
-        self.active_facts_responses
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .insert(key.to_string(), Ok(rows));
@@ -466,36 +452,6 @@ impl DbClient for MockDbClient {
             return f(normalized_name);
         }
         Ok(None)
-    }
-
-    async fn select_entities_batch(
-        &self,
-        _namespace: &str,
-        _names: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_entities_batch
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_active_facts(
-        &self,
-        _namespace: &str,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_active_facts
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
     }
 
     async fn select_episodes_by_content(
