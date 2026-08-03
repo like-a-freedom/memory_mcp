@@ -35,7 +35,6 @@ pub struct MockDbClient {
     facts_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     facts_entity_links_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    episodes_by_content_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     query_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
@@ -50,7 +49,6 @@ pub struct MockDbClient {
     fallback_facts_filtered: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_by_entity_links: Mutex<Option<Box<SelectTableFn>>>,
     fallback_facts_ann: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_episodes_by_content: Mutex<Option<Box<SelectTableFn>>>,
 }
 
 impl MockDbClient {
@@ -61,7 +59,6 @@ impl MockDbClient {
             facts_filtered_responses: Mutex::new(HashMap::new()),
             facts_entity_links_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
-            episodes_by_content_responses: Mutex::new(HashMap::new()),
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
             query_responses: Mutex::new(HashMap::new()),
@@ -76,7 +73,6 @@ impl MockDbClient {
             fallback_facts_filtered: Mutex::new(None),
             fallback_facts_by_entity_links: Mutex::new(None),
             fallback_facts_ann: Mutex::new(None),
-            fallback_episodes_by_content: Mutex::new(None),
         }
     }
 
@@ -198,14 +194,6 @@ impl MockDbClient {
 
     pub fn expect_facts_by_entity_links(self, key: &str, rows: Vec<Value>) -> Self {
         self.facts_entity_links_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(key.to_string(), Ok(rows));
-        self
-    }
-
-    pub fn expect_episodes_by_content(self, key: &str, rows: Vec<Value>) -> Self {
-        self.episodes_by_content_responses
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .insert(key.to_string(), Ok(rows));
@@ -384,25 +372,6 @@ impl DbClient for MockDbClient {
             .unwrap_or_else(|p| p.into_inner())
         {
             return f(node_id, _direction);
-        }
-        Ok(vec![])
-    }
-
-    async fn select_episodes_by_content(
-        &self,
-        _namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        _query_contains: Option<&str>,
-        _limit: i32,
-        _project: Option<&str>,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_episodes_by_content
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
         }
         Ok(vec![])
     }

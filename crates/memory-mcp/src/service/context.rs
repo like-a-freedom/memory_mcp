@@ -520,18 +520,6 @@ mod tests {
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
         }
 
         let service = crate::service::MemoryService::new(
@@ -643,31 +631,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("hello world") => vec![json!({
-                        "episode_id": "episode:doc",
-                        "source_type": "document",
-                        "source_id": "fixture:pdf",
-                        "content": "Hello World from episode fallback.",
-                        "t_ref": "2026-04-07T10:00:00Z",
-                        "t_ingested": "2026-04-07T10:00:00Z",
-                        "scope": "org",
-                        "visibility_scope": "org",
-                        "policy_tags": [],
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -688,10 +651,28 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the episode-content fallback through
+                // the core `query` op; serve the canned episode here.
+                if sql.contains("FROM episode") {
+                    if let Some(vars) = vars {
+                        assert_eq!(vars["query"], json!("hello world"));
+                    }
+                    return Ok(json!([{
+                        "episode_id": "episode:doc",
+                        "source_type": "document",
+                        "source_id": "fixture:pdf",
+                        "content": "Hello World from episode fallback.",
+                        "t_ref": "2026-04-07T10:00:00Z",
+                        "t_ingested": "2026-04-07T10:00:00Z",
+                        "scope": "org",
+                        "visibility_scope": "org",
+                        "policy_tags": [],
+                    }]));
+                }
                 Ok(Value::Null)
             }
 
@@ -893,18 +874,6 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
-            }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
         }
 
@@ -1120,18 +1089,6 @@ mod tests {
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
         }
 
         let service = crate::service::MemoryService::new(
@@ -1335,18 +1292,6 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
-            }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
         }
 
@@ -1565,18 +1510,6 @@ mod tests {
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
         }
 
         let service = crate::service::MemoryService::new(
@@ -1734,18 +1667,6 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
-            }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
         }
 
@@ -1912,18 +1833,6 @@ mod tests {
 
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
-            }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
         }
 

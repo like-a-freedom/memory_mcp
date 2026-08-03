@@ -186,9 +186,14 @@ impl ContextStoreClient {
         limit: i32,
         project: Option<&str>,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_episodes_by_content(namespace, scope, cutoff, query, limit, project)
-            .await
+        let (sql, vars) = crate::storage::queries::build_select_episodes_by_content_query(
+            scope, cutoff, query, limit, project,
+        );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Active (not-yet-invalidated) facts for a namespace.

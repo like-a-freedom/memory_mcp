@@ -808,18 +808,6 @@ mod tests {
                 self.calls.safe_lock().push(namespace.to_string());
                 Ok(())
             }
-
-            async fn select_episodes_by_content(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
         }
 
         let db_client = Arc::new(StartupMigrationDbClient {

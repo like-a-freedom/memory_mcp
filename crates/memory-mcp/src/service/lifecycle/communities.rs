@@ -449,18 +449,6 @@ mod tests {
         async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
             Ok(())
         }
-
-        async fn select_episodes_by_content(
-            &self,
-            _namespace: &str,
-            _scope: &str,
-            _cutoff: &str,
-            _query_contains: Option<&str>,
-            _limit: i32,
-            _project: Option<&str>,
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
     }
 
     fn edge(from_id: &str, to_id: &str) -> Value {
