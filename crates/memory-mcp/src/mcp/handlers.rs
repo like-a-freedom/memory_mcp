@@ -2,17 +2,16 @@
 
 use std::sync::Arc;
 
-use rmcp::handler::server::tool::ToolRouter;
+use rmcp::handler::server::tool::{ToolCallContext, ToolRouter};
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{
-    CallToolRequestParams, CancelTaskParams, CancelTaskResult, CreateTaskResult, GetTaskParams,
-    GetTaskPayloadParams, GetTaskPayloadResult, GetTaskResult, ListResourceTemplatesResult,
-    ListResourcesResult, ListTasksResult, PaginatedRequestParams, ReadResourceRequestParams,
-    ReadResourceResult, ServerCapabilities, ServerInfo, TasksCapability,
+    CallToolRequestParams, CallToolResponse, CallToolResult, CancelTaskParams, CreateTaskResult,
+    GetTaskParams, GetTaskResult, ListResourceTemplatesResult, ListResourcesResult,
+    PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse, ServerCapabilities,
+    ServerInfo, UpdateTaskParams,
 };
 use rmcp::service::RequestContext;
-
-type McpError = rmcp::ErrorData;
+use rmcp::task_manager::{TaskExit, TaskManager, TaskOptions};
 use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router};
 #[cfg(feature = "mcp-apps")]
 use serde_json::json;
@@ -36,10 +35,7 @@ use super::params::*;
 use super::resources::app_session_uri;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session::{self, SessionManager};
-use super::tasks::{
-    DEFAULT_TASK_POLL_INTERVAL_MS, DEFAULT_TASK_TTL_MS, TaskCancelState, TaskCreateError,
-    TaskOutcome, TaskPayloadState, TaskStore, add_related_task_metadata, related_task_metadata,
-};
+
 mod apps;
 
 /// MCP (Model Context Protocol) server handler for memory operations.
@@ -68,7 +64,7 @@ mod apps;
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
     session_manager: SessionManager,
-    task_store: Arc<tokio::sync::Mutex<TaskStore>>,
+    tasks: TaskManager,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -84,7 +80,7 @@ impl MemoryMcp {
         Self {
             service: Arc::new(service),
             session_manager: SessionManager::new(),
-            task_store: Arc::new(tokio::sync::Mutex::new(TaskStore::default())),
+            tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
         }
     }
@@ -108,7 +104,7 @@ impl MemoryMcp {
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
-                .enable_tasks_with(TasksCapability::server_default())
+                .enable_tasks()
                 .build(),
         )
         .with_instructions(Self::SERVER_INSTRUCTIONS)
@@ -127,164 +123,91 @@ impl MemoryMcp {
     }
 }
 
+async fn extract_response(
+    service: Arc<MemoryService>,
+    params: ExtractParams,
+) -> Result<ToolResponse<ExtractResult>, ErrorData> {
+    crate::tools::extract(&service.build_context(), params)
+        .await
+        .map_err(mcp_error)
+}
+
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for MemoryMcp {
     fn get_info(&self) -> ServerInfo {
         Self::build_server_info()
     }
 
-    async fn enqueue_task(
+    async fn call_tool(
         &self,
-        mut request: CallToolRequestParams,
+        request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
-    ) -> Result<CreateTaskResult, McpError> {
-        let task_id = format!("task_{}", crate::tools::request_id::next_request_id());
-        let requested_ttl = request.task.as_ref().and_then(|metadata| metadata.ttl);
-        request.task = None;
+    ) -> Result<CallToolResponse, ErrorData> {
+        let client_supports_tasks = context
+            .client_capabilities()
+            .is_some_and(|caps| caps.supports_tasks());
 
-        let task = self
-            .task_store
-            .lock()
-            .await
-            .create(task_id.clone(), requested_ttl)
-            .map_err(|error| match error {
-                TaskCreateError::ActiveCapacity => {
-                    Self::internal_error("too many active MCP tasks; retry later")
-                }
-                TaskCreateError::RetainedCapacity => {
-                    Self::internal_error("MCP task result capacity exhausted; retry later")
-                }
+        if request.name == "extract" && client_supports_tasks {
+            let params: ExtractParams = serde_json::from_value(serde_json::Value::Object(
+                request.arguments.clone().unwrap_or_default(),
+            ))
+            .map_err(|error| {
+                ErrorData::invalid_params(
+                    format!("failed to deserialize parameters: {error}"),
+                    None,
+                )
             })?;
-        let ttl = task.ttl.unwrap_or(DEFAULT_TASK_TTL_MS);
-        let server = self.clone();
-        let worker_task_id = task_id.clone();
-        let worker = tokio::spawn(async move {
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(ttl),
-                server.call_tool(request, context),
-            )
-            .await
-            {
-                Ok(Ok(result)) => {
-                    let is_error = result.is_error.unwrap_or(false);
-                    match serde_json::to_value(result) {
-                        Ok(mut payload) => {
-                            if let Err(error) =
-                                add_related_task_metadata(&mut payload, &worker_task_id)
-                            {
-                                TaskOutcome::ProtocolError(McpError::internal_error(error, None))
-                            } else {
-                                TaskOutcome::ToolResult { payload, is_error }
+            let service = Arc::clone(&self.service);
+            let task = self.tasks.spawn(
+                TaskOptions::new().with_status_message("Task accepted"),
+                move |ctx| {
+                    Box::pin(async move {
+                        tokio::select! {
+                            _ = ctx.cancelled() => Err(TaskExit::Cancelled),
+                            result = extract_response(service, params) => {
+                                let response = result.map_err(TaskExit::Error)?;
+                                let structured = serde_json::to_value(response).map_err(|error| {
+                                    TaskExit::Error(ErrorData::internal_error(
+                                        format!("failed to serialize extract task result: {error}"),
+                                        None,
+                                    ))
+                                })?;
+                                Ok(CallToolResult::structured(structured))
                             }
                         }
-                        Err(error) => TaskOutcome::ProtocolError(McpError::internal_error(
-                            format!("failed to serialize task result: {error}"),
-                            None,
-                        )),
-                    }
-                }
-                Ok(Err(error)) => TaskOutcome::ProtocolError(error),
-                Err(_) => TaskOutcome::ProtocolError(McpError::internal_error(
-                    "task TTL elapsed before completion",
-                    None,
-                )),
-            }
-        });
-        let abort_handle = worker.abort_handle();
-        let store = self.task_store.clone();
-        let completion_id = task_id.clone();
-        tokio::spawn(async move {
-            let outcome = match worker.await {
-                Ok(outcome) => outcome,
-                Err(error) => TaskOutcome::ProtocolError(McpError::internal_error(
-                    format!("task worker terminated: {error}"),
-                    None,
-                )),
-            };
-            store.lock().await.complete(&completion_id, outcome);
-        });
-        self.task_store
-            .lock()
-            .await
-            .attach_abort_handle(&task_id, abort_handle);
-
-        Ok(CreateTaskResult::new(task).with_meta(related_task_metadata(&task_id)))
-    }
-
-    async fn list_tasks(
-        &self,
-        request: Option<PaginatedRequestParams>,
-        _context: RequestContext<RoleServer>,
-    ) -> Result<ListTasksResult, McpError> {
-        if request.is_some_and(|params| params.cursor.is_some()) {
-            return Err(Self::invalid_params("unknown tasks/list cursor"));
+                    })
+                },
+            );
+            return Ok(CallToolResponse::Task(CreateTaskResult::new(task)));
         }
-        Ok(ListTasksResult::new(self.task_store.lock().await.list()))
+
+        let tcc = ToolCallContext::new(self, request, context);
+        self.tool_router.call(tcc).await
     }
 
-    async fn get_task_info(
+    async fn get_task(
         &self,
         request: GetTaskParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<GetTaskResult, McpError> {
-        self.task_store
-            .lock()
-            .await
-            .get(&request.task_id)
-            .map(GetTaskResult::new)
-            .ok_or_else(|| Self::invalid_params(format!("task not found: {}", request.task_id)))
+    ) -> Result<GetTaskResult, ErrorData> {
+        Ok(GetTaskResult::new(self.tasks.get_task(&request.task_id)?))
     }
 
-    async fn get_task_result(
+    async fn update_task(
         &self,
-        request: GetTaskPayloadParams,
+        request: UpdateTaskParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<GetTaskPayloadResult, McpError> {
-        loop {
-            let state = self.task_store.lock().await.payload(&request.task_id);
-            match state {
-                TaskPayloadState::Ready(payload) => {
-                    return Ok(GetTaskPayloadResult::new(payload));
-                }
-                TaskPayloadState::ProtocolError(error) => return Err(error),
-                TaskPayloadState::Pending => {
-                    tokio::time::sleep(std::time::Duration::from_millis(
-                        DEFAULT_TASK_POLL_INTERVAL_MS,
-                    ))
-                    .await;
-                }
-                TaskPayloadState::Unavailable(status) => {
-                    return Err(Self::invalid_params(format!(
-                        "task {} has no result in status {status:?}",
-                        request.task_id
-                    )));
-                }
-                TaskPayloadState::Missing => {
-                    return Err(Self::invalid_params(format!(
-                        "task not found: {}",
-                        request.task_id
-                    )));
-                }
-            }
-        }
+    ) -> Result<(), ErrorData> {
+        self.tasks
+            .update_task(&request.task_id, request.input_responses)
     }
 
     async fn cancel_task(
         &self,
         request: CancelTaskParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<CancelTaskResult, McpError> {
-        match self.task_store.lock().await.cancel(&request.task_id) {
-            TaskCancelState::Cancelled(task) => Ok(CancelTaskResult::new(task)),
-            TaskCancelState::NotCancellable(status) => Err(Self::invalid_params(format!(
-                "task {} cannot be cancelled in status {status:?}",
-                request.task_id
-            ))),
-            TaskCancelState::Missing => Err(Self::invalid_params(format!(
-                "task not found: {}",
-                request.task_id
-            ))),
-        }
+    ) -> Result<(), ErrorData> {
+        self.tasks.cancel_task(&request.task_id)
     }
 
     async fn list_resources(
@@ -294,11 +217,7 @@ impl ServerHandler for MemoryMcp {
     ) -> Result<ListResourcesResult, ErrorData> {
         #[cfg(not(feature = "mcp-apps"))]
         {
-            Ok(ListResourcesResult {
-                resources: Vec::new(),
-                meta: None,
-                next_cursor: None,
-            })
+            Ok(ListResourcesResult::with_all_items(Vec::new()))
         }
         #[cfg(feature = "mcp-apps")]
         {
@@ -313,11 +232,7 @@ impl ServerHandler for MemoryMcp {
     ) -> Result<ListResourceTemplatesResult, ErrorData> {
         #[cfg(not(feature = "mcp-apps"))]
         {
-            Ok(ListResourceTemplatesResult {
-                resource_templates: Vec::new(),
-                meta: None,
-                next_cursor: None,
-            })
+            Ok(ListResourceTemplatesResult::with_all_items(Vec::new()))
         }
         #[cfg(feature = "mcp-apps")]
         {
@@ -329,8 +244,8 @@ impl ServerHandler for MemoryMcp {
         &self,
         request: ReadResourceRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResult, ErrorData> {
-        self.read_resource_result(request).await
+    ) -> Result<ReadResourceResponse, ErrorData> {
+        self.read_resource_result(request).await.map(Into::into)
     }
 }
 
@@ -363,17 +278,15 @@ impl MemoryMcp {
     }
 
     #[tool(
-        execution(task_support = "optional"),
         description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `scope`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
     )]
     pub async fn extract(
         &self,
         params: Parameters<ExtractParams>,
     ) -> Result<Json<ToolResponse<ExtractResult>>, ErrorData> {
-        crate::tools::extract(&self.service.build_context(), params.0)
+        extract_response(Arc::clone(&self.service), params.0)
             .await
             .map(Json)
-            .map_err(mcp_error)
     }
 
     #[tool(
@@ -607,7 +520,9 @@ mod tests {
     use crate::models::EntityCandidate;
     #[cfg(feature = "mcp-apps")]
     use crate::models::IngestRequest;
+    #[cfg(feature = "mcp-apps")]
     use crate::service::capabilities::ingest::IngestCapability;
+    #[cfg(feature = "mcp-apps")]
     use crate::service::capabilities::resolve::ResolveCapability;
     use crate::service::edge_neighbor;
     use crate::storage::{DbClient, SurrealDbClient};
@@ -680,35 +595,18 @@ mod tests {
         assert!(capabilities.get("tools").is_some());
         assert!(capabilities.get("resources").is_some());
         assert!(
-            capabilities.get("tasks").is_some(),
-            "tasks capability missing: {}",
+            capabilities["extensions"]["io.modelcontextprotocol/tasks"].is_object(),
+            "tasks extension capability missing: {}",
             capabilities
         );
-        assert!(
-            capabilities["tasks"]["requests"]["tools"]["call"].is_object(),
-            "unexpected tasks structure: {}",
-            capabilities["tasks"]
-        );
+        assert!(capabilities.get("tasks").is_none());
     }
 
     #[tokio::test]
-    async fn only_extract_allows_task_execution() {
-        use rmcp::model::TaskSupport;
-
+    async fn tool_router_still_exposes_extract_and_non_task_tools() {
         let mcp = create_test_mcp().await;
-        let extract_tool = mcp.get_tool("extract").expect("extract tool must exist");
-        assert_eq!(extract_tool.task_support(), TaskSupport::Optional);
-
-        let ingest_tool = mcp.get_tool("ingest").expect("ingest tool must exist");
-        assert_eq!(ingest_tool.task_support(), TaskSupport::Forbidden);
-
-        let resolve_tool = mcp.get_tool("resolve").expect("resolve tool must exist");
-        assert_eq!(resolve_tool.task_support(), TaskSupport::Forbidden);
-
-        let invalidate_tool = mcp
-            .get_tool("invalidate")
-            .expect("invalidate tool must exist");
-        assert_eq!(invalidate_tool.task_support(), TaskSupport::Forbidden);
+        assert!(mcp.get_tool("extract").is_some());
+        assert!(mcp.get_tool("ingest").is_some());
     }
 
     #[test]

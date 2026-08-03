@@ -262,7 +262,13 @@ fn value_to_string(value: &Value) -> String {
     };
 
     if s.len() > MAX_LEN {
-        format!("{}...", &s[..s.floor_char_boundary(MAX_LEN - 3)])
+        let end = s
+            .char_indices()
+            .map(|(index, _)| index)
+            .take_while(|&index| index <= MAX_LEN - 3)
+            .last()
+            .unwrap_or(0);
+        format!("{}...", &s[..end])
     } else {
         s
     }

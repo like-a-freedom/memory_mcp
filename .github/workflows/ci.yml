@@ -39,6 +39,38 @@ jobs:
       - name: Run fmt check
         run: cargo fmt --all -- --check
 
+  metadata:
+    name: Cargo metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Validate locked metadata
+        run: cargo metadata --locked --no-deps
+
+  msrv:
+    name: Rust MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: 1.88
+          cache: true
+
+      - name: Check MSRV
+        run: cargo check --workspace --all-targets --locked
+
   clippy:
     name: Rust clippy
     runs-on: ubuntu-latest
@@ -90,7 +122,7 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: cargo test --workspace --lib --bins --tests
+        run: cargo test --workspace --lib --bins --tests --locked
 
   eval-pr:
     name: Evaluation PR profile
@@ -183,7 +215,7 @@ jobs:
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
-    needs: [fmt, clippy, clippy_macos, test]
+    needs: [fmt, metadata, clippy, clippy_macos, test, msrv]
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60
     permissions:

@@ -69,20 +69,12 @@ pub(super) fn summarize_ingestion_review_items(items: &[Value]) -> Value {
 impl MemoryMcp {
     #[cfg(feature = "mcp-apps")]
     pub(super) fn list_resources_result() -> ListResourcesResult {
-        ListResourcesResult {
-            resources: app_catalog_resources(),
-            meta: None,
-            next_cursor: None,
-        }
+        ListResourcesResult::with_all_items(app_catalog_resources())
     }
 
     #[cfg(feature = "mcp-apps")]
     pub(super) fn list_resource_templates_result() -> ListResourceTemplatesResult {
-        ListResourceTemplatesResult {
-            resource_templates: app_resource_templates(),
-            meta: None,
-            next_cursor: None,
-        }
+        ListResourceTemplatesResult::with_all_items(app_resource_templates())
     }
 
     pub(super) fn normalize_public_app_name(app: &str) -> Option<&'static str> {

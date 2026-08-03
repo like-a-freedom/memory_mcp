@@ -741,12 +741,19 @@ and the Criterion reproduction contract.
 
 ### MCP Tasks (optional)
 
-The server advertises MCP Tasks capability (`extract` is task-optional). Task-capable
-clients add task metadata to the ordinary `tools/call` request for `extract`, then poll
-`tasks/get` and retrieve the payload through `tasks/result`; `tasks/list` and
-`tasks/cancel` are also supported. Legacy clients continue to call `extract`
-synchronously with no changes required. The server bounds task retention to 64 active
-and 1024 retained tasks, with an accepted TTL of 1 second to 1 hour.
+The server advertises the official `io.modelcontextprotocol/tasks` extension.
+`extract` is the only task-capable tool. A client that advertises the extension
+calls `extract` through ordinary `tools/call` and receives a task handle with
+`taskId`, `status`, timestamps, TTL, and a suggested polling interval at the
+result level. Poll `tasks/get` until the task is terminal; completed payloads are
+embedded in the detailed task’s `result` field and failed payloads in its `error`
+field. `tasks/update` is available for input responses and `tasks/cancel` requests
+cooperative cancellation. Task listing and a separate terminal-result request are
+not part of this extension contract.
+
+Clients that do not advertise `io.modelcontextprotocol/tasks` continue to receive
+synchronous `extract` results. rmcp’s `TaskManager` supplies the default five-minute
+TTL, polling metadata, lifecycle, and retention behavior.
 
 CPU is the production default. Metal remains an experimental, explicit opt-in until its
 candidate parity, latency, contention, and memory gates are recorded for the deployment

@@ -62,15 +62,20 @@ impl ReembedStoreClient {
         last_completed_fact_id: Option<&str>,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        let cursor_clause = if last_completed_fact_id.is_some() {
-            " AND fact_id > $last_completed_fact_id"
+        let sql = if last_completed_fact_id.is_some() {
+            // SurrealDB 3.0 can incorrectly eliminate rows when the cursor
+            // comparison and the stale-signature OR predicate are combined in
+            // one WHERE clause. Filtering the stale set in a subquery keeps
+            // cursor pagination correct on the MSRV-compatible database.
+            "SELECT * FROM (SELECT * FROM fact WHERE embedding_signature IS NONE \
+             OR embedding_signature IS NULL OR embedding_signature != $target_signature) \
+             WHERE fact_id > $last_completed_fact_id ORDER BY fact_id ASC LIMIT $limit"
+                .to_string()
         } else {
-            ""
-        };
-        let sql = format!(
             "SELECT * FROM fact WHERE (embedding_signature IS NONE OR embedding_signature IS NULL \
-             OR embedding_signature != $target_signature){cursor_clause} ORDER BY fact_id ASC LIMIT $limit"
-        );
+             OR embedding_signature != $target_signature) ORDER BY fact_id ASC LIMIT $limit"
+                .to_string()
+        };
         let vars = json!({
             "target_signature": target_signature,
             "last_completed_fact_id": last_completed_fact_id,

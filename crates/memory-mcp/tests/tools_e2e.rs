@@ -89,30 +89,39 @@ impl StdioMcpProcess {
         self.stdin.flush().expect("flush MCP notification");
     }
 
-    fn initialize(&mut self) {
+    fn initialize(&mut self, task_capable: bool) {
+        let client_capabilities = if task_capable {
+            serde_json::json!({
+                "extensions": {
+                    "io.modelcontextprotocol/tasks": {}
+                }
+            })
+        } else {
+            serde_json::json!({})
+        };
         let response = self.request(
             1,
             "initialize",
             serde_json::json!({
                 "protocolVersion": "2025-11-25",
-                "capabilities": {},
+                "capabilities": client_capabilities,
                 "clientInfo": {"name": "memory-mcp-e2e", "version": "1.0.0"}
             }),
         );
-        let tasks = &response["result"]["capabilities"]["tasks"];
-        assert!(tasks["list"].is_object(), "missing tasks/list: {response}");
+        let capabilities = &response["result"]["capabilities"];
         assert!(
-            tasks["cancel"].is_object(),
-            "missing tasks/cancel: {response}"
-        );
-        assert!(
-            tasks["requests"]["tools"]["call"].is_object(),
-            "missing task-augmented tools/call: {response}"
+            capabilities["extensions"]["io.modelcontextprotocol/tasks"].is_object(),
+            "server must advertise the tasks extension: {response}"
         );
         self.notify("notifications/initialized", serde_json::json!({}));
     }
 
-    fn wait_for_terminal_task(&mut self, request_id: &mut i64, task_id: &str) -> serde_json::Value {
+    fn wait_for_terminal_task(
+        &mut self,
+        request_id: &mut i64,
+        task_id: &str,
+        poll_interval_ms: u64,
+    ) -> serde_json::Value {
         let deadline = Instant::now() + Duration::from_secs(20);
         loop {
             assert!(
@@ -127,7 +136,9 @@ impl StdioMcpProcess {
             *request_id += 1;
             match status["result"]["status"].as_str() {
                 Some("completed" | "failed" | "cancelled") => return status,
-                Some("working") => std::thread::sleep(Duration::from_millis(10)),
+                Some("working" | "input_required") => {
+                    std::thread::sleep(Duration::from_millis(poll_interval_ms));
+                }
                 other => panic!("unexpected task state {other:?}: {status}"),
             }
         }
@@ -139,25 +150,6 @@ impl Drop for StdioMcpProcess {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
-}
-
-fn task_payload_for_sync_result(
-    mut synchronous_result: serde_json::Value,
-    task_id: &str,
-) -> serde_json::Value {
-    let object = synchronous_result
-        .as_object_mut()
-        .expect("tools/call result object");
-    let meta = object
-        .entry("_meta")
-        .or_insert_with(|| serde_json::json!({}))
-        .as_object_mut()
-        .expect("tools/call result metadata object");
-    meta.insert(
-        "io.modelcontextprotocol/related-task".to_string(),
-        serde_json::json!({"taskId": task_id}),
-    );
-    synchronous_result
 }
 
 #[tokio::test]
@@ -291,10 +283,9 @@ async fn test_mcp_tools_flow() {
 
 #[test]
 fn test_mcp_extract_task_lifecycle_over_stdio() {
-    let mut mcp = StdioMcpProcess::start();
-    mcp.initialize();
-
-    let ingest = mcp.request(
+    let mut synchronous_client = StdioMcpProcess::start();
+    synchronous_client.initialize(false);
+    let ingest = synchronous_client.request(
         2,
         "tools/call",
         serde_json::json!({
@@ -310,8 +301,9 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
     );
     let episode_id = ingest["result"]["structuredContent"]["result"]
         .as_str()
-        .unwrap_or_else(|| panic!("missing episode id in ingest response: {ingest}"));
-    let synchronous = mcp.request(
+        .unwrap_or_else(|| panic!("missing episode id in ingest response: {ingest}"))
+        .to_string();
+    let synchronous = synchronous_client.request(
         3,
         "tools/call",
         serde_json::json!({
@@ -319,174 +311,136 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
             "arguments": {"episode_id": episode_id}
         }),
     );
-    let synchronous_result = synchronous["result"].clone();
-
-    let created = mcp.request(
+    assert!(synchronous["result"]["structuredContent"].is_object());
+    assert!(synchronous["result"]["taskId"].is_null());
+    let synchronous_structured_content = synchronous["result"]["structuredContent"].clone();
+    let synchronous_failure = synchronous_client.request(
         4,
         "tools/call",
         serde_json::json!({
             "name": "extract",
-            "arguments": {"episode_id": episode_id},
-            "task": {"ttl": 60_000}
+            "arguments": {"episode_id": "episode:missing-task-e2e"}
         }),
     );
-    let task_id = created["result"]["task"]["taskId"]
-        .as_str()
-        .unwrap_or_else(|| panic!("missing task id: {created}"))
-        .to_string();
-    let created_at = created["result"]["task"]["createdAt"]
-        .as_str()
-        .unwrap_or_else(|| panic!("missing task creation timestamp: {created}"))
-        .to_string();
-    assert_eq!(created["result"]["task"]["status"], "working");
-    assert_eq!(
-        created["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"], task_id,
-        "task creation response must identify the related task: {created}"
-    );
+    assert!(synchronous_failure["error"].is_object());
 
-    let mut request_id = 5;
-    let completed = mcp.wait_for_terminal_task(&mut request_id, &task_id);
+    let mut task_client = StdioMcpProcess::start();
+    task_client.initialize(true);
+    let task_ingest = task_client.request(
+        2,
+        "tools/call",
+        serde_json::json!({
+            "name": "ingest",
+            "arguments": {
+                "source_type": "email",
+                "source_id": "TASK-E2E-1",
+                "content": "Alice Smith will deliver ARR $1M by Friday.",
+                "t_ref": "2026-02-05T00:00:00Z",
+                "scope": "org"
+            }
+        }),
+    );
+    let task_episode_id = task_ingest["result"]["structuredContent"]["result"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing task episode id: {task_ingest}"));
+    assert!(task_ingest["result"]["taskId"].is_null());
+
+    let created = task_client.request(
+        3,
+        "tools/call",
+        serde_json::json!({
+            "name": "extract",
+            "arguments": {"episode_id": task_episode_id}
+        }),
+    );
+    let task_id = created["result"]["taskId"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing flattened task id: {created}"))
+        .to_string();
+    assert!(created["result"]["task"].is_null());
+    assert_eq!(created["result"]["status"], "working");
+    let created_at = created["result"]["createdAt"].clone();
+    let poll_interval_ms = created["result"]["pollIntervalMs"]
+        .as_u64()
+        .unwrap_or(1_000);
+
+    let mut request_id = 4;
+    let completed = task_client.wait_for_terminal_task(&mut request_id, &task_id, poll_interval_ms);
     assert_eq!(completed["result"]["status"], "completed");
     assert_eq!(completed["result"]["createdAt"], created_at);
-
-    let listed = mcp.request(request_id, "tasks/list", serde_json::json!({}));
-    request_id += 1;
-    assert!(
-        listed["result"]["tasks"]
-            .as_array()
-            .is_some_and(|tasks| tasks.iter().any(|task| task["taskId"] == task_id)),
-        "completed task must remain listable while its result is retained: {listed}"
+    assert_eq!(
+        completed["result"]["result"]["structuredContent"],
+        synchronous_structured_content
     );
-    let invalid_cursor = mcp.request(
+    assert!(completed["result"]["error"].is_null());
+
+    let update_ack = task_client.request(
         request_id,
-        "tasks/list",
-        serde_json::json!({"cursor": "missing-page"}),
+        "tasks/update",
+        serde_json::json!({"taskId": task_id, "inputResponses": {}}),
     );
     request_id += 1;
-    assert_eq!(
-        invalid_cursor["error"]["code"], -32602,
-        "unknown task cursors must use Invalid params: {invalid_cursor}"
-    );
+    assert!(update_ack["result"].is_object());
 
-    let task_result = mcp.request(
-        request_id,
-        "tasks/result",
-        serde_json::json!({"taskId": task_id}),
-    );
-    request_id += 1;
-    assert_eq!(
-        task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"], task_id,
-        "task payload must identify the related task: {task_result}"
-    );
-    assert_eq!(
-        task_result["result"],
-        task_payload_for_sync_result(synchronous_result, &task_id),
-        "task and synchronous extract returned different payloads: {task_result}"
-    );
-
-    let repeated_result = mcp.request(
-        request_id,
-        "tasks/result",
-        serde_json::json!({"taskId": task_id}),
-    );
-    request_id += 1;
-    assert_eq!(
-        repeated_result["result"], task_result["result"],
-        "reading a task result must not consume it: {repeated_result}"
-    );
-
-    let unknown = mcp.request(
+    let unknown = task_client.request(
         request_id,
         "tasks/get",
         serde_json::json!({"taskId": "missing-task"}),
     );
     request_id += 1;
-    assert_eq!(
-        unknown["error"]["code"], -32602,
-        "unknown task IDs must use Invalid params: {unknown}"
-    );
+    assert_eq!(unknown["error"]["code"], -32602);
     assert!(
         unknown["error"]["message"]
             .as_str()
-            .is_some_and(|message| message.contains("task not found: missing-task")),
+            .is_some_and(|message| message.contains("unknown task: missing-task")),
         "unexpected unknown-task response: {unknown}"
     );
-
-    for method in ["tasks/result", "tasks/cancel"] {
-        let response = mcp.request(
-            request_id,
-            method,
-            serde_json::json!({"taskId": "missing-task"}),
-        );
+    for method in ["tasks/update", "tasks/cancel"] {
+        let params = if method == "tasks/update" {
+            serde_json::json!({"taskId": "missing-task", "inputResponses": {}})
+        } else {
+            serde_json::json!({"taskId": "missing-task"})
+        };
+        let response = task_client.request(request_id, method, params);
         request_id += 1;
-        assert_eq!(
-            response["error"]["code"], -32602,
-            "{method} must reject an unknown task as Invalid params: {response}"
-        );
+        assert_eq!(response["error"]["code"], -32602);
+    }
+    for method in ["tasks/list", "tasks/result"] {
+        let response = task_client.request(request_id, method, serde_json::json!({}));
+        request_id += 1;
+        assert_eq!(response["error"]["code"], -32601);
     }
 
-    let forbidden_task = mcp.request(
-        request_id,
-        "tools/call",
-        serde_json::json!({
-            "name": "ingest",
-            "arguments": {},
-            "task": {"ttl": 60_000}
-        }),
-    );
-    request_id += 1;
-    assert_eq!(
-        forbidden_task["error"]["code"], -32602,
-        "non-task tools must reject task augmentation: {forbidden_task}"
-    );
-
-    let missing_arguments = serde_json::json!({"episode_id": "episode:missing-task-e2e"});
-    let synchronous_failure = mcp.request(
+    let asynchronous_failure = task_client.request(
         request_id,
         "tools/call",
         serde_json::json!({
             "name": "extract",
-            "arguments": missing_arguments.clone()
+            "arguments": {"episode_id": "episode:missing-task-e2e"}
         }),
     );
     request_id += 1;
-    let asynchronous_failure = mcp.request(
-        request_id,
-        "tools/call",
-        serde_json::json!({
-            "name": "extract",
-            "arguments": missing_arguments,
-            "task": {"ttl": 60_000}
-        }),
-    );
-    request_id += 1;
-    let failed_task_id = asynchronous_failure["result"]["task"]["taskId"]
+    let failed_task_id = asynchronous_failure["result"]["taskId"]
         .as_str()
         .unwrap_or_else(|| panic!("missing failed task id: {asynchronous_failure}"))
         .to_string();
-    let failed_status = mcp.wait_for_terminal_task(&mut request_id, &failed_task_id);
-    assert_eq!(failed_status["result"]["status"], "failed");
-    let failed_result = mcp.request(
-        request_id,
-        "tasks/result",
-        serde_json::json!({"taskId": failed_task_id}),
+    let failed_poll_interval_ms = asynchronous_failure["result"]["pollIntervalMs"]
+        .as_u64()
+        .unwrap_or(1_000);
+    let failed_status = task_client.wait_for_terminal_task(
+        &mut request_id,
+        &failed_task_id,
+        failed_poll_interval_ms,
     );
-    request_id += 1;
-    if synchronous_failure["error"].is_object() {
-        assert_eq!(
-            failed_result["error"], synchronous_failure["error"],
-            "task must preserve the original JSON-RPC error: {failed_result}"
-        );
-    } else {
-        assert_eq!(
-            failed_result["result"],
-            task_payload_for_sync_result(synchronous_failure["result"].clone(), &failed_task_id),
-            "task must preserve the original tool error payload: {failed_result}"
-        );
-    }
+    assert_eq!(failed_status["result"]["status"], "failed");
+    assert_eq!(
+        failed_status["result"]["error"]["code"],
+        synchronous_failure["error"]["code"]
+    );
+    assert!(failed_status["result"]["result"].is_null());
 
     let long_content = "Alice Smith met OpenAI in Moscow. ".repeat(25_000);
-    let long_ingest = mcp.request(
+    let long_ingest = task_client.request(
         request_id,
         "tools/call",
         serde_json::json!({
@@ -504,53 +458,86 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
     let long_episode_id = long_ingest["result"]["structuredContent"]["result"]
         .as_str()
         .unwrap_or_else(|| panic!("missing long episode id: {long_ingest}"));
-    let cancellable = mcp.request(
+    let cancellable = task_client.request(
         request_id,
         "tools/call",
         serde_json::json!({
             "name": "extract",
-            "arguments": {"episode_id": long_episode_id},
-            "task": {"ttl": 60_000}
+            "arguments": {"episode_id": long_episode_id}
         }),
     );
     request_id += 1;
-    let cancellable_id = cancellable["result"]["task"]["taskId"]
+    let cancellable_id = cancellable["result"]["taskId"]
         .as_str()
         .unwrap_or_else(|| panic!("missing cancellable task id: {cancellable}"))
         .to_string();
-    let cancellable_created_at = cancellable["result"]["task"]["createdAt"].clone();
-    let cancelled = mcp.request(
+    let cancellable_created_at = cancellable["result"]["createdAt"].clone();
+    let cancellable_poll_interval_ms = cancellable["result"]["pollIntervalMs"]
+        .as_u64()
+        .unwrap_or(1_000);
+    let cancelled = task_client.request(
         request_id,
         "tasks/cancel",
         serde_json::json!({"taskId": cancellable_id}),
     );
     request_id += 1;
-    assert_eq!(
-        cancelled["result"]["status"], "cancelled",
-        "task cancellation failed: {cancelled}"
+    assert!(cancelled["result"].is_object());
+    let cancelled_status = task_client.wait_for_terminal_task(
+        &mut request_id,
+        &cancellable_id,
+        cancellable_poll_interval_ms,
     );
-    let cancelled_status = mcp.request(
-        request_id,
-        "tasks/get",
-        serde_json::json!({"taskId": cancellable_id}),
-    );
-    assert_eq!(
-        cancelled_status["result"]["status"], "cancelled",
-        "cancelled is terminal and must remain observable: {cancelled_status}"
-    );
+    assert!(matches!(
+        cancelled_status["result"]["status"].as_str(),
+        Some("completed" | "failed" | "cancelled")
+    ));
     assert_eq!(
         cancelled_status["result"]["createdAt"],
         cancellable_created_at
     );
-    request_id += 1;
-    let cancelled_result = mcp.request(
-        request_id,
-        "tasks/result",
-        serde_json::json!({"taskId": cancellable_id}),
+}
+
+#[cfg(feature = "mcp-apps")]
+#[test]
+fn test_mcp_resources_read_over_stdio() {
+    let mut client = StdioMcpProcess::start();
+    client.initialize(false);
+
+    let listed = client.request(2, "resources/list", serde_json::json!({}));
+    let resources = listed["result"]["resources"]
+        .as_array()
+        .unwrap_or_else(|| panic!("missing resource catalog: {listed}"));
+    assert!(
+        resources
+            .iter()
+            .any(|resource| { resource["uri"].as_str() == Some("ui://memory/apps") })
     );
-    assert_eq!(
-        cancelled_result["error"]["code"], -32800,
-        "cancelled task result must preserve cancellation: {cancelled_result}"
+
+    let response = client.request(
+        3,
+        "resources/read",
+        serde_json::json!({"uri": "ui://memory/apps"}),
+    );
+    assert!(
+        response["error"].is_null(),
+        "resources/read failed: {response}"
+    );
+    let contents = response["result"]["contents"]
+        .as_array()
+        .unwrap_or_else(|| panic!("missing resource contents: {response}"));
+    assert_eq!(contents.len(), 1);
+    assert_eq!(contents[0]["uri"], "ui://memory/apps");
+    assert_eq!(contents[0]["mimeType"], "application/json");
+    let payload: serde_json::Value = serde_json::from_str(
+        contents[0]["text"]
+            .as_str()
+            .unwrap_or_else(|| panic!("resource content is not text: {response}")),
+    )
+    .unwrap_or_else(|error| panic!("resource content is not JSON: {error}: {response}"));
+    assert!(
+        payload["apps"]
+            .as_array()
+            .is_some_and(|apps| !apps.is_empty())
     );
 }
 

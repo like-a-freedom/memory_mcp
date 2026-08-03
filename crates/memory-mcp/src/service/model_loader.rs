@@ -161,10 +161,12 @@ pub async fn ensure_model_cached_with_files(
         ))
     })?;
 
-    let (owner, name) = hf_hub::split_id(repo_id);
-    let repo = hf_hub::HFClient::new()
-        .map_err(|e| MemoryError::Storage(format!("failed to init hf-hub api: {e}")))?
-        .model(owner, name);
+    let api = hf_hub::api::tokio::ApiBuilder::from_env()
+        .with_cache_dir(cache_dir.to_path_buf())
+        .with_progress(false)
+        .build()
+        .map_err(|e| MemoryError::Storage(format!("failed to init hf-hub api: {e}")))?;
+    let repo = api.model(repo_id.to_string());
 
     for file_name in required_files {
         let target_path = cache_dir.join(file_name);
@@ -177,42 +179,45 @@ pub async fn ensure_model_cached_with_files(
             continue;
         }
 
-        let mut last_err = None;
+        let mut last_err: Option<String> = None;
         for attempt in 1..=MAX_RETRIES {
-            match repo
-                .download_file()
-                .filename(*file_name)
-                .local_dir(cache_dir.to_path_buf())
-                .send()
-                .await
-            {
-                Ok(_) => {
-                    let bytes = std::fs::metadata(&target_path)
-                        .map(|metadata| metadata.len())
-                        .unwrap_or_default();
-                    log_message(
-                        logger,
-                        LogLevel::Info,
-                        &format!("Downloaded {file_name} ({bytes} bytes)"),
-                    );
-                    last_err = None;
-                    break;
+            match repo.get(file_name).await {
+                Ok(downloaded_path) => {
+                    match tokio::fs::copy(&downloaded_path, &target_path).await {
+                        Ok(_) => {
+                            let bytes = std::fs::metadata(&target_path)
+                                .map(|metadata| metadata.len())
+                                .unwrap_or_default();
+                            log_message(
+                                logger,
+                                LogLevel::Info,
+                                &format!("Downloaded {file_name} ({bytes} bytes)"),
+                            );
+                            last_err = None;
+                            break;
+                        }
+                        Err(e) => {
+                            let _ = std::fs::remove_file(&target_path);
+                            last_err = Some(format!("failed to copy cached download: {e}"));
+                        }
+                    }
                 }
                 Err(e) => {
                     let _ = std::fs::remove_file(&target_path);
-                    last_err = Some(e);
-                    if attempt < MAX_RETRIES {
-                        let delay = Duration::from_secs(2u64.pow(attempt));
-                        log_message(
-                            logger,
-                            LogLevel::Warn,
-                            &format!(
-                                "Download {file_name} failed (attempt {attempt}/{MAX_RETRIES}), retrying in {delay:?}"
-                            ),
-                        );
-                        tokio::time::sleep(delay).await;
-                    }
+                    last_err = Some(e.to_string());
                 }
+            }
+
+            if attempt < MAX_RETRIES {
+                let delay = Duration::from_secs(2u64.pow(attempt));
+                log_message(
+                    logger,
+                    LogLevel::Warn,
+                    &format!(
+                        "Download {file_name} failed (attempt {attempt}/{MAX_RETRIES}), retrying in {delay:?}"
+                    ),
+                );
+                tokio::time::sleep(delay).await;
             }
         }
 

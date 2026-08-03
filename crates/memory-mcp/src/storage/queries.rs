@@ -164,10 +164,12 @@ pub fn build_select_facts_filtered_query(
     let base_where = where_clauses.join(" AND ");
 
     let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
+        let query_literal = surreal_string_literal(query);
+        // Keep the query in the vars object for instrumentation and test
+        // doubles; SurrealDB 3.0 uses the escaped literal in MATCHES above.
         vars.insert("query".to_string(), json!(query));
-
         format!(
-            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ $query OR index_keys @1@ $query) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal}) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
         format!(
@@ -176,6 +178,33 @@ pub fn build_select_facts_filtered_query(
     };
 
     (sql, Value::Object(vars))
+}
+
+/// Escapes a user-provided value as a SurrealQL double-quoted string literal.
+///
+/// SurrealDB 3.0 does not evaluate bound variables as MATCHES operands, so
+/// full-text queries must use a literal while all ordinary filters remain bound.
+pub(crate) fn surreal_string_literal(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\u{08}' => escaped.push_str("\\b"),
+            '\u{0C}' => escaped.push_str("\\f"),
+            character if character.is_control() => {
+                use std::fmt::Write;
+                let _ = write!(escaped, "\\u{:04x}", character as u32);
+            }
+            character => escaped.push(character),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
 
 pub fn build_select_facts_by_entity_links_query(
@@ -530,6 +559,33 @@ mod tests {
         let (sql, bind) = build_select_one_query("fact:52f9d92d20d829840f24294f");
         assert_eq!(sql, "SELECT * FROM fact:⟨52f9d92d20d829840f24294f⟩");
         assert!(bind.is_none());
+    }
+
+    #[test]
+    fn build_select_facts_filtered_query_uses_safe_literal_for_fts_operand() {
+        let (sql, vars) = build_select_facts_filtered_query(
+            "org",
+            "2026-05-13T00:00:00Z",
+            Some("Alice \"launch\""),
+            10,
+            None,
+            &[],
+        );
+
+        assert!(sql.contains("search::score(1) AS ft_score"));
+        assert!(sql.contains("content @1@ \"Alice \\\"launch\\\"\""));
+        assert!(sql.contains("index_keys @1@ \"Alice \\\"launch\\\"\""));
+        assert!(!sql.contains("@1@ $query"));
+        assert_eq!(vars["scope"], "org");
+        assert_eq!(vars["limit"], 10);
+    }
+
+    #[test]
+    fn surreal_string_literal_escapes_surrealql_control_characters() {
+        assert_eq!(
+            surreal_string_literal("quote\" slash\\ newline\n"),
+            "\"quote\\\" slash\\\\ newline\\n\""
+        );
     }
 
     #[test]

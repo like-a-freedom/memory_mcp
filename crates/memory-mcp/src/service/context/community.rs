@@ -76,7 +76,6 @@ pub(crate) async fn collect_community_facts(
         )
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
-
     let community_summary_by_member = matched_communities
         .iter()
         .enumerate()

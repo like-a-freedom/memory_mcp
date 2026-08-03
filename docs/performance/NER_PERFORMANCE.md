@@ -148,26 +148,17 @@ candidate, quality, latency, contention, and memory measurements.
 
 ## MCP Tasks
 
-Task-capable clients add task metadata to the normal `tools/call` request for
-`extract`, then use `tasks/get`, `tasks/list`, `tasks/result`, and `tasks/cancel`.
-Synchronous `tools/call` remains backward compatible.
+Task-capable clients advertise `io.modelcontextprotocol/tasks`. The server
+materializes only `extract` from an ordinary `tools/call`; clients poll
+`tasks/get`, send input responses through `tasks/update`, and request
+cooperative cancellation through `tasks/cancel`. The detailed task returned by
+`tasks/get` embeds a completed tool payload under `result` or a failed payload
+under `error`. Task listing and a separate terminal-result request are not part
+of the extension contract. Clients without the extension continue to receive
+synchronous tool results.
 
-The project uses rmcp 2.2.0 model/transport types but owns the lifecycle store in the
-MCP adapter because rmcp's generated task handler still consumes results and loses
-some terminal states. Wire-level stdio tests cover stable timestamps, list/get,
-repeatable results, related-task metadata, original tool/protocol failures,
-cancellation, invalid cursors, unknown IDs, and forbidden task augmentation.
-
-Operational bounds are intentionally fixed and small:
-
-- 64 active tasks
-- 1024 retained tasks
-- accepted TTL range: 1 second to 1 hour (default 5 minutes)
-- result poll interval: 100 ms
-
-Cancellation is cooperative at the Tokio task boundary. It cannot preempt a Candle
-CPU kernel that is already executing synchronously; the NER concurrency gate still
-bounds such work.
+The MCP adapter delegates task lifecycle, TTL, polling, retention, and
+cooperative cancellation to rmcp 3.1 `TaskManager`.
 
 ## Device policy
 
