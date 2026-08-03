@@ -607,6 +607,8 @@ mod tests {
     use crate::models::EntityCandidate;
     #[cfg(feature = "mcp-apps")]
     use crate::models::IngestRequest;
+    use crate::service::capabilities::ingest::IngestCapability;
+    use crate::service::capabilities::resolve::ResolveCapability;
     use crate::service::edge_neighbor;
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Datelike;
@@ -647,17 +649,17 @@ mod tests {
     #[cfg(feature = "mcp-apps")]
     #[cfg(feature = "mcp-apps")]
     async fn create_test_entity(mcp: &MemoryMcp, canonical_name: &str) -> String {
-        mcp.service()
-            .resolve(
-                EntityCandidate {
-                    entity_type: "person".to_string(),
-                    canonical_name: canonical_name.to_string(),
-                    aliases: Vec::new(),
-                },
-                None,
-            )
-            .await
-            .expect("create test entity")
+        ResolveCapability::resolve(
+            &mcp.service().build_context(),
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: canonical_name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+        .expect("create test entity")
     }
 
     fn schema_json<T: schemars::JsonSchema>() -> serde_json::Value {
@@ -1168,24 +1170,23 @@ mod tests {
     #[tokio::test]
     async fn lifecycle_app_commands_archive_and_restore_candidates() {
         let mcp = create_test_mcp().await;
-        let stale_episode_id = mcp
-            .service()
-            .ingest(
-                IngestRequest {
-                    source_type: "meeting".to_string(),
-                    source_id: "stale-lifecycle-episode".to_string(),
-                    content: "Legacy launch plan that should be archived.".to_string(),
-                    t_ref: Utc.with_ymd_and_hms(2025, 1, 10, 9, 0, 0).unwrap(),
-                    scope: "org".to_string(),
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await
-            .expect("ingest stale episode");
+        let stale_episode_id = IngestCapability::ingest(
+            &mcp.service().build_context(),
+            IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: "stale-lifecycle-episode".to_string(),
+                content: "Legacy launch plan that should be archived.".to_string(),
+                t_ref: Utc.with_ymd_and_hms(2025, 1, 10, 9, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("ingest stale episode");
 
         let open_result = mcp
             .open_app(Parameters(OpenAppParams {

@@ -2,6 +2,8 @@ mod embedded_support;
 
 use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, Provenance};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::resolve::ResolveCapability;
 
 /// Integration test: verifies that multi-word queries work through the full
 /// SurrealDB stack (embedded) with the configured full-text analyzer.
@@ -40,8 +42,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         )
         .await?;
 
-    let ctx = service
-        .assemble_context(AssembleContextRequest {
+    let ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -53,8 +56,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !ctx.is_empty(),
@@ -66,8 +70,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         "Result content should contain 'enrollment', got: {content}"
     );
 
-    let ctx2 = service
-        .assemble_context(AssembleContextRequest {
+    let ctx2 = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "mobile certs tokens ports episode:fts_test_2".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -79,16 +84,18 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !ctx2.is_empty(),
         "Query with episode ref should find facts after preprocessing (got empty)"
     );
 
-    let ctx3 = service
-        .assemble_context(AssembleContextRequest {
+    let ctx3 = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "cert".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -100,8 +107,9 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !ctx3.is_empty(),
@@ -131,8 +139,9 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
         )
         .await?;
 
-    let ctx = service
-        .assemble_context(AssembleContextRequest {
+    let ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "atlas launch".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -144,8 +153,9 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !ctx.is_empty(),
@@ -177,8 +187,9 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
         )
         .await?;
 
-    let person_ctx = service
-        .assemble_context(AssembleContextRequest {
+    let person_ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "alice smith".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -190,16 +201,18 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !person_ctx.is_empty(),
         "query should match canonical entity name through fact.index_keys"
     );
 
-    let time_ctx = service
-        .assemble_context(AssembleContextRequest {
+    let time_ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "march 2026".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -211,8 +224,9 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !time_ctx.is_empty(),
@@ -242,8 +256,9 @@ async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn s
         )
         .await?;
 
-    let ctx = service
-        .assemble_context(AssembleContextRequest {
+    let ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "9794206".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -255,8 +270,9 @@ async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn s
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         ctx.iter().any(|item| item.fact_id == fact_id),
@@ -415,29 +431,29 @@ async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::err
     let service = embedded_support::setup_embedded_service().await?;
 
     // Create "Alice Smith" and attach the alias "Alicia".
-    let alice_id = service
-        .resolve(
-            memory_mcp::models::EntityCandidate {
-                entity_type: "person".to_string(),
-                canonical_name: "Alice Smith".to_string(),
-                aliases: vec!["Alicia".to_string()],
-            },
-            None,
-        )
-        .await?;
+    let alice_id = ResolveCapability::resolve(
+        &service.build_context(),
+        memory_mcp::models::EntityCandidate {
+            entity_type: "person".to_string(),
+            canonical_name: "Alice Smith".to_string(),
+            aliases: vec!["Alicia".to_string()],
+        },
+        None,
+    )
+    .await?;
 
     // Resolving the bare canonical "Alicia" (which only matches via alias)
     // must return the same entity id, NOT create a new one.
-    let alicia_id = service
-        .resolve(
-            memory_mcp::models::EntityCandidate {
-                entity_type: "person".to_string(),
-                canonical_name: "Alicia".to_string(),
-                aliases: vec![],
-            },
-            None,
-        )
-        .await?;
+    let alicia_id = ResolveCapability::resolve(
+        &service.build_context(),
+        memory_mcp::models::EntityCandidate {
+            entity_type: "person".to_string(),
+            canonical_name: "Alicia".to_string(),
+            aliases: vec![],
+        },
+        None,
+    )
+    .await?;
 
     assert_eq!(
         alice_id, alicia_id,
@@ -473,8 +489,9 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
         )
         .await?;
 
-    let ctx = service
-        .assemble_context(AssembleContextRequest {
+    let ctx = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             // Query the nominative form; the stored fact has the prepositional
             // case "Газпроме". A Russian stemmer collapses both to the same stem.
             query: "Газпром".to_string(),
@@ -488,8 +505,9 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert!(
         !ctx.is_empty(),

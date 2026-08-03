@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
@@ -67,28 +69,30 @@ impl CapacitySuite {
             _ => "test content",
         };
 
-        let result = service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "lifecycle".into(),
-                    source_id: format!("cap-{scenario}"),
-                    content: content.into(),
-                    t_ref: chrono::Utc::now(),
-                    scope: "org".into(),
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await;
+        let result = IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "lifecycle".into(),
+                source_id: format!("cap-{scenario}"),
+                content: content.into(),
+                t_ref: chrono::Utc::now(),
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
         match result {
             Ok(episode_id) => {
-                let extraction = service.extract(&episode_id, None, None).await;
+                let extraction =
+                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                        .await;
                 let fact_count = extraction.as_ref().map(|e| e.facts.len()).unwrap_or(0) as f64;
 
                 let after_usage = measure_storage(&db_client).await;

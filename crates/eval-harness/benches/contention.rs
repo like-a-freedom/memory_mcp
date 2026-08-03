@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 fn bench_contention_single_client(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -11,8 +13,9 @@ fn bench_contention_single_client(c: &mut Criterion) {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
                 for i in 0..5 {
-                    let episode_id = service
-                        .ingest(
+                    let episode_id = IngestCapability::ingest(
+                        &service.build_context(),
+
                             memory_mcp::models::IngestRequest {
                                 source_type: "bench".into(),
                                 source_id: format!("contention-{i}"),
@@ -28,7 +31,7 @@ fn bench_contention_single_client(c: &mut Criterion) {
                         )
                         .await
                         .unwrap();
-                    let _ = service.extract(&episode_id, None, None).await.unwrap();
+                    let _ = ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await.unwrap();
                 }
             });
         });
@@ -52,24 +55,33 @@ fn bench_contention_multi_client(c: &mut Criterion) {
                         let svc = Arc::clone(&service);
                         handles.push(tokio::spawn(async move {
                             for i in 0..ops_per_client {
-                                let episode_id = svc
-                                    .ingest(
-                                        memory_mcp::models::IngestRequest {
-                                            source_type: "bench".into(),
-                                            source_id: format!("contention-c{client_idx}-{i}"),
-                                            content: format!("Client {client_idx} fact {i}: Project status update."),
-                                            t_ref: chrono::Utc::now(),
-                                            scope: "org".into(),
-                                            project: None,
-                                            t_ingested: None,
-                                            visibility_scope: None,
-                                            policy_tags: vec![],
-                                        },
-                                        None,
-                                    )
-                                    .await
-                                    .unwrap();
-                                let _ = svc.extract(&episode_id, None, None).await.unwrap();
+                                let episode_id = IngestCapability::ingest(
+                                    &svc.build_context(),
+                                    memory_mcp::models::IngestRequest {
+                                        source_type: "bench".into(),
+                                        source_id: format!("contention-c{client_idx}-{i}"),
+                                        content: format!(
+                                            "Client {client_idx} fact {i}: Project status update."
+                                        ),
+                                        t_ref: chrono::Utc::now(),
+                                        scope: "org".into(),
+                                        project: None,
+                                        t_ingested: None,
+                                        visibility_scope: None,
+                                        policy_tags: vec![],
+                                    },
+                                    None,
+                                )
+                                .await
+                                .unwrap();
+                                let _ = ExtractCapability::extract(
+                                    &svc.build_context(),
+                                    &episode_id,
+                                    None,
+                                    None,
+                                )
+                                .await
+                                .unwrap();
                             }
                         }));
                     }

@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{IngestRequest, Provenance};
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
@@ -153,23 +154,23 @@ pub async fn seed_fact_with_links_and_project(
         )
     });
 
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: "seed".to_string(),
-                source_id,
-                content: format!("seed source for {content}"),
-                t_ref: t_valid,
-                scope: scope.to_string(),
-                project: normalized_project.map(str::to_string),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("seed project episode should succeed");
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        IngestRequest {
+            source_type: "seed".to_string(),
+            source_id,
+            content: format!("seed source for {content}"),
+            t_ref: t_valid,
+            scope: scope.to_string(),
+            project: normalized_project.map(str::to_string),
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("seed project episode should succeed");
 
     service
         .add_fact(

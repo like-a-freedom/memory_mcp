@@ -9,6 +9,8 @@ use tempfile::TempDir;
 
 use memory_mcp::mcp::MemoryMcp;
 use memory_mcp::models::{AssembleContextRequest, ExplainRequest};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::explain::ExplainCapability;
 
 mod common;
 
@@ -202,11 +204,12 @@ async fn test_mcp_tools_flow() {
         "compact": false,
     }))
     .unwrap();
-    let context = mcp
-        .service()
-        .assemble_context(assemble_request)
-        .await
-        .expect("assemble");
+    let context = AssembleContextCapability::assemble_context(
+        &mcp.service().build_context(),
+        assemble_request,
+    )
+    .await
+    .expect("assemble");
     assert!(!context.is_empty());
 
     // Verify rounding of f64 fields in assemble_context response
@@ -236,11 +239,10 @@ async fn test_mcp_tools_flow() {
         context_pack,
         compact: false,
     };
-    let explanation = mcp
-        .service()
-        .explain(explain_request, None)
-        .await
-        .expect("explain");
+    let explanation =
+        ExplainCapability::explain(&mcp.service().build_context(), explain_request, None)
+            .await
+            .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
 
     // Verify rounding of decayed_confidence in explain response
@@ -279,11 +281,10 @@ async fn test_mcp_tools_flow() {
         context_pack: context_pack_ids,
         compact: false,
     };
-    let explanation_ids = mcp
-        .service()
-        .explain(explain_request_ids, None)
-        .await
-        .expect("explain ids");
+    let explanation_ids =
+        ExplainCapability::explain(&mcp.service().build_context(), explain_request_ids, None)
+            .await
+            .expect("explain ids");
     assert_eq!(explanation_ids[0].source_episode, episode_id);
     assert_eq!(explanation_ids[1].source_episode, episode_id2);
 }
@@ -591,11 +592,12 @@ async fn test_mcp_full_flow_end_to_end() {
         "compact": false,
     }))
     .unwrap();
-    let context = mcp
-        .service()
-        .assemble_context(assemble_request)
-        .await
-        .expect("assemble");
+    let context = AssembleContextCapability::assemble_context(
+        &mcp.service().build_context(),
+        assemble_request,
+    )
+    .await
+    .expect("assemble");
     assert!(!context.is_empty());
 
     let context_items = serde_json::to_string(&vec![serde_json::json!({"content": "ARR $1M","quote": "ARR $1M","source_episode": episode_id.clone()})]).unwrap();
@@ -605,11 +607,10 @@ async fn test_mcp_full_flow_end_to_end() {
         context_pack,
         compact: false,
     };
-    let explanation = mcp
-        .service()
-        .explain(explain_request, None)
-        .await
-        .expect("explain");
+    let explanation =
+        ExplainCapability::explain(&mcp.service().build_context(), explain_request, None)
+            .await
+            .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
 
     let fact_id = context[0].fact_id.clone();
@@ -630,11 +631,12 @@ async fn test_mcp_full_flow_end_to_end() {
             "compact": false,
         }))
         .unwrap();
-    let context_after = mcp
-        .service()
-        .assemble_context(assemble_request_after)
-        .await
-        .expect("assemble");
+    let context_after = AssembleContextCapability::assemble_context(
+        &mcp.service().build_context(),
+        assemble_request_after,
+    )
+    .await
+    .expect("assemble");
     assert!(
         !context_after
             .iter()
@@ -759,11 +761,10 @@ async fn test_mcp_explain_mixed_array() {
         context_pack,
         compact: false,
     };
-    let explanation = mcp
-        .service()
-        .explain(explain_request, None)
-        .await
-        .expect("explain with mixed array should not fail");
+    let explanation =
+        ExplainCapability::explain(&mcp.service().build_context(), explain_request, None)
+            .await
+            .expect("explain with mixed array should not fail");
     assert_eq!(explanation.len(), 2);
     assert_eq!(explanation[0].source_episode, "episode:plain-id");
     assert_eq!(explanation[1].source_episode, "task:obj");
@@ -802,11 +803,10 @@ async fn test_mcp_explain_loads_episode_context() {
         context_pack,
         compact: false,
     };
-    let explanation = mcp
-        .service()
-        .explain(explain_request, None)
-        .await
-        .expect("explain with loaded episode context");
+    let explanation =
+        ExplainCapability::explain(&mcp.service().build_context(), explain_request, None)
+            .await
+            .expect("explain with loaded episode context");
 
     assert_eq!(explanation.len(), 1);
     assert_eq!(explanation[0].source_episode, episode_id);
@@ -866,11 +866,12 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
     });
 
     let assemble_request: AssembleContextRequest = serde_json::from_value(params).unwrap();
-    let context = mcp
-        .service()
-        .assemble_context(assemble_request)
-        .await
-        .expect("assemble timeline");
+    let context = AssembleContextCapability::assemble_context(
+        &mcp.service().build_context(),
+        assemble_request,
+    )
+    .await
+    .expect("assemble timeline");
 
     assert_eq!(context.len(), 1);
     assert_eq!(context[0].content, "Atlas budget increased");

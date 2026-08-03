@@ -234,14 +234,21 @@ async fn load_event(
 
 /// Runs the existing extraction path on an episode.
 ///
-/// This reuses `MemoryService::extract` with an `episode_id`, propagating
+/// This reuses the `ExtractCapability` with an `episode_id`, propagating
 /// origin through provenance. No new LLM or second extraction implementation.
 async fn run_extraction(
     service: &MemoryService,
     episode_id: &str,
     _namespace: &str,
 ) -> Result<(), MemoryError> {
-    service.extract(episode_id, None, None).await.map(|_| ())
+    crate::service::capabilities::extract::ExtractCapability::extract(
+        &service.build_context(),
+        episode_id,
+        None,
+        None,
+    )
+    .await
+    .map(|_| ())
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -250,7 +251,12 @@ impl EvalSuite for ResponseSizeSuite {
                 compact: false,
             };
 
-            let items = match service.assemble_context(request_verbose).await {
+            let items = match AssembleContextCapability::assemble_context(
+                &service.build_context(),
+                request_verbose,
+            )
+            .await
+            {
                 Ok(items) => items,
                 Err(_) => continue,
             };

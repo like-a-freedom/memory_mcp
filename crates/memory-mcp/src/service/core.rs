@@ -7,10 +7,7 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
-use crate::models::{
-    AccessPayload, AssembleContextRequest, AssembledContextItem, EntityCandidate, ExplainItem,
-    ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
-};
+use crate::models::AccessPayload;
 
 use super::error::MemoryError;
 #[cfg(test)]
@@ -135,61 +132,6 @@ impl MemoryService {
             total += count;
         }
         Ok(total)
-    }
-
-    /// Ingests a new episode.
-    ///
-    /// Thin delegator to [`IngestCapability::ingest`].
-    pub async fn ingest(
-        &self,
-        request: IngestRequest,
-        access: Option<AccessPayload>,
-    ) -> Result<String, MemoryError> {
-        let ctx = self.build_context();
-        super::capabilities::ingest::IngestCapability::ingest(&ctx, request, access).await
-    }
-
-    /// Provides explanations for context items with batched graph insights.
-    ///
-    /// Thin delegator to [`ExplainCapability::explain`].
-    pub async fn explain(
-        &self,
-        request: ExplainRequest,
-        access: Option<AccessPayload>,
-    ) -> Result<Vec<ExplainItem>, MemoryError> {
-        let ctx = self.build_context();
-        super::capabilities::explain::ExplainCapability::explain(&ctx, request, access).await
-    }
-
-    /// Extracts entities and facts from an episode.
-    ///
-    /// Thin delegator to [`ExtractCapability::extract`].
-    pub async fn extract(
-        &self,
-        episode_id: &str,
-        access: Option<AccessPayload>,
-        zero_shot_labels: Option<&[String]>,
-    ) -> Result<ExtractResult, MemoryError> {
-        let ctx = self.build_context();
-        super::capabilities::extract::ExtractCapability::extract(
-            &ctx,
-            episode_id,
-            access,
-            zero_shot_labels,
-        )
-        .await
-    }
-
-    /// Resolves an entity candidate.
-    ///
-    /// Thin delegator to [`ResolveCapability::resolve`].
-    pub async fn resolve(
-        &self,
-        candidate: EntityCandidate,
-        access: Option<AccessPayload>,
-    ) -> Result<String, MemoryError> {
-        let ctx = self.build_context();
-        super::capabilities::resolve::ResolveCapability::resolve(&ctx, candidate, access).await
     }
 
     /// Adds a new fact.
@@ -357,103 +299,11 @@ impl MemoryService {
             .await
     }
 
-    /// Invalidates a fact.
-    pub async fn invalidate(
-        &self,
-        request: InvalidateRequest,
-        access: Option<AccessPayload>,
-    ) -> Result<(), MemoryError> {
-        super::capabilities::invalidate::InvalidateCapability::invalidate(
-            &self.build_context(),
-            request,
-            access,
-        )
-        .await
-    }
-
-    /// Assembles context for a query.
-    ///
-    /// Thin delegator to [`AssembleContextCapability::assemble_context`].
-    pub async fn assemble_context(
-        &self,
-        request: AssembleContextRequest,
-    ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-        let ctx = self.build_context();
-        super::capabilities::assemble_context::AssembleContextCapability::assemble_context(
-            &ctx, request,
-        )
-        .await
-    }
-
-    /// Resolves an entity by its type and canonical name.
-    pub async fn resolve_entity(
-        &self,
-        entity_type: &str,
-        name: &str,
-    ) -> Result<String, MemoryError> {
-        self.resolve(
-            EntityCandidate {
-                entity_type: entity_type.to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
-    }
-
-    /// Creates a relationship edge between two entities.
-    pub async fn relate(
-        &self,
-        from_id: &str,
-        relation: &str,
-        to_id: &str,
-    ) -> Result<(), MemoryError> {
-        use crate::models::{Edge, EdgeOrigin};
-        let edge = Edge {
-            in_id: from_id.to_string(),
-            relation: relation.to_string(),
-            out_id: to_id.to_string(),
-            origin: EdgeOrigin::Inferred,
-            strength: 1.0,
-            confidence: 0.8,
-            provenance: crate::models::Provenance::manual(),
-            t_valid: super::query::now(),
-            t_ingested: super::query::now(),
-            t_invalid: None,
-            t_invalid_ingested: None,
-        };
-        super::episode::store_edge(&self.build_context(), &edge, &self.default_namespace).await
-    }
-
     /// Retrieves SurrealDB config.
     pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
         Ok(json!({
             "namespaces": self.namespaces.clone(),
         }))
-    }
-
-    /// Invalidates a superseded metric.
-    pub async fn invalidate_metric_if_superseded(
-        &self,
-        new_value: f64,
-        old_fact_id: &str,
-        t_invalid: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let (record, _) = self.find_fact_record(old_fact_id).await?;
-        if record.is_none() {
-            return Ok(());
-        }
-        self.invalidate(
-            InvalidateRequest {
-                fact_id: old_fact_id.to_string(),
-                reason: format!("Superseded by {new_value}"),
-                t_invalid,
-            },
-            None,
-        )
-        .await?;
-        Ok(())
     }
 
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
@@ -921,17 +771,18 @@ mod tests {
         )
         .unwrap();
 
-        let resolved = service
-            .resolve(
-                EntityCandidate {
-                    entity_type: "person".to_string(),
-                    canonical_name: "Dima Ivanov".to_string(),
-                    aliases: vec![],
-                },
-                None,
-            )
-            .await
-            .unwrap();
+        let ctx = service.build_context();
+        let resolved = crate::service::capabilities::resolve::ResolveCapability::resolve(
+            &ctx,
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Dima Ivanov".to_string(),
+                aliases: vec![],
+            },
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(resolved, "entity:existing");
     }

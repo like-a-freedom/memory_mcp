@@ -1,5 +1,7 @@
 use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 
 mod common;
 
@@ -21,8 +23,9 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
     )
     .await;
 
-    let items = service
-        .assemble_context(AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "alice atlas deck".into(),
             scope: "personal".into(),
             as_of: None,
@@ -34,9 +37,10 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("context should assemble");
+        },
+    )
+    .await
+    .expect("context should assemble");
 
     assert!(
         items
@@ -50,8 +54,9 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
 async fn assemble_context_when_question_is_unanswerable_then_returns_empty() {
     let service = common::make_service().await;
 
-    let items = service
-        .assemble_context(AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "what is Bob's passport number".into(),
             scope: "personal".into(),
             as_of: None,
@@ -63,9 +68,10 @@ async fn assemble_context_when_question_is_unanswerable_then_returns_empty() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("context should assemble");
+        },
+    )
+    .await
+    .expect("context should assemble");
 
     assert!(items.is_empty());
 }
@@ -79,20 +85,21 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
         common::seed_fact_at(&service, "personal", "Atlas launch was scheduled", t_valid).await;
     let invalid_at = now + Duration::days(2);
 
-    service
-        .invalidate(
-            InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "launch rescheduled".into(),
-                t_invalid: invalid_at,
-            },
-            None,
-        )
-        .await
-        .expect("invalidate should succeed");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "launch rescheduled".into(),
+            t_invalid: invalid_at,
+        },
+        None,
+    )
+    .await
+    .expect("invalidate should succeed");
 
-    let before_items = service
-        .assemble_context(AssembleContextRequest {
+    let before_items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "atlas launch".into(),
             scope: "personal".into(),
             as_of: Some(now + Duration::days(1)),
@@ -104,11 +111,13 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("historical context should assemble");
-    let after_items = service
-        .assemble_context(AssembleContextRequest {
+        },
+    )
+    .await
+    .expect("historical context should assemble");
+    let after_items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "atlas launch".into(),
             scope: "personal".into(),
             as_of: Some(now + Duration::days(3)),
@@ -120,9 +129,10 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("future context should assemble");
+        },
+    )
+    .await
+    .expect("future context should assemble");
 
     assert!(before_items.iter().any(|item| item.fact_id == fact_id));
     assert!(!after_items.iter().any(|item| item.fact_id == fact_id));
@@ -136,24 +146,25 @@ async fn assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_
     let old_fact_id =
         common::seed_fact_at(&service, "personal", "Atlas budget is $1M", old_time).await;
 
-    service
-        .invalidate(
-            InvalidateRequest {
-                fact_id: old_fact_id.clone(),
-                reason: "budget updated".into(),
-                t_invalid: Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap(),
-            },
-            None,
-        )
-        .await
-        .expect("invalidate should succeed");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        InvalidateRequest {
+            fact_id: old_fact_id.clone(),
+            reason: "budget updated".into(),
+            t_invalid: Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap(),
+        },
+        None,
+    )
+    .await
+    .expect("invalidate should succeed");
 
     let new_time = old_time + Duration::days(35);
     let new_fact_id =
         common::seed_fact_at(&service, "personal", "Atlas budget is $2M", new_time).await;
 
-    let items = service
-        .assemble_context(AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "atlas budget".into(),
             scope: "personal".into(),
             as_of: None,
@@ -165,9 +176,10 @@ async fn assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("context should assemble");
+        },
+    )
+    .await
+    .expect("context should assemble");
 
     assert!(items.iter().any(|item| item.fact_id == new_fact_id));
     assert!(!items.iter().any(|item| item.fact_id == old_fact_id));
@@ -184,8 +196,9 @@ async fn assemble_context_when_direct_fact_lookup_then_returns_exact_evidence() 
     )
     .await;
 
-    let items = service
-        .assemble_context(AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "deployment window thursday".into(),
             scope: "personal".into(),
             as_of: None,
@@ -197,9 +210,10 @@ async fn assemble_context_when_direct_fact_lookup_then_returns_exact_evidence() 
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("context should assemble");
+        },
+    )
+    .await
+    .expect("context should assemble");
 
     assert!(items.iter().any(|item| item.fact_id == fact_id));
 }

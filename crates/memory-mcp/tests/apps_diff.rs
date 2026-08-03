@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::service::DiffRequest;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 
 mod common;
 
@@ -24,17 +25,17 @@ async fn build_diff_reports_added_and_removed_facts_across_timepoints() {
     )
     .await;
 
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: left_fact.clone(),
-                reason: "superseded".to_string(),
-                t_invalid: Utc.with_ymd_and_hms(2026, 3, 2, 12, 0, 0).unwrap(),
-            },
-            None,
-        )
-        .await
-        .expect("invalidate left fact");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: left_fact.clone(),
+            reason: "superseded".to_string(),
+            t_invalid: Utc.with_ymd_and_hms(2026, 3, 2, 12, 0, 0).unwrap(),
+        },
+        None,
+    )
+    .await
+    .expect("invalidate left fact");
 
     let diff = service
         .build_diff(DiffRequest {

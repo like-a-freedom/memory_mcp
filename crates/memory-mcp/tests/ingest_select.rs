@@ -1,6 +1,8 @@
 mod embedded_support;
 use chrono::Utc;
 use memory_mcp::models::IngestRequest;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 #[tokio::test]
 async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,11 +20,11 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
         policy_tags: vec![],
     };
 
-    let episode_id = svc.ingest(req.clone(), None).await?;
-    let episode_id_2 = svc.ingest(req, None).await?;
+    let episode_id = IngestCapability::ingest(&svc.build_context(), req.clone(), None).await?;
+    let episode_id_2 = IngestCapability::ingest(&svc.build_context(), req, None).await?;
     assert_eq!(episode_id, episode_id_2);
 
-    let payload = svc.extract(&episode_id, None, None).await?;
+    let payload = ExtractCapability::extract(&svc.build_context(), &episode_id, None, None).await?;
     assert_eq!(payload.episode_id, episode_id);
     assert!(!payload.entities.is_empty());
     assert!(!payload.facts.is_empty());

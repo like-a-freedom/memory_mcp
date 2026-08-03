@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -74,26 +76,26 @@ async fn ingest_and_extract(
     source_id: &str,
     content: &str,
 ) -> Result<memory_mcp::models::ExtractResult, memory_mcp::MemoryError> {
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: source_type.to_string(),
-                source_id: source_id.to_string(),
-                content: content.to_string(),
-                t_ref: "2026-04-07T10:00:00Z"
-                    .parse::<DateTime<Utc>>()
-                    .expect("static timestamp should parse"),
-                scope: scope.to_string(),
-                project: None,
-                t_ingested: Some("2026-04-07T10:00:00Z".parse().expect("static timestamp")),
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await?;
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        IngestRequest {
+            source_type: source_type.to_string(),
+            source_id: source_id.to_string(),
+            content: content.to_string(),
+            t_ref: "2026-04-07T10:00:00Z"
+                .parse::<DateTime<Utc>>()
+                .expect("static timestamp should parse"),
+            scope: scope.to_string(),
+            project: None,
+            t_ingested: Some("2026-04-07T10:00:00Z".parse().expect("static timestamp")),
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await?;
 
-    service.extract(&episode_id, None, None).await
+    ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await
 }
 
 struct CaseResult {
@@ -120,13 +122,13 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         {
             return EvalCaseOutcome {
                 case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
-                mode: EvalMode::EndToEnd,
-                split: CorpusSplit::Development,
+                mode: EvalMode::RetrievalOnly,
+                split: CorpusSplit::Test,
                 label_trust: LabelTrust::Official,
                 status: CaseStatus::Invalid,
                 metrics: std::collections::BTreeMap::new(),
                 evidence: std::collections::BTreeMap::new(),
-                invalid_reason: Some(format!("setup episode failed: {err}")),
+                invalid_reason: Some(format!("ingest_and_extract failed: {err}")),
                 failures: vec![],
                 duration_ms: start.elapsed().as_millis() as u64,
                 attempts: 1,

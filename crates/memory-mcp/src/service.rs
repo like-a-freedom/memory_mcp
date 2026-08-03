@@ -60,7 +60,7 @@ mod util;
 
 pub mod procedures;
 
-pub(crate) mod capabilities;
+pub mod capabilities;
 mod model_loader;
 pub mod service_context;
 pub(crate) mod value_helpers;

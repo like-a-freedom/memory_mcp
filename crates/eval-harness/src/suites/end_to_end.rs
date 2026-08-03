@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -181,25 +184,25 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     let mut all_entities: Vec<String> = Vec::new();
 
     for source in &case.sources {
-        let episode_id = match service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: source.source_type.clone(),
-                    source_id: source.source_id.clone(),
-                    content: source.content.clone(),
-                    t_ref: case.t_ref,
-                    scope: case.scope.clone(),
-                    project: case.project.clone(),
-                    // Keep transaction time inside the fixture's as_of window;
-                    // leaving this unset would use Utc::now() and hide the fact
-                    // from a deterministic historical query.
-                    t_ingested: Some(case.t_ref),
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await
+        let episode_id = match IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: source.source_type.clone(),
+                source_id: source.source_id.clone(),
+                content: source.content.clone(),
+                t_ref: case.t_ref,
+                scope: case.scope.clone(),
+                project: case.project.clone(),
+                // Keep transaction time inside the fixture's as_of window;
+                // leaving this unset would use Utc::now() and hide the fact
+                // from a deterministic historical query.
+                t_ingested: Some(case.t_ref),
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
         {
             Ok(id) => id,
             Err(err) => {
@@ -219,7 +222,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             }
         };
 
-        match service.extract(&episode_id, None, None).await {
+        match ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await {
             Ok(extraction) => {
                 all_entities.extend(extraction.entities.iter().map(|e| e.canonical_name.clone()));
             }
@@ -242,8 +245,9 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     }
 
     let query_start = std::time::Instant::now();
-    let context_result = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let context_result = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),
             scope: case.scope.clone(),
             as_of: Some(case.as_of),
@@ -255,8 +259,9 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await;
+        },
+    )
+    .await;
 
     let query_ms = query_start.elapsed().as_millis() as u64;
 

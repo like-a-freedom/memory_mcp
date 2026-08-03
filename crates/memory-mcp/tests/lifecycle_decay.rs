@@ -8,6 +8,7 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::Provenance;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 use memory_mcp::service::run_decay_pass;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
@@ -281,17 +282,17 @@ async fn decay_pass_skips_already_invalidated_facts() {
         .expect("fact added");
 
     // Pre-invalidate the fact
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "test pre-invalidation".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .expect("fact invalidated");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "test pre-invalidation".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .expect("fact invalidated");
 
     // Act: Run decay pass
     let count = run_decay_pass(&service, 0.3, 100.0)

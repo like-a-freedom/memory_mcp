@@ -5,6 +5,11 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::models::Provenance;
 use memory_mcp::service::EntityExtractor;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::explain::ExplainCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use serde_json::{Value, json};
 
@@ -58,10 +63,14 @@ async fn test_service_ingest_and_extract_flow() {
         policy_tags: vec![],
     };
 
-    let episode_id = service.ingest(request, None).await.unwrap();
+    let episode_id = IngestCapability::ingest(&service.build_context(), request, None)
+        .await
+        .unwrap();
     assert!(episode_id.starts_with("episode:"));
 
-    let result = service.extract(&episode_id, None, None).await.unwrap();
+    let result = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+        .await
+        .unwrap();
 
     assert_eq!(result.episode_id, episode_id);
     assert!(!result.entities.is_empty());
@@ -155,7 +164,9 @@ async fn test_service_add_fact_and_assemble_context() {
         compact: false,
     };
 
-    let context = service.assemble_context(request).await.unwrap();
+    let context = AssembleContextCapability::assemble_context(&service.build_context(), request)
+        .await
+        .unwrap();
     assert!(!context.is_empty());
     assert!(!context[0].fact_id.is_empty());
     assert!(!context[0].content.is_empty());
@@ -205,25 +216,27 @@ async fn test_service_add_fact_persists_provenance() {
 async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "edge-prov-1".to_string(),
-                content: "Meeting with Alice Smith about ARR goals".to_string(),
-                t_ref: Utc.with_ymd_and_hms(2024, 3, 2, 12, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "edge-prov-1".to_string(),
+            content: "Meeting with Alice Smith about ARR goals".to_string(),
+            t_ref: Utc.with_ymd_and_hms(2024, 3, 2, 12, 0, 0).unwrap(),
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
+
+    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .unwrap();
-
-    let extraction = service.extract(&episode_id, None, None).await.unwrap();
     assert!(!extraction.links.is_empty());
 
     let edges = db_client.select_table("edge", "org").await.unwrap();
@@ -244,26 +257,29 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
 async fn test_service_extract_returns_contradiction_warning_for_conflicting_metric_fact() {
     let service = common::make_service().await;
 
-    let first_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "chat".to_string(),
-                source_id: "contradiction-metric-1".to_string(),
-                content: "Alice Smith reports ARR is $5M.".to_string(),
-                t_ref: "2026-03-01T10:00:00Z"
-                    .parse()
-                    .expect("static timestamp should parse"),
-                scope: "personal".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest first episode");
-    let first_result = service.extract(&first_episode, None, None).await.unwrap();
+    let first_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "chat".to_string(),
+            source_id: "contradiction-metric-1".to_string(),
+            content: "Alice Smith reports ARR is $5M.".to_string(),
+            t_ref: "2026-03-01T10:00:00Z"
+                .parse()
+                .expect("static timestamp should parse"),
+            scope: "personal".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest first episode");
+    let first_result =
+        ExtractCapability::extract(&service.build_context(), &first_episode, None, None)
+            .await
+            .unwrap();
     let first_json = serde_json::to_value(&first_result).expect("serialize first extract result");
 
     assert_eq!(
@@ -275,26 +291,29 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
         0
     );
 
-    let second_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "chat".to_string(),
-                source_id: "contradiction-metric-2".to_string(),
-                content: "Alice Smith reports ARR is $7M.".to_string(),
-                t_ref: "2026-03-01T10:00:00Z"
-                    .parse()
-                    .expect("static timestamp should parse"),
-                scope: "personal".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest second episode");
-    let second_result = service.extract(&second_episode, None, None).await.unwrap();
+    let second_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "chat".to_string(),
+            source_id: "contradiction-metric-2".to_string(),
+            content: "Alice Smith reports ARR is $7M.".to_string(),
+            t_ref: "2026-03-01T10:00:00Z"
+                .parse()
+                .expect("static timestamp should parse"),
+            scope: "personal".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest second episode");
+    let second_result =
+        ExtractCapability::extract(&service.build_context(), &second_episode, None, None)
+            .await
+            .unwrap();
     let second_json =
         serde_json::to_value(&second_result).expect("serialize second extract result");
 
@@ -398,23 +417,23 @@ async fn test_service_exposes_regex_entity_extractor() {
 async fn test_service_does_not_persist_fact_embeddings_without_provider() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "semantic-slot-1".to_string(),
-                content: "Alice Smith reviewed ARR improvements".to_string(),
-                t_ref: Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "semantic-slot-1".to_string(),
+            content: "Alice Smith reviewed ARR improvements".to_string(),
+            t_ref: Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let entity_id = service
         .resolve_entity("person", "Alice Smith")
@@ -477,8 +496,9 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
         .await
         .unwrap();
 
-    let context = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let context = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "salary raise".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now()),
@@ -490,9 +510,10 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(
         context.iter().all(|item| item.fact_id != fact_id),
@@ -517,24 +538,26 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
         ("community-merge-1", "Alice Smith met Bob Jones"),
         ("community-merge-2", "Bob Jones met Carol White"),
     ] {
-        let episode_id = service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "meeting".to_string(),
-                    source_id: source_id.to_string(),
-                    content: content.to_string(),
-                    t_ref: Utc.with_ymd_and_hms(2024, 4, 2, 10, 0, 0).unwrap(),
-                    scope: "org".to_string(),
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
+        let episode_id = IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "meeting".to_string(),
+                source_id: source_id.to_string(),
+                content: content.to_string(),
+                t_ref: Utc.with_ymd_and_hms(2024, 4, 2, 10, 0, 0).unwrap(),
+                scope: "org".to_string(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
+        .unwrap();
+        ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
             .await
             .unwrap();
-        service.extract(&episode_id, None, None).await.unwrap();
     }
 
     let communities = db_client.select_table("community", "org").await.unwrap();
@@ -592,21 +615,24 @@ async fn test_service_fact_invalidation() {
         access: None,
         compact: false,
     };
-    let context_before = service.assemble_context(request_before).await.unwrap();
+    let context_before =
+        AssembleContextCapability::assemble_context(&service.build_context(), request_before)
+            .await
+            .unwrap();
     assert!(context_before.iter().any(|f| f.fact_id == fact_id));
 
     let t_invalid = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "Superseded by new value".to_string(),
-                t_invalid,
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "Superseded by new value".to_string(),
+            t_invalid,
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let request_after = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
@@ -621,7 +647,10 @@ async fn test_service_fact_invalidation() {
         access: None,
         compact: false,
     };
-    let context_after = service.assemble_context(request_after).await.unwrap();
+    let context_after =
+        AssembleContextCapability::assemble_context(&service.build_context(), request_after)
+            .await
+            .unwrap();
     assert!(!context_after.iter().any(|f| f.fact_id == fact_id));
 }
 
@@ -660,10 +689,15 @@ async fn test_service_cache_behavior() {
         access: None,
         compact: false,
     };
-    let result1 = service.assemble_context(request.clone()).await.unwrap();
+    let result1 =
+        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+            .await
+            .unwrap();
     assert!(!result1.is_empty());
 
-    let result2 = service.assemble_context(request).await.unwrap();
+    let result2 = AssembleContextCapability::assemble_context(&service.build_context(), request)
+        .await
+        .unwrap();
     assert_eq!(result1.len(), result2.len());
 }
 
@@ -687,8 +721,9 @@ async fn test_service_assemble_context_records_fact_access_heat() {
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "heat tracking retrieval".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -700,9 +735,10 @@ async fn test_service_assemble_context_records_fact_access_heat() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(items.iter().any(|item| item.fact_id == fact_id));
 
@@ -755,7 +791,10 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
         compact: false,
     };
 
-    let first_items = service.assemble_context(request.clone()).await.unwrap();
+    let first_items =
+        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+            .await
+            .unwrap();
     assert!(first_items.iter().any(|item| item.fact_id == fact_id));
 
     let stored_after_first = db_client
@@ -772,7 +811,10 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
     );
     assert!(stored_after_first.get("last_accessed").is_some());
 
-    let second_items = service.assemble_context(request).await.unwrap();
+    let second_items =
+        AssembleContextCapability::assemble_context(&service.build_context(), request)
+            .await
+            .unwrap();
     assert!(second_items.iter().any(|item| item.fact_id == fact_id));
 
     let stored_after_second = db_client
@@ -810,8 +852,9 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "default disabled query logging".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
@@ -823,9 +866,10 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(!items.is_empty());
 
@@ -856,8 +900,9 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "query analytics retrieval".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
@@ -869,9 +914,10 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(items.iter().any(|item| item.fact_id == fact_id));
 
@@ -933,8 +979,9 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
     )
     .await;
 
-    let _ = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let _ = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -946,9 +993,10 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("assemble context");
+        },
+    )
+    .await
+    .expect("assemble context");
 
     let query_logs = db_client.select_table("query_log", "org").await.unwrap();
     let row = query_logs.first().expect("query_log row should exist");
@@ -1005,8 +1053,13 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
         compact: false,
     };
 
-    let first = service.assemble_context(request.clone()).await.unwrap();
-    let second = service.assemble_context(request).await.unwrap();
+    let first =
+        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+            .await
+            .unwrap();
+    let second = AssembleContextCapability::assemble_context(&service.build_context(), request)
+        .await
+        .unwrap();
 
     assert!(!first.is_empty());
     assert!(!second.is_empty());
@@ -1064,8 +1117,9 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "default retention pruning".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 13, 5, 0).unwrap()),
@@ -1077,9 +1131,10 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(!items.is_empty());
     assert!(
@@ -1137,8 +1192,9 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "custom retention pruning".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 14, 5, 0).unwrap()),
@@ -1150,9 +1206,10 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(!items.is_empty());
     assert!(
@@ -1231,7 +1288,10 @@ async fn test_service_scope_isolation() {
         access: None,
         compact: false,
     };
-    let org_results = service.assemble_context(request_org).await.unwrap();
+    let org_results =
+        AssembleContextCapability::assemble_context(&service.build_context(), request_org)
+            .await
+            .unwrap();
     assert!(org_results.iter().all(|r| { r.content.contains("Org") }));
 }
 
@@ -1261,8 +1321,9 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
     )
     .await;
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "atlas".to_string(),
             scope: "personal".to_string(),
             as_of: None,
@@ -1274,9 +1335,10 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
             window_end: Some(Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap()),
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     let contents = items
         .iter()
@@ -1314,8 +1376,9 @@ async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mod
     )
     .await;
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
             scope: "personal".to_string(),
             as_of: None,
@@ -1327,9 +1390,10 @@ async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mod
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("assemble context");
+        },
+    )
+    .await
+    .expect("assemble context");
 
     assert_eq!(items.len(), 3);
     assert!(items[0].content.contains("planning started"));
@@ -1367,8 +1431,9 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
     )
     .await;
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "Alice Stone".to_string(),
             scope: "org".to_string(),
             as_of: None,
@@ -1380,9 +1445,10 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .expect("assemble context");
+        },
+    )
+    .await
+    .expect("assemble context");
 
     let graph_item = items
         .iter()
@@ -1396,41 +1462,41 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
     let service = common::make_service().await;
     let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
 
-    let atlas_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "document".to_string(),
-                source_id: "project-atlas-budget".to_string(),
-                content: "Atlas budget source note".to_string(),
-                t_ref: t_valid,
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-                project: Some("atlas".to_string()),
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let atlas_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "document".to_string(),
+            source_id: "project-atlas-budget".to_string(),
+            content: "Atlas budget source note".to_string(),
+            t_ref: t_valid,
+            scope: "org".to_string(),
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+            project: Some("atlas".to_string()),
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
-    let beacon_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "document".to_string(),
-                source_id: "project-beacon-budget".to_string(),
-                content: "Beacon budget source note".to_string(),
-                t_ref: t_valid,
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-                project: Some("beacon".to_string()),
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let beacon_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "document".to_string(),
+            source_id: "project-beacon-budget".to_string(),
+            content: "Beacon budget source note".to_string(),
+            t_ref: t_valid,
+            scope: "org".to_string(),
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+            project: Some("beacon".to_string()),
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     service
         .add_fact(
@@ -1481,8 +1547,9 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
         .unwrap();
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
             scope: "org".to_string(),
             as_of: Some(as_of),
@@ -1494,9 +1561,10 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             project: Some("atlas".to_string()),
             fact_types: vec!["metric".to_string()],
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     let contents = items
         .iter()
@@ -1513,23 +1581,23 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
     let note_time = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
     let experience_time = Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap();
 
-    let source_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "document".to_string(),
-                source_id: "experience-primary-match".to_string(),
-                content: "Atlas source episode".to_string(),
-                t_ref: note_time,
-                scope: "org".to_string(),
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-                project: None,
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let source_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "document".to_string(),
+            source_id: "experience-primary-match".to_string(),
+            content: "Atlas source episode".to_string(),
+            t_ref: note_time,
+            scope: "org".to_string(),
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+            project: None,
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     service
         .add_fact(
@@ -1563,8 +1631,9 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -1576,9 +1645,10 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             project: None,
             fact_types: vec![],
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert_eq!(items[0].content, "Atlas budget is $2M");
     assert!(
@@ -1631,29 +1701,30 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
             t_valid + chrono::Duration::minutes(2),
         ),
     ] {
-        service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "document".to_string(),
-                    source_id: source_id.to_string(),
-                    content: content.to_string(),
-                    t_ref,
-                    scope: "org".to_string(),
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: policy_tags.into_iter().map(str::to_string).collect(),
-                    project: project.map(str::to_string),
-                },
-                None,
-            )
-            .await
-            .unwrap();
+        IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "document".to_string(),
+                source_id: source_id.to_string(),
+                content: content.to_string(),
+                t_ref,
+                scope: "org".to_string(),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: policy_tags.into_iter().map(str::to_string).collect(),
+                project: project.map(str::to_string),
+            },
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: String::new(),
             scope: "org".to_string(),
             as_of: Some(as_of),
@@ -1665,9 +1736,10 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
             project: None,
             fact_types: vec![],
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     let atlas = items
         .iter()
@@ -1743,8 +1815,9 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
 
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "ignored".to_string(),
             scope: "org".to_string(),
             as_of: Some(as_of),
@@ -1756,9 +1829,10 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             project: None,
             fact_types: vec![],
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     let contents = items
         .iter()
@@ -1796,8 +1870,9 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
     service.relate(&bob_id, "knows", &carol_id).await.unwrap();
     service.relate(&bob_id, "knows", &diana_id).await.unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: String::new(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -1809,9 +1884,10 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert_eq!(items.len(), 3, "expected top 3 hub entities");
     assert!(
@@ -1856,8 +1932,9 @@ async fn test_service_assemble_context_map_view_includes_communities() {
     )
     .await;
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: String::new(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -1869,9 +1946,10 @@ async fn test_service_assemble_context_map_view_includes_communities() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     let community = items
         .iter()
@@ -1925,8 +2003,9 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
             .unwrap();
     }
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "event".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -1938,9 +2017,10 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert_eq!(items.len(), 3);
     // Timeline view must be chronologically ascending by t_ref.
@@ -1984,11 +2064,16 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
     };
 
     // First call: cache miss, computes and stores in cache.
-    let first = service.assemble_context(request.clone()).await.unwrap();
+    let first =
+        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+            .await
+            .unwrap();
     assert!(first.iter().any(|item| item.fact_id == fact_id));
 
     // Second call with identical params: cache hit, still tracks access.
-    let second = service.assemble_context(request).await.unwrap();
+    let second = AssembleContextCapability::assemble_context(&service.build_context(), request)
+        .await
+        .unwrap();
     assert_eq!(first.len(), second.len());
 
     let stored = db_client
@@ -2008,23 +2093,23 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
 async fn test_service_assemble_context_appends_recent_experience_for_browse_like_requests() {
     let (service, _db_client) = common::make_service_with_client().await;
 
-    let source_episode = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "document".to_string(),
-                source_id: "experience-browse-base".to_string(),
-                content: "Atlas source episode".to_string(),
-                t_ref: Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let source_episode = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "document".to_string(),
+            source_id: "experience-browse-base".to_string(),
+            content: "Atlas source episode".to_string(),
+            t_ref: Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let fact_id = service
         .add_fact(
@@ -2058,8 +2143,9 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: String::new(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -2071,9 +2157,10 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(
         items.iter().any(|item| item.fact_id == fact_id),
@@ -2107,8 +2194,9 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "query logging enabled".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -2120,9 +2208,10 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(!items.is_empty());
 
@@ -2234,21 +2323,24 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         access: None,
         compact: false,
     };
-    let cached = service.assemble_context(request.clone()).await.unwrap();
+    let cached =
+        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+            .await
+            .unwrap();
     assert!(cached.iter().any(|item| item.fact_id == fact_id));
 
     // Invalidate the fact.
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "superseded".to_string(),
-                t_invalid: Utc::now() - chrono::Duration::seconds(10),
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "superseded".to_string(),
+            t_invalid: Utc::now() - chrono::Duration::seconds(10),
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     // Re-query with a later as_of — invalidated fact must be excluded.
     let after_request = memory_mcp::models::AssembleContextRequest {
@@ -2264,7 +2356,10 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         access: None,
         compact: false,
     };
-    let after = service.assemble_context(after_request).await.unwrap();
+    let after =
+        AssembleContextCapability::assemble_context(&service.build_context(), after_request)
+            .await
+            .unwrap();
     assert!(
         !after.iter().any(|item| item.fact_id == fact_id),
         "invalidated fact should not appear in context after cache invalidation"
@@ -2305,23 +2400,23 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
     )
     .await;
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "explain-graph-1".to_string(),
-                content: "Bob Explain coordinated the partner review".to_string(),
-                t_ref,
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "explain-graph-1".to_string(),
+            content: "Bob Explain coordinated the partner review".to_string(),
+            t_ref,
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let fact_id = service
         .add_fact(
@@ -2339,31 +2434,31 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
         .await
         .unwrap();
 
-    let explanation = service
-        .explain(
-            memory_mcp::models::ExplainRequest {
-                context_pack: vec![memory_mcp::models::ExplainItem {
-                    fact_id: Some(fact_id),
-                    content: "Bob Explain coordinated the partner review".to_string(),
-                    quote: "Bob Explain coordinated the partner review".to_string(),
-                    source_episode: episode_id.clone(),
-                    scope: None,
-                    t_ref: None,
-                    t_ingested: None,
-                    provenance: serde_json::json!({"source_episode": &episode_id}),
-                    citation_context: None,
-                    all_sources: vec![],
-                    graph_insights: None,
-                    fact_age_days: None,
-                    decayed_confidence: None,
-                    ingestion_method: None,
-                }],
-                compact: false,
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let explanation = ExplainCapability::explain(
+        &service.build_context(),
+        memory_mcp::models::ExplainRequest {
+            context_pack: vec![memory_mcp::models::ExplainItem {
+                fact_id: Some(fact_id),
+                content: "Bob Explain coordinated the partner review".to_string(),
+                quote: "Bob Explain coordinated the partner review".to_string(),
+                source_episode: episode_id.clone(),
+                scope: None,
+                t_ref: None,
+                t_ingested: None,
+                provenance: serde_json::json!({"source_episode": &episode_id}),
+                citation_context: None,
+                all_sources: vec![],
+                graph_insights: None,
+                fact_age_days: None,
+                decayed_confidence: None,
+                ingestion_method: None,
+            }],
+            compact: false,
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let serialized = serde_json::to_value(&explanation[0]).expect("serialize explain item");
     let graph_insights = serialized
@@ -2429,8 +2524,9 @@ async fn test_service_multi_namespace_scope_isolation() {
         .unwrap();
 
     // Query "personal" scope — should only return the personal fact.
-    let personal_items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let personal_items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
             scope: "personal".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -2442,9 +2538,10 @@ async fn test_service_multi_namespace_scope_isolation() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(
         personal_items
@@ -2460,8 +2557,9 @@ async fn test_service_multi_namespace_scope_isolation() {
     );
 
     // Query "org" scope — should only return the org fact.
-    let org_items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let org_items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -2473,9 +2571,10 @@ async fn test_service_multi_namespace_scope_isolation() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(
         org_items.iter().any(|item| item.fact_id == org_fact_id),
@@ -2513,8 +2612,9 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
         .await
         .unwrap();
 
-    let items = service
-        .assemble_context(memory_mcp::models::AssembleContextRequest {
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
             query: "quantum entanglement photon superposition".to_string(),
             scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
@@ -2526,9 +2626,10 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await
-        .unwrap();
+        },
+    )
+    .await
+    .unwrap();
 
     assert!(
         items.is_empty(),
@@ -2599,17 +2700,17 @@ async fn test_service_decay_pass_skips_already_invalidated_facts() {
         .unwrap();
 
     // Manually invalidate first.
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "pre-invalidation".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "pre-invalidation".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let count = memory_mcp::service::run_decay_pass(&service, 0.3, 100.0)
         .await
@@ -2633,23 +2734,23 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - chrono::Duration::days(200);
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "archival-real-1".to_string(),
-                content: "Old episode for archival".to_string(),
-                t_ref: old_date,
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "archival-real-1".to_string(),
+            content: "Old episode for archival".to_string(),
+            t_ref: old_date,
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let fact_id = service
         .add_fact(
@@ -2668,17 +2769,17 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
         .unwrap();
 
     // Invalidate the fact so the episode becomes eligible for archival.
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id,
-                reason: "prepare archival".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id,
+            reason: "prepare archival".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     let count = memory_mcp::service::run_archival_pass(&service, 90)
         .await
@@ -2706,23 +2807,23 @@ async fn test_service_archival_pass_skips_recent_episodes() {
     let (service, db_client) = common::make_service_with_client().await;
     let recent_date = Utc::now() - chrono::Duration::days(10);
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "chat".to_string(),
-                source_id: "archival-recent-skip".to_string(),
-                content: "Recent episode should not be archived".to_string(),
-                t_ref: recent_date,
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .unwrap();
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "chat".to_string(),
+            source_id: "archival-recent-skip".to_string(),
+            content: "Recent episode should not be archived".to_string(),
+            t_ref: recent_date,
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .unwrap();
 
     service
         .add_fact(
@@ -2761,8 +2862,9 @@ async fn test_service_archival_pass_skips_recent_episodes() {
 #[tokio::test]
 async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
     let service = common::make_service().await;
-    let episode_id = service
-        .ingest(
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+
             memory_mcp::models::IngestRequest {
                 source_type: "requirement".to_string(),
                 source_id: "summary-requirement-1".to_string(),
@@ -2779,8 +2881,7 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
         .await
         .expect("ingest summary episode");
 
-    let extraction = service
-        .extract(&episode_id, None, None)
+    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .expect("extract summary episode");
 
@@ -2793,8 +2894,9 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
 #[tokio::test]
 async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_records() {
     let (service, db_client) = common::make_service_with_client().await;
-    let episode_id = service
-        .ingest(
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+
             memory_mcp::models::IngestRequest {
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-summary-line-facts-1".to_string(),
@@ -2811,8 +2913,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         .await
         .expect("ingest meeting summary episode");
 
-    let extraction = service
-        .extract(&episode_id, None, None)
+    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .expect("extract meeting summary episode");
 
@@ -2870,8 +2971,9 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
 #[tokio::test]
 async fn test_extract_summary_with_thematic_sections_generates_line_level_note_records() {
     let (service, db_client) = common::make_service_with_client().await;
-    let episode_id = service
-        .ingest(
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+
             memory_mcp::models::IngestRequest {
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-summary-thematic-sections-1".to_string(),
@@ -2888,8 +2990,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         .await
         .expect("ingest thematic summary episode");
 
-    let extraction = service
-        .extract(&episode_id, None, None)
+    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .expect("extract thematic summary episode");
 

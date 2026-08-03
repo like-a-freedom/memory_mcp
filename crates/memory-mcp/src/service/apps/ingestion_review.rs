@@ -31,7 +31,8 @@ impl crate::service::MemoryService {
         ) {
             (Some(source_text), None) => {
                 let now = Utc::now();
-                self.ingest(
+                crate::service::capabilities::ingest::IngestCapability::ingest(
+                    &self.build_context(),
                     IngestRequest {
                         source_type: "app_ingestion_review".to_string(),
                         source_id: format!(

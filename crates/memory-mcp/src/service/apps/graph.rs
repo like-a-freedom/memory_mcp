@@ -48,6 +48,53 @@ impl MemoryService {
         )
         .await
     }
+
+    /// Resolves an entity by its type and canonical name.
+    ///
+    /// Graph/entity convenience built on [`ResolveCapability`]; lives here with
+    /// the other graph conveniences per ADR-0024 step 1.
+    pub async fn resolve_entity(
+        &self,
+        entity_type: &str,
+        name: &str,
+    ) -> Result<String, MemoryError> {
+        use crate::service::capabilities::resolve::ResolveCapability;
+        ResolveCapability::resolve(
+            &self.build_context(),
+            crate::models::EntityCandidate {
+                entity_type: entity_type.to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
+
+    /// Creates a relationship edge between two entities.
+    pub async fn relate(
+        &self,
+        from_id: &str,
+        relation: &str,
+        to_id: &str,
+    ) -> Result<(), MemoryError> {
+        use crate::models::{Edge, EdgeOrigin};
+        let edge = Edge {
+            in_id: from_id.to_string(),
+            relation: relation.to_string(),
+            out_id: to_id.to_string(),
+            origin: EdgeOrigin::Inferred,
+            strength: 1.0,
+            confidence: 0.8,
+            provenance: crate::models::Provenance::manual(),
+            t_valid: crate::service::query::now(),
+            t_ingested: crate::service::query::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+        };
+        crate::service::episode::store_edge(&self.build_context(), &edge, &self.default_namespace)
+            .await
+    }
 }
 
 const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;

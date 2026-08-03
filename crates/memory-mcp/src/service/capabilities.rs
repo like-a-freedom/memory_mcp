@@ -1,10 +1,10 @@
-pub(crate) mod invalidate;
+pub mod invalidate;
 
-pub(crate) mod assemble_context;
-pub(crate) mod explain;
-pub(crate) mod extract;
-pub(crate) mod ingest;
-pub(crate) mod resolve;
+pub mod assemble_context;
+pub mod explain;
+pub mod extract;
+pub mod ingest;
+pub mod resolve;
 
 #[cfg(test)]
 pub(crate) mod test_support {

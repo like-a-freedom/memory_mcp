@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -204,26 +206,25 @@ async fn ingest_and_extract(
 ) -> Result<(memory_mcp::models::ExtractResult, ExtractedSource), EvalError> {
     let t_ref_datetime = parse_reference_time(params.t_ref)?;
 
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: params.source_type.to_string(),
-                source_id: params.source_id.to_string(),
-                content: params.content.to_string(),
-                t_ref: t_ref_datetime,
-                scope: params.scope.to_string(),
-                project: params.project.map(str::to_string),
-                t_ingested: Some(t_ref_datetime),
-                visibility_scope: None,
-                policy_tags: params.policy_tags.to_vec(),
-            },
-            None,
-        )
-        .await
-        .map_err(|e| EvalError::Suite(format!("ingest failed for {}: {e}", params.source_id)))?;
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        IngestRequest {
+            source_type: params.source_type.to_string(),
+            source_id: params.source_id.to_string(),
+            content: params.content.to_string(),
+            t_ref: t_ref_datetime,
+            scope: params.scope.to_string(),
+            project: params.project.map(str::to_string),
+            t_ingested: Some(t_ref_datetime),
+            visibility_scope: None,
+            policy_tags: params.policy_tags.to_vec(),
+        },
+        None,
+    )
+    .await
+    .map_err(|e| EvalError::Suite(format!("ingest failed for {}: {e}", params.source_id)))?;
 
-    let extraction = service
-        .extract(&episode_id, None, None)
+    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .map_err(|e| EvalError::Suite(format!("extract failed for {}: {e}", params.source_id)))?;
 

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -228,8 +229,9 @@ impl LocalRetrievalSuite {
         }
 
         let as_of = case_as_of(case);
-        let items = match service
-            .assemble_context(memory_mcp::models::AssembleContextRequest {
+        let items = match AssembleContextCapability::assemble_context(
+            &service.build_context(),
+            memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),
                 scope: case.scope.clone(),
                 as_of: Some(as_of),
@@ -241,8 +243,9 @@ impl LocalRetrievalSuite {
                 window_end: None,
                 access: None,
                 compact: false,
-            })
-            .await
+            },
+        )
+        .await
         {
             Ok(items) => items,
             Err(err) => {

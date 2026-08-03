@@ -1,4 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 fn bench_ner_cpu_single_window(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -7,8 +9,9 @@ fn bench_ner_cpu_single_window(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
-                let episode_id = service
-                    .ingest(
+                let episode_id = IngestCapability::ingest(
+                    &service.build_context(),
+
                         memory_mcp::models::IngestRequest {
                             source_type: "bench".into(),
                             source_id: "ner-bench-001".into(),
@@ -24,7 +27,7 @@ fn bench_ner_cpu_single_window(c: &mut Criterion) {
                     )
                     .await
                     .unwrap();
-                black_box(service.extract(&episode_id, None, None).await.unwrap());
+                black_box(ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await.unwrap());
             });
         });
     });
@@ -42,8 +45,9 @@ fn bench_ner_cpu_multi_window(c: &mut Criterion) {
                         .map(|i| format!("Window {i}: Alice Smith from Acme Corp reported revenue milestone {i}."))
                         .collect::<Vec<_>>()
                         .join(". ");
-                    let episode_id = service
-                        .ingest(
+                    let episode_id = IngestCapability::ingest(
+                        &service.build_context(),
+
                             memory_mcp::models::IngestRequest {
                                 source_type: "bench".into(),
                                 source_id: "ner-bench-multi".into(),
@@ -64,7 +68,7 @@ fn bench_ner_cpu_multi_window(c: &mut Criterion) {
             },
             |(service, episode_id)| {
                 rt.block_on(async {
-                    black_box(service.extract(&episode_id, None, None).await.unwrap());
+                    black_box(ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await.unwrap());
                 });
             },
             criterion::BatchSize::SmallInput,

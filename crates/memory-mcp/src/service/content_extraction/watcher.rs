@@ -124,22 +124,22 @@ impl FsWatcher {
                     LogLevel::Debug,
                 );
 
-                let ingest_result = service
-                    .ingest(
-                        IngestRequest {
-                            source_type: source_type.clone(),
-                            source_id: format!("watch:{}", path.display()),
-                            content: path.to_string_lossy().into_owned(),
-                            t_ref: now(),
-                            scope: scope.clone(),
-                            project: project.clone(),
-                            t_ingested: None,
-                            visibility_scope: None,
-                            policy_tags: vec![],
-                        },
-                        None,
-                    )
-                    .await;
+                let ingest_result = crate::service::capabilities::ingest::IngestCapability::ingest(
+                    &service.build_context(),
+                    IngestRequest {
+                        source_type: source_type.clone(),
+                        source_id: format!("watch:{}", path.display()),
+                        content: path.to_string_lossy().into_owned(),
+                        t_ref: now(),
+                        scope: scope.clone(),
+                        project: project.clone(),
+                        t_ingested: None,
+                        visibility_scope: None,
+                        policy_tags: vec![],
+                    },
+                    None,
+                )
+                .await;
 
                 match ingest_result {
                     Ok(episode_id) => {

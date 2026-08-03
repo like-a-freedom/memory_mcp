@@ -3,6 +3,8 @@ mod embedded_support;
 use chrono::{Duration, Utc};
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
 use memory_mcp::service::MemoryService;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use memory_mcp::storage::SurrealDbClient;
 
@@ -50,8 +52,9 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
 
     let as_of_before = Utc::now() + Duration::seconds(1);
 
-    let context_before = service
-        .assemble_context(AssembleContextRequest {
+    let context_before = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "ARR".to_string(),
             scope: "org".to_string(),
             as_of: Some(as_of_before),
@@ -63,24 +66,26 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
     assert!(!context_before.is_empty());
 
-    service
-        .invalidate(
-            InvalidateRequest {
-                fact_id,
-                reason: "Superseded".to_string(),
-                t_invalid: now - Duration::seconds(1),
-            },
-            None,
-        )
-        .await?;
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        InvalidateRequest {
+            fact_id,
+            reason: "Superseded".to_string(),
+            t_invalid: now - Duration::seconds(1),
+        },
+        None,
+    )
+    .await?;
 
     let as_of_after = Utc::now() + Duration::seconds(2);
-    let context_after = service
-        .assemble_context(AssembleContextRequest {
+    let context_after = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        AssembleContextRequest {
             query: "ARR".to_string(),
             scope: "org".to_string(),
             as_of: Some(as_of_after),
@@ -92,8 +97,9 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             window_end: None,
             access: None,
             compact: false,
-        })
-        .await?;
+        },
+    )
+    .await?;
     assert!(context_after.is_empty());
 
     Ok(())

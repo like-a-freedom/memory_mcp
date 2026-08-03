@@ -12,6 +12,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::IngestRequest;
 use memory_mcp::service::MemoryService;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 fn parse_t_ref(s: &str) -> DateTime<Utc> {
@@ -31,25 +33,24 @@ async fn ingest_source(
     scope: &str,
     t_ref: &str,
 ) -> String {
-    let episode_id = service
-        .ingest(
-            IngestRequest {
-                source_type: source_type.to_string(),
-                source_id: source_id.to_string(),
-                content: content.to_string(),
-                t_ref: parse_t_ref(t_ref),
-                scope: scope.to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest should succeed");
-    service
-        .extract(&episode_id, None, None)
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        IngestRequest {
+            source_type: source_type.to_string(),
+            source_id: source_id.to_string(),
+            content: content.to_string(),
+            t_ref: parse_t_ref(t_ref),
+            scope: scope.to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest should succeed");
+    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
         .await
         .expect("extract should succeed");
     episode_id

@@ -1,4 +1,7 @@
 use async_trait::async_trait;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
@@ -42,31 +45,34 @@ impl PoisoningSuite {
             _ => "test",
         };
 
-        let result = service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "external".into(),
-                    source_id: format!("poison-{scenario}"),
-                    content: malicious_content.into(),
-                    t_ref: chrono::Utc::now(),
-                    scope: "org".into(),
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await;
+        let result = IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "external".into(),
+                source_id: format!("poison-{scenario}"),
+                content: malicious_content.into(),
+                t_ref: chrono::Utc::now(),
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
         match result {
             Ok(episode_id) => {
-                let _ = service.extract(&episode_id, None, None).await;
+                let _ =
+                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                        .await;
 
-                let context_result = service
-                    .assemble_context(memory_mcp::models::AssembleContextRequest {
+                let context_result = AssembleContextCapability::assemble_context(
+                    &service.build_context(),
+                    memory_mcp::models::AssembleContextRequest {
                         query: "admin mode safety".into(),
                         scope: "org".into(),
                         as_of: Some(chrono::Utc::now()),
@@ -78,8 +84,9 @@ impl PoisoningSuite {
                         window_end: None,
                         access: None,
                         compact: false,
-                    })
-                    .await;
+                    },
+                )
+                .await;
 
                 match context_result {
                     Ok(items) => {

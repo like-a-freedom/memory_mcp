@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
@@ -70,22 +73,22 @@ impl ActionGroundingSuite {
         let service = test_support::make_service().await;
 
         let content = "The security review was approved by the CISO on March 15, 2026.";
-        let episode_id = match service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "email".into(),
-                    source_id: format!("grounding-{mode_name}"),
-                    content: content.into(),
-                    t_ref: chrono::Utc::now(),
-                    scope: "org".into(),
-                    project: Some("security".into()),
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await
+        let episode_id = match IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "email".into(),
+                source_id: format!("grounding-{mode_name}"),
+                content: content.into(),
+                t_ref: chrono::Utc::now(),
+                scope: "org".into(),
+                project: Some("security".into()),
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
         {
             Ok(id) => id,
             Err(err) => {
@@ -105,10 +108,11 @@ impl ActionGroundingSuite {
             }
         };
 
-        let _ = service.extract(&episode_id, None, None).await;
+        let _ = ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await;
 
-        let context_result = service
-            .assemble_context(memory_mcp::models::AssembleContextRequest {
+        let context_result = AssembleContextCapability::assemble_context(
+            &service.build_context(),
+            memory_mcp::models::AssembleContextRequest {
                 query: "security review approval".into(),
                 scope: "org".into(),
                 as_of: Some(chrono::Utc::now()),
@@ -120,8 +124,9 @@ impl ActionGroundingSuite {
                 window_end: None,
                 access: None,
                 compact: false,
-            })
-            .await;
+            },
+        )
+        .await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 

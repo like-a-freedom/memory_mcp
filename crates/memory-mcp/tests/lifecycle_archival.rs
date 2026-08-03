@@ -8,6 +8,8 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::Provenance;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 use memory_mcp::service::run_archival_pass;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
@@ -19,23 +21,23 @@ async fn archival_pass_processes_all_configured_namespaces() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(150);
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "personal-archival-1".to_string(),
-                content: "Personal archival candidate".to_string(),
-                t_ref: old_date,
-                scope: "personal".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest episode");
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "personal-archival-1".to_string(),
+            content: "Personal archival candidate".to_string(),
+            t_ref: old_date,
+            scope: "personal".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest episode");
 
     let fact_id = service
         .add_fact(
@@ -53,17 +55,17 @@ async fn archival_pass_processes_all_configured_namespaces() {
         .await
         .expect("add fact");
 
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id,
-                reason: "prepare archival".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .expect("invalidate fact");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id,
+            reason: "prepare archival".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .expect("invalidate fact");
 
     let count = run_archival_pass(&service, 90)
         .await
@@ -84,23 +86,23 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(150);
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "personal-archival-hot-1".to_string(),
-                content: "Personal hot archival candidate".to_string(),
-                t_ref: old_date,
-                scope: "personal".to_string(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest episode");
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "personal-archival-hot-1".to_string(),
+            content: "Personal hot archival candidate".to_string(),
+            t_ref: old_date,
+            scope: "personal".to_string(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest episode");
 
     let fact_id = service
         .add_fact(
@@ -118,17 +120,17 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
         .await
         .expect("add fact");
 
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "prepare archival".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .expect("invalidate fact");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "prepare archival".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .expect("invalidate fact");
 
     db_client
         .update(
@@ -211,17 +213,17 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
     )
     .await;
 
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id: fact_id.clone(),
-                reason: "test invalidation".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .expect("fact invalidated");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "test invalidation".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .expect("fact invalidated");
 
     let count = run_archival_pass(&service, 90)
         .await
@@ -257,17 +259,17 @@ async fn archival_pass_respects_age_threshold() {
     )
     .await;
 
-    service
-        .invalidate(
-            memory_mcp::models::InvalidateRequest {
-                fact_id,
-                reason: "test".to_string(),
-                t_invalid: Utc::now(),
-            },
-            None,
-        )
-        .await
-        .expect("fact invalidated");
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        memory_mcp::models::InvalidateRequest {
+            fact_id,
+            reason: "test".to_string(),
+            t_invalid: Utc::now(),
+        },
+        None,
+    )
+    .await
+    .expect("fact invalidated");
 
     let count = run_archival_pass(&service, 90)
         .await
@@ -292,17 +294,17 @@ async fn archival_pass_batch_limit_respected() {
         )
         .await;
 
-        service
-            .invalidate(
-                memory_mcp::models::InvalidateRequest {
-                    fact_id,
-                    reason: "test".to_string(),
-                    t_invalid: Utc::now(),
-                },
-                None,
-            )
-            .await
-            .expect("fact invalidated");
+        InvalidateCapability::invalidate(
+            &service.build_context(),
+            memory_mcp::models::InvalidateRequest {
+                fact_id,
+                reason: "test".to_string(),
+                t_invalid: Utc::now(),
+            },
+            None,
+        )
+        .await
+        .expect("fact invalidated");
     }
 
     // Act: Run archival pass

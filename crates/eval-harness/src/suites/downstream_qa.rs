@@ -4,6 +4,9 @@
 // profiles until that pinning happens.
 
 use async_trait::async_trait;
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::error::EvalError;
@@ -109,22 +112,22 @@ impl EvalSuite for DownstreamQaSuite {
 
         let service = test_support::make_service().await;
         let content = "The team decided to adopt TypeScript for the new microservice.";
-        let episode_id = match service
-            .ingest(
-                memory_mcp::models::IngestRequest {
-                    source_type: "qa-test".into(),
-                    source_id: "qa-001".into(),
-                    content: content.into(),
-                    t_ref: chrono::Utc::now(),
-                    scope: "org".into(),
-                    project: None,
-                    t_ingested: None,
-                    visibility_scope: None,
-                    policy_tags: vec![],
-                },
-                None,
-            )
-            .await
+        let episode_id = match IngestCapability::ingest(
+            &service.build_context(),
+            memory_mcp::models::IngestRequest {
+                source_type: "qa-test".into(),
+                source_id: "qa-001".into(),
+                content: content.into(),
+                t_ref: chrono::Utc::now(),
+                scope: "org".into(),
+                project: None,
+                t_ingested: None,
+                visibility_scope: None,
+                policy_tags: vec![],
+            },
+            None,
+        )
+        .await
         {
             Ok(id) => id,
             Err(err) => {
@@ -144,11 +147,12 @@ impl EvalSuite for DownstreamQaSuite {
             }
         };
 
-        let _ = service.extract(&episode_id, None, None).await;
+        let _ = ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await;
 
         let start = std::time::Instant::now();
-        let context_result = service
-            .assemble_context(memory_mcp::models::AssembleContextRequest {
+        let context_result = AssembleContextCapability::assemble_context(
+            &service.build_context(),
+            memory_mcp::models::AssembleContextRequest {
                 query: "what language did the team choose?".into(),
                 scope: "org".into(),
                 as_of: Some(chrono::Utc::now()),
@@ -160,8 +164,9 @@ impl EvalSuite for DownstreamQaSuite {
                 window_end: None,
                 access: None,
                 compact: false,
-            })
-            .await;
+            },
+        )
+        .await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 

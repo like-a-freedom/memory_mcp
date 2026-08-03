@@ -1,4 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
+use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 fn bench_ingest(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -7,23 +10,23 @@ fn bench_ingest(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
-                service
-                    .ingest(
-                        memory_mcp::models::IngestRequest {
-                            source_type: "bench".into(),
-                            source_id: "bench-001".into(),
-                            content: "Benchmark test content for ingestion timing.".into(),
-                            t_ref: chrono::Utc::now(),
-                            scope: "org".into(),
-                            project: None,
-                            t_ingested: None,
-                            visibility_scope: None,
-                            policy_tags: vec![],
-                        },
-                        None,
-                    )
-                    .await
-                    .unwrap();
+                IngestCapability::ingest(
+                    &service.build_context(),
+                    memory_mcp::models::IngestRequest {
+                        source_type: "bench".into(),
+                        source_id: "bench-001".into(),
+                        content: "Benchmark test content for ingestion timing.".into(),
+                        t_ref: chrono::Utc::now(),
+                        scope: "org".into(),
+                        project: None,
+                        t_ingested: None,
+                        visibility_scope: None,
+                        policy_tags: vec![],
+                    },
+                    None,
+                )
+                .await
+                .unwrap();
             });
         });
     });
@@ -37,8 +40,9 @@ fn bench_extract(c: &mut Criterion) {
             || {
                 rt.block_on(async {
                     let service = eval_harness::test_support::make_service().await;
-                    let episode_id = service
-                        .ingest(
+                    let episode_id = IngestCapability::ingest(
+                        &service.build_context(),
+
                             memory_mcp::models::IngestRequest {
                                 source_type: "bench".into(),
                                 source_id: "bench-ext-001".into(),
@@ -59,7 +63,7 @@ fn bench_extract(c: &mut Criterion) {
             },
             |(service, episode_id)| {
                 rt.block_on(async {
-                    service.extract(&episode_id, None, None).await.unwrap();
+                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await.unwrap();
                 });
             },
             criterion::BatchSize::SmallInput,
@@ -75,26 +79,29 @@ fn bench_retrieval(c: &mut Criterion) {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
                 for i in 0..10 {
-                    service
-                        .ingest(
-                            memory_mcp::models::IngestRequest {
-                                source_type: "bench".into(),
-                                source_id: format!("bench-ret-{i}"),
-                                content: format!("Fact {i}: The project status update shows milestone {i} completed."),
-                                t_ref: chrono::Utc::now(),
-                                scope: "org".into(),
-                                project: None,
-                                t_ingested: None,
-                                visibility_scope: None,
-                                policy_tags: vec![],
-                            },
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    IngestCapability::ingest(
+                        &service.build_context(),
+                        memory_mcp::models::IngestRequest {
+                            source_type: "bench".into(),
+                            source_id: format!("bench-ret-{i}"),
+                            content: format!(
+                                "Fact {i}: The project status update shows milestone {i} completed."
+                            ),
+                            t_ref: chrono::Utc::now(),
+                            scope: "org".into(),
+                            project: None,
+                            t_ingested: None,
+                            visibility_scope: None,
+                            policy_tags: vec![],
+                        },
+                        None,
+                    )
+                    .await
+                    .unwrap();
                 }
-                service
-                    .assemble_context(memory_mcp::models::AssembleContextRequest {
+                AssembleContextCapability::assemble_context(
+                    &service.build_context(),
+                    memory_mcp::models::AssembleContextRequest {
                         query: "project status".into(),
                         scope: "org".into(),
                         as_of: Some(chrono::Utc::now()),
@@ -106,9 +113,10 @@ fn bench_retrieval(c: &mut Criterion) {
                         window_end: None,
                         access: None,
                         compact: false,
-                    })
-                    .await
-                    .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             });
         });
     });

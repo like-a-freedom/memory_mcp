@@ -1,4 +1,5 @@
 use chrono::{TimeZone, Utc};
+use memory_mcp::service::capabilities::ingest::IngestCapability;
 use memory_mcp::storage::DbClient;
 
 mod common;
@@ -8,23 +9,23 @@ async fn lifecycle_view_and_archive_restore_flow_are_service_backed() {
     let (service, db_client) = common::make_service_with_client().await;
     let request_time = Utc.with_ymd_and_hms(2026, 1, 10, 9, 0, 0).unwrap();
 
-    let episode_id = service
-        .ingest(
-            memory_mcp::models::IngestRequest {
-                source_type: "meeting".to_string(),
-                source_id: "lifecycle-archive-1".to_string(),
-                content: "Lifecycle candidate episode".to_string(),
-                t_ref: request_time,
-                scope: "org".to_string(),
-                project: None,
-                t_ingested: Some(request_time),
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
-        )
-        .await
-        .expect("ingest episode");
+    let episode_id = IngestCapability::ingest(
+        &service.build_context(),
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "lifecycle-archive-1".to_string(),
+            content: "Lifecycle candidate episode".to_string(),
+            t_ref: request_time,
+            scope: "org".to_string(),
+            project: None,
+            t_ingested: Some(request_time),
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest episode");
 
     let view = service
         .build_lifecycle_view("org")
