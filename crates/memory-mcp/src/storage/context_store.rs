@@ -121,9 +121,13 @@ impl ContextStoreClient {
         query_vec: &[f64],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_facts_ann(namespace, scope, cutoff, query_vec, limit)
-            .await
+        let (sql, vars) =
+            crate::storage::queries::build_select_facts_ann_query(scope, cutoff, query_vec, limit);
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Neighboring edge records around a node, direction-bounded and

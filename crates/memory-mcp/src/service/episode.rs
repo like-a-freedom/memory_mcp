@@ -677,17 +677,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -805,17 +794,6 @@ mod tests {
                 _node_id: &str,
                 _cutoff: &str,
                 _direction: crate::storage::GraphDirection,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
             ) -> Result<Vec<serde_json::Value>, MemoryError> {
                 Ok(vec![])
             }

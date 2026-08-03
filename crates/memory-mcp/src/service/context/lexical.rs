@@ -1232,17 +1232,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1415,17 +1404,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1592,17 +1570,6 @@ mod tests {
                     })],
                     _ => vec![],
                 })
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn select_edges_filtered(

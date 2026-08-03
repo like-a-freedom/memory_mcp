@@ -450,17 +450,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -576,17 +565,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -737,17 +715,6 @@ mod tests {
                         "community fact expansion should not use unfiltered select_facts_filtered fallback"
                     )
                 }
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
             }
 
             async fn select_edges_filtered(
@@ -977,17 +944,6 @@ mod tests {
                 })
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1135,17 +1091,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1318,17 +1263,6 @@ mod tests {
                 _limit: i32,
                 _project: Option<&str>,
                 _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
@@ -1514,34 +1448,6 @@ mod tests {
                 panic!("semantic retrieval should not scan the full fact table")
             }
 
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
-                embedding[0] = 1.0;
-                Ok(vec![json!({
-                    "fact_id": "fact:semantic",
-                    "fact_type": "note",
-                    "content": "Compensation increase approved for the engineering team",
-                    "quote": "Compensation increase approved",
-                    "source_episode": "episode:semantic",
-                    "t_valid": "2026-01-15T10:30:00Z",
-                    "t_ingested": "2026-01-15T10:30:00Z",
-                    "scope": "org",
-                    "entity_links": [],
-                    "policy_tags": [],
-                    "confidence": 0.9,
-                    "provenance": {},
-                    "embedding": embedding,
-                    "sem_score": 0.99,
-                })])
-            }
-
             #[allow(clippy::too_many_arguments)]
             async fn select_facts_filtered(
                 &self,
@@ -1594,10 +1500,33 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
+                sql: &str,
                 _vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the ANN retrieval through the core
+                // `query` op; serve the semantically-similar fact here so the
+                // provider-backed path can be exercised end to end.
+                if sql.contains("vector::similarity") {
+                    let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+                    embedding[0] = 1.0;
+                    return Ok(json!([{
+                        "fact_id": "fact:semantic",
+                        "fact_type": "note",
+                        "content": "Compensation increase approved for the engineering team",
+                        "quote": "Compensation increase approved",
+                        "source_episode": "episode:semantic",
+                        "t_valid": "2026-01-15T10:30:00Z",
+                        "t_ingested": "2026-01-15T10:30:00Z",
+                        "scope": "org",
+                        "entity_links": [],
+                        "policy_tags": [],
+                        "confidence": 0.9,
+                        "provenance": {},
+                        "embedding": embedding,
+                        "sem_score": 0.99,
+                    }]));
+                }
                 Ok(Value::Null)
             }
 
@@ -1714,17 +1643,6 @@ mod tests {
                 _node_id: &str,
                 _cutoff: &str,
                 _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_facts_ann(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_vec: &[f64],
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }

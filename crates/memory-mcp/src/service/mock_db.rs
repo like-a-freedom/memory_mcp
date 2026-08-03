@@ -46,7 +46,6 @@ pub struct MockDbClient {
     fallback_edges_filtered: Mutex<Option<Box<SelectTableFn>>>,
     fallback_edge_neighbors: Mutex<Option<Box<EdgeNeighborsFn>>>,
     fallback_facts_filtered: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_facts_ann: Mutex<Option<Box<SelectTableFn>>>,
 }
 
 impl MockDbClient {
@@ -68,7 +67,6 @@ impl MockDbClient {
             fallback_edges_filtered: Mutex::new(None),
             fallback_edge_neighbors: Mutex::new(None),
             fallback_facts_filtered: Mutex::new(None),
-            fallback_facts_ann: Mutex::new(None),
         }
     }
 
@@ -269,24 +267,6 @@ impl DbClient for MockDbClient {
         }
         if let Some(ref f) = *self
             .fallback_facts_filtered
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_facts_ann(
-        &self,
-        _namespace: &str,
-        _scope: &str,
-        _cutoff: &str,
-        _query_vec: &[f64],
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_facts_ann
             .lock()
             .unwrap_or_else(|p| p.into_inner())
         {

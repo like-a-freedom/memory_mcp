@@ -2259,7 +2259,7 @@ mod tests {
         assert_eq!(state.get("status"), Some(&json!("ready")));
         assert_eq!(state.get("active_signature"), Some(&json!("embsig:new")));
 
-        let matches = db
+        let matches = crate::storage::ContextStoreClient::new(db.clone())
             .select_facts_ann(
                 "org",
                 "org",
