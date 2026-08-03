@@ -1162,76 +1162,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("atlas launch checklist") => vec![],
-                    Some("atlas") => vec![
-                        json!({
-                            "fact_id": "fact:shared",
-                            "fact_type": "note",
-                            "content": "Atlas launch is scheduled.",
-                            "quote": "Atlas launch is scheduled.",
-                            "source_episode": "episode:1",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org"
-                        }),
-                        json!({
-                            "fact_id": "fact:atlas-only",
-                            "fact_type": "note",
-                            "content": "Atlas has a risk review.",
-                            "quote": "Atlas has a risk review.",
-                            "source_episode": "episode:2",
-                            "t_valid": "2026-01-09T10:30:00Z",
-                            "t_ingested": "2026-01-09T10:30:00Z",
-                            "scope": "org"
-                        }),
-                    ],
-                    Some("launch") => vec![
-                        json!({
-                            "fact_id": "fact:shared",
-                            "fact_type": "note",
-                            "content": "Atlas launch is scheduled.",
-                            "quote": "Atlas launch is scheduled.",
-                            "source_episode": "episode:1",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org"
-                        }),
-                        json!({
-                            "fact_id": "fact:launch-only",
-                            "fact_type": "note",
-                            "content": "Launch checklist is ready.",
-                            "quote": "Launch checklist is ready.",
-                            "source_episode": "episode:3",
-                            "t_valid": "2026-01-08T10:30:00Z",
-                            "t_ingested": "2026-01-08T10:30:00Z",
-                            "scope": "org"
-                        }),
-                    ],
-                    Some("checklist") => vec![json!({
-                        "fact_id": "fact:launch-only",
-                        "fact_type": "note",
-                        "content": "Launch checklist is ready.",
-                        "quote": "Launch checklist is ready.",
-                        "source_episode": "episode:3",
-                        "t_valid": "2026-01-08T10:30:00Z",
-                        "t_ingested": "2026-01-08T10:30:00Z",
-                        "scope": "org"
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1270,10 +1200,73 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the full-text fact retrieval through
+                // the core `query` op; serve the canned per-term records here.
+                if sql.contains("search::score") {
+                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
+                    return Ok(Value::Array(match query.as_deref() {
+                        Some("atlas launch checklist") => vec![],
+                        Some("atlas") => vec![
+                            json!({
+                                "fact_id": "fact:shared",
+                                "fact_type": "note",
+                                "content": "Atlas launch is scheduled.",
+                                "quote": "Atlas launch is scheduled.",
+                                "source_episode": "episode:1",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org"
+                            }),
+                            json!({
+                                "fact_id": "fact:atlas-only",
+                                "fact_type": "note",
+                                "content": "Atlas has a risk review.",
+                                "quote": "Atlas has a risk review.",
+                                "source_episode": "episode:2",
+                                "t_valid": "2026-01-09T10:30:00Z",
+                                "t_ingested": "2026-01-09T10:30:00Z",
+                                "scope": "org"
+                            }),
+                        ],
+                        Some("launch") => vec![
+                            json!({
+                                "fact_id": "fact:shared",
+                                "fact_type": "note",
+                                "content": "Atlas launch is scheduled.",
+                                "quote": "Atlas launch is scheduled.",
+                                "source_episode": "episode:1",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org"
+                            }),
+                            json!({
+                                "fact_id": "fact:launch-only",
+                                "fact_type": "note",
+                                "content": "Launch checklist is ready.",
+                                "quote": "Launch checklist is ready.",
+                                "source_episode": "episode:3",
+                                "t_valid": "2026-01-08T10:30:00Z",
+                                "t_ingested": "2026-01-08T10:30:00Z",
+                                "scope": "org"
+                            }),
+                        ],
+                        Some("checklist") => vec![json!({
+                            "fact_id": "fact:launch-only",
+                            "fact_type": "note",
+                            "content": "Launch checklist is ready.",
+                            "quote": "Launch checklist is ready.",
+                            "source_episode": "episode:3",
+                            "t_valid": "2026-01-08T10:30:00Z",
+                            "t_ingested": "2026-01-08T10:30:00Z",
+                            "scope": "org"
+                        })],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 
@@ -1345,65 +1338,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("lgbtq support group") => vec![json!({
-                        "fact_id": "fact:support-group",
-                        "fact_type": "note",
-                        "content": "Caroline attended the LGBTQ support group recently.",
-                        "quote": "Caroline attended the LGBTQ support group recently.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-09T10:30:00Z",
-                        "t_ingested": "2026-01-09T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 5.0
-                    })],
-                    Some("support group") => vec![json!({
-                        "fact_id": "fact:support-group",
-                        "fact_type": "note",
-                        "content": "Caroline attended the LGBTQ support group recently.",
-                        "quote": "Caroline attended the LGBTQ support group recently.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-09T10:30:00Z",
-                        "t_ingested": "2026-01-09T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 5.0
-                    })],
-                    Some("support") => vec![json!({
-                        "fact_id": "fact:generic-support",
-                        "fact_type": "note",
-                        "content": "Customer support team added a new channel.",
-                        "quote": "Customer support team added a new channel.",
-                        "source_episode": "episode:2",
-                        "t_valid": "2026-01-08T10:30:00Z",
-                        "t_ingested": "2026-01-08T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 3.0
-                    })],
-                    Some("group") => vec![json!({
-                        "fact_id": "fact:generic-group",
-                        "fact_type": "note",
-                        "content": "Project group met to finalize the roadmap.",
-                        "quote": "Project group met to finalize the roadmap.",
-                        "source_episode": "episode:3",
-                        "t_valid": "2026-01-07T10:30:00Z",
-                        "t_ingested": "2026-01-07T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 3.0
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1442,10 +1376,62 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the full-text fact retrieval through
+                // the core `query` op; serve the canned per-term records here.
+                if sql.contains("search::score") {
+                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
+                    return Ok(Value::Array(match query.as_deref() {
+                        Some("lgbtq support group") => vec![json!({
+                            "fact_id": "fact:support-group",
+                            "fact_type": "note",
+                            "content": "Caroline attended the LGBTQ support group recently.",
+                            "quote": "Caroline attended the LGBTQ support group recently.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 5.0
+                        })],
+                        Some("support group") => vec![json!({
+                            "fact_id": "fact:support-group",
+                            "fact_type": "note",
+                            "content": "Caroline attended the LGBTQ support group recently.",
+                            "quote": "Caroline attended the LGBTQ support group recently.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-09T10:30:00Z",
+                            "t_ingested": "2026-01-09T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 5.0
+                        })],
+                        Some("support") => vec![json!({
+                            "fact_id": "fact:generic-support",
+                            "fact_type": "note",
+                            "content": "Customer support team added a new channel.",
+                            "quote": "Customer support team added a new channel.",
+                            "source_episode": "episode:2",
+                            "t_valid": "2026-01-08T10:30:00Z",
+                            "t_ingested": "2026-01-08T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 3.0
+                        })],
+                        Some("group") => vec![json!({
+                            "fact_id": "fact:generic-group",
+                            "fact_type": "note",
+                            "content": "Project group met to finalize the roadmap.",
+                            "quote": "Project group met to finalize the roadmap.",
+                            "source_episode": "episode:3",
+                            "t_valid": "2026-01-07T10:30:00Z",
+                            "t_ingested": "2026-01-07T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 3.0
+                        })],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 
@@ -1510,68 +1496,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("What degree did I graduate with?") => vec![],
-                    Some("degree graduate") => vec![json!({
-                        "fact_id": "fact:answer",
-                        "fact_type": "note",
-                        "content": "I will graduate with a degree in Business Administration.",
-                        "quote": "I will graduate with a degree in Business Administration.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 4.0
-                    })],
-                    Some("degree") => vec![
-                        json!({
-                            "fact_id": "fact:generic",
-                            "fact_type": "note",
-                            "content": "The degree committee met to review course requirements.",
-                            "quote": "The degree committee met to review course requirements.",
-                            "source_episode": "episode:2",
-                            "t_valid": "2026-01-09T10:30:00Z",
-                            "t_ingested": "2026-01-09T10:30:00Z",
-                            "scope": "org",
-                            "ft_score": 8.0
-                        }),
-                        json!({
-                            "fact_id": "fact:answer",
-                            "fact_type": "note",
-                            "content": "I will graduate with a degree in Business Administration.",
-                            "quote": "I will graduate with a degree in Business Administration.",
-                            "source_episode": "episode:1",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org",
-                            "ft_score": 4.0
-                        }),
-                    ],
-                    Some("graduate") => vec![json!({
-                        "fact_id": "fact:answer",
-                        "fact_type": "note",
-                        "content": "I will graduate with a degree in Business Administration.",
-                        "quote": "I will graduate with a degree in Business Administration.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "ft_score": 4.0
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1610,10 +1534,65 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the full-text fact retrieval through
+                // the core `query` op; serve the canned per-term records here.
+                if sql.contains("search::score") {
+                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
+                    return Ok(Value::Array(match query.as_deref() {
+                        Some("What degree did I graduate with?") => vec![],
+                        Some("degree graduate") => vec![json!({
+                            "fact_id": "fact:answer",
+                            "fact_type": "note",
+                            "content": "I will graduate with a degree in Business Administration.",
+                            "quote": "I will graduate with a degree in Business Administration.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 4.0
+                        })],
+                        Some("degree") => vec![
+                            json!({
+                                "fact_id": "fact:generic",
+                                "fact_type": "note",
+                                "content": "The degree committee met to review course requirements.",
+                                "quote": "The degree committee met to review course requirements.",
+                                "source_episode": "episode:2",
+                                "t_valid": "2026-01-09T10:30:00Z",
+                                "t_ingested": "2026-01-09T10:30:00Z",
+                                "scope": "org",
+                                "ft_score": 8.0
+                            }),
+                            json!({
+                                "fact_id": "fact:answer",
+                                "fact_type": "note",
+                                "content": "I will graduate with a degree in Business Administration.",
+                                "quote": "I will graduate with a degree in Business Administration.",
+                                "source_episode": "episode:1",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org",
+                                "ft_score": 4.0
+                            }),
+                        ],
+                        Some("graduate") => vec![json!({
+                            "fact_id": "fact:answer",
+                            "fact_type": "note",
+                            "content": "I will graduate with a degree in Business Administration.",
+                            "quote": "I will graduate with a degree in Business Administration.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "ft_score": 4.0
+                        })],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 

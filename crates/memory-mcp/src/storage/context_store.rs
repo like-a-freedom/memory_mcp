@@ -41,17 +41,19 @@ impl ContextStoreClient {
             project,
             fact_types,
         } = query;
-        self.db
-            .select_facts_filtered(
-                namespace,
-                scope,
-                cutoff,
-                query_contains,
-                limit,
-                project,
-                fact_types,
-            )
-            .await
+        let (sql, vars) = crate::storage::queries::build_select_facts_filtered_query(
+            scope,
+            cutoff,
+            query_contains,
+            limit,
+            project,
+            fact_types,
+        );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Facts linked to a set of normalized entity ids.

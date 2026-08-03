@@ -723,19 +723,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,

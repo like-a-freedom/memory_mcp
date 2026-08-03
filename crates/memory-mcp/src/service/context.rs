@@ -404,52 +404,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("atlas launch checklist") => vec![],
-                    Some("atlas") => vec![json!({
-                        "fact_id": "fact:fallback",
-                        "fact_type": "note",
-                        "content": "Atlas launch is scheduled.",
-                        "quote": "Atlas launch is scheduled.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org"
-                    })],
-                    Some("launch") => vec![json!({
-                        "fact_id": "fact:fallback",
-                        "fact_type": "note",
-                        "content": "Atlas launch is scheduled.",
-                        "quote": "Atlas launch is scheduled.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org"
-                    })],
-                    Some("checklist") => vec![json!({
-                        "fact_id": "fact:fallback",
-                        "fact_type": "note",
-                        "content": "Atlas launch is scheduled.",
-                        "quote": "Atlas launch is scheduled.",
-                        "source_episode": "episode:1",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org"
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -488,10 +442,29 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The context store now runs the full-text fact retrieval through
+                // the core `query` op; serve the canned per-term records here.
+                if sql.contains("search::score") {
+                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
+                    return Ok(Value::Array(match query.as_deref() {
+                        Some("atlas launch checklist") => vec![],
+                        Some("atlas") | Some("launch") | Some("checklist") => vec![json!({
+                            "fact_id": "fact:fallback",
+                            "fact_type": "note",
+                            "content": "Atlas launch is scheduled.",
+                            "quote": "Atlas launch is scheduled.",
+                            "source_episode": "episode:1",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org"
+                        })],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 
@@ -556,19 +529,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -698,25 +658,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                if query_contains.is_some() {
-                    Ok(vec![])
-                } else {
-                    panic!(
-                        "community fact expansion should not use unfiltered select_facts_filtered fallback"
-                    )
-                }
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -773,6 +714,9 @@ mod tests {
                         "member_entities": ["entity:alice"]
                     }]));
                 }
+                if sql.contains("search::score") {
+                    return Ok(json!([]));
+                }
                 if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
                     self.entity_link_fact_calls.fetch_add(1, Ordering::SeqCst);
                     if let Some(vars) = vars {
@@ -806,6 +750,11 @@ mod tests {
                             "provenance": {"source_episode": "episode:2"}
                         }
                     ]));
+                }
+                if sql.contains("FROM fact") && sql.contains("scope = $scope") {
+                    panic!(
+                        "community fact expansion should not use unfiltered select_facts_filtered fallback"
+                    );
                 }
                 Ok(Value::Null)
             }
@@ -914,36 +863,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match query_contains {
-                    Some("atlas launch") => vec![json!({
-                        "fact_id": "fact:direct",
-                        "fact_type": "note",
-                        "content": "Atlas launch checklist is blocked on DNS cutover.",
-                        "quote": "Atlas launch checklist is blocked on DNS cutover.",
-                        "source_episode": "episode:direct",
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:atlas"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:direct"},
-                        "ft_score": 100.0
-                    })],
-                    Some("atlas") | Some("launch") => vec![],
-                    other => panic!("unexpected fallback query: {other:?}"),
-                })
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -988,6 +907,27 @@ mod tests {
             ) -> Result<Value, MemoryError> {
                 // The context store now runs the entity-link fact expansion through
                 // the core `query` op; serve the community-linked fact here.
+                if sql.contains("search::score") {
+                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
+                    return Ok(Value::Array(match query.as_deref() {
+                        Some("atlas launch") => vec![json!({
+                            "fact_id": "fact:direct",
+                            "fact_type": "note",
+                            "content": "Atlas launch checklist is blocked on DNS cutover.",
+                            "quote": "Atlas launch checklist is blocked on DNS cutover.",
+                            "source_episode": "episode:direct",
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z",
+                            "scope": "org",
+                            "entity_links": ["entity:atlas"],
+                            "policy_tags": [],
+                            "provenance": {"source_episode": "episode:direct"},
+                            "ft_score": 100.0
+                        })],
+                        Some("atlas") | Some("launch") => vec![],
+                        other => panic!("unexpected fallback query: {other:?}"),
+                    }));
+                }
                 if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
                     if let Some(vars) = vars {
                         assert_eq!(vars["entity_links"], json!(["entity:atlas"]));
@@ -1082,19 +1022,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1254,19 +1181,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1449,19 +1363,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,
@@ -1616,19 +1517,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_facts_filtered(
-                &self,
-                _namespace: &str,
-                _scope: &str,
-                _cutoff: &str,
-                _query_contains: Option<&str>,
-                _limit: i32,
-                _project: Option<&str>,
-                _fact_types: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_edges_filtered(
                 &self,
                 _namespace: &str,

@@ -32,7 +32,6 @@ type EdgeNeighborsFn =
 pub struct MockDbClient {
     select_one_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     select_table_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    facts_filtered_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
@@ -45,7 +44,6 @@ pub struct MockDbClient {
     fallback_update: Mutex<Option<Box<UpdateFn>>>,
     fallback_edges_filtered: Mutex<Option<Box<SelectTableFn>>>,
     fallback_edge_neighbors: Mutex<Option<Box<EdgeNeighborsFn>>>,
-    fallback_facts_filtered: Mutex<Option<Box<SelectTableFn>>>,
 }
 
 impl MockDbClient {
@@ -53,7 +51,6 @@ impl MockDbClient {
         Self {
             select_one_responses: Mutex::new(HashMap::new()),
             select_table_responses: Mutex::new(HashMap::new()),
-            facts_filtered_responses: Mutex::new(HashMap::new()),
             edge_neighbors_responses: Mutex::new(HashMap::new()),
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
@@ -66,7 +63,6 @@ impl MockDbClient {
             fallback_update: Mutex::new(None),
             fallback_edges_filtered: Mutex::new(None),
             fallback_edge_neighbors: Mutex::new(None),
-            fallback_facts_filtered: Mutex::new(None),
         }
     }
 
@@ -178,14 +174,6 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_facts_filtered(self, key: &str, rows: Vec<Value>) -> Self {
-        self.facts_filtered_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(key.to_string(), Ok(rows));
-        self
-    }
-
     pub fn expect_migration_result(mut self, result: Result<(), MemoryError>) -> Self {
         self.migration_result = Mutex::new(result);
         self
@@ -245,36 +233,6 @@ impl DbClient for MockDbClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn select_facts_filtered(
-        &self,
-        _namespace: &str,
-        scope: &str,
-        _cutoff: &str,
-        query_contains: Option<&str>,
-        _limit: i32,
-        _project: Option<&str>,
-        _fact_types: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        let key = format!("{}/{}", scope, query_contains.unwrap_or(""));
-        if let Some(resp) = self
-            .facts_filtered_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(&key)
-            .cloned()
-        {
-            return resp;
-        }
-        if let Some(ref f) = *self
-            .fallback_facts_filtered
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
     async fn select_edges_filtered(
         &self,
         _namespace: &str,
