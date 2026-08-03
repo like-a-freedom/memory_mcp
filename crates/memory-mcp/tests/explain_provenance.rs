@@ -314,9 +314,8 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     for (fact_id, _edge_suffix) in [(&fact_a_id, "a"), (&fact_b_id, "b")] {
         let edge_id =
             memory_mcp::service::deterministic_edge_id(&entity_id, "involved_in", fact_id, t_ref);
-        db_client
+        memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
             .relate_edge(
-                scope,
                 &edge_id,
                 &entity_id,
                 fact_id,
@@ -328,6 +327,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
                     "t_valid": memory_mcp::service::normalize_dt(t_ref),
                     "t_ingested": memory_mcp::service::normalize_dt(now),
                 }),
+                scope,
             )
             .await
             .expect("relate edge");

@@ -707,31 +707,12 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
                 _query: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -905,26 +886,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: serde_json::Value,
-            ) -> Result<serde_json::Value, MemoryError> {
-                Ok(serde_json::Value::Null)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -945,10 +906,16 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
+                sql: &str,
                 _vars: Option<serde_json::Value>,
                 _namespace: &str,
             ) -> Result<serde_json::Value, MemoryError> {
+                // The episode store now runs the indexed community lookup
+                // through the core `query` op; flag it so the test can assert
+                // the indexed path is used (not a full `select_table` scan).
+                if sql.contains("community") && sql.contains("CONTAINSANY") {
+                    SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
+                }
                 Ok(serde_json::Value::Null)
             }
 

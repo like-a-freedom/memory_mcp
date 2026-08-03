@@ -498,31 +498,12 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
                 _query: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -719,25 +700,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -928,14 +890,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -949,17 +903,6 @@ mod tests {
                     "summary": "Alice and the Atlas project team",
                     "member_entities": ["entity:alice"]
                 })])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -1196,14 +1139,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1215,17 +1150,6 @@ mod tests {
                     "summary": "Atlas launch workstream",
                     "member_entities": ["entity:atlas"]
                 })])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -1433,14 +1357,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1461,17 +1377,6 @@ mod tests {
                         "ft_score": 10.0
                     }),
                 ])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -1692,14 +1597,6 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -1720,17 +1617,6 @@ mod tests {
                         "ft_score": 10.0
                     }),
                 ])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -1911,31 +1797,12 @@ mod tests {
                 Ok(None)
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
                 _query: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(
@@ -2124,14 +1991,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_communities_by_member_entities(
-                &self,
-                _namespace: &str,
-                _member_entities: &[String],
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn select_communities_matching_summary(
                 &self,
                 _namespace: &str,
@@ -2146,17 +2005,6 @@ mod tests {
                 .into_iter()
                 .map(Ok)
                 .collect::<Result<Vec<_>, _>>()
-            }
-
-            async fn relate_edge(
-                &self,
-                _namespace: &str,
-                _edge_id: &str,
-                _from_id: &str,
-                _to_id: &str,
-                _content: Value,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
             }
 
             async fn create(

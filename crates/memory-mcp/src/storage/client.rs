@@ -28,14 +28,12 @@ use super::migrations::{
     validate_applied_migration, versioned_migrations,
 };
 use super::queries::{
-    active_edge_scan_limit, build_create_query, build_relate_edge_query,
-    build_select_communities_by_member_entities_query,
-    build_select_communities_matching_summary_query, build_select_edge_neighbors_query,
-    build_select_edges_filtered_page_query, build_select_edges_filtered_query,
-    build_select_entity_lookup_alias_query, build_select_entity_lookup_canonical_query,
-    build_select_episodes_by_content_query, build_select_facts_ann_query,
-    build_select_facts_by_entity_links_query, build_select_facts_filtered_query,
-    build_select_one_query, build_update_query,
+    active_edge_scan_limit, build_create_query, build_select_communities_matching_summary_query,
+    build_select_edge_neighbors_query, build_select_edges_filtered_page_query,
+    build_select_edges_filtered_query, build_select_entity_lookup_alias_query,
+    build_select_entity_lookup_canonical_query, build_select_episodes_by_content_query,
+    build_select_facts_ann_query, build_select_facts_by_entity_links_query,
+    build_select_facts_filtered_query, build_select_one_query, build_update_query,
 };
 use super::types::GraphDirection;
 
@@ -156,24 +154,6 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
         query: &str,
     ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects communities that contain any of the given member entities.
-    /// Uses array containment check (member_entities CONTAINSANY $members) for index efficiency.
-    async fn select_communities_by_member_entities(
-        &self,
-        namespace: &str,
-        member_entities: &[String],
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Creates a native graph relation edge while preserving compatibility fields.
-    async fn relate_edge(
-        &self,
-        namespace: &str,
-        edge_id: &str,
-        from_id: &str,
-        to_id: &str,
-        content: Value,
-    ) -> Result<Value, MemoryError>;
 
     /// Creates a new record.
     async fn create(
@@ -1329,75 +1309,6 @@ impl DbClient for SurrealDbClient {
         );
 
         Ok(results)
-    }
-
-    async fn select_communities_by_member_entities(
-        &self,
-        namespace: &str,
-        member_entities: &[String],
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_communities_by_member_entities",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                (
-                    "member_count",
-                    Value::Number(serde_json::Number::from(member_entities.len())),
-                ),
-            ],
-        );
-
-        let (sql, vars) = build_select_communities_by_member_entities_query(member_entities);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_communities_by_member_entities.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn relate_edge(
-        &self,
-        namespace: &str,
-        edge_id: &str,
-        from_id: &str,
-        to_id: &str,
-        content: Value,
-    ) -> Result<Value, MemoryError> {
-        self.log_op(
-            "db.relate_edge",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("edge_id", Value::String(edge_id.to_string())),
-                ("from_id", Value::String(from_id.to_string())),
-                ("to_id", Value::String(to_id.to_string())),
-            ],
-        );
-
-        let (sql, vars) = build_relate_edge_query(edge_id, from_id, to_id, content);
-        let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
-        let normalized = surreal_to_json(surreal_val);
-        let result = extract_first_record(normalized).unwrap_or(Value::Null);
-
-        self.log_op(
-            "db.relate_edge.result",
-            vec![("result", Value::String("ok".to_string()))],
-        );
-
-        Ok(result)
     }
 
     async fn create(

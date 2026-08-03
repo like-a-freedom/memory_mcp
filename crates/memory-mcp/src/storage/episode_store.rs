@@ -116,9 +116,15 @@ impl EpisodeStoreClient {
         namespace: &str,
         member_entities: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_communities_by_member_entities(namespace, member_entities)
-            .await
+        let (sql, vars) =
+            crate::storage::queries::build_select_communities_by_member_entities_query(
+                member_entities,
+            );
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Edges whose `in`/`out`/`relation` matches this triple query.
@@ -150,9 +156,15 @@ impl EpisodeStoreClient {
         content: Value,
         namespace: &str,
     ) -> Result<Value, MemoryError> {
-        self.db
-            .relate_edge(namespace, edge_id, from_id, to_id, content)
-            .await
+        let (sql, vars) =
+            crate::storage::queries::build_relate_edge_query(edge_id, from_id, to_id, content);
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value
+                .as_array()
+                .and_then(|rows| rows.first().cloned())
+                .unwrap_or(Value::Null)),
+            Err(err) => Err(err),
+        }
     }
 }
 

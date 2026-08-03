@@ -18,9 +18,8 @@ async fn seed_edge(
     to_id: &str,
     t_valid: chrono::DateTime<Utc>,
 ) {
-    db_client
+    memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
         .relate_edge(
-            namespace,
             edge_id,
             from_id,
             to_id,
@@ -36,6 +35,7 @@ async fn seed_edge(
                 "t_valid": normalize_dt(t_valid),
                 "t_ingested": normalize_dt(t_valid),
             }),
+            namespace,
         )
         .await
         .expect("seed edge should succeed");
