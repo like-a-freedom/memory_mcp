@@ -1057,7 +1057,7 @@ mod tests {
 
     use super::{FactQueryParams, lexical_candidate_limit, select_fact_records_for_query};
     use crate::service::error::MemoryError;
-    use crate::storage::{DbClient, GraphDirection};
+    use crate::storage::DbClient;
     use async_trait::async_trait;
     use std::sync::Arc;
 
@@ -1162,24 +1162,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1338,24 +1320,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1496,24 +1460,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,

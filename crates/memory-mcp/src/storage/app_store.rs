@@ -61,9 +61,30 @@ impl AppStoreClient {
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_edge_neighbors(namespace, node_id, cutoff, direction)
-            .await
+        let (sql, vars) =
+            crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// One page of active edges in stable order.
+    pub async fn select_edges_filtered_page(
+        &self,
+        namespace: &str,
+        cutoff: &str,
+        start: usize,
+        limit: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) =
+            crate::storage::queries::build_select_edges_filtered_page_query(cutoff, limit, start);
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn select_entity_lookup(

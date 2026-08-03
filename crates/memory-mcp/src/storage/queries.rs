@@ -275,10 +275,6 @@ pub fn build_select_episodes_by_content_query(
     (sql, Value::Object(vars))
 }
 
-pub fn build_select_edges_filtered_query(cutoff: &str) -> (String, Value) {
-    build_select_edges_filtered_page_query(cutoff, active_edge_scan_batch_size() as usize, 0)
-}
-
 pub fn build_select_edges_filtered_page_query(
     cutoff: &str,
     limit: usize,

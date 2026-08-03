@@ -595,7 +595,7 @@ mod tests {
 
     #[tokio::test]
     async fn collect_connected_entity_component_uses_neighbor_queries_instead_of_edge_scan() {
-        use crate::storage::{DbClient, GraphDirection};
+        use crate::storage::DbClient;
         use std::sync::Arc;
 
         struct NeighborOnlyDbClient;
@@ -619,51 +619,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("community traversal should not scan the full edge table")
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                let mk = |from_id: &str, relation: &str, to_id: &str| {
-                    json!({
-                        "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
-                        "in": from_id,
-                        "relation": relation,
-                        "out": to_id,
-                        "t_valid": "2024-01-01T00:00:00Z",
-                        "t_ingested": "2024-01-01T00:00:00Z"
-                    })
-                };
-
-                Ok(match (node_id, direction) {
-                    ("entity:alice", GraphDirection::Outgoing) => {
-                        vec![mk("entity:alice", "mentioned_in", "episode:shared")]
-                    }
-                    ("episode:shared", GraphDirection::Incoming) => vec![
-                        mk("entity:alice", "mentioned_in", "episode:shared"),
-                        mk("entity:bob", "mentioned_in", "episode:shared"),
-                    ],
-                    ("entity:bob", GraphDirection::Outgoing) => {
-                        vec![mk("entity:bob", "involved_in", "fact:joint")]
-                    }
-                    ("fact:joint", GraphDirection::Incoming) => vec![
-                        mk("entity:bob", "involved_in", "fact:joint"),
-                        mk("entity:carol", "involved_in", "fact:joint"),
-                    ],
-                    _ => vec![],
-                })
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -684,10 +639,49 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The episode store now runs graph-neighbor lookups through the
+                // core `query` op; serve the deterministic component edges here
+                // and panic on a full edge scan.
+                if sql.contains("FROM edge") {
+                    if !(sql.contains("WHERE in =") || sql.contains("WHERE out =")) {
+                        panic!("community traversal should not scan the full edge table");
+                    }
+                    let incoming = sql.contains("WHERE out =");
+                    let node_id = vars
+                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .unwrap_or_default();
+                    let mk = |from_id: &str, relation: &str, to_id: &str| {
+                        json!({
+                            "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
+                            "in": from_id,
+                            "relation": relation,
+                            "out": to_id,
+                            "t_valid": "2024-01-01T00:00:00Z",
+                            "t_ingested": "2024-01-01T00:00:00Z"
+                        })
+                    };
+                    return Ok(Value::Array(match (node_id.as_str(), incoming) {
+                        ("entity:alice", false) => {
+                            vec![mk("entity:alice", "mentioned_in", "episode:shared")]
+                        }
+                        ("episode:shared", true) => vec![
+                            mk("entity:alice", "mentioned_in", "episode:shared"),
+                            mk("entity:bob", "mentioned_in", "episode:shared"),
+                        ],
+                        ("entity:bob", false) => {
+                            vec![mk("entity:bob", "involved_in", "fact:joint")]
+                        }
+                        ("fact:joint", true) => vec![
+                            mk("entity:bob", "involved_in", "fact:joint"),
+                            mk("entity:carol", "involved_in", "fact:joint"),
+                        ],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 
@@ -754,24 +748,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: crate::storage::GraphDirection,
-            ) -> Result<Vec<serde_json::Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,

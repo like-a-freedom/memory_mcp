@@ -15,15 +15,13 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::service::MemoryError;
-use crate::storage::{DbClient, GraphDirection};
+use crate::storage::DbClient;
 
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;
 type SelectTableFn = dyn Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync;
 type QueryFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type CreateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
-type EdgeNeighborsFn =
-    dyn Fn(&str, GraphDirection) -> Result<Vec<Value>, MemoryError> + Send + Sync;
 
 /// Configurable mock database client for tests.
 ///
@@ -42,8 +40,6 @@ pub struct MockDbClient {
     fallback_query: Mutex<Option<Box<QueryFn>>>,
     fallback_create: Mutex<Option<Box<CreateFn>>>,
     fallback_update: Mutex<Option<Box<UpdateFn>>>,
-    fallback_edges_filtered: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_edge_neighbors: Mutex<Option<Box<EdgeNeighborsFn>>>,
 }
 
 impl MockDbClient {
@@ -61,8 +57,6 @@ impl MockDbClient {
             fallback_query: Mutex::new(None),
             fallback_create: Mutex::new(None),
             fallback_update: Mutex::new(None),
-            fallback_edges_filtered: Mutex::new(None),
-            fallback_edge_neighbors: Mutex::new(None),
         }
     }
 
@@ -114,22 +108,6 @@ impl MockDbClient {
         self
     }
 
-    pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
-        self.edge_neighbors_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(node_id.to_string(), Ok(neighbors));
-        self
-    }
-
-    pub fn expect_edge_neighbors_with(
-        mut self,
-        f: impl Fn(&str, GraphDirection) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
-    ) -> Self {
-        self.fallback_edge_neighbors = Mutex::new(Some(Box::new(f)));
-        self
-    }
-
     pub fn expect_select_table_with(
         mut self,
         f: impl Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
@@ -145,16 +123,12 @@ impl MockDbClient {
         })
     }
 
-    pub fn expect_edges_filtered_with(
-        mut self,
-        f: impl Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync + 'static,
-    ) -> Self {
-        self.fallback_edges_filtered = Mutex::new(Some(Box::new(f)));
+    pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
+        self.edge_neighbors_responses
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(node_id.to_string(), Ok(neighbors));
         self
-    }
-
-    pub fn expect_edges_filtered_panic(self) -> Self {
-        self.expect_edges_filtered_with(|_| panic!("select_edges_filtered should not be called"))
     }
 
     pub fn expect_migration_handler(
@@ -233,47 +207,6 @@ impl DbClient for MockDbClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn select_edges_filtered(
-        &self,
-        _namespace: &str,
-        _cutoff: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_edges_filtered
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_edge_neighbors(
-        &self,
-        _namespace: &str,
-        node_id: &str,
-        _cutoff: &str,
-        _direction: GraphDirection,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(resp) = self
-            .edge_neighbors_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(node_id)
-            .cloned()
-        {
-            return resp;
-        }
-        if let Some(ref f) = *self
-            .fallback_edge_neighbors
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f(node_id, _direction);
-        }
-        Ok(vec![])
-    }
-
     async fn create(
         &self,
         record_id: &str,
@@ -327,9 +260,30 @@ impl DbClient for MockDbClient {
     async fn query(
         &self,
         sql: &str,
-        _vars: Option<Value>,
+        vars: Option<Value>,
         _namespace: &str,
     ) -> Result<Value, MemoryError> {
+        // The graph stores now run edge-neighbor lookups through the core `query`
+        // op; serve the per-node canned responses keyed by `node_id`. A full edge
+        // scan must never be used by live traversal, so panic on it.
+        if sql.contains("FROM edge") {
+            if !(sql.contains("WHERE in =") || sql.contains("WHERE out =")) {
+                panic!("select_edges_filtered should not be called");
+            }
+            let node_id = vars
+                .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                .unwrap_or_default();
+            if let Some(resp) = self
+                .edge_neighbors_responses
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .get(&node_id)
+                .cloned()
+            {
+                return resp.map(Value::Array);
+            }
+            return Ok(Value::Array(Vec::new()));
+        }
         for (prefix, result) in self
             .query_responses
             .lock()

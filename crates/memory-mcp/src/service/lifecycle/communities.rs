@@ -123,9 +123,13 @@ async fn rebuild_namespace_communities_with_batch_size(
     updated_at: &str,
     batch_size: usize,
 ) -> Result<usize, MemoryError> {
-    let (edge_records, edge_scan_batches) =
-        collect_active_edge_records(service.db_client.as_ref(), namespace, cutoff, batch_size)
-            .await?;
+    let (edge_records, edge_scan_batches) = collect_active_edge_records(
+        &crate::storage::AppStoreClient::new(service.db_client.clone()),
+        namespace,
+        cutoff,
+        batch_size,
+    )
+    .await?;
     let rebuilt = build_communities_from_active_edges(service, namespace, &edge_records).await?;
     let active_ids = rebuilt
         .iter()
@@ -210,22 +214,19 @@ async fn rebuild_namespace_communities_with_batch_size(
     Ok(rebuilt.len())
 }
 
-async fn collect_active_edge_records<C>(
-    db_client: &C,
+async fn collect_active_edge_records(
+    app_store: &crate::storage::AppStoreClient,
     namespace: &str,
     cutoff: &str,
     batch_size: usize,
-) -> Result<(Vec<Value>, usize), MemoryError>
-where
-    C: crate::storage::DbClient + ?Sized,
-{
+) -> Result<(Vec<Value>, usize), MemoryError> {
     let batch_size = batch_size.max(1);
     let mut edge_records = Vec::new();
     let mut batch_count = 0;
     let mut start = 0;
 
     loop {
-        let batch = db_client
+        let batch = app_store
             .select_edges_filtered_page(namespace, cutoff, start, batch_size)
             .await?;
         if batch.is_empty() {
@@ -321,99 +322,55 @@ fn is_entity_id(record_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     use crate::service::episode;
-    use crate::storage::{DbClient, GraphDirection};
+    use crate::storage::{DbClient, SurrealDbClient};
     use serde_json::json;
 
-    #[derive(Default)]
-    struct PagedEdgeDbClient {
-        edges: Vec<Value>,
-        calls: Arc<Mutex<Vec<(usize, usize)>>>,
+    /// Connects an in-memory SurrealDB with migrations applied for `org`.
+    async fn make_in_memory_db() -> Arc<SurrealDbClient> {
+        let db = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                &format!(
+                    "lifecycle_communities_test_{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                ),
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory db"),
+        );
+        db.apply_migrations("org").await.expect("apply migrations");
+        db
     }
 
-    #[async_trait::async_trait]
-    impl DbClient for PagedEdgeDbClient {
-        async fn select_one(
-            &self,
-            _record_id: &str,
-            _namespace: &str,
-        ) -> Result<Option<Value>, MemoryError> {
-            Ok(None)
-        }
-
-        async fn select_table(
-            &self,
-            _table: &str,
-            _namespace: &str,
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
-
-        #[allow(clippy::too_many_arguments)]
-        async fn select_edges_filtered(
-            &self,
-            _namespace: &str,
-            _cutoff: &str,
-        ) -> Result<Vec<Value>, MemoryError> {
-            panic!("batched community rebuild should use paged edge scans")
-        }
-
-        async fn select_edges_filtered_page(
-            &self,
-            _namespace: &str,
-            _cutoff: &str,
-            start: usize,
-            limit: usize,
-        ) -> Result<Vec<Value>, MemoryError> {
-            self.calls
-                .lock()
-                .expect("edge call log")
-                .push((start, limit));
-            Ok(self.edges.iter().skip(start).take(limit).cloned().collect())
-        }
-
-        async fn select_edge_neighbors(
-            &self,
-            _namespace: &str,
-            _node_id: &str,
-            _cutoff: &str,
-            _direction: GraphDirection,
-        ) -> Result<Vec<Value>, MemoryError> {
-            Ok(vec![])
-        }
-
-        async fn create(
-            &self,
-            _record_id: &str,
-            content: Value,
-            _namespace: &str,
-        ) -> Result<Value, MemoryError> {
-            Ok(content)
-        }
-
-        async fn update(
-            &self,
-            _record_id: &str,
-            content: Value,
-            _namespace: &str,
-        ) -> Result<Value, MemoryError> {
-            Ok(content)
-        }
-
-        async fn query(
-            &self,
-            _sql: &str,
-            _vars: Option<Value>,
-            _namespace: &str,
-        ) -> Result<Value, MemoryError> {
-            Ok(Value::Null)
-        }
-
-        async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-            Ok(())
-        }
+    /// Seeds an active edge record (visible at the test cutoff) via RELATE.
+    async fn seed_edge(db: &Arc<SurrealDbClient>, edge_id: &str, from_id: &str, to_id: &str) {
+        crate::storage::EpisodeStoreClient::new(db.clone())
+            .relate_edge(
+                edge_id,
+                from_id,
+                to_id,
+                json!({
+                    "edge_id": edge_id,
+                    "in": from_id,
+                    "relation": "linked",
+                    "out": to_id,
+                    "origin": "inferred",
+                    "strength": 1.0,
+                    "confidence": 0.8,
+                    "t_valid": "2026-01-01T00:00:00Z",
+                    "t_ingested": "2026-01-01T00:00:00Z",
+                }),
+                "org",
+            )
+            .await
+            .expect("seed edge");
     }
 
     fn edge(from_id: &str, to_id: &str) -> Value {
@@ -557,94 +514,69 @@ mod tests {
 
     #[tokio::test]
     async fn collect_active_edge_records_pages_until_partial_batch() {
-        let calls = Arc::new(Mutex::new(Vec::new()));
-        let db_client = PagedEdgeDbClient {
-            edges: vec![
-                edge("entity:alice", "entity:bob"),
-                edge("entity:bob", "entity:carol"),
-                edge("entity:carol", "entity:dana"),
-            ],
-            calls: calls.clone(),
-        };
+        let db = make_in_memory_db().await;
+        seed_edge(&db, "edge:1", "entity:alice", "entity:bob").await;
+        seed_edge(&db, "edge:2", "entity:bob", "entity:carol").await;
+        seed_edge(&db, "edge:3", "entity:carol", "entity:dana").await;
+        let app_store = crate::storage::AppStoreClient::new(db);
 
         let (edges, batches) =
-            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
                 .await
                 .expect("paged edge scan should succeed");
 
         assert_eq!(edges.len(), 3);
         assert_eq!(batches, 2);
-        assert_eq!(*calls.lock().expect("edge call log"), vec![(0, 2), (2, 2)]);
     }
 
     #[tokio::test]
     async fn collect_active_edge_records_returns_empty_when_first_page_is_empty() {
-        let calls = Arc::new(Mutex::new(Vec::new()));
-        let db_client = PagedEdgeDbClient {
-            calls: calls.clone(),
-            ..Default::default()
-        };
+        let db = make_in_memory_db().await;
+        let app_store = crate::storage::AppStoreClient::new(db);
 
         let (edges, batches) =
-            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
                 .await
                 .expect("empty paged edge scan should succeed");
 
         assert!(edges.is_empty());
         assert_eq!(batches, 0);
-        assert_eq!(*calls.lock().expect("edge call log"), vec![(0, 2)]);
     }
 
     #[tokio::test]
     async fn collect_active_edge_records_checks_trailing_empty_page_for_exact_multiple() {
-        let calls = Arc::new(Mutex::new(Vec::new()));
-        let db_client = PagedEdgeDbClient {
-            edges: vec![
-                edge("entity:alice", "entity:bob"),
-                edge("entity:bob", "entity:carol"),
-                edge("entity:carol", "entity:dana"),
-                edge("entity:dana", "entity:erin"),
-            ],
-            calls: calls.clone(),
-        };
+        let db = make_in_memory_db().await;
+        seed_edge(&db, "edge:1", "entity:alice", "entity:bob").await;
+        seed_edge(&db, "edge:2", "entity:bob", "entity:carol").await;
+        seed_edge(&db, "edge:3", "entity:carol", "entity:dana").await;
+        seed_edge(&db, "edge:4", "entity:dana", "entity:erin").await;
+        let app_store = crate::storage::AppStoreClient::new(db);
 
         let (edges, batches) =
-            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
                 .await
                 .expect("exact-multiple paged edge scan should succeed");
 
         assert_eq!(edges.len(), 4);
         assert_eq!(batches, 2);
-        assert_eq!(
-            *calls.lock().expect("edge call log"),
-            vec![(0, 2), (2, 2), (4, 2)]
-        );
     }
 
     #[tokio::test]
     async fn batched_edge_scan_can_build_entity_communities_across_context_nodes() {
-        let calls = Arc::new(Mutex::new(Vec::new()));
-        let db_client = PagedEdgeDbClient {
-            edges: vec![
-                edge("entity:alice", "episode:shared"),
-                edge("entity:bob", "episode:shared"),
-                edge("entity:bob", "fact:joint"),
-                edge("entity:carol", "fact:joint"),
-            ],
-            calls: calls.clone(),
-        };
+        let db = make_in_memory_db().await;
+        seed_edge(&db, "edge:1", "entity:alice", "episode:shared").await;
+        seed_edge(&db, "edge:2", "entity:bob", "episode:shared").await;
+        seed_edge(&db, "edge:3", "entity:bob", "fact:joint").await;
+        seed_edge(&db, "edge:4", "entity:carol", "fact:joint").await;
+        let app_store = crate::storage::AppStoreClient::new(db);
 
         let (edges, batches) =
-            collect_active_edge_records(&db_client, "org", "2026-05-13T00:00:00Z", 2)
+            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
                 .await
                 .expect("paged edge scan should succeed");
         let grouped = group_entity_components_from_active_edges(&edges);
 
         assert_eq!(batches, 2);
-        assert_eq!(
-            *calls.lock().expect("edge call log"),
-            vec![(0, 2), (2, 2), (4, 2)]
-        );
         assert_eq!(
             grouped,
             vec![vec![

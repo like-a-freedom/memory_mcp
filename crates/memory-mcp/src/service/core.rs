@@ -12,9 +12,6 @@ use crate::models::{
     ExplainRequest, ExtractResult, IngestRequest, InvalidateRequest,
 };
 
-#[cfg(test)]
-use crate::storage::GraphDirection;
-
 use super::error::MemoryError;
 #[cfg(test)]
 use super::value_helpers::string_from_value;
@@ -723,24 +720,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -939,7 +918,6 @@ mod tests {
 
         let db = crate::service::mock_db::MockDbClient::new()
             .expect_select_table_panic("entity")
-            .expect_edges_filtered_panic()
             .expect_create_with(|| {
                 panic!("resolve should not create when indexed lookup finds a record")
             })
@@ -985,7 +963,6 @@ mod tests {
         use std::sync::Arc;
 
         let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edges_filtered_panic()
             .expect_edge_neighbors(
                 "entity:openai",
                 vec![json!({"in": "entity:bob", "out": "entity:openai"})],
@@ -1025,7 +1002,6 @@ mod tests {
         use std::sync::Arc;
 
         let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edges_filtered_panic()
             .expect_edge_neighbors(
                 "entity:openai",
                 vec![
@@ -1065,7 +1041,6 @@ mod tests {
         use std::sync::Arc;
 
         let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edges_filtered_panic()
             .expect_edge_neighbors(
                 "entity:openai",
                 vec![

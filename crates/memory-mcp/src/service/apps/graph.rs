@@ -1042,48 +1042,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                self.neighbor_queries.fetch_add(1, Ordering::Relaxed);
-
-                if direction == GraphDirection::Incoming {
-                    return Ok(vec![]);
-                }
-
-                let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
-                    let idx = idx.parse::<usize>().unwrap_or(0);
-                    json!({
-                        "in": format!("entity:{idx}"),
-                        "out": format!("episode:{idx}"),
-                        "relation": "linked",
-                    })
-                } else if let Some(idx) = node_id.strip_prefix("episode:") {
-                    let idx = idx.parse::<usize>().unwrap_or(0);
-                    json!({
-                        "in": format!("episode:{idx}"),
-                        "out": format!("entity:{}", idx + 1),
-                        "relation": "linked",
-                    })
-                } else {
-                    return Ok(vec![]);
-                };
-
-                Ok(vec![next_edge])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1104,10 +1062,38 @@ mod tests {
 
             async fn query(
                 &self,
-                _sql: &str,
-                _vars: Option<Value>,
+                sql: &str,
+                vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                // The app store now runs graph-neighbor lookups through the core
+                // `query` op; serve the deterministic chain of edges here.
+                if sql.contains("FROM edge") {
+                    self.neighbor_queries.fetch_add(1, Ordering::Relaxed);
+                    if sql.contains("WHERE out =") {
+                        return Ok(Value::Array(Vec::new()));
+                    }
+                    let node_id = vars
+                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .unwrap_or_default();
+                    let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
+                        json!({
+                            "in": format!("entity:{idx}"),
+                            "out": format!("episode:{idx}"),
+                            "relation": "linked",
+                        })
+                    } else if let Some(idx) = node_id.strip_prefix("episode:") {
+                        let idx = idx.parse::<usize>().unwrap_or(0);
+                        json!({
+                            "in": format!("episode:{idx}"),
+                            "out": format!("entity:{}", idx + 1),
+                            "relation": "linked",
+                        })
+                    } else {
+                        return Ok(Value::Array(Vec::new()));
+                    };
+                    return Ok(Value::Array(vec![next_edge]));
+                }
                 Ok(Value::Null)
             }
 

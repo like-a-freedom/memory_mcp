@@ -27,12 +27,7 @@ use super::migrations::{
     MigrationScript, migration_checksum, migration_has_statements, migration_record_id,
     validate_applied_migration, versioned_migrations,
 };
-use super::queries::{
-    active_edge_scan_limit, build_create_query, build_select_edge_neighbors_query,
-    build_select_edges_filtered_page_query, build_select_edges_filtered_query,
-    build_select_one_query, build_update_query,
-};
-use super::types::GraphDirection;
+use super::queries::{build_create_query, build_select_one_query, build_update_query};
 
 /// Trait for database operations, enabling dependency injection and testing.
 #[async_trait]
@@ -46,46 +41,6 @@ pub trait DbClient: Send + Sync {
 
     /// Selects all records from a table.
     async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects edges with DB-side filtering for bi-temporal visibility.
-    ///
-    /// This helper is retained for compatibility and targeted tests. Production
-    /// community rebuilds prefer `select_edges_filtered_page`, while live graph
-    /// traversal prefers `select_edge_neighbors` to avoid materializing the full
-    /// edge table in one shot.
-    async fn select_edges_filtered(
-        &self,
-        namespace: &str,
-        cutoff: &str,
-    ) -> Result<Vec<Value>, MemoryError>;
-
-    /// Selects one page of active edges in stable order.
-    ///
-    /// The default implementation preserves compatibility for test doubles by
-    /// delegating to `select_edges_filtered` and slicing the result in memory.
-    async fn select_edges_filtered_page(
-        &self,
-        namespace: &str,
-        cutoff: &str,
-        start: usize,
-        limit: usize,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-
-        let records = self.select_edges_filtered(namespace, cutoff).await?;
-        Ok(records.into_iter().skip(start).take(limit).collect())
-    }
-
-    /// Selects active graph neighbors for one node without materializing the full edge table.
-    async fn select_edge_neighbors(
-        &self,
-        namespace: &str,
-        node_id: &str,
-        cutoff: &str,
-        direction: GraphDirection,
-    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Creates a new record.
     async fn create(
@@ -819,152 +774,6 @@ impl DbClient for SurrealDbClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn select_edges_filtered(
-        &self,
-        namespace: &str,
-        cutoff: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_edges_filtered",
-            vec![
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-            ],
-        );
-
-        // Retained for compatibility/test coverage; production community
-        // rebuilds prefer paged scans via `select_edges_filtered_page`, while
-        // live graph traversal prefers bounded neighbor lookups.
-        let (sql, vars) = build_select_edges_filtered_query(cutoff);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        // Warn if the edge scan hit the limit — community detection will be incomplete
-        if results.len() == active_edge_scan_limit() as usize {
-            let mut event = HashMap::new();
-            event.insert(
-                "op".to_string(),
-                Value::String("db.select_edges_filtered.limit_hit".to_string()),
-            );
-            event.insert(
-                "warning".to_string(),
-                Value::String(format!(
-                    "Edge scan hit limit of {} edges; community detection may be incomplete",
-                    active_edge_scan_limit()
-                )),
-            );
-            event.insert(
-                "count".to_string(),
-                Value::Number(serde_json::Number::from(results.len())),
-            );
-            self.logger.log(event, LogLevel::Warn);
-        }
-
-        self.log_op(
-            "db.select_edges_filtered.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_edge_neighbors(
-        &self,
-        namespace: &str,
-        node_id: &str,
-        cutoff: &str,
-        direction: GraphDirection,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_edge_neighbors",
-            vec![
-                ("namespace", Value::String(namespace.to_string())),
-                ("node_id", Value::String(node_id.to_string())),
-                ("cutoff", Value::String(cutoff.to_string())),
-                (
-                    "direction",
-                    Value::String(match direction {
-                        GraphDirection::Incoming => "incoming".to_string(),
-                        GraphDirection::Outgoing => "outgoing".to_string(),
-                    }),
-                ),
-            ],
-        );
-
-        let (sql, vars) = build_select_edge_neighbors_query(node_id, cutoff, direction);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_edge_neighbors.result",
-            vec![(
-                "count",
-                Value::Number(serde_json::Number::from(results.len())),
-            )],
-        );
-
-        Ok(results)
-    }
-
-    async fn select_edges_filtered_page(
-        &self,
-        namespace: &str,
-        cutoff: &str,
-        start: usize,
-        limit: usize,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.log_op(
-            "db.select_edges_filtered_page",
-            vec![
-                ("cutoff", Value::String(cutoff.to_string())),
-                ("namespace", Value::String(namespace.to_string())),
-                ("start", Value::Number(serde_json::Number::from(start))),
-                ("limit", Value::Number(serde_json::Number::from(limit))),
-            ],
-        );
-
-        let (sql, vars) = build_select_edges_filtered_page_query(cutoff, limit, start);
-        let surreal_val = match self.execute_query(&sql, Some(vars), namespace).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(Vec::new());
-            }
-            Err(err) => return Err(err),
-        };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
-
-        self.log_op(
-            "db.select_edges_filtered_page.result",
-            vec![
-                ("start", Value::Number(serde_json::Number::from(start))),
-                (
-                    "count",
-                    Value::Number(serde_json::Number::from(results.len())),
-                ),
-            ],
-        );
-
-        Ok(results)
-    }
-
     async fn create(
         &self,
         record_id: &str,

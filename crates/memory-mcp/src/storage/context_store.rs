@@ -141,9 +141,13 @@ impl ContextStoreClient {
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_edge_neighbors(namespace, node_id, cutoff, direction)
-            .await
+        let (sql, vars) =
+            crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     /// Entities matching a batch of normalized names (alias-resolution hot path).

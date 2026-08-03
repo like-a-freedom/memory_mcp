@@ -321,7 +321,7 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::service::EmbeddingProvider;
-    use crate::storage::{DbClient, GraphDirection};
+    use crate::storage::DbClient;
     use async_trait::async_trait;
     use chrono::Utc;
     use serde_json::{Value, json};
@@ -404,24 +404,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -529,24 +511,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -658,24 +622,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -863,24 +809,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1022,24 +950,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1181,46 +1091,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(match node_id {
-                    "entity:alpha" => vec![json!({
-                        "edge_id": "edge:alpha-extracted",
-                        "in": "entity:alpha",
-                        "relation": "knows",
-                        "out": "entity:anchor_alpha",
-                        "origin": "extracted",
-                        "confidence": 0.9,
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z"
-                    })],
-                    "entity:beta" => vec![json!({
-                        "edge_id": "edge:beta-inferred",
-                        "in": "entity:beta",
-                        "relation": "knows",
-                        "out": "entity:anchor_beta",
-                        "origin": "inferred",
-                        "confidence": 0.2,
-                        "t_valid": "2026-01-10T10:30:00Z",
-                        "t_ingested": "2026-01-10T10:30:00Z"
-                    })],
-                    _ => vec![],
-                })
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1299,6 +1169,34 @@ mod tests {
                         }
                     ]));
                 }
+                if sql.contains("FROM edge") {
+                    let node_id = vars
+                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .unwrap_or_default();
+                    return Ok(Value::Array(match node_id.as_str() {
+                        "entity:alpha" => vec![json!({
+                            "edge_id": "edge:alpha-extracted",
+                            "in": "entity:alpha",
+                            "relation": "knows",
+                            "out": "entity:anchor_alpha",
+                            "origin": "extracted",
+                            "confidence": 0.9,
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z"
+                        })],
+                        "entity:beta" => vec![json!({
+                            "edge_id": "edge:beta-inferred",
+                            "in": "entity:beta",
+                            "relation": "knows",
+                            "out": "entity:anchor_beta",
+                            "origin": "inferred",
+                            "confidence": 0.2,
+                            "t_valid": "2026-01-10T10:30:00Z",
+                            "t_ingested": "2026-01-10T10:30:00Z"
+                        })],
+                        _ => vec![],
+                    }));
+                }
                 Ok(Value::Null)
             }
 
@@ -1363,24 +1261,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
@@ -1517,24 +1397,6 @@ mod tests {
             }
 
             #[allow(clippy::too_many_arguments)]
-            async fn select_edges_filtered(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_edge_neighbors(
-                &self,
-                _namespace: &str,
-                _node_id: &str,
-                _cutoff: &str,
-                _direction: GraphDirection,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn create(
                 &self,
                 _record_id: &str,
