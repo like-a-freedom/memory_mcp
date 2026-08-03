@@ -291,7 +291,7 @@ impl MemoryService {
                     return Ok((summary, ReembedOutcome::Interrupted));
                 }
                 let batch = self
-                    .db_client
+                    .reembed_store()
                     .select_facts_needing_reembed(
                         namespace,
                         &target_signature,
@@ -692,7 +692,7 @@ impl MemoryService {
         let mut total = 0;
         for namespace in &self.namespaces {
             total += self
-                .db_client
+                .reembed_store()
                 .count_facts_needing_reembed(namespace, target_signature)
                 .await?;
         }

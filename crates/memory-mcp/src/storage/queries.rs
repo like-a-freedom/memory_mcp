@@ -268,36 +268,6 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
     )
 }
 
-pub fn build_count_facts_needing_reembed_query(target_signature: &str) -> (String, Value) {
-    (
-        "SELECT count() AS count FROM fact WHERE embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature GROUP ALL".to_string(),
-        json!({"target_signature": target_signature}),
-    )
-}
-
-pub fn build_select_facts_needing_reembed_query(
-    target_signature: &str,
-    last_completed_fact_id: Option<&str>,
-    limit: i32,
-) -> (String, Value) {
-    let cursor_clause = if last_completed_fact_id.is_some() {
-        " AND fact_id > $last_completed_fact_id"
-    } else {
-        ""
-    };
-
-    (
-        format!(
-            "SELECT * FROM fact WHERE (embedding_signature IS NONE OR embedding_signature IS NULL OR embedding_signature != $target_signature){cursor_clause} ORDER BY fact_id ASC LIMIT $limit"
-        ),
-        json!({
-            "target_signature": target_signature,
-            "last_completed_fact_id": last_completed_fact_id,
-            "limit": limit,
-        }),
-    )
-}
-
 pub fn build_select_episodes_for_archival_query(cutoff: &str, limit: i32) -> (String, Value) {
     (
         "SELECT * FROM episode WHERE status != 'archived' AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit".to_string(),

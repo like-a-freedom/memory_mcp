@@ -715,24 +715,6 @@ impl DbClient for MockDbClient {
         Ok(vec![])
     }
 
-    async fn count_facts_needing_reembed(
-        &self,
-        _namespace: &str,
-        _target_signature: &str,
-    ) -> Result<usize, MemoryError> {
-        Ok(0)
-    }
-
-    async fn select_facts_needing_reembed(
-        &self,
-        _namespace: &str,
-        _target_signature: &str,
-        _last_completed_fact_id: Option<&str>,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        Ok(vec![])
-    }
-
     async fn select_edges_for_triple(
         &self,
         _namespace: &str,

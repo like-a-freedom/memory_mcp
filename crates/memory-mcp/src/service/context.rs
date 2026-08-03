@@ -566,24 +566,6 @@ mod tests {
                 Ok(Vec::new())
             }
 
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
             async fn select_episodes_by_content(
                 &self,
                 _namespace: &str,
@@ -856,24 +838,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }
@@ -1160,24 +1124,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }
@@ -1510,24 +1456,6 @@ mod tests {
                 Ok(Vec::new())
             }
 
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
             async fn select_episodes_by_content(
                 &self,
                 _namespace: &str,
@@ -1832,24 +1760,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }
@@ -2176,24 +2086,6 @@ mod tests {
                 Ok(Vec::new())
             }
 
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
             async fn select_episodes_by_content(
                 &self,
                 _namespace: &str,
@@ -2458,24 +2350,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }
@@ -2764,24 +2638,6 @@ mod tests {
                 Ok(Vec::new())
             }
 
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
             async fn select_episodes_by_content(
                 &self,
                 _namespace: &str,
@@ -3064,24 +2920,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }
@@ -3422,24 +3260,6 @@ mod tests {
                 _in_id: &str,
                 _relation: &str,
                 _out_id: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(Vec::new())
-            }
-
-            async fn count_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-            ) -> Result<usize, MemoryError> {
-                Ok(0)
-            }
-
-            async fn select_facts_needing_reembed(
-                &self,
-                _namespace: &str,
-                _target_signature: &str,
-                _last_completed_fact_id: Option<&str>,
-                _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(Vec::new())
             }

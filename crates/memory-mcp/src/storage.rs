@@ -26,6 +26,7 @@ mod helpers;
 mod migrations;
 mod procedures;
 mod queries;
+pub(crate) mod reembed_store;
 mod types;
 
 // Re-export the public API
@@ -44,4 +45,5 @@ pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
     fact_embedding_dimension_placeholder,
 };
+pub use reembed_store::ReembedStoreClient;
 pub use types::GraphDirection;
