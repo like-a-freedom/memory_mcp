@@ -75,10 +75,6 @@ pub(crate) fn filter_facts_by_constraints(
 // TODO(adr-0027): wire into selective-recall or delete — production-only caller
 // is missing; only `filtering::tests` exercise this helper.
 #[allow(dead_code)]
-pub(crate) fn filter_facts_by_policy(records: Vec<Value>, access: &AccessPayload) -> Vec<Fact> {
-    filter_facts_by_constraints(records, access, None, &[])
-}
-
 pub(crate) fn fact_record_allowed(
     record: &Value,
     access: &AccessPayload,
@@ -575,7 +571,7 @@ mod tests {
     #[test]
     fn filter_facts_by_policy_returns_empty_for_empty_input() {
         let access = AccessPayload::default();
-        let result = filter_facts_by_policy(vec![], &access);
+        let result = filter_facts_by_constraints(vec![], &access, None, &[]);
         assert!(result.is_empty());
     }
 
@@ -583,7 +579,7 @@ mod tests {
     fn filter_facts_by_policy_skips_invalid_records() {
         let access = AccessPayload::default();
         let records = vec![serde_json::json!({"invalid": "data"})];
-        let result = filter_facts_by_policy(records, &access);
+        let result = filter_facts_by_constraints(records, &access, None, &[]);
         assert!(result.is_empty());
     }
 
@@ -628,7 +624,7 @@ mod tests {
             }),
         ];
 
-        let result = filter_facts_by_policy(records, &access);
+        let result = filter_facts_by_constraints(records, &access, None, &[]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].fact_id, "fact:1");
     }
@@ -667,7 +663,7 @@ mod tests {
             }),
         ];
 
-        let result = filter_facts_by_policy(records, &access);
+        let result = filter_facts_by_constraints(records, &access, None, &[]);
         assert_eq!(result.len(), 2);
     }
 
@@ -687,7 +683,7 @@ mod tests {
             }
         })];
 
-        let result = filter_facts_by_policy(records, &access);
+        let result = filter_facts_by_constraints(records, &access, None, &[]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].fact_id, "fact:1");
     }
@@ -723,7 +719,7 @@ mod tests {
             ]
         })];
 
-        let result = filter_facts_by_policy(records, &access);
+        let result = filter_facts_by_constraints(records, &access, None, &[]);
         assert_eq!(result.len(), 2);
     }
 }

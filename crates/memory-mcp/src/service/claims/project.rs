@@ -202,13 +202,6 @@ impl ClaimService {
         // Persist via store
         let persist_request = PersistProjectionRequest {
             namespace: params.namespace,
-            fact_id: params.fact_id,
-            episode_id: params.source_episode_id,
-            scope: params.scope,
-            project: params.project,
-            policy_tags: &[],
-            extractor_fingerprint: fingerprint,
-            t_ingested,
             claims,
             jobs: vec![projection_job],
         };
@@ -301,22 +294,8 @@ mod tests {
 
     #[async_trait]
     impl ClaimStore for NoopClaimStore {
-        async fn load_projection_source(
-            &self,
-            _ns: &str,
-            _fid: &FactId,
-        ) -> Result<Option<crate::storage::claims::ClaimProjectionSource>, MemoryError> {
-            Ok(None)
-        }
         async fn ensure_projection_job(&self, _job: &ClaimJob) -> Result<(), MemoryError> {
             Ok(())
-        }
-        async fn load_job(
-            &self,
-            _ns: &str,
-            _jid: &ClaimJobId,
-        ) -> Result<Option<ClaimJob>, MemoryError> {
-            Ok(None)
         }
         async fn lease_next_job(
             &self,
@@ -348,12 +327,6 @@ mod tests {
         ) -> Result<Vec<crate::models::claim::ClaimRelation>, MemoryError> {
             Ok(vec![])
         }
-        async fn select_source_evidence(
-            &self,
-            _q: crate::storage::claims::SourceEvidenceQuery<'_>,
-        ) -> Result<Vec<crate::storage::claims::SourceEvidenceRecord>, MemoryError> {
-            Ok(vec![])
-        }
         async fn count_active_relations(
             &self,
             _ns: &str,
@@ -369,13 +342,6 @@ mod tests {
         async fn retract_fact_and_claims(
             &self,
             _req: crate::storage::claims::RetractFactAndClaimsRequest<'_>,
-        ) -> Result<(), MemoryError> {
-            Ok(())
-        }
-        async fn upsert_compiled_policies(
-            &self,
-            _ns: &str,
-            _pols: &[crate::storage::claims::ClaimPolicyRecord],
         ) -> Result<(), MemoryError> {
             Ok(())
         }

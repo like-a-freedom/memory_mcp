@@ -7,33 +7,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
 use super::DbClient;
-use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ExtractorFingerprint};
-use crate::models::{ClaimJobId, EpisodeId, FactId};
+use crate::models::FactId;
+use crate::models::claim::{Claim, ClaimJob, ClaimRelation};
 use crate::service::MemoryError;
 
 // ─── ClaimStore Trait ─────────────────────────────────────────────────────────
 
 /// Narrow storage capability for the claim reconciliation pipeline.
-///
-// TODO(adr-0027): `load_projection_source`, `select_source_evidence`, and
-// `upsert_compiled_policies` have no production caller; removing the allow
-// surfaces dead-method warnings under `-D warnings`.
 #[async_trait]
-#[allow(dead_code)]
 pub(crate) trait ClaimStore: Send + Sync {
-    async fn load_projection_source(
-        &self,
-        namespace: &str,
-        fact_id: &FactId,
-    ) -> Result<Option<ClaimProjectionSource>, MemoryError>;
-
     async fn ensure_projection_job(&self, job: &ClaimJob) -> Result<(), MemoryError>;
-
-    async fn load_job(
-        &self,
-        namespace: &str,
-        job_id: &crate::models::ClaimJobId,
-    ) -> Result<Option<ClaimJob>, MemoryError>;
 
     async fn lease_next_job(
         &self,
@@ -60,11 +43,6 @@ pub(crate) trait ClaimStore: Send + Sync {
         query: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError>;
 
-    async fn select_source_evidence(
-        &self,
-        query: SourceEvidenceQuery<'_>,
-    ) -> Result<Vec<SourceEvidenceRecord>, MemoryError>;
-
     async fn count_active_relations(
         &self,
         namespace: &str,
@@ -80,12 +58,6 @@ pub(crate) trait ClaimStore: Send + Sync {
         request: RetractFactAndClaimsRequest<'_>,
     ) -> Result<(), MemoryError>;
 
-    async fn upsert_compiled_policies(
-        &self,
-        namespace: &str,
-        policies: &[ClaimPolicyRecord],
-    ) -> Result<(), MemoryError>;
-
     /// Atomically commit relation versions and update job cursor.
     async fn commit_reconciliation_page(
         &self,
@@ -95,18 +67,6 @@ pub(crate) trait ClaimStore: Send + Sync {
 
 // ─── Request/Response Types ───────────────────────────────────────────────────
 
-/// A fact source record for projection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub(crate) struct ClaimProjectionSource {
-    pub fact_id: String,
-    pub content: String,
-    pub t_ref: String,
-    pub scope: String,
-    pub project: Option<String>,
-    pub policy_tags: Vec<String>,
-}
-
 /// Lease request for the next pending job.
 pub(crate) struct LeaseJobRequest<'a> {
     pub namespace: &'a str,
@@ -115,18 +75,8 @@ pub(crate) struct LeaseJobRequest<'a> {
 }
 
 /// Persist projection output (claims + jobs).
-// TODO(adr-0027): wire or delete — several fields are never read by the store
-// implementation; removing the allow surfaces dead-field warnings.
-#[allow(dead_code)]
 pub(crate) struct PersistProjectionRequest<'a> {
     pub namespace: &'a str,
-    pub fact_id: &'a FactId,
-    pub episode_id: &'a EpisodeId,
-    pub scope: &'a str,
-    pub project: Option<&'a str>,
-    pub policy_tags: &'a [String],
-    pub extractor_fingerprint: &'a ExtractorFingerprint,
-    pub t_ingested: chrono::DateTime<chrono::Utc>,
     pub claims: Vec<Claim>,
     pub jobs: Vec<ClaimJob>,
 }
@@ -151,26 +101,6 @@ pub(crate) struct RelationsForFactsQuery<'a> {
     pub fact_ids: &'a [FactId],
 }
 
-/// Query for source evidence of a fact's claims.
-// TODO(adr-0027): wire or delete — never constructed; `select_source_evidence`
-// is not yet called by any worker.
-#[allow(dead_code)]
-pub(crate) struct SourceEvidenceQuery<'a> {
-    pub namespace: &'a str,
-    pub fact_id: &'a FactId,
-}
-
-/// A source evidence record for citation.
-// TODO(adr-0027): wire or delete — never constructed; see `SourceEvidenceQuery`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub(crate) struct SourceEvidenceRecord {
-    pub claim_id: String,
-    pub source_episode_id: String,
-    pub source_lineage: Option<String>,
-    pub content: Option<String>,
-}
-
 /// Count of active relations grouped by schema family and outcome.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ActiveRelationCount {
@@ -191,19 +121,6 @@ pub(crate) struct RetractFactAndClaimsRequest<'a> {
     pub namespace: &'a str,
     pub fact_id: &'a FactId,
     pub retract_reason: &'a str,
-}
-
-/// A compiled policy record for storage.
-// TODO(adr-0027): wire or delete — never constructed; policy persistence is
-// not yet wired to a caller.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub(crate) struct ClaimPolicyRecord {
-    pub policy_id: String,
-    pub schema_family: String,
-    pub schema_version: u16,
-    pub policy_fingerprint: String,
-    pub definition: serde_json::Value,
 }
 
 /// Job counters for reconciliation page commits.
@@ -276,71 +193,12 @@ impl SurrealClaimStore {
 
 #[async_trait]
 impl ClaimStore for SurrealClaimStore {
-    async fn load_projection_source(
-        &self,
-        namespace: &str,
-        fact_id: &FactId,
-    ) -> Result<Option<ClaimProjectionSource>, MemoryError> {
-        let sql = format!("SELECT * FROM fact:⟨{}⟩", fact_id.as_ref());
-        let result = self.db.query(&sql, None, namespace).await?;
-        match Self::extract_first(result) {
-            Some(Value::Object(map)) => Ok(Some(ClaimProjectionSource {
-                fact_id: map
-                    .get("fact_id")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                content: map
-                    .get("content")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                t_ref: map
-                    .get("t_valid")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                scope: map
-                    .get("scope")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                project: map.get("project").and_then(Value::as_str).map(String::from),
-                policy_tags: map
-                    .get("policy_tags")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            })),
-            _ => Ok(None),
-        }
-    }
-
     async fn ensure_projection_job(&self, job: &ClaimJob) -> Result<(), MemoryError> {
         let content = Self::serialize(job)?;
         let sql = Self::upsert_one_sql("claim_job", job.job_id.as_ref())?;
         let vars = serde_json::json!({"content": content});
         self.db.query(&sql, Some(vars), &job.namespace).await?;
         Ok(())
-    }
-
-    async fn load_job(
-        &self,
-        namespace: &str,
-        job_id: &ClaimJobId,
-    ) -> Result<Option<ClaimJob>, MemoryError> {
-        let sql = format!("SELECT * FROM claim_job:⟨{}⟩", job_id.body());
-        let result = self.db.query(&sql, None, namespace).await?;
-        match Self::extract_first(result) {
-            Some(v) => serde_json::from_value(v)
-                .map(Some)
-                .map_err(|e| MemoryError::Storage(format!("job deser: {e}"))),
-            None => Ok(None),
-        }
     }
 
     async fn lease_next_job(
@@ -466,23 +324,6 @@ impl ClaimStore for SurrealClaimStore {
             .collect()
     }
 
-    async fn select_source_evidence(
-        &self,
-        q: SourceEvidenceQuery<'_>,
-    ) -> Result<Vec<SourceEvidenceRecord>, MemoryError> {
-        let sql = "SELECT claim_id, source_episode_id, source_lineage FROM claim WHERE source_fact_id = $fact_id";
-        let vars = serde_json::json!({"fact_id": q.fact_id.as_ref()});
-        let result = self.db.query(sql, Some(vars), q.namespace).await?;
-        let records = Self::deserialize_vec(result);
-        records
-            .into_iter()
-            .map(|v| {
-                serde_json::from_value(v)
-                    .map_err(|e| MemoryError::Storage(format!("evidence deser: {e}")))
-            })
-            .collect()
-    }
-
     async fn count_active_relations(
         &self,
         namespace: &str,
@@ -544,20 +385,6 @@ impl ClaimStore for SurrealClaimStore {
             "fact_id": request.fact_id.as_ref(),
         });
         self.db.query(sql3, Some(vars3), request.namespace).await?;
-        Ok(())
-    }
-
-    async fn upsert_compiled_policies(
-        &self,
-        namespace: &str,
-        policies: &[ClaimPolicyRecord],
-    ) -> Result<(), MemoryError> {
-        for policy in policies {
-            let content = Self::serialize(policy)?;
-            let sql = Self::upsert_one_sql("claim_policy", &policy.policy_id)?;
-            let vars = serde_json::json!({"content": content});
-            self.db.query(&sql, Some(vars), namespace).await?;
-        }
         Ok(())
     }
 
