@@ -297,25 +297,6 @@ mod tests {
                 Ok(vec![])
             }
 
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
             async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
                 Ok(())
             }

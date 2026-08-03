@@ -5,9 +5,10 @@
 
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::service::MemoryError;
+use crate::storage::helpers::is_missing_table_error;
 use crate::storage::{DbClient, GraphDirection};
 
 /// Concrete store for app-facing graph + entity + record reads and mutations.
@@ -89,9 +90,14 @@ impl AppStoreClient {
         cutoff: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.db
-            .select_episodes_for_archival(namespace, cutoff, limit)
-            .await
+        let sql = "SELECT * FROM episode WHERE status != 'archived' \
+                   AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit";
+        let vars = json!({ "cutoff": cutoff, "limit": limit });
+        match self.db.query(sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn update_record(

@@ -2832,7 +2832,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         "expected at least one fact/note record, got {extraction:?}"
     );
 
-    let stored_facts = db_client
+    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
         .select_active_facts_by_episode(
             "org",
             &episode_id,
@@ -2902,7 +2902,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         "expected thematic section lines to become note facts, got {extraction:?}"
     );
 
-    let stored_facts = db_client
+    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
         .select_active_facts_by_episode(
             "org",
             &episode_id,

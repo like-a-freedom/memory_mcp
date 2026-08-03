@@ -35,6 +35,11 @@ impl MemoryService {
         crate::storage::ReembedStoreClient::new(self.db_client.clone())
     }
 
+    /// Episode-domain store (ADR-0027: episode queries live in the store).
+    pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
+        crate::storage::EpisodeStoreClient::new(self.db_client.clone())
+    }
+
     /// Builds a `ServiceContext` from this service's fields.
     ///
     /// Used by capability modules and tools that need a narrow reference
@@ -844,25 +849,6 @@ mod tests {
             async fn select_active_facts(
                 &self,
                 _namespace: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_episodes_for_archival(
-                &self,
-                _namespace: &str,
-                _cutoff: &str,
-                _limit: i32,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            async fn select_active_facts_by_episode(
-                &self,
-                _namespace: &str,
-                _episode_id: &str,
-                _cutoff: &str,
                 _limit: i32,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])

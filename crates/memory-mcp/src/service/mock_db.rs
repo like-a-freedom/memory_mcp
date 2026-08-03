@@ -59,8 +59,6 @@ pub struct MockDbClient {
     fallback_entity_lookup: Mutex<Option<Box<SelectOneFn>>>,
     fallback_entities_batch: Mutex<Option<Box<SelectTableFn>>>,
     fallback_active_facts: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_episodes_for_archival: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_active_facts_by_episode: Mutex<Option<Box<SelectTableFn>>>,
     fallback_episodes_by_content: Mutex<Option<Box<SelectTableFn>>>,
 }
 
@@ -96,8 +94,6 @@ impl MockDbClient {
             fallback_entity_lookup: Mutex::new(None),
             fallback_entities_batch: Mutex::new(None),
             fallback_active_facts: Mutex::new(None),
-            fallback_episodes_for_archival: Mutex::new(None),
-            fallback_active_facts_by_episode: Mutex::new(None),
             fallback_episodes_by_content: Mutex::new(None),
         }
     }
@@ -496,39 +492,6 @@ impl DbClient for MockDbClient {
     ) -> Result<Vec<Value>, MemoryError> {
         if let Some(ref f) = *self
             .fallback_active_facts
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_episodes_for_archival(
-        &self,
-        _namespace: &str,
-        _cutoff: &str,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_episodes_for_archival
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f("");
-        }
-        Ok(vec![])
-    }
-
-    async fn select_active_facts_by_episode(
-        &self,
-        _namespace: &str,
-        _episode_id: &str,
-        _cutoff: &str,
-        _limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        if let Some(ref f) = *self
-            .fallback_active_facts_by_episode
             .lock()
             .unwrap_or_else(|p| p.into_inner())
         {

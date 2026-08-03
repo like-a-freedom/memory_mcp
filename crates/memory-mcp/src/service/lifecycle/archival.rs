@@ -88,7 +88,7 @@ pub async fn run_archival_pass(
 
     for namespace in &service.namespaces {
         let episodes = service
-            .db_client
+            .app_store()
             .select_episodes_for_archival(namespace, &cutoff_str, ARCHIVAL_BATCH_LIMIT)
             .await?;
 
@@ -131,7 +131,7 @@ async fn check_episode_has_active_facts(
 ) -> Result<bool, MemoryError> {
     let cutoff = crate::service::normalize_dt(Utc::now());
     let facts = service
-        .db_client
+        .episode_store()
         .select_active_facts_by_episode(namespace, episode_id, &cutoff, 1)
         .await?;
 

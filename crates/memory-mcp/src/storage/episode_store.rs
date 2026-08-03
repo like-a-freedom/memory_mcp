@@ -2,16 +2,16 @@
 //! community/entity lookups community helpers use.
 //!
 //! Replaces direct `DbClient` consumption in `service/episode/` per
-//! ADR-0024 step 6. The store owns which query is being issued; the SQL
-//! text itself still lives in `SurrealDbClient` (the single engine
-//! implementation). Pulling SQL construction up to this layer is out of
-//! scope for this refactor.
+//! ADR-0024 step 6. The store owns its queries; SQL for episode-domain
+//! reads lives here (ADR-0027) rather than on the universal `DbClient`.
 
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::service::MemoryError;
+use crate::storage::helpers::is_missing_table_error;
+use crate::storage::queries::build_fact_visibility_clause;
 use crate::storage::{DbClient, GraphDirection};
 
 #[derive(Clone)]
@@ -81,6 +81,26 @@ impl EpisodeStoreClient {
         self.db.select_entities_by_ids(namespace, entity_ids).await
     }
 
+    /// Active (not-yet-invalidated) facts linked to an episode.
+    pub async fn select_active_facts_by_episode(
+        &self,
+        namespace: &str,
+        episode_id: &str,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let visibility = build_fact_visibility_clause("$cutoff");
+        let sql = format!(
+            "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
+        );
+        let vars = json!({ "episode_id": episode_id, "cutoff": cutoff, "limit": limit });
+        match self.db.query(&sql, Some(vars), namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Communities containing any of the listed member entities.
     pub async fn select_communities_by_member_entities(
         &self,
@@ -117,5 +137,127 @@ impl EpisodeStoreClient {
         self.db
             .relate_edge(namespace, edge_id, from_id, to_id, content)
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::json;
+
+    use crate::service::normalize_dt;
+    use crate::storage::{DbClient, SurrealDbClient, episode_store::EpisodeStoreClient};
+
+    async fn make_db() -> Arc<SurrealDbClient> {
+        let db_name = format!(
+            "episode_store_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                &db_name,
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory db"),
+        );
+        db_client
+            .apply_migrations("org")
+            .await
+            .expect("apply migrations");
+        db_client
+    }
+
+    async fn seed_fact(db_client: &Arc<SurrealDbClient>, fact_id: &str, invalidated: bool) {
+        let now = normalize_dt(chrono::Utc::now());
+        let embedding = vec![0.1f64; 1536];
+        db_client
+            .create(
+                fact_id,
+                json!({
+                    "fact_id": fact_id,
+                    "fact_type": "note",
+                    "content": format!("content {fact_id}"),
+                    "quote": format!("content {fact_id}"),
+                    "source_episode": "episode:seed",
+                    "t_valid": now,
+                    "t_ingested": now,
+                    "confidence": 0.9,
+                    "index_keys": [],
+                    "access_count": 0,
+                    "entity_links": [],
+                    "scope": "org",
+                    "policy_tags": [],
+                    "provenance": {"source_episode": "episode:seed"},
+                    "embedding": embedding,
+                    "embedding_provider": "legacy-test",
+                    "embedding_model": "legacy-model",
+                    "embedding_dimension": 1536,
+                    "embedding_signature": Some("embsig:test"),
+                    "embedding_updated_at": now,
+                    "t_invalid": if invalidated {
+                        Some(now)
+                    } else {
+                        None
+                    },
+                }),
+                "org",
+            )
+            .await
+            .expect("seed fact should succeed");
+    }
+
+    #[tokio::test]
+    async fn active_facts_by_episode_returns_empty_when_fact_table_missing() {
+        let db_name = format!(
+            "episode_store_unmigrated_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                &db_name,
+                &["org".to_string()],
+                "warn",
+            )
+            .await
+            .expect("connect in memory db"),
+        );
+        let store = EpisodeStoreClient::new(db_client.clone());
+        let cutoff = normalize_dt(chrono::Utc::now());
+
+        let facts = store
+            .select_active_facts_by_episode("org", "episode:seed", &cutoff, 10)
+            .await
+            .expect("must not error on missing table");
+        assert!(facts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn active_facts_by_episode_filters_invalidated_and_limits() {
+        let db_client = make_db().await;
+        seed_fact(&db_client, "fact:1", false).await;
+        seed_fact(&db_client, "fact:2", true).await;
+        seed_fact(&db_client, "fact:3", false).await;
+        let store = EpisodeStoreClient::new(db_client.clone());
+        let cutoff = normalize_dt(chrono::Utc::now() + chrono::Duration::seconds(1));
+
+        let facts = store
+            .select_active_facts_by_episode("org", "episode:seed", &cutoff, 2)
+            .await
+            .expect("select active facts");
+        let ids: Vec<&str> = facts
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(|v| v.as_str()))
+            .collect();
+        // Invalidated fact:2 excluded; limit 2 caps the page.
+        assert_eq!(ids, vec!["fact:1", "fact:3"]);
     }
 }
