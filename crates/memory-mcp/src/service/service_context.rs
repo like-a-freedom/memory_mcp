@@ -190,18 +190,62 @@ impl ServiceContext {
         crate::storage::EpisodeStoreClient::new(self.db_client.clone())
     }
 
-    /// Finds an entity record by ID across all namespaces.
-    pub(crate) async fn find_entity_record_by_id(
+    /// Batch-fetch entity records by IDs across all namespaces.
+    ///
+    /// Returns a map of entity ID to (canonical_name, aliases). Missing IDs are
+    /// omitted from the result (caller checks `map.get`).Namespace precedence
+    /// follows `self.namespaces` order: first namespace containing the ID wins.
+    pub(crate) async fn find_entity_records_by_ids(
         &self,
-        entity_id: &str,
-    ) -> Result<Option<Value>, MemoryError> {
+        entity_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, (String, Vec<String>)>, MemoryError> {
+        use std::collections::HashMap;
+        let mut result: HashMap<String, (String, Vec<String>)> = HashMap::new();
+        if entity_ids.is_empty() {
+            return Ok(result);
+        }
+        let names = entity_ids.to_vec();
         for namespace in &self.namespaces {
-            let record = self.db_client.select_one(entity_id, namespace).await?;
-            if record.is_some() {
-                return Ok(record);
+            let sql =
+                "SELECT entity_id, canonical_name, aliases FROM entity WHERE entity_id IN $ids";
+            let rows = self
+                .db_client
+                .query(
+                    sql,
+                    Some(serde_json::json!({ "ids": names.clone() })),
+                    namespace,
+                )
+                .await?;
+            if let serde_json::Value::Array(rows) = rows {
+                for row in rows {
+                    let serde_json::Value::Object(map) = row else {
+                        continue;
+                    };
+                    let entity_id = map
+                        .get("entity_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string();
+                    let canonical = map
+                        .get("canonical_name")
+                        .and_then(Value::as_str)
+                        .unwrap_or(entity_id.as_str())
+                        .to_string();
+                    let aliases = map
+                        .get("aliases")
+                        .and_then(Value::as_array)
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(Value::as_str)
+                                .map(str::to_string)
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    result.entry(entity_id).or_insert((canonical, aliases));
+                }
             }
         }
-        Ok(None)
+        Ok(result)
     }
 
     /// Returns the project associated with a source episode, if any.

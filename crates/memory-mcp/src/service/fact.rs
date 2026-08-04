@@ -220,30 +220,10 @@ impl FactService {
         let namespace = ctx.namespace_for_scope(scope)?;
         let project = ctx.project_for_source_episode(source_episode).await?;
 
-        // Pre-fetch entity records to avoid async closures.
-        let mut entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
-            std::collections::HashMap::new();
-        for entity_id in &entity_links {
-            let entity_record = ctx.find_entity_record_by_id(entity_id).await?;
-            if let Some(map) = entity_record.as_ref().and_then(Value::as_object) {
-                let canonical = map
-                    .get("canonical_name")
-                    .and_then(Value::as_str)
-                    .unwrap_or(entity_id.as_str())
-                    .to_string();
-                let aliases = map
-                    .get("aliases")
-                    .and_then(Value::as_array)
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(Value::as_str)
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                entity_map.insert(entity_id.clone(), (canonical, aliases));
-            }
-        }
+        // Pre-fetch linked entity records in a single batch query per namespace,
+        // avoiding O(N) round-trips. Returns None for missing IDs.
+        let entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
+            ctx.find_entity_records_by_ids(&entity_links).await?;
 
         // Pre-fetch episode source_id.
         let (episode_record, _) = ctx.find_episode_record(source_episode).await?;

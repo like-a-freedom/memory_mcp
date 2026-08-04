@@ -11,9 +11,9 @@ license = "MIT"
 [workspace.dependencies]
 anno = { version = "0.11.0", default-features = false }
 async-trait = "0.1.89"
-candle-core = { git = "https://github.com/huggingface/candle.git", default-features = false }
-candle-nn = { git = "https://github.com/huggingface/candle.git", default-features = false }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", default-features = false }
+candle-core = { git = "https://github.com/huggingface/candle.git", rev = "21cca0b", default-features = false }
+candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "21cca0b", default-features = false }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", rev = "21cca0b", default-features = false }
 chrono = { version = "0.4.45", features = ["serde", "clock"] }
 clap = { version = "4.6", features = ["derive", "env"] }
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -40,6 +40,10 @@ zip.workspace = true
 
 [features]
 default = []
+# On macOS, accelerate can be the default when building for Apple Silicon.
+# Enables Accelerate.framework BLAS paths in Candle.
+# Remove 'accelerate' from default when targeting other platforms.
+accelerate = ["candle-core/accelerate"]
 cli-watch = ["notify"]
 mcp-apps = []
 prometheus = ["dep:metrics-exporter-prometheus"]
