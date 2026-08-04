@@ -34,7 +34,7 @@ memory_mcp/
 │   │   │       ├── apps/           # MCP app session handlers (feature-gated, mcp-apps)
 │   │   │       ├── cache/          # Context cache
 │   │   │       ├── embedding/      # Embedding provider implementations
-│   │   │       ├── entity_extraction/# NER providers: Gliner, Anno, LLM, Regex
+│   │   │       ├── entity_extraction/# Pluggable NER backends (regex, anno, gliner, llm) behind a registry
 │   │   │       ├── lifecycle/      # Background workers: archival, decay, community rebuild
 │   │   │       ├── procedures/     # Procedural memory
 │   │   │       ├── query/          # Query utilities
