@@ -35,6 +35,57 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
     FACT_EMBEDDING_DIMENSION_PLACEHOLDER
 }
 
+/// Validate a record-id string before it reaches the query builder.
+///
+/// Accepts either a canonical `<table>:<id>` form (lowercase table, non-empty id)
+/// or a plain table name (for callers that target an entire table, e.g. `select_table`).
+///
+/// Rejects bare hex strings (the bug masked by `build_select_one_query`'s safe noop),
+/// empty input, malformed `<table>:<id>` (empty parts), and uppercase tables.
+///
+/// `dead_code` is allowed here because the first caller is wired in Task 2
+/// (`ServiceContext::find_record_by_id`); subsequent tasks add the other callers.
+#[allow(dead_code)]
+pub(crate) fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryError> {
+    use crate::service::MemoryError;
+
+    let record_id = record_id.trim();
+
+    if record_id.is_empty() {
+        return Err(MemoryError::Validation(
+            "record_id is empty; expected '<table>:<id>'".to_string(),
+        ));
+    }
+
+    if let Some(idx) = record_id.find(':') {
+        let table = &record_id[..idx];
+        let id = &record_id[idx + 1..];
+
+        if table.is_empty() {
+            return Err(MemoryError::Validation(format!(
+                "record_id has empty table part; expected '<table>:<id>', got ':{id}'"
+            )));
+        }
+        if id.is_empty() {
+            return Err(MemoryError::Validation(format!(
+                "record_id has empty id part; expected '<table>:<id>', got '{table}:'"
+            )));
+        }
+        if !table.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+            return Err(MemoryError::Validation(format!(
+                "record_id table must be lowercase ascii or underscore, got '{table}:{id}'; expected '<table>:<id>'"
+            )));
+        }
+        Ok(())
+    } else if is_valid_table_name(record_id) {
+        Ok(())
+    } else {
+        Err(MemoryError::Validation(format!(
+            "record_id '{record_id}' is not a valid table name; expected '<table>:<id>'"
+        )))
+    }
+}
+
 /// Build SQL query for selecting a single record.
 pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     let record_id = record_id.trim();
@@ -511,6 +562,94 @@ fn normalize_surreal_json(v: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::MemoryError;
+
+    // -----------------------------------------------------------------------
+    // validate_record_id — RED phase tests (function not yet defined)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validate_record_id_accepts_episode_with_id() {
+        assert!(validate_record_id("episode:abc123").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_accepts_fact_with_hex_id() {
+        assert!(validate_record_id("fact:52f9d92d20d829840f24294f").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_accepts_plain_table() {
+        // Used by select_table-style callers (no :id part).
+        assert!(validate_record_id("episode").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_rejects_bare_hex() {
+        let err = validate_record_id("474b2d8b81b3feabf832ef08").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => {
+                assert!(
+                    msg.contains("'<table>:<id>'"),
+                    "message should name the expected form, got: {msg}"
+                );
+                assert!(
+                    msg.contains("474b2d8b81b3feabf832ef08"),
+                    "message should echo the bad input, got: {msg}"
+                );
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_bare_hex_with_letters() {
+        let err = validate_record_id("072d682d0d467aa94aad684d").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_string() {
+        let err = validate_record_id("").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => assert!(!msg.is_empty()),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_colon_only() {
+        let err = validate_record_id(":").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_id_part() {
+        let err = validate_record_id("episode:").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => assert!(msg.contains("empty id"), "got: {msg}"),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_table_part() {
+        let err = validate_record_id(":abc123").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => assert!(msg.contains("empty table"), "got: {msg}"),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_uppercase_table() {
+        let err = validate_record_id("Episode:abc").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Existing build_select_one_query tests (unchanged behavior contract)
+    // -----------------------------------------------------------------------
 
     #[test]
     fn build_select_one_query_empty_string_returns_safe_noop() {
