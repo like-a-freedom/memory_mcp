@@ -43,7 +43,7 @@ pub use helpers::is_missing_index_error;
 pub use procedures::ProcedureStore;
 pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
-    fact_embedding_dimension_placeholder,
+    fact_embedding_dimension_placeholder, validate_record_id,
 };
 pub use reembed_store::ReembedStoreClient;
 pub use types::GraphDirection;

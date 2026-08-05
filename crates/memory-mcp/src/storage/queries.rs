@@ -42,11 +42,7 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
 ///
 /// Rejects bare hex strings (the bug masked by `build_select_one_query`'s safe noop),
 /// empty input, malformed `<table>:<id>` (empty parts), and uppercase tables.
-///
-/// `dead_code` is allowed here because the first caller is wired in Task 2
-/// (`ServiceContext::find_record_by_id`); subsequent tasks add the other callers.
-#[allow(dead_code)]
-pub(crate) fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryError> {
+pub fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryError> {
     use crate::service::MemoryError;
 
     let record_id = record_id.trim();
