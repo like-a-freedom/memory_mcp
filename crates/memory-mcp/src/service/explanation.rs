@@ -288,6 +288,12 @@ impl ExplanationService {
         &self,
         fact_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        // Validate the record-id shape up-front so callers can't mask bugs as
+        // silent 'not found' by passing bare hex (the query builder used to
+        // turn such inputs into a no-op SELECT). This entry point has its own
+        // body and does NOT delegate to `find_record_by_id`, so it validates
+        // independently.
+        crate::storage::validate_record_id(fact_id)?;
         for namespace in &self.namespaces {
             let record = self.db_client.select_one(fact_id, namespace).await?;
             if let Some(map) = record.and_then(|v| v.as_object().cloned()) {
@@ -301,6 +307,8 @@ impl ExplanationService {
         &self,
         record_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        // Validate the record-id shape up-front (see comment in `find_fact_record`).
+        crate::storage::validate_record_id(record_id)?;
         for namespace in &self.namespaces {
             let record = self.db_client.select_one(record_id, namespace).await?;
             if let Some(map) = record.and_then(|v| v.as_object().cloned()) {
@@ -545,5 +553,68 @@ impl ExplanationService {
         });
 
         Ok(sources)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! RED phase tests (Task 3): drive validation into
+    //! `ExplanationService::find_record_by_id` and the entry points that
+    //! delegate to it (`find_episode_record`, `find_fact_record`).
+    //!
+    //! `find_fact_record` has its own body and does NOT delegate to
+    //! `find_record_by_id`, so its validation must be wired in independently.
+
+    use super::*;
+    use crate::service::error::MemoryError;
+    use crate::service::mock_db::MockDbClient;
+
+    fn make_service() -> ExplanationService {
+        ExplanationService::new(
+            Arc::new(MockDbClient::new()),
+            StdoutLogger::new("warn"),
+            vec!["org".to_string()],
+        )
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_rejects_bare_hex() {
+        let svc = make_service();
+        let result = svc.find_episode_record("474b2d8b81b3feabf832ef08").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_rejects_empty_id_part() {
+        let svc = make_service();
+        let result = svc.find_episode_record("episode:").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_fact_record_rejects_bare_hex() {
+        // `find_fact_record` has its own implementation that does not delegate
+        // to `find_record_by_id`, so this test guards that path independently.
+        let svc = make_service();
+        let result = svc.find_fact_record("072d682d0d467aa94aad684d").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_fact_record_rejects_empty_id_part() {
+        let svc = make_service();
+        let result = svc.find_fact_record("fact:").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_accepts_wellformed_episode_id() {
+        // Sanity: well-formed ids pass validation and reach the DB (mock returns None).
+        let svc = make_service();
+        let result = svc.find_episode_record("episode:doesnotexist").await;
+        assert!(
+            result.is_ok(),
+            "well-formed id must pass validation: {result:?}"
+        );
     }
 }

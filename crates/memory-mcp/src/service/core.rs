@@ -338,6 +338,10 @@ impl MemoryService {
         &self,
         record_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        // Validate the record-id shape up-front so callers can't mask bugs as
+        // silent 'not found' by passing bare hex (the query builder used to
+        // turn such inputs into a no-op SELECT).
+        crate::storage::validate_record_id(record_id)?;
         for namespace in &self.namespaces {
             let record = self.db_client.select_one(record_id, namespace).await?;
             if let Some(Value::Object(map)) = record {
@@ -1216,5 +1220,67 @@ mod tests {
 
         let count = service.episode_count().await.expect("count episodes");
         assert_eq!(count, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Task 3: validate_record_id wired into MemoryService::find_record_by_id
+    // (RED phase tests — exercised via the public find_episode_record /
+    // find_fact_record entry points, which delegate to find_record_by_id).
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn find_episode_record_rejects_bare_hex() {
+        let service = create_test_service(vec!["org"]);
+        let result = service
+            .find_episode_record("474b2d8b81b3feabf832ef08")
+            .await;
+        match result {
+            Err(crate::service::error::MemoryError::Validation(msg)) => {
+                assert!(msg.contains("'<table>:<id>'"), "{msg}");
+                assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_rejects_empty_id_part() {
+        let service = create_test_service(vec!["org"]);
+        let result = service.find_episode_record("episode:").await;
+        assert!(matches!(
+            result,
+            Err(crate::service::error::MemoryError::Validation(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn find_fact_record_rejects_bare_hex() {
+        let service = create_test_service(vec!["org"]);
+        let result = service.find_fact_record("072d682d0d467aa94aad684d").await;
+        assert!(matches!(
+            result,
+            Err(crate::service::error::MemoryError::Validation(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn find_fact_record_rejects_empty_id_part() {
+        let service = create_test_service(vec!["org"]);
+        let result = service.find_fact_record("fact:").await;
+        assert!(matches!(
+            result,
+            Err(crate::service::error::MemoryError::Validation(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_accepts_wellformed_episode_id() {
+        // Sanity: well-formed ids pass validation and reach the DB (mock returns None).
+        let service = create_test_service(vec!["org"]);
+        let result = service.find_episode_record("episode:doesnotexist").await;
+        assert!(
+            result.is_ok(),
+            "well-formed id must pass validation: {result:?}"
+        );
     }
 }
