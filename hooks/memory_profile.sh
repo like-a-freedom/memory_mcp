@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Samples RSS (and footprint when available) of a running memory_mcp process.
-# Usage: scripts/memory_profile.sh <pid> <duration_secs> [log_file]
+# Usage: hooks/memory_profile.sh <pid> <duration_secs> [log_file]
 set -euo pipefail
 
-pid="${1:?usage: memory_profile.sh <pid> <duration_secs> [log_file]}"
+pid="${1:?usage: hooks/memory_profile.sh <pid> <duration_secs> [log_file]}"
 duration="${2:?}"
 log="${3:-/tmp/memory_mcp_rss.log}"
 
