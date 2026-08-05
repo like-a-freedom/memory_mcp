@@ -766,8 +766,12 @@ impl GlinerLoader {
         let device = select_device(device_kind, &logger)?;
 
         let vb = if safetensors_path.is_file() {
-            unsafe { VarBuilder::from_mmaped_safetensors(&[&safetensors_path], DTYPE, &device) }
-                .map_err(|err| MemoryError::Storage(format!("failed to load safetensors: {err}")))?
+            let buffer = std::fs::read(&safetensors_path).map_err(|err| {
+                MemoryError::Storage(format!("failed to read safetensors: {err}"))
+            })?;
+            VarBuilder::from_buffered_safetensors(buffer, DTYPE, &device).map_err(|err| {
+                MemoryError::Storage(format!("failed to load safetensors: {err}"))
+            })?
         } else if pytorch_path.is_file() {
             VarBuilder::from_pth(pytorch_path.to_str().unwrap_or(""), DTYPE, &device).map_err(
                 |err| MemoryError::Storage(format!("failed to load pytorch weights: {err}")),
