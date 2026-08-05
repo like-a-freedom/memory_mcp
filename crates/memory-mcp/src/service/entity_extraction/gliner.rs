@@ -1399,7 +1399,8 @@ impl EntityExtractor for GlinerEntityExtractor {
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
         let _permit = self.acquire_inference_permit().await?;
-        self.loaded.extract_inner_with_labels(content, zero_shot_labels)
+        self.loaded
+            .extract_inner_with_labels(content, zero_shot_labels)
     }
 }
 
