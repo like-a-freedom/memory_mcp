@@ -70,28 +70,28 @@ Env of the live process: `NER_PROVIDER=local-gliner`, `NER_MODEL=urchade/gliner_
 **Interfaces:**
 - Produces: the `BASELINE` numbers quoted by Task 2 (ADR-0030) and Task 11 (soak).
 
-- [ ] **Step 1: Locate the live process**
+- [x] **Step 1: Locate the live process**
 
 ```bash
 ps -axo pid,rss,etime,command | grep -i memory_mcp | grep -v grep
 ```
 Expected: one line per running instance. Record `pid` and `rss` (KB).
 
-- [ ] **Step 2: Capture region-level attribution**
+- [x] **Step 2: Capture region-level attribution**
 
 ```bash
 vmmap -summary <pid> 2>&1 | head -45
 ```
 Record `Physical footprint`, `Physical footprint (peak)`, and the `MALLOC_LARGE` / `MALLOC_SMALL (empty)` rows. Expected: `MALLOC_SMALL (empty)` resident ≈ GBs with dirty ≈ MBs (retained arenas).
 
-- [ ] **Step 3: Capture the process env (which providers are active)**
+- [x] **Step 3: Capture the process env (which providers are active)**
 
 ```bash
 ps eww -p <pid> | tr ' ' '\n' | grep -E '^(NER_|EMBEDDINGS_|SURREALDB_)' | sort
 ```
 Expected: `NER_PROVIDER=local-gliner`, `EMBEDDINGS_PROVIDER=openai-compatible`.
 
-- [ ] **Step 4: Save the numbers**
+- [x] **Step 4: Save the numbers**
 
 ```bash
 {
@@ -102,7 +102,7 @@ Expected: `NER_PROVIDER=local-gliner`, `EMBEDDINGS_PROVIDER=openai-compatible`.
 } > docs/superpowers/plans/2026-08-03-gliner-memory-reduction.baseline.txt
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-03-gliner-memory-reduction.baseline.txt
@@ -122,7 +122,7 @@ git commit -m "docs: record GLiNER memory baseline (7.3 GB RSS)"
 - Consumes: baseline numbers from Task 1.
 - Produces: the decision text quoted in Tasks 6–9.
 
-- [ ] **Step 1: Write the ADR**
+- [x] **Step 1: Write the ADR**
 
 Follow the existing format in `docs/adr/0026-adopt-durable-work-mechanics.md` (Context / Decision / Consequences sections). Content:
 
@@ -170,7 +170,7 @@ down; unload alone fixes the physical footprint.
 - RSS benefit of unload without mimalloc is partial (arena retention).
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/adr/0030-gliner-lazy-load-with-idle-unload.md
@@ -184,7 +184,7 @@ git commit -m "docs: ADR-0030 GLiNER lazy-load with idle unload"
 **Files:**
 - Create: `docs/adr/0031-ner-runtime-defaults-for-memory.md`
 
-- [ ] **Step 1: Write the ADR**
+- [x] **Step 1: Write the ADR**
 
 ```markdown
 # 0031: NER Runtime Defaults for Memory
@@ -212,7 +212,7 @@ memory benefit. Activation memory is already sized to the actual window
   (e.g., Metal/Accelerate per the latency plan), not this constant.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/adr/0031-ner-runtime-defaults-for-memory.md
@@ -226,7 +226,7 @@ git commit -m "docs: ADR-0031 NER runtime defaults for memory"
 **Files:**
 - Create: `docs/adr/0032-optional-mimalloc-allocator.md`
 
-- [ ] **Step 1: Write the ADR**
+- [x] **Step 1: Write the ADR**
 
 ```markdown
 # 0032: Optional mimalloc Allocator
@@ -258,7 +258,7 @@ allocations. Feature-gated so the default build is untouched.
   it; soak verification (Task 11) validates it on the real binary.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/adr/0032-optional-mimalloc-allocator.md
@@ -274,7 +274,7 @@ git commit -m "docs: ADR-0032 optional mimalloc allocator"
 **Files:**
 - Create: `docs/adr/0033-surrealdb-rocksdb-memory-footprint.md`
 
-- [ ] **Step 1: Verify whether surrealdb exposes RocksDB cache controls**
+- [x] **Step 1: Verify whether surrealdb exposes RocksDB cache controls**
 
 Check the surrealdb 3.0.0 public API for RocksDB options (block cache / write buffer sizing):
 
@@ -283,7 +283,7 @@ cargo doc -p memory_mcp --no-deps -q 2>/dev/null
 grep -rn "rocksdb" ~/.cargo/registry/src/*/surrealdb-3.0.0/src/ 2>/dev/null | grep -iE "cache|options" | head -10 || echo "no public RocksDB cache options exposed"
 ```
 
-- [ ] **Step 2: Write the ADR recording the finding**
+- [x] **Step 2: Write the ADR recording the finding**
 
 ```markdown
 # 0033: SurrealDB/RocksDB Memory Footprint
@@ -301,7 +301,7 @@ GLiNER-scale 1+ GB terms) and is NOT addressed by this plan. Revisit only if
 post-fix profiling shows the DB term dominating idle RSS.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/adr/0033-surrealdb-rocksdb-memory-footprint.md
@@ -328,7 +328,7 @@ git commit -m "docs: ADR-0033 SurrealDB/RocksDB memory footprint"
   - `NerConfig { ..., pub gliner_idle_unload_secs: u64 }` (Default + `from_env`)
   - Env var `GLINER_IDLE_UNLOAD_SECS` (seconds; `0` = keep loaded forever)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `crates/memory-mcp/src/config/ner.rs`, inside `mod tests`:
 
@@ -360,14 +360,14 @@ fn gliner_idle_unload_rejects_non_numeric() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 ```bash
 cargo test -p memory_mcp ner::tests::gliner_idle_unload -- --nocapture
 ```
 Expected: FAIL — `no field gliner_idle_unload_secs on type NerConfig`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `crates/memory-mcp/src/config/constants.rs`, after `DEFAULT_NER_MAX_CONCURRENCY`:
 
@@ -420,7 +420,7 @@ In `crates/eval-harness/benches/ner_cpu.rs:27` (after `device: NerDeviceKind::Cp
         };
 ```
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 ```bash
 cargo test -p memory_mcp ner::tests::gliner_idle_unload
@@ -428,7 +428,7 @@ cargo check --workspace --all-targets
 ```
 Expected: PASS (all three tests); `cargo check --workspace --all-targets` compiles every target — including the `eval-harness` bench (`ner_cpu.rs`) and the `local_model_integration` test binary.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/memory-mcp/src/config/constants.rs crates/memory-mcp/src/config/ner.rs crates/memory-mcp/tests/local_model_integration.rs crates/eval-harness/benches/ner_cpu.rs
@@ -455,13 +455,13 @@ git commit -m "feat: add GLINER_IDLE_UNLOAD_SECS config (default off)"
   - `struct GlinerEntityExtractor { loader: Arc<GlinerLoader>, loaded: Arc<LoadedGliner>, inference_gate: gate::InferenceGate }` — **temporarily eager**; Task 8 makes it lazy
   - `GlinerEntityExtractor::new_with_runtime(model_dir, labels, threshold, batch_size, max_batch_tokens, max_concurrency, device_kind, idle_unload_secs: u64, logger) -> Result<Self, MemoryError>` — `idle_unload_secs` accepted but unused until Task 8
 
-- [ ] **Step 1: Rename the struct and drop the gate field**
+- [x] **Step 1: Rename the struct and drop the gate field**
 
 Rename `pub struct GlinerEntityExtractor` (`:40`) to `pub struct LoadedGliner` and delete the `inference_gate: gate::InferenceGate,` field (`:57`). Rename the `impl GlinerEntityExtractor {` block(s) that contain inference methods to `impl LoadedGliner {`. The methods whose bodies use only model fields move with it — no body changes: `encode_window`, `collect_prompt_entity_positions`, `extract_word_representations`, `run_forward`, `run_forward_batch`, `decode_window`, `build_label_representations`, `compute_span_scores`, `extract_spans`, `apply_nms`, `extract_inner`, `extract_inner_with_labels`, `build_prompt_words_for_labels`.
 
 **`split_text_words` is special** (`:797-802`): it has no `&self`, only references the module-level `WHITESPACE_WORD_SPLITTER`. Keep it OUT of the `impl LoadedGliner` block — leave it as a plain private `fn` free function in `gliner.rs` at module scope. Update the only internal caller in `extract_inner_with_labels` (`:1213`): replace `let text_words = Self::split_text_words(text);` with `let text_words = split_text_words(text);`. Step 7 updates the test's external caller. **Visibility note**: no `pub(crate)` needed because both callers are descendants of `gliner` (Rust re-entry rule: a descendant module can reference a private ancestor item via the absolute `crate::` path — verified empirically; see the project's own `crate::service::entity_extraction::gliner::build_span_scoring_log_event` for a contrasting sibling-crossing case that DOES need `pub(crate)`). Rationale: the function is a pure utility over a constant; putting it on a struct ties it to a lifetime it doesn't need and forces call-site churn if the wrapper type changes again.
 
-- [ ] **Step 2: Move construction into `GlinerLoader`**
+- [x] **Step 2: Move construction into `GlinerLoader`**
 
 Move `build_from_var_builder` into `impl LoadedGliner`, remove its `max_concurrency: usize` parameter, and delete the `inference_gate: gate::InferenceGate::new(max_concurrency),` line from its struct literal (`:780`). Move `resolve_ent_token` alongside it.
 
@@ -491,7 +491,7 @@ Move the body of `load_with_runtime` (`:641-719`) into `impl GlinerLoader { fn l
 
 Keep the validation (`batch_size == 0`, `max_batch_tokens == 0`, `max_concurrency == 0`) in the new outer `new_with_runtime`, not in `load`.
 
-- [ ] **Step 3: Build the thin outer type**
+- [x] **Step 3: Build the thin outer type**
 
 Replace the old constructors on the outer type:
 
@@ -544,7 +544,7 @@ impl GlinerEntityExtractor {
 
 Update `new_with_logger` (`:589-605`) to pass `crate::config::DEFAULT_GLINER_IDLE_UNLOAD_SECS` as the new argument (position: between `device_kind` and `logger`).
 
-- [ ] **Step 4: Fix the trait impl and Debug impl**
+- [x] **Step 4: Fix the trait impl and Debug impl**
 
 `impl EntityExtractor for GlinerEntityExtractor` (`:1347-1366`): keep `provider_name` on the outer type; `acquire_inference_permit` stays on the outer type but must reference the loader's logger — replace `self.logger.log(` with `self.loader.logger.log(` and `self.inference_gate.available_permits()` stays as-is (body otherwise unchanged):
 
@@ -605,7 +605,7 @@ impl std::fmt::Debug for GlinerEntityExtractor {
 }
 ```
 
-- [ ] **Step 5: Update the factory call site**
+- [x] **Step 5: Update the factory call site**
 
 In `crates/memory-mcp/src/service/entity_extraction.rs:126-135`, add the new argument between `config.device` and `logger.clone()`:
 
@@ -615,7 +615,7 @@ In `crates/memory-mcp/src/service/entity_extraction.rs:126-135`, add the new arg
                 logger.clone(),
 ```
 
-- [ ] **Step 6: Verify — behavior must be identical**
+- [x] **Step 6: Verify — behavior must be identical**
 
 ```bash
 cargo test -p memory_mcp ner::tests::gliner_idle_unload
@@ -626,7 +626,7 @@ cargo fmt --all --check
 ```
 Expected: PASS; the model-backed extraction tests still find the same entities (candidate assertions unchanged). `cargo check --workspace --all-targets` catches the eval-harness bench. Clippy zero warnings.
 
-- [ ] **Step 7: Fix the batching.rs diagnostic test**
+- [x] **Step 7: Fix the batching.rs diagnostic test**
 
 `crates/memory-mcp/src/service/entity_extraction/gliner/batching.rs:65-158` (`batched_forward_matches_unbatched_hidden_states_with_padding`, `#[ignore]`d) constructs `GlinerEntityExtractor::new(...)` and then calls `build_prompt_words_for_labels`, `encode_window`, `run_forward`, `run_forward_batch` on the result. After the split those methods live on `LoadedGliner` (batching.rs is a child module of gliner.rs, so it can reach the private `GlinerLoader` via an absolute `crate::` path — Rust re-entry rule lets a descendant module access a private ancestor item). Replace the setup (`:83-88`) — use the absolute path to match the test's existing style:
 
@@ -653,7 +653,7 @@ In the closure body, replace the static call at `:92-95`:
 
 (it resolves to the plain `fn` free function from Step 1 — no visibility annotation needed; the rest of the test calls instance methods on `extractor`, which is a `LoadedGliner`, so `build_prompt_words_for_labels`, `encode_window`, `run_forward`, `run_forward_batch` keep working unchanged).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/entity_extraction/gliner.rs crates/memory-mcp/src/service/entity_extraction.rs crates/memory-mcp/src/service/entity_extraction/gliner/batching.rs
@@ -679,7 +679,7 @@ git commit -m "refactor: split LoadedGliner/GlinerLoader from extractor (no beha
   - `impl<T: Send + Sync + 'static> LazyModel<T>`: `new(idle_unload)`, `get_or_load<F>(load) -> Result<Arc<T>, MemoryError>` (F: `FnOnce() -> Result<Arc<T>, MemoryError> + Send + 'static`), `arm_unload(&self)`, `spawn_unload_task(state, timeout)`
   - **Unload semantics**: `get_or_load` never schedules an unload; the caller calls `arm_unload()` AFTER each use. The idle clock measures time since the last use COMPLETED — a long extract can never be interrupted by an unload (and the Arc clone keeps the model alive even if an unload fired).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `crates/memory-mcp/src/service/entity_extraction/gliner/lazy.rs` with the module scaffolding and the full test module, but **without** `get_or_load` / `arm_unload` / `spawn_unload_task` (they are added in Step 3):
 
@@ -857,14 +857,14 @@ Declare the module in `crates/memory-mcp/src/service/entity_extraction/gliner.rs
 mod lazy;
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 ```bash
 cargo test -p memory_mcp lazy::tests
 ```
 Expected: FAIL to compile with `no method named 'get_or_load' found` — the tests reference an API that does not exist yet.
 
-- [ ] **Step 3: Implement `get_or_load` + `arm_unload` + `spawn_unload_task`**
+- [x] **Step 3: Implement `get_or_load` + `arm_unload` + `spawn_unload_task`**
 
 Fill the impl block in `lazy.rs`:
 
@@ -924,14 +924,14 @@ Fill the impl block in `lazy.rs`:
 }
 ```
 
-- [ ] **Step 4: Run the new unit tests**
+- [x] **Step 4: Run the new unit tests**
 
 ```bash
 cargo test -p memory_mcp lazy::tests
 ```
 Expected: PASS (all 7 tests: construct, cache, unload-after-timeout, arm-resets-timer, no-unload-before-first-arm, concurrent-once, disabled).
 
-- [ ] **Step 5: Wire the extractor**
+- [x] **Step 5: Wire the extractor**
 
 In `crates/memory-mcp/src/service/entity_extraction/gliner.rs` add `use std::time::Duration;` (the `mod lazy;` declaration was added in Step 1; `LazyModel` is referenced by its module path `lazy::LazyModel`).
 
@@ -995,7 +995,7 @@ Rewrite the trait methods to route through `ensure_loaded`:
     }
 ```
 
-- [ ] **Step 6: Run the model-backed regression gate**
+- [x] **Step 6: Run the model-backed regression gate**
 
 ```bash
 cargo test -p memory_mcp --test local_model_integration local_gliner
@@ -1006,7 +1006,7 @@ Expected: PASS — extractor now loads lazily on first extract but produces iden
 1. The 3-arg public `new` still exists on the outer type and still returns an eager-load extractor (Task 7 Step 3 builds a `LoadedGliner` eagerly inside `new_with_runtime`).
 2. After this task, `new_with_runtime` swaps the eager field for `lazy::LazyModel::new(None)` when `idle_unload_secs == 0`, so the test's first `extract_candidates` triggers `ensure_loaded()` and reloads transparently — the model is still resident for the test's lifetime because `arm_unload` with `idle_unload=None` is a no-op. Candidate assertions are unchanged.
 
-- [ ] **Step 7: Lint gate**
+- [x] **Step 7: Lint gate**
 
 ```bash
 cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings
@@ -1014,7 +1014,7 @@ cargo fmt --all --check
 ```
 Expected: clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/entity_extraction/gliner/lazy.rs crates/memory-mcp/src/service/entity_extraction/gliner.rs
@@ -1035,7 +1035,7 @@ git commit -m "feat: lazy-load GLiNER model with idle unload (LazyModel)"
 - Consumes: `VarBuilder::from_buffered_safetensors(Vec<u8>, DType, &Device)` (candle).
 - Produces: same `LoadedGliner`, now heap-backed.
 
-- [ ] **Step 1: Swap the loading strategy**
+- [x] **Step 1: Swap the loading strategy**
 
 Replace the safetensors branch of `GlinerLoader::load`:
 
@@ -1059,14 +1059,14 @@ Replace the safetensors branch of `GlinerLoader::load`:
         };
 ```
 
-- [ ] **Step 2: Verify the model still loads and extracts identically**
+- [x] **Step 2: Verify the model still loads and extracts identically**
 
 ```bash
 cargo test -p memory_mcp --test local_model_integration local_gliner
 ```
 Expected: PASS — same candidate assertions against the fixture.
 
-- [ ] **Step 3: Measure the cold-load peak**
+- [x] **Step 3: Measure the cold-load peak**
 
 Confirm the transient read buffer does not blow up the load peak beyond the expected band — run a single extract with idle-unload off (so the post-load RSS equals the loaded-model RSS) and sample at 0.5 s granularity:
 
@@ -1089,7 +1089,7 @@ awk '{ if ($1 > m) m = $1 } END { print "PEAK_RSS_KB=" m }' /tmp/mm_peak.log
 ```
 Expected: peak ≈ 2.2–2.8 GB. The cold-load transient is bounded by `(read buffer ≈ 1.1 GB) + (candle tensor copies ≈ 1.1–1.5 GB f32) + (support structures ≈ 0.1 GB) ≈ 2.3–2.7 GB`; this happens once, during the first extract's load phase. Steady-state after the load completes is ~1.8 GB (the same as today — the weight bytes already lived in `MALLOC_LARGE` before this task, see Evidence §1). **Standalone peak only**: measure after a fresh server start with no other heavy activity, so the number reflects this load path, not unrelated churn. If it exceeds **~3.0 GB**, the read buffer is being kept alive by candle after model build — fall back to mmap for the load path and rely on unload + mimalloc only (record in ADR-0030 as a consequence, not a regression of today's numbers).
 
-- [ ] **Step 4: Lint gate**
+- [x] **Step 4: Lint gate**
 
 ```bash
 cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings
@@ -1097,7 +1097,7 @@ cargo fmt --all --check
 ```
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/entity_extraction/gliner.rs
@@ -1121,7 +1121,7 @@ git commit -m "perf: load GLiNER weights heap-backed via buffered safetensors"
 
 > **Approval gate:** AGENTS.md requires asking before changing `Cargo.toml`. The user pre-approved *planning* the allocator option; confirm explicitly before executing this task.
 
-- [ ] **Step 1: Add the workspace dependency**
+- [x] **Step 1: Add the workspace dependency**
 
 In `Cargo.toml` `[workspace.dependencies]` (alphabetical, after `metrics-exporter-prometheus`):
 
@@ -1131,7 +1131,7 @@ mimalloc = "0.1"
 
 > Pin to the latest 0.1.x at implementation time (`cargo add mimalloc@0.1 --dry-run` or the crates.io page). The 0.1 series is the stable line.
 
-- [ ] **Step 2: Add the optional dependency + feature to the crate**
+- [x] **Step 2: Add the optional dependency + feature to the crate**
 
 In `crates/memory-mcp/Cargo.toml` `[dependencies]` (after `metrics-exporter-prometheus`):
 
@@ -1145,7 +1145,7 @@ In `[features]` (additive, `default = []` unchanged):
 mimalloc = ["dep:mimalloc"]
 ```
 
-- [ ] **Step 3: Install the global allocator**
+- [x] **Step 3: Install the global allocator**
 
 In `crates/memory-mcp/src/main.rs`:
 
@@ -1163,7 +1163,7 @@ async fn main() -> std::process::ExitCode {
 }
 ```
 
-- [ ] **Step 4: Verify both build configurations**
+- [x] **Step 4: Verify both build configurations**
 
 ```bash
 cargo build -p memory_mcp                       # default: no mimalloc
@@ -1173,7 +1173,7 @@ cargo clippy --workspace --all-targets --features cli-watch,mcp-apps,mimalloc --
 ```
 Expected: both builds succeed; tests pass; clippy clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Cargo.toml crates/memory-mcp/Cargo.toml crates/memory-mcp/src/main.rs
@@ -1194,7 +1194,7 @@ git commit -m "feat: optional mimalloc global allocator (feature-gated)"
 - Consumes: running `memory_mcp` PID; env `GLINER_IDLE_UNLOAD_SECS`, feature `mimalloc`.
 - Produces: `/tmp/memory_mcp_rss.log` with per-2s RSS samples + `PEAK_RSS_KB` line.
 
-- [ ] **Step 1: Create the sampler script**
+- [x] **Step 1: Create the sampler script**
 
 `scripts/memory_profile.sh`:
 
@@ -1223,7 +1223,7 @@ echo "PEAK_RSS_KB=$peak" | tee -a "$log"
 
 `chmod +x scripts/memory_profile.sh`
 
-- [ ] **Step 2: Baseline re-run on the OLD binary (already measured: RSS 7.3 GB / footprint 1.8 GB)**
+- [x] **Step 2: Baseline re-run on the OLD binary (already measured: RSS 7.3 GB / footprint 1.8 GB)**
 
 Restart the background server, then:
 
@@ -1233,7 +1233,7 @@ vmmap -summary <pid> 2>&1 | head -45   # record MALLOC_LARGE + MALLOC_SMALL (emp
 ```
 While it samples, trigger 3–5 extracts from zed (the user's normal flow). Expected: `rss_kb` ratchets up and stays high (matches Task 1).
 
-- [ ] **Step 3: NEW binary, idle unload only (default allocator)**
+- [x] **Step 3: NEW binary, idle unload only (default allocator)**
 
 Build `--release` (no mimalloc), run with `GLINER_IDLE_UNLOAD_SECS=30`:
 
@@ -1251,18 +1251,18 @@ vmmap -summary <pid> 2>&1 | head -45
 - **RSS drops by ~1.5 GB but the empty arenas stay** (macOS malloc does not return them; they are clean and only reclaimed under kernel pressure) → RSS settles around **5–6 GB**, NOT at the floor. Do not mark this a failure — it is the documented behavior driving the mimalloc step.
 - Peak during extract ≈ 1.6–2.2 GB; no unbounded ratchet beyond the retained arenas.
 
-- [ ] **Step 4: NEW binary, idle unload + mimalloc**
+- [x] **Step 4: NEW binary, idle unload + mimalloc**
 
 Build `--release --features mimalloc`, same env. Repeat Step 3. Expected:
 - After the last extract, **RSS returns toward the floor (~50–300 MB) within ~30–35 s** (unload frees the model AND mimalloc returns the arenas to the OS).
 - `PEAK_RSS_KB` across repeated extracts stays bounded; no ratchet.
 - This is the config that meets the user's ~1 GB idle target.
 
-- [ ] **Step 5: mimalloc without idle unload**
+- [x] **Step 5: mimalloc without idle unload**
 
 Build `--release --features mimalloc`, `GLINER_IDLE_UNLOAD_SECS` unset. Expected: after an extract burst, RSS converges to ~1.5–2 GB (live model) instead of climbing to 4–7 GB. Documents the allocator-only configuration.
 
-- [ ] **Step 6: Record results + lint**
+- [x] **Step 6: Record results + lint**
 
 ```bash
 cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings
@@ -1279,7 +1279,7 @@ git commit -m "test: add RSS/footprint sampler for memory soak verification"
 - Modify: `README.md` (config/env tables)
 - Modify: `docs/agent/EVALUATION.md` only if it references NER defaults (verify; likely no change)
 
-- [ ] **Step 1: Document the new env var**
+- [x] **Step 1: Document the new env var**
 
 In `README.md`, add to the NER configuration section:
 
@@ -1289,7 +1289,7 @@ In `README.md`, add to the NER configuration section:
 | `GLINER_IDLE_UNLOAD_SECS` | Seconds of inactivity before the local GLiNER model is unloaded to free memory. `0` (default) keeps the model loaded for the process lifetime. Set e.g. `30` for Ollama `keep_alive`-style unloading. |
 ```
 
-- [ ] **Step 2: Document the feature flag**
+- [x] **Step 2: Document the feature flag**
 
 In `README.md` build/features section:
 
@@ -1300,11 +1300,11 @@ In `README.md` build/features section:
   Build: `cargo build --release --features mimalloc`.
 ```
 
-- [ ] **Step 3: Note that NER defaults are unchanged**
+- [x] **Step 3: Note that NER defaults are unchanged**
 
 `NER_MAX_BATCH_TOKENS` stays at its current default (per ADR-0031 — it does not drive activation memory at `batch_size=1`). If `README.md` currently documents a padding/waste rationale for it, correct that note instead of changing the default.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
