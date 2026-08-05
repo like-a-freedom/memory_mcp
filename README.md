@@ -395,6 +395,15 @@ Configuration is loaded from environment variables.
 | `NER_MAX_BATCH_TOKENS` | Max padded tokens per batch (default: 1536) |
 | `NER_MAX_CONCURRENCY` | Concurrent local NER inference limit (default: 1) |
 | `NER_DEVICE` | Device: `cpu`, `metal`, or `auto` (default: `cpu`) |
+| `GLINER_IDLE_UNLOAD_SECS` | Seconds of inactivity before the local GLiNER model is unloaded to free memory. `0` (default) keeps the model loaded for the process lifetime. Set e.g. `30` for Ollama `keep_alive`-style unloading. First extract after an unload pays the ~1–2 s cold-load latency. |
+
+### Optional build features
+
+The binary supports a few opt-in Cargo features:
+
+| Feature | Effect |
+| --- | --- |
+| `mimalloc` | Use the mimalloc global allocator instead of the system malloc. Returns freed pages to the OS aggressively, keeping per-process RSS close to live allocations on long-running servers (default macOS malloc retains ~5 GB of empty arenas on this workload). Build: `cargo build --release --features mimalloc`. |
 
 ### Scopes and namespaces
 
