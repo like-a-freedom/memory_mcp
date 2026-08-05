@@ -4,7 +4,7 @@
 
 **Goal:** Reduce steady-state and peak RSS of the `memory_mcp` server (currently observed up to 7.3 GB on macOS) so that idle RSS collapses to the SurrealDB floor (~50–300 MB) and peak RSS during a single-shot GLiNER extract stays bounded (~1.6–2.2 GB), without changing the GLiNER model, entity quality, or the MCP tool surface. **Two metrics matter and are fixed by different levers** (see Evidence): unload alone collapses the physical footprint; the RSS number the user watches collapses only when unload is combined with the allocator fix.
 
-**Architecture:** Three additive changes attack three proven memory terms (see Evidence below): (1) **lazy-load + idle unload** of the GLiNER model via a new `GLINER_IDLE_UNLOAD_SECS` env var (default `0` = off, Ollama-style `keep_alive`), implemented with a generic `LazyModel<T>` state machine (load-on-demand, exactly-once under concurrency; the idle clock is armed at USE COMPLETION so long extracts are never interrupted); (2) **heap-backed safetensors loading** (`from_buffered_safetensors`) — a determinism/cleanliness change since the weights already live in the heap (verified), making `drop()` of the model release the weight bytes to the allocator; (3) an **optional `mimalloc` allocator feature** (default off) that returns freed pages to the OS — the lever that actually collapses the per-process RSS by eliminating the 5.2 GB of retained-but-empty malloc arenas. `NER_MAX_BATCH_TOKENS` is deliberately NOT touched: verified that it only bounds batch packing, not padding, so it has no memory effect at `batch_size=1` (ADR-0029, Rejected).
+**Architecture:** Three additive changes attack three proven memory terms (see Evidence below): (1) **lazy-load + idle unload** of the GLiNER model via a new `GLINER_IDLE_UNLOAD_SECS` env var (default `0` = off, Ollama-style `keep_alive`), implemented with a generic `LazyModel<T>` state machine (load-on-demand, exactly-once under concurrency; the idle clock is armed at USE COMPLETION so long extracts are never interrupted); (2) **heap-backed safetensors loading** (`from_buffered_safetensors`) — a determinism/cleanliness change since the weights already live in the heap (verified), making `drop()` of the model release the weight bytes to the allocator; (3) an **optional `mimalloc` allocator feature** (default off) that returns freed pages to the OS — the lever that actually collapses the per-process RSS by eliminating the 5.2 GB of retained-but-empty malloc arenas. `NER_MAX_BATCH_TOKENS` is deliberately NOT touched: verified that it only bounds batch packing, not padding, so it has no memory effect at `batch_size=1` (ADR-0031, Rejected).
 
 **Tech Stack:**
 - Rust 1.88+ (edition 2024), Tokio 1.53 (`rt-multi-thread`, `sync`, `time`, `macros`)
@@ -34,7 +34,7 @@ Env of the live process: `NER_PROVIDER=local-gliner`, `NER_MODEL=urchade/gliner_
 
 **Root cause chain:**
 1. `builder.rs:205-206` calls `create_entity_extractor()` at startup → GLiNER weights (~1.1 GB f32, ~1.5 GB with support structures) are loaded eagerly and live for the **entire process lifetime** (nothing ever drops them). This is the ~1.5 GB floor. Verified heap-backed: `vmmap` shows the weights in `MALLOC_LARGE` (1.5 GB resident), and **no file-backed region for the model exists** — candle already copies mmap'd weights into heap tensors during model build, so the mmap is transient.
-2. With `NER_MAX_CONCURRENCY=2` and hours of uptime, allocation churn (extract activations, tensors, tokenizer, SurrealDB, service state) leaves macOS malloc per-thread arenas that are freed but never returned to the OS — `MALLOC_SMALL (empty)` = 5.2 GB resident with only 1.2 MB dirty. **macOS malloc does not return freed pages to the OS**, so RSS ratchets up to the observed 4–7 GB. (Note: activations are NOT padded to `NER_MAX_BATCH_TOKENS` — `run_forward_batch` pads to the longest window in the batch, and windows are capped at `max_len=384` per `gliner_config.json`. So the padding knob is a red herring; see ADR-0029.)
+2. With `NER_MAX_CONCURRENCY=2` and hours of uptime, allocation churn (extract activations, tensors, tokenizer, SurrealDB, service state) leaves macOS malloc per-thread arenas that are freed but never returned to the OS — `MALLOC_SMALL (empty)` = 5.2 GB resident with only 1.2 MB dirty. **macOS malloc does not return freed pages to the OS**, so RSS ratchets up to the observed 4–7 GB. (Note: activations are NOT padded to `NER_MAX_BATCH_TOKENS` — `run_forward_batch` pads to the longest window in the batch, and windows are capped at `max_len=384` per `gliner_config.json`. So the padding knob is a red herring; see ADR-0031.)
 3. `Physical footprint` (what drives macOS memory pressure and Activity Monitor's system-wide "Memory Used") is only **1.8 GB** — the 5.2 GB empty arenas are clean/reclaimable pages that do not count toward footprint but DO count toward the process RSS the user observes. Two different numbers; the plan fixes both by different levers.
 
 **Expected outcome (honest targets, two metrics):**
@@ -52,7 +52,7 @@ Env of the live process: `NER_PROVIDER=local-gliner`, `NER_MODEL=urchade/gliner_
 3. **Feature flags additive**: `default = []`; `mimalloc = ["dep:mimalloc"]`; existing `cli-watch`, `mcp-apps`, `prometheus`, `metal`, `eval-support` untouched.
 4. **`main.rs` stays thin**: only the `#[global_allocator]` static may be added; no business logic.
 5. **Cargo.toml changes require explicit user approval** (AGENTS.md): the `mimalloc` workspace dep + crate feature. No other dependency changes in this plan (tests use real-time sleeps — no `tokio`/`test-util` feature needed).
-6. **Quality gate**: the model-backed tests in `crates/memory-mcp/tests/local_model_integration.rs` (candidate signature assertions against the committed fixture) must pass after every task that touches the GLiNER load or extract path. This plan makes NO change to NER runtime defaults (ADR-0029, Rejected).
+6. **Quality gate**: the model-backed tests in `crates/memory-mcp/tests/local_model_integration.rs` (candidate signature assertions against the committed fixture) must pass after every task that touches the GLiNER load or extract path. This plan makes NO change to NER runtime defaults (ADR-0031, Rejected).
 7. **Lint gate (before shipping)**: `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` and `cargo fmt --all --check` must both be clean.
 8. **No `unwrap()` in production code** — `Result`/`?` only.
 9. **Coordinate with the latency plan** (`2026-08-03-ner-performance-optimization-plan.md`): do NOT change `NER_DEVICE` defaults here (it may flip to Metal there); both plans may be applied together — test together.
@@ -68,7 +68,7 @@ Env of the live process: `NER_PROVIDER=local-gliner`, `NER_MODEL=urchade/gliner_
 - Create: `docs/superpowers/plans/2026-08-03-gliner-memory-reduction.baseline.txt`
 
 **Interfaces:**
-- Produces: the `BASELINE` numbers quoted by Task 2 (ADR-0028) and Task 11 (soak).
+- Produces: the `BASELINE` numbers quoted by Task 2 (ADR-0030) and Task 11 (soak).
 
 - [ ] **Step 1: Locate the live process**
 
@@ -111,12 +111,12 @@ git commit -m "docs: record GLiNER memory baseline (7.3 GB RSS)"
 
 ---
 
-## Task 2: ADR-0028 — GLiNER Lazy-load + Idle Unload
+## Task 2: ADR-0030 — GLiNER Lazy-load + Idle Unload
 
 **Why:** Records the primary design decision before code.
 
 **Files:**
-- Create: `docs/adr/0028-gliner-lazy-load-with-idle-unload.md`
+- Create: `docs/adr/0030-gliner-lazy-load-with-idle-unload.md`
 
 **Interfaces:**
 - Consumes: baseline numbers from Task 1.
@@ -127,7 +127,7 @@ git commit -m "docs: record GLiNER memory baseline (7.3 GB RSS)"
 Follow the existing format in `docs/adr/0026-adopt-durable-work-mechanics.md` (Context / Decision / Consequences sections). Content:
 
 ```markdown
-# 0028: GLiNER Lazy-load with Idle Unload
+# 0030: GLiNER Lazy-load with Idle Unload
 
 ## Status
 Accepted
@@ -155,12 +155,12 @@ of the weight bytes and is freed deterministically.
 Note on the allocator: unload alone returns the ~1.5 GB MALLOC_LARGE model
 allocation to the OS even with default malloc (large zones unmap on free),
 but the ~5.2 GB MALLOC_SMALL (empty) arena term persists without mimalloc
-(ADR-0030). Both levers are required to bring the per-process RSS number
+(ADR-0032). Both levers are required to bring the per-process RSS number
 down; unload alone fixes the physical footprint.
 
 ## Consequences
 + Idle footprint (memory pressure) collapses to the SurrealDB floor.
-+ Idle RSS collapses to ~50-300 MB when built with mimalloc (ADR-0030).
++ Idle RSS collapses to ~50-300 MB when built with mimalloc (ADR-0032).
 + Peak during an active extract is unchanged (~1.6-2.2 GB) — unavoidable
   without a smaller model (weights are 1.1 GB).
 + First extract after idle pays cold-load latency (~1-2 s, single-shot OK).
@@ -173,21 +173,21 @@ down; unload alone fixes the physical footprint.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add docs/adr/0028-gliner-lazy-load-with-idle-unload.md
-git commit -m "docs: ADR-0028 GLiNER lazy-load with idle unload"
+git add docs/adr/0030-gliner-lazy-load-with-idle-unload.md
+git commit -m "docs: ADR-0030 GLiNER lazy-load with idle unload"
 ```
 
 ---
 
-## Task 3: ADR-0029 — NER Runtime Defaults for Memory
+## Task 3: ADR-0031 — NER Runtime Defaults for Memory
 
 **Files:**
-- Create: `docs/adr/0029-ner-runtime-defaults-for-memory.md`
+- Create: `docs/adr/0031-ner-runtime-defaults-for-memory.md`
 
 - [ ] **Step 1: Write the ADR**
 
 ```markdown
-# 0029: NER Runtime Defaults for Memory
+# 0031: NER Runtime Defaults for Memory
 
 ## Status
 Rejected
@@ -215,21 +215,21 @@ memory benefit. Activation memory is already sized to the actual window
 - [ ] **Step 2: Commit**
 
 ```bash
-git add docs/adr/0029-ner-runtime-defaults-for-memory.md
-git commit -m "docs: ADR-0029 NER runtime defaults for memory"
+git add docs/adr/0031-ner-runtime-defaults-for-memory.md
+git commit -m "docs: ADR-0031 NER runtime defaults for memory"
 ```
 
 ---
 
-## Task 4: ADR-0030 — Optional mimalloc Allocator
+## Task 4: ADR-0032 — Optional mimalloc Allocator
 
 **Files:**
-- Create: `docs/adr/0030-optional-mimalloc-allocator.md`
+- Create: `docs/adr/0032-optional-mimalloc-allocator.md`
 
 - [ ] **Step 1: Write the ADR**
 
 ```markdown
-# 0030: Optional mimalloc Allocator
+# 0032: Optional mimalloc Allocator
 
 ## Status
 Accepted
@@ -261,18 +261,18 @@ allocations. Feature-gated so the default build is untouched.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add docs/adr/0030-optional-mimalloc-allocator.md
-git commit -m "docs: ADR-0030 optional mimalloc allocator"
+git add docs/adr/0032-optional-mimalloc-allocator.md
+git commit -m "docs: ADR-0032 optional mimalloc allocator"
 ```
 
 ---
 
-## Task 5: ADR-0031 — SurrealDB/RocksDB Memory Footprint
+## Task 5: ADR-0033 — SurrealDB/RocksDB Memory Footprint
 
 **Why:** Rule out (or record) the embedded-database term so the allocator/lazy changes are not blamed for what belongs to the DB.
 
 **Files:**
-- Create: `docs/adr/0031-surrealdb-rocksdb-memory-footprint.md`
+- Create: `docs/adr/0033-surrealdb-rocksdb-memory-footprint.md`
 
 - [ ] **Step 1: Verify whether surrealdb exposes RocksDB cache controls**
 
@@ -286,7 +286,7 @@ grep -rn "rocksdb" ~/.cargo/registry/src/*/surrealdb-3.0.0/src/ 2>/dev/null | gr
 - [ ] **Step 2: Write the ADR recording the finding**
 
 ```markdown
-# 0031: SurrealDB/RocksDB Memory Footprint
+# 0033: SurrealDB/RocksDB Memory Footprint
 
 ## Status
 Accepted (investigation)
@@ -304,8 +304,8 @@ post-fix profiling shows the DB term dominating idle RSS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/adr/0031-surrealdb-rocksdb-memory-footprint.md
-git commit -m "docs: ADR-0031 SurrealDB/RocksDB memory footprint"
+git add docs/adr/0033-surrealdb-rocksdb-memory-footprint.md
+git commit -m "docs: ADR-0033 SurrealDB/RocksDB memory footprint"
 ```
 
 ---
@@ -1087,7 +1087,7 @@ done
 kill "$pid" 2>/dev/null
 awk '{ if ($1 > m) m = $1 } END { print "PEAK_RSS_KB=" m }' /tmp/mm_peak.log
 ```
-Expected: peak ≈ 2.2–2.8 GB. The cold-load transient is bounded by `(read buffer ≈ 1.1 GB) + (candle tensor copies ≈ 1.1–1.5 GB f32) + (support structures ≈ 0.1 GB) ≈ 2.3–2.7 GB`; this happens once, during the first extract's load phase. Steady-state after the load completes is ~1.8 GB (the same as today — the weight bytes already lived in `MALLOC_LARGE` before this task, see Evidence §1). **Standalone peak only**: measure after a fresh server start with no other heavy activity, so the number reflects this load path, not unrelated churn. If it exceeds **~3.0 GB**, the read buffer is being kept alive by candle after model build — fall back to mmap for the load path and rely on unload + mimalloc only (record in ADR-0028 as a consequence, not a regression of today's numbers).
+Expected: peak ≈ 2.2–2.8 GB. The cold-load transient is bounded by `(read buffer ≈ 1.1 GB) + (candle tensor copies ≈ 1.1–1.5 GB f32) + (support structures ≈ 0.1 GB) ≈ 2.3–2.7 GB`; this happens once, during the first extract's load phase. Steady-state after the load completes is ~1.8 GB (the same as today — the weight bytes already lived in `MALLOC_LARGE` before this task, see Evidence §1). **Standalone peak only**: measure after a fresh server start with no other heavy activity, so the number reflects this load path, not unrelated churn. If it exceeds **~3.0 GB**, the read buffer is being kept alive by candle after model build — fall back to mmap for the load path and rely on unload + mimalloc only (record in ADR-0030 as a consequence, not a regression of today's numbers).
 
 - [ ] **Step 4: Lint gate**
 
@@ -1302,7 +1302,7 @@ In `README.md` build/features section:
 
 - [ ] **Step 3: Note that NER defaults are unchanged**
 
-`NER_MAX_BATCH_TOKENS` stays at its current default (per ADR-0029 — it does not drive activation memory at `batch_size=1`). If `README.md` currently documents a padding/waste rationale for it, correct that note instead of changing the default.
+`NER_MAX_BATCH_TOKENS` stays at its current default (per ADR-0031 — it does not drive activation memory at `batch_size=1`). If `README.md` currently documents a padding/waste rationale for it, correct that note instead of changing the default.
 
 - [ ] **Step 4: Commit**
 
