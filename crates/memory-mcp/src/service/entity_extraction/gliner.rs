@@ -2,7 +2,7 @@
 //!
 //! This module provides zero-shot NER extraction with local GLiNER weights.
 
-use std::{collections::HashMap, path::Path, sync::Arc, sync::LazyLock};
+use std::{collections::HashMap, path::Path, sync::Arc, sync::LazyLock, time::Duration};
 
 use async_trait::async_trait;
 use candle_core::{Device, IndexOp, Module, Tensor};
@@ -78,9 +78,7 @@ struct GlinerLoader {
     batch_size: usize,
     max_batch_tokens: usize,
     // Kept for the recipe record; consumed by `new_with_runtime` before `load`
-    // is callable (validation + gate sizing happen there). The loader itself
-    // does not consult this field — silencing dead_code until Task 8 wires
-    // the lazy reload path which re-checks it.
+    // is callable (validation + gate sizing happen there).
     #[allow(dead_code)]
     max_concurrency: usize,
     device_kind: crate::config::NerDeviceKind,
@@ -88,10 +86,11 @@ struct GlinerLoader {
 }
 
 /// Thin outer type implementing `EntityExtractor`. Owns the loader recipe and
-/// the currently-loaded model. Task 8 replaces the eager field with `LazyModel`.
+/// the lazily-constructed model. `inference_gate` stays on the outer type so
+/// concurrent extracts share one permit pool across reloads.
 pub struct GlinerEntityExtractor {
     loader: Arc<GlinerLoader>,
-    loaded: Arc<LoadedGliner>,
+    model: lazy::LazyModel<LoadedGliner>,
     inference_gate: gate::InferenceGate,
 }
 
@@ -666,7 +665,7 @@ impl GlinerEntityExtractor {
                 "NER_MAX_CONCURRENCY must be greater than zero".to_string(),
             ));
         }
-        let _ = idle_unload_secs; // reserved; consumed by Task 8 (lazy load)
+        let idle_unload = (idle_unload_secs > 0).then(|| Duration::from_secs(idle_unload_secs));
         let loader = Arc::new(GlinerLoader {
             model_dir: model_dir.to_path_buf(),
             labels,
@@ -677,12 +676,18 @@ impl GlinerEntityExtractor {
             device_kind,
             logger: logger.clone(),
         });
-        let loaded = Arc::new(loader.load()?);
         Ok(Self {
             loader,
-            loaded,
+            model: lazy::LazyModel::new(idle_unload),
             inference_gate: gate::InferenceGate::new(max_concurrency),
         })
+    }
+
+    async fn ensure_loaded(&self) -> Result<Arc<LoadedGliner>, MemoryError> {
+        let loader = Arc::clone(&self.loader);
+        self.model
+            .get_or_load(move || Ok(Arc::new(loader.load()?)))
+            .await
     }
 
     async fn acquire_inference_permit(
@@ -1390,7 +1395,12 @@ impl EntityExtractor for GlinerEntityExtractor {
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         let _permit = self.acquire_inference_permit().await?;
-        self.loaded.extract_inner(content)
+        let loaded = self.ensure_loaded().await?;
+        let result = loaded.extract_inner(content);
+        // Arm the idle-unload timer at USE COMPLETION (also fires when
+        // extract_inner returned Err — the model was still "used").
+        self.model.arm_unload().await;
+        result
     }
 
     async fn extract_candidates_with_labels(
@@ -1399,8 +1409,10 @@ impl EntityExtractor for GlinerEntityExtractor {
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
         let _permit = self.acquire_inference_permit().await?;
-        self.loaded
-            .extract_inner_with_labels(content, zero_shot_labels)
+        let loaded = self.ensure_loaded().await?;
+        let result = loaded.extract_inner_with_labels(content, zero_shot_labels);
+        self.model.arm_unload().await;
+        result
     }
 }
 
