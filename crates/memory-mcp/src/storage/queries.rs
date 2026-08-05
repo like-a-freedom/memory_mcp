@@ -67,7 +67,7 @@ pub fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryE
                 "record_id has empty id part; expected '<table>:<id>', got '{table}:'"
             )));
         }
-        if !table.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+        if !is_valid_table_name(table) {
             return Err(MemoryError::Validation(format!(
                 "record_id table must be lowercase ascii or underscore, got '{table}:{id}'; expected '<table>:<id>'"
             )));
@@ -77,7 +77,7 @@ pub fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryE
         Ok(())
     } else {
         Err(MemoryError::Validation(format!(
-            "record_id '{record_id}' is not a valid table name; expected '<table>:<id>'"
+            "record_id '{record_id}' is not a valid table name (no ':' separator); expected '<table>:<id>'"
         )))
     }
 }
