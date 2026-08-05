@@ -1365,6 +1365,39 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 }
 
+/// Builds the GLiNER backend: validates config, downloads/caches the model,
+/// and constructs the extractor. This is the only place GLiNER-specific
+/// loading logic lives.
+pub(crate) fn build(
+    config: crate::config::NerConfig,
+    data_dir: String,
+    logger: crate::logging::StdoutLogger,
+) -> super::BackendBoxFuture {
+    Box::pin(async move {
+        let model = config.model.clone().ok_or_else(|| {
+            MemoryError::ConfigInvalid(
+                "NER_MODEL is required for local-gliner provider".to_string(),
+            )
+        })?;
+
+        let model_dir = std::path::PathBuf::from(config.model_dir_or_default(&data_dir));
+        let resolved_dir =
+            crate::service::model_loader::ensure_gliner_model_cached(&model, &model_dir, &logger)
+                .await?;
+
+        Ok(std::sync::Arc::new(GlinerEntityExtractor::new_with_runtime(
+            &resolved_dir,
+            config.labels.clone(),
+            config.threshold,
+            config.batch_size,
+            config.max_batch_tokens,
+            config.max_concurrency,
+            config.device,
+            logger,
+        )?) as std::sync::Arc<dyn EntityExtractor>)
+    })
+}
+
 pub(crate) fn build_span_scoring_log_event(
     text_words: usize,
     span_count: usize,

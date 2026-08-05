@@ -8,7 +8,19 @@ use regex::Regex;
 use crate::models::EntityCandidate;
 
 use super::classifier::classify_entity_type;
-use super::{EntityExtractor, MemoryError};
+use super::{BackendBoxFuture, EntityExtractor, MemoryError};
+
+/// Builds the regex backend — no async work needed.
+pub(crate) fn build(
+    _config: crate::config::NerConfig,
+    _data_dir: String,
+    _logger: crate::logging::StdoutLogger,
+) -> BackendBoxFuture {
+    Box::pin(async {
+        Ok(std::sync::Arc::new(RegexEntityExtractor::new()?)
+            as std::sync::Arc<dyn EntityExtractor>)
+    })
+}
 
 /// Regex-based deterministic extractor used as the default fallback implementation.
 #[derive(Debug)]
