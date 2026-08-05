@@ -863,3 +863,77 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
     assert_eq!(context.len(), 1);
     assert_eq!(context[0].content, "Atlas budget increased");
 }
+
+/// Regression test for the user-reported bug: a bare hex string (no
+/// `episode:` prefix) passed as `episode_id` to `extract` used to return a
+/// misleading `Episode not found: <hex>` error because the query builder's
+/// safe-noop turned the malformed id into `SELECT * FROM none WHERE false`
+/// and the DB reported it as missing.
+///
+/// After the fix (Tasks 1-3 in this plan):
+///   - `validate_record_id` runs at every record-id entry point and rejects
+///     bare hex with a `Validation` error that names the canonical
+///     `<table>:<id>` form and echoes the bad input.
+///   - The MCP `extract` tool surfaces this as `INVALID_PARAMS` (the same
+///     error code as before) but with a message that explains the input
+///     shape, not a fake "not found".
+#[tokio::test]
+async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found() {
+    let service = common::make_service().await;
+    let mcp = MemoryMcp::new(service);
+
+    // 1. Ingest a real episode and get back the canonical id.
+    let ingest_params = serde_json::json!({
+        "source_type": "ad-hoc",
+        "source_id": "reproducer:bare-hex-bug",
+        "content": "Test content: meeting notes about EPS reduction decision.",
+        "t_ref": "2026-07-31T18:00:00Z",
+        "scope": "org"
+    });
+    let canonical_id = mcp
+        .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
+        .await
+        .expect("ingest")
+        .0
+        .result;
+    assert!(
+        canonical_id.starts_with("episode:"),
+        "expected canonical 'episode:<hex>' id, got {canonical_id}"
+    );
+
+    // 2. Strip the prefix the way a broken client might.
+    let bare_hex = canonical_id.trim_start_matches("episode:").to_string();
+
+    // 3. Call extract with the bare hex. Pre-fix: misleading "Episode not found".
+    //    Post-fix: a clear Validation error that names the expected form.
+    let extract_params = serde_json::json!({ "episode_id": bare_hex });
+    let err = match mcp
+        .extract(Parameters(serde_json::from_value(extract_params).unwrap()))
+        .await
+    {
+        Ok(_) => panic!(
+            "extract with bare hex must fail validation; got Ok. \
+             The bug regression is back: bare hex '{bare_hex}' should be rejected."
+        ),
+        Err(err) => err,
+    };
+    let message = err.to_string();
+    assert!(
+        message.contains("'<table>:<id>'") || message.contains("no ':' separator"),
+        "expected validation message to name the canonical form, got: {message}"
+    );
+    assert!(
+        !message.starts_with("Episode not found"),
+        "bug regression: extract still returns misleading 'Episode not found': {message}"
+    );
+    assert!(
+        message.contains(&bare_hex),
+        "validation message should echo the bad input '{bare_hex}', got: {message}"
+    );
+
+    // 4. Control: extract with the correct prefixed id must succeed.
+    let ok_params = serde_json::json!({ "episode_id": canonical_id });
+    mcp.extract(Parameters(serde_json::from_value(ok_params).unwrap()))
+        .await
+        .expect("well-formed episode_id must succeed");
+}
