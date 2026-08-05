@@ -20,6 +20,7 @@ lopdf.workspace = true
 lru.workspace = true
 metrics.workspace = true
 metrics-exporter-prometheus = { workspace = true, optional = true }
+mimalloc = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
 regex.workspace = true
 reqwest.workspace = true
@@ -48,6 +49,7 @@ cli-watch = ["notify"]
 mcp-apps = []
 prometheus = ["dep:metrics-exporter-prometheus"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+mimalloc = ["dep:mimalloc"]
 eval-support = []
 
 [dev-dependencies]
