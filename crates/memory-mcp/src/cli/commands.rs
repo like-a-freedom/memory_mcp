@@ -7,6 +7,7 @@ pub mod assemble_context;
 pub mod explain;
 pub mod extract;
 pub mod ingest;
+pub mod init;
 pub mod invalidate;
 pub mod lifecycle_capture;
 pub mod lifecycle_recall;

@@ -39,6 +39,8 @@ pub enum Command {
     Watch(args::WatchArgs),
     /// Rebuild all fact embeddings for the current embedding provider/model.
     Reembed(args::ReembedArgs),
+    /// Print copy-paste configuration for an MCP host without changing files.
+    Init(args::InitArgs),
     /// Store raw source material as an episode (source_type, source_id, content).
     /// Requires `--source-type`, `--source-id`, `--content`, `--t-ref` (ISO 8601).
     /// Output: ToolResponse with status, episode_id. Next step: `extract --episode-id <id>`.

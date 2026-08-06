@@ -23,6 +23,8 @@
 use std::collections::HashSet;
 use std::fs;
 
+use clap::{CommandFactory, Parser};
+use memory_mcp::cli::Cli;
 use serde::Deserialize;
 
 /// The exact eight MCP tool names exposed by the server.
@@ -55,12 +57,11 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
     "list_procedures",
 ];
 
-/// Ordinary `memory_mcp` CLI subcommands that must remain stable.
+/// The live `memory_mcp` CLI subcommands that must remain stable.
 ///
-/// `Serve`, `Watch`, and `Reembed` are runtime modes; the remaining six are
-/// the ordinary CLI equivalents of the six core MCP tools. The two
-/// `lifecycle_*` entries are internal hidden subcommands consumed by hook
-/// scripts (ADR-0016 AD-4/AD-5) — not ordinary public tools.
+/// `init` is the one output-only onboarding exception authorized by ADR-0030.
+/// The `lifecycle-*` entries are internal hidden subcommands consumed by hook
+/// scripts (ADR-0016 AD-4/AD-5), not ordinary public memory tools.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
     "watch",
@@ -70,9 +71,10 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "resolve",
     "invalidate",
     "explain",
-    "assemble_context",
-    "lifecycle_capture",
-    "lifecycle_recall",
+    "assemble-context",
+    "lifecycle-capture",
+    "lifecycle-recall",
+    "init",
 ];
 
 /// Ordinary CLI subcommands that must never appear.
@@ -145,6 +147,31 @@ struct LifecycleCase {
 ///
 /// This test is the first line of defense against accidental surface
 /// expansion. It must pass before any lifecycle work is merged.
+#[test]
+fn cli_parser_exposes_init() {
+    let parsed = Cli::try_parse_from(["memory_mcp", "init"]);
+
+    assert!(
+        parsed.is_ok(),
+        "init must be a real clap subcommand: {parsed:?}"
+    );
+}
+
+#[test]
+fn live_cli_surface_matches_snapshot() {
+    let command = Cli::command();
+    let actual: HashSet<&str> = command
+        .get_subcommands()
+        .map(clap::Command::get_name)
+        .collect();
+    let expected: HashSet<&str> = EXPECTED_CLI_SUBCOMMANDS.iter().copied().collect();
+
+    assert_eq!(
+        actual, expected,
+        "frozen CLI snapshot must match live Clap commands"
+    );
+}
+
 #[test]
 fn public_surface_snapshot() {
     // The eight canonical MCP tool names.

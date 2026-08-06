@@ -139,6 +139,13 @@ pub struct ReembedArgs {
     pub retry_failed: bool,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct InitArgs {
+    /// Host configuration target: vscode, claude-desktop, codex, zed, or env.
+    #[arg(long, value_name = "TARGET", default_value = "vscode")]
+    pub target: String,
+}
+
 #[derive(Debug, Args)]
 pub struct WatchArgs {
     /// Directory to watch for new files

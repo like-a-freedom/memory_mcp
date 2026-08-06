@@ -54,6 +54,8 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
             .await
             .map_err(boxed_to_failure),
 
+        Some(Command::Init(args)) => commands::init::run(args).map_err(report_cli_error),
+
         Some(Command::Watch(args)) => run_watch_mode(logger, watch_command_from_args(args))
             .await
             .map_err(boxed_to_failure),
@@ -194,6 +196,7 @@ fn mode_label(cli: &Cli) -> &'static str {
         None | Some(Command::Serve) => "serve",
         Some(Command::Watch(_)) => "watch",
         Some(Command::Reembed(_)) => "reembed",
+        Some(Command::Init(_)) => "cli.init",
         Some(Command::Ingest(_)) => "cli.ingest",
         Some(Command::Extract(_)) => "cli.extract",
         Some(Command::Resolve(_)) => "cli.resolve",
