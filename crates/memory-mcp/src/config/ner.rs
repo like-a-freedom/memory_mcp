@@ -50,6 +50,9 @@ pub struct NerConfig {
     pub max_concurrency: usize,
     /// Device backend for local inference.
     pub device: NerDeviceKind,
+    /// Seconds of inactivity before the GLiNER model is unloaded.
+    /// `0` keeps the model loaded for the process lifetime.
+    pub gliner_idle_unload_secs: u64,
 }
 
 impl Default for NerConfig {
@@ -64,6 +67,7 @@ impl Default for NerConfig {
             max_batch_tokens: DEFAULT_NER_MAX_BATCH_TOKENS,
             max_concurrency: DEFAULT_NER_MAX_CONCURRENCY,
             device: NerDeviceKind::Cpu,
+            gliner_idle_unload_secs: DEFAULT_GLINER_IDLE_UNLOAD_SECS,
         }
     }
 }
@@ -150,6 +154,8 @@ impl NerConfig {
             max_batch_tokens,
             max_concurrency,
             device,
+            gliner_idle_unload_secs: parse_env::<u64>("GLINER_IDLE_UNLOAD_SECS")?
+                .unwrap_or(DEFAULT_GLINER_IDLE_UNLOAD_SECS),
         })
     }
 
@@ -272,6 +278,32 @@ mod tests {
     #[test]
     fn ner_device_rejects_unknown_backend() {
         with_ner_env(&[("NER_DEVICE", Some("coreml"))], || {
+            assert!(matches!(
+                NerConfig::from_env(),
+                Err(MemoryError::ConfigInvalid(_))
+            ));
+        });
+    }
+
+    #[test]
+    fn gliner_idle_unload_defaults_to_zero_off() {
+        with_ner_env(&[("GLINER_IDLE_UNLOAD_SECS", None)], || {
+            let config = NerConfig::from_env().expect("default NER config");
+            assert_eq!(config.gliner_idle_unload_secs, 0);
+        });
+    }
+
+    #[test]
+    fn gliner_idle_unload_reads_env_override() {
+        with_ner_env(&[("GLINER_IDLE_UNLOAD_SECS", Some("60"))], || {
+            let config = NerConfig::from_env().expect("NER config with idle unload");
+            assert_eq!(config.gliner_idle_unload_secs, 60);
+        });
+    }
+
+    #[test]
+    fn gliner_idle_unload_rejects_non_numeric() {
+        with_ner_env(&[("GLINER_IDLE_UNLOAD_SECS", Some("soon"))], || {
             assert!(matches!(
                 NerConfig::from_env(),
                 Err(MemoryError::ConfigInvalid(_))

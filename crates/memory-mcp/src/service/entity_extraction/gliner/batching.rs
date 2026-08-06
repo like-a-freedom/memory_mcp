@@ -80,19 +80,21 @@ mod tests {
             "event".into(),
             "technology".into(),
         ];
-        let extractor = crate::service::entity_extraction::gliner::GlinerEntityExtractor::new(
-            &model_dir,
-            labels.clone(),
-            crate::config::DEFAULT_NER_THRESHOLD,
-        )
-        .expect("load local GLiNER model");
+        let loader = crate::service::entity_extraction::gliner::GlinerLoader {
+            model_dir: model_dir.to_path_buf(),
+            labels: labels.clone(),
+            threshold: crate::config::DEFAULT_NER_THRESHOLD,
+            batch_size: 1,
+            max_batch_tokens: crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
+            max_concurrency: 1,
+            device_kind: crate::config::NerDeviceKind::Cpu,
+            logger: crate::logging::StdoutLogger::new("error"),
+        };
+        let extractor = loader.load().expect("load local GLiNER model");
         let prompt_words = extractor.build_prompt_words_for_labels(&labels);
 
         let encode = |text: &str| {
-            let text_words =
-                crate::service::entity_extraction::gliner::GlinerEntityExtractor::split_text_words(
-                    text,
-                );
+            let text_words = crate::service::entity_extraction::gliner::split_text_words(text);
             let (encoding, window_end) = extractor
                 .encode_window(&prompt_words, &text_words, 0)
                 .expect("encode GLiNER window");

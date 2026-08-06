@@ -386,6 +386,7 @@ async fn local_gliner_candidate_signatures_for_batch_size(
         max_batch_tokens: 1536,
         max_concurrency: 1,
         device: NerDeviceKind::Cpu,
+        gliner_idle_unload_secs: 0,
     };
 
     let extractor = create_entity_extractor(

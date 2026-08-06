@@ -25,6 +25,7 @@ fn build_gliner_extractor() -> Arc<dyn EntityExtractor> {
             max_batch_tokens: 1536,
             max_concurrency: 1,
             device: NerDeviceKind::Cpu,
+            gliner_idle_unload_secs: 0,
         };
         create_entity_extractor(
             &config,

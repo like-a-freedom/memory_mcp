@@ -2,7 +2,7 @@
 //!
 //! This module provides zero-shot NER extraction with local GLiNER weights.
 
-use std::{collections::HashMap, path::Path, sync::LazyLock};
+use std::{collections::HashMap, path::Path, sync::Arc, sync::LazyLock, time::Duration};
 
 use async_trait::async_trait;
 use candle_core::{Device, IndexOp, Module, Tensor};
@@ -17,6 +17,7 @@ use super::{EntityExtractor, MemoryError};
 
 mod batching;
 mod gate;
+mod lazy;
 mod scoring;
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
@@ -29,6 +30,18 @@ const BACKBONE_PREFIX: &str = "token_rep_layer.bert_layer.model";
 static WHITESPACE_WORD_SPLITTER: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S").expect("valid splitter regex"));
 
+/// Splits `text` into whitespace/punctuation-delimited words with byte offsets.
+/// Pure utility over `WHITESPACE_WORD_SPLITTER`; lives at module scope (not on
+/// `LoadedGliner`) because it has no model state. Called from
+/// `LoadedGliner::extract_inner_with_labels` and from `batching::tests` via
+/// the absolute path (descendant re-entry allows the private item).
+fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
+    WHITESPACE_WORD_SPLITTER
+        .find_iter(text)
+        .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 struct ScoredSpan {
     start: usize,
@@ -38,7 +51,8 @@ struct ScoredSpan {
     score: f32,
 }
 
-pub struct GlinerEntityExtractor {
+/// A fully loaded GLiNER model with all inference state.
+pub struct LoadedGliner {
     model: DebertaV2Model,
     tokenizer: Tokenizer,
     device: Device,
@@ -54,6 +68,29 @@ pub struct GlinerEntityExtractor {
     logger: crate::logging::StdoutLogger,
     batch_size: usize,
     max_batch_tokens: usize,
+}
+
+/// A stateless recipe that can rebuild a `LoadedGliner` from disk.
+struct GlinerLoader {
+    model_dir: std::path::PathBuf,
+    labels: Vec<String>,
+    threshold: f64,
+    batch_size: usize,
+    max_batch_tokens: usize,
+    // Kept for the recipe record; consumed by `new_with_runtime` before `load`
+    // is callable (validation + gate sizing happen there).
+    #[allow(dead_code)]
+    max_concurrency: usize,
+    device_kind: crate::config::NerDeviceKind,
+    logger: crate::logging::StdoutLogger,
+}
+
+/// Thin outer type implementing `EntityExtractor`. Owns the loader recipe and
+/// the lazily-constructed model. `inference_gate` stays on the outer type so
+/// concurrent extracts share one permit pool across reloads.
+pub struct GlinerEntityExtractor {
+    loader: Arc<GlinerLoader>,
+    model: lazy::LazyModel<LoadedGliner>,
     inference_gate: gate::InferenceGate,
 }
 
@@ -601,6 +638,7 @@ impl GlinerEntityExtractor {
             crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
             crate::config::DEFAULT_NER_MAX_CONCURRENCY,
             crate::config::NerDeviceKind::Cpu,
+            crate::config::DEFAULT_GLINER_IDLE_UNLOAD_SECS,
             logger,
         )
     }
@@ -614,6 +652,7 @@ impl GlinerEntityExtractor {
         max_batch_tokens: usize,
         max_concurrency: usize,
         device_kind: crate::config::NerDeviceKind,
+        idle_unload_secs: u64,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         if batch_size == 0 || max_batch_tokens == 0 {
@@ -626,29 +665,65 @@ impl GlinerEntityExtractor {
                 "NER_MAX_CONCURRENCY must be greater than zero".to_string(),
             ));
         }
-        Self::load_with_runtime(
-            model_dir,
+        let idle_unload = (idle_unload_secs > 0).then(|| Duration::from_secs(idle_unload_secs));
+        let loader = Arc::new(GlinerLoader {
+            model_dir: model_dir.to_path_buf(),
             labels,
             threshold,
             batch_size,
             max_batch_tokens,
             max_concurrency,
             device_kind,
-            logger,
-        )
+            logger: logger.clone(),
+        });
+        Ok(Self {
+            loader,
+            model: lazy::LazyModel::new(idle_unload),
+            inference_gate: gate::InferenceGate::new(max_concurrency),
+        })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn load_with_runtime(
-        model_dir: &Path,
-        labels: Vec<String>,
-        threshold: f64,
-        batch_size: usize,
-        max_batch_tokens: usize,
-        max_concurrency: usize,
-        device_kind: crate::config::NerDeviceKind,
-        logger: crate::logging::StdoutLogger,
-    ) -> Result<Self, MemoryError> {
+    async fn ensure_loaded(&self) -> Result<Arc<LoadedGliner>, MemoryError> {
+        let loader = Arc::clone(&self.loader);
+        self.model
+            .get_or_load(move || Ok(Arc::new(loader.load()?)))
+            .await
+    }
+
+    async fn acquire_inference_permit(
+        &self,
+    ) -> Result<tokio::sync::OwnedSemaphorePermit, MemoryError> {
+        let (permit, queue_wait) = self
+            .inference_gate
+            .acquire()
+            .await
+            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
+        self.loader.logger.log(
+            crate::service::log_event(
+                "ner.gliner.queue.done",
+                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
+                serde_json::json!({
+                    "available_permits": self.inference_gate.available_permits()
+                }),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
+        Ok(permit)
+    }
+}
+
+impl GlinerLoader {
+    fn load(&self) -> Result<LoadedGliner, MemoryError> {
+        let model_dir = &self.model_dir;
+        let labels = self.labels.clone();
+        let threshold = self.threshold;
+        let batch_size = self.batch_size;
+        let max_batch_tokens = self.max_batch_tokens;
+        let device_kind = self.device_kind;
+        let logger = self.logger.clone();
         let tokenizer_path = model_dir.join("tokenizer.json");
         let config_path = if model_dir.join("gliner_config.json").exists() {
             model_dir.join("gliner_config.json")
@@ -691,7 +766,10 @@ impl GlinerEntityExtractor {
         let device = select_device(device_kind, &logger)?;
 
         let vb = if safetensors_path.is_file() {
-            unsafe { VarBuilder::from_mmaped_safetensors(&[&safetensors_path], DTYPE, &device) }
+            let buffer = std::fs::read(&safetensors_path).map_err(|err| {
+                MemoryError::Storage(format!("failed to read safetensors: {err}"))
+            })?;
+            VarBuilder::from_buffered_safetensors(buffer, DTYPE, &device)
                 .map_err(|err| MemoryError::Storage(format!("failed to load safetensors: {err}")))?
         } else if pytorch_path.is_file() {
             VarBuilder::from_pth(pytorch_path.to_str().unwrap_or(""), DTYPE, &device).map_err(
@@ -704,7 +782,7 @@ impl GlinerEntityExtractor {
             ));
         };
 
-        Self::build_from_var_builder(
+        LoadedGliner::build_from_var_builder(
             tokenizer,
             vb,
             &device,
@@ -714,10 +792,11 @@ impl GlinerEntityExtractor {
             logger,
             batch_size,
             max_batch_tokens,
-            max_concurrency,
         )
     }
+}
 
+impl LoadedGliner {
     #[allow(clippy::too_many_arguments)]
     fn build_from_var_builder(
         tokenizer: Tokenizer,
@@ -729,7 +808,6 @@ impl GlinerEntityExtractor {
         logger: crate::logging::StdoutLogger,
         batch_size: usize,
         max_batch_tokens: usize,
-        max_concurrency: usize,
     ) -> Result<Self, MemoryError> {
         let ent_token_id = Self::resolve_ent_token(&tokenizer)?;
 
@@ -777,7 +855,6 @@ impl GlinerEntityExtractor {
             logger,
             batch_size,
             max_batch_tokens,
-            inference_gate: gate::InferenceGate::new(max_concurrency),
         })
     }
 
@@ -792,13 +869,6 @@ impl GlinerEntityExtractor {
             "GLiNER tokenizer missing entity separator token. Expected one of: {:?}",
             ENT_TOKEN_CANDIDATES
         )))
-    }
-
-    fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
-        WHITESPACE_WORD_SPLITTER
-            .find_iter(text)
-            .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
-            .collect()
     }
 
     fn encode_window(
@@ -1209,7 +1279,7 @@ impl GlinerEntityExtractor {
         text: &str,
         labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
-        let text_words = Self::split_text_words(text);
+        let text_words = split_text_words(text);
         if text_words.is_empty() {
             return Ok(Vec::new());
         }
@@ -1309,37 +1379,13 @@ impl GlinerEntityExtractor {
         prompt.push(SEP_TOKEN.to_string());
         prompt
     }
-
-    async fn acquire_inference_permit(
-        &self,
-    ) -> Result<tokio::sync::OwnedSemaphorePermit, MemoryError> {
-        let (permit, queue_wait) = self
-            .inference_gate
-            .acquire()
-            .await
-            .map_err(|_| MemoryError::Storage("GLiNER inference gate closed".to_string()))?;
-        self.logger.log(
-            crate::service::log_event(
-                "ner.gliner.queue.done",
-                crate::service::log_args_with_duration(serde_json::json!({}), queue_wait),
-                serde_json::json!({
-                    "available_permits": self.inference_gate.available_permits()
-                }),
-                None,
-                None,
-                None,
-            ),
-            crate::logging::LogLevel::Debug,
-        );
-        Ok(permit)
-    }
 }
 
 impl std::fmt::Debug for GlinerEntityExtractor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GlinerEntityExtractor")
-            .field("labels", &self.labels)
-            .field("threshold", &self.threshold)
+            .field("labels", &self.loader.labels)
+            .field("threshold", &self.loader.threshold)
             .finish()
     }
 }
@@ -1352,7 +1398,12 @@ impl EntityExtractor for GlinerEntityExtractor {
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         let _permit = self.acquire_inference_permit().await?;
-        self.extract_inner(content)
+        let loaded = self.ensure_loaded().await?;
+        let result = loaded.extract_inner(content);
+        // Arm the idle-unload timer at USE COMPLETION (also fires when
+        // extract_inner returned Err — the model was still "used").
+        self.model.arm_unload().await;
+        result
     }
 
     async fn extract_candidates_with_labels(
@@ -1361,7 +1412,10 @@ impl EntityExtractor for GlinerEntityExtractor {
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
         let _permit = self.acquire_inference_permit().await?;
-        self.extract_inner_with_labels(content, zero_shot_labels)
+        let loaded = self.ensure_loaded().await?;
+        let result = loaded.extract_inner_with_labels(content, zero_shot_labels);
+        self.model.arm_unload().await;
+        result
     }
 }
 
@@ -1393,6 +1447,7 @@ pub(crate) fn build(
             config.max_batch_tokens,
             config.max_concurrency,
             config.device,
+            config.gliner_idle_unload_secs,
             logger,
         )?) as std::sync::Arc<dyn EntityExtractor>)
     })

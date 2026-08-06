@@ -34,6 +34,13 @@ pub const DEFAULT_NER_MAX_BATCH_TOKENS: usize = 1536;
 /// Default max concurrent local NER inference operations.
 pub const DEFAULT_NER_MAX_CONCURRENCY: usize = 1;
 
+/// Default idle timeout before unloading the GLiNER model (seconds).
+///
+/// `0` disables idle unloading — the model stays loaded for the process
+/// lifetime (today's behavior). A positive value unloads the model after
+/// that many seconds without an extract (Ollama `keep_alive` style).
+pub const DEFAULT_GLINER_IDLE_UNLOAD_SECS: u64 = 0;
+
 /// Default interval for confidence decay refresh (seconds).
 pub(crate) const DEFAULT_DECAY_INTERVAL_SECS: u64 = 3600;
 

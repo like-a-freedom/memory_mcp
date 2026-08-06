@@ -25,6 +25,7 @@ lopdf = "0.44.0"
 lru = "0.18.1"
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["http-listener"] }
+mimalloc = "0.1"
 mockall = "0.15.0"
 notify = "8.2.0"
 proptest = "1.11.0"
