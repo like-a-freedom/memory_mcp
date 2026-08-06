@@ -85,7 +85,7 @@ Storage layer (`src/storage.rs` + SurrealDB)
 ### Requirements
 
 - Rust 1.85+
-- SurrealDB-compatible runtime configuration
+- No external SurrealDB service is required for the default embedded mode
 
 ### Build
 
@@ -96,8 +96,17 @@ cargo build --release
 ### Install locally
 
 ```bash
-cargo install --path .
+cargo install --path crates/memory-mcp --locked
 ```
+
+### First run
+
+1. Download a release binary, or from a checkout run `cargo install --path crates/memory-mcp --locked`.
+2. Run `memory_mcp init` for the default VS Code snippet, or pass one of the exact targets `claude-desktop`, `codex`, `zed`, or `env`.
+3. Copy the printed host-native snippet into the indicated configuration file. No `SURREALDB_*` variables are required for local embedded mode.
+4. Ingest one source, run `extract --episode-id <episode-id>`, then run `assemble-context` to verify a real fact is recalled.
+
+`memory_mcp init` prints configuration only: it does not edit host files, change environment variables, start a database, download models, or access the network. NER defaults to Anno; zero-config means no external database/service setup, not a dependency-free binary.
 
 ### Run
 
@@ -117,15 +126,24 @@ The binary uses stdio transport, which makes it suitable for local MCP client in
 
 ### Run with environment
 
+The default embedded mode needs no `SURREALDB_*` variables. To select a remote
+SurrealDB explicitly, use one of the supported remote schemes (`ws`, `wss`,
+`http`, or `https`) and provide non-empty credentials:
+
 ```bash
-SURREALDB_URL=rocksdb://./data/surreal.db \
+SURREALDB_URL=ws://127.0.0.1:8000/rpc \
+SURREALDB_EMBEDDED=false \
 SURREALDB_DB_NAME=memory \
 SURREALDB_NAMESPACES=org,personal \
-SURREALDB_USERNAME=root \
-SURREALDB_PASSWORD=root \
+SURREALDB_USERNAME=<your-remote-username> \
+SURREALDB_PASSWORD=<your-remote-password> \
 RUST_LOG=info \
 cargo run --quiet --bin memory_mcp
 ```
+
+`mem://` and `rocksdb://` are not remote URL schemes. For an explicit local
+RocksDB location, set `SURREALDB_DATA_DIR`; otherwise the server uses a
+user-owned data directory by default.
 
 ### Filesystem watch mode (optional)
 
@@ -162,12 +180,7 @@ Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipp
 
 ```bash
 # Terminal 1 — start the MCP server (stdio, for VS Code / Copilot)
-SURREALDB_URL=rocksdb://./data/surreal.db \
-SURREALDB_NAMESPACES=org \
-SURREALDB_USERNAME=root \
-SURREALDB_PASSWORD=root \
-RUST_LOG=info \
-cargo run --quiet --bin memory_mcp
+RUST_LOG=info cargo run --quiet --bin memory_mcp -- serve
 
 # Terminal 2 — start the watcher on a project inbox
 cargo run --features cli-watch --quiet -- \
@@ -323,52 +336,43 @@ Example info-level output for a successful ingest:
 
 ### VS Code MCP host example
 
-If you run the server directly from this workspace, a stdio host configuration can point at Cargo:
+Run the renderer for the current VS Code schema and copy its JSON into
+`.vscode/mcp.json`:
 
-```json
-{
-    "mcpServers": {
-        "memory-mcp": {
-            "command": "cargo",
-            "args": ["run", "--quiet", "--bin", "memory_mcp"],
-            "cwd": "/path/to/memory_mcp",
-            "env": {
-                "SURREALDB_URL": "rocksdb://./data/surreal.db",
-                "SURREALDB_DB_NAME": "memory",
-                "SURREALDB_NAMESPACES": "org,personal",
-                "SURREALDB_USERNAME": "root",
-                "SURREALDB_PASSWORD": "root",
-                "RUST_LOG": "info"
-            }
-        }
-    }
-}
+```bash
+memory_mcp init --target vscode
 ```
 
-After `cargo build --release` or
-`cargo install --path crates/memory-mcp --locked`, you can switch `command` to
-`./target/release/memory_mcp` or `memory_mcp` respectively.
+The generated snippet uses `servers.memory_mcp` with a stdio `command` of
+`memory_mcp` and no environment variables. After `cargo build --release` or
+`cargo install --path crates/memory-mcp --locked`, the installed binary can be
+used directly by the host.
 
 ## Configuration
 
 Configuration is loaded from environment variables.
 
-### Required variables
+### Storage variables and defaults
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `SURREALDB_DB_NAME` | Yes | Database name |
-| `SURREALDB_NAMESPACES` | Yes | Comma-separated namespace list |
-| `SURREALDB_USERNAME` | Yes | Database username |
-| `SURREALDB_PASSWORD` | Yes | Database password |
-| `SURREALDB_URL` | Yes for remote mode | SurrealDB connection URL |
+| `SURREALDB_DB_NAME` | No | Database name (default: `memory`) |
+| `SURREALDB_NAMESPACES` | No | Comma-separated namespace list (default: `org`) |
+| `SURREALDB_USERNAME` | Remote only | Database username; embedded mode defaults to `root` |
+| `SURREALDB_PASSWORD` | Remote only | Database password; embedded mode defaults to `root` |
+| `SURREALDB_URL` | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
+| `SURREALDB_EMBEDDED` | No | Explicit `true`/`false`; when unset, remote URLs select remote mode and all other URLs select embedded mode |
+| `SURREALDB_DATA_DIR` | No | Custom embedded data directory; otherwise a user-owned directory is selected |
+
+The default local path is embedded RocksDB with no external service, credential,
+or model download required to start storage. Remote mode requires a valid URL and
+non-empty explicit username and password. NER defaults to the in-process Anno
+backend; `zero-config` does not mean the binary has no dependencies.
 
 ### Optional variables
 
 | Variable | Description |
 | --- | --- |
-| `SURREALDB_EMBEDDED` | Set to `true` to use embedded mode |
-| `SURREALDB_DATA_DIR` | Custom embedded data directory |
 | `RUST_LOG` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
 | `QUERY_LOGGING_ENABLED` | Set to `true` to persist `assemble_context` analytics rows into `query_log` (default: `false`) |
 | `QUERY_LOG_RETENTION_DAYS` | Days to retain persisted `query_log` analytics before best-effort pruning (default: `90`) |
@@ -905,6 +909,11 @@ Every memory tool can be invoked directly from the command line. The CLI shares 
 | `invalidate` | Invalidate a fact while preserving history |
 | `explain` | Get citation-ready source snippets |
 | `assemble-context` | Assemble ranked, relevant context for a query |
+| `init [--target TARGET]` | Print deterministic, output-only host setup for `vscode`, `claude-desktop`, `codex`, `zed`, or `env` |
+
+`init` is the one authorized output-only onboarding exception to the ordinary
+CLI surface. It does not build a service, touch storage, edit files, or change
+environment variables.
 
 ### Examples
 
@@ -952,7 +961,7 @@ memory_mcp explain \
 
 ### Output Format
 
-All CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**:
+Memory-operation CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**. The output-only `init` command prints its documented result object to **stdout**:
 
 ```json
 {
@@ -965,7 +974,9 @@ All CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**:
 }
 ```
 
-Structured log events go to **stdout** (controlled by `RUST_LOG`). Error responses go to **stderr** as JSON:
+Structured log events go to **stderr** (controlled by `RUST_LOG`). Successful
+CLI results, including `memory_mcp init`, go to **stdout** as JSON. Configuration
+failures and other error responses go to **stderr** as JSON:
 
 ```json
 {
@@ -991,7 +1002,8 @@ This project is licensed under the **MIT** license. See [`LICENSE`](LICENSE) for
 
 `memory_mcp` supports agent-host lifecycle integration through an internal
 control plane that does not add new public tools. The eight-tool MCP surface
-and the ordinary CLI surface remain unchanged.
+remains exactly eight tools. The ordinary CLI surface has one separate,
+output-only onboarding exception: `memory_mcp init`.
 
 - **Architecture:** A versioned host lifecycle bridge invokes internal
   `LifecycleRecall` and `LifecycleCapture` capabilities, which reuse the
