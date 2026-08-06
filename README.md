@@ -46,7 +46,7 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 - **Context assembly** for ranked retrieval by query, scope, and time cutoff
 - **Graph relationships** between episodes, entities, and facts
 - **Optional semantic retrieval providers** including in-process `local-candle`
-- **Optional local GLiNER NER** for zero-shot entity extraction
+- **Pluggable NER backends** for entity extraction: `regex`, `anno`, or local zero-shot GLiNER (selectable via `NER_PROVIDER`)
 - **SurrealDB support** for embedded and remote deployments
 - **Optional watch-mode ingestion** for filesystem-backed auto-ingest workflows
 - **MCP-native interface** for tool-driven agent workflows
