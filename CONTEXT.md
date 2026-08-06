@@ -7,15 +7,18 @@
 ## Public surface (frozen)
 
 Exactly eight MCP tools. The `public_surface_snapshot` test in
-`tests/eval_agent_memory_lifecycle.rs` freezes this surface.
+`crates/memory-mcp/tests/agent_memory_lifecycle_release_gate.rs` freezes this
+surface.
 
 ```text
 ingest, extract, resolve, assemble_context, explain, invalidate, open_app, app_command
 ```
 
-No lifecycle integration adds a public tool, a CLI subcommand, or a
-caller-controlled trust argument. Any future proposal for a new public tool
-requires a separate ADR and the evidence gate described in ADR 0016.
+Lifecycle integration adds no public MCP tool and no ordinary lifecycle CLI
+subcommand. The one output-only onboarding exception, `memory_mcp init`, is
+authorized by ADR-0030; it prints host configuration, does not build a service,
+and does not change the eight-tool MCP surface. Any future public-surface
+proposal requires a separate ADR and the evidence gate described in ADR-0016.
 
 ## Module seams
 

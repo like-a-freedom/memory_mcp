@@ -5,8 +5,10 @@ Canonical contract for agent-host lifecycle integration with `memory_mcp`. Host-
 ## Public surface (frozen)
 
 The public surface is exactly eight MCP tools and the ordinary CLI equivalents
-of the six core tools. No lifecycle integration adds a public tool, a CLI
-subcommand, or a caller-controlled trust argument.
+of the six core tools. Lifecycle integration adds no public MCP tool and no
+ordinary lifecycle CLI subcommand. The one output-only onboarding exception,
+`memory_mcp init`, is authorized by ADR-0030 and does not change the MCP surface
+or build a service.
 
 ```text
 MCP tools (exactly eight):
@@ -21,12 +23,21 @@ MCP tools (exactly eight):
 
 Ordinary CLI subcommands:
   serve | watch | reembed
-  ingest | extract | resolve | invalidate | explain | assemble_context
+  ingest | extract | resolve | invalidate | explain | assemble-context
+
+Hidden lifecycle CLI subcommands:
+  lifecycle-capture | lifecycle-recall
+
+Output-only onboarding CLI subcommand:
+  init [--target vscode|claude-desktop|codex|zed|env]
 ```
 
-The `public_surface_snapshot` test in `tests/eval_agent_memory_lifecycle.rs`
-freezes this surface. A future proposal for a new public tool requires a
-separate ADR and the evidence gate described in ADR 0016.
+The live Clap spellings are `assemble-context`, `lifecycle-capture`, and
+`lifecycle-recall`; the MCP tool names remain snake_case. The
+`public_surface_snapshot` and live CLI-surface tests in
+`crates/memory-mcp/tests/agent_memory_lifecycle_release_gate.rs` protect these
+contracts. A future public-surface proposal requires a separate ADR and the
+evidence gate described in ADR-0016.
 
 ## Integration architecture
 

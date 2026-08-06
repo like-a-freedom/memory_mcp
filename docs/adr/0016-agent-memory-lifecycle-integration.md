@@ -12,8 +12,10 @@ significant outcome after it occurs, is currently left to model choice. That cho
 compaction and restarts, and the server cannot enforce it.
 
 This ADR records the architectural decisions that let supported agent hosts
-consult `memory_mcp` at lifecycle boundaries without a new public tool, a new
-ordinary CLI subcommand, or any caller-controlled trust argument.
+consult `memory_mcp` at lifecycle boundaries without a new public MCP tool, a new
+ordinary lifecycle CLI subcommand, or any caller-controlled trust argument. The
+separate output-only onboarding exception, `memory_mcp init`, is authorized by
+ADR-0030 and is not part of lifecycle integration.
 
 The decision is grounded in the implementation plan
 `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`,
@@ -29,10 +31,16 @@ not enforce; only the host adapter does.
 
 ### AD-2 — Freeze the current public tool and ordinary CLI surface
 
-Internal capabilities (`LifecycleCapture`, `LifecycleWorkerRuntime`) are not
-registered in `tools/list`, are not CLI subcommands, and have no public JSON
-schema. They call the same service/tool modules used by `assemble_context`
-and inline `extract`.
+The eight MCP tools remain the frozen public memory surface. Internal capabilities
+(`LifecycleCapture`, `LifecycleWorkerRuntime`) are not registered in `tools/list`
+and have no public JSON schema. Their hidden lifecycle CLI subcommands are
+internal transport entry points, not part of the ordinary public CLI surface. They
+call the same service/tool modules used by `assemble_context` and inline `extract`.
+
+The ordinary CLI freeze has one explicit exception: the output-only onboarding
+command `memory_mcp init`, authorized by ADR-0030. It is not a lifecycle verb, does
+not expose a memory capability, does not build a service, and does not change the
+eight-tool MCP surface.
 
 ### AD-3 — Transport authority outside tool arguments
 
@@ -111,8 +119,10 @@ immutable-domain growth.
 
 ## Consequences
 
-- The public MCP surface stays at exactly eight tools. Any future proposal for
-  a new public tool requires a separate ADR and the evidence gate.
+- The public MCP surface stays at exactly eight tools. `memory_mcp init` is the
+  sole output-only onboarding exception to the ordinary CLI freeze; it is not an
+  MCP tool or lifecycle capability. Any future proposal for a new public tool or
+  ordinary CLI exception requires a separate ADR and the evidence gate.
 - Agent hosts gain reliable, model-independent recall and capture at
   documented lifecycle boundaries.
 - Trust is never caller-controlled; external content cannot become privileged
