@@ -558,7 +558,7 @@ fn normalize_surreal_json(v: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::error::MemoryError;
+    use crate::service::MemoryError;
 
     // -----------------------------------------------------------------------
     // validate_record_id — RED phase tests
