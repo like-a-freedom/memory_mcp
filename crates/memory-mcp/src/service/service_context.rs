@@ -66,6 +66,10 @@ impl ServiceContext {
         ),
         MemoryError,
     > {
+        // Validate the record-id shape up-front so callers can't mask bugs as
+        // silent 'not found' by passing bare hex (the query builder used to
+        // turn such inputs into a no-op SELECT).
+        crate::storage::validate_record_id(record_id)?;
         for namespace in &self.namespaces {
             let record = self.db_client.select_one(record_id, namespace).await?;
             if let Some(serde_json::Value::Object(map)) = record {
@@ -267,5 +271,58 @@ impl crate::service::apps::graph::GraphContext for ServiceContext {
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::error::MemoryError;
+    use crate::service::mock_db::MockDbClient;
+
+    // RED phase: these tests drive the wiring of `validate_record_id` into
+    // `ServiceContext::find_record_by_id` (Task 2).
+
+    #[tokio::test]
+    async fn find_record_by_id_rejects_bare_hex_with_validation_error() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ctx.find_record_by_id("474b2d8b81b3feabf832ef08").await;
+        match result {
+            Err(MemoryError::Validation(msg)) => {
+                assert!(msg.contains("'<table>:<id>'"), "{msg}");
+                assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn find_record_by_id_rejects_empty_id_part() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ctx.find_record_by_id("episode:").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_record_by_id_rejects_empty_input() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ctx.find_record_by_id("").await;
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_record_by_id_accepts_wellformed_episode_id() {
+        // Sanity: fully-formed ID must not be rejected by pre-validation.
+        // DB layer may still return Ok(None, None) — that's an honest "not found".
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ctx.find_record_by_id("episode:doesnotexist").await;
+        assert!(
+            result.is_ok(),
+            "well-formed id must pass validation: {result:?}"
+        );
     }
 }

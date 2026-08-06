@@ -35,6 +35,53 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
     FACT_EMBEDDING_DIMENSION_PLACEHOLDER
 }
 
+/// Validate a record-id string before it reaches the query builder.
+///
+/// Accepts either a canonical `<table>:<id>` form (lowercase table, non-empty id)
+/// or a plain table name (for callers that target an entire table, e.g. `select_table`).
+///
+/// Rejects bare hex strings (the bug masked by `build_select_one_query`'s safe noop),
+/// empty input, malformed `<table>:<id>` (empty parts), and uppercase tables.
+pub fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryError> {
+    use crate::service::MemoryError;
+
+    let record_id = record_id.trim();
+
+    if record_id.is_empty() {
+        return Err(MemoryError::Validation(
+            "record_id is empty; expected '<table>:<id>'".to_string(),
+        ));
+    }
+
+    if let Some(idx) = record_id.find(':') {
+        let table = &record_id[..idx];
+        let id = &record_id[idx + 1..];
+
+        if table.is_empty() {
+            return Err(MemoryError::Validation(format!(
+                "record_id has empty table part; expected '<table>:<id>', got ':{id}'"
+            )));
+        }
+        if id.is_empty() {
+            return Err(MemoryError::Validation(format!(
+                "record_id has empty id part; expected '<table>:<id>', got '{table}:'"
+            )));
+        }
+        if !is_valid_table_name(table) {
+            return Err(MemoryError::Validation(format!(
+                "record_id table must be lowercase ascii or underscore, got '{table}:{id}'; expected '<table>:<id>'"
+            )));
+        }
+        Ok(())
+    } else if is_valid_table_name(record_id) {
+        Ok(())
+    } else {
+        Err(MemoryError::Validation(format!(
+            "record_id '{record_id}' is not a valid table name (no ':' separator); expected '<table>:<id>'"
+        )))
+    }
+}
+
 /// Build SQL query for selecting a single record.
 pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     let record_id = record_id.trim();
