@@ -9,21 +9,27 @@ use surrealdb::types::Value as SurrealValue;
 use crate::service::MemoryError;
 
 pub fn normalize_url(url: &str) -> String {
-    if url.starts_with("http://") {
-        let base = url.replace("http://", "ws://");
+    let trimmed = url.trim();
+    let Some((scheme, rest)) = trimmed.split_once("://") else {
+        return trimmed.to_string();
+    };
+    let normalized = format!("{}://{rest}", scheme.to_ascii_lowercase());
+
+    if normalized.starts_with("http://") {
+        let base = normalized.replacen("http://", "ws://", 1);
         if base.ends_with("/rpc") {
             return base;
         }
         return format!("{}/rpc", base.trim_end_matches('/'));
     }
-    if url.starts_with("https://") {
-        let base = url.replace("https://", "wss://");
+    if normalized.starts_with("https://") {
+        let base = normalized.replacen("https://", "wss://", 1);
         if base.ends_with("/rpc") {
             return base;
         }
         return format!("{}/rpc", base.trim_end_matches('/'));
     }
-    url.to_string()
+    normalized
 }
 
 pub fn is_missing_table_error(message: &str) -> bool {
@@ -215,5 +221,21 @@ mod tests {
         ));
         assert!(!is_table_already_exists_error("already exists"));
         assert!(!is_table_already_exists_error("table created"));
+    }
+
+    #[test]
+    fn normalize_url_trims_and_normalizes_schemes() {
+        assert_eq!(
+            normalize_url("  HTTPS://db.example.com  "),
+            "wss://db.example.com/rpc"
+        );
+        assert_eq!(
+            normalize_url("  WS://db.example.com/rpc  "),
+            "ws://db.example.com/rpc"
+        );
+        assert_eq!(
+            normalize_url("  WSS://db.example.com  "),
+            "wss://db.example.com"
+        );
     }
 }

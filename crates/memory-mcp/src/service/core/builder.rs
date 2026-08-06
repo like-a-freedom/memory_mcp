@@ -75,6 +75,36 @@ pub(super) struct ServiceBuildConfig {
     pub(super) embedding_similarity_threshold: f64,
 }
 
+fn startup_config_events(
+    config: &SurrealConfig,
+) -> Vec<std::collections::HashMap<String, serde_json::Value>> {
+    let mut events = config
+        .defaulted_variables
+        .iter()
+        .map(|variable| {
+            std::collections::HashMap::from([
+                (
+                    "op".to_string(),
+                    serde_json::json!("config.default_applied"),
+                ),
+                ("variable".to_string(), serde_json::json!(variable)),
+            ])
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(path) = &config.legacy_data_dir {
+        events.push(std::collections::HashMap::from([
+            (
+                "op".to_string(),
+                serde_json::json!("config.legacy_data_dir_detected"),
+            ),
+            ("path".to_string(), serde_json::json!(path)),
+        ]));
+    }
+
+    events
+}
+
 impl MemoryService {
     /// Creates a new `MemoryService` from environment variables.
     pub async fn new_from_env() -> Result<Self, MemoryError> {
@@ -91,6 +121,9 @@ impl MemoryService {
 
         let effective_data_dir = config.data_dir_or_default();
         let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
+        for event in startup_config_events(&config) {
+            startup_logger.log(event, crate::logging::LogLevel::Info);
+        }
         let mut startup_event = std::collections::HashMap::new();
         startup_event.insert("op".to_string(), serde_json::json!("startup"));
         startup_event.insert(
@@ -489,5 +522,76 @@ impl MemoryService {
     #[must_use]
     pub fn query_log_retention_days(&self) -> u32 {
         self.query_log_retention_days
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config() -> SurrealConfig {
+        crate::config::SurrealConfigBuilder::new()
+            .db_name("memory")
+            .namespace("org")
+            .credentials("root", "root")
+            .embedded(true)
+            .build()
+            .expect("valid config")
+    }
+
+    #[test]
+    fn startup_config_events_report_defaulted_variables_without_values() {
+        let mut config = config();
+        config.defaulted_variables = vec![
+            "SURREALDB_DB_NAME",
+            "SURREALDB_NAMESPACES",
+            "SURREALDB_EMBEDDED",
+            "SURREALDB_USERNAME",
+            "SURREALDB_PASSWORD",
+            "SURREALDB_DATA_DIR",
+        ];
+
+        let events = startup_config_events(&config);
+
+        assert_eq!(events.len(), 6);
+        for event in &events {
+            assert_eq!(event.keys().count(), 2);
+            assert_eq!(
+                event.get("op"),
+                Some(&serde_json::json!("config.default_applied"))
+            );
+            assert!(event.contains_key("variable"));
+            assert!(
+                !event
+                    .values()
+                    .any(|value| value == &serde_json::json!("root"))
+            );
+        }
+    }
+
+    #[test]
+    fn startup_config_events_are_empty_for_explicit_configuration() {
+        let config = config();
+
+        assert!(startup_config_events(&config).is_empty());
+    }
+
+    #[test]
+    fn startup_config_events_report_selected_legacy_path() {
+        let mut config = config();
+        config.legacy_data_dir = Some("/tmp/legacy/surrealdb".to_string());
+
+        let events = startup_config_events(&config);
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].keys().count(), 2);
+        assert_eq!(
+            events[0].get("op"),
+            Some(&serde_json::json!("config.legacy_data_dir_detected"))
+        );
+        assert_eq!(
+            events[0].get("path"),
+            Some(&serde_json::json!("/tmp/legacy/surrealdb"))
+        );
     }
 }
