@@ -99,7 +99,7 @@ Full contract: [`docs/agent_integration/CONTRACT.md`](docs/agent_integration/CON
 | `SURREALDB_USERNAME` | Auth username |
 | `SURREALDB_PASSWORD` | Auth password |
 
-**Feature flags (additive):** `cli-watch` (file watcher), `mcp-apps` (app sessions), `prometheus` (metrics), `metal` (Metal GPU), `eval-support` (eval harness).
+**Feature flags (additive):** `cli-watch` (file watcher), `mcp-apps` (app sessions), `prometheus` (metrics), `metal` (Metal GPU), `eval-support` (eval harness), `mimalloc` (allocator), `accelerate` (BLAS via Accelerate.framework on Apple Silicon; see ADR-0028).
 
 ## Hooks
 

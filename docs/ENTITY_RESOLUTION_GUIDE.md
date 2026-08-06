@@ -42,7 +42,7 @@ The `RegexEntityExtractor` classifies entities into types based on naming patter
 | Location gazetteer | `location` | "San Francisco", "Moscow", "Europe" |
 | Unknown fallback | `unknown` | Other single-token names |
 
-**Implementation:** `src/service/entity_extraction.rs::classify_entity_type()`
+**Implementation:** `src/service/entity_extraction/classifier.rs::classify_entity_type()`
 
 ### 3. Unicode-Aware Regex Extraction
 
@@ -187,7 +187,7 @@ SELECT canonical_name, aliases FROM entity WHERE aliases CONTAINS "dima ivanov"
 
 ### Wrong entity type classified
 
-**Symptoms:** "OpenAI" classified as `unknown` instead of `technology`
+**Symptoms:** a type you expected is not the one returned
 
 **Check:**
 1. Does the name match CamelCase pattern? (starts uppercase, has uppercase inside, no spaces)
@@ -246,7 +246,9 @@ Potential improvements for later iterations:
 
 ## References
 
-- `src/service/entity_extraction.rs` — Entity extraction logic
+- `src/service/entity_extraction.rs` — extractor registry + trait
+- `src/service/entity_extraction/regex.rs` — regex backend (extraction)
+- `src/service/entity_extraction/classifier.rs` — entity-type classification
 - `src/service/core.rs::resolve()` — Entity resolution entry point
 - `src/storage.rs::select_entity_lookup()` — Single entity DB lookup
 - `src/storage.rs::select_entities_batch()` — Batch entity DB lookup

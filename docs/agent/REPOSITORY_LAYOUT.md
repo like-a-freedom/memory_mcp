@@ -49,7 +49,7 @@ memory_mcp/
 │   │   │   └── cli/
 │   │   │       ├── args.rs, commands.rs, runtime.rs
 │   │   │       └── commands/   # One-shot CLI: ingest, extract, resolve, etc. + hidden lifecycle subcommands (lifecycle_capture, lifecycle_recall) consumed by hook scripts per ADR-0016 AD-4
-│   │   ├── tests/              # 29+ integration tests
+│   │   ├── tests/              # 28+ integration tests
 │   │   │   ├── service_integration.rs, tools_e2e.rs, tools_shared.rs,
 │   │   │   │   explain_provenance.rs, embedded_*.rs, apps_*.rs,
 │   │   │   │   claim_*.rs, lifecycle_*.rs, procedural_memory_e2e.rs,
@@ -84,11 +84,12 @@ memory_mcp/
 │       │   │   ├── adapters.rs # Corpus adapters
 │       │   │   ├── selection.rs# Corpus selection and sampling
 │       │   │   └── prepare.rs  # Corpus preparation
-│       │   └── suites/         # 10 evaluation suites:
+│       │   └── suites/         # 11 evaluation suites:
 │       │       ├── retrieval.rs, extraction.rs, claims.rs,
 │       │       │   end_to_end.rs, lifecycle.rs, capacity.rs,
 │       │       │   action_grounding.rs, poisoning.rs,
-│       │       │   downstream_qa.rs, external_retrieval.rs
+│       │       │   downstream_qa.rs, external_retrieval.rs,
+│       │       │   response_size.rs
 │       └── benches/            # Criterion benchmarks
 │           ├── pipeline.rs     # Pipeline stage benchmarks
 │           ├── ner_cpu.rs      # CPU NER benchmarks

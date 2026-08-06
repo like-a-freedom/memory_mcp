@@ -864,8 +864,11 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/MEMORY_SYSTEM_SPEC.md`](docs/MEMORY_SYSTEM_SPEC.md) — full system specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
 - [`docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`](docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md) — target-state spec for the upcoming breaking search simplification
+- [`docs/ENTITY_RESOLUTION_GUIDE.md`](docs/ENTITY_RESOLUTION_GUIDE.md) — normalization, classification, and alias-resolution reference
+- [`docs/GRAPH_RELATION_COMPATIBILITY.md`](docs/GRAPH_RELATION_COMPATIBILITY.md) — relation-table strategy and migration path
 - [`docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md`](docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md) — curated references for intent- and skills-driven MCP design
 - [`docs/security-hardening-roadmap.md`](docs/security-hardening-roadmap.md) — current query-surface inventory, deployment assumptions, and remaining hardening work
+- [`docs/BACKLOG.md`](docs/BACKLOG.md) — open engineering backlog
 
 ## Contributing
 
