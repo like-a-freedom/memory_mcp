@@ -132,17 +132,34 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
 /// Shared error mapper for one-shot CLI tools. Prints the JSON envelope on
 /// stderr and returns the matching `ExitCode`. Defined once so the policy
 /// cannot drift between arms. See Risk R6 and Risk R7.
+fn cli_error_json(err: &MemoryError) -> serde_json::Value {
+    let code = error_exit_code(err);
+    let mut envelope = serde_json::json!({
+        "error": err.to_string(),
+        "kind": error_kind(err),
+        "exit_code": code,
+    });
+
+    match err {
+        MemoryError::ConfigMissing(_) => {
+            envelope["hint"] = serde_json::json!(
+                "Run `memory_mcp init` for host configuration, or unset remote database variables to use embedded mode."
+            );
+        }
+        MemoryError::ConfigInvalid(_) => {
+            envelope["hint"] = serde_json::json!(
+                "Check the environment values or run `memory_mcp init` to print a known-good configuration."
+            );
+        }
+        _ => {}
+    }
+
+    envelope
+}
+
 fn report_cli_error(err: MemoryError) -> ExitCode {
-    let code = error_exit_code(&err);
-    eprintln!(
-        "{}",
-        serde_json::json!({
-            "error": err.to_string(),
-            "kind": error_kind(&err),
-            "exit_code": code,
-        })
-    );
-    ExitCode::from(code)
+    eprintln!("{}", cli_error_json(&err));
+    ExitCode::from(error_exit_code(&err))
 }
 
 /// Exit-code policy for `MemoryError`.
@@ -198,12 +215,47 @@ fn watch_command_from_args(args: WatchArgs) -> WatchCommand {
 }
 
 fn boxed_to_failure(err: Box<dyn std::error::Error>) -> ExitCode {
-    eprintln!(
-        "{}",
-        serde_json::json!({
-            "error": err.to_string(),
-            "exit_code": 1u8,
-        })
-    );
+    if let Some(memory_error) = err.downcast_ref::<MemoryError>() {
+        eprintln!("{}", cli_error_json(memory_error));
+    } else {
+        eprintln!(
+            "{}",
+            serde_json::json!({"error": err.to_string(), "exit_code": 1u8})
+        );
+    }
     ExitCode::FAILURE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_error_config_missing_contains_zero_config_hint() {
+        let value = cli_error_json(&MemoryError::ConfigMissing("SURREALDB_URL".into()));
+
+        assert_eq!(value["kind"], "ConfigMissing");
+        assert_eq!(
+            value["hint"],
+            "Run `memory_mcp init` for host configuration, or unset remote database variables to use embedded mode."
+        );
+    }
+
+    #[test]
+    fn cli_error_config_invalid_contains_repair_hint() {
+        let value = cli_error_json(&MemoryError::ConfigInvalid("bad namespace".into()));
+
+        assert_eq!(value["kind"], "ConfigInvalid");
+        assert_eq!(
+            value["hint"],
+            "Check the environment values or run `memory_mcp init` to print a known-good configuration."
+        );
+    }
+
+    #[test]
+    fn cli_error_non_config_error_has_no_hint_field() {
+        let value = cli_error_json(&MemoryError::Validation("bad input".into()));
+
+        assert!(value.get("hint").is_none());
+    }
 }
