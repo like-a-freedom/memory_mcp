@@ -511,6 +511,102 @@ fn normalize_surreal_json(v: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::error::MemoryError;
+
+    // -----------------------------------------------------------------------
+    // validate_record_id — RED phase tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validate_record_id_accepts_episode_with_id() {
+        assert!(validate_record_id("episode:abc123").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_accepts_fact_with_hex_id() {
+        assert!(validate_record_id("fact:52f9d92d20d829840f24294f").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_accepts_plain_table() {
+        // Used by select_table-style callers (no :id part).
+        assert!(validate_record_id("episode").is_ok());
+    }
+
+    #[test]
+    fn validate_record_id_rejects_bare_hex() {
+        let err = validate_record_id("474b2d8b81b3feabf832ef08").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => {
+                assert!(
+                    msg.contains("'<table>:<id>'"),
+                    "message should name the expected form, got: {msg}"
+                );
+                assert!(
+                    msg.contains("474b2d8b81b3feabf832ef08"),
+                    "message should echo the bad input, got: {msg}"
+                );
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_bare_hex_with_letters() {
+        let err = validate_record_id("072d682d0d467aa94aad684d").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_string() {
+        let err = validate_record_id("").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => assert!(!msg.is_empty()),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_colon_only() {
+        let err = validate_record_id(":").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_id_part() {
+        // "episode:" — table present but id empty.
+        let err = validate_record_id("episode:").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => {
+                assert!(msg.contains("empty id"), "got: {msg}");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_empty_table_part() {
+        // ":abc123" — id present but table empty.
+        let err = validate_record_id(":abc123").unwrap_err();
+        match err {
+            MemoryError::Validation(msg) => {
+                assert!(msg.contains("empty table"), "got: {msg}");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_record_id_rejects_uppercase_table() {
+        // is_valid_table_name requires lowercase; uppercase should be rejected
+        // when it appears in a full "Table:id" record id.
+        let err = validate_record_id("Episode:abc").unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(_)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Existing build_select_one_query tests (unchanged behavior contract)
+    // -----------------------------------------------------------------------
 
     #[test]
     fn build_select_one_query_empty_string_returns_safe_noop() {

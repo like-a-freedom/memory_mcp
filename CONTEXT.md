@@ -46,6 +46,24 @@ requires a separate ADR and the evidence gate described in ADR 0016.
   `lifecycle-capture` and `lifecycle-recall` subcommands consumed by
   hook scripts.
 
+## Entity extraction vocabulary
+
+**Entity Extractor**:
+The stable capability that turns source text into normalized entity candidates. It is the caller-facing seam for entity extraction and does not expose model architecture, checkpoint format, or runtime details.
+_Avoid_: Model, NER implementation, provider-specific extractor
+
+**NER Backend**:
+A concrete implementation of the Entity Extractor capability. Backends may differ in model family and execution strategy while preserving the same candidate semantics.
+_Avoid_: Model provider, public MCP tool
+
+**NER Provider**:
+The configured selection of an NER Backend. Provider selection is configuration, not a separate extraction capability.
+_Avoid_: Entity type, model checkpoint
+
+**Model Checkpoint**:
+A versioned set of model artifacts used by one NER Backend. A checkpoint is not assumed to be interchangeable with another checkpoint in the same model family.
+_Avoid_: Generic model, provider
+
 ## Lifecycle vocabulary
 
 **Lifecycle Event**:
