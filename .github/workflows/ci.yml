@@ -251,7 +251,7 @@ jobs:
           target: ${{ matrix.platform.target }}
 
       - name: Build binary
-        run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }}
+        run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }} --locked
 
       - name: Prepare artifact (Unix)
         if: matrix.platform.os != 'windows-latest'
@@ -267,6 +267,22 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path app/${{ matrix.platform.target }}
           Copy-Item target/${{ matrix.platform.target }}/release/memory_mcp.exe app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+
+      - name: Smoke test binary (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          target/${{ matrix.platform.target }}/release/memory_mcp --version
+          target/${{ matrix.platform.target }}/release/memory_mcp init --target vscode > init-output.json
+          python3 -c 'import json; from pathlib import Path; payload=json.loads(Path("init-output.json").read_text()); assert payload["mutates_files"] is False; assert payload["target"] == "vscode"'
+
+      - name: Smoke test binary (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          target/${{ matrix.platform.target }}/release/memory_mcp.exe --version
+          target/${{ matrix.platform.target }}/release/memory_mcp.exe init --target vscode | Out-File -Encoding utf8 init-output.json
+          $payload = Get-Content init-output.json -Raw | ConvertFrom-Json
+          if ($payload.mutates_files -ne $false -or $payload.target -ne 'vscode') { throw 'invalid init smoke-test result' }
 
       - name: Generate SHA-256 (Unix)
         if: matrix.platform.os != 'windows-latest'
