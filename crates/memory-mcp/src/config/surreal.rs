@@ -12,6 +12,22 @@ use super::lifecycle::LifecycleConfig;
 use super::ner::NerConfig;
 use crate::service::MemoryError;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StorageBackend {
+    Embedded,
+    Remote,
+}
+
+impl StorageBackend {
+    pub(crate) const fn from_embedded(embedded: bool) -> Self {
+        if embedded {
+            Self::Embedded
+        } else {
+            Self::Remote
+        }
+    }
+}
+
 /// Configuration for SurrealDB connection.
 ///
 /// Supports both embedded (RocksDB) and remote (WebSocket) modes.
@@ -461,6 +477,15 @@ mod tests {
         for key in SURREAL_CONFIG_ENV_KEYS {
             unsafe { env::remove_var(key) };
         }
+    }
+
+    #[test]
+    fn storage_backend_selection_follows_embedded_flag() {
+        assert_eq!(
+            StorageBackend::from_embedded(true),
+            StorageBackend::Embedded
+        );
+        assert_eq!(StorageBackend::from_embedded(false), StorageBackend::Remote);
     }
 
     #[test]

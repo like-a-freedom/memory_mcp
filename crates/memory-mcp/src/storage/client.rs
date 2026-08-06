@@ -15,7 +15,7 @@ use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 use surrealdb::types::Value as SurrealValue;
 
-use crate::config::SurrealConfig;
+use crate::config::{StorageBackend, SurrealConfig};
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::service::MemoryError;
 
@@ -140,10 +140,9 @@ impl SurrealDbClient {
         config: &SurrealConfig,
         default_namespace: &str,
     ) -> Result<Self, MemoryError> {
-        let engine = if config.embedded {
-            Self::connect_embedded(config, default_namespace).await?
-        } else {
-            Self::connect_remote(config, default_namespace).await?
+        let engine = match StorageBackend::from_embedded(config.embedded) {
+            StorageBackend::Embedded => Self::connect_embedded(config, default_namespace).await?,
+            StorageBackend::Remote => Self::connect_remote(config, default_namespace).await?,
         };
 
         Ok(Self {
