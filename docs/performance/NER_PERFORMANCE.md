@@ -12,6 +12,34 @@ The accepted CPU default is `NER_BATCH_SIZE=1`. On this corpus, batching three
 uneven windows increased padding work and was slower than three batch-one forward
 passes.
 
+## Allocator and CPU-backend policy
+
+The fresh production-like allocator comparison is recorded in [`MEMORY_PROFILE.md`](MEMORY_PROFILE.md). It found that the default allocator plus `GLINER_IDLE_UNLOAD_SECS=30` reached about 430 MB post-unload RSS and 277 MB physical footprint, while mimalloc plus unload retained about 2.56 GB RSS despite a 190 MB physical footprint. Mimalloc therefore remains opt-in; the lower physical-footprint reading does not justify a default when RSS is the monitored process metric.
+
+The `accelerate` Cargo feature is also opt-in and Apple-specific. The 2026-08-06 A/B used three Criterion runs for `ner_cpu` and `pipeline` on the same Apple Silicon host. The values below are the median of each run's Criterion point estimate:
+
+| Benchmark | System CPU | Accelerate | Delta |
+|---|---:|---:|---:|
+| `gliner_single_window_warm` | 154.30 ms | 50.65 ms | -67.17% |
+| `gliner_multi_window_warm` | 547.86 ms | 239.32 ms | -56.32% |
+| `default_service_extract_warm` | 1.6164 ms | 1.6638 ms | +2.93% |
+| `ingest_single_episode` | 65.010 ms | 65.692 ms | +1.05% |
+| `extract_single_episode` | 923.64 us | 863.41 us | -6.52% |
+| `assemble_context_single_query` | 67.416 ms | 68.144 ms | +1.08% |
+| `retrieval_metrics_100_cases` | 6.2382 us | 6.0837 us | -2.48% |
+
+The direct warm GLiNER path is much faster with Accelerate, but the strict
+no-degradation policy applies to the complete benchmark surface. The service
+probe was slower in every paired run, and its final paired Criterion intervals
+were separated on the slower side (+0.84% in that rerun). Pipeline ingest and
+context were also slower in the three-run comparison. The outcome is therefore
+`REJECTED_REGRESSION`: no production optimization, Make target, or speed claim
+is adopted. The feature remains available for explicit experiments and can be
+reconsidered only after a clean, repeatable comparison passes every common
+benchmark and the quality gates. The probe also emits a known non-fatal duplicate
+claim-job warning when it repeats the same episode; its raw logs are retained
+under `target/evals/accelerate-ab/` for this local investigation.
+
 ## Measurement provenance
 
 - Baseline commit: `32db8f99f44a` (telemetry and harness present, before vectorization)
@@ -40,8 +68,11 @@ The old `eval_ner_latency` and `eval_latency` integration tests have been remove
 # NER CPU benchmarks (one-window and multi-window)
 cargo bench -p eval-harness --bench ner_cpu -- --noplot
 
-# NER Metal benchmarks (macOS only, requires --features metal)
-cargo bench -p eval-harness --features metal --bench ner_metal -- --noplot
+# NER Metal benchmarks (macOS only; feature belongs to memory_mcp)
+cargo bench -p eval-harness --features memory_mcp/metal --bench ner_metal -- --noplot
+
+# NER CPU with Candle Accelerate (macOS only; currently rejected for production adoption)
+cargo bench -p eval-harness --features memory_mcp/accelerate --bench ner_cpu -- --noplot
 
 # Contention benchmarks (multi-client concurrency)
 cargo bench -p eval-harness --bench contention -- --noplot

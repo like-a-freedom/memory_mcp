@@ -403,7 +403,11 @@ The binary supports a few opt-in Cargo features:
 
 | Feature | Effect |
 | --- | --- |
-| `mimalloc` | Use the mimalloc global allocator instead of the system malloc. Returns freed pages to the OS aggressively, keeping per-process RSS close to live allocations on long-running servers (default macOS malloc retains ~5 GB of empty arenas on this workload). Build: `cargo build --release --features mimalloc`. |
+| `mimalloc` | Use the mimalloc global allocator instead of the system allocator. This remains an explicit experiment: the fresh macOS matrix reduced physical footprint after GLiNER unload but increased observed RSS to about 2.56 GB, so it is not the server default. Build: `cargo build --release --features mimalloc`. |
+| `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
+| `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
+
+The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `GLINER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 
 ### Scopes and namespaces
 
@@ -738,8 +742,11 @@ cargo bench -p eval-harness --bench pipeline -- --noplot
 # NER on CPU
 cargo bench -p eval-harness --bench ner_cpu -- --noplot
 
-# NER on Metal (macOS only)
-cargo bench -p eval-harness --features metal --bench ner_metal -- --noplot
+# NER on Metal (macOS only; feature belongs to memory_mcp)
+cargo bench -p eval-harness --features memory_mcp/metal --bench ner_metal -- --noplot
+
+# NER CPU with Candle Accelerate (macOS only; currently experimental)
+cargo bench -p eval-harness --features memory_mcp/accelerate --bench ner_cpu -- --noplot
 
 # Contention
 cargo bench -p eval-harness --bench contention -- --noplot

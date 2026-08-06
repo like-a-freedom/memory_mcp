@@ -186,7 +186,7 @@ mod tests {
     fn importer_rejects_empty_content() {
         let facts = vec![CanonicalFact {
             fact_id: "f1".into(),
-            episode_id: "e1".into(),
+            episode_id: "episode:e1".into(),
             content: "  ".into(),
             scope: "org".into(),
             project: None,
@@ -203,7 +203,7 @@ mod tests {
     fn importer_rejects_embedding_without_model() {
         let facts = vec![CanonicalFact {
             fact_id: "f1".into(),
-            episode_id: "e1".into(),
+            episode_id: "episode:e1".into(),
             content: "valid content".into(),
             scope: "org".into(),
             project: None,
@@ -221,7 +221,7 @@ mod tests {
         let service = crate::test_support::make_service().await;
         let facts = vec![CanonicalFact {
             fact_id: "f1".into(),
-            episode_id: "e1".into(),
+            episode_id: "episode:e1".into(),
             content: "valid content".into(),
             scope: "org".into(),
             project: None,
@@ -241,7 +241,7 @@ mod tests {
         let service = crate::test_support::make_service().await;
         let facts = vec![CanonicalFact {
             fact_id: "f1".into(),
-            episode_id: "e1".into(),
+            episode_id: "episode:e1".into(),
             content: "Alice works at Orbital Labs".into(),
             scope: "org".into(),
             project: None,

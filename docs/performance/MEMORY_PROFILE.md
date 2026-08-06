@@ -62,11 +62,11 @@ footprint from 1,458 MB to 277 MB:
 - **-1,181 MB**, or approximately **-81%**;
 - RSS fell from 1,541 MB to 430 MB: **-1,111 MB**, or approximately **-72%**.
 
-The combined `mimalloc` plus idle-unload variant reduced physical footprint
-from its own active peak of 2,531 MB to 190 MB, approximately **-2,341 MB
-(-92%)**. However, its RSS did not fall in the same way. This is why the
-allocator result must not be summarized as “mimalloc lowers RSS” on this
-platform.
+Compared with the default allocator plus idle unload, mimalloc plus unload
+used **87 MB less physical footprint** (190 MB versus 277 MB, about **-31%**) but
+retained **2,126 MB more RSS** (2,556 MB versus 430 MB, about **+494%**). Both
+variants had similar active peaks. This is why the allocator result must not be
+summarized as “mimalloc lowers RSS” on this platform.
 
 ### Historical pre-change evidence
 

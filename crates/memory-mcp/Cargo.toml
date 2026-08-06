@@ -41,9 +41,8 @@ zip.workspace = true
 
 [features]
 default = []
-# On macOS, accelerate can be the default when building for Apple Silicon.
-# Enables Accelerate.framework BLAS paths in Candle.
-# Remove 'accelerate' from default when targeting other platforms.
+# Optional Apple-specific CPU backend. Keep this out of `default`: Cargo package
+# defaults are not target-aware, so portable consumers must opt in explicitly.
 accelerate = ["candle-core/accelerate"]
 cli-watch = ["notify"]
 mcp-apps = []
