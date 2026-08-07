@@ -1,7 +1,9 @@
-# 0030: GLiNER Lazy-load with Idle Unload
+# ADR-0035: GLiNER Lazy Load with Idle Unload
 
 ## Status
-Accepted
+Accepted (renumbered from duplicate ADR-0030 on 2026-08-07)
+
+Amended by: ADR-0034 for allocator and recommended idle-unload policy.
 
 ## Context
 The GLiNER model (~1.1 GB f32 weights) is loaded eagerly at service startup
@@ -11,9 +13,11 @@ showed RSS of 7.3 GB, dominated by (a) ~1.5 GB live heap weights and (b)
 extract activity. 99% of usage is single-shot extract followed by long idle.
 
 ## Decision
-Load the GLiNER model lazily on first extract and unload it after N seconds
-of inactivity, controlled by GLINER_IDLE_UNLOAD_SECS (seconds, default 0 =
-disabled = today's behavior; Ollama keep_alive-style). Implementation: a
+Load the GLiNER model lazily on first extraction for every configuration.
+Optionally unload it after N seconds of inactivity, controlled by
+`GLINER_IDLE_UNLOAD_SECS` (seconds). The default `0` disables idle unloading:
+the model is still loaded on first extraction, then retained for the process
+lifetime. Implementation: a
 generic LazyModel<T> state machine (tokio Mutex + spawn_blocking load +
 tokio::time::sleep unload task). Unload is armed AFTER each extract
 completes (arm_unload), so the idle clock measures time since last USE
@@ -37,5 +41,6 @@ down; unload alone fixes the physical footprint.
 + First extract after idle pays cold-load latency (~1-2 s, single-shot OK).
 + Concurrency is safe: exactly-once load under the state lock; unload task
   re-checks last_used before dropping; arms only after use completes.
-- Default off preserves existing behavior; opt-in via env var.
+- Lazy loading is always active. Idle unloading is opt-in; the default `0`
+  retains a model after its first extraction.
 - RSS benefit of unload without mimalloc is partial (arena retention).

@@ -48,7 +48,7 @@ Env of the live process: `NER_PROVIDER=local-gliner`, `NER_MODEL=urchade/gliner_
 ## Global Constraints
 
 1. **Model unchanged**: `urchade/gliner_multi-v2.1`; no re-download, no re-tokenize, no quality-affecting changes. `tests/models/ner/urchade--gliner_multi-v2.1` fixture is the parity oracle.
-2. **Default behavior unchanged**: `GLINER_IDLE_UNLOAD_SECS=0` must keep today's eager-load semantics (model loads at startup and stays loaded). The lazy path only activates when the env var is set.
+2. **Final implemented behavior**: the model loads lazily on first extraction for every configuration. `GLINER_IDLE_UNLOAD_SECS=0` disables idle unloading and retains the model after that first load; a positive value enables idle unloading.
 3. **Feature flags additive**: `default = []`; `mimalloc = ["dep:mimalloc"]`; existing `cli-watch`, `mcp-apps`, `prometheus`, `metal`, `eval-support` untouched.
 4. **`main.rs` stays thin**: only the `#[global_allocator]` static may be added; no business logic.
 5. **Cargo.toml changes require explicit user approval** (AGENTS.md): the `mimalloc` workspace dep + crate feature. No other dependency changes in this plan (tests use real-time sleeps — no `tokio`/`test-util` feature needed).
@@ -111,12 +111,12 @@ git commit -m "docs: record GLiNER memory baseline (7.3 GB RSS)"
 
 ---
 
-## Task 2: ADR-0030 — GLiNER Lazy-load + Idle Unload
+## Task 2: ADR-0035 — GLiNER Lazy Load + Idle Unload
 
 **Why:** Records the primary design decision before code.
 
 **Files:**
-- Create: `docs/adr/0030-gliner-lazy-load-with-idle-unload.md`
+- Create: `docs/adr/0035-gliner-lazy-load-with-idle-unload.md` (renumbered from the original duplicate ADR-0030 on 2026-08-07)
 
 **Interfaces:**
 - Consumes: baseline numbers from Task 1.
@@ -127,7 +127,7 @@ git commit -m "docs: record GLiNER memory baseline (7.3 GB RSS)"
 Follow the existing format in `docs/adr/0026-adopt-durable-work-mechanics.md` (Context / Decision / Consequences sections). Content:
 
 ```markdown
-# 0030: GLiNER Lazy-load with Idle Unload
+# ADR-0035: GLiNER Lazy Load with Idle Unload
 
 ## Status
 Accepted
@@ -140,9 +140,11 @@ showed RSS of 7.3 GB, dominated by (a) ~1.5 GB live heap weights and (b)
 extract activity. 99% of usage is single-shot extract followed by long idle.
 
 ## Decision
-Load the GLiNER model lazily on first extract and unload it after N seconds
-of inactivity, controlled by GLINER_IDLE_UNLOAD_SECS (seconds, default 0 =
-disabled = today's behavior; Ollama keep_alive-style). Implementation: a
+Load the GLiNER model lazily on first extraction for every configuration and
+optionally unload it after N seconds of inactivity, controlled by
+GLINER_IDLE_UNLOAD_SECS. The default 0 disables idle unloading: the model is
+still loaded on first extraction, then retained for the process lifetime.
+Implementation: a
 generic LazyModel<T> state machine (tokio Mutex + spawn_blocking load +
 tokio::time::sleep unload task). Unload is armed AFTER each extract
 completes (arm_unload), so the idle clock measures time since last USE
@@ -166,15 +168,16 @@ down; unload alone fixes the physical footprint.
 + First extract after idle pays cold-load latency (~1-2 s, single-shot OK).
 + Concurrency is safe: exactly-once load under the state lock; unload task
   re-checks last_used before dropping; arms only after use completes.
-- Default off preserves existing behavior; opt-in via env var.
+- Lazy loading is always active. Idle unloading is opt-in; the default `0`
+  retains a model after its first extraction.
 - RSS benefit of unload without mimalloc is partial (arena retention).
 ```
 
 - [x] **Step 2: Commit**
 
 ```bash
-git add docs/adr/0030-gliner-lazy-load-with-idle-unload.md
-git commit -m "docs: ADR-0030 GLiNER lazy-load with idle unload"
+git add docs/adr/0035-gliner-lazy-load-with-idle-unload.md
+git commit -m "docs: ADR-0035 GLiNER lazy load with idle unload"
 ```
 
 ---

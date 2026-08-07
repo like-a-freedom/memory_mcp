@@ -1,6 +1,6 @@
 # ADR-0020: Pin Evaluation Corpora and Separate Label Trust
 
-> Status: Proposed (2026-07-28)
+> Status: Accepted (2026-07-28; implemented by the eval-harness corpus manifests, pinned revisions, and trust-aware release gates)
 > Related: ADR-0019 (profile-driven truthful evaluation)
 
 ## Context

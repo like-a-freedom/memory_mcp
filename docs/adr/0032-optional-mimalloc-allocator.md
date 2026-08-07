@@ -1,7 +1,7 @@
 # 0032: Optional mimalloc Allocator
 
 ## Status
-Accepted
+Accepted; amended by ADR-0034 (2026-08-06), which retains `mimalloc` as an opt-in experiment and rejects default promotion for the measured workload.
 
 ## Context
 vmmap shows ~5.1-5.2 GB of MALLOC_SMALL (empty) regions — freed pages macOS
@@ -19,9 +19,12 @@ allocations. Feature-gated so the default build is untouched.
 
 ## Consequences
 + RSS converges to ~live model (1.5 GB) instead of ratcheting to 7 GB.
-+ REQUIRED to realize the idle RSS target after unload (~50-300 MB);
-  without it, freed model memory can land in retained arenas and RSS stays
-  high until kernel memory pressure reclaims the clean pages.
++ It remains available as an opt-in allocator experiment for workloads where
+  the platform allocator retains freed model memory.
+- Later production-like measurement in ADR-0034 did not reproduce the original
+  RSS benefit: default allocator plus idle unload reached 430 MB RSS, while
+  mimalloc plus idle unload reached 2,556 MB. The earlier target is historical
+  evidence, not the current default-policy basis.
 - Requires user approval for the Cargo.toml change (AGENTS.md).
 - Binary-only: the static lives in main.rs, so library tests don't exercise
   it; soak verification (Task 11) validates it on the real binary.

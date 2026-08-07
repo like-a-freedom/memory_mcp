@@ -1,6 +1,8 @@
 # ADR 0016: Agent Memory Lifecycle Integration
 
-Status: Proposed (2026-07-23)
+Status: Accepted (2026-07-23; implemented)
+
+Amended by: ADR-0030 (`memory_mcp init` is the sole output-only exception to the ordinary CLI freeze).
 
 ## Context
 

@@ -1,8 +1,9 @@
 # ADR-0028: Optimize Candle Inference via Apple Hardware Acceleration
 
-> Status: Accepted
+> Status: Superseded by ADR-0034 (2026-08-06)
 > Date: 2026-08-03
 > Context owner: Memory MCP Core Engine
+> Superseded by: ADR-0034, whose production-like A/B evidence keeps `accelerate` explicit and out of the package default.
 
 ## Context
 
