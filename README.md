@@ -108,6 +108,30 @@ cargo install --path crates/memory-mcp --locked
 
 `memory_mcp init` prints configuration only: it does not edit host files, change environment variables, start a database, download models, or access the network. NER defaults to Anno; zero-config means no external database/service setup, not a dependency-free binary.
 
+### Measuring time-to-value
+
+The clean-machine harness measures the path from the selected persona's start to a
+real fact recalled by `assemble-context`; it does not measure GUI host startup or
+memory quality. It uses isolated `HOME`, `XDG_DATA_HOME`, `CARGO_HOME`, and working
+directories and prints machine-readable timings with median and p90 aggregates:
+
+```bash
+scripts/measure_ttv.sh --binary ./target/release/memory_mcp --persona release-binary --repeat 5
+scripts/measure_ttv.sh --binary ./target/release/memory_mcp --persona host-config-user --repeat 5
+scripts/measure_ttv.sh --cargo-install --source . --persona rust-user --repeat 5
+```
+
+The fixture is a summary-like `requirement` episode because the existing extractor
+intentionally limits note fallback facts to summary-capable source types. The
+validator rejects malformed responses, empty fact arrays, and episode-only fallback
+items, so a run is successful only when a persisted fact—not an episode fallback—is
+recalled. Installation, host-snippet preparation, storage initialization, episode
+write, extraction, and fact recall are reported separately. A median total of
+`<= 300` seconds is the measured target, not a guarantee; the first clean rust-user
+run on this macOS workspace took `544.098` seconds, with `542.634` seconds spent in
+isolated compilation/install and approximately `1.46` seconds in the application
+path.
+
 ### Run
 
 ```bash
