@@ -151,13 +151,11 @@ fn select_embedded_data_dir(
         };
     }
 
-    if legacy_exists {
-        if let Some(legacy_path) = legacy_path {
-            return EmbeddedDataDirResolution {
-                path: legacy_path.clone(),
-                legacy_path: Some(legacy_path),
-            };
-        }
+    if legacy_exists && let Some(legacy_path) = legacy_path {
+        return EmbeddedDataDirResolution {
+            path: legacy_path.clone(),
+            legacy_path: Some(legacy_path),
+        };
     }
 
     EmbeddedDataDirResolution {

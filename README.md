@@ -1,6 +1,6 @@
 # Memory MCP
 
-[![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-1.88%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](https://doc.rust-lang.org/edition-guide/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -84,29 +84,28 @@ Storage layer (`src/storage.rs` + SurrealDB)
 
 ### Requirements
 
-- Rust 1.85+
+- Rust 1.88+ only when compiling from source
 - No external SurrealDB service is required for the default embedded mode
 
-### Build
+### First run with a release binary
 
-```bash
-cargo build --release
-```
+1. Download the release asset for your platform and verify its accompanying SHA-256 checksum. Rename it to `memory_mcp` (or create a symlink with that name); the Windows asset already includes `.exe`.
+2. Put the renamed executable on `PATH`.
+3. Run `memory_mcp init` for the default VS Code snippet, or pass one of the exact targets `claude-desktop`, `codex`, `zed`, or `env`.
+4. Copy the printed host-native snippet into the indicated configuration file.
+5. Ingest one source, run `extract --episode-id <episode-id>`, then run `assemble-context` to verify a real fact is recalled.
 
-### Install locally
+The default path needs no environment variables, configuration file, external database, API key, network request, or model download. It uses a user-owned embedded database, Anno extraction, and lexical/graph retrieval immediately. `memory_mcp init` prints configuration only: it does not edit host files, change environment variables, start a database, download models, or access the network.
+
+### Install from source (fallback)
+
+A Rust toolchain is needed only when a prebuilt release is unavailable:
 
 ```bash
 cargo install --path crates/memory-mcp --locked
 ```
 
-### First run
-
-1. Download a release binary, or from a checkout run `cargo install --path crates/memory-mcp --locked`.
-2. Run `memory_mcp init` for the default VS Code snippet, or pass one of the exact targets `claude-desktop`, `codex`, `zed`, or `env`.
-3. Copy the printed host-native snippet into the indicated configuration file. No `SURREALDB_*` variables are required for local embedded mode.
-4. Ingest one source, run `extract --episode-id <episode-id>`, then run `assemble-context` to verify a real fact is recalled.
-
-`memory_mcp init` prints configuration only: it does not edit host files, change environment variables, start a database, download models, or access the network. NER defaults to Anno; zero-config means no external database/service setup, not a dependency-free binary.
+This builds the same full-capability application as the release binary; it is not a reduced onboarding build.
 
 ### Measuring time-to-value
 
@@ -387,13 +386,16 @@ Configuration is loaded from environment variables.
 | `SURREALDB_URL` | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
 | `SURREALDB_EMBEDDED` | No | Explicit `true`/`false`; when unset, remote URLs select remote mode and all other URLs select embedded mode |
 | `SURREALDB_DATA_DIR` | No | Custom embedded data directory; otherwise a user-owned directory is selected |
+| `SURREALDB_EMBEDDING_DIMENSION` | No | Existing vector dimension override used by embedding configuration |
 
 The default local path is embedded RocksDB with no external service, credential,
 or model download required to start storage. Remote mode requires a valid URL and
 non-empty explicit username and password. NER defaults to the in-process Anno
 backend; `zero-config` does not mean the binary has no dependencies.
 
-### Optional variables
+### Advanced runtime overrides
+
+The following settings are optional for power users. They are read by the same executable used by the no-configuration quick start.
 
 | Variable | Description |
 | --- | --- |
@@ -410,6 +412,7 @@ backend; `zero-config` does not mean the binary has no dependencies.
 | `EMBEDDINGS_PROVIDER` | Embedding backend: `local-candle`, `openai-compatible`, or `ollama` |
 | `EMBEDDINGS_MODEL` | Model identifier for the selected embedding provider |
 | `EMBEDDINGS_MODEL_DIR` | Optional local cache directory for `local-candle` |
+| `EMBEDDINGS_BASE_URL` | Base URL for `openai-compatible` or `ollama` |
 | `EMBEDDINGS_MAX_TOKENS` | Max token budget before `local-candle` chunks long inputs |
 | `EMBEDDINGS_TIMEOUT_SECS` | Timeout for remote embedding calls |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | Minimum cosine similarity for semantic matches |
@@ -424,6 +427,13 @@ backend; `zero-config` does not mean the binary has no dependencies.
 | `NER_MAX_CONCURRENCY` | Concurrent local NER inference limit (default: 1) |
 | `NER_DEVICE` | Device: `cpu`, `metal`, or `auto` (default: `cpu`) |
 | `GLINER_IDLE_UNLOAD_SECS` | Seconds of inactivity before the local GLiNER model is unloaded to free memory. `0` (default) keeps the model loaded for the process lifetime. Set e.g. `30` for Ollama `keep_alive`-style unloading. First extract after an unload pays the ~1–2 s cold-load latency. |
+| `MEMORY_CLAIM_ROLLOUT_STAGE` | Claim reconciliation rollout stage |
+| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | Candidate page size for claim reconciliation |
+| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | Inline claim candidate limit |
+| `MEMORY_CLAIM_INLINE_BUDGET_MS` | Inline claim reconciliation budget in milliseconds |
+| `ENTITY_FUZZY_THRESHOLD` | Entity fuzzy-match threshold |
+
+Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
 
 ### Optional build features
 
@@ -434,6 +444,7 @@ The binary supports a few opt-in Cargo features:
 | `mimalloc` | Use the mimalloc global allocator instead of the system allocator. This remains an explicit experiment: the fresh macOS matrix reduced physical footprint after GLiNER unload but increased observed RSS to about 2.56 GB, so it is not the server default. Build: `cargo build --release --features mimalloc`. |
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
+| `mcp-apps` | Enable the optional interactive MCP app-session surface. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps`. |
 
 The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `GLINER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 

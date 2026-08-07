@@ -39,6 +39,32 @@ The live Clap spellings are `assemble-context`, `lifecycle-capture`, and
 contracts. A future public-surface proposal requires a separate ADR and the
 evidence gate described in ADR-0016.
 
+## Runtime onboarding contract
+
+The release and source-built executables are the same provider-capable application.
+The optional `mcp-apps` Cargo feature adds interactive app-session UI surfaces but
+is not required for the core MCP tools or zero-config first value. A casual user
+can start with no application environment variables: storage uses
+embedded RocksDB in a user-owned data directory, database `memory`, namespace
+`org`, embedded `root/root` credentials, Anno entity extraction, disabled
+embeddings, and lexical/graph retrieval. This path does not require an external
+SurrealDB service, API key, configuration file, network request, or model download.
+
+Power users override the same executable with the canonical runtime variables
+`SURREALDB_URL`, `SURREALDB_EMBEDDED`, `SURREALDB_DB_NAME`,
+`SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`,
+`SURREALDB_DATA_DIR`, `NER_PROVIDER`, `NER_MODEL`, `NER_MODEL_DIR`,
+`EMBEDDINGS_ENABLED`, `EMBEDDINGS_PROVIDER`, `EMBEDDINGS_MODEL`,
+`EMBEDDINGS_MODEL_DIR`, `EMBEDDINGS_BASE_URL`, and `EMBEDDINGS_API_KEY`, plus
+the documented tuning variables. Runtime settings are orthogonal; users do not
+select a Cargo feature to obtain the normal product experience.
+
+Remote storage requires non-empty explicit `SURREALDB_USERNAME` and
+`SURREALDB_PASSWORD`. Missing or invalid explicit configuration fails with an
+actionable configuration error rather than silently falling back to remote
+`root/root` credentials. `memory_mcp init` only renders host configuration; it
+never mutates host files, environment variables, databases, or model caches.
+
 ## Integration architecture
 
 The lifecycle bridge operates through three complementary surfaces. No custom

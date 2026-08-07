@@ -284,6 +284,15 @@ jobs:
           $payload = Get-Content init-output.json -Raw | ConvertFrom-Json
           if ($payload.mutates_files -ne $false -or $payload.target -ne 'vscode') { throw 'invalid init smoke-test result' }
 
+      - name: Smoke test zero-config runtime (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          bash scripts/measure_ttv.sh \
+            --binary target/${{ matrix.platform.target }}/release/memory_mcp \
+            --persona release-binary \
+            --repeat 1 > ttv-output.json
+          python3 -c 'import json; from pathlib import Path; payload=json.loads(Path("ttv-output.json").read_text()); assert payload["success"] is True; assert payload["median_seconds"]["total_seconds"] <= 300'
+
       - name: Generate SHA-256 (Unix)
         if: matrix.platform.os != 'windows-latest'
         run: |

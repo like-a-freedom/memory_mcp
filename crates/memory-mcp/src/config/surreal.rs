@@ -663,6 +663,52 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_runtime_defaults_to_local_first_without_provider_selection() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+
+        let config = SurrealConfig::from_env().expect("zero-config defaults");
+
+        assert!(config.embedded);
+        assert_eq!(config.db_name, "memory");
+        assert_eq!(config.namespaces, vec!["org"]);
+        assert_eq!(config.username, "root");
+        assert_eq!(config.password, "root");
+        assert_eq!(
+            config.ner.provider,
+            super::super::ner::NerProviderKind::Anno
+        );
+        assert_eq!(
+            config.embedding.provider,
+            super::super::embedding::EmbeddingProviderKind::Disabled
+        );
+    }
+
+    #[test]
+    fn ordinary_runtime_accepts_canonical_advanced_provider_overrides() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe {
+            env::set_var("NER_PROVIDER", "local-gliner");
+            env::set_var("EMBEDDINGS_ENABLED", "true");
+            env::set_var("EMBEDDINGS_PROVIDER", "local-candle");
+        }
+
+        let config = SurrealConfig::from_env().expect("canonical provider overrides");
+
+        assert_eq!(
+            config.ner.provider,
+            super::super::ner::NerProviderKind::LocalGliner
+        );
+        assert_eq!(
+            config.embedding.provider,
+            super::super::embedding::EmbeddingProviderKind::LocalCandle
+        );
+    }
+
+    #[test]
     fn from_env_uses_new_user_data_path_and_records_all_storage_defaults() {
         let _lock = env_lock().lock().expect("environment lock");
         let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
