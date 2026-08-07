@@ -16,8 +16,6 @@ use crate::models::EntityCandidate;
 use super::{EntityExtractor, MemoryError};
 
 mod batching;
-mod gate;
-mod lazy;
 mod scoring;
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
@@ -90,8 +88,8 @@ struct GlinerLoader {
 /// concurrent extracts share one permit pool across reloads.
 pub struct GlinerEntityExtractor {
     loader: Arc<GlinerLoader>,
-    model: lazy::LazyModel<LoadedGliner>,
-    inference_gate: gate::InferenceGate,
+    model: super::super::model_runtime::LoadedModel<LoadedGliner>,
+    inference_gate: super::super::model_runtime::InferenceGate,
 }
 
 #[derive(Debug, Clone)]
@@ -678,8 +676,8 @@ impl GlinerEntityExtractor {
         });
         Ok(Self {
             loader,
-            model: lazy::LazyModel::new(idle_unload),
-            inference_gate: gate::InferenceGate::new(max_concurrency),
+            model: super::super::model_runtime::LoadedModel::new(idle_unload),
+            inference_gate: super::super::model_runtime::InferenceGate::new(max_concurrency),
         })
     }
 

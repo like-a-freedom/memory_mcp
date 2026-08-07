@@ -49,6 +49,7 @@ pub(crate) mod explanation;
 pub(crate) mod fact;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
+mod model_runtime;
 mod query;
 mod reembed;
 pub mod reembed_options;
