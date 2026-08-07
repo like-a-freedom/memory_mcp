@@ -377,16 +377,16 @@ Configuration is loaded from environment variables.
 
 ### Storage variables and defaults
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `SURREALDB_DB_NAME` | No | Database name (default: `memory`) |
-| `SURREALDB_NAMESPACES` | No | Comma-separated namespace list (default: `org`) |
-| `SURREALDB_USERNAME` | Remote only | Database username; embedded mode defaults to `root` |
-| `SURREALDB_PASSWORD` | Remote only | Database password; embedded mode defaults to `root` |
-| `SURREALDB_URL` | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
-| `SURREALDB_EMBEDDED` | No | Explicit `true`/`false`; when unset, remote URLs select remote mode and all other URLs select embedded mode |
-| `SURREALDB_DATA_DIR` | No | Custom embedded data directory; otherwise a user-owned directory is selected |
-| `SURREALDB_EMBEDDING_DIMENSION` | No | Existing vector dimension override used by embedding configuration |
+| Variable | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `SURREALDB_DB_NAME` | string | `memory` | No | Database name |
+| `SURREALDB_NAMESPACES` | comma-separated list | `org` | No | Namespace list |
+| `SURREALDB_USERNAME` | string | `root` (embedded); explicit value required (remote) | Remote only | Database username |
+| `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Remote only | Database password |
+| `SURREALDB_URL` | URL | unset (embedded) | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
+| `SURREALDB_EMBEDDED` | boolean | inferred from `SURREALDB_URL` | No | Explicit `true`/`false`; remote URLs select remote mode and all other URLs select embedded mode when unset |
+| `SURREALDB_DATA_DIR` | path | `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Custom embedded data directory; an existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
+| `SURREALDB_EMBEDDING_DIMENSION` | unsigned integer | unset | No | Existing vector dimension override; the provider fallback is `384` for `local-candle` and `1536` for other embedding providers |
 
 The default local path is embedded RocksDB with no external service, credential,
 or model download required to start storage. Remote mode requires a valid URL and
@@ -397,41 +397,42 @@ backend; `zero-config` does not mean the binary has no dependencies.
 
 The following settings are optional for power users. They are read by the same executable used by the no-configuration quick start.
 
-| Variable | Description |
-| --- | --- |
-| `RUST_LOG` | Logging level such as `trace`, `debug`, `info`, `warn`, or `error` |
-| `QUERY_LOGGING_ENABLED` | Set to `true` to persist `assemble_context` analytics rows into `query_log` (default: `false`) |
-| `QUERY_LOG_RETENTION_DAYS` | Days to retain persisted `query_log` analytics before best-effort pruning (default: `90`) |
-| `LIFECYCLE_ENABLED` | Enable background lifecycle jobs (`true`/`false`, default: `false`) |
-| `LIFECYCLE_DECAY_INTERVAL_SECS` | Decay worker interval in seconds (default: `3600`) |
-| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Archival worker interval in seconds (default: `86400`) |
-| `LIFECYCLE_DECAY_THRESHOLD` | Confidence threshold for fact invalidation (default: `0.3`) |
-| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | Days before archiving episodes (default: `90`) |
-| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | Half-life in days for decay computation (default: `365`) |
-| `EMBEDDINGS_ENABLED` | Enable semantic retrieval providers (default: `false`) |
-| `EMBEDDINGS_PROVIDER` | Embedding backend: `local-candle`, `openai-compatible`, or `ollama` |
-| `EMBEDDINGS_MODEL` | Model identifier for the selected embedding provider |
-| `EMBEDDINGS_MODEL_DIR` | Optional local cache directory for `local-candle` |
-| `EMBEDDINGS_BASE_URL` | Base URL for `openai-compatible` or `ollama` |
-| `EMBEDDINGS_MAX_TOKENS` | Max token budget before `local-candle` chunks long inputs |
-| `EMBEDDINGS_TIMEOUT_SECS` | Timeout for remote embedding calls |
-| `EMBEDDINGS_SIMILARITY_THRESHOLD` | Minimum cosine similarity for semantic matches |
-| `EMBEDDINGS_API_KEY` | Optional bearer token for OpenAI-compatible providers |
-| `NER_PROVIDER` | Entity extraction backend: `regex`, `anno`, or `local-gliner` |
-| `NER_MODEL` | HuggingFace repo for `local-gliner` |
-| `NER_MODEL_DIR` | Optional local cache directory for `local-gliner` |
-| `NER_LABELS` | Comma-separated runtime labels for `local-gliner` |
-| `NER_THRESHOLD` | Confidence threshold for `local-gliner` acceptance |
-| `NER_BATCH_SIZE` | Max windows per transformer forward pass (CPU default: 1; increase only after workload-specific benchmarking) |
-| `NER_MAX_BATCH_TOKENS` | Max padded tokens per batch (default: 1536) |
-| `NER_MAX_CONCURRENCY` | Concurrent local NER inference limit (default: 1) |
-| `NER_DEVICE` | Device: `cpu`, `metal`, or `auto` (default: `cpu`) |
-| `GLINER_IDLE_UNLOAD_SECS` | Seconds of inactivity before the local GLiNER model is unloaded to free memory. `0` (default) keeps the model loaded for the process lifetime. Set e.g. `30` for Ollama `keep_alive`-style unloading. First extract after an unload pays the ~1–2 s cold-load latency. |
-| `MEMORY_CLAIM_ROLLOUT_STAGE` | Claim reconciliation rollout stage |
-| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | Candidate page size for claim reconciliation |
-| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | Inline claim candidate limit |
-| `MEMORY_CLAIM_INLINE_BUDGET_MS` | Inline claim reconciliation budget in milliseconds |
-| `ENTITY_FUZZY_THRESHOLD` | Entity fuzzy-match threshold |
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `RUST_LOG` | string | `info` | Logging level; canonical values are `trace`, `debug`, `info`, `warn`, and `error`; `warning` aliases `warn`, and unknown values fall back to `info` |
+| `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `prometheus` feature is compiled and this variable is set |
+| `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
+| `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
+| `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs |
+| `LIFECYCLE_DECAY_INTERVAL_SECS` | unsigned integer | `3600` | Decay worker interval in seconds |
+| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | unsigned integer | `86400` | Archival worker interval in seconds |
+| `LIFECYCLE_DECAY_THRESHOLD` | floating-point number | `0.3` | Confidence threshold for fact invalidation |
+| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | unsigned integer | `90` | Days before archiving episodes |
+| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | floating-point number | `365` | Half-life in days for decay computation |
+| `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set; `true` when a provider is set and this variable is unset | Enable semantic retrieval; explicit `false` takes precedence over provider selection |
+| `EMBEDDINGS_PROVIDER` | string enum | `disabled` when both variables are unset; `local-candle` when `EMBEDDINGS_ENABLED=true` without a provider | Embedding backend: `local-candle`, `openai-compatible`, or `ollama`; when `EMBEDDINGS_ENABLED` is unset, setting a provider enables embeddings, while explicit `false` disables them and explicit `true` enables the selected/default provider |
+| `EMBEDDINGS_MODEL` | string | `intfloat/multilingual-e5-small` for `local-candle`; required for external providers when enabled | Model identifier for the selected embedding provider |
+| `EMBEDDINGS_MODEL_DIR` | path | unset (derived under the effective data/cache root for `local-candle`) | Optional local cache directory for `local-candle` |
+| `EMBEDDINGS_BASE_URL` | URL | unset for `local-candle`; `https://api.openai.com/v1` for `openai-compatible`; `http://127.0.0.1:11434` for `ollama` | Base URL for remote embedding providers |
+| `EMBEDDINGS_MAX_TOKENS` | unsigned integer | `384` | Max token budget before `local-candle` chunks long inputs |
+| `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
+| `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
+| `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
+| `NER_PROVIDER` | string enum | `anno` | Entity extraction backend: `anno`, `regex`, or `local-gliner` |
+| `NER_MODEL` | string | unset for `anno`/`regex`; `urchade/gliner_multi-v2.1` for `local-gliner` | Hugging Face repository for `local-gliner` |
+| `NER_MODEL_DIR` | path | unset (derived under the effective data/cache root for `local-gliner`) | Optional local cache directory for `local-gliner` |
+| `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for `local-gliner` |
+| `NER_THRESHOLD` | floating-point number | `0.5` | Confidence threshold for `local-gliner` acceptance |
+| `NER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; increase only after workload-specific benchmarking |
+| `NER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch |
+| `NER_MAX_CONCURRENCY` | positive integer | `1` | Concurrent local NER inference limit |
+| `NER_DEVICE` | string enum | `cpu` | Device for local GLiNER: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU |
+| `GLINER_IDLE_UNLOAD_SECS` | unsigned integer | `0` | Seconds of inactivity before the local GLiNER model is unloaded; `0` keeps it loaded for the process lifetime. After unloading, the first extraction pays the model cold-load latency. |
+| `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `shadow` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence` |
+| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation |
+| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Inline claim candidate limit |
+| `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Inline claim reconciliation budget in milliseconds |
+| `ENTITY_FUZZY_THRESHOLD` | floating-point number | `0.85` | Entity fuzzy-match threshold |
 
 Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
 
