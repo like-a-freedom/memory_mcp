@@ -10,6 +10,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 
 use crate::service::MemoryError;
 
@@ -126,6 +127,17 @@ impl RevisionResolver for HfRevisionResolver {
     }
 }
 
+/// Verifies a hex SHA-256 digest against an expected value.
+pub(crate) fn verify_checksum(actual: &str, expected: &str, path: &str) -> Result<(), MemoryError> {
+    if actual.eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        Err(MemoryError::Validation(format!(
+            "checksum mismatch for {path}: expected {expected}, got {actual}"
+        )))
+    }
+}
+
 /// Streams files from `https://huggingface.co/{repo}/resolve/{revision}/{path}`
 /// with byte progress and a stall watchdog.
 pub struct HfArtifactFetcher {
@@ -192,6 +204,7 @@ impl ArtifactFetcher for HfArtifactFetcher {
         let mut last_progress: u64 = 0;
         let mut last_byte_at = std::time::Instant::now();
         let stall_timeout = Duration::from_secs(DOWNLOAD_STALL_TIMEOUT_SECS);
+        let mut hasher = Sha256::new();
 
         loop {
             let tick = tokio::time::timeout(STALL_CHECK_INTERVAL, response.chunk());
@@ -207,6 +220,7 @@ impl ArtifactFetcher for HfArtifactFetcher {
                     }
                 }
                 Ok(Ok(Some(chunk))) => {
+                    hasher.update(&chunk);
                     file.write_all(&chunk).await.map_err(|err| {
                         MemoryError::Storage(format!("cannot write {}: {err}", tmp.display()))
                     })?;
@@ -237,6 +251,13 @@ impl ArtifactFetcher for HfArtifactFetcher {
         file.flush().await.map_err(|err| {
             MemoryError::Storage(format!("cannot flush {}: {err}", tmp.display()))
         })?;
+        if let Some(expected) = requirement.sha256 {
+            let actual = hex::encode(hasher.finalize());
+            if let Err(err) = verify_checksum(&actual, expected, requirement.path) {
+                let _ = tokio::fs::remove_file(&tmp).await;
+                return Err(err);
+            }
+        }
         tokio::fs::rename(&tmp, target).await.map_err(|err| {
             let _ = std::fs::remove_file(&tmp);
             MemoryError::Storage(format!(
@@ -264,5 +285,25 @@ mod tests {
         assert_eq!(REVISION_RESOLVE_ATTEMPTS, 2);
         assert_eq!(DOWNLOAD_STALL_TIMEOUT_SECS, 60);
         assert!(REVISION_RESOLVE_DEADLINE <= Duration::from_secs(10));
+    }
+
+    #[test]
+    fn verify_checksum_accepts_match_and_rejects_mismatch() {
+        let bytes = b"checkpoint-content";
+        let good = hex::encode(Sha256::digest(bytes));
+
+        assert!(verify_checksum(&good, &good, "model.bin").is_ok());
+        // Case-insensitive hex comparison.
+        assert!(verify_checksum(&good.to_uppercase(), &good, "model.bin").is_ok());
+
+        let bad = "0".repeat(64);
+        let err = verify_checksum(&good, &bad, "model.bin").expect_err("mismatch rejected");
+        match err {
+            MemoryError::Validation(message) => {
+                assert!(message.contains("checksum mismatch"));
+                assert!(message.contains("model.bin"));
+            }
+            other => panic!("expected Validation error, got {other}"),
+        }
     }
 }

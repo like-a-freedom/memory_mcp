@@ -553,19 +553,28 @@ mod tests {
     }
 
     #[test]
-    fn flipped_kernel_restores_pytorch_conv_orientation() {
-        // PyTorch's nn.Conv1d(padding=1) with kernel [1, 0, 0] computes
-        // out[l] = in[l + 1] (the tap points *forward*). Candle's conv1d
-        // applies the same tap *backward*; flipping the kernel along the length
-        // axis (as `Lfm2ShortConv::load` does) reproduces PyTorch's output.
+    fn candle_conv1d_matches_pytorch_cross_correlation() {
+        // Pin the conv orientation independently of the checkpoint: candle's
+        // conv1d must equal PyTorch's nn.Conv1d (cross-correlation),
+        // `out[l] = sum_k input[l + k - padding] * w[k]`, for an asymmetric
+        // kernel. Hand-computed over input [1..5], kernel [1,2,3], padding 1:
+        //   out[0] = in[-1]*1 + in[0]*2 + in[1]*3 = 0 + 2 + 6  = 8
+        //   out[1] = in[0]*1  + in[1]*2 + in[2]*3 = 1 + 4 + 9  = 14
+        //   out[2] = in[1]*1  + in[2]*2 + in[3]*3 = 2 + 6 + 12 = 20
+        //   out[3] = in[2]*1  + in[3]*2 + in[4]*3 = 3 + 8 + 15 = 26
+        //   out[4] = in[3]*1  + in[4]*2 + in[5]*3 = 4 + 10 + 0 = 14
         let device = Device::Cpu;
         let input = Tensor::from_vec(vec![1f32, 2., 3., 4., 5.], (1, 1, 5), &device).unwrap();
-        let kernel = Tensor::from_vec(vec![1f32, 0., 0.], (1, 1, 3), &device).unwrap();
-        let flipped = kernel.flip(&[2]).unwrap();
-        let out = input.conv1d(&flipped, 1, 1, 1, 1).unwrap();
+        let kernel = Tensor::from_vec(vec![1f32, 2., 3.], (1, 1, 3), &device).unwrap();
+        let out = input.conv1d(&kernel, 1, 1, 1, 1).unwrap();
         let values = out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
-        // PyTorch: out = [in[1], in[2], in[3], in[4], pad] = [2, 3, 4, 5, 0].
-        assert_eq!(values, vec![2., 3., 4., 5., 0.]);
+        assert_eq!(values, vec![8., 14., 20., 26., 14.]);
+        // A flipped kernel would produce [4, 10, 16, 22, 22] — assert that is
+        // NOT the output so a regression to the flip is caught.
+        let flipped = kernel.flip(&[2]).unwrap();
+        let flipped_out = input.conv1d(&flipped, 1, 1, 1, 1).unwrap();
+        let flipped_values = flipped_out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
+        assert_eq!(flipped_values, vec![4., 10., 16., 22., 22.]);
     }
 
     #[test]

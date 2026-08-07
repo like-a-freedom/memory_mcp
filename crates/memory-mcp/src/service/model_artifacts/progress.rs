@@ -195,7 +195,6 @@ impl ModelProgressSink for JsonLineProgressSink {
 }
 
 /// Renders human-readable progress lines to stderr.
-/// Renders human-readable progress lines to stderr.
 pub struct CliProgressSink {
     writer: Mutex<std::io::Stderr>,
 }
@@ -233,8 +232,6 @@ impl ModelProgressSink for CliProgressSink {
     }
 }
 
-/// Throttles the domain stream: emits on phase change, completion or failure,
-/// each crossed 5% boundary, or after a five-second heartbeat with no change.
 /// Throttles the domain stream: emits on phase change, completion or failure,
 /// each crossed 5% boundary, or after a five-second heartbeat with no change.
 pub struct ThrottledProgressSink<S: ModelProgressSink> {

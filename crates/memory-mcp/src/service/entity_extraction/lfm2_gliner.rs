@@ -278,7 +278,8 @@ impl VagoLfm2EntityExtractor {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new_with_runtime(
+    #[doc(hidden)]
+    pub fn new_with_runtime(
         model_dir: &Path,
         labels: Vec<String>,
         threshold: f64,
@@ -441,6 +442,24 @@ impl EntityExtractor for VagoLfm2EntityExtractor {
         let _permit = self.acquire_inference_permit().await?;
         let loaded = self.ensure_loaded().await?;
         let result = loaded.extract_inner_with_labels(content, zero_shot_labels);
+        self.model.arm_unload().await;
+        result
+    }
+}
+
+impl VagoLfm2EntityExtractor {
+    /// Scored extraction for release-parity validation (doc-hidden; not part
+    /// of the public API). Returns NMS'd, thresholded spans with sigmoid
+    /// probabilities so the parity test can enforce the `1e-4` score tolerance.
+    #[doc(hidden)]
+    pub async fn scored_extract(
+        &self,
+        content: &str,
+        labels: &[String],
+    ) -> Result<Vec<decode::ScoredEntity>, MemoryError> {
+        let _permit = self.acquire_inference_permit().await?;
+        let loaded = self.ensure_loaded().await?;
+        let result = loaded.extract_scored(content, labels);
         self.model.arm_unload().await;
         result
     }

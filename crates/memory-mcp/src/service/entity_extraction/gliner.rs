@@ -85,11 +85,18 @@ struct GlinerLoader {
 
 /// Thin outer type implementing `EntityExtractor`. Owns the loader recipe and
 /// the lazily-constructed model. `inference_gate` stays on the outer type so
-/// concurrent extracts share one permit pool across reloads.
+/// concurrent extracts share one permit pool across reloads. The provenance
+/// fields capture the prepared-checkpoint identity for the fingerprint.
 pub struct GlinerEntityExtractor {
     loader: Arc<GlinerLoader>,
     model: super::super::model_runtime::LoadedModel<LoadedGliner>,
     inference_gate: super::super::model_runtime::InferenceGate,
+    repository: Option<String>,
+    revision: Option<String>,
+    artifact_identity: Option<String>,
+    revision_status: Option<crate::service::model_artifacts::RevisionStatus>,
+    validation_status: Option<crate::service::model_artifacts::ValidationStatus>,
+    effective_device: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -551,6 +558,14 @@ fn log_selected_device(logger: &crate::logging::StdoutLogger, requested: &str, s
     );
 }
 
+fn device_string(device: &Device) -> String {
+    if device.is_metal() {
+        "metal".to_string()
+    } else {
+        "cpu".to_string()
+    }
+}
+
 fn select_device(
     kind: crate::config::GlinerDeviceKind,
     logger: &crate::logging::StdoutLogger,
@@ -619,7 +634,11 @@ impl GlinerEntityExtractor {
         native: &crate::config::NativeGlinerConfig,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
-        Self::new_with_runtime(
+        // Resolve the device once at construction so the fingerprint reports
+        // the actually selected backend (same policy as the VAGO backend).
+        let device = select_device(native.device, &logger)?;
+        let effective_device = device_string(&device);
+        let mut extractor = Self::new_with_runtime(
             &checkpoint.root,
             native.model.labels.clone(),
             native
@@ -632,7 +651,14 @@ impl GlinerEntityExtractor {
             native.device,
             native.model.idle_unload_secs,
             logger,
-        )
+        )?;
+        extractor.repository = Some(checkpoint.repository.clone());
+        extractor.revision = Some(checkpoint.revision.clone());
+        extractor.artifact_identity = Some(checkpoint.artifact_identity.clone());
+        extractor.revision_status = Some(checkpoint.revision_status);
+        extractor.validation_status = Some(checkpoint.validation_status);
+        extractor.effective_device = Some(effective_device);
+        Ok(extractor)
     }
 
     /// Constructs the model, runs a fixed smoke inference, and installs the
@@ -715,6 +741,12 @@ impl GlinerEntityExtractor {
             loader,
             model: super::super::model_runtime::LoadedModel::new(idle_unload),
             inference_gate: super::super::model_runtime::InferenceGate::new(max_concurrency),
+            repository: None,
+            revision: None,
+            artifact_identity: None,
+            revision_status: None,
+            validation_status: None,
+            effective_device: None,
         })
     }
 
@@ -1436,17 +1468,14 @@ impl EntityExtractor for GlinerEntityExtractor {
             selector: crate::config::SELECTOR_CLASSIC_GLINER.to_string(),
             backend: "gliner".to_string(),
             repository: Some(crate::config::SELECTOR_CLASSIC_GLINER.to_string()),
-            revision: None,
-            artifact_identity: None,
+            revision: self.revision.clone(),
+            artifact_identity: self.artifact_identity.clone(),
             labels: super::anno_onnx::normalize_labels(&self.loader.labels),
             threshold: Some(self.loader.threshold),
-            revision_status: None,
-            validation_status: None,
+            revision_status: self.revision_status,
+            validation_status: self.validation_status,
             runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-            // The loaded device is not tracked on `GlinerLoader`; the effective
-            // device is intentionally reported as `None` rather than guessed
-            // from the requested device kind.
-            effective_device: None,
+            effective_device: self.effective_device.clone(),
         }
     }
 

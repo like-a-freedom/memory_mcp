@@ -146,11 +146,10 @@ impl Lfm2ShortConv {
             (hidden, 1, config.conv_l_cache),
             &tensors::conv_conv_weight(layer_idx),
         )?;
-        // candle's conv1d indexes `w[k]` against `input[l - padding + k]`, while
-        // PyTorch's nn.Conv1d (the checkpoint's training convention) uses
-        // `input[l + padding - k]`. Flip the kernel along the length axis so the
-        // upstream correlation orientation is reproduced.
-        let weight = weight.flip(&[2])?;
+        // Candle's conv1d computes `out[l] = sum_k input[l + k - padding] * w[k]`
+        // — the same cross-correlation convention as PyTorch's nn.Conv1d (the
+        // checkpoint's training convention). No kernel flip is applied; the
+        // orientation is pinned by `candle_conv1d_matches_pytorch_cross_correlation`.
         // Depthwise: groups == hidden. Symmetric padding kernel/2 each side.
         let conv = Conv1d::new(
             weight,
@@ -1098,13 +1097,15 @@ impl LoadedLfm2Gliner {
         Ok(())
     }
 
-    /// Runs the windowed extraction pipeline over `text` with the configured
-    /// labels and returns deduplicated, sorted entity candidates.
-    pub(crate) fn extract_inner_with_labels(
+    /// Runs the windowed extraction pipeline over `text` with `labels` and
+    /// returns the NMS'd, thresholded scored spans (before candidate
+    /// conversion). Shared by [`Self::extract_inner_with_labels`] and the
+    /// doc-hidden scored variant used for release-parity validation.
+    fn extract_scored_inner(
         &self,
         text: &str,
         labels: &[String],
-    ) -> Result<Vec<EntityCandidate>, MemoryError> {
+    ) -> Result<Vec<decode::ScoredEntity>, MemoryError> {
         let text_words = decode::split_text_words(text);
         if text_words.is_empty() {
             return Ok(Vec::new());
@@ -1144,7 +1145,17 @@ impl LoadedLfm2Gliner {
             window_start = window_end.saturating_sub(1).max(window_start + 1);
         }
 
-        let final_spans = decode::apply_nms(all_spans);
+        Ok(decode::apply_nms(all_spans))
+    }
+
+    /// Runs the windowed extraction pipeline over `text` with the configured
+    /// labels and returns deduplicated, sorted entity candidates.
+    pub(crate) fn extract_inner_with_labels(
+        &self,
+        text: &str,
+        labels: &[String],
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let final_spans = self.extract_scored_inner(text, labels)?;
         let mut candidates = final_spans
             .into_iter()
             .map(|span| EntityCandidate {
@@ -1160,6 +1171,18 @@ impl LoadedLfm2Gliner {
         });
 
         Ok(candidates)
+    }
+
+    /// Scored extraction for release-parity validation: returns the NMS'd,
+    /// thresholded spans with their sigmoid probabilities so a test can
+    /// compare native scores against the pinned Python reference.
+    #[doc(hidden)]
+    pub fn extract_scored(
+        &self,
+        text: &str,
+        labels: &[String],
+    ) -> Result<Vec<decode::ScoredEntity>, MemoryError> {
+        self.extract_scored_inner(text, labels)
     }
 
     /// Runs the pipeline with the configured labels.

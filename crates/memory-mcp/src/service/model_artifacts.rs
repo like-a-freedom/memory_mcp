@@ -317,12 +317,13 @@ impl NerArtifactStore {
             spec.extractor_id,
             ModelProgressPhase::Verify,
         ));
-        let identity = artifact_identity(&staging, spec.files)?;
-        if let Some(expected) = spec.files.iter().find_map(|requirement| requirement.sha256) {
-            // Identity covers content; a pinned checksum is verified at the
-            // file level below.
-            let _ = expected;
-        }
+        let identity = artifact_identity(
+            &staging,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        )?;
+        // Pinned per-file SHA-256 checksums (when present on a requirement) are
+        // verified inside `HfArtifactFetcher::fetch` while streaming; the
+        // identity below additionally covers content for the whole checkpoint.
 
         // Atomic activation: rename the staged dir into the revisions layout.
         std::fs::create_dir_all(&layout.revisions).map_err(|err| {
@@ -421,7 +422,10 @@ impl NerArtifactStore {
                 record.revision
             )));
         }
-        let identity = artifact_identity(&revision_dir, spec.files)?;
+        let identity = artifact_identity(
+            &revision_dir,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        )?;
         self.emit(&ModelProgressEvent::completed(
             spec.extractor_id,
             ModelProgressPhase::Fallback,
@@ -550,7 +554,10 @@ impl NerArtifactStore {
         revision: &str,
         revision_status: RevisionStatus,
     ) -> Result<PreparedCheckpoint, MemoryError> {
-        let identity = artifact_identity(revision_dir, spec.files)?;
+        let identity = artifact_identity(
+            revision_dir,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        )?;
         Ok(PreparedCheckpoint {
             root: revision_dir.to_path_buf(),
             repository: spec.repository.to_string(),
@@ -563,7 +570,8 @@ impl NerArtifactStore {
 }
 
 fn is_complete(root: &Path, spec: &NerArtifactSpec) -> bool {
-    spec.files
-        .iter()
+    // Primary AND companion files must be present: a staged checkpoint missing
+    // its companion tokenizer is not reusable and must not bypass re-fetch.
+    spec.all_requirements()
         .all(|requirement| root.join(requirement.path).is_file())
 }

@@ -8,6 +8,8 @@
 
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
+#[doc(hidden)]
+pub use entity_extraction::VagoLfm2EntityExtractor;
 pub use entity_extraction::{
     AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor,
     RegexEntityExtractor, create_entity_extractor,

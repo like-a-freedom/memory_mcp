@@ -73,13 +73,17 @@ pub(crate) fn collect_ent_token_positions(
 
 /// A decoded entity span. `start`/`end` are BYTE offsets into the source
 /// text (from the word splitter), so `&text[start..end]` round-trips.
+///
+/// `#[doc(hidden)] pub` so the release-parity integration test can compare
+/// native scores against the Python reference; not part of the public API.
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ScoredEntity {
-    pub(crate) start: usize,
-    pub(crate) end: usize,
-    pub(crate) text: String,
-    pub(crate) label: String,
-    pub(crate) score: f32,
+pub struct ScoredEntity {
+    pub start: usize,
+    pub end: usize,
+    pub text: String,
+    pub label: String,
+    pub score: f32,
 }
 
 /// Converts per-span score rows into thresholded [`ScoredEntity`] instances.

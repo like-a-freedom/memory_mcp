@@ -267,6 +267,8 @@ fn vago_embedded_runtime_corpus_matches_checked_in_corpus() {
 #[ignore = "requires the 1.6 GB VAGO checkpoint and Python reference scores under tests/models/ner/VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER/"]
 #[tokio::test]
 async fn vago_release_parity_matches_python_reference() {
+    use memory_mcp::service::VagoLfm2EntityExtractor;
+
     let parity = load_parity_file("vago_release_parity.json");
     assert_eq!(
         parity.fixture_status, "release-parity-verified",
@@ -274,25 +276,42 @@ async fn vago_release_parity_matches_python_reference() {
          update evals/corpora/ner/vago_release_parity.json and re-generate \
          reference scores before enabling this gate"
     );
+    for case in &parity.cases {
+        for entity in &case.entities {
+            assert!(
+                entity.score.is_some(),
+                "case {}: reference score missing for `{}`",
+                case.id,
+                entity.text
+            );
+        }
+    }
 
-    let config = vago_config(Some(vago_model_dir()));
-    let extractor = create_entity_extractor(&config, env!("CARGO_MANIFEST_DIR"), &logger())
-        .await
-        .expect("vago extractor builds from a prepared checkpoint");
+    // Build directly from the local checkpoint (no artifact store) so the
+    // gate is purely native-vs-reference.
+    let extractor = VagoLfm2EntityExtractor::new_with_runtime(
+        &vago_model_dir(),
+        parity_labels(&parity),
+        0.5,
+        1,
+        1536,
+        1,
+        GlinerDeviceKind::Cpu,
+        0,
+        logger(),
+    )
+    .expect("vago extractor loads from the local checkpoint");
 
     for case in &parity.cases {
-        let candidates = extractor
-            .extract_candidates(&case.text)
+        let scored = extractor
+            .scored_extract(&case.text, &case.labels)
             .await
             .unwrap_or_else(|err| panic!("extract `{}`: {err}", case.id));
-        let mut actual: Vec<(String, String)> = candidates
+
+        // Structural parity: exact text/label/set equality.
+        let mut actual: Vec<(String, String)> = scored
             .iter()
-            .map(|candidate| {
-                (
-                    candidate.canonical_name.clone(),
-                    candidate.entity_type.clone(),
-                )
-            })
+            .map(|span| (span.text.clone(), span.label.clone()))
             .collect();
         actual.sort();
         let mut expected: Vec<(String, String)> = case
@@ -306,21 +325,37 @@ async fn vago_release_parity_matches_python_reference() {
             "case {}: structural parity mismatch",
             case.id
         );
-        // Score parity requires reference scores; only checked when present.
+
+        // Score parity: abs(native - reference) <= 1e-4 per entity.
         for entity in &case.entities {
-            if let Some(_reference) = entity.score {
-                let matched = candidates.iter().find(|candidate| {
-                    candidate.canonical_name == entity.text && candidate.entity_type == entity.label
-                });
-                assert!(
-                    matched.is_some(),
-                    "case {}: missing entity {:?}",
-                    case.id,
-                    entity
-                );
+            let reference = entity.score.expect("reference score present");
+            let native = scored
+                .iter()
+                .find(|span| span.text == entity.text && span.label == entity.label)
+                .unwrap_or_else(|| panic!("case {}: missing scored span {:?}", case.id, entity));
+            assert!(
+                (native.score - reference).abs() <= 1e-4,
+                "case {}: score drift for `{}` ({}): native {:.6}, reference {:.6}",
+                case.id,
+                entity.text,
+                entity.label,
+                native.score,
+                reference
+            );
+        }
+    }
+}
+
+fn parity_labels(parity: &ParityFile) -> Vec<String> {
+    let mut labels = Vec::new();
+    for case in &parity.cases {
+        for label in &case.labels {
+            if !labels.contains(label) {
+                labels.push(label.clone());
             }
         }
     }
+    labels
 }
 
 /// The real `NerArtifactStore` resolves the latest upstream revision over the

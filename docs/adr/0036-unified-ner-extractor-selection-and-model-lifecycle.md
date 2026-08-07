@@ -18,7 +18,7 @@ The zero-configuration contract must remain local and download-free. The ordinar
 
 - unset or `anno`: lightweight Anno pattern-and-heuristic extraction, with no model download;
 - `regex`: the project-owned deterministic regex extractor;
-- `anno-onnx`: Anno's explicit NuNER ONNX backend using `numind/NuNER_Zero`;
+- `anno-onnx`: Anno's explicit NuNER ONNX backend using the `deepanwa/NuNerZero_onnx` export (the `numind/NuNER_Zero` source ships no ONNX files);
 - `urchade/gliner_multi-v2.1`: the native Candle classic GLiNER backend;
 - `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`: a distinct native Candle LFM2 GLiNER backend for that exact checkpoint.
 
