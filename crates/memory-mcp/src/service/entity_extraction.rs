@@ -29,6 +29,28 @@ pub trait EntityExtractor: Send + Sync {
         "unknown"
     }
 
+    /// Returns the extractor's durable identity fingerprint.
+    ///
+    /// Lightweight extractors (Anno, regex) report selector + backend only;
+    /// model-backed extractors add repository, revision, artifact identity,
+    /// labels, threshold, and validation status. Persisted with new
+    /// extraction projections so historical outputs stay attributable.
+    fn fingerprint(&self) -> ExtractorFingerprint {
+        ExtractorFingerprint {
+            selector: self.provider_name().to_string(),
+            backend: self.provider_name().to_string(),
+            repository: None,
+            revision: None,
+            artifact_identity: None,
+            labels: Vec::new(),
+            threshold: None,
+            revision_status: None,
+            validation_status: None,
+            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
+            effective_device: None,
+        }
+    }
+
     /// Returns normalized entity candidates discovered in the supplied content.
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError>;
 
@@ -93,6 +115,38 @@ impl EntityExtractor for LlmEntityExtractor {
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         (self.extract_fn)(content.to_string()).await
     }
+}
+
+/// Durable identity of the extractor that produced an entity projection.
+///
+/// Persisted alongside new extraction projections so historical outputs stay
+/// attributable to the exact selector, backend, revision, and validation state.
+/// Lightweight extractors leave model fields `None`; model-backed extractors
+/// fill repository/revision/identity/validation/device.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ExtractorFingerprint {
+    /// Public selector (`NER_EXTRACTOR` value), e.g. `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`.
+    pub selector: String,
+    /// Stable backend name, e.g. `sauerkraut-lfm2.5-gliner`.
+    pub backend: String,
+    /// Artifact repository for model-backed extractors.
+    pub repository: Option<String>,
+    /// Resolved upstream revision (commit hash) when applicable.
+    pub revision: Option<String>,
+    /// Stable content identity over sorted `path:size:sha256` entries.
+    pub artifact_identity: Option<String>,
+    /// Normalized ordered labels.
+    pub labels: Vec<String>,
+    /// Effective confidence threshold.
+    pub threshold: Option<f64>,
+    /// How the revision was resolved at activation.
+    pub revision_status: Option<crate::service::model_artifacts::RevisionStatus>,
+    /// How the revision was validated.
+    pub validation_status: Option<crate::service::model_artifacts::ValidationStatus>,
+    /// Runtime/model-family version.
+    pub runtime_version: String,
+    /// Effective device (`cpu`/`metal`) — never the requested device alone.
+    pub effective_device: Option<String>,
 }
 
 /// Future returned by every backend `build` hook.
@@ -454,12 +508,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn anno_onnx_stub_fails_until_backend_is_implemented() {
+    async fn anno_onnx_backend_fails_without_model_files() {
         let logger = crate::logging::StdoutLogger::new("error");
         let config = crate::config::NerConfig {
             extractor: crate::config::NerExtractorConfig::AnnoOnnx(
                 crate::config::ModelBackedNerConfig {
-                    cache_dir: None,
+                    cache_dir: Some(std::path::PathBuf::from("/nonexistent/anno-onnx-model")),
                     labels: vec!["person".to_string()],
                     threshold: None,
                     max_concurrency: 1,
@@ -470,10 +524,13 @@ mod tests {
         let result = create_entity_extractor(&config, "/tmp/memory-mcp-tests", &logger).await;
         match result {
             Err(MemoryError::ConfigInvalid(message)) => {
-                assert!(message.contains("not implemented"));
+                assert!(
+                    message.contains("not found"),
+                    "expected missing-model guidance, got: {message}"
+                );
             }
             Err(other) => panic!("expected ConfigInvalid, got {other}"),
-            Ok(_) => panic!("anno-onnx backend must fail until implemented"),
+            Ok(_) => panic!("anno-onnx backend must fail without model files"),
         }
     }
 
