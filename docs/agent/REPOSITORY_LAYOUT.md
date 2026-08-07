@@ -34,7 +34,7 @@ memory_mcp/
 │   │   │       ├── apps/           # MCP app session handlers (feature-gated, mcp-apps)
 │   │   │       ├── cache/          # Context cache
 │   │   │       ├── embedding/      # Embedding provider implementations
-│   │   │       ├── entity_extraction/# Pluggable NER backends (regex, anno, gliner, llm) behind a registry
+│   │   │       ├── entity_extraction/# Pluggable NER backends (anno, regex, anno-onnx, classic gliner, vago lfm2) behind a registry; shared loaded-model + artifact-store lifecycles live in model_runtime.rs and model_artifacts/
 │   │   │       ├── lifecycle/      # Background workers: archival, decay, community rebuild
 │   │   │       ├── procedures/     # Procedural memory
 │   │   │       ├── query/          # Query utilities

@@ -293,6 +293,45 @@ jobs:
             --repeat 1 > ttv-output.json
           python3 -c 'import json; from pathlib import Path; payload=json.loads(Path("ttv-output.json").read_text()); assert payload["success"] is True; assert payload["median_seconds"]["total_seconds"] <= 300'
 
+      # Every release selector must boot and extract without a model download:
+      # anno and regex are local and download-free; the model-backed selectors
+      # (anno-onnx, urchade/gliner_multi-v2.1, VAGOsolutions/...) are covered
+      # by the fixture-gated integration tests (test job) because CI has no
+      # local checkpoints.
+      - name: Smoke test NER selectors (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          for selector in anno regex; do
+            NER_EXTRACTOR=$selector SURREALDB_EMBEDDED=true \
+              SURREALDB_DATA_DIR=$(mktemp -d) SURREALDB_DB_NAME=smoke \
+              SURREALDB_NAMESPACES=org SURREALDB_USERNAME=root SURREALDB_PASSWORD=root \
+              EMBEDDINGS_ENABLED=false \
+              target/${{ matrix.platform.target }}/release/memory_mcp ingest \
+              --source-type smoke --source-id selector-$selector \
+              --content 'Alice Smith from OpenAI presented Project Atlas.' \
+              --t-ref 2026-02-05T00:00:00Z
+          done
+
+      - name: Smoke test NER selectors (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          foreach ($selector in @('anno', 'regex')) {
+            $env:NER_EXTRACTOR = $selector
+            $env:SURREALDB_EMBEDDED = 'true'
+            $env:SURREALDB_DATA_DIR = (New-Item -ItemType Directory -Force "$env:TEMP\ner-smoke-$selector").FullName
+            $env:SURREALDB_DB_NAME = 'smoke'
+            $env:SURREALDB_NAMESPACES = 'org'
+            $env:SURREALDB_USERNAME = 'root'
+            $env:SURREALDB_PASSWORD = 'root'
+            $env:EMBEDDINGS_ENABLED = 'false'
+            & target/${{ matrix.platform.target }}/release/memory_mcp.exe ingest `
+              --source-type smoke --source-id selector-$selector `
+              --content 'Alice Smith from OpenAI presented Project Atlas.' `
+              --t-ref 2026-02-05T00:00:00Z
+            if ($LASTEXITCODE -ne 0) { throw "NER selector $selector smoke failed" }
+          }
+
       - name: Generate SHA-256 (Unix)
         if: matrix.platform.os != 'windows-latest'
         run: |

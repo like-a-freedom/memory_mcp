@@ -46,7 +46,7 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 - **Context assembly** for ranked retrieval by query, scope, and time cutoff
 - **Graph relationships** between episodes, entities, and facts
 - **Optional semantic retrieval providers** including in-process `local-candle`
-- **Pluggable NER backends** for entity extraction: `regex`, `anno`, or local zero-shot GLiNER (selectable via `NER_PROVIDER`)
+- **Pluggable NER backends** for entity extraction: `anno`, `regex`, explicit Anno NuNER ONNX, and two native Candle zero-shot GLiNER backends (selectable via `NER_EXTRACTOR`)
 - **SurrealDB support** for embedded and remote deployments
 - **Optional watch-mode ingestion** for filesystem-backed auto-ingest workflows
 - **MCP-native interface** for tool-driven agent workflows
@@ -418,16 +418,15 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
-| `NER_PROVIDER` | string enum | `anno` | Entity extraction backend: `anno`, `regex`, or `local-gliner` |
-| `NER_MODEL` | string | unset for `anno`/`regex`; `urchade/gliner_multi-v2.1` for `local-gliner` | Hugging Face repository for `local-gliner` |
-| `NER_MODEL_DIR` | path | unset (derived under the effective data/cache root for `local-gliner`) | Optional local cache directory for `local-gliner` |
-| `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for `local-gliner` |
-| `NER_THRESHOLD` | floating-point number | `0.5` | Confidence threshold for `local-gliner` acceptance |
-| `NER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; increase only after workload-specific benchmarking |
-| `NER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch |
+| `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
+| `NER_CACHE_DIR` | path | `<data>/models/ner` | Artifact store root for model-backed extractors (Anno ONNX, classic GLiNER, VAGO LFM2) |
+| `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for model-backed extractors; trimmed, lowercased, deduplicated in first-declared order |
+| `NER_THRESHOLD` | floating-point number | `0.5` | Confidence threshold for model-backed extractors (each backend owns an evaluated default; explicit in-range values override it) |
 | `NER_MAX_CONCURRENCY` | positive integer | `1` | Concurrent local NER inference limit |
-| `NER_DEVICE` | string enum | `cpu` | Device for local GLiNER: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU |
-| `GLINER_IDLE_UNLOAD_SECS` | unsigned integer | `0` | Seconds of inactivity before the local GLiNER model is unloaded; `0` keeps it loaded for the process lifetime. After unloading, the first extraction pays the model cold-load latency. |
+| `NER_IDLE_UNLOAD_SECS` | unsigned integer | `0` | Seconds of inactivity before any model-backed extractor unloads its model; `0` keeps it loaded for the process lifetime |
+| `GLINER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; increase only after workload-specific benchmarking |
+| `GLINER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch |
+| `GLINER_DEVICE` | string enum | `cpu` | Device for the native Candle GLiNER backends: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU (with an event) |
 | `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `shadow` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence` |
 | `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation |
 | `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Inline claim candidate limit |

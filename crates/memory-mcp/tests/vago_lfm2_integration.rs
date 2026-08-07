@@ -308,7 +308,7 @@ async fn vago_release_parity_matches_python_reference() {
         );
         // Score parity requires reference scores; only checked when present.
         for entity in &case.entities {
-            if let Some(reference) = entity.score {
+            if let Some(_reference) = entity.score {
                 let matched = candidates.iter().find(|candidate| {
                     candidate.canonical_name == entity.text && candidate.entity_type == entity.label
                 });
