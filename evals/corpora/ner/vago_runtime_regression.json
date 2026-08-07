@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "fixture_status": "runtime-regression",
+  "repository": "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER",
+  "languages": ["ru", "en", "mixed"],
+  "purpose": "Embedded runtime gate for unseen upstream revisions. Each case must extract without error (structural success). Reference scores are intentionally absent: unseen commits are never claimed as Python-parity verified.",
+  "cases": [
+    {
+      "id": "ru-1",
+      "language": "ru",
+      "text": "Иван Петров работает в компании Яндекс в Москве.",
+      "labels": ["person", "company", "location"]
+    },
+    {
+      "id": "ru-2",
+      "language": "ru",
+      "text": "Мария Иванова представила продукт СберБизнес на конференции AI Journey в Санкт-Петербурге.",
+      "labels": ["person", "product", "event", "location"]
+    },
+    {
+      "id": "en-1",
+      "language": "en",
+      "text": "Alice Smith from OpenAI presented the Surface Laptop 6 at Build 2026 in Seattle.",
+      "labels": ["person", "company", "product", "event", "location"]
+    },
+    {
+      "id": "en-2",
+      "language": "en",
+      "text": "At Cloud Summit 2026 in Berlin, Bob Jones and DeepMind compared Pixel 8 Pro with PostgreSQL.",
+      "labels": ["person", "company", "product", "event", "location", "technology"]
+    },
+    {
+      "id": "mixed-1",
+      "language": "mixed",
+      "text": "Иван Петров from Microsoft unveiled Surface Laptop 6 at Build 2026 in Seattle using Kubernetes.",
+      "labels": ["person", "company", "product", "event", "location", "technology"]
+    },
+    {
+      "id": "mixed-2",
+      "language": "mixed",
+      "text": "Наталья Смирнова of Yandex Cloud demoed сервис YandexGPT на AI Day в Москве.",
+      "labels": ["person", "company", "product", "event", "location"]
+    }
+  ]
+}

@@ -358,18 +358,36 @@ impl VagoLfm2EntityExtractor {
         Ok(permit)
     }
 
-    /// Loads the model, runs a fixed smoke extraction over a short RU/EN
-    /// mixed sentence, and installs the validated instance so the first real
-    /// extraction reuses it.
+    /// Loads the model, runs the embedded RU/EN/mixed runtime-regression
+    /// corpus, and installs the validated instance so the first real
+    /// extraction reuses it. Every corpus case must extract without error;
+    /// a structural failure marks the revision incompatible through the
+    /// caller's `record_incompatible` path.
     async fn probe_and_install(&self) -> Result<(), MemoryError> {
         let loader = Arc::clone(&self.loader);
         let loaded = self
             .model
             .get_or_load(move || Ok(Arc::new(loader.load()?)))
             .await?;
-        // Fixed smoke probe over a short English/Russian mixed sentence; any
-        // entity output is sufficient — the goal is architecture validation.
-        let _ = loaded.extract_inner("Alice Smith from Acme Corp");
+        let corpus: crate::service::model_artifacts::runtime::RuntimeCorpusFile =
+            serde_json::from_str(
+                crate::service::model_artifacts::runtime::RUNTIME_REGRESSION_CORPUS,
+            )
+            .map_err(|err| {
+                MemoryError::ConfigInvalid(format!(
+                    "embedded VAGO runtime corpus is invalid: {err}"
+                ))
+            })?;
+        for case in corpus.cases {
+            loaded
+                .extract_inner_with_labels(&case.text, &case.labels)
+                .map_err(|err| {
+                    MemoryError::Storage(format!(
+                        "VAGO runtime regression failed on `{}`: {err}",
+                        case.id
+                    ))
+                })?;
+        }
         self.model.install_loaded(loaded).await;
         Ok(())
     }

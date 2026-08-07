@@ -27,6 +27,32 @@ pub use state::{
     IncompatibilityRecord, PersistedArtifactState, RevisionState, persist_state, read_state,
 };
 
+/// Embedded RU/EN/mixed runtime-regression corpus for unseen upstream
+/// revisions: extraction must succeed structurally on every case. Reference
+/// scores are absent by design — unseen commits are never claimed as
+/// Python-parity verified (see `evals/corpora/ner/vago_release_parity.json`).
+pub mod runtime {
+    /// Compiled from `evals/corpora/ner/vago_runtime_regression.json` so the
+    /// gate ships inside the binary and cannot drift from the checked-in
+    /// corpus.
+    pub const RUNTIME_REGRESSION_CORPUS: &str =
+        include_str!("../../../../evals/corpora/ner/vago_runtime_regression.json");
+
+    #[derive(Debug, serde::Deserialize)]
+    pub struct RuntimeCorpusFile {
+        #[serde(default)]
+        pub cases: Vec<RuntimeCorpusCase>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    pub struct RuntimeCorpusCase {
+        pub id: String,
+        #[serde(default)]
+        pub labels: Vec<String>,
+        pub text: String,
+    }
+}
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;

@@ -8,6 +8,9 @@
 //! publish a successful nanosecond placeholder for an unavailable device.
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+use std::sync::Arc;
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use criterion::{Criterion, criterion_group, criterion_main};
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -52,8 +55,85 @@ fn bench_ner_apple_silicon_single_window(c: &mut Criterion) {
     });
 }
 
+/// Apple-Silicon VAGO extractor benchmark, fixture-gated: builds the native
+/// LFM2 GLiNER extractor on the Metal device when the 1.6 GB checkpoint is
+/// present locally, otherwise skips with a note (the bench file must still
+/// compile and run on machines without the fixture).
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-criterion_group!(benches, bench_ner_apple_silicon_single_window);
+fn bench_vago_apple_silicon_single_window(c: &mut Criterion) {
+    use memory_mcp::config::{
+        GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
+    };
+    use memory_mcp::logging::StdoutLogger;
+    use memory_mcp::service::{EntityExtractor, create_entity_extractor};
+
+    let fixture = std::path::PathBuf::from(format!(
+        "{}/../memory-mcp/tests/models/ner/VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER",
+        env!("CARGO_MANIFEST_DIR")
+    ));
+    if !fixture.join("pytorch_model.bin").is_file() {
+        eprintln!("VAGO Metal bench skipped: missing {}", fixture.display());
+        return;
+    }
+    let extractor: Arc<dyn EntityExtractor> = tokio::runtime::Runtime::new()
+        .expect("runtime")
+        .block_on(async {
+            let config = NerConfig {
+                extractor: NerExtractorConfig::SauerkrautLfm25(NativeGlinerConfig {
+                    model: ModelBackedNerConfig {
+                        cache_dir: Some(fixture),
+                        labels: vec![
+                            "person".to_string(),
+                            "company".to_string(),
+                            "location".to_string(),
+                            "product".to_string(),
+                            "event".to_string(),
+                            "technology".to_string(),
+                        ],
+                        threshold: Some(0.5),
+                        max_concurrency: 1,
+                        idle_unload_secs: 0,
+                    },
+                    batch_size: 1,
+                    max_batch_tokens: 1536,
+                    device: GlinerDeviceKind::Auto,
+                }),
+            };
+            create_entity_extractor(
+                &config,
+                env!("CARGO_MANIFEST_DIR"),
+                &StdoutLogger::new("error"),
+            )
+            .await
+            .expect("VAGO extractor must load")
+        });
+
+    let text = "Alice Smith from Acme Corp presented the quarterly revenue report.".to_string();
+    c.bench_function("vago_apple_silicon_single_window", |b| {
+        b.iter_custom(|iters| {
+            let start = std::time::Instant::now();
+            let rt = tokio::runtime::Runtime::new().expect("runtime");
+            for _ in 0..iters {
+                rt.block_on(async {
+                    criterion::black_box(
+                        extractor
+                            .extract_candidates(criterion::black_box(&text))
+                            .await
+                            .expect("extract"),
+                    );
+                });
+            }
+            start.elapsed()
+        });
+    });
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+criterion_group!(
+    benches,
+    bench_ner_apple_silicon_single_window,
+    bench_vago_apple_silicon_single_window
+);
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 criterion_main!(benches);

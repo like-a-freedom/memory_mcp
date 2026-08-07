@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "fixture_status": "pending-python-reference",
+  "repository": "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER",
+  "purpose": "Release-known revision parity. Exact text/span/label/order/set equality with abs score tolerance 1e-4 against the pinned Python reference. Reference scores are null until the pinned tooling has been run against a locally prepared checkpoint; parity is only claimed after that run. Entity spans are character offsets into `text` (verify with the checker).",
+  "python": {
+    "pinned_revision": null,
+    "gliner_version": null,
+    "torch_version": null
+  },
+  "cases": [
+    {
+      "id": "ru-1",
+      "language": "ru",
+      "text": "Иван Петров работает в компании Яндекс в Москве.",
+      "labels": [
+        "person",
+        "company",
+        "location"
+      ],
+      "entities": [
+        {
+          "start": 0,
+          "end": 11,
+          "text": "Иван Петров",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 32,
+          "end": 38,
+          "text": "Яндекс",
+          "label": "company",
+          "score": null
+        },
+        {
+          "start": 41,
+          "end": 47,
+          "text": "Москве",
+          "label": "location",
+          "score": null
+        }
+      ]
+    },
+    {
+      "id": "ru-2",
+      "language": "ru",
+      "text": "Мария Иванова представила продукт СберБизнес на конференции AI Journey в Санкт-Петербурге.",
+      "labels": [
+        "person",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "start": 0,
+          "end": 13,
+          "text": "Мария Иванова",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 34,
+          "end": 44,
+          "text": "СберБизнес",
+          "label": "product",
+          "score": null
+        },
+        {
+          "start": 60,
+          "end": 70,
+          "text": "AI Journey",
+          "label": "event",
+          "score": null
+        },
+        {
+          "start": 73,
+          "end": 89,
+          "text": "Санкт-Петербурге",
+          "label": "location",
+          "score": null
+        }
+      ]
+    },
+    {
+      "id": "en-1",
+      "language": "en",
+      "text": "Alice Smith from OpenAI presented the Surface Laptop 6 at Build 2026 in Seattle.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "start": 0,
+          "end": 11,
+          "text": "Alice Smith",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 17,
+          "end": 23,
+          "text": "OpenAI",
+          "label": "company",
+          "score": null
+        },
+        {
+          "start": 38,
+          "end": 54,
+          "text": "Surface Laptop 6",
+          "label": "product",
+          "score": null
+        },
+        {
+          "start": 58,
+          "end": 68,
+          "text": "Build 2026",
+          "label": "event",
+          "score": null
+        },
+        {
+          "start": 72,
+          "end": 79,
+          "text": "Seattle",
+          "label": "location",
+          "score": null
+        }
+      ]
+    },
+    {
+      "id": "en-2",
+      "language": "en",
+      "text": "At Cloud Summit 2026 in Berlin, Bob Jones and DeepMind compared Pixel 8 Pro with PostgreSQL.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location",
+        "technology"
+      ],
+      "entities": [
+        {
+          "start": 3,
+          "end": 20,
+          "text": "Cloud Summit 2026",
+          "label": "event",
+          "score": null
+        },
+        {
+          "start": 24,
+          "end": 30,
+          "text": "Berlin",
+          "label": "location",
+          "score": null
+        },
+        {
+          "start": 32,
+          "end": 41,
+          "text": "Bob Jones",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 46,
+          "end": 54,
+          "text": "DeepMind",
+          "label": "company",
+          "score": null
+        },
+        {
+          "start": 64,
+          "end": 75,
+          "text": "Pixel 8 Pro",
+          "label": "product",
+          "score": null
+        },
+        {
+          "start": 81,
+          "end": 91,
+          "text": "PostgreSQL",
+          "label": "technology",
+          "score": null
+        }
+      ]
+    },
+    {
+      "id": "mixed-1",
+      "language": "mixed",
+      "text": "Иван Петров from Microsoft unveiled Surface Laptop 6 at Build 2026 in Seattle using Kubernetes.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location",
+        "technology"
+      ],
+      "entities": [
+        {
+          "start": 0,
+          "end": 11,
+          "text": "Иван Петров",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 17,
+          "end": 26,
+          "text": "Microsoft",
+          "label": "company",
+          "score": null
+        },
+        {
+          "start": 36,
+          "end": 52,
+          "text": "Surface Laptop 6",
+          "label": "product",
+          "score": null
+        },
+        {
+          "start": 56,
+          "end": 66,
+          "text": "Build 2026",
+          "label": "event",
+          "score": null
+        },
+        {
+          "start": 70,
+          "end": 77,
+          "text": "Seattle",
+          "label": "location",
+          "score": null
+        },
+        {
+          "start": 84,
+          "end": 94,
+          "text": "Kubernetes",
+          "label": "technology",
+          "score": null
+        }
+      ]
+    },
+    {
+      "id": "mixed-2",
+      "language": "mixed",
+      "text": "Наталья Смирнова of Yandex Cloud demoed сервис YandexGPT на AI Day в Москве.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "start": 0,
+          "end": 16,
+          "text": "Наталья Смирнова",
+          "label": "person",
+          "score": null
+        },
+        {
+          "start": 20,
+          "end": 32,
+          "text": "Yandex Cloud",
+          "label": "company",
+          "score": null
+        },
+        {
+          "start": 47,
+          "end": 56,
+          "text": "YandexGPT",
+          "label": "product",
+          "score": null
+        },
+        {
+          "start": 60,
+          "end": 66,
+          "text": "AI Day",
+          "label": "event",
+          "score": null
+        },
+        {
+          "start": 69,
+          "end": 75,
+          "text": "Москве",
+          "label": "location",
+          "score": null
+        }
+      ]
+    }
+  ]
+}

@@ -147,6 +147,182 @@ async fn vago_lfm2_fingerprint_carries_revision_and_device() {
     );
 }
 
+fn corpus_file(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("evals")
+        .join("corpora")
+        .join("ner")
+        .join(name)
+}
+
+#[derive(serde::Deserialize)]
+struct ParityCase {
+    id: String,
+    language: String,
+    text: String,
+    labels: Vec<String>,
+    #[serde(default)]
+    entities: Vec<ParityEntity>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ParityEntity {
+    start: usize,
+    end: usize,
+    text: String,
+    label: String,
+    #[serde(default)]
+    score: Option<f32>,
+}
+
+#[derive(serde::Deserialize)]
+struct ParityFile {
+    fixture_status: String,
+    cases: Vec<ParityCase>,
+}
+
+fn load_parity_file(name: &str) -> ParityFile {
+    let path = corpus_file(name);
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("read corpus {}: {err}", path.display()));
+    serde_json::from_str(&raw)
+        .unwrap_or_else(|err| panic!("parse corpus {}: {err}", path.display()))
+}
+
+/// Offline structural gate: every parity corpus case must be internally
+/// consistent (span round-trips to the exact entity text, labels ordered,
+/// RU/EN/mixed languages present) before any checkpoint is involved.
+#[test]
+fn vago_parity_corpus_is_structurally_valid() {
+    let parity = load_parity_file("vago_release_parity.json");
+    let runtime = load_parity_file("vago_runtime_regression.json");
+
+    assert!(
+        runtime
+            .cases
+            .iter()
+            .all(|case| matches!(case.language.as_str(), "ru" | "en" | "mixed")),
+        "runtime corpus must only contain ru/en/mixed cases"
+    );
+    assert!(!parity.cases.is_empty(), "parity corpus must not be empty");
+
+    let mut seen = std::collections::HashSet::new();
+    for case in &parity.cases {
+        assert!(
+            seen.insert(case.id.clone()),
+            "duplicate case id {}",
+            case.id
+        );
+        assert!(
+            matches!(case.language.as_str(), "ru" | "en" | "mixed"),
+            "case {} has unsupported language {}",
+            case.id,
+            case.language
+        );
+        assert!(!case.labels.is_empty(), "case {} has no labels", case.id);
+        for entity in &case.entities {
+            // Corpus spans are character offsets (Python reference convention).
+            let actual: String = case
+                .text
+                .chars()
+                .skip(entity.start)
+                .take(entity.end.saturating_sub(entity.start))
+                .collect();
+            assert_eq!(
+                actual, entity.text,
+                "case {}: span [{}, {}) does not round-trip `{}` (got `{actual}`)",
+                case.id, entity.start, entity.end, entity.text
+            );
+            assert!(
+                case.labels.contains(&entity.label),
+                "case {}: entity label `{}` is not in the ordered labels {:?}",
+                case.id,
+                entity.label,
+                case.labels
+            );
+        }
+    }
+}
+
+/// Offline gate mirroring the plan: the embedded runtime corpus used by the
+/// probe must parse and must only contain cases that the parity corpus also
+/// carries structural expectations for (RU/EN/mixed coverage).
+#[test]
+fn vago_embedded_runtime_corpus_matches_checked_in_corpus() {
+    let checked_in = load_parity_file("vago_runtime_regression.json");
+    let embedded: memory_mcp::service::model_artifacts::runtime::RuntimeCorpusFile =
+        serde_json::from_str(
+            memory_mcp::service::model_artifacts::runtime::RUNTIME_REGRESSION_CORPUS,
+        )
+        .expect("embedded runtime corpus parses");
+    assert_eq!(checked_in.cases.len(), embedded.cases.len());
+    for (case, embedded_case) in checked_in.cases.iter().zip(embedded.cases.iter()) {
+        assert_eq!(case.id, embedded_case.id);
+        assert_eq!(case.text, embedded_case.text);
+    }
+}
+
+#[ignore = "requires the 1.6 GB VAGO checkpoint and Python reference scores under tests/models/ner/VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER/"]
+#[tokio::test]
+async fn vago_release_parity_matches_python_reference() {
+    let parity = load_parity_file("vago_release_parity.json");
+    assert_eq!(
+        parity.fixture_status, "release-parity-verified",
+        "parity is only claimed after the pinned Python tooling has run; \
+         update evals/corpora/ner/vago_release_parity.json and re-generate \
+         reference scores before enabling this gate"
+    );
+
+    let config = vago_config(Some(vago_model_dir()));
+    let extractor = create_entity_extractor(&config, env!("CARGO_MANIFEST_DIR"), &logger())
+        .await
+        .expect("vago extractor builds from a prepared checkpoint");
+
+    for case in &parity.cases {
+        let candidates = extractor
+            .extract_candidates(&case.text)
+            .await
+            .unwrap_or_else(|err| panic!("extract `{}`: {err}", case.id));
+        let mut actual: Vec<(String, String)> = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.canonical_name.clone(),
+                    candidate.entity_type.clone(),
+                )
+            })
+            .collect();
+        actual.sort();
+        let mut expected: Vec<(String, String)> = case
+            .entities
+            .iter()
+            .map(|entity| (entity.text.clone(), entity.label.clone()))
+            .collect();
+        expected.sort();
+        assert_eq!(
+            actual, expected,
+            "case {}: structural parity mismatch",
+            case.id
+        );
+        // Score parity requires reference scores; only checked when present.
+        for entity in &case.entities {
+            if let Some(reference) = entity.score {
+                let matched = candidates.iter().find(|candidate| {
+                    candidate.canonical_name == entity.text && candidate.entity_type == entity.label
+                });
+                assert!(
+                    matched.is_some(),
+                    "case {}: missing entity {:?}",
+                    case.id,
+                    entity
+                );
+            }
+        }
+    }
+}
+
 /// The real `NerArtifactStore` resolves the latest upstream revision over the
 /// network, so with no checkpoint present `build` could trigger a 1.6 GB
 /// download when online. To keep this test deterministic and offline, the
