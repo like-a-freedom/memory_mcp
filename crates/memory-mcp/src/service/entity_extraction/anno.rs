@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use anno::{Model, StackedNER};
+use anno::{HeuristicNER, Model, RegexNER, StackedNER};
 use async_trait::async_trait;
 
 use crate::models::EntityCandidate;
@@ -32,12 +32,17 @@ pub struct AnnoEntityExtractor {
 impl AnnoEntityExtractor {
     /// Creates a new anno-backed extractor.
     pub fn new() -> Result<Self, MemoryError> {
-        // In this repository `anno` is built with `default-features = false`, so
-        // `StackedNER::default()` stays on the dependency-light rule-based path.
-        // If we later switch to GLiNER/GLiNER2 with custom type labels, batch
-        // labels into groups of ~20-30 per `docs/BACKENDS.md` guidance.
+        // Build the dependency-light rule stack explicitly. With anno's
+        // `onnx` feature enabled, `StackedNER::default()` becomes
+        // cache- and download-sensitive (it probes BERT/NuNER/GLiNER ONNX
+        // backends through Hugging Face), which would break the
+        // zero-configuration download-free default. The explicit
+        // Regex + Heuristic stack is exactly what the pre-onnx default built.
         Ok(Self {
-            model: StackedNER::default(),
+            model: StackedNER::builder()
+                .layer(RegexNER::new())
+                .layer(HeuristicNER::new())
+                .build(),
         })
     }
 }

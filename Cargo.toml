@@ -9,7 +9,7 @@ rust-version = "1.88"
 license = "MIT"
 
 [workspace.dependencies]
-anno = { version = "0.11.0", default-features = false }
+anno = { version = "0.11.0", default-features = false, features = ["onnx"] }
 async-trait = "0.1.89"
 candle-core = { git = "https://github.com/huggingface/candle.git", rev = "21cca0b", default-features = false }
 candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "21cca0b", default-features = false }
