@@ -59,9 +59,9 @@ _Avoid_: Model, NER implementation, provider-specific extractor
 A concrete implementation of the Entity Extractor capability. Backends may differ in model family and execution strategy while preserving the same candidate semantics.
 _Avoid_: Model provider, public MCP tool
 
-**NER Provider**:
-The configured selection of an NER Backend. Provider selection is configuration, not a separate extraction capability.
-_Avoid_: Entity type, model checkpoint
+**Extractor Selection**:
+The configured choice of an Entity Extractor. A selection may name a lightweight backend or one supported model checkpoint; it is not a second extraction capability.
+_Avoid_: NER provider, generic model
 
 **Model Checkpoint**:
 A versioned set of model artifacts used by one NER Backend. A checkpoint is not assumed to be interchangeable with another checkpoint in the same model family.

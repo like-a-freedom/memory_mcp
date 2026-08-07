@@ -3,6 +3,7 @@
 ## Status
 
 Accepted (implemented in `crates/memory-mcp/src/service/entity_extraction.rs`).
+Amended by ADR-0036: the registry seam remains, while public provider/model configuration is replaced by typed extractor selection.
 
 ## Context
 
@@ -28,12 +29,13 @@ the kind and awaits the hook.
 
 ## Adding a new backend
 
-1. Create `crates/memory-mcp/src/service/entity_extraction/<name>.rs` implementing `EntityExtractor` and exposing `pub(crate) fn build(config: NerConfig, data_dir: String, logger: StdoutLogger) -> BackendBoxFuture`.
-2. Add a `NerProviderKind` variant and its `NER_PROVIDER` env alias (`config/ner.rs`).
-3. Add one `BackendSpec { kind, name, build }` entry to `backend_registry()`.
-4. Update the registry-size test in `entity_extraction.rs::tests`.
+The implemented extension steps below describe the pre-ADR-0036 configuration shape:
 
-No other dispatch sites exist; no framework changes are needed.
+1. Create `crates/memory-mcp/src/service/entity_extraction/<name>.rs` implementing `EntityExtractor` and exposing a backend build hook.
+2. Add the backend to the single registry dispatch table.
+3. Update the registry-size and dispatch tests.
+
+ADR-0036 removes the `NerProviderKind`/`NER_PROVIDER` extension step. New work must instead add one closed-catalog extractor selection and its typed configuration variant. A model-backed extractor also declares backend-owned artifact requirements consumed by the shared artifact lifecycle. No other dispatch sites should be introduced.
 
 ## Consequences
 

@@ -4,6 +4,7 @@
 Accepted (renumbered from duplicate ADR-0030 on 2026-08-07)
 
 Amended by: ADR-0034 for allocator and recommended idle-unload policy.
+Amended by: ADR-0036 generalizes the loaded-model lifecycle and renames `GLINER_IDLE_UNLOAD_SECS` to `NER_IDLE_UNLOAD_SECS` for all model-backed extractors.
 
 ## Context
 The GLiNER model (~1.1 GB f32 weights) is loaded eagerly at service startup
@@ -15,7 +16,7 @@ extract activity. 99% of usage is single-shot extract followed by long idle.
 ## Decision
 Load the GLiNER model lazily on first extraction for every configuration.
 Optionally unload it after N seconds of inactivity, controlled by
-`GLINER_IDLE_UNLOAD_SECS` (seconds). The default `0` disables idle unloading:
+`NER_IDLE_UNLOAD_SECS` (seconds; renamed by ADR-0036 from the original GLiNER-specific setting). The default `0` disables idle unloading:
 the model is still loaded on first extraction, then retained for the process
 lifetime. Implementation: a
 generic LazyModel<T> state machine (tokio Mutex + spawn_blocking load +

@@ -2,7 +2,7 @@
 
 > Status: Accepted
 > Date: 2026-08-06
-> Related: ADR-0016 (public surface freeze), ADR-0028, ADR-0029
+> Related: ADR-0016 (public surface freeze), ADR-0029, ADR-0036
 > Amends: ADR-0016 AD-2 and the frozen public-surface wording in `CONTEXT.md` and `docs/agent_integration/CONTRACT.md`.
 
 ## Context
@@ -35,5 +35,7 @@ on the target's authoritative documentation and format.
 
 ## Non-goals
 
-This command does not install the binary, download models, edit shell profiles,
-configure remote credentials, or claim that Anno/ML startup is dependency-free.
+This command does not install the binary, prepare or download extractor models,
+edit shell profiles, or configure remote credentials. ADR-0036 governs runtime
+extractor selection and model-backed startup; `init` remains deterministic and
+network-free regardless of the selected runtime extractor.
