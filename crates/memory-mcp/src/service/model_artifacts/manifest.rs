@@ -12,7 +12,7 @@ use crate::service::MemoryError;
 
 /// One artifact file required by an extractor.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ArtifactRequirement {
+pub struct ArtifactRequirement {
     /// Path relative to the checkpoint root, e.g. `pytorch_model.bin`.
     pub path: &'static str,
     /// Optional expected SHA-256; verified when present.
@@ -21,7 +21,7 @@ pub(crate) struct ArtifactRequirement {
 
 /// Everything needed to fetch and validate one extractor's artifacts.
 #[derive(Debug, Clone)]
-pub(crate) struct NerArtifactSpec {
+pub struct NerArtifactSpec {
     /// Stable extractor identity, e.g. `vago-lfm2.5-gliner`.
     pub extractor_id: &'static str,
     /// Hugging Face repository, e.g. `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`.
@@ -35,7 +35,7 @@ pub(crate) struct NerArtifactSpec {
 /// How trustworthy the resolved upstream revision is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum RevisionStatus {
+pub enum RevisionStatus {
     /// Upstream HEAD was resolved and verified this startup.
     Latest,
     /// Upstream was unreachable; a previously verified revision is in use.
@@ -47,7 +47,7 @@ pub(crate) enum RevisionStatus {
 /// How a revision was validated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ValidationStatus {
+pub enum ValidationStatus {
     /// Matches a release-known Python reference on RU/EN/mixed fixtures.
     ReleaseParityVerified,
     /// Passed the embedded RU/EN runtime regression corpus only.
@@ -56,7 +56,7 @@ pub(crate) enum ValidationStatus {
 
 /// A fully prepared, validated local checkpoint ready for a backend loader.
 #[derive(Debug, Clone)]
-pub(crate) struct PreparedCheckpoint {
+pub struct PreparedCheckpoint {
     /// Local root containing all required artifact files.
     pub root: std::path::PathBuf,
     /// Repository the checkpoint was resolved from.
@@ -75,7 +75,7 @@ pub(crate) struct PreparedCheckpoint {
 ///
 /// Entries are sorted by relative path; each is rendered as
 /// `path:size:sha256`. A missing or zero-byte required file is an error.
-pub(crate) fn artifact_identity(
+pub fn artifact_identity(
     root: &Path,
     requirements: &[ArtifactRequirement],
 ) -> Result<String, MemoryError> {

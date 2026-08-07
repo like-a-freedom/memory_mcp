@@ -17,12 +17,12 @@ const PROGRESS_BUCKET_PERCENT: u8 = 5;
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Schema version of the MCP JSON Lines progress event.
-pub(crate) const PROGRESS_SCHEMA_VERSION: u8 = 1;
+pub const PROGRESS_SCHEMA_VERSION: u8 = 1;
 
 /// Phase of artifact preparation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ModelProgressPhase {
+pub enum ModelProgressPhase {
     /// Resolving the upstream latest revision.
     Resolve,
     /// Waiting for a concurrent process to release the lease.
@@ -44,7 +44,7 @@ pub(crate) enum ModelProgressPhase {
 impl ModelProgressPhase {
     /// Stable lowercase name used in CLI rendering and log events.
     #[must_use]
-    pub(crate) fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Resolve => "resolve",
             Self::WaitForLease => "wait-for-lease",
@@ -60,7 +60,7 @@ impl ModelProgressPhase {
 
 /// One progress event on the domain stream.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub(crate) struct ModelProgressEvent {
+pub struct ModelProgressEvent {
     /// Schema version of this event shape.
     pub schema_version: u8,
     /// Stable extractor identity, e.g. `vago-lfm2.5-gliner`.
@@ -83,7 +83,7 @@ pub(crate) struct ModelProgressEvent {
 
 impl ModelProgressEvent {
     /// Creates a `started` event for a phase.
-    pub(crate) fn started(extractor: &str, phase: ModelProgressPhase) -> Self {
+    pub fn started(extractor: &str, phase: ModelProgressPhase) -> Self {
         Self {
             schema_version: PROGRESS_SCHEMA_VERSION,
             extractor: extractor.to_string(),
@@ -98,7 +98,7 @@ impl ModelProgressEvent {
     }
 
     /// Creates a `completed` event for a phase.
-    pub(crate) fn completed(
+    pub fn completed(
         extractor: &str,
         phase: ModelProgressPhase,
         message: impl Into<String>,
@@ -117,11 +117,7 @@ impl ModelProgressEvent {
     }
 
     /// Creates a `failed` event.
-    pub(crate) fn failed(
-        extractor: &str,
-        phase: ModelProgressPhase,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn failed(extractor: &str, phase: ModelProgressPhase, message: impl Into<String>) -> Self {
         Self {
             schema_version: PROGRESS_SCHEMA_VERSION,
             extractor: extractor.to_string(),
@@ -136,7 +132,7 @@ impl ModelProgressEvent {
     }
 
     /// Creates a download progress update event.
-    pub(crate) fn download(
+    pub fn download(
         extractor: &str,
         revision: Option<String>,
         downloaded_bytes: u64,
@@ -158,7 +154,7 @@ impl ModelProgressEvent {
 }
 
 /// Receives progress events. Sinks must be cheap and must not block.
-pub(crate) trait ModelProgressSink: Send + Sync {
+pub trait ModelProgressSink: Send + Sync {
     fn emit(&self, event: &ModelProgressEvent);
 }
 
@@ -169,12 +165,12 @@ impl<S: ModelProgressSink> ModelProgressSink for Arc<S> {
 }
 
 /// Writes one compact JSON object plus newline per event to stderr.
-pub(crate) struct JsonLineProgressSink {
+pub struct JsonLineProgressSink {
     writer: Mutex<std::io::Stderr>,
 }
 
 impl JsonLineProgressSink {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             writer: Mutex::new(std::io::stderr()),
         }
@@ -199,12 +195,13 @@ impl ModelProgressSink for JsonLineProgressSink {
 }
 
 /// Renders human-readable progress lines to stderr.
-pub(crate) struct CliProgressSink {
+/// Renders human-readable progress lines to stderr.
+pub struct CliProgressSink {
     writer: Mutex<std::io::Stderr>,
 }
 
 impl CliProgressSink {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             writer: Mutex::new(std::io::stderr()),
         }
@@ -240,7 +237,9 @@ impl ModelProgressSink for CliProgressSink {
 
 /// Throttles the domain stream: emits on phase change, completion or failure,
 /// each crossed 5% boundary, or after a five-second heartbeat with no change.
-pub(crate) struct ThrottledProgressSink<S: ModelProgressSink> {
+/// Throttles the domain stream: emits on phase change, completion or failure,
+/// each crossed 5% boundary, or after a five-second heartbeat with no change.
+pub struct ThrottledProgressSink<S: ModelProgressSink> {
     inner: S,
     last: Mutex<ThrottleState>,
 }
@@ -254,7 +253,7 @@ struct ThrottleState {
 }
 
 impl<S: ModelProgressSink> ThrottledProgressSink<S> {
-    pub(crate) fn new(inner: S) -> Self {
+    pub fn new(inner: S) -> Self {
         Self {
             inner,
             last: Mutex::new(ThrottleState::default()),
@@ -294,27 +293,31 @@ impl<S: ModelProgressSink> ModelProgressSink for ThrottledProgressSink<S> {
     }
 }
 
+/// Captures emitted events in memory (test and integration-test helper).
+#[derive(Default)]
+pub struct CapturingSink {
+    events: Mutex<Vec<ModelProgressEvent>>,
+}
+
+impl CapturingSink {
+    pub fn events(&self) -> Vec<ModelProgressEvent> {
+        self.events.lock().expect("events lock").clone()
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.events.lock().expect("events lock").len()
+    }
+}
+
+impl ModelProgressSink for CapturingSink {
+    fn emit(&self, event: &ModelProgressEvent) {
+        self.events.lock().expect("events lock").push(event.clone());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-
-    #[derive(Default)]
-    struct CapturingSink {
-        events: Mutex<Vec<ModelProgressEvent>>,
-    }
-
-    impl CapturingSink {
-        fn events(&self) -> Vec<ModelProgressEvent> {
-            self.events.lock().expect("events lock").clone()
-        }
-    }
-
-    impl ModelProgressSink for CapturingSink {
-        fn emit(&self, event: &ModelProgressEvent) {
-            self.events.lock().expect("events lock").push(event.clone());
-        }
-    }
 
     #[test]
     fn json_line_serializes_compact_single_line_with_schema_version() {

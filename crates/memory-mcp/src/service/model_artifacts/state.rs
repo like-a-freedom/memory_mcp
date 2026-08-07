@@ -12,11 +12,11 @@ use crate::service::MemoryError;
 use super::manifest::{RevisionStatus, ValidationStatus};
 
 /// Version of the persisted state schema.
-pub(crate) const STATE_SCHEMA_VERSION: u8 = 1;
+pub const STATE_SCHEMA_VERSION: u8 = 1;
 
 /// One revision's durable record.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct RevisionState {
+pub struct RevisionState {
     /// Resolved upstream revision (commit hash or tag).
     pub revision: String,
     /// Stable content identity over sorted `path:size:sha256` entries.
@@ -35,7 +35,7 @@ pub(crate) struct RevisionState {
 /// Why a revision was rejected, keyed by commit so it is not retried
 /// until upstream HEAD changes or the record is cleared.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct IncompatibilityRecord {
+pub struct IncompatibilityRecord {
     /// The rejected commit hash.
     pub commit: String,
     /// Reason recorded at rejection time.
@@ -46,7 +46,7 @@ pub(crate) struct IncompatibilityRecord {
 
 /// The full persisted state document.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub(crate) struct PersistedArtifactState {
+pub struct PersistedArtifactState {
     pub schema_version: u8,
     /// Most recent first; contains active + retained previous known-good entries.
     #[serde(default)]
@@ -55,7 +55,7 @@ pub(crate) struct PersistedArtifactState {
 
 impl PersistedArtifactState {
     /// Creates an empty state at the current schema version.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             schema_version: STATE_SCHEMA_VERSION,
             revisions: Vec::new(),
@@ -82,7 +82,7 @@ impl PersistedArtifactState {
 
 /// Reads and validates the persisted state, returning an empty state when
 /// the file is absent.
-pub(crate) fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
+pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -110,10 +110,7 @@ pub(crate) fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryEr
 }
 
 /// Persists state atomically: write a sibling temp file, `sync_all`, rename.
-pub(crate) fn persist_state(
-    path: &Path,
-    state: &PersistedArtifactState,
-) -> Result<(), MemoryError> {
+pub fn persist_state(path: &Path, state: &PersistedArtifactState) -> Result<(), MemoryError> {
     let parent = path.parent().ok_or_else(|| {
         MemoryError::Storage(format!(
             "artifact state path {} has no parent",

@@ -49,7 +49,8 @@ pub(crate) mod explanation;
 pub(crate) mod fact;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
-mod model_artifacts;
+#[doc(hidden)]
+pub mod model_artifacts;
 mod model_runtime;
 mod query;
 mod reembed;
