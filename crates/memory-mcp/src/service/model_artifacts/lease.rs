@@ -8,7 +8,6 @@
 //! otherwise waiters wait and report progress.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use crate::service::MemoryError;
 
@@ -83,7 +82,7 @@ impl Lease {
             }
         };
         use std::io::Write;
-        if let Err(err) = (&mut std::io::BufWriter::new(file)).write_all(&json) {
+        if let Err(err) = std::io::BufWriter::new(file).write_all(&json) {
             let _ = std::fs::remove_file(lease_path);
             return Err(MemoryError::Storage(format!(
                 "cannot write lease {}: {err}",
@@ -168,20 +167,6 @@ pub fn can_reclaim(record: &LeaseRecord, now: i64) -> bool {
         Some(false) => true,
         // Live owner, or liveness unknown: be conservative.
         Some(true) | None => false,
-    }
-}
-
-/// Waits for a lease that another live process holds, bounded by `timeout`.
-pub async fn wait_for_release(path: &Path, timeout: Duration) {
-    let deadline = tokio::time::Instant::now() + timeout;
-    loop {
-        if tokio::time::Instant::now() >= deadline {
-            return;
-        }
-        if !path.exists() {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 }
 

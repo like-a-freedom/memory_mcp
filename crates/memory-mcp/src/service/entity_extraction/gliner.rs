@@ -613,6 +613,43 @@ fn select_device(
 }
 
 impl GlinerEntityExtractor {
+    /// Constructs a classic GLiNER extractor from a prepared checkpoint.
+    pub(crate) fn new_with_checkpoint(
+        checkpoint: &crate::service::model_artifacts::PreparedCheckpoint,
+        native: &crate::config::NativeGlinerConfig,
+        logger: crate::logging::StdoutLogger,
+    ) -> Result<Self, MemoryError> {
+        Self::new_with_runtime(
+            &checkpoint.root,
+            native.model.labels.clone(),
+            native
+                .model
+                .threshold
+                .unwrap_or(crate::config::DEFAULT_NER_THRESHOLD),
+            native.batch_size,
+            native.max_batch_tokens,
+            native.model.max_concurrency,
+            native.device,
+            native.model.idle_unload_secs,
+            logger,
+        )
+    }
+
+    /// Constructs the model, runs a fixed smoke inference, and installs the
+    /// validated instance so the first real extraction reuses it.
+    async fn probe_and_install(&self) -> Result<(), MemoryError> {
+        let loader = Arc::clone(&self.loader);
+        let loaded = self
+            .model
+            .get_or_load(move || Ok(Arc::new(loader.load()?)))
+            .await?;
+        // Fixed smoke probe over a short English/Russian mixed sentence; any
+        // entity output is sufficient — the goal is architecture validation.
+        let _ = loaded.extract_inner("Alice Smith from Acme Corp");
+        self.model.install_loaded(loaded).await;
+        Ok(())
+    }
+
     pub fn new(model_dir: &Path, labels: Vec<String>, threshold: f64) -> Result<Self, MemoryError> {
         Self::new_with_logger(
             model_dir,
@@ -1417,10 +1454,33 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 }
 
-/// Builds the classic GLiNER backend: downloads/caches the fixed
-/// `urchade/gliner_multi-v2.1` model under the configured cache root, then
-/// constructs the extractor. Later tasks replace this direct download with
-/// prepared `PreparedCheckpoint`s from the shared artifact store.
+/// Classic GLiNER artifact requirements: DeBERTa weights, architecture config,
+/// and tokenizer, all from the fixed `urchade/gliner_multi-v2.1` repository.
+pub(crate) const CLASSIC_GLINER_SPEC: crate::service::model_artifacts::NerArtifactSpec =
+    crate::service::model_artifacts::NerArtifactSpec {
+        extractor_id: "gliner",
+        repository: crate::config::SELECTOR_CLASSIC_GLINER,
+        runtime_version: "gliner-multi-v2.1",
+        files: &[
+            crate::service::model_artifacts::ArtifactRequirement {
+                path: "model.safetensors",
+                sha256: None,
+            },
+            crate::service::model_artifacts::ArtifactRequirement {
+                path: "gliner_config.json",
+                sha256: None,
+            },
+            crate::service::model_artifacts::ArtifactRequirement {
+                path: "tokenizer.json",
+                sha256: None,
+            },
+        ],
+    };
+
+/// Builds the classic GLiNER backend: resolves and prepares the fixed
+/// `urchade/gliner_multi-v2.1` checkpoint through the shared artifact store,
+/// then constructs the extractor. A newly staged revision is probe-loaded and
+/// installed before activation so the first real extraction reuses it.
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
     context: super::NerBuildContext,
@@ -1432,34 +1492,50 @@ pub(crate) fn build(
             ));
         };
 
-        let model_dir = native.model.cache_dir.clone().unwrap_or_else(|| {
-            context
-                .data_dir
-                .join("models")
-                .join("ner")
-                .join("urchade--gliner_multi-v2.1")
-        });
-        let resolved_dir = crate::service::model_loader::ensure_gliner_model_cached(
-            crate::config::SELECTOR_CLASSIC_GLINER,
-            &model_dir,
-            &context.logger,
-        )
-        .await?;
+        let store_root = native
+            .model
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| context.data_dir.join("models").join("ner"));
+        let progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink> =
+            std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new());
+        let store = crate::service::model_artifacts::NerArtifactStore::new(store_root, progress)?;
+        let was_active = store.active_revision(&CLASSIC_GLINER_SPEC);
+        let checkpoint = store.prepare(&CLASSIC_GLINER_SPEC).await?;
 
-        Ok(std::sync::Arc::new(GlinerEntityExtractor::new_with_runtime(
-            &resolved_dir,
-            native.model.labels.clone(),
-            native
-                .model
-                .threshold
-                .unwrap_or(crate::config::DEFAULT_NER_THRESHOLD),
-            native.batch_size,
-            native.max_batch_tokens,
-            native.model.max_concurrency,
-            native.device,
-            native.model.idle_unload_secs,
-            context.logger,
-        )?) as std::sync::Arc<dyn EntityExtractor>)
+        let extractor = GlinerEntityExtractor::new_with_checkpoint(
+            &checkpoint,
+            &native,
+            context.logger.clone(),
+        )?;
+
+        // A newly staged revision must construct and pass a smoke inference
+        // before activation. The probe result is installed so the first real
+        // extraction reuses the validated model.
+        if was_active.as_deref() != Some(checkpoint.revision.as_str()) {
+            match extractor.probe_and_install().await {
+                Ok(()) => {}
+                Err(err) => {
+                    let fallback = store
+                        .record_incompatible(
+                            &CLASSIC_GLINER_SPEC,
+                            &checkpoint.revision,
+                            &err.to_string(),
+                        )
+                        .await?;
+                    let extractor = GlinerEntityExtractor::new_with_checkpoint(
+                        &fallback,
+                        &native,
+                        context.logger,
+                    )?;
+                    return Ok(
+                        std::sync::Arc::new(extractor) as std::sync::Arc<dyn EntityExtractor>
+                    );
+                }
+            }
+        }
+
+        Ok(std::sync::Arc::new(extractor) as std::sync::Arc<dyn EntityExtractor>)
     })
 }
 

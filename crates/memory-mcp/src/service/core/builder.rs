@@ -352,6 +352,7 @@ impl MemoryService {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_with_embedding_provider(
         db_client: Arc<dyn DbClient>,
         namespaces: Vec<String>,

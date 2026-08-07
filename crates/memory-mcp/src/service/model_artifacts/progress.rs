@@ -220,10 +220,8 @@ impl ModelProgressSink for CliProgressSink {
         if let Some(percent) = event.progress_percent {
             line.push_str(&format!(" {percent}%"));
         }
-        if let Some(bytes) = event.downloaded_bytes {
-            if let Some(total) = event.total_bytes {
-                line.push_str(&format!(" ({bytes}/{total} bytes)"));
-            }
+        if let (Some(bytes), Some(total)) = (event.downloaded_bytes, event.total_bytes) {
+            line.push_str(&format!(" ({bytes}/{total} bytes)"));
         }
         if let Some(message) = &event.message {
             line.push_str(": ");
@@ -321,7 +319,6 @@ mod tests {
 
     #[test]
     fn json_line_serializes_compact_single_line_with_schema_version() {
-        let sink = JsonLineProgressSink::new();
         // Rendering goes to stderr; the serialization shape is what we assert
         // via the same serializer the sink uses.
         let event = ModelProgressEvent::started("vago", ModelProgressPhase::Resolve);

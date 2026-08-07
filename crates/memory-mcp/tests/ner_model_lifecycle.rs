@@ -2,7 +2,6 @@
 //! and recovery. All collaborators are fakes; nothing here touches the
 //! network.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -10,7 +9,7 @@ use memory_mcp::config::{ModelBackedNerConfig, NativeGlinerConfig, NerConfig, Ne
 use memory_mcp::service::MemoryError;
 use memory_mcp::service::model_artifacts::{
     ArtifactFetcher, ArtifactRequirement, CapturingSink, Clock, ModelProgressSink, NerArtifactSpec,
-    NerArtifactStore, PreparedCheckpoint, RevisionResolver, SystemClock,
+    NerArtifactStore, RevisionResolver, SystemClock,
 };
 use tempfile::TempDir;
 
@@ -120,11 +119,9 @@ impl ArtifactFetcher for FakeFetcher {
         self.fetch_calls.fetch_add(1, Ordering::SeqCst);
         {
             let mut remaining = self.fail_after.lock().expect("fail_after lock");
-            if let Some(count) = remaining.as_mut() {
-                if *count > 0 {
-                    *count -= 1;
-                    return Err(MemoryError::Storage("download failed".to_string()));
-                }
+            if let Some(count) = remaining.as_mut().filter(|count| **count > 0) {
+                *count -= 1;
+                return Err(MemoryError::Storage("download failed".to_string()));
             }
         }
         if self.stall.load(Ordering::SeqCst) {

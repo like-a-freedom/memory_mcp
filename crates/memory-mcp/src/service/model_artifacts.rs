@@ -41,7 +41,6 @@ use download::{REVISION_RESOLVE_ATTEMPTS, REVISION_RESOLVE_BACKOFF, REVISION_RES
 /// `<root>/<extractor_id>/leases/`, state at
 /// `<root>/<extractor_id>/state.json`.
 struct ExtractorLayout {
-    root: PathBuf,
     revisions: PathBuf,
     staging: PathBuf,
     leases: PathBuf,
@@ -56,7 +55,6 @@ impl ExtractorLayout {
             staging: root.join("staging"),
             leases: root.join("leases"),
             state_path: root.join("state.json"),
-            root,
         }
     }
 
@@ -103,6 +101,17 @@ impl NerArtifactStore {
             progress,
             clock,
         }
+    }
+
+    /// Returns the currently activated (non-incompatible) revision for `spec`,
+    /// if any, from the persisted state.
+    pub fn active_revision(&self, spec: &NerArtifactSpec) -> Option<String> {
+        let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
+        read_state(&layout.state_path).ok().and_then(|state| {
+            state
+                .last_known_good()
+                .map(|record| record.revision.clone())
+        })
     }
 
     /// Prepares a fully validated local checkpoint for `spec`.
@@ -181,6 +190,11 @@ impl NerArtifactStore {
         let lease_path = layout.leases.join(format!("{latest}.json"));
         let staging = self.stage_path(&layout, &latest);
         let lease = loop {
+            // A concurrent process may have completed this revision while we
+            // waited for the lease; reuse it instead of downloading again.
+            if is_complete(&revision_dir, spec) {
+                return self.build_prepared(spec, &revision_dir, &latest, RevisionStatus::Latest);
+            }
             let record = LeaseRecord {
                 extractor: spec.extractor_id.to_string(),
                 revision: latest.clone(),
@@ -425,7 +439,7 @@ impl NerArtifactStore {
         });
         state
             .revisions
-            .sort_by(|a, b| b.activated_at.cmp(&a.activated_at));
+            .sort_by_key(|record| std::cmp::Reverse(record.activated_at));
         // Never evict active; keep active + one previous known-good.
         let mut kept = Vec::new();
         for record in state.revisions {
