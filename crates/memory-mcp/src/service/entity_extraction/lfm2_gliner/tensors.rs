@@ -323,7 +323,7 @@ pub(crate) fn tiny_weights(config: &Lfm2BiConfig) -> HashMap<String, Tensor> {
 
 /// Deterministic pseudo-random fill (seeded LCG) so tests are reproducible.
 #[cfg(test)]
-fn rand_tensor(shape: &[usize], scale: f32, device: &Device) -> Tensor {
+pub(crate) fn rand_tensor(shape: &[usize], scale: f32, device: &Device) -> Tensor {
     let count: usize = shape.iter().product();
     let values: Vec<f32> = (0..count)
         .map(|index| {
@@ -356,12 +356,14 @@ mod tests {
             layer_types: vec![LayerKind::Conv, LayerKind::FullAttention],
             max_width: 12,
             max_len: 32,
-            ent_token_id: 128_002,
-            sep_token_id: 128_003,
+            ent_token_id: 64_402,
+            sep_token_id: 64_403,
             class_token_index: 64_402,
             fuse_layers: true,
             num_post_fusion_layers: 1,
             num_rnn_layers: 1,
+            span_mode: "markerV1".to_string(),
+            subtoken_pooling: "first".to_string(),
         }
     }
 

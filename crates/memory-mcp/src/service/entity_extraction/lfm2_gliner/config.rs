@@ -5,10 +5,9 @@
 //! the native Candle backbone ([`super::model::Lfm2BiModel`]) and, in Task 9,
 //! by the span-decoding head.
 //
-// The whole surface is the Task 8 → Task 9 contract: nothing in this build step
-// calls `from_gliner_config` yet (the registry `build` hook wires it in
-// Task 9). Silence the dormant-code lint until then; the unit tests below
-// exercise everything.
+// Task 9 wires `from_gliner_config` into the checkpoint load path; the module
+// keeps a module-level lint allowance for the shared Task 8 → Task 9 contract
+// surface.
 #![allow(dead_code)]
 
 use serde_json::Value;
@@ -16,12 +15,12 @@ use serde_json::Value;
 use crate::service::MemoryError;
 
 /// Tokenizer-resolved GLiNER separator token IDs for the
-/// SauerkrautLM-LFM2.5-GLiNER checkpoint (`<<ENT>>` = 128002,
-/// `<<SEP>>` = 128003). The checkpoint's `gliner_config.json` carries only the
+/// SauerkrautLM-LFM2.5-GLiNER checkpoint (`<<ENT>>` = 64402,
+/// `<<SEP>>` = 64403). The checkpoint's `gliner_config.json` carries only the
 /// token *strings* (`ent_token` / `sep_token`); the numeric IDs come from the
 /// tokenizer, so these constants are the canonical fallback.
-pub(crate) const DEFAULT_ENT_TOKEN_ID: u32 = 128_002;
-pub(crate) const DEFAULT_SEP_TOKEN_ID: u32 = 128_003;
+pub(crate) const DEFAULT_ENT_TOKEN_ID: u32 = 64_402;
+pub(crate) const DEFAULT_SEP_TOKEN_ID: u32 = 64_403;
 
 /// Head-side defaults applied when `gliner_config.json` omits a field.
 const DEFAULT_MAX_WIDTH: usize = 12;
@@ -70,6 +69,11 @@ pub(crate) struct Lfm2BiConfig {
     pub(crate) fuse_layers: bool,
     pub(crate) num_post_fusion_layers: usize,
     pub(crate) num_rnn_layers: usize,
+    /// GLiNER span representation mode; this backend only supports `markerV1`.
+    pub(crate) span_mode: String,
+    /// Subtoken pooling for word embeddings; this backend only supports
+    /// `first` (gather the first subtoken).
+    pub(crate) subtoken_pooling: String,
 }
 
 impl Lfm2BiConfig {
@@ -178,6 +182,27 @@ impl Lfm2BiConfig {
         }
         let head_dim = hidden_size / num_attention_heads;
 
+        let span_mode = json
+            .get("span_mode")
+            .and_then(Value::as_str)
+            .unwrap_or("markerV1");
+        if span_mode != "markerV1" {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "gliner_config.json span_mode `{span_mode}` is unsupported; \
+                 this backend only supports markerV1"
+            )));
+        }
+        let subtoken_pooling = json
+            .get("subtoken_pooling")
+            .and_then(Value::as_str)
+            .unwrap_or("first");
+        if subtoken_pooling != "first" {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "gliner_config.json subtoken_pooling `{subtoken_pooling}` is unsupported; \
+                 this backend only supports first"
+            )));
+        }
+
         Ok(Self {
             vocab_size,
             hidden_size,
@@ -206,6 +231,8 @@ impl Lfm2BiConfig {
             num_post_fusion_layers: top_usize(json, "num_post_fusion_layers")
                 .unwrap_or(DEFAULT_POST_FUSION_LAYERS),
             num_rnn_layers: top_usize(json, "num_rnn_layers").unwrap_or(DEFAULT_RNN_LAYERS),
+            span_mode: span_mode.to_string(),
+            subtoken_pooling: subtoken_pooling.to_string(),
         })
     }
 }
@@ -405,12 +432,46 @@ mod tests {
         assert_eq!(config.conv_l_cache, 3);
         assert_eq!(config.max_width, 12);
         assert_eq!(config.max_len, 1024);
-        assert_eq!(config.ent_token_id, 128_002);
-        assert_eq!(config.sep_token_id, 128_003);
+        assert_eq!(config.ent_token_id, 64_402);
+        assert_eq!(config.sep_token_id, 64_403);
         assert_eq!(config.class_token_index, 64_402);
         assert!(config.fuse_layers);
         assert_eq!(config.num_post_fusion_layers, 1);
         assert_eq!(config.num_rnn_layers, 1);
+        assert_eq!(config.span_mode, "markerV1");
+        assert_eq!(config.subtoken_pooling, "first");
+    }
+
+    #[test]
+    fn unsupported_span_mode_is_rejected() {
+        let json: Value = serde_json::from_str(REAL_GLINER_CONFIG).expect("valid JSON literal");
+        let mut object = json.as_object().expect("config object").clone();
+        object.insert(
+            "span_mode".to_string(),
+            Value::String("markerV2".to_string()),
+        );
+        let error = Lfm2BiConfig::from_gliner_config(&Value::Object(object))
+            .expect_err("unsupported span_mode must fail");
+        assert!(
+            error.to_string().contains("markerV1"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn unsupported_subtoken_pooling_is_rejected() {
+        let json: Value = serde_json::from_str(REAL_GLINER_CONFIG).expect("valid JSON literal");
+        let mut object = json.as_object().expect("config object").clone();
+        object.insert(
+            "subtoken_pooling".to_string(),
+            Value::String("mean".to_string()),
+        );
+        let error = Lfm2BiConfig::from_gliner_config(&Value::Object(object))
+            .expect_err("unsupported subtoken_pooling must fail");
+        assert!(
+            error.to_string().contains("first"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

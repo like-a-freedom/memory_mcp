@@ -7,19 +7,27 @@
 //! - GQA with per-head RMSNorm and half-split RoPE,
 //! - squeeze-and-excitation `LayersFuser` over all per-layer hidden states.
 //!
-//! Span decoding and tokenization land in Task 9; this module only produces the
-//! fused encoder output `[batch, seq, hidden]`.
+//! Task 9 extends this module with the loaded runtime: tokenization, the
+//! GLiNER head (`rnn`, markerV1 span representations, prompt projection), and
+//! the windowed extraction pipeline over the fused encoder output.
 //
-// Dormant API until Task 9 wires the checkpoint load path (see `config.rs`).
+// The module keeps a module-level lint allowance for the shared Task 8 → Task 9
+// contract surface.
 #![allow(dead_code)]
 
 use std::sync::Mutex;
 
-use candle_core::{D, Device, Module, Tensor};
+use candle_core::{D, Device, IndexOp, Module, Tensor};
 use candle_nn::ops::{sigmoid, softmax};
-use candle_nn::{Conv1d, Conv1dConfig, Embedding, Linear, VarBuilder};
+use candle_nn::rnn::Direction;
+use candle_nn::{Conv1d, Conv1dConfig, Embedding, LSTM, LSTMConfig, Linear, RNN, VarBuilder};
+use tokenizers::{Encoding, Tokenizer};
+
+use crate::models::EntityCandidate;
+use crate::service::MemoryError;
 
 use super::config::{LayerKind, Lfm2BiConfig};
+use super::decode;
 use super::tensors;
 
 /// RMSNorm matching the upstream `Lfm2RMSNorm`: normalize over the last dim
@@ -499,9 +507,185 @@ impl Lfm2BiModel {
     }
 }
 
-/// Placeholder for the loaded LFM2 GLiNER runtime: Task 8 wires the backbone
-/// load path; Task 9 adds tokenization and span decoding on top.
+/// Bidirectional LSTM over word embeddings (upstream `rnn`). Forward and
+/// backward passes each use half the hidden size and are concatenated on the
+/// last dim — the classic GLiNER `BiLstmLayer` pattern. Candle's LSTM key
+/// names (`weight_ih_l0` / `weight_ih_l0_reverse`, ...) match the PyTorch
+/// bidirectional state dict exactly, so no key adaptation is needed.
 #[derive(Debug)]
+pub(crate) struct BiLstmLayer {
+    forward: LSTM,
+    backward: LSTM,
+}
+
+impl BiLstmLayer {
+    fn load(vb: VarBuilder, input_dim: usize, hidden_dim: usize) -> candle_core::Result<Self> {
+        if hidden_dim == 0 || !hidden_dim.is_multiple_of(2) {
+            return Err(candle_core::Error::Msg(
+                "VAGO rnn hidden size must be a positive even number".to_string(),
+            ));
+        }
+
+        let forward = candle_nn::lstm(
+            input_dim,
+            hidden_dim,
+            LSTMConfig {
+                direction: Direction::Forward,
+                ..Default::default()
+            },
+            vb.pp("lstm"),
+        )?;
+        let backward = candle_nn::lstm(
+            input_dim,
+            hidden_dim,
+            LSTMConfig {
+                direction: Direction::Backward,
+                ..Default::default()
+            },
+            vb.pp("lstm"),
+        )?;
+
+        Ok(Self { forward, backward })
+    }
+
+    fn reverse_time_axis(xs: &Tensor) -> candle_core::Result<Tensor> {
+        let seq_len = xs.dim(1)?;
+        let mut steps = Vec::with_capacity(seq_len);
+        for idx in (0..seq_len).rev() {
+            steps.push(xs.i((.., idx, ..))?.contiguous()?);
+        }
+
+        let refs = steps.iter().collect::<Vec<_>>();
+        Tensor::stack(&refs, 1)
+    }
+
+    fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
+        let xs = xs.unsqueeze(0)?;
+
+        let forward_states = self.forward.seq(&xs)?;
+        let forward_hidden = forward_states
+            .into_iter()
+            .map(|state| state.h)
+            .collect::<Vec<_>>();
+        let forward_refs = forward_hidden.iter().collect::<Vec<_>>();
+        let forward = Tensor::stack(&forward_refs, 1)?;
+
+        let reversed_xs = Self::reverse_time_axis(&xs)?;
+        let backward_states = self.backward.seq(&reversed_xs)?;
+        let mut backward_hidden = backward_states
+            .into_iter()
+            .map(|state| state.h)
+            .collect::<Vec<_>>();
+        backward_hidden.reverse();
+        let backward_refs = backward_hidden.iter().collect::<Vec<_>>();
+        let backward = Tensor::stack(&backward_refs, 1)?;
+
+        Tensor::cat(&[&forward, &backward], 2)?.squeeze(0)
+    }
+}
+
+/// Two-layer MLP matching upstream `create_projection_layer`:
+/// `Linear(in, 4*out), ReLU, Dropout, Linear(4*out, out)` — keys `0.*` and
+/// `3.*` under the module prefix (dropout is inference-inert).
+#[derive(Debug)]
+pub(crate) struct FeedForwardProjection {
+    input: candle_nn::Linear,
+    output: candle_nn::Linear,
+}
+
+impl FeedForwardProjection {
+    fn load(
+        vb: VarBuilder,
+        input_dim: usize,
+        hidden_dim: usize,
+        output_dim: usize,
+    ) -> candle_core::Result<Self> {
+        let input = candle_nn::linear(input_dim, hidden_dim, vb.pp("0"))?;
+        let output = candle_nn::linear(hidden_dim, output_dim, vb.pp("3"))?;
+        Ok(Self { input, output })
+    }
+
+    fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
+        let hidden = self.input.forward(xs)?.relu()?;
+        self.output.forward(&hidden)
+    }
+}
+
+/// `SpanMarkerV1` head (span_mode = "markerV1").
+///
+/// For each candidate span the upstream forward concatenates
+/// `[project_start(h)[start]; project_end(h)[end]; mean(h)]`, applies ReLU,
+/// and projects the triple back to `hidden_size`. The mean is taken over ALL
+/// word rows; `project_first` exists in the state dict but is NOT applied by
+/// the upstream forward (dead parameter), so it is not loaded here.
+#[derive(Debug)]
+pub(crate) struct SpanMarkerV1Layer {
+    project_start: FeedForwardProjection,
+    project_end: FeedForwardProjection,
+    out_project: FeedForwardProjection,
+}
+
+impl SpanMarkerV1Layer {
+    /// Loads from `span_rep_layer.span_rep_layer.*` (double nesting, exactly
+    /// like the classic backend). `out_project` consumes the concatenated
+    /// `3 * hidden_size` span feature and projects back to `hidden_size`.
+    fn load(vb: VarBuilder, hidden_size: usize) -> candle_core::Result<Self> {
+        let project_start = FeedForwardProjection::load(
+            vb.pp("project_start"),
+            hidden_size,
+            hidden_size * 4,
+            hidden_size,
+        )?;
+        let project_end = FeedForwardProjection::load(
+            vb.pp("project_end"),
+            hidden_size,
+            hidden_size * 4,
+            hidden_size,
+        )?;
+        let out_project = FeedForwardProjection::load(
+            vb.pp("out_project"),
+            hidden_size * 3,
+            hidden_size * 4,
+            hidden_size,
+        )?;
+        Ok(Self {
+            project_start,
+            project_end,
+            out_project,
+        })
+    }
+
+    /// markerV1 forward over already-gathered span start/end rows
+    /// (`[S, D]` each) plus the full word-hidden tensor for the mean row.
+    fn forward(
+        &self,
+        start_hidden: &Tensor,
+        end_hidden: &Tensor,
+        text_hidden: &Tensor,
+    ) -> candle_core::Result<Tensor> {
+        let hidden = start_hidden.dim(1)?;
+        let span_count = start_hidden.dim(0)?;
+        let average = text_hidden.mean(0)?;
+        let first = average.unsqueeze(0)?.expand((span_count, hidden))?;
+        let start = self.project_start.forward(start_hidden)?;
+        let end = self.project_end.forward(end_hidden)?;
+        let combined = Tensor::cat(&[&start, &end, &first], 1)?.relu()?;
+        self.out_project.forward(&combined)
+    }
+}
+
+/// One encoded input window: raw ids, per-token word ids, and the covered
+/// `[window_start, window_end)` slice of the split text words.
+struct EncodedWindow {
+    input_ids: Vec<u32>,
+    word_ids: Vec<Option<u32>>,
+    window_start: usize,
+    window_end: usize,
+}
+
+/// The fully loaded SauerkrautLM LFM2 GLiNER runtime: backbone, head, and
+/// tokenization state. Construction and inference are CPU-bound and blocking;
+/// callers run them on the blocking pool via `LoadedModel`.
 pub(crate) struct LoadedLfm2Gliner {
     /// Bidirectional LFM2 backbone with fused-layer output.
     pub(crate) model: Lfm2BiModel,
@@ -509,12 +693,501 @@ pub(crate) struct LoadedLfm2Gliner {
     pub(crate) config: Lfm2BiConfig,
     /// Device the model tensors live on.
     pub(crate) device: Device,
+    /// Checkpoint tokenizer.
+    pub(crate) tokenizer: Tokenizer,
+    /// Resolved `<<ENT>>` token id (== `class_token_index` for this checkpoint).
+    pub(crate) ent_token_id: u32,
+    /// Resolved `<<SEP>>` token id.
+    pub(crate) sep_token_id: u32,
+    /// Configured entity labels.
+    pub(crate) labels: Vec<String>,
+    /// Confidence threshold for span acceptance.
+    pub(crate) threshold: f64,
+    /// Bidirectional LSTM over word embeddings.
+    pub(crate) rnn: BiLstmLayer,
+    /// markerV1 span representation layer.
+    pub(crate) span_rep_layer: SpanMarkerV1Layer,
+    /// Prompt (label) representation projection.
+    pub(crate) prompt_rep_layer: FeedForwardProjection,
+    /// Structured logger.
+    pub(crate) logger: crate::logging::StdoutLogger,
+    /// Configured batch size (recorded; forwards run one window at a time).
+    pub(crate) batch_size: usize,
+    /// Configured max padded tokens per batch (recorded).
+    pub(crate) max_batch_tokens: usize,
+}
+
+impl std::fmt::Debug for LoadedLfm2Gliner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadedLfm2Gliner")
+            .field("config", &self.config)
+            .field("device", &self.device)
+            .field("labels", &self.labels)
+            .field("threshold", &self.threshold)
+            .finish()
+    }
+}
+
+impl LoadedLfm2Gliner {
+    /// Builds the full runtime from a root `VarBuilder` over the upstream
+    /// checkpoint, resolving the marker token ids from the tokenizer and
+    /// validating them against the parsed config.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_from_var_builder(
+        vb: VarBuilder,
+        tokenizer: Tokenizer,
+        config: Lfm2BiConfig,
+        labels: Vec<String>,
+        threshold: f64,
+        device: &Device,
+        logger: crate::logging::StdoutLogger,
+        batch_size: usize,
+        max_batch_tokens: usize,
+    ) -> Result<Self, MemoryError> {
+        if config.span_mode != "markerV1" {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "unsupported span_mode `{}`; VAGO backend only supports markerV1",
+                config.span_mode
+            )));
+        }
+        if config.subtoken_pooling != "first" {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "unsupported subtoken_pooling `{}`; VAGO backend only supports first",
+                config.subtoken_pooling
+            )));
+        }
+
+        // Resolve `<<ENT>>`/`<<SEP>>` from the tokenizer, falling back to the
+        // config constants, and require `<<ENT>>` to agree with
+        // `class_token_index` (prompt extraction matches rows by that id).
+        let ent_token_id = tokenizer
+            .token_to_id("<<ENT>>")
+            .unwrap_or(config.ent_token_id);
+        if ent_token_id != config.class_token_index {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "tokenizer <<ENT>> id {ent_token_id} disagrees with \
+                 gliner_config class_token_index {}",
+                config.class_token_index
+            )));
+        }
+        let sep_token_id = tokenizer
+            .token_to_id("<<SEP>>")
+            .unwrap_or(config.sep_token_id);
+
+        let model = Lfm2BiModel::load(vb.clone(), &config)
+            .map_err(|err| MemoryError::Storage(format!("failed to build LFM2 backbone: {err}")))?;
+        let rnn = BiLstmLayer::load(vb.pp("rnn"), config.hidden_size, config.hidden_size / 2)
+            .map_err(|err| MemoryError::Storage(format!("failed to load rnn: {err}")))?;
+        let span_rep_layer = SpanMarkerV1Layer::load(
+            vb.pp("span_rep_layer").pp("span_rep_layer"),
+            config.hidden_size,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load span_rep_layer: {err}")))?;
+        let prompt_rep_layer = FeedForwardProjection::load(
+            vb.pp("prompt_rep_layer"),
+            config.hidden_size,
+            config.hidden_size * 4,
+            config.hidden_size,
+        )
+        .map_err(|err| MemoryError::Storage(format!("failed to load prompt_rep_layer: {err}")))?;
+
+        Ok(Self {
+            model,
+            config,
+            device: device.clone(),
+            tokenizer,
+            ent_token_id,
+            sep_token_id,
+            labels,
+            threshold,
+            rnn,
+            span_rep_layer,
+            prompt_rep_layer,
+            logger,
+            batch_size,
+            max_batch_tokens,
+        })
+    }
+
+    /// Encodes the prompt plus the longest text-word prefix that fits into
+    /// `config.max_len` tokens, mirroring the classic window encoder.
+    fn encode_window(
+        &self,
+        prompt_words: &[String],
+        text_words: &[(String, (usize, usize))],
+        window_start: usize,
+    ) -> Result<(Encoding, usize), MemoryError> {
+        let mut last_fit = None;
+
+        for window_end in window_start + 1..=text_words.len() {
+            let mut input_words =
+                Vec::with_capacity(prompt_words.len() + window_end - window_start);
+            input_words.extend(prompt_words.iter().cloned());
+            input_words.extend(
+                text_words[window_start..window_end]
+                    .iter()
+                    .map(|(word, _)| word.clone()),
+            );
+
+            let encoding = self
+                .tokenizer
+                .encode(input_words, true)
+                .map_err(|err| MemoryError::Storage(format!("tokenization failed: {err}")))?;
+
+            if encoding.len() > self.config.max_len {
+                break;
+            }
+
+            last_fit = Some((encoding, window_end));
+        }
+
+        last_fit.ok_or_else(|| {
+            MemoryError::Storage(format!(
+                "VAGO GLiNER input window does not fit into max sequence length {}",
+                self.config.max_len
+            ))
+        })
+    }
+
+    /// Single-window forward pass (batch size 1) returning `[seq, hidden]`.
+    fn run_forward(&self, input_ids: &[u32]) -> Result<Tensor, MemoryError> {
+        // The LFM2 backbone expects an F32 0/1 mask (bi-mask math and padding
+        // scaling both broadcast against F32 hidden states).
+        let attention_mask = vec![1.0f32; input_ids.len()];
+
+        let input_ids = Tensor::new(input_ids, &self.device)
+            .map_err(|err| MemoryError::Storage(format!("tensor error: {err}")))?
+            .unsqueeze(0)
+            .map_err(|err| MemoryError::Storage(format!("unsqueeze error: {err}")))?;
+        let attention_mask = Tensor::new(attention_mask, &self.device)
+            .map_err(|err| MemoryError::Storage(format!("mask tensor error: {err}")))?
+            .unsqueeze(0)
+            .map_err(|err| MemoryError::Storage(format!("mask unsqueeze error: {err}")))?;
+
+        self.model
+            .forward(&input_ids, &attention_mask, &self.device)
+            .map_err(|err| MemoryError::Storage(format!("forward pass failed: {err}")))?
+            .squeeze(0)
+            .map_err(|err| MemoryError::Storage(format!("squeeze failed: {err}")))
+    }
+
+    /// Prompt marker positions: `input_ids[i] == ent_token_id` with a word id
+    /// inside the prompt (`word_id < prompt_word_count`).
+    fn collect_prompt_entity_positions(
+        &self,
+        input_ids: &[u32],
+        word_ids: &[Option<u32>],
+        prompt_word_count: usize,
+    ) -> Vec<usize> {
+        decode::collect_ent_token_positions(
+            input_ids,
+            word_ids,
+            self.ent_token_id,
+            prompt_word_count,
+        )
+    }
+
+    /// Gathers first-subtoken hidden rows for every text word, mirroring the
+    /// classic `extract_word_representations` (subtoken_pooling = "first").
+    fn extract_word_representations(
+        &self,
+        hidden: &Tensor,
+        word_ids: &[Option<u32>],
+        prompt_word_count: usize,
+        text_offsets: &[(usize, usize)],
+    ) -> Result<(Tensor, Vec<(usize, usize)>), MemoryError> {
+        let mut prev_word_id = None;
+        let mut word_states = Vec::new();
+        let mut word_offsets = Vec::new();
+
+        for (token_index, word_id) in word_ids.iter().enumerate() {
+            let Some(word_id) = *word_id else {
+                prev_word_id = None;
+                continue;
+            };
+
+            if Some(word_id) == prev_word_id {
+                continue;
+            }
+            prev_word_id = Some(word_id);
+
+            if word_id < prompt_word_count as u32 {
+                continue;
+            }
+
+            let text_word_index = (word_id as usize).saturating_sub(prompt_word_count);
+            if text_word_index >= text_offsets.len() {
+                continue;
+            }
+
+            let word_hidden = hidden
+                .narrow(0, token_index, 1)
+                .map_err(|err| MemoryError::Storage(format!("word narrow failed: {err}")))?
+                .squeeze(0)
+                .map_err(|err| MemoryError::Storage(format!("word squeeze failed: {err}")))?;
+            word_states.push(word_hidden);
+            word_offsets.push(text_offsets[text_word_index]);
+        }
+
+        if word_states.is_empty() {
+            return Err(MemoryError::Storage(
+                "VAGO tokenization produced no word-level text embeddings".to_string(),
+            ));
+        }
+
+        let word_state_refs = word_states.iter().collect::<Vec<_>>();
+        let word_tensor = Tensor::stack(&word_state_refs, 0)
+            .map_err(|err| MemoryError::Storage(format!("word stack failed: {err}")))?;
+
+        Ok((word_tensor, word_offsets))
+    }
+
+    /// Projects the hidden rows at the `<<ENT>>` prompt positions into label
+    /// representations `[C, D]`.
+    fn build_label_representations(
+        &self,
+        hidden: &Tensor,
+        entity_token_positions: &[usize],
+    ) -> Result<Tensor, MemoryError> {
+        let mut prompt_labels = Vec::with_capacity(entity_token_positions.len());
+
+        for &entity_pos in entity_token_positions {
+            let label_hidden = hidden
+                .narrow(0, entity_pos, 1)
+                .map_err(|err| MemoryError::Storage(format!("label narrow failed: {err}")))?
+                .squeeze(0)
+                .map_err(|err| MemoryError::Storage(format!("label squeeze failed: {err}")))?;
+            prompt_labels.push(label_hidden);
+        }
+
+        let prompt_label_refs = prompt_labels.iter().collect::<Vec<_>>();
+        let prompt_label_embeddings = Tensor::stack(&prompt_label_refs, 0)
+            .map_err(|err| MemoryError::Storage(format!("label stack failed: {err}")))?;
+
+        self.prompt_rep_layer
+            .forward(&prompt_label_embeddings)
+            .map_err(|err| MemoryError::Storage(format!("prompt projection failed: {err}")))
+    }
+
+    /// Enumerates spans over the LSTM-output word embeddings and computes the
+    /// markerV1 span representations `[S, D]` plus the matching `(start, end)`
+    /// word-index pairs.
+    fn compute_span_scores(
+        &self,
+        text_hidden: &Tensor,
+    ) -> Result<(Tensor, Vec<(usize, usize)>), MemoryError> {
+        let timer = std::time::Instant::now();
+        let text_len = text_hidden
+            .dim(0)
+            .map_err(|err| MemoryError::Storage(format!("dim error: {err}")))?;
+        let span_indices = decode::enumerate_span_indices(text_len, self.config.max_width);
+        if span_indices.is_empty() {
+            let empty = Tensor::zeros(
+                (0, self.config.hidden_size),
+                candle_core::DType::F32,
+                &self.device,
+            )
+            .map_err(|err| MemoryError::Storage(format!("empty span tensor: {err}")))?;
+            return Ok((empty, span_indices));
+        }
+
+        let starts = span_indices
+            .iter()
+            .map(|(start, _)| *start as u32)
+            .collect::<Vec<_>>();
+        let ends = span_indices
+            .iter()
+            .map(|(_, end)| *end as u32)
+            .collect::<Vec<_>>();
+        let start_indices = Tensor::new(starts.as_slice(), &self.device)
+            .map_err(|err| MemoryError::Storage(format!("start index tensor failed: {err}")))?;
+        let end_indices = Tensor::new(ends.as_slice(), &self.device)
+            .map_err(|err| MemoryError::Storage(format!("end index tensor failed: {err}")))?;
+        let start_hidden = text_hidden
+            .index_select(&start_indices, 0)
+            .map_err(|err| MemoryError::Storage(format!("start gather failed: {err}")))?;
+        let end_hidden = text_hidden
+            .index_select(&end_indices, 0)
+            .map_err(|err| MemoryError::Storage(format!("end gather failed: {err}")))?;
+        let span_representations = self
+            .span_rep_layer
+            .forward(&start_hidden, &end_hidden, text_hidden)
+            .map_err(|err| MemoryError::Storage(format!("span projection failed: {err}")))?;
+
+        self.logger.log(
+            crate::service::log_event(
+                "ner.vago.span_scores.done",
+                crate::service::log_args_with_duration(
+                    serde_json::json!({"text_words": text_len}),
+                    timer.elapsed(),
+                ),
+                serde_json::json!({"span_count": span_indices.len()}),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Debug,
+        );
+
+        Ok((span_representations, span_indices))
+    }
+
+    /// Scores every enumerated span against the label representations and
+    /// appends the thresholded entities to `all_spans`.
+    #[allow(clippy::too_many_arguments)]
+    fn decode_window(
+        &self,
+        text: &str,
+        text_words: &[(String, (usize, usize))],
+        labels: &[String],
+        prompt_word_count: usize,
+        window: &EncodedWindow,
+        hidden: &Tensor,
+        all_spans: &mut Vec<decode::ScoredEntity>,
+    ) -> Result<(), MemoryError> {
+        let entity_token_positions = self.collect_prompt_entity_positions(
+            &window.input_ids,
+            &window.word_ids,
+            prompt_word_count,
+        );
+        if entity_token_positions.len() != labels.len() {
+            return Err(MemoryError::Storage(format!(
+                "VAGO prompt extraction mismatch: expected {} entity tokens, found {}",
+                labels.len(),
+                entity_token_positions.len()
+            )));
+        }
+        let label_representations =
+            self.build_label_representations(hidden, &entity_token_positions)?;
+        let window_offsets = text_words[window.window_start..window.window_end]
+            .iter()
+            .map(|(_, offsets)| *offsets)
+            .collect::<Vec<_>>();
+        let (word_hidden, word_offsets) = self.extract_word_representations(
+            hidden,
+            &window.word_ids,
+            prompt_word_count,
+            &window_offsets,
+        )?;
+        let text_hidden = self
+            .rnn
+            .forward(&word_hidden)
+            .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
+        let (span_representations, span_indices) = self.compute_span_scores(&text_hidden)?;
+        let label_transposed = label_representations
+            .t()
+            .map_err(|err| MemoryError::Storage(format!("label transpose failed: {err}")))?;
+        let score_rows = span_representations
+            .matmul(&label_transposed)
+            .map_err(|err| MemoryError::Storage(format!("span score matmul failed: {err}")))?
+            .to_vec2::<f32>()
+            .map_err(|err| MemoryError::Storage(format!("span score transfer failed: {err}")))?;
+
+        let spans_data = span_indices
+            .into_iter()
+            .zip(score_rows)
+            .map(|((start, end), scores)| (start, end, scores))
+            .collect::<Vec<_>>();
+        all_spans.extend(decode::extract_spans(
+            text,
+            &spans_data,
+            &word_offsets,
+            labels,
+            self.threshold,
+        ));
+        Ok(())
+    }
+
+    /// Runs the windowed extraction pipeline over `text` with the configured
+    /// labels and returns deduplicated, sorted entity candidates.
+    pub(crate) fn extract_inner_with_labels(
+        &self,
+        text: &str,
+        labels: &[String],
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let text_words = decode::split_text_words(text);
+        if text_words.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let prompt_words = self.build_prompt_words_for_labels(labels);
+        let prompt_word_count = prompt_words.len();
+
+        let mut all_spans = Vec::new();
+        let mut window_start = 0;
+        while window_start < text_words.len() {
+            let (encoding, window_end) =
+                self.encode_window(&prompt_words, &text_words, window_start)?;
+            let window = EncodedWindow {
+                input_ids: encoding.get_ids().to_vec(),
+                word_ids: encoding.get_word_ids().to_vec(),
+                window_start,
+                window_end,
+            };
+            // KISS batching: one window per forward pass (batch size 1). The
+            // configured batch limits are validated and recorded but not yet
+            // used for packing; the classic `pack_window_batches` is
+            // `pub(super)` to the classic backend and cannot be reused.
+            let hidden = self.run_forward(&window.input_ids)?;
+            self.decode_window(
+                text,
+                &text_words,
+                labels,
+                prompt_word_count,
+                &window,
+                &hidden,
+                &mut all_spans,
+            )?;
+            if window_end >= text_words.len() {
+                break;
+            }
+            window_start = window_end.saturating_sub(1).max(window_start + 1);
+        }
+
+        let final_spans = decode::apply_nms(all_spans);
+        let mut candidates = final_spans
+            .into_iter()
+            .map(|span| EntityCandidate {
+                entity_type: span.label,
+                canonical_name: span.text,
+                aliases: Vec::new(),
+            })
+            .collect::<Vec<_>>();
+
+        candidates.sort_by(|left, right| left.canonical_name.cmp(&right.canonical_name));
+        candidates.dedup_by(|left, right| {
+            left.canonical_name == right.canonical_name && left.entity_type == right.entity_type
+        });
+
+        Ok(candidates)
+    }
+
+    /// Runs the pipeline with the configured labels.
+    pub(crate) fn extract_inner(&self, text: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        self.extract_inner_with_labels(text, &self.labels)
+    }
+
+    /// Builds the marker prompt: `[<<ENT>>, label, <<ENT>>, label, ..., <<SEP>>]`.
+    fn build_prompt_words_for_labels(&self, labels: &[String]) -> Vec<String> {
+        let ent_token = self
+            .tokenizer
+            .id_to_token(self.ent_token_id)
+            .unwrap_or_else(|| "<<ENT>>".to_string());
+        let mut prompt = Vec::with_capacity(labels.len() * 2 + 1);
+        for label in labels {
+            prompt.push(ent_token.clone());
+            prompt.push(label.clone());
+        }
+        prompt.push("<<SEP>>".to_string());
+        prompt
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use candle_core::{DType, IndexOp};
+    use std::collections::HashMap;
 
     fn tiny_config(fuse_layers: bool) -> Lfm2BiConfig {
         Lfm2BiConfig {
@@ -531,12 +1204,14 @@ mod tests {
             layer_types: vec![LayerKind::Conv, LayerKind::FullAttention],
             max_width: 12,
             max_len: 32,
-            ent_token_id: 128_002,
-            sep_token_id: 128_003,
+            ent_token_id: 64_402,
+            sep_token_id: 64_403,
             class_token_index: 64_402,
             fuse_layers,
             num_post_fusion_layers: 1,
             num_rnn_layers: 1,
+            span_mode: "markerV1".to_string(),
+            subtoken_pooling: "first".to_string(),
         }
     }
 
@@ -720,6 +1395,152 @@ mod tests {
             position_zero(&out_a),
             position_zero(&out_b),
             "masked padding must not affect position 0"
+        );
+    }
+
+    /// Tiny deterministic wordpiece tokenizer with the marker tokens, two
+    /// labels, and the test words. All ids stay below `tiny_config`'s
+    /// `vocab_size` (32).
+    fn tiny_vago_tokenizer() -> Tokenizer {
+        use tokenizers::models::wordpiece::WordPiece;
+        let vocab = [
+            ("<<ENT>>".to_string(), 0u32),
+            ("<<SEP>>".to_string(), 1),
+            ("[UNK]".to_string(), 2),
+            ("alice".to_string(), 3),
+            ("smith".to_string(), 4),
+            ("acme".to_string(), 5),
+            ("corp".to_string(), 6),
+            ("person".to_string(), 7),
+            ("company".to_string(), 8),
+        ];
+        let wordpiece = WordPiece::builder()
+            .vocab(vocab)
+            .unk_token("[UNK]".to_string())
+            .build()
+            .expect("wordpiece");
+        Tokenizer::new(wordpiece)
+    }
+
+    /// Inserts deterministic head weights (rnn + span_rep_layer +
+    /// prompt_rep_layer) into the tiny backbone state dict.
+    fn insert_head_weights(map: &mut HashMap<String, Tensor>, config: &Lfm2BiConfig) {
+        let device = &Device::Cpu;
+        let h = config.hidden_size;
+        let rnn_hidden = h / 2;
+
+        for suffix in ["", "_reverse"] {
+            map.insert(
+                format!("rnn.lstm.weight_ih_l0{suffix}"),
+                tensors::rand_tensor(&[4 * rnn_hidden, h], 0.5, device),
+            );
+            map.insert(
+                format!("rnn.lstm.weight_hh_l0{suffix}"),
+                tensors::rand_tensor(&[4 * rnn_hidden, rnn_hidden], 0.5, device),
+            );
+            map.insert(
+                format!("rnn.lstm.bias_ih_l0{suffix}"),
+                tensors::rand_tensor(&[4 * rnn_hidden], 0.5, device),
+            );
+            map.insert(
+                format!("rnn.lstm.bias_hh_l0{suffix}"),
+                tensors::rand_tensor(&[4 * rnn_hidden], 0.5, device),
+            );
+        }
+
+        let project =
+            |map: &mut HashMap<String, Tensor>, name: &str, input: usize, output: usize| {
+                let hidden = output * 4;
+                map.insert(
+                    format!("{name}.0.weight"),
+                    tensors::rand_tensor(&[hidden, input], 0.5, device),
+                );
+                map.insert(
+                    format!("{name}.0.bias"),
+                    tensors::rand_tensor(&[hidden], 0.5, device),
+                );
+                map.insert(
+                    format!("{name}.3.weight"),
+                    tensors::rand_tensor(&[output, hidden], 0.5, device),
+                );
+                map.insert(
+                    format!("{name}.3.bias"),
+                    tensors::rand_tensor(&[output], 0.5, device),
+                );
+            };
+        project(map, "span_rep_layer.span_rep_layer.project_start", h, h);
+        project(map, "span_rep_layer.span_rep_layer.project_end", h, h);
+        project(map, "span_rep_layer.span_rep_layer.out_project", 3 * h, h);
+        project(map, "prompt_rep_layer", h, h);
+    }
+
+    #[test]
+    fn extract_inner_runs_end_to_end_on_tiny_model() {
+        let device = Device::Cpu;
+        let tokenizer = tiny_vago_tokenizer();
+        let mut config = tiny_config(false);
+        config.class_token_index = tokenizer.token_to_id("<<ENT>>").unwrap();
+        config.ent_token_id = tokenizer.token_to_id("<<ENT>>").unwrap();
+        config.sep_token_id = tokenizer.token_to_id("<<SEP>>").unwrap();
+
+        let mut weights = tensors::tiny_weights(&config);
+        insert_head_weights(&mut weights, &config);
+        let vb = VarBuilder::from_tensors(weights, DType::F32, &device);
+
+        let loaded = LoadedLfm2Gliner::new_from_var_builder(
+            vb,
+            tokenizer,
+            config,
+            vec!["person".to_string(), "company".to_string()],
+            0.0,
+            &device,
+            crate::logging::StdoutLogger::new("error"),
+            1,
+            1536,
+        )
+        .expect("tiny runtime builds");
+
+        let candidates = loaded
+            .extract_inner("alice smith")
+            .expect("extraction runs");
+        assert!(!candidates.is_empty(), "expected entities, got none");
+        for candidate in &candidates {
+            assert!(
+                "alice smith".contains(&candidate.canonical_name),
+                "unexpected entity text {:?}",
+                candidate.canonical_name
+            );
+            assert!(
+                candidate.entity_type == "person" || candidate.entity_type == "company",
+                "unexpected entity type {:?}",
+                candidate.entity_type
+            );
+        }
+    }
+
+    #[test]
+    fn new_from_var_builder_rejects_ent_token_class_token_mismatch() {
+        let device = Device::Cpu;
+        let tokenizer = tiny_vago_tokenizer();
+        let config = tiny_config(false);
+        let weights = tensors::tiny_weights(&config);
+        let vb = VarBuilder::from_tensors(weights, DType::F32, &device);
+
+        let error = LoadedLfm2Gliner::new_from_var_builder(
+            vb,
+            tokenizer,
+            config,
+            vec!["person".to_string()],
+            0.5,
+            &device,
+            crate::logging::StdoutLogger::new("error"),
+            1,
+            1536,
+        )
+        .expect_err("class_token_index mismatch must fail");
+        assert!(
+            error.to_string().contains("class_token_index"),
+            "unexpected error: {error}"
         );
     }
 }

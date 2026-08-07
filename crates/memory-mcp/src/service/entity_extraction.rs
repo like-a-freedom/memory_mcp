@@ -19,6 +19,11 @@ mod regex;
 
 pub use anno::AnnoEntityExtractor;
 pub use gliner::GlinerEntityExtractor;
+// Task 9 contract: the concrete VAGO extractor type is publicly re-exported
+// from this module. `service.rs` will surface it in a later step, so the lint
+// cannot see a consumer yet.
+#[allow(unused_imports)]
+pub use lfm2_gliner::VagoLfm2EntityExtractor;
 pub use regex::RegexEntityExtractor;
 
 /// Extracts entity candidates from text.
