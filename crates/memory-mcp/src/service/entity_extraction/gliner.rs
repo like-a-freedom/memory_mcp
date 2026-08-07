@@ -1521,9 +1521,8 @@ pub(crate) fn build(
             .cache_dir
             .clone()
             .unwrap_or_else(|| context.data_dir.join("models").join("ner"));
-        let progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink> =
-            std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new());
-        let store = crate::service::model_artifacts::NerArtifactStore::new(store_root, progress)?;
+        let store =
+            crate::service::model_artifacts::NerArtifactStore::new(store_root, context.progress)?;
         let was_active = store.active_revision(&CLASSIC_GLINER_SPEC);
         let checkpoint = store.prepare(&CLASSIC_GLINER_SPEC).await?;
 

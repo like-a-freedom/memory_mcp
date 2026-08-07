@@ -68,15 +68,36 @@ pub async fn build_memory_service(
     logger: &StdoutLogger,
     mode: EmbeddingActivationMode,
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {
+    build_memory_service_with_progress(
+        logger,
+        mode,
+        std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new()),
+    )
+    .await
+}
+
+/// Builds a service with an explicit NER model-progress sink. MCP stdio uses
+/// the JSON-lines sink (stdout stays JSON-RPC-only); every CLI path uses the
+/// human-readable CLI sink.
+pub(crate) async fn build_memory_service_with_progress(
+    logger: &StdoutLogger,
+    mode: EmbeddingActivationMode,
+    ner_progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
+) -> Result<MemoryService, Box<dyn std::error::Error>> {
     crate::observability::install()
         .map_err(|err| log_and_return_error(logger, "main.observability_failed", err))?;
-    MemoryService::new_from_env_with_mode(mode)
+    MemoryService::new_from_env_with_mode_and_progress(mode, ner_progress)
         .await
         .map_err(|err| log_and_return_error(logger, "main.startup_failed", err))
 }
 
 pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::error::Error>> {
-    let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
+    let memory_service = build_memory_service_with_progress(
+        logger,
+        EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(crate::service::model_artifacts::JsonLineProgressSink::new()),
+    )
+    .await?;
     let claim_worker = memory_service.start_claim_workers().await;
     let lifecycle_worker = memory_service.start_lifecycle_worker().await;
     // Keep a handle for background-worker shutdown. The runtime is shared via

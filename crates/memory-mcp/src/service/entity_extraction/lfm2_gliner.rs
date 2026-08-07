@@ -22,8 +22,7 @@ use candle_nn::VarBuilder;
 use crate::config::{GlinerDeviceKind, NativeGlinerConfig, SELECTOR_SAUKRAUT_LFM25};
 use crate::models::EntityCandidate;
 use crate::service::model_artifacts::{
-    ArtifactRequirement, CliProgressSink, ModelProgressSink, NerArtifactSpec, NerArtifactStore,
-    PreparedCheckpoint,
+    ArtifactRequirement, NerArtifactSpec, NerArtifactStore, PreparedCheckpoint,
 };
 
 use super::{
@@ -469,8 +468,7 @@ pub(crate) fn build(
             .cache_dir
             .clone()
             .unwrap_or_else(|| context.data_dir.join("models").join("ner"));
-        let progress: Arc<dyn ModelProgressSink> = Arc::new(CliProgressSink::new());
-        let store = NerArtifactStore::new(store_root, progress)?;
+        let store = NerArtifactStore::new(store_root, context.progress)?;
         let was_active = store.active_revision(&VAGO_GLINER_SPEC);
         let checkpoint = store.prepare(&VAGO_GLINER_SPEC).await?;
 

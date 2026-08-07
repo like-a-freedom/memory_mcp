@@ -531,10 +531,10 @@ pub(crate) fn build(
             Some(dir) => dir,
             None => {
                 let store_root = context.data_dir.join("models").join("ner");
-                let progress: Arc<dyn crate::service::model_artifacts::ModelProgressSink> =
-                    Arc::new(crate::service::model_artifacts::CliProgressSink::new());
-                let store =
-                    crate::service::model_artifacts::NerArtifactStore::new(store_root, progress)?;
+                let store = crate::service::model_artifacts::NerArtifactStore::new(
+                    store_root,
+                    context.progress,
+                )?;
                 let checkpoint = store.prepare(&ANN_ONNX_SPEC).await?;
                 checkpoint.root
             }

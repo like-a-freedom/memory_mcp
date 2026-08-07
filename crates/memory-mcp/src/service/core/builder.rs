@@ -11,7 +11,7 @@ use crate::service::cache::CacheKey;
 use crate::service::embedding::{
     DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider_with_dimension,
 };
-use crate::service::entity_extraction::create_entity_extractor;
+use crate::service::entity_extraction::create_entity_extractor_with_progress;
 use crate::service::error::MemoryError;
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
@@ -113,6 +113,20 @@ impl MemoryService {
 
     pub(crate) async fn new_from_env_with_mode(
         mode: EmbeddingActivationMode,
+    ) -> Result<Self, MemoryError> {
+        Self::new_from_env_with_mode_and_progress(
+            mode,
+            std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new()),
+        )
+        .await
+    }
+
+    /// Creates a service with an explicit model-progress sink. MCP stdio
+    /// processes pass [`crate::service::model_artifacts::JsonLineProgressSink`]
+    /// so stdout stays JSON-RPC-only; CLI paths use the default human sink.
+    pub(crate) async fn new_from_env_with_mode_and_progress(
+        mode: EmbeddingActivationMode,
+        ner_progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
     ) -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
         let default_namespace = config
@@ -235,8 +249,13 @@ impl MemoryService {
             }
         };
 
-        let entity_extractor =
-            create_entity_extractor(&config.ner, &effective_data_dir, &startup_logger).await?;
+        let entity_extractor = create_entity_extractor_with_progress(
+            &config.ner,
+            &effective_data_dir,
+            &startup_logger,
+            ner_progress,
+        )
+        .await?;
 
         let mut service = Self::new_with_embedding_provider(
             db_client.clone(),

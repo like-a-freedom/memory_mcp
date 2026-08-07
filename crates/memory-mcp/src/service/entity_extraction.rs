@@ -162,6 +162,9 @@ pub(crate) type BackendBoxFuture =
 pub(crate) struct NerBuildContext {
     pub(crate) data_dir: std::path::PathBuf,
     pub(crate) logger: crate::logging::StdoutLogger,
+    /// Model-progress sink selected by the hosting process: JSON lines on
+    /// stderr for MCP stdio, human-readable lines on stderr for the CLI.
+    pub(crate) progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
 }
 
 impl Clone for NerBuildContext {
@@ -169,6 +172,7 @@ impl Clone for NerBuildContext {
         Self {
             data_dir: self.data_dir.clone(),
             logger: self.logger.clone(),
+            progress: self.progress.clone(),
         }
     }
 }
@@ -231,10 +235,43 @@ fn backend_registry() -> &'static [BackendSpec] {
 ///
 /// Returns an error when the selected extractor is unknown to the registry or
 /// the backend's own construction fails (invalid config, model load failure).
+/// Factory function to create an entity extractor from NER configuration.
+///
+/// Dispatches through [`backend_registry`] to the selected backend's `build`
+/// hook. This is the only extractor-dispatch point; no other code matches on
+/// `NerExtractorKind`. Uses the human-readable CLI progress sink; MCP stdio
+/// processes should call [`create_entity_extractor_with_progress`] with the
+/// JSON-lines sink instead.
+///
+/// # Errors
+///
+/// Returns an error when the selected extractor is unknown to the registry or
+/// the backend's own construction fails (invalid config, model load failure).
 pub async fn create_entity_extractor(
     config: &crate::config::NerConfig,
     data_dir: &str,
     logger: &crate::logging::StdoutLogger,
+) -> Result<Arc<dyn EntityExtractor>, MemoryError> {
+    create_entity_extractor_with_progress(
+        config,
+        data_dir,
+        logger,
+        std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new()),
+    )
+    .await
+}
+
+/// Extractor factory with an explicit model-progress sink.
+///
+/// The sink choice is a process concern: MCP stdio must keep stdout
+/// JSON-RPC-only, so [`crate::service::model_artifacts::JsonLineProgressSink`]
+/// writes to stderr; interactive CLI paths use
+/// [`crate::service::model_artifacts::CliProgressSink`].
+pub(crate) async fn create_entity_extractor_with_progress(
+    config: &crate::config::NerConfig,
+    data_dir: &str,
+    logger: &crate::logging::StdoutLogger,
+    progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
 ) -> Result<Arc<dyn EntityExtractor>, MemoryError> {
     let kind = config.extractor.kind();
     let spec = backend_registry()
@@ -251,6 +288,7 @@ pub async fn create_entity_extractor(
     let context = NerBuildContext {
         data_dir: std::path::PathBuf::from(data_dir),
         logger: logger.clone(),
+        progress,
     };
     (spec.build)(config.extractor.clone(), context).await
 }
