@@ -85,6 +85,8 @@ pub(crate) const ANN_ONNX_SPEC: NerArtifactSpec = NerArtifactSpec {
             sha256: None,
         },
     ],
+    companion_repository: None,
+    companion_files: &[],
 };
 
 /// Stable public selector/backend name for this extractor.

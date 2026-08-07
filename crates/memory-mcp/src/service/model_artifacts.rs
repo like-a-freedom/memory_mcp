@@ -260,6 +260,26 @@ impl NerArtifactStore {
                 return Err(err);
             }
         }
+        if let Some(companion) = spec.companion_repository {
+            let companion_revision = self.resolve_latest(companion).await?;
+            for requirement in spec.companion_files {
+                let target = staging.join(requirement.path);
+                if let Err(err) = self
+                    .fetcher
+                    .fetch(
+                        companion,
+                        &companion_revision,
+                        requirement,
+                        &target,
+                        self.progress.as_ref(),
+                    )
+                    .await
+                {
+                    let _ = std::fs::remove_dir_all(&staging);
+                    return Err(err);
+                }
+            }
+        }
         drop(lease); // release before verification; verification is local
         self.emit(&ModelProgressEvent::completed(
             spec.extractor_id,

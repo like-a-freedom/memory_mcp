@@ -11,7 +11,7 @@ use std::path::Path;
 use crate::service::MemoryError;
 
 /// One artifact file required by an extractor.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ArtifactRequirement {
     /// Path relative to the checkpoint root, e.g. `pytorch_model.bin`.
     pub path: &'static str,
@@ -28,8 +28,25 @@ pub struct NerArtifactSpec {
     pub repository: &'static str,
     /// Required files and their optional pinned checksums.
     pub files: &'static [ArtifactRequirement],
+    /// Optional companion repository for files that do not live in
+    /// `repository` (e.g. a base-model `tokenizer.json` referenced by the
+    /// model config). Companion files are fetched from the companion
+    /// repository's own HEAD, staged with the primary files, and included in
+    /// completeness and identity checks. The tokenizer is stable in practice,
+    /// so companion drift does not re-key the primary revision.
+    pub companion_repository: Option<&'static str>,
+    /// Files to fetch from `companion_repository` when it is set.
+    pub companion_files: &'static [ArtifactRequirement],
     /// Runtime/model-family version recorded in fingerprints.
     pub runtime_version: &'static str,
+}
+
+impl NerArtifactSpec {
+    /// All required files: primary plus companion. Used for completeness and
+    /// identity checks so a staged checkpoint cannot activate missing pieces.
+    pub fn all_requirements(&self) -> impl Iterator<Item = &ArtifactRequirement> {
+        self.files.iter().chain(self.companion_files.iter())
+    }
 }
 
 /// How trustworthy the resolved upstream revision is.

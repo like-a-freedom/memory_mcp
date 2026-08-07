@@ -1473,8 +1473,12 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 }
 
-/// Classic GLiNER artifact requirements: DeBERTa weights, architecture config,
-/// and tokenizer, all from the fixed `urchade/gliner_multi-v2.1` repository.
+/// Classic GLiNER artifact requirements: DeBERTa weights and architecture
+/// config from `urchade/gliner_multi-v2.1` (which ships no tokenizer), plus
+/// the mDeBERTa-v3 fast tokenizer named by the checkpoint's `model_name`
+/// (`microsoft/mdeberta-v3-base` ships only SentencePiece `spm.model`) as a
+/// companion source. `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` is the same
+/// base tokenizer published as a ready `tokenizer.json`.
 pub(crate) const CLASSIC_GLINER_SPEC: crate::service::model_artifacts::NerArtifactSpec =
     crate::service::model_artifacts::NerArtifactSpec {
         extractor_id: "gliner",
@@ -1489,11 +1493,12 @@ pub(crate) const CLASSIC_GLINER_SPEC: crate::service::model_artifacts::NerArtifa
                 path: "gliner_config.json",
                 sha256: None,
             },
-            crate::service::model_artifacts::ArtifactRequirement {
-                path: "tokenizer.json",
-                sha256: None,
-            },
         ],
+        companion_repository: Some("MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"),
+        companion_files: &[crate::service::model_artifacts::ArtifactRequirement {
+            path: "tokenizer.json",
+            sha256: None,
+        }],
     };
 
 /// Builds the classic GLiNER backend: resolves and prepares the fixed

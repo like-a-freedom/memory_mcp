@@ -46,7 +46,20 @@ fn test_spec() -> NerArtifactSpec {
                 sha256: None,
             },
         ],
+        companion_repository: None,
+        companion_files: &[],
     }
+}
+
+/// Spec with a companion tokenizer source from a second repository.
+fn companion_spec() -> NerArtifactSpec {
+    let mut spec = test_spec();
+    spec.companion_repository = Some("org/base-tokenizer");
+    spec.companion_files = &[ArtifactRequirement {
+        path: "tokenizer.json",
+        sha256: None,
+    }];
+    spec
 }
 
 /// A fake resolver whose behavior is controlled per test.
@@ -194,6 +207,22 @@ async fn prepare_reuses_complete_active_revision_without_fetching() {
         fetcher_handle.fetch_calls.load(Ordering::SeqCst),
         calls_before
     );
+}
+
+#[tokio::test]
+async fn prepare_fetches_companion_files_from_second_repository() {
+    let temp = TempDir::new().expect("temp dir");
+    let fetcher = Arc::new(FakeFetcher::new());
+    let (store, _, fetcher_handle) = make_store(&temp, FakeResolver::ok("abc123"), fetcher);
+    let checkpoint = store.prepare(&companion_spec()).await.expect("prepare");
+    // Primary files plus the companion tokenizer are staged and verified.
+    assert!(checkpoint.root.join("model.bin").is_file());
+    assert!(checkpoint.root.join("config.json").is_file());
+    assert!(checkpoint.root.join("tokenizer.json").is_file());
+    assert_eq!(checkpoint.artifact_identity.len(), 64);
+    // Primary files (2) + companion file (1); the companion repository HEAD is
+    // resolved and fetched separately.
+    assert_eq!(fetcher_handle.fetch_calls.load(Ordering::SeqCst), 3);
 }
 
 #[tokio::test]

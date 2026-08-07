@@ -72,6 +72,47 @@ fn local_gliner_model_dir() -> PathBuf {
         .join("urchade--gliner_multi-v2.1")
 }
 
+/// Current upstream HEAD of `urchade/gliner_multi-v2.1`, used as the seeded
+/// known-good revision so the artifact store reuses the local fixture instead
+/// of re-downloading the 1.1 GB checkpoint. If upstream HEAD ever moves, the
+/// first `--ignored` run re-downloads once and the store then caches it.
+const SEEDED_GLINER_REVISION: &str = "443d26d654e0324125a96bebd8e796c14ff2efe6";
+
+/// Seeds a store root with the local GLiNER fixture as a known-good revision.
+/// The store then resolves offline (resolve failure falls back to the seeded
+/// revision) or reuses it online when upstream HEAD still matches.
+fn seed_gliner_store(temp_dir: &TempDir) -> PathBuf {
+    use memory_mcp::service::model_artifacts::{
+        PersistedArtifactState, RevisionState, RevisionStatus, ValidationStatus, persist_state,
+    };
+
+    let store_root = temp_dir.path().join("ner-store");
+    let revision_dir = store_root
+        .join("gliner")
+        .join("revisions")
+        .join(SEEDED_GLINER_REVISION);
+    std::fs::create_dir_all(&revision_dir).expect("create seeded revision directory");
+    for file_name in GLINER_REQUIRED_FILES {
+        std::fs::copy(
+            local_gliner_model_dir().join(file_name),
+            revision_dir.join(file_name),
+        )
+        .expect("copy GLiNER fixture into seeded store");
+    }
+    let mut state = PersistedArtifactState::new();
+    state.revisions.push(RevisionState {
+        revision: SEEDED_GLINER_REVISION.to_string(),
+        artifact_identity: "seeded-local-fixture".to_string(),
+        validation_status: ValidationStatus::RuntimeRegressionVerified,
+        revision_status: RevisionStatus::Latest,
+        activated_at: 1_700_000_000,
+        incompatible: None,
+    });
+    persist_state(&store_root.join("gliner").join("state.json"), &state)
+        .expect("persist seeded artifact state");
+    store_root
+}
+
 fn local_candle_model_dir() -> PathBuf {
     repo_root()
         .join("tests")
@@ -197,7 +238,7 @@ fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>, threshold: f6
         ),
         (
             "NER_CACHE_DIR",
-            Some(local_gliner_model_dir().display().to_string()),
+            Some(seed_gliner_store(temp_dir).display().to_string()),
         ),
         ("NER_LABELS", labels.map(|labels| labels.join(","))),
         ("NER_THRESHOLD", Some(threshold.to_string())),
@@ -390,10 +431,11 @@ async fn local_gliner_extractor_supports_per_call_custom_labels() {
 async fn local_gliner_candidate_signatures_for_batch_size(
     batch_size: usize,
 ) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let seeded_dir = TempDir::new().expect("seeded store temp dir");
     let config = NerConfig {
         extractor: NerExtractorConfig::ClassicGliner(NativeGlinerConfig {
             model: ModelBackedNerConfig {
-                cache_dir: Some(local_gliner_model_dir()),
+                cache_dir: Some(seed_gliner_store(&seeded_dir)),
                 labels: supported_gliner_labels(),
                 threshold: Some(0.5),
                 max_concurrency: 1,

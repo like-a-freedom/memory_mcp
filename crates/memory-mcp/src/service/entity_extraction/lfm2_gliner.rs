@@ -59,6 +59,8 @@ pub(crate) const VAGO_GLINER_SPEC: NerArtifactSpec = NerArtifactSpec {
             sha256: None,
         },
     ],
+    companion_repository: None,
+    companion_files: &[],
 };
 
 /// Crate-visible constructor namespace for the native LFM2 GLiNER backend.
