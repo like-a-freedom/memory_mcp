@@ -1163,6 +1163,7 @@ mod tests {
             100,
             provider,
             DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service should build");
         service.current_embedding_signature = Some("embsig:new".to_string());

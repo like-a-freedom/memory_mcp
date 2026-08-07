@@ -434,15 +434,21 @@ mod tests {
         "EMBEDDINGS_MODEL",
         "EMBEDDINGS_BASE_URL",
         "EMBEDDINGS_API_KEY",
-        "NER_PROVIDER",
-        "NER_MODEL",
+        "NER_EXTRACTOR",
+        "NER_CACHE_DIR",
         "NER_LABELS",
         "NER_THRESHOLD",
+        "NER_MAX_CONCURRENCY",
+        "NER_IDLE_UNLOAD_SECS",
+        "GLINER_BATCH_SIZE",
+        "GLINER_MAX_BATCH_TOKENS",
+        "GLINER_DEVICE",
+        "NER_PROVIDER",
+        "NER_MODEL",
+        "NER_MODEL_DIR",
         "NER_BATCH_SIZE",
         "NER_MAX_BATCH_TOKENS",
-        "NER_MAX_CONCURRENCY",
         "NER_DEVICE",
-        "NER_MODEL_DIR",
         "GLINER_IDLE_UNLOAD_SECS",
         "XDG_DATA_HOME",
         "HOME",
@@ -675,10 +681,10 @@ mod tests {
         assert_eq!(config.namespaces, vec!["org"]);
         assert_eq!(config.username, "root");
         assert_eq!(config.password, "root");
-        assert_eq!(
-            config.ner.provider,
-            super::super::ner::NerProviderKind::Anno
-        );
+        assert!(matches!(
+            config.ner.extractor,
+            super::super::ner::NerExtractorConfig::Anno
+        ));
         assert_eq!(
             config.embedding.provider,
             super::super::embedding::EmbeddingProviderKind::Disabled
@@ -691,17 +697,17 @@ mod tests {
         let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
         clear_surreal_environment();
         unsafe {
-            env::set_var("NER_PROVIDER", "local-gliner");
+            env::set_var("NER_EXTRACTOR", super::super::ner::SELECTOR_CLASSIC_GLINER);
             env::set_var("EMBEDDINGS_ENABLED", "true");
             env::set_var("EMBEDDINGS_PROVIDER", "local-candle");
         }
 
         let config = SurrealConfig::from_env().expect("canonical provider overrides");
 
-        assert_eq!(
-            config.ner.provider,
-            super::super::ner::NerProviderKind::LocalGliner
-        );
+        assert!(matches!(
+            config.ner.extractor,
+            super::super::ner::NerExtractorConfig::ClassicGliner(_)
+        ));
         assert_eq!(
             config.embedding.provider,
             super::super::embedding::EmbeddingProviderKind::LocalCandle

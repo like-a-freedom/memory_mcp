@@ -33,7 +33,7 @@ impl StdioMcpProcess {
             .env("SURREALDB_USERNAME", "root")
             .env("SURREALDB_PASSWORD", "root")
             .env("EMBEDDINGS_ENABLED", "false")
-            .env("NER_PROVIDER", "anno")
+            .env("NER_EXTRACTOR", "anno")
             .env("RUST_LOG", "warn")
             .env_remove("SURREALDB_URL")
             .stdin(Stdio::piped())

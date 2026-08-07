@@ -1,9 +1,12 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use memory_mcp::config::{NerConfig, NerDeviceKind, NerProviderKind};
+use memory_mcp::config::{
+    GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
+};
 use memory_mcp::logging::StdoutLogger;
 use memory_mcp::service::capabilities::extract::ExtractCapability;
 use memory_mcp::service::capabilities::ingest::IngestCapability;
 use memory_mcp::service::{EntityExtractor, create_entity_extractor};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -12,20 +15,30 @@ use std::time::Instant;
 fn build_gliner_extractor() -> Arc<dyn EntityExtractor> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        let model_dir = PathBuf::from(format!(
+            "{}/../memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1",
+            env!("CARGO_MANIFEST_DIR")
+        ));
         let config = NerConfig {
-            provider: NerProviderKind::LocalGliner,
-            model: Some("urchade/gliner_multi-v2.1".to_string()),
-            model_dir: Some(format!(
-                "{}/../memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1",
-                env!("CARGO_MANIFEST_DIR")
-            )),
-            labels: NerConfig::default().labels,
-            threshold: 0.5,
-            batch_size: 1,
-            max_batch_tokens: 1536,
-            max_concurrency: 1,
-            device: NerDeviceKind::Cpu,
-            gliner_idle_unload_secs: 0,
+            extractor: NerExtractorConfig::ClassicGliner(NativeGlinerConfig {
+                model: ModelBackedNerConfig {
+                    cache_dir: Some(model_dir),
+                    labels: vec![
+                        "person".to_string(),
+                        "company".to_string(),
+                        "location".to_string(),
+                        "product".to_string(),
+                        "event".to_string(),
+                        "technology".to_string(),
+                    ],
+                    threshold: Some(0.5),
+                    max_concurrency: 1,
+                    idle_unload_secs: 0,
+                },
+                batch_size: 1,
+                max_batch_tokens: 1536,
+                device: GlinerDeviceKind::Cpu,
+            }),
         };
         create_entity_extractor(
             &config,

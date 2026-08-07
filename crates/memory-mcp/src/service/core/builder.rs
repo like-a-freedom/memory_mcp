@@ -246,6 +246,7 @@ impl MemoryService {
             100,
             embedding_provider,
             config.embedding.similarity_threshold,
+            entity_extractor,
         )?
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
@@ -253,7 +254,6 @@ impl MemoryService {
         service.current_embedding_signature = target.as_ref().map(|value| value.signature.clone());
         service.current_embedding_model = target.as_ref().and_then(|value| value.model.clone());
         service.current_embedding_dimension = target.as_ref().map(|value| value.dimension);
-        service.entity_extractor = entity_extractor;
 
         // Wire environment-driven claim configuration
         if let Ok(claim_config) = crate::config::claims::ClaimConfig::from_env() {
@@ -348,6 +348,7 @@ impl MemoryService {
             Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
+            Arc::new(AnnoEntityExtractor::new()?),
         )
     }
 
@@ -359,6 +360,7 @@ impl MemoryService {
         rate_limit_burst: i32,
         embedding_provider: Arc<dyn EmbeddingProvider>,
         embedding_similarity_threshold: f64,
+        entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
@@ -371,6 +373,7 @@ impl MemoryService {
                 embedding_similarity_threshold,
             },
             embedding_provider,
+            entity_extractor,
         )
     }
 
@@ -398,6 +401,7 @@ impl MemoryService {
             Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
+            Arc::new(AnnoEntityExtractor::new()?),
         )
     }
 
@@ -407,6 +411,7 @@ impl MemoryService {
         log_level: String,
         build_config: ServiceBuildConfig,
         embedding_provider: Arc<dyn EmbeddingProvider>,
+        entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         if namespaces.is_empty() {
             return Err(MemoryError::ConfigInvalid(
@@ -459,7 +464,7 @@ impl MemoryService {
             fact_service,
             explanation_service,
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
+            entity_extractor,
             embedding_provider,
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
             current_embedding_signature: None,

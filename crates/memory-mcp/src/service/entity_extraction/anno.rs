@@ -11,11 +11,15 @@ use super::{BackendBoxFuture, EntityExtractor, MemoryError};
 
 /// Builds the anno backend — no async work needed.
 pub(crate) fn build(
-    _config: crate::config::NerConfig,
-    _data_dir: String,
-    _logger: crate::logging::StdoutLogger,
+    config: crate::config::NerExtractorConfig,
+    _context: super::NerBuildContext,
 ) -> BackendBoxFuture {
-    Box::pin(async {
+    Box::pin(async move {
+        if !matches!(config, crate::config::NerExtractorConfig::Anno) {
+            return Err(MemoryError::ConfigInvalid(
+                "anno::build requires NER_EXTRACTOR=anno".to_string(),
+            ));
+        }
         Ok(std::sync::Arc::new(AnnoEntityExtractor::new()?) as std::sync::Arc<dyn EntityExtractor>)
     })
 }

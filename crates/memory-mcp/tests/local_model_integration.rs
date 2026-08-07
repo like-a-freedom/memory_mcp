@@ -6,7 +6,9 @@ use std::sync::LazyLock;
 
 use chrono::Utc;
 use memory_mcp::MemoryService;
-use memory_mcp::config::{NerConfig, NerDeviceKind, NerProviderKind};
+use memory_mcp::config::{
+    GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
+};
 use memory_mcp::logging::StdoutLogger;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
 use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
@@ -116,7 +118,14 @@ fn configure_embedded_env(temp_dir: &TempDir) -> Vec<(&'static str, Option<Strin
 }
 
 fn supported_gliner_labels() -> Vec<String> {
-    NerConfig::default().labels
+    vec![
+        "person".to_string(),
+        "company".to_string(),
+        "location".to_string(),
+        "product".to_string(),
+        "event".to_string(),
+        "technology".to_string(),
+    ]
 }
 
 type GlinerExpectedEntities = Vec<(&'static str, Vec<&'static str>)>;
@@ -182,15 +191,21 @@ fn assert_gliner_case_matrix_covers_supported_labels(cases: &[GlinerCoverageCase
 fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>, threshold: f64) -> EnvGuard {
     let mut pairs = configure_embedded_env(temp_dir);
     pairs.extend([
-        ("NER_PROVIDER", Some("local-gliner".to_string())),
-        ("NER_MODEL", Some("urchade/gliner_multi-v2.1".to_string())),
         (
-            "NER_MODEL_DIR",
+            "NER_EXTRACTOR",
+            Some("urchade/gliner_multi-v2.1".to_string()),
+        ),
+        (
+            "NER_CACHE_DIR",
             Some(local_gliner_model_dir().display().to_string()),
         ),
         ("NER_LABELS", labels.map(|labels| labels.join(","))),
         ("NER_THRESHOLD", Some(threshold.to_string())),
-        ("NER_BATCH_SIZE", Some("4".to_string())),
+        ("GLINER_BATCH_SIZE", Some("4".to_string())),
+        ("GLINER_MAX_BATCH_TOKENS", None),
+        ("GLINER_DEVICE", Some("cpu".to_string())),
+        ("NER_MAX_CONCURRENCY", None),
+        ("NER_IDLE_UNLOAD_SECS", None),
         ("EMBEDDINGS_ENABLED", Some("false".to_string())),
         ("EMBEDDINGS_PROVIDER", None),
         ("EMBEDDINGS_MODEL", None),
@@ -206,12 +221,11 @@ fn local_gliner_env(temp_dir: &TempDir, labels: Option<&[String]>, threshold: f6
 fn local_candle_env(temp_dir: &TempDir, similarity_threshold: f64) -> EnvGuard {
     let mut pairs = configure_embedded_env(temp_dir);
     pairs.extend([
-        ("NER_PROVIDER", Some("regex".to_string())),
-        ("NER_MODEL", None),
-        ("NER_MODEL_DIR", None),
+        ("NER_EXTRACTOR", Some("regex".to_string())),
+        ("NER_CACHE_DIR", None),
         ("NER_LABELS", None),
         ("NER_THRESHOLD", None),
-        ("NER_BATCH_SIZE", None),
+        ("GLINER_BATCH_SIZE", None),
         ("EMBEDDINGS_ENABLED", Some("true".to_string())),
         ("EMBEDDINGS_PROVIDER", Some("local-candle".to_string())),
         (
@@ -377,16 +391,18 @@ async fn local_gliner_candidate_signatures_for_batch_size(
     batch_size: usize,
 ) -> (Vec<(String, String)>, Vec<(String, String)>) {
     let config = NerConfig {
-        provider: NerProviderKind::LocalGliner,
-        model: Some("urchade/gliner_multi-v2.1".to_string()),
-        model_dir: Some(local_gliner_model_dir().display().to_string()),
-        labels: NerConfig::default().labels,
-        threshold: 0.5,
-        batch_size,
-        max_batch_tokens: 1536,
-        max_concurrency: 1,
-        device: NerDeviceKind::Cpu,
-        gliner_idle_unload_secs: 0,
+        extractor: NerExtractorConfig::ClassicGliner(NativeGlinerConfig {
+            model: ModelBackedNerConfig {
+                cache_dir: Some(local_gliner_model_dir()),
+                labels: supported_gliner_labels(),
+                threshold: Some(0.5),
+                max_concurrency: 1,
+                idle_unload_secs: 0,
+            },
+            batch_size,
+            max_batch_tokens: 1536,
+            device: GlinerDeviceKind::Cpu,
+        }),
     };
 
     let extractor = create_entity_extractor(

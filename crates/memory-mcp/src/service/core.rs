@@ -849,6 +849,7 @@ mod tests {
             100,
             Arc::new(StaticTestEmbeddingProvider::new()),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
 
@@ -903,6 +904,7 @@ mod tests {
             100,
             Arc::new(FlakyRemoteTestEmbeddingProvider::new(1)),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
         service.current_embedding_signature = Some("embsig:background-test".to_string());
@@ -972,6 +974,7 @@ mod tests {
             100,
             Arc::new(FlakyRemoteTestEmbeddingProvider::new(1)),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
         service.current_embedding_signature = Some("embsig:background-query-test".to_string());

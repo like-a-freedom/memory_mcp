@@ -21,25 +21,21 @@ pub const DEFAULT_QUERY_LOG_RETENTION_DAYS: u32 = 90;
 /// Default confidence threshold for local NER span acceptance.
 pub const DEFAULT_NER_THRESHOLD: f64 = 0.5;
 
-/// Default batch size for local CPU NER inference.
-///
-/// Uneven GLiNER windows make padding overhead larger than the amortized
-/// forward-pass overhead on the supported CPU profile. Larger batches remain
-/// available as an explicit, benchmark-driven override.
-pub const DEFAULT_NER_BATCH_SIZE: usize = 1;
+/// Default batch size for native GLiNER inference.
+pub const DEFAULT_GLINER_BATCH_SIZE: usize = 1;
 
-/// Default max padded tokens per NER batch.
-pub const DEFAULT_NER_MAX_BATCH_TOKENS: usize = 1536;
+/// Default max padded tokens per native GLiNER batch.
+pub const DEFAULT_GLINER_MAX_BATCH_TOKENS: usize = 1536;
 
-/// Default max concurrent local NER inference operations.
+/// Default max concurrent model-backed NER inference operations.
 pub const DEFAULT_NER_MAX_CONCURRENCY: usize = 1;
 
-/// Default idle timeout before unloading the GLiNER model (seconds).
+/// Default idle timeout before unloading a model-backed NER model (seconds).
 ///
 /// `0` disables idle unloading — the model stays loaded for the process
-/// lifetime (today's behavior). A positive value unloads the model after
-/// that many seconds without an extract (Ollama `keep_alive` style).
-pub const DEFAULT_GLINER_IDLE_UNLOAD_SECS: u64 = 0;
+/// lifetime. A positive value unloads the model after that many seconds
+/// without an extract.
+pub const DEFAULT_NER_IDLE_UNLOAD_SECS: u64 = 0;
 
 /// Default interval for confidence decay refresh (seconds).
 pub(crate) const DEFAULT_DECAY_INTERVAL_SECS: u64 = 3600;

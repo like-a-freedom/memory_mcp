@@ -12,11 +12,15 @@ use super::{BackendBoxFuture, EntityExtractor, MemoryError};
 
 /// Builds the regex backend — no async work needed.
 pub(crate) fn build(
-    _config: crate::config::NerConfig,
-    _data_dir: String,
-    _logger: crate::logging::StdoutLogger,
+    config: crate::config::NerExtractorConfig,
+    _context: super::NerBuildContext,
 ) -> BackendBoxFuture {
-    Box::pin(async {
+    Box::pin(async move {
+        if !matches!(config, crate::config::NerExtractorConfig::Regex) {
+            return Err(MemoryError::ConfigInvalid(
+                "regex::build requires NER_EXTRACTOR=regex".to_string(),
+            ));
+        }
         Ok(std::sync::Arc::new(RegexEntityExtractor::new()?)
             as std::sync::Arc<dyn EntityExtractor>)
     })

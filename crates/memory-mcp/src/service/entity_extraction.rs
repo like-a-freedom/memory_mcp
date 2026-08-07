@@ -11,8 +11,10 @@ use crate::models::EntityCandidate;
 use super::MemoryError;
 
 mod anno;
+mod anno_onnx;
 mod classifier;
 mod gliner;
+mod lfm2_gliner;
 mod regex;
 
 pub use anno::AnnoEntityExtractor;
@@ -97,40 +99,65 @@ impl EntityExtractor for LlmEntityExtractor {
 pub(crate) type BackendBoxFuture =
     Pin<Box<dyn Future<Output = Result<Arc<dyn EntityExtractor>, MemoryError>> + Send>>;
 
+/// Shared build inputs available to every backend constructor.
+pub(crate) struct NerBuildContext {
+    pub(crate) data_dir: std::path::PathBuf,
+    pub(crate) logger: crate::logging::StdoutLogger,
+}
+
+impl Clone for NerBuildContext {
+    fn clone(&self) -> Self {
+        Self {
+            data_dir: self.data_dir.clone(),
+            logger: self.logger.clone(),
+        }
+    }
+}
+
 /// Signature of a backend construction hook.
 pub(crate) type BackendBuildFn =
-    fn(crate::config::NerConfig, String, crate::logging::StdoutLogger) -> BackendBoxFuture;
+    fn(crate::config::NerExtractorConfig, NerBuildContext) -> BackendBoxFuture;
 
-/// One registered NER backend: its config kind, stable log name, and builder.
+/// One registered NER backend: its catalog kind, stable log name, and builder.
 struct BackendSpec {
-    kind: crate::config::NerProviderKind,
+    kind: crate::config::NerExtractorKind,
     name: &'static str,
     build: BackendBuildFn,
 }
 
-/// Static registry of all config-selectable NER backends.
+/// Static registry of all `NER_EXTRACTOR`-selectable backends.
 ///
-/// The LLM extractor is injected by code, not selected via `NerProviderKind`,
-/// so it is intentionally absent. To add a backend: implement `EntityExtractor`
-/// and a `build` hook in a new module, add a `NerProviderKind` variant, and
-/// append one entry here.
+/// The LLM extractor is injected by code rather than by configuration, so it
+/// is intentionally absent. Adding a backend: implement `EntityExtractor` and
+/// a `build` hook in a new module, extend `NerExtractorKind` and
+/// `NerExtractorConfig`, and append exactly one entry here.
 fn backend_registry() -> &'static [BackendSpec] {
-    use crate::config::NerProviderKind as Kind;
+    use crate::config::NerExtractorKind as Kind;
     &[
-        BackendSpec {
-            kind: Kind::Regex,
-            name: "regex",
-            build: regex::build,
-        },
         BackendSpec {
             kind: Kind::Anno,
             name: "anno",
             build: anno::build,
         },
         BackendSpec {
-            kind: Kind::LocalGliner,
+            kind: Kind::Regex,
+            name: "regex",
+            build: regex::build,
+        },
+        BackendSpec {
+            kind: Kind::AnnoOnnx,
+            name: "anno-onnx",
+            build: anno_onnx::build,
+        },
+        BackendSpec {
+            kind: Kind::ClassicGliner,
             name: "gliner",
             build: gliner::build,
+        },
+        BackendSpec {
+            kind: Kind::SauerkrautLfm25,
+            name: "sauerkraut-lfm2.5-gliner",
+            build: lfm2_gliner::build,
         },
     ]
 }
@@ -138,30 +165,35 @@ fn backend_registry() -> &'static [BackendSpec] {
 /// Factory function to create an entity extractor from NER configuration.
 ///
 /// Dispatches through [`backend_registry`] to the selected backend's `build`
-/// hook. This is the only provider-dispatch point; no other code matches on
-/// `NerProviderKind`.
+/// hook. This is the only extractor-dispatch point; no other code matches on
+/// `NerExtractorKind`.
 ///
 /// # Errors
 ///
-/// Returns an error when the selected provider is unknown to the registry or
+/// Returns an error when the selected extractor is unknown to the registry or
 /// the backend's own construction fails (invalid config, model load failure).
 pub async fn create_entity_extractor(
     config: &crate::config::NerConfig,
     data_dir: &str,
     logger: &crate::logging::StdoutLogger,
 ) -> Result<Arc<dyn EntityExtractor>, MemoryError> {
+    let kind = config.extractor.kind();
     let spec = backend_registry()
         .iter()
-        .find(|spec| spec.kind == config.provider)
+        .find(|spec| spec.kind == kind)
         .ok_or_else(|| {
             let known: Vec<&str> = backend_registry().iter().map(|s| s.name).collect();
             MemoryError::ConfigInvalid(format!(
-                "unsupported NER provider: {:?} (registered: {})",
-                config.provider,
+                "unsupported NER extractor: {:?} (registered: {})",
+                kind,
                 known.join(", ")
             ))
         })?;
-    (spec.build)(config.clone(), data_dir.to_string(), logger.clone()).await
+    let context = NerBuildContext {
+        data_dir: std::path::PathBuf::from(data_dir),
+        logger: logger.clone(),
+    };
+    (spec.build)(config.extractor.clone(), context).await
 }
 
 #[cfg(test)]
@@ -378,24 +410,43 @@ mod tests {
     }
 
     #[test]
-    fn registry_has_one_spec_per_config_dispatchable_provider_kind() {
-        // The LLM extractor is injected by code, not by config, so it has no
-        // NerProviderKind and no registry entry.
-        assert_eq!(backend_registry().len(), 3);
+    fn registry_has_one_spec_per_extractor_kind() {
+        let seen: std::collections::BTreeSet<_> =
+            backend_registry().iter().map(|spec| spec.kind).collect();
+        let expected: std::collections::BTreeSet<_> = [
+            crate::config::NerExtractorKind::Anno,
+            crate::config::NerExtractorKind::Regex,
+            crate::config::NerExtractorKind::AnnoOnnx,
+            crate::config::NerExtractorKind::ClassicGliner,
+            crate::config::NerExtractorKind::SauerkrautLfm25,
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(backend_registry().len(), 5);
+        assert_eq!(seen, expected);
     }
 
     #[test]
-    fn registry_names_match_backend_provider_names() {
-        for spec in backend_registry() {
-            assert!(matches!(spec.name, "regex" | "anno" | "gliner"));
-        }
+    fn registry_names_are_stable() {
+        let names: Vec<&str> = backend_registry().iter().map(|spec| spec.name).collect();
+        assert_eq!(
+            names,
+            vec![
+                "anno",
+                "regex",
+                "anno-onnx",
+                "gliner",
+                "sauerkraut-lfm2.5-gliner"
+            ]
+        );
     }
 
     #[tokio::test]
     async fn registry_dispatches_to_regex_backend() {
         let logger = crate::logging::StdoutLogger::new("error");
-        let mut config = crate::config::NerConfig::default();
-        config.provider = crate::config::NerProviderKind::Regex;
+        let config = crate::config::NerConfig {
+            extractor: crate::config::NerExtractorConfig::Regex,
+        };
         let extractor = create_entity_extractor(&config, "/tmp/memory-mcp-tests", &logger)
             .await
             .expect("regex extractor");
@@ -403,16 +454,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gliner_build_requires_model_name_when_provider_is_gliner() {
-        let mut config = crate::config::NerConfig::default();
-        config.provider = crate::config::NerProviderKind::LocalGliner;
-        config.model = None;
+    async fn anno_onnx_stub_fails_until_backend_is_implemented() {
         let logger = crate::logging::StdoutLogger::new("error");
+        let config = crate::config::NerConfig {
+            extractor: crate::config::NerExtractorConfig::AnnoOnnx(
+                crate::config::ModelBackedNerConfig {
+                    cache_dir: None,
+                    labels: vec!["person".to_string()],
+                    threshold: None,
+                    max_concurrency: 1,
+                    idle_unload_secs: 0,
+                },
+            ),
+        };
         let result = create_entity_extractor(&config, "/tmp/memory-mcp-tests", &logger).await;
         match result {
-            Err(MemoryError::ConfigInvalid(_)) => {}
+            Err(MemoryError::ConfigInvalid(message)) => {
+                assert!(message.contains("not implemented"));
+            }
             Err(other) => panic!("expected ConfigInvalid, got {other}"),
-            Ok(_) => panic!("expected Err when gliner model is missing"),
+            Ok(_) => panic!("anno-onnx backend must fail until implemented"),
         }
     }
 

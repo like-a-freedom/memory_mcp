@@ -1348,6 +1348,7 @@ mod tests {
             100,
             Arc::new(SemanticEmbeddingProvider),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
 

@@ -81,7 +81,7 @@ struct GlinerLoader {
     // is callable (validation + gate sizing happen there).
     #[allow(dead_code)]
     max_concurrency: usize,
-    device_kind: crate::config::NerDeviceKind,
+    device_kind: crate::config::GlinerDeviceKind,
     logger: crate::logging::StdoutLogger,
 }
 
@@ -554,15 +554,15 @@ fn log_selected_device(logger: &crate::logging::StdoutLogger, requested: &str, s
 }
 
 fn select_device(
-    kind: crate::config::NerDeviceKind,
+    kind: crate::config::GlinerDeviceKind,
     logger: &crate::logging::StdoutLogger,
 ) -> Result<Device, MemoryError> {
     match kind {
-        crate::config::NerDeviceKind::Cpu => {
+        crate::config::GlinerDeviceKind::Cpu => {
             log_selected_device(logger, "cpu", "cpu");
             Ok(Device::Cpu)
         }
-        crate::config::NerDeviceKind::Metal => {
+        crate::config::GlinerDeviceKind::Metal => {
             #[cfg(feature = "metal")]
             {
                 Device::new_metal(0)
@@ -576,11 +576,11 @@ fn select_device(
             #[cfg(not(feature = "metal"))]
             {
                 Err(MemoryError::ConfigInvalid(
-                    "NER_DEVICE=metal requires building with --features metal".to_string(),
+                    "GLINER_DEVICE=metal requires building with --features metal".to_string(),
                 ))
             }
         }
-        crate::config::NerDeviceKind::Auto => {
+        crate::config::GlinerDeviceKind::Auto => {
             #[cfg(feature = "metal")]
             {
                 match Device::new_metal(0) {
@@ -634,11 +634,11 @@ impl GlinerEntityExtractor {
             model_dir,
             labels,
             threshold,
-            crate::config::DEFAULT_NER_BATCH_SIZE,
-            crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
+            crate::config::DEFAULT_GLINER_BATCH_SIZE,
+            crate::config::DEFAULT_GLINER_MAX_BATCH_TOKENS,
             crate::config::DEFAULT_NER_MAX_CONCURRENCY,
-            crate::config::NerDeviceKind::Cpu,
-            crate::config::DEFAULT_GLINER_IDLE_UNLOAD_SECS,
+            crate::config::GlinerDeviceKind::Cpu,
+            crate::config::DEFAULT_NER_IDLE_UNLOAD_SECS,
             logger,
         )
     }
@@ -651,7 +651,7 @@ impl GlinerEntityExtractor {
         batch_size: usize,
         max_batch_tokens: usize,
         max_concurrency: usize,
-        device_kind: crate::config::NerDeviceKind,
+        device_kind: crate::config::GlinerDeviceKind,
         idle_unload_secs: u64,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
@@ -1419,36 +1419,48 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 }
 
-/// Builds the GLiNER backend: validates config, downloads/caches the model,
-/// and constructs the extractor. This is the only place GLiNER-specific
-/// loading logic lives.
+/// Builds the classic GLiNER backend: downloads/caches the fixed
+/// `urchade/gliner_multi-v2.1` model under the configured cache root, then
+/// constructs the extractor. Later tasks replace this direct download with
+/// prepared `PreparedCheckpoint`s from the shared artifact store.
 pub(crate) fn build(
-    config: crate::config::NerConfig,
-    data_dir: String,
-    logger: crate::logging::StdoutLogger,
+    config: crate::config::NerExtractorConfig,
+    context: super::NerBuildContext,
 ) -> super::BackendBoxFuture {
     Box::pin(async move {
-        let model = config.model.clone().ok_or_else(|| {
-            MemoryError::ConfigInvalid(
-                "NER_MODEL is required for local-gliner provider".to_string(),
-            )
-        })?;
+        let crate::config::NerExtractorConfig::ClassicGliner(native) = config else {
+            return Err(MemoryError::ConfigInvalid(
+                "gliner::build requires NER_EXTRACTOR=urchade/gliner_multi-v2.1".to_string(),
+            ));
+        };
 
-        let model_dir = std::path::PathBuf::from(config.model_dir_or_default(&data_dir));
-        let resolved_dir =
-            crate::service::model_loader::ensure_gliner_model_cached(&model, &model_dir, &logger)
-                .await?;
+        let model_dir = native.model.cache_dir.clone().unwrap_or_else(|| {
+            context
+                .data_dir
+                .join("models")
+                .join("ner")
+                .join("urchade--gliner_multi-v2.1")
+        });
+        let resolved_dir = crate::service::model_loader::ensure_gliner_model_cached(
+            crate::config::SELECTOR_CLASSIC_GLINER,
+            &model_dir,
+            &context.logger,
+        )
+        .await?;
 
         Ok(std::sync::Arc::new(GlinerEntityExtractor::new_with_runtime(
             &resolved_dir,
-            config.labels.clone(),
-            config.threshold,
-            config.batch_size,
-            config.max_batch_tokens,
-            config.max_concurrency,
-            config.device,
-            config.gliner_idle_unload_secs,
-            logger,
+            native.model.labels.clone(),
+            native
+                .model
+                .threshold
+                .unwrap_or(crate::config::DEFAULT_NER_THRESHOLD),
+            native.batch_size,
+            native.max_batch_tokens,
+            native.model.max_concurrency,
+            native.device,
+            native.model.idle_unload_secs,
+            context.logger,
         )?) as std::sync::Arc<dyn EntityExtractor>)
     })
 }

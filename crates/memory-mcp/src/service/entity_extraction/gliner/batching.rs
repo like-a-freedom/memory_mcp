@@ -85,9 +85,9 @@ mod tests {
             labels: labels.clone(),
             threshold: crate::config::DEFAULT_NER_THRESHOLD,
             batch_size: 1,
-            max_batch_tokens: crate::config::DEFAULT_NER_MAX_BATCH_TOKENS,
+            max_batch_tokens: crate::config::DEFAULT_GLINER_MAX_BATCH_TOKENS,
             max_concurrency: 1,
-            device_kind: crate::config::NerDeviceKind::Cpu,
+            device_kind: crate::config::GlinerDeviceKind::Cpu,
             logger: crate::logging::StdoutLogger::new("error"),
         };
         let extractor = loader.load().expect("load local GLiNER model");
