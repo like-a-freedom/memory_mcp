@@ -77,6 +77,108 @@ async fn test_service_ingest_and_extract_flow() {
     assert!(!result.facts.is_empty());
 }
 
+/// Selects append-only extraction projection rows for an episode, ordered by
+/// ingestion time so the earliest run is first.
+async fn select_extraction_projections(
+    db_client: &std::sync::Arc<memory_mcp::storage::SurrealDbClient>,
+    episode_id: &str,
+) -> Vec<Value> {
+    db_client
+        .query(
+            "SELECT * FROM entity_extraction_projection WHERE episode_id = $episode_id ORDER BY t_ingested",
+            Some(json!({ "episode_id": episode_id })),
+            "org",
+        )
+        .await
+        .expect("select projection rows should succeed")
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn extractor_fingerprint_projection() {
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let request = memory_mcp::models::IngestRequest {
+        source_type: "meeting".to_string(),
+        source_id: "fingerprint-projection-1".to_string(),
+        content: "Alice Inc and Bob Corp discussed the Atlas launch with Carol.".to_string(),
+        t_ref: Utc::now(),
+        scope: "org".to_string(),
+        project: None,
+        t_ingested: None,
+        visibility_scope: None,
+        policy_tags: vec![],
+    };
+
+    let episode_id = IngestCapability::ingest(&service.build_context(), request, None)
+        .await
+        .unwrap();
+    assert!(episode_id.starts_with("episode:"));
+
+    let first = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+        .await
+        .unwrap();
+    assert!(!first.entities.is_empty());
+
+    // One append-only projection row per successful extraction run.
+    let rows = select_extraction_projections(&db_client, &episode_id).await;
+    assert_eq!(
+        rows.len(),
+        1,
+        "first extraction must write one projection row"
+    );
+
+    let row = &rows[0];
+    assert_eq!(row["episode_id"].as_str(), Some(episode_id.as_str()));
+    assert_eq!(row["scope"].as_str(), Some("org"));
+    assert!(
+        !row["t_ingested"].is_null(),
+        "projection row must carry its ingestion timestamp"
+    );
+    assert_eq!(
+        row["fingerprint"]["selector"].as_str(),
+        Some("anno"),
+        "projection must record the extractor selector"
+    );
+    let entity_ids = row["entity_ids"].as_array().expect("entity_ids array");
+    assert!(
+        !entity_ids.is_empty(),
+        "projection must record the resolved entity ids"
+    );
+    assert!(entity_ids.iter().all(|id| id.is_string()));
+
+    let id_value = row.get("id").expect("projection row has a record id");
+    assert!(
+        serde_json::to_string(id_value)
+            .unwrap_or_default()
+            .contains("entity_extraction_projection"),
+        "projection record id must live in the projection table: {id_value}"
+    );
+
+    // Re-extracting appends a SECOND projection row; the first stays unchanged.
+    let _second = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+        .await
+        .unwrap();
+
+    let rows_after = select_extraction_projections(&db_client, &episode_id).await;
+    assert_eq!(
+        rows_after.len(),
+        2,
+        "second extraction must append a new projection row"
+    );
+    assert_eq!(
+        rows_after[0], rows[0],
+        "first projection row must remain unchanged (append-only)"
+    );
+    assert_ne!(
+        rows_after[0].get("id"),
+        rows_after[1].get("id"),
+        "projection rows must have distinct record ids"
+    );
+}
+
 #[tokio::test]
 async fn test_service_resolve_and_relate_entities() {
     let service = common::make_service().await;

@@ -95,6 +95,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "030_claim_reconciliation_hardening.surql",
             sql: include_str!("../../migrations/030_claim_reconciliation_hardening.surql"),
         },
+        MigrationScript {
+            file_name: "031_entity_extraction_projection.surql",
+            sql: include_str!("../../migrations/031_entity_extraction_projection.surql"),
+        },
     ]
 }
 
@@ -226,6 +230,16 @@ mod tests {
             migrations
                 .iter()
                 .any(|migration| migration.file_name == "028_procedural_memory.surql")
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_031_entity_extraction_projection() {
+        let migrations = versioned_migrations();
+        assert!(
+            migrations
+                .iter()
+                .any(|migration| migration.file_name == "031_entity_extraction_projection.surql")
         );
     }
 

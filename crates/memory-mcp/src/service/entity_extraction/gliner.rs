@@ -13,7 +13,7 @@ use tokenizers::{Encoding, Tokenizer};
 
 use crate::models::EntityCandidate;
 
-use super::{EntityExtractor, MemoryError};
+use super::{EntityExtractor, ExtractorFingerprint, MemoryError};
 
 mod batching;
 mod scoring;
@@ -1429,6 +1429,25 @@ impl std::fmt::Debug for GlinerEntityExtractor {
 impl EntityExtractor for GlinerEntityExtractor {
     fn provider_name(&self) -> &'static str {
         "gliner"
+    }
+
+    fn fingerprint(&self) -> ExtractorFingerprint {
+        ExtractorFingerprint {
+            selector: crate::config::SELECTOR_CLASSIC_GLINER.to_string(),
+            backend: "gliner".to_string(),
+            repository: Some(crate::config::SELECTOR_CLASSIC_GLINER.to_string()),
+            revision: None,
+            artifact_identity: None,
+            labels: super::anno_onnx::normalize_labels(&self.loader.labels),
+            threshold: Some(self.loader.threshold),
+            revision_status: None,
+            validation_status: None,
+            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
+            // The loaded device is not tracked on `GlinerLoader`; the effective
+            // device is intentionally reported as `None` rather than guessed
+            // from the requested device kind.
+            effective_device: None,
+        }
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {

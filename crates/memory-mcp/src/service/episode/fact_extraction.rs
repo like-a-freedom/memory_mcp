@@ -368,7 +368,14 @@ pub async fn extract_from_episode(
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
     let entity_extraction_content = sanitized_content_for_entity_extraction(&episode.content);
-    let entities = extract_entities(service, &entity_extraction_content, zero_shot_labels).await?;
+    let entities = extract_entities(
+        service,
+        episode_id,
+        &namespace,
+        &entity_extraction_content,
+        zero_shot_labels,
+    )
+    .await?;
     let fact_outcome = extract_facts(service, &episode, &entities).await?;
     let facts = fact_outcome.facts;
     let warnings = detect_contradiction_warnings(service, &facts, &namespace).await?;

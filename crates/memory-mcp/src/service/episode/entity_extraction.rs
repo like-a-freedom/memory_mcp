@@ -11,7 +11,13 @@ use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
 
 fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
-    matches!(provider, "anno" | "gliner")
+    // CPU/Metal-heavy local inference backends must not block the async
+    // runtime, so their extraction runs on the blocking pool. `anno` is
+    // retained for legacy rule-based extraction symmetry.
+    matches!(
+        provider,
+        "anno" | "gliner" | "anno-onnx" | "sauerkraut-lfm2.5-gliner"
+    )
 }
 
 /// Extract entities from content.
@@ -19,11 +25,16 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
 /// # Arguments
 ///
 /// * `service` - The memory service containing the entity extractor.
+/// * `episode_id` - The episode being extracted; recorded on the append-only
+///   extraction projection row written after a successful run.
+/// * `namespace` - The persistence namespace for the episode and projection.
 /// * `content` - The text content to extract entities from.
 /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
 ///   When provided, these labels override the default NER configuration.
 pub async fn extract_entities(
     service: &ServiceContext,
+    episode_id: &str,
+    namespace: &str,
     content: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
@@ -133,7 +144,72 @@ pub async fn extract_entities(
         }
     }
 
+    persist_extraction_projection(service, episode_id, namespace, &entities).await?;
+
     Ok(entities)
+}
+
+/// Persists one append-only projection row for a successful extraction run.
+///
+/// The row records the resolved entity ids and the durable extractor
+/// fingerprint that produced them. Rows are never updated or deleted: repeated
+/// extractions of the same episode accumulate rows, each keyed by its ingestion
+/// timestamp. Historical outputs therefore stay attributable to the exact
+/// extractor selector, backend, labels, and threshold.
+pub(super) async fn persist_extraction_projection(
+    service: &ServiceContext,
+    episode_id: &str,
+    namespace: &str,
+    entities: &[ExtractedEntity],
+) -> Result<(), MemoryError> {
+    let ingested_at = crate::service::now();
+    let fingerprint = service.entity_extractor.fingerprint();
+    let fingerprint_value = serde_json::to_value(&fingerprint).map_err(|err| {
+        MemoryError::Storage(format!("failed to serialize extractor fingerprint: {err}"))
+    })?;
+
+    let entity_ids = entities
+        .iter()
+        .map(|entity| entity.entity_id.clone())
+        .collect::<Vec<_>>();
+
+    // Record id: `entity_extraction_projection:<episode-key>:<projection-id>`.
+    // The projection suffix is deterministic over the episode, scope, and
+    // ingestion timestamp, so each extraction run appends a distinct row.
+    let episode_key = episode_id.strip_prefix("episode:").unwrap_or(episode_id);
+    let projection_suffix = crate::service::ids::hash_prefix(&format!(
+        "{episode_id}|{namespace}|{}|{}",
+        crate::service::normalize_dt(ingested_at),
+        fingerprint.selector,
+    ));
+    // `⟨...⟩` keeps the two-part record body a single id string.
+    let record_body = format!("{episode_key}:{projection_suffix}");
+
+    // Written through the episode store so no raw SurrealDB queries leak into
+    // tools. `type::datetime(...)` mirrors the query builder's temporal-field
+    // handling for `episode`/`fact`/`edge`: SurrealDB does not coerce RFC3339
+    // strings into `datetime`-typed schema fields.
+    let sql = format!(
+        "CREATE entity_extraction_projection:⟨{record_body}⟩ SET \
+         episode_id = $episode_id, scope = $scope, \
+         t_ingested = type::datetime($t_ingested), t_created = type::datetime($t_created), \
+         fingerprint = $fingerprint, entity_ids = $entity_ids RETURN *"
+    );
+    let vars = serde_json::json!({
+        "episode_id": episode_id,
+        "scope": namespace,
+        "t_ingested": crate::service::normalize_dt(ingested_at),
+        "t_created": crate::service::normalize_dt(ingested_at),
+        "fingerprint": fingerprint_value,
+        "entity_ids": entity_ids,
+    });
+
+    service
+        .episode_store()
+        .query(&sql, Some(vars), namespace)
+        .await?;
+
+    Ok(())
 }
 
 pub(super) fn dedupe_entity_candidates(candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {

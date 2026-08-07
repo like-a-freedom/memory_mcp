@@ -470,10 +470,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migration_030_is_last_registered() {
+    fn migration_031_is_last_registered() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "030_claim_reconciliation_hardening.surql");
+        assert_eq!(last.file_name, "031_entity_extraction_projection.surql");
     }
 
     #[test]

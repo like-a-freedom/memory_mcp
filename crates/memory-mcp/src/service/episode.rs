@@ -581,9 +581,15 @@ mod tests {
         });
         tokio::task::yield_now().await;
 
-        let _ = extract_entities(&service.build_context(), "Atlas project status", None)
-            .await
-            .expect("extract entities");
+        let _ = extract_entities(
+            &service.build_context(),
+            "episode:blocking-test",
+            "org",
+            "Atlas project status",
+            None,
+        )
+        .await
+        .expect("extract entities");
         let tick_elapsed = ticker.await.expect("join ticker");
 
         assert!(
