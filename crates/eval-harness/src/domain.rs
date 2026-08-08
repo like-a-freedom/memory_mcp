@@ -222,6 +222,7 @@ pub enum EvalProfile {
     Release,
     Nightly,
     ResponseSize,
+    NerQuality,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -388,6 +389,14 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&EvalProfile::Nightly).unwrap(),
             "\"nightly\""
+        );
+        assert_eq!(
+            serde_json::to_string(&EvalProfile::ResponseSize).unwrap(),
+            "\"response_size\""
+        );
+        assert_eq!(
+            serde_json::to_string(&EvalProfile::NerQuality).unwrap(),
+            "\"ner_quality\""
         );
     }
 
