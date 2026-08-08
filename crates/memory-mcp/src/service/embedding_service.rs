@@ -1,8 +1,7 @@
 //! Embedding generation service — owns embedding provider access, query/fact
 //! embedding caching, and the background embedding retry pipeline.
 //!
-//! Extracted from `ServiceContext` to keep the context struct a narrow seam
-//! (fields + shared lookups) and concentrate embedding concerns here.
+//! Concentrates embedding concerns in one place.
 
 use std::sync::Arc;
 use std::time::Instant;

@@ -1,7 +1,7 @@
 //! Concrete app store: owns the queries that MCP apps, lifecycle, and graph
 //! expansion need, without exposing the full `DbClient` surface.
 //!
-//! Replaces the `AppStore` trait seam per ADR-0024 step 4.
+//! Replaces the `AppStore` trait seam.
 
 use std::sync::Arc;
 

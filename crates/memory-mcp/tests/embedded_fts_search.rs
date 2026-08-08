@@ -414,9 +414,9 @@ fn edge_origin_is_introduced_by_followup_migration() {
 // plan (see docs/superpowers/plans/2026-06-29-plan-review-critical-analysis.md):
 //
 //   1. `EntityService::find_entity_id_by_alias` used the FTS operator `@1@`
-//      against a non-FULLTEXT index on `entity.aliases`, so step 2 of the
-//      fuzzy resolver silently never matched. The probe confirmed a real alias
-//      stored on disk was returned as `[]`. Fixed to use `CONTAINS`.
+//      against a non-FULLTEXT index on `entity.aliases`, so the fuzzy resolver
+//      silently never matched. The probe confirmed a real alias stored on disk
+//      was returned as `[]`. Fixed to use `CONTAINS`.
 //
 //   2. Migration 025 defined a `memory_fts_ru` analyzer but no index referenced
 //      it, so Russian-language stemming never ran. Migration 026 fixes this by

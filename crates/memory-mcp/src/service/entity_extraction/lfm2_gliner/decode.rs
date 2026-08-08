@@ -1,5 +1,5 @@
 //! Pure span-decoding helpers for the SauerkrautLM LFM2 GLiNER backend
-//! (Task 9).
+//! Span decoding for markerV1 representations.
 //!
 //! Everything in this module is model-free: word splitting, span
 //! enumeration, prompt token-position collection, thresholded span

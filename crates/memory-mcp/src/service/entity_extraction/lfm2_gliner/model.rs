@@ -1,4 +1,4 @@
-//! Bidirectional LFM2 backbone + GLiNER layer fuser in native Candle (Task 8).
+//! Bidirectional LFM2 backbone + GLiNER layer fuser in native Candle.
 //!
 //! Faithful port of `code_modification/lfm2_bi.py` over the causal
 //! `modeling_lfm2.py` backbone:
@@ -7,12 +7,12 @@
 //! - GQA with per-head RMSNorm and half-split RoPE,
 //! - squeeze-and-excitation `LayersFuser` over all per-layer hidden states.
 //!
-//! Task 9 extends this module with the loaded runtime: tokenization, the
+//! A later step extends this module with the loaded runtime: tokenization, the
 //! GLiNER head (`rnn`, markerV1 span representations, prompt projection), and
 //! the windowed extraction pipeline over the fused encoder output.
 //
-// The module keeps a module-level lint allowance for the shared Task 8 → Task 9
-// contract surface.
+// The module keeps a module-level lint allowance for the shared contract surface
+//! between config parsing and span decoding.
 #![allow(dead_code)]
 
 use std::sync::Mutex;
@@ -688,7 +688,7 @@ struct EncodedWindow {
 pub(crate) struct LoadedLfm2Gliner {
     /// Bidirectional LFM2 backbone with fused-layer output.
     pub(crate) model: Lfm2BiModel,
-    /// Parsed configuration (backbone + GLiNER head contract for Task 9).
+    /// Parsed configuration (backbone + GLiNER head contract).
     pub(crate) config: Lfm2BiConfig,
     /// Device the model tensors live on.
     pub(crate) device: Device,

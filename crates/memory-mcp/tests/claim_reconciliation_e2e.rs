@@ -2,7 +2,7 @@
 //!
 //! These tests exercise the full pipeline: ingest → extract → claim projection
 //! → job creation → reconciliation → persisted relations.
-//! Currently some assertions are expected to fail (red phase) until
+//! Currently some assertions are expected to fail until
 //! the pipeline is fully wired.
 
 mod common;

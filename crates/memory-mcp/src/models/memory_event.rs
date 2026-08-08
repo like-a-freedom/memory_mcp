@@ -458,7 +458,7 @@ pub fn access_ref(access: &Option<AccessPayload>) -> Option<&AccessPayload> {
 mod tests {
     use super::*;
 
-    // --- Task 2 Step 1: failing domain tests (now implemented) ---
+    // --- Domain tests for invocation origin detection ---
 
     #[test]
     fn ordinary_mcp_and_cli_are_agent_selected() {

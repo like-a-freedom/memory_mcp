@@ -29,9 +29,8 @@ impl GraphContext for MemoryService {
 impl MemoryService {
     /// Finds an introduction chain.
     ///
-    /// Graph traversal lives in this module per ADR-0024 step 1; the method is
-    /// exposed on `MemoryService` so callers can use it without reaching into
-    /// the internal graph API.
+    /// Graph traversal lives in this module; the method is exposed on
+    /// `MemoryService` so callers can use it without reaching into the internal graph API.
     pub async fn find_intro_chain(
         &self,
         target_name: &str,
@@ -52,7 +51,7 @@ impl MemoryService {
     /// Resolves an entity by its type and canonical name.
     ///
     /// Graph/entity convenience built on [`ResolveCapability`]; lives here with
-    /// the other graph conveniences per ADR-0024 step 1.
+    /// the other graph conveniences.
     pub async fn resolve_entity(
         &self,
         entity_type: &str,
@@ -576,7 +575,7 @@ fn is_traversable_graph_node(record_id: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Introduction-chain traversal (moved from service/core.rs, ADR-0024 step 1)
+// Introduction-chain traversal
 // ---------------------------------------------------------------------------
 
 /// Builds an introduction-chain path from a BFS next-hop map.
@@ -749,7 +748,7 @@ fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
 }
 
 // ---------------------------------------------------------------------------
-// Graph traversal for app sessions (extracted from MCP handlers)
+// Graph traversal for app sessions
 // ---------------------------------------------------------------------------
 
 /// Result of a BFS path search between two entities.

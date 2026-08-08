@@ -9,7 +9,7 @@
 //! 1. **Public-surface freeze** (`public_surface_snapshot`): a synchronous,
 //!    network-free test that pins the exact eight MCP tool names and the
 //!    ordinary CLI command snapshot, and asserts the absence of every
-//!    lifecycle-only verb the plan forbids from the public surface.
+//!    lifecycle-only verb forbidden from the public surface.
 //! 2. **Lifecycle fixture coverage** (`lifecycle_fixture_covers_core_risks`):
 //!    a synchronous test that loads the labeled lifecycle corpus and asserts
 //!    every release-gate risk family is represented.
@@ -30,7 +30,7 @@ use serde::Deserialize;
 /// The exact eight MCP tool names exposed by the server.
 ///
 /// This is the frozen public surface. Adding a name here requires a separate
-/// ADR and the evidence gate described in the plan.
+/// ADR and the evidence gate.
 const EXPECTED_MCP_TOOLS: &[&str] = &[
     "ingest",
     "extract",
@@ -105,7 +105,7 @@ const CORPUS_PATH: &str = "tests/fixtures/agent_memory_lifecycle_cases.json";
 
 /// The release-gate risk families the lifecycle corpus must cover.
 ///
-/// Mirrors Task 1, Step 4 of the plan. Every family below must be
+/// Mirrors Step 4. Every family below must be
 /// human-reviewed before release.
 const REQUIRED_RISK_FAMILIES: &[&str] = &[
     "preference",
@@ -332,8 +332,8 @@ fn lifecycle_fixture_covers_core_risks() {
 
 /// Reproducible before-state baseline across the four pre-integration modes.
 ///
-/// Marked `#[ignore]` until Task 1 Step 5 lands the backing harness. The
-/// command in the plan is:
+/// Marked `#[ignore]` until Step 5 lands the backing harness. The
+/// command is:
 ///
 /// ```text
 /// cargo test --test eval_agent_memory_lifecycle run_agent_memory_lifecycle_baseline -- --ignored --exact --nocapture

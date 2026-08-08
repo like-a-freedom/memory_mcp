@@ -1,13 +1,12 @@
-//! Bidirectional LFM2 GLiNER configuration parsing (Task 8).
+//! Bidirectional LFM2 GLiNER configuration parsing.
 //!
 //! Parses the upstream `gliner_config.json` of
 //! `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` into a typed config consumed by
-//! the native Candle backbone ([`super::model::Lfm2BiModel`]) and, in Task 9,
+//! the native Candle backbone ([`super::model::Lfm2BiModel`]) and, in a later step,
 //! by the span-decoding head.
 //
-// Task 9 wires `from_gliner_config` into the checkpoint load path; the module
-// keeps a module-level lint allowance for the shared Task 8 → Task 9 contract
-// surface.
+// A module-level lint allowance covers the shared contract surface between
+//! config parsing and span decoding.
 #![allow(dead_code)]
 
 use serde_json::Value;
@@ -45,7 +44,7 @@ impl LayerKind {
     }
 }
 
-/// Native configuration of the bidirectional LFM2 GLiNER backbone (Task 8).
+/// Native configuration of the bidirectional LFM2 GLiNER backbone.
 #[derive(Debug, Clone)]
 pub(crate) struct Lfm2BiConfig {
     pub(crate) vocab_size: usize,

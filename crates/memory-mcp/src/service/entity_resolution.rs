@@ -40,7 +40,7 @@ impl EntityResolver {
     ) -> Result<(String, bool), MemoryError> {
         let normalized = normalize_entity_name(&candidate.canonical_name);
 
-        // Step 1: Exact match by normalized name (fast path via DB index).
+        // Fast path: exact match by normalized name (via DB index).
         if let Some(entity_id) = entity_service
             .find_entity_id_by_name(&normalized, namespace)
             .await?
@@ -48,7 +48,7 @@ impl EntityResolver {
             return Ok((entity_id, false));
         }
 
-        // Step 2: Check aliases for an exact match.
+        // Alias check: look up by alias for an exact match.
         if let Some(entity_id) = entity_service
             .find_entity_id_by_alias(&normalized, namespace)
             .await?
@@ -56,7 +56,7 @@ impl EntityResolver {
             return Ok((entity_id, false));
         }
 
-        // Step 3: Fuzzy match — find candidates with similar names.
+        // Fuzzy match: find candidates with similar names.
         // Use char_indices to safely extract first 3 characters (not bytes) for prefix search.
         let prefix = normalized
             .char_indices()
@@ -97,7 +97,7 @@ impl EntityResolver {
             return Ok((entity_id, false));
         }
 
-        // Step 4: No match found — create a new entity.
+        // No match found — create a new entity.
         let entity_id = entity_service.create_entity(candidate, namespace).await?;
         Ok((entity_id, true))
     }
@@ -238,18 +238,18 @@ mod tests {
     #[tokio::test]
     async fn resolve_or_create_fuzzy_matches_cyrillic_near_duplicate() {
         let db = MockDbClient::new()
-            // Step 1: exact lookup — returns None
+            // Exact lookup — returns None
             .expect_query(
                 "SELECT * FROM entity WHERE canonical_name_normalized",
                 json!([]),
             )
-            // Step 2: alias lookup — returns None
+            // Alias lookup — returns None
             .expect_query("SELECT * FROM entity WHERE aliases CONTAINS", json!([]))
             .expect_query(
                 "SELECT entity_id FROM entity WHERE aliases CONTAINS",
                 json!([]),
             )
-            // Step 3: prefix search — returns the canonical "Иван Петров"
+            // Prefix search — returns the canonical "Иван Петров"
             .expect_query(
                 "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with",
                 json!([

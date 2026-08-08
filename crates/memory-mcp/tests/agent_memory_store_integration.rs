@@ -1,6 +1,6 @@
 //! Integration tests for the agent-memory lifecycle store.
 //!
-//! These tests verify the migration and storage contract described in Task 3:
+//! These tests verify the migration and storage contract:
 //! accepted events create one episode/event/job; ignored and duplicate events
 //! add zero rows; changed immutable identity conflicts; quarantine is absent
 //! from ordinary retrieval; rejected secrets are absent from raw fields; and

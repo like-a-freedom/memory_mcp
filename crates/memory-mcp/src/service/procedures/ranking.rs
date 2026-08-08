@@ -1,4 +1,4 @@
-//! Deterministic ranking for procedure candidates (Task 10 Step 3).
+//! Deterministic ranking for procedure candidates.
 //!
 //! Filter by namespace, scope, project, policy, status, trust floor, and risk
 //! authorization before ranking. Use normalized task overlap, posterior mean,

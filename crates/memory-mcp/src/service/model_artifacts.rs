@@ -1,8 +1,8 @@
 //! Shared NER artifact lifecycle domain.
 //!
-//! Task 4 provides the pure manifest, state, and progress contracts with no
-//! network or filesystem side effects beyond the sinks themselves. Task 5 adds
-//! acquisition, leases, activation, and recovery orchestration through
+//! Pure manifest, state, and progress contracts with no
+//! network or filesystem side effects beyond the sinks themselves. Acquisition,
+//! leases, activation, and recovery orchestration are added in a later step.
 //! [`NerArtifactStore`].
 
 pub(crate) mod download;

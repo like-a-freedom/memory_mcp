@@ -1226,8 +1226,8 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Task 3: validate_record_id wired into MemoryService::find_record_by_id
-    // (RED phase tests — exercised via the public find_episode_record /
+    // validate_record_id wired into MemoryService::find_record_by_id
+    // (tests — exercised via the public find_episode_record /
     // find_fact_record entry points, which delegate to find_record_by_id).
     // -----------------------------------------------------------------------
 

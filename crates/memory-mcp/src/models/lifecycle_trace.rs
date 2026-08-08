@@ -5,9 +5,9 @@
 //! (see `LifecycleTraceLink` in `memory_event.rs`). Unlinked traces create no
 //! durable rows.
 //!
-//! This module is expanded in Task 6 with the full `LifecycleRecall`
-//! implementation. For now it provides the bounded trace store skeleton so
-//! Task 2's policy types have a concrete home.
+//! This module is expanded with the full `LifecycleRecall` implementation.
+//! For now it provides the bounded trace store skeleton so
+//! Policy types have a concrete home.
 
 use std::collections::VecDeque;
 

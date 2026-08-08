@@ -2,7 +2,7 @@
 //! full `DbClient` surface.
 //!
 //! Replaces the formerly implicit `DbClient` consumption in
-//! `service/fact.rs` per ADR-0024 step 5.
+//! `service/fact.rs`.
 
 use std::sync::Arc;
 

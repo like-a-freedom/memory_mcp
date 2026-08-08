@@ -1,6 +1,6 @@
 //! Integration tests for the procedure candidate store.
 //!
-//! These tests verify the storage contract described in Task 10 Step 3:
+//! These tests verify the storage contract:
 //! candidates are persisted, loaded, updated, and listed by filter.
 //! The procedure gate must pass before promotion is enabled.
 

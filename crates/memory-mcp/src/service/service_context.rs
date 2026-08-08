@@ -280,8 +280,8 @@ mod tests {
     use crate::service::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
 
-    // RED phase: these tests drive the wiring of `validate_record_id` into
-    // `ServiceContext::find_record_by_id` (Task 2).
+    // These tests drive the wiring of `validate_record_id` into
+    // `ServiceContext::find_record_by_id`.
 
     #[tokio::test]
     async fn find_record_by_id_rejects_bare_hex_with_validation_error() {

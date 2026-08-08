@@ -50,7 +50,7 @@ pub(crate) struct ClaimDraftCandidate {
     pub validity_source: ClaimValiditySource,
     pub source_lineage: Option<String>,
     // Byte offset range in the original source content. Asserted by extract tests;
-    // persisted through `Claim.source_span` by Task 4 of the completion plan.
+    // persisted through `Claim.source_span` in a later step.
     #[allow(dead_code)]
     pub source_span: Option<(usize, usize)>,
 }

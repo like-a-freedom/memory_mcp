@@ -1,11 +1,11 @@
-//! Upstream state-dict name mapping and weight adaptation (Task 8).
+//! Upstream state-dict name mapping and weight adaptation.
 //!
 //! The GLiNER `Encoder` wraps the bidirectional LFM2 backbone under
 //! `bert_layer.model.*` and the layer fuser under `bert_layer.layers_fuser.*`.
 //! This module owns every upstream tensor name so the model loader and the
 //! checkpoint-adaptation gate stay in one place.
 //
-// Dormant API until Task 9 wires the checkpoint load path (see `config.rs`).
+// Dormant API until the span-decoding head is wired into the checkpoint load path.
 #![allow(dead_code)]
 
 use candle_core::Result;

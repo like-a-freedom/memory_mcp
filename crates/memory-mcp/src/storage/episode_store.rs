@@ -2,8 +2,8 @@
 //! community/entity lookups community helpers use.
 //!
 //! Replaces direct `DbClient` consumption in `service/episode/` per
-//! ADR-0024 step 6. The store owns its queries; SQL for episode-domain
-//! reads lives here (ADR-0027) rather than on the universal `DbClient`.
+//! The store owns its queries; SQL for episode-domain reads lives here
+//! (ADR-0027) rather than on the universal `DbClient`.
 
 use std::sync::Arc;
 

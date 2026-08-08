@@ -274,8 +274,8 @@ mod tests {
 
     #[test]
     fn metric_names_use_memory_prefix() {
-        // Completion plan Task 8 step 2 mandates the `memory_` prefix for
-        // the five families so dashboards can filter by prefix.
+        // The `memory_` prefix is used for the five families so dashboards can
+        // filter by prefix.
         assert!(METRIC_PIPELINE_TOTAL.starts_with("memory_claim_"));
         assert!(METRIC_PIPELINE_DURATION_SECONDS.starts_with("memory_claim_"));
         assert!(METRIC_CANDIDATE_COUNT.starts_with("memory_claim_"));

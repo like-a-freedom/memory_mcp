@@ -1,4 +1,4 @@
-//! Operator review workflow for procedure candidates (Task 11 Step 1).
+//! Operator review workflow for procedure candidates.
 //!
 //! `open_app` and `app_command` expose candidate evidence and operator actions.
 //! Every mutation returns a change ID and is verified by persisted readback.

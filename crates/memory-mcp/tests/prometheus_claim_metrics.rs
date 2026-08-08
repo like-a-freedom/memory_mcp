@@ -1,6 +1,6 @@
 //! Integration tests for Prometheus metric recording in claim reconciliation.
 //!
-//! Verifies the five metric families from completion plan Task 8 render
+//! Verifies the five metric families render
 //! correctly when the `prometheus` feature is enabled, and that no
 //! forbidden identifier (ADR-0005) appears as a Prometheus label.
 

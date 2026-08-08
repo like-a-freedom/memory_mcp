@@ -16,7 +16,7 @@ fn is_missing_table_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("table")
 }
 
-/// Resolves and persists entities. Extracted from `MemoryService::resolve`.
+/// Resolves and persists entities.
 #[derive(Clone)]
 pub struct EntityService {
     db_client: Arc<dyn crate::storage::DbClient>,

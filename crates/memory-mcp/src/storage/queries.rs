@@ -561,7 +561,7 @@ mod tests {
     use crate::service::MemoryError;
 
     // -----------------------------------------------------------------------
-    // validate_record_id — RED phase tests
+    // validate_record_id tests
     // -----------------------------------------------------------------------
 
     #[test]

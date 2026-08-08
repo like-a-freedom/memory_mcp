@@ -1,6 +1,6 @@
 //! Fact persistence service — handles fact record creation, validation, and index keys.
 //!
-//! Extracted from `MemoryService::add_fact` to reduce the God Object.
+//! Reduces the God Object.
 //! Embedding generation, triple extraction, and claim projection remain
 //! orchestrated by `MemoryService` — this service handles only the core
 //! fact record lifecycle.

@@ -922,7 +922,7 @@ mod tests {
         assert!(
             results[1].retrieval_tier.as_deref() == Some("graph")
                 || results[1].rationale.contains("community:atlas"),
-            "secondary expansion should remain the community-linked fact, even if Task 2 now surfaces it via graph expansion first; got tier={:?} rationale={}",
+            "secondary expansion should remain the community-linked fact, even if graph expansion surfaces it first; got tier={:?} rationale={}",
             results[1].retrieval_tier,
             results[1].rationale
         );

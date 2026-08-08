@@ -1,7 +1,7 @@
 //! Fire-and-forget triple extraction spawned after fact creation.
 //!
-//! Extracted from `ServiceContext` to colocate triple-extraction logic with
-//! the rest of the episode module. The `triple_extraction_semaphore` stays on
+//! Colocates triple-extraction logic with the rest of the episode module.
+//! The `triple_extraction_semaphore` stays on
 //! `ServiceContext` as shared infrastructure bounding concurrency.
 
 use serde_json::json;

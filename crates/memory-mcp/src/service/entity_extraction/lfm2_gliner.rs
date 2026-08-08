@@ -1,8 +1,8 @@
 //! Native SauerkrautLM LFM2 GLiNER NER backend (Tasks 8–9).
 //!
-//! Task 8 provides the bidirectional LFM2 backbone + GLiNER layer fuser in
-//! native Candle, config parsing, and the upstream state-dict tensor adapter.
-//! Task 9 (this module) wires tokenization and markerV1 span decoding into the
+//! Bidirectional LFM2 backbone + GLiNER layer fuser in native Candle, config
+//! parsing, and the upstream state-dict tensor adapter.
+//! This module wires tokenization and markerV1 span decoding into the
 //! full [`EntityExtractor`] lifecycle: artifact preparation through the shared
 //! store, device policy, lazy load/unload, and smoke-validated activation.
 
@@ -30,8 +30,8 @@ use super::{
 };
 
 pub(crate) use config::Lfm2BiConfig;
-// `LayerKind` is part of the Task 9 contract (root re-export); nothing in this
-// build step consumes it yet, which the lint cannot know.
+// `LayerKind` is part of the span-decoding contract (root re-export); nothing in
+// this build step consumes it yet, which the lint cannot know.
 #[allow(unused_imports)]
 pub(crate) use config::LayerKind;
 pub(crate) use model::LoadedLfm2Gliner;

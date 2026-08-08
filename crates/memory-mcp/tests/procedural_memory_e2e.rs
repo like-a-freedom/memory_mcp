@@ -4,11 +4,11 @@
 //! ranking, operator review workflow, and the storage contract. Promotion is
 //! disabled until the procedure gate passes.
 //!
-//! Task 10-11 gates:
+//! Procedure gates:
 //! - no candidate from quarantined/rejected/external-untrusted evidence;
 //! - no promotion without operator authority;
 //! - deterministic IDs/evidence/ranking;
-//! - projected storage within the Task 9 budget.
+//! - projected storage within the capacity budget.
 
 use memory_mcp::models::{
     ProcedureCandidateRecord, ProcedureStatus, beta_posterior_mean, deterministic_candidate_id,
@@ -95,8 +95,8 @@ fn beta_posterior_increases_with_success() {
 #[test]
 fn projected_storage_within_budget() {
     // The projected storage for procedure candidates is bounded by the number
-    // of unique task fingerprints. Each candidate is one row with bounded
-    // fields. This is within the Task 9 budget.
+    // of unique fingerprints. Each candidate is one row with bounded
+    // fields. This is within the capacity budget.
     let max_candidates_per_project = 1000;
     let bytes_per_candidate = 512; // conservative estimate
     let projected = max_candidates_per_project * bytes_per_candidate;

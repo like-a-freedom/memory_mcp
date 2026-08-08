@@ -1,7 +1,7 @@
 //! Explanation service — resolves episodes and facts for explain items,
 //! computes shared graph insights, and builds citation-ready explain output.
 //!
-//! Extracted from `MemoryService::explain` to reduce the God Object.
+//! Reduces the God Object.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -558,7 +558,7 @@ impl ExplanationService {
 
 #[cfg(test)]
 mod tests {
-    //! RED phase tests (Task 3): drive validation into
+    //! Tests: drive validation into
     //! `ExplanationService::find_record_by_id` and the entry points that
     //! delegate to it (`find_episode_record`, `find_fact_record`).
     //!
