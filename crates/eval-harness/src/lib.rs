@@ -8,6 +8,7 @@ pub mod error;
 pub mod gate;
 pub mod merge;
 pub mod metrics;
+pub mod ner_fixtures;
 pub mod profile;
 pub mod reducer;
 pub mod report;
