@@ -31,9 +31,9 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     let single = fixture.single_window.to_string();
     let multi = fixture.multi_window.to_string();
 
-    // Reuse the setup runtime: creating one per iteration adds tens of µs of
-    // noise that swamps the fast lightweight backends (regex ~1.2 ms, anno
-    // ~0.4 ms).
+    // Reuse the setup runtime: creating one per iteration adds ~50-200 µs of
+    // noise that swamps the fast lightweight backends (measured warm single
+    // window: regex ~1 µs, anno ~5 µs).
     c.bench_function(&format!("{label}_single_window_warm"), |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();

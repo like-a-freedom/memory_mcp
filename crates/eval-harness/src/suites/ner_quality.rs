@@ -83,10 +83,10 @@ pub fn register(suite_id: &str, suites: &mut Vec<Box<dyn EvalSuite>>) -> Result<
 
 /// The reducer depends on fixture availability: when the checkpoint is absent
 /// the run emits only `Invalid` outcomes, and a count-based reducer keeps the
-/// report honest (explicit per-case "fixture missing" reasons) instead of
-/// presenting zero-valued classification metrics. With a present fixture the
-/// classification reducer is used; it degrades to zeroes if an extractor
-/// produces no predictions rather than failing the run.
+/// report honest (explicit per-case reasons) instead of presenting zero-valued
+/// classification metrics. With a present fixture the classification reducer is
+/// used; it degrades to zeroes if an extractor produces no predictions rather
+/// than failing the run.
 enum NerSuiteReducer {
     Class(ClassificationReducer),
     Count(CountReducer),
@@ -149,14 +149,14 @@ impl EvalSuite for NerQualitySuite {
             return self
                 .cases
                 .iter()
-                .map(|case| invalid_outcome(&self.id, case, "fixture missing"))
+                .map(|case| invalid_outcome(&self.id, case, "fixture unavailable"))
                 .collect();
         }
         let Some(extractor) = ner_fixtures::build_extractor(self.kind).await else {
             return self
                 .cases
                 .iter()
-                .map(|case| invalid_outcome(&self.id, case, "fixture missing"))
+                .map(|case| invalid_outcome(&self.id, case, "fixture unavailable"))
                 .collect();
         };
         let mut outcomes = Vec::with_capacity(self.cases.len());

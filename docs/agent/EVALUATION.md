@@ -93,8 +93,8 @@ the folders under `crates/memory-mcp/tests/models/ner/`:
 
 | Suite | Fixture dir | How to populate it (all offline after first download) |
 |---|---|---|
-| `ner-quality-anno-onnx` | `crates/memory-mcp/tests/models/ner/deepanwa--NuNerZero_onnx/` | Download HF `deepanwa/NuNerZero_onnx` (`model.onnx`, `tokenizer.json`, `config.json`) into this dir. |
-| `ner-quality-gliner` | `crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1/` | Download HF `urchade/gliner_multi-v2.1` (`model.safetensors`, `gliner_config.json`, `tokenizer.json`) into this dir. |
+| `ner-quality-anno-onnx` | `crates/memory-mcp/tests/models/ner/deepanwa--NuNerZero_onnx/` | Download HF `deepanwa/NuNerZero_onnx` (`model.onnx`, `tokenizer.json`) into this dir. |
+| `ner-quality-gliner` | `crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1/` | Download `model.safetensors` + `gliner_config.json` from HF `urchade/gliner_multi-v2.1` and `tokenizer.json` from the companion repo `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` (the GLiNER repo ships no tokenizer) into this dir. |
 | `ner-quality-vago` | `crates/memory-mcp/tests/models/ner/VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER/` | Download HF `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (`pytorch_model.bin`, `gliner_config.json`, `tokenizer.json`, ~1.6 GB) into this dir. |
 
 ### Interpreting the results

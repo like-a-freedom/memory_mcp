@@ -35,7 +35,8 @@ pub fn fixture_root() -> PathBuf {
 /// Required checkpoint files per model-backed kind.
 fn required_files(kind: NerExtractorKind) -> &'static [&'static str] {
     match kind {
-        NerExtractorKind::AnnoOnnx => &["model.onnx", "tokenizer.json", "config.json"],
+        // The direct-dir loader reads only the ONNX session and tokenizer.
+        NerExtractorKind::AnnoOnnx => &["model.onnx", "tokenizer.json"],
         NerExtractorKind::ClassicGliner => {
             &["model.safetensors", "gliner_config.json", "tokenizer.json"]
         }
@@ -92,44 +93,26 @@ fn logger() -> StdoutLogger {
     StdoutLogger::new("error")
 }
 
-/// Builds the extractor for `kind` from a local fixture, when present.
+/// Builds a model-backed extractor from a prepared fixture directory through
+/// the production store-free constructors.
 ///
-/// Returns `None` when a model-backed kind has no complete local fixture.
-/// Model-backed kinds are built through the production store-free
-/// constructors, so no revision is resolved and nothing is downloaded.
-/// A `None` from a present-but-incomplete fixture is never a panic.
-#[allow(clippy::question_mark)] // `?` on `Option` inside async: `return None` is clearer here.
-pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
-    let extractor: Arc<dyn EntityExtractor> = match kind {
-        NerExtractorKind::Anno => create_entity_extractor(
-            &NerConfig {
-                extractor: NerExtractorConfig::Anno,
-            },
-            env!("CARGO_MANIFEST_DIR"),
-            &logger(),
-        )
-        .await
-        .expect("anno extractor must build"),
-        NerExtractorKind::Regex => create_entity_extractor(
-            &NerConfig {
-                extractor: NerExtractorConfig::Regex,
-            },
-            env!("CARGO_MANIFEST_DIR"),
-            &logger(),
-        )
-        .await
-        .expect("regex extractor must build"),
+/// Returns `None` when construction fails (e.g. an unloadable ONNX session),
+/// never panicking. GLiNER/VAGO loaders defer to first inference, so a
+/// present-but-corrupt checkpoint may construct and then fail per case.
+async fn build_model_extractor(
+    kind: NerExtractorKind,
+    dir: &std::path::Path,
+) -> Option<Arc<dyn EntityExtractor>> {
+    match kind {
         NerExtractorKind::AnnoOnnx => {
             // `create_entity_extractor` with an explicit `cache_dir` treats it
             // as a raw model directory (anno_onnx::build), so the ONNX fixture
-            // is used directly with no store and no download.
-            let Some(dir) = fixture_dir(kind) else {
-                return None;
-            };
+            // is used directly with no store and no download. The session is
+            // built eagerly, so a corrupt fixture surfaces here as `None`.
             create_entity_extractor(
                 &NerConfig {
                     extractor: NerExtractorConfig::AnnoOnnx(ModelBackedNerConfig {
-                        cache_dir: Some(dir),
+                        cache_dir: Some(dir.to_path_buf()),
                         labels: default_labels(),
                         threshold: Some(0.5),
                         max_concurrency: 1,
@@ -140,27 +123,20 @@ pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExt
                 &logger(),
             )
             .await
-            .expect("anno-onnx extractor must build from a prepared checkpoint")
+            .ok()
         }
         NerExtractorKind::ClassicGliner => {
-            let Some(dir) = fixture_dir(kind) else {
-                return None;
-            };
             // Store-free production constructor: direct lazy loader, no
             // revision resolution, no download.
-            match GlinerEntityExtractor::new(&dir, default_labels(), 0.5) {
-                Ok(extractor) => Arc::new(extractor),
-                Err(_) => return None,
-            }
+            GlinerEntityExtractor::new(dir, default_labels(), 0.5)
+                .ok()
+                .map(|e| Arc::new(e) as Arc<dyn EntityExtractor>)
         }
         NerExtractorKind::SauerkrautLfm25 => {
-            let Some(dir) = fixture_dir(kind) else {
-                return None;
-            };
             // Store-free production constructor (same path the release-parity
             // gate uses): direct lazy loader over `pytorch_model.bin`.
-            match VagoLfm2EntityExtractor::new_with_runtime(
-                &dir,
+            VagoLfm2EntityExtractor::new_with_runtime(
+                dir,
                 default_labels(),
                 0.5,
                 1,    // batch_size
@@ -169,13 +145,52 @@ pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExt
                 GlinerDeviceKind::Cpu,
                 0, // idle_unload_secs (retain)
                 logger(),
-            ) {
-                Ok(extractor) => Arc::new(extractor),
-                Err(_) => return None,
-            }
+            )
+            .ok()
+            .map(|e| Arc::new(e) as Arc<dyn EntityExtractor>)
         }
-    };
-    Some(extractor)
+        // Lightweight kinds never reach the model-backed path.
+        NerExtractorKind::Anno | NerExtractorKind::Regex => None,
+    }
+}
+
+/// Builds the extractor for `kind`, fixture-gated for model-backed kinds.
+///
+/// Lightweight kinds always build. A model-backed kind returns `None` when
+/// its fixture is absent, incomplete, or fails to construct — never a panic
+/// and never a download.
+pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
+    if let Some(dir) = fixture_dir(kind) {
+        return build_model_extractor(kind, &dir).await;
+    }
+    match kind {
+        NerExtractorKind::Anno => Some(
+            create_entity_extractor(
+                &NerConfig {
+                    extractor: NerExtractorConfig::Anno,
+                },
+                env!("CARGO_MANIFEST_DIR"),
+                &logger(),
+            )
+            .await
+            .expect("anno extractor must build"),
+        ),
+        NerExtractorKind::Regex => Some(
+            create_entity_extractor(
+                &NerConfig {
+                    extractor: NerExtractorConfig::Regex,
+                },
+                env!("CARGO_MANIFEST_DIR"),
+                &logger(),
+            )
+            .await
+            .expect("regex extractor must build"),
+        ),
+        // Model-backed kind without a complete local fixture.
+        NerExtractorKind::AnnoOnnx
+        | NerExtractorKind::ClassicGliner
+        | NerExtractorKind::SauerkrautLfm25 => None,
+    }
 }
 
 #[cfg(test)]
@@ -230,7 +245,7 @@ mod tests {
         // every model-backed kind declares the exact files its loader reads.
         assert_eq!(
             required_files(NerExtractorKind::AnnoOnnx),
-            &["model.onnx", "tokenizer.json", "config.json"]
+            &["model.onnx", "tokenizer.json"]
         );
         assert_eq!(
             required_files(NerExtractorKind::ClassicGliner),
@@ -243,5 +258,27 @@ mod tests {
         // Lightweight kinds never consult the filesystem.
         assert!(required_files(NerExtractorKind::Anno).is_empty());
         assert!(required_files(NerExtractorKind::Regex).is_empty());
+    }
+
+    #[test]
+    fn corrupt_model_fixture_never_panics() {
+        // A fixture whose files exist but fail to load (a truncated ONNX
+        // session or unparseable tokenizer) must yield `None`, not panic: the
+        // completeness check proves existence only, so construction errors are
+        // mapped to `None` by `build_model_extractor`.
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        for file in ["model.onnx", "tokenizer.json"] {
+            std::fs::write(temp.path().join(file), b"not a real model")
+                .expect("write corrupt file");
+        }
+        let extractor = rt.block_on(build_model_extractor(
+            NerExtractorKind::AnnoOnnx,
+            temp.path(),
+        ));
+        assert!(
+            extractor.is_none(),
+            "corrupt ONNX fixture must not construct"
+        );
     }
 }
