@@ -21,10 +21,13 @@ Add a manual-only evaluation workflow, in `eval-harness`, covering every backend
    hand-annotated spans/labels, structurally validated offline. Six cases reuse the
    VAGO release-parity corpus verbatim (pinned by a consistency test).
 2. One `NerQualitySuite` per extractor (`ner-quality-anno|regex|anno-onnx|gliner|vago`)
-   that builds the extractor through the production `create_entity_extractor` path,
-   fixture-gated (missing checkpoint => explicit invalid cases, never a download).
-   Mention-level precision/recall/F1 use the existing `ClassificationReducer`;
-   typed match is a per-case diagnostic.
+   that builds the extractor through the production constructors — the store-free
+   paths (`create_entity_extractor` with an explicit `cache_dir` for anno-onnx,
+   `GlinerEntityExtractor::new` and `VagoLfm2EntityExtractor::new_with_runtime` for
+   the model-backed kinds) — fixture-gated (missing or incomplete checkpoint =>
+   explicit invalid cases, never a revision resolve or download). Mention-level
+   precision/recall/F1 use the existing `ClassificationReducer`; typed match is a
+   per-case diagnostic.
 3. Full CPU latency bench coverage (`ner_cpu.rs`) with cold-start reporting.
 4. A dedicated `ner_quality` profile; the suites are excluded from `pr`/`release`/
    `nightly` profiles because CI has no model checkpoints and any invalid outcome

@@ -82,9 +82,11 @@ pub fn register(suite_id: &str, suites: &mut Vec<Box<dyn EvalSuite>>) -> Result<
 }
 
 /// The reducer depends on fixture availability: when the checkpoint is absent
-/// the run emits only `Invalid` outcomes and `ClassificationReducer` would
-/// hard-error on zero predictions, so a count-based reducer is used instead
-/// (the report then shows the explicit invalid cases).
+/// the run emits only `Invalid` outcomes, and a count-based reducer keeps the
+/// report honest (explicit per-case "fixture missing" reasons) instead of
+/// presenting zero-valued classification metrics. With a present fixture the
+/// classification reducer is used; it degrades to zeroes if an extractor
+/// produces no predictions rather than failing the run.
 enum NerSuiteReducer {
     Class(ClassificationReducer),
     Count(CountReducer),
@@ -233,10 +235,11 @@ pub async fn run_case(
             })
         })
         .count() as u64;
-    let typed_precision = if predicted.is_empty() {
+    // Unique predicted names: duplicate candidates must not deflate precision.
+    let typed_precision = if predicted_names.is_empty() {
         0.0
     } else {
-        typed_tp as f64 / predicted.len() as f64
+        typed_tp as f64 / predicted_names.len() as f64
     };
     let typed_recall = if expected_names.is_empty() {
         1.0

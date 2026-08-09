@@ -97,18 +97,26 @@ pub fn merge_shards(shards: &[RunArtifact]) -> Result<RunArtifact, EvalError> {
 
     let mut seen_ids = BTreeSet::new();
     for outcome in &all_outcomes {
-        if !seen_ids.insert(outcome.case_id().as_str()) {
+        let key = (
+            outcome.case_key.suite_id.as_str(),
+            outcome.case_key.case_id.as_str(),
+        );
+        if !seen_ids.insert(key) {
             return Err(EvalError::InvalidInput(format!(
-                "duplicate case ID in merged shards: {}",
+                "duplicate case in merged shards: suite `{}` case `{}`",
+                outcome.case_key.suite_id.as_str(),
                 outcome.case_id().as_str()
             )));
         }
     }
 
-    let outcome_ids: BTreeSet<&str> = all_outcomes.iter().map(|o| o.case_id().as_str()).collect();
+    // Expected ids are bare corpus case ids; outcomes are suite-scoped, so a
+    // bare id is covered when any suite produced a case with that id.
+    let outcome_case_ids: BTreeSet<&str> =
+        all_outcomes.iter().map(|o| o.case_id().as_str()).collect();
 
     for id in &all_expected {
-        if !outcome_ids.contains(*id) {
+        if !outcome_case_ids.contains(*id) {
             return Err(EvalError::InvalidInput(format!(
                 "missing outcome for expected case: {id}"
             )));
@@ -167,11 +175,15 @@ mod tests {
     use crate::artifact::{RunFingerprint, SuiteSummary};
 
     fn make_shard(shard_idx: u32, case_ids: Vec<&str>) -> RunArtifact {
+        make_shard_with_suite(shard_idx, "test-suite", case_ids)
+    }
+
+    fn make_shard_with_suite(shard_idx: u32, suite_id: &str, case_ids: Vec<&str>) -> RunArtifact {
         let outcomes: Vec<EvalCaseOutcome> = case_ids
             .iter()
             .map(|id| {
                 EvalCaseOutcome::new(
-                    "test-suite",
+                    suite_id,
                     *id,
                     EvalMode::RetrievalOnly,
                     CorpusSplit::Development,
@@ -196,7 +208,7 @@ mod tests {
             expected_cases: vec![],
             outcomes,
             suite_summaries: vec![SuiteSummary {
-                suite_id: "test-suite".into(),
+                suite_id: suite_id.into(),
                 mode: EvalMode::RetrievalOnly,
                 total: case_ids.len(),
                 passed: case_ids.len(),
@@ -227,6 +239,18 @@ mod tests {
     #[test]
     fn merge_rejects_empty_shards() {
         assert!(merge_shards(&[]).is_err());
+    }
+
+    #[test]
+    fn merge_accepts_same_case_ids_across_suites() {
+        // Two shards from different suites sharing the same corpus case ids
+        // (the NER quality profile shape) must merge without a duplicate.
+        let shard0 = make_shard_with_suite(0, "ner-quality-anno", vec!["q-en-1", "q-en-2"]);
+        let shard1 = make_shard_with_suite(1, "ner-quality-regex", vec!["q-en-1", "q-en-2"]);
+        let merged = merge_shards(&[shard0, shard1]).unwrap();
+        assert_eq!(merged.outcomes.len(), 4);
+        assert_eq!(merged.expected_case_ids.len(), 2);
+        assert_eq!(merged.suite_summaries.len(), 2);
     }
 
     #[test]

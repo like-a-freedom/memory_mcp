@@ -1,20 +1,26 @@
 //! Shared NER fixture resolution for benches and evaluation suites.
 //!
 //! Single source of truth for where local NER checkpoints live, the default
-//! label set, and how to build any `NER_EXTRACTOR` backend through the
-//! production `create_entity_extractor` path. Model-backed kinds are
-//! fixture-gated: they return `None` when the local checkpoint is absent so
-//! benches and suites can skip honestly instead of downloading models.
+//! label set, and how to build any `NER_EXTRACTOR` backend for benchmarking.
+//!
+//! Model-backed kinds use the production **store-free** constructors
+//! (`GlinerEntityExtractor::new`, `VagoLfm2EntityExtractor::new_with_runtime`,
+//! `create_entity_extractor` with an explicit `cache_dir` for anno-onnx) so
+//! evaluation never resolves upstream revisions or downloads checkpoints.
+//! Kinds are fixture-gated: `build_extractor` returns `None` when the local
+//! checkpoint (or any required file) is absent, so benches and suites can
+//! skip honestly.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use memory_mcp::config::{
-    GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
-    NerExtractorKind,
+    GlinerDeviceKind, ModelBackedNerConfig, NerConfig, NerExtractorConfig, NerExtractorKind,
 };
 use memory_mcp::logging::StdoutLogger;
-use memory_mcp::service::{EntityExtractor, create_entity_extractor};
+use memory_mcp::service::{
+    EntityExtractor, GlinerEntityExtractor, VagoLfm2EntityExtractor, create_entity_extractor,
+};
 
 /// Root of the local (gitignored) NER checkpoints.
 pub fn fixture_root() -> PathBuf {
@@ -26,8 +32,22 @@ pub fn fixture_root() -> PathBuf {
         .join("ner")
 }
 
-/// Fixture directory for a model-backed kind, when present. Lightweight
-/// kinds have no fixture directory (`None`).
+/// Required checkpoint files per model-backed kind.
+fn required_files(kind: NerExtractorKind) -> &'static [&'static str] {
+    match kind {
+        NerExtractorKind::AnnoOnnx => &["model.onnx", "tokenizer.json", "config.json"],
+        NerExtractorKind::ClassicGliner => {
+            &["model.safetensors", "gliner_config.json", "tokenizer.json"]
+        }
+        NerExtractorKind::SauerkrautLfm25 => {
+            &["pytorch_model.bin", "gliner_config.json", "tokenizer.json"]
+        }
+        NerExtractorKind::Anno | NerExtractorKind::Regex => &[],
+    }
+}
+
+/// Fixture directory for a model-backed kind that is present and complete.
+/// Lightweight kinds have no fixture directory (`None`).
 fn fixture_dir(kind: NerExtractorKind) -> Option<PathBuf> {
     let dir = match kind {
         NerExtractorKind::AnnoOnnx => fixture_root().join("deepanwa--NuNerZero_onnx"),
@@ -38,11 +58,19 @@ fn fixture_dir(kind: NerExtractorKind) -> Option<PathBuf> {
         // Lightweight kinds never consult the filesystem.
         NerExtractorKind::Anno | NerExtractorKind::Regex => return None,
     };
-    if dir.is_dir() { Some(dir) } else { None }
+    if dir.is_dir()
+        && required_files(kind)
+            .iter()
+            .all(|file| dir.join(file).is_file())
+    {
+        Some(dir)
+    } else {
+        None
+    }
 }
 
-/// Whether the checkpoint for `kind` exists locally. Lightweight kinds are
-/// always "present".
+/// Whether a usable checkpoint for `kind` exists locally. Lightweight kinds
+/// are always "present".
 pub fn fixture_present(kind: NerExtractorKind) -> bool {
     matches!(kind, NerExtractorKind::Anno | NerExtractorKind::Regex) || fixture_dir(kind).is_some()
 }
@@ -64,15 +92,15 @@ fn logger() -> StdoutLogger {
     StdoutLogger::new("error")
 }
 
-/// Builds the extractor for `kind` through the production factory.
+/// Builds the extractor for `kind` from a local fixture, when present.
 ///
-/// Returns `None` when a model-backed kind has no local fixture. Classic
-/// GLiNER uses the seeded artifact-store pattern (revision pinned, no
-/// network); the other kinds build directly from their prepared checkpoint
-/// directory via `cache_dir`.
-#[allow(clippy::question_mark)] // `?` on `Option` inside async: verifier flow is clearer as `return None` here.
+/// Returns `None` when a model-backed kind has no complete local fixture.
+/// Model-backed kinds are built through the production store-free
+/// constructors, so no revision is resolved and nothing is downloaded.
+/// A `None` from a present-but-incomplete fixture is never a panic.
+#[allow(clippy::question_mark)] // `?` on `Option` inside async: `return None` is clearer here.
 pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
-    let extractor = match kind {
+    let extractor: Arc<dyn EntityExtractor> = match kind {
         NerExtractorKind::Anno => create_entity_extractor(
             &NerConfig {
                 extractor: NerExtractorConfig::Anno,
@@ -92,6 +120,9 @@ pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExt
         .await
         .expect("regex extractor must build"),
         NerExtractorKind::AnnoOnnx => {
+            // `create_entity_extractor` with an explicit `cache_dir` treats it
+            // as a raw model directory (anno_onnx::build), so the ONNX fixture
+            // is used directly with no store and no download.
             let Some(dir) = fixture_dir(kind) else {
                 return None;
             };
@@ -115,91 +146,36 @@ pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExt
             let Some(dir) = fixture_dir(kind) else {
                 return None;
             };
-            create_entity_extractor(
-                &NerConfig {
-                    extractor: NerExtractorConfig::ClassicGliner(NativeGlinerConfig {
-                        model: ModelBackedNerConfig {
-                            cache_dir: Some(seeded_gliner_store_root(&dir)),
-                            labels: default_labels(),
-                            threshold: Some(0.5),
-                            max_concurrency: 1,
-                            idle_unload_secs: 0,
-                        },
-                        batch_size: 1,
-                        max_batch_tokens: 1536,
-                        device: GlinerDeviceKind::Cpu,
-                    }),
-                },
-                env!("CARGO_MANIFEST_DIR"),
-                &logger(),
-            )
-            .await
-            .expect("GLiNER extractor must build from the seeded store")
+            // Store-free production constructor: direct lazy loader, no
+            // revision resolution, no download.
+            match GlinerEntityExtractor::new(&dir, default_labels(), 0.5) {
+                Ok(extractor) => Arc::new(extractor),
+                Err(_) => return None,
+            }
         }
         NerExtractorKind::SauerkrautLfm25 => {
             let Some(dir) = fixture_dir(kind) else {
                 return None;
             };
-            create_entity_extractor(
-                &NerConfig {
-                    extractor: NerExtractorConfig::SauerkrautLfm25(NativeGlinerConfig {
-                        model: ModelBackedNerConfig {
-                            cache_dir: Some(dir),
-                            labels: default_labels(),
-                            threshold: Some(0.5),
-                            max_concurrency: 1,
-                            idle_unload_secs: 0,
-                        },
-                        batch_size: 1,
-                        max_batch_tokens: 1536,
-                        device: GlinerDeviceKind::Cpu,
-                    }),
-                },
-                env!("CARGO_MANIFEST_DIR"),
-                &logger(),
-            )
-            .await
-            .expect("VAGO extractor must build from a prepared checkpoint")
+            // Store-free production constructor (same path the release-parity
+            // gate uses): direct lazy loader over `pytorch_model.bin`.
+            match VagoLfm2EntityExtractor::new_with_runtime(
+                &dir,
+                default_labels(),
+                0.5,
+                1,    // batch_size
+                1536, // max_batch_tokens
+                1,    // max_concurrency
+                GlinerDeviceKind::Cpu,
+                0, // idle_unload_secs (retain)
+                logger(),
+            ) {
+                Ok(extractor) => Arc::new(extractor),
+                Err(_) => return None,
+            }
         }
     };
     Some(extractor)
-}
-
-/// Seeds a leaked artifact-store root from the local GLiNER fixture so the
-/// production store reuses the checkpoint instead of downloading 1.1 GB.
-/// The upstream revision is pinned; if upstream HEAD moves, the first run
-/// re-downloads once and the store then caches it (documented limitation).
-fn seeded_gliner_store_root(fixture_dir: &std::path::Path) -> PathBuf {
-    use memory_mcp::service::model_artifacts::{
-        PersistedArtifactState, RevisionState, RevisionStatus, ValidationStatus, persist_state,
-    };
-    const SEEDED_REVISION: &str = "443d26d654e0324125a96bebd8e796c14ff2efe6";
-
-    let temp = tempfile::TempDir::new().expect("temp dir for seeded store");
-    let store_root = temp.path().join("ner-store");
-    let revision_dir = store_root
-        .join("gliner")
-        .join("revisions")
-        .join(SEEDED_REVISION);
-    std::fs::create_dir_all(&revision_dir).expect("create seeded revision dir");
-    for file_name in ["gliner_config.json", "model.safetensors", "tokenizer.json"] {
-        std::fs::copy(fixture_dir.join(file_name), revision_dir.join(file_name))
-            .expect("copy GLiNER fixture into seeded store");
-    }
-    let mut state = PersistedArtifactState::new();
-    state.revisions.push(RevisionState {
-        revision: SEEDED_REVISION.to_string(),
-        artifact_identity: "seeded-local-fixture".to_string(),
-        validation_status: ValidationStatus::RuntimeRegressionVerified,
-        revision_status: RevisionStatus::Latest,
-        activated_at: 1_700_000_000,
-        incompatible: None,
-    });
-    persist_state(&store_root.join("gliner").join("state.json"), &state)
-        .expect("persist seeded state");
-    // The store lives for the whole process; drop only the guard.
-    std::mem::forget(temp);
-    store_root
 }
 
 #[cfg(test)]
@@ -246,5 +222,26 @@ mod tests {
             let extractor = rt.block_on(build_extractor(kind));
             assert_eq!(fixture_present(kind), extractor.is_some(), "{kind:?}");
         }
+    }
+
+    #[test]
+    fn model_kinds_declare_required_checkpoint_files() {
+        // The completeness contract that keeps `build_extractor` panic-free:
+        // every model-backed kind declares the exact files its loader reads.
+        assert_eq!(
+            required_files(NerExtractorKind::AnnoOnnx),
+            &["model.onnx", "tokenizer.json", "config.json"]
+        );
+        assert_eq!(
+            required_files(NerExtractorKind::ClassicGliner),
+            &["model.safetensors", "gliner_config.json", "tokenizer.json"]
+        );
+        assert_eq!(
+            required_files(NerExtractorKind::SauerkrautLfm25),
+            &["pytorch_model.bin", "gliner_config.json", "tokenizer.json"]
+        );
+        // Lightweight kinds never consult the filesystem.
+        assert!(required_files(NerExtractorKind::Anno).is_empty());
+        assert!(required_files(NerExtractorKind::Regex).is_empty());
     }
 }

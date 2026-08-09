@@ -63,9 +63,10 @@ cargo run -p eval-harness --bin memory-eval -- run \
 The markdown report renders one suite summary per extractor:
 `entity_mention_precision`, `entity_mention_recall`, `entity_mention_f1` (mention matching is
 case-insensitive on canonical names, so type-vocabulary differences between backends
-do not distort the comparison). Per-case diagnostics include `ner_typed_f1` and a list
-of missing/unexpected mentions. Selecting a suite whose checkpoint is missing produces
-explicit `invalid` cases — filter with `--suite` to what you have.
+do not distort the comparison). The artifact carries per-case diagnostics —
+`ner_typed_f1` and the list of missing/unexpected mentions — and the report surfaces
+them on invalid cases. Selecting a suite whose checkpoint is missing produces explicit
+`invalid` cases — filter with `--suite` to what you have.
 
 ### Performance (latency + cold start)
 
@@ -87,13 +88,13 @@ before measuring. Model-backed benches skip with a note when the checkpoint is a
 ## Checkpoints
 
 The model-backed suites read **local, gitignored** checkpoints only — nothing is
-downloaded. Prepare them by placing the folders under
-`crates/memory-mcp/tests/models/ner/`:
+downloaded and no upstream revision is resolved at eval time. Prepare them by placing
+the folders under `crates/memory-mcp/tests/models/ner/`:
 
 | Suite | Fixture dir | How to populate it (all offline after first download) |
 |---|---|---|
-| `ner-quality-anno-onnx` | `crates/memory-mcp/tests/models/ner/deepanwa--NuNerZero_onnx/` | Set `NER_EXTRACTOR=anno-onnx` and run `memory_mcp ingest` once; the artifact store downloads the ONNX package into `~/.cache/memory_mcp/models/ner-store/<revision>/`; copy that directory as the fixture dir. |
-| `ner-quality-gliner` | `crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1/` | Set `NER_EXTRACTOR=urchade/gliner_multi-v2.1` and run `memory_mcp ingest` once; copy `~/.cache/memory_mcp/models/ner-store/<revision>/` as the fixture dir. |
+| `ner-quality-anno-onnx` | `crates/memory-mcp/tests/models/ner/deepanwa--NuNerZero_onnx/` | Download HF `deepanwa/NuNerZero_onnx` (`model.onnx`, `tokenizer.json`, `config.json`) into this dir. |
+| `ner-quality-gliner` | `crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1/` | Download HF `urchade/gliner_multi-v2.1` (`model.safetensors`, `gliner_config.json`, `tokenizer.json`) into this dir. |
 | `ner-quality-vago` | `crates/memory-mcp/tests/models/ner/VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER/` | Download HF `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (`pytorch_model.bin`, `gliner_config.json`, `tokenizer.json`, ~1.6 GB) into this dir. |
 
 ### Interpreting the results

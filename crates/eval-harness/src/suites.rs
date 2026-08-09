@@ -42,6 +42,9 @@ mod tests {
         "entity_f1",
         "entity_precision",
         "entity_recall",
+        "entity_mention_f1",
+        "entity_mention_precision",
+        "entity_mention_recall",
         "claim_precision",
         "claim_recall",
     ];

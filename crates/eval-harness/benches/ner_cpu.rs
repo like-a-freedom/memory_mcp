@@ -31,10 +31,12 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     let single = fixture.single_window.to_string();
     let multi = fixture.multi_window.to_string();
 
+    // Reuse the setup runtime: creating one per iteration adds tens of µs of
+    // noise that swamps the fast lightweight backends (regex ~1.2 ms, anno
+    // ~0.4 ms).
     c.bench_function(&format!("{label}_single_window_warm"), |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();
-            let rt = tokio::runtime::Runtime::new().unwrap();
             for _ in 0..iters {
                 rt.block_on(async {
                     black_box(
@@ -52,7 +54,6 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     c.bench_function(&format!("{label}_multi_window_warm"), |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();
-            let rt = tokio::runtime::Runtime::new().unwrap();
             for _ in 0..iters {
                 rt.block_on(async {
                     black_box(
@@ -118,7 +119,6 @@ fn bench_default_service_probe(c: &mut Criterion) {
     c.bench_function("default_service_extract_warm", |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();
-            let rt = tokio::runtime::Runtime::new().unwrap();
             for _ in 0..iters {
                 rt.block_on(async {
                     black_box(

@@ -222,8 +222,9 @@ impl RunArtifact {
             })
             .collect();
         for id in &self.expected_case_ids {
-            // `id` is either a bare case id (legacy single-suite artifact) or a
-            // `suite_id::case_id` pair. Check both forms.
+            // Expected ids are bare corpus case ids; outcomes are
+            // suite-scoped, so a bare id is covered when any suite produced a
+            // case with that id.
             let present = outcome_keys
                 .iter()
                 .any(|(_, case_id)| case_id == id.as_str());

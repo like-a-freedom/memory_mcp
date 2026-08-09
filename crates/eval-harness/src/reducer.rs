@@ -159,20 +159,19 @@ impl SuiteReducer for ClassificationReducer {
 
         let mut metrics = BTreeMap::new();
 
+        // Degrade gracefully instead of hard-failing the run: an extractor
+        // that produced no predictions (or no evidence at all, e.g. all cases
+        // invalid) still renders a summary whose counts tell the story.
         let precision = if total_tp + total_fp > 0 {
             total_tp as f64 / (total_tp + total_fp) as f64
         } else {
-            return Err(EvalError::InvalidInput(
-                "no classification predictions to evaluate".into(),
-            ));
+            0.0
         };
 
         let recall = if total_tp + total_fn > 0 {
             total_tp as f64 / (total_tp + total_fn) as f64
         } else {
-            return Err(EvalError::InvalidInput(
-                "no classification ground truth to evaluate".into(),
-            ));
+            0.0
         };
 
         let f1 = if precision + recall > 0.0 {
@@ -415,6 +414,35 @@ mod tests {
         assert!((summary.metrics["entity_precision"] - 0.5).abs() < 1e-12);
         assert!((summary.metrics["entity_recall"] - 0.5).abs() < 1e-12);
         assert!((summary.metrics["entity_f1"] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn classification_empty_predictions_returns_zeroes() {
+        // Ground truth exists but the extractor produced nothing: precision,
+        // recall, and F1 are 0.0, and the run still renders instead of erroring.
+        let outcomes = vec![classification_outcome("a", 0, 0, 3, 0)];
+        let summary = ClassificationReducer::new("extraction", "entity")
+            .reduce(&outcomes)
+            .unwrap()
+            .remove(0);
+        assert_eq!(summary.metrics["entity_precision"], 0.0);
+        assert_eq!(summary.metrics["entity_recall"], 0.0);
+        assert_eq!(summary.metrics["entity_f1"], 0.0);
+    }
+
+    #[test]
+    fn classification_no_evidence_returns_zeroes() {
+        // All outcomes invalid without evidence must not hard-fail the runner.
+        let outcomes = vec![
+            classification_outcome("a", 0, 0, 0, 0),
+            classification_outcome("b", 0, 0, 0, 0),
+        ];
+        let summary = ClassificationReducer::new("extraction", "entity")
+            .reduce(&outcomes)
+            .unwrap()
+            .remove(0);
+        assert_eq!(summary.metrics["entity_precision"], 0.0);
+        assert_eq!(summary.total, 2);
     }
 
     #[test]
