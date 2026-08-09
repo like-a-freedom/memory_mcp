@@ -229,4 +229,25 @@ mod tests {
             assert!(!manifest.suites.is_empty());
         }
     }
+
+    #[test]
+    fn ner_quality_profile_loads_with_expected_suites() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../evals/profiles/ner_quality.json");
+        let manifest = ProfileManifest::load(&path).expect("ner_quality profile must load");
+        assert_eq!(manifest.profile, EvalProfile::NerQuality);
+        assert_eq!(manifest.time_budget_seconds, 1800);
+        assert_eq!(manifest.suites.len(), 5);
+        let ids: Vec<_> = manifest.suites.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "ner-quality-anno",
+                "ner-quality-regex",
+                "ner-quality-anno-onnx",
+                "ner-quality-gliner",
+                "ner-quality-vago",
+            ]
+        );
+    }
 }

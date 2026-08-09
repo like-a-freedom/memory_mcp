@@ -5,7 +5,7 @@ use eval_harness::{
     ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest, DatasetKind,
     DownstreamQaSuite, EndToEndSuite, ExternalRetrievalSuite, ExtractionSuite,
     LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, ResponseSizeSuite, RetrievalSuite,
-    RunArtifact, RunRequest, Runner, SuiteId,
+    RunArtifact, RunRequest, Runner, SuiteId, suites::ner_quality,
 };
 
 #[tokio::main]
@@ -134,6 +134,16 @@ async fn cmd_run(
                     issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
                 }
             },
+            "ner-quality-anno"
+            | "ner-quality-regex"
+            | "ner-quality-anno-onnx"
+            | "ner-quality-gliner"
+            | "ner-quality-vago" => {
+                if let Err(e) = ner_quality::register(&suite_decl.id, &mut suites) {
+                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
+                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
+                }
+            }
             other => {
                 eprintln!("warning: unknown suite {other}");
                 issues.push(eval_harness::RunIssue::empty_suite(other));

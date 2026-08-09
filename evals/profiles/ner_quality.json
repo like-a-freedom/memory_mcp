@@ -1,0 +1,13 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "ner_quality",
+  "time_budget_seconds": 1800,
+  "suites": [
+    { "id": "ner-quality-anno", "expected_coverage": { "exact_cases": 10 } },
+    { "id": "ner-quality-regex", "expected_coverage": { "exact_cases": 10 } },
+    { "id": "ner-quality-anno-onnx", "expected_coverage": { "exact_cases": 10 } },
+    { "id": "ner-quality-gliner", "expected_coverage": { "exact_cases": 10 } },
+    { "id": "ner-quality-vago", "expected_coverage": { "exact_cases": 10 } }
+  ],
+  "gates": []
+}

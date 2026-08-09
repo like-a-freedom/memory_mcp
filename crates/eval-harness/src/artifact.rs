@@ -183,6 +183,11 @@ impl RunArtifact {
         for outcome in &self.outcomes {
             outcome.validate()?;
 
+            let outcome_key = (
+                outcome.case_key.suite_id.as_str(),
+                outcome.case_key.case_id.as_str(),
+            );
+
             if !seen_expected.contains(outcome.case_id().as_str()) {
                 let key_str = format!(
                     "{}::{}",
@@ -197,18 +202,32 @@ impl RunArtifact {
                 }
             }
 
-            if !seen_outcomes.insert(outcome.case_id().as_str()) {
+            if !seen_outcomes.insert(outcome_key) {
                 return Err(EvalError::InvalidInput(format!(
-                    "duplicate outcome for case ID: {}",
+                    "duplicate outcome for suite `{}` case `{}`",
+                    outcome.case_key.suite_id.as_str(),
                     outcome.case_id().as_str()
                 )));
             }
         }
 
-        let outcome_ids: std::collections::HashSet<&str> =
-            self.outcomes.iter().map(|o| o.case_id().as_str()).collect();
+        let outcome_keys: std::collections::HashSet<(String, String)> = self
+            .outcomes
+            .iter()
+            .map(|o| {
+                (
+                    o.case_key.suite_id.as_str().to_string(),
+                    o.case_key.case_id.as_str().to_string(),
+                )
+            })
+            .collect();
         for id in &self.expected_case_ids {
-            if !outcome_ids.contains(id.as_str()) {
+            // `id` is either a bare case id (legacy single-suite artifact) or a
+            // `suite_id::case_id` pair. Check both forms.
+            let present = outcome_keys
+                .iter()
+                .any(|(_, case_id)| case_id == id.as_str());
+            if !present {
                 return Err(EvalError::InvalidInput(format!(
                     "missing outcome for expected case ID: {}",
                     id.as_str()
