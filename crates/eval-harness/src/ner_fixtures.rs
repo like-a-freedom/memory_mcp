@@ -70,6 +70,7 @@ fn logger() -> StdoutLogger {
 /// GLiNER uses the seeded artifact-store pattern (revision pinned, no
 /// network); the other kinds build directly from their prepared checkpoint
 /// directory via `cache_dir`.
+#[allow(clippy::question_mark)] // `?` on `Option` inside async: verifier flow is clearer as `return None` here.
 pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
     let extractor = match kind {
         NerExtractorKind::Anno => create_entity_extractor(

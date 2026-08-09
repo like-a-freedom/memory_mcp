@@ -6,6 +6,7 @@ pub mod end_to_end;
 pub mod external_retrieval;
 pub mod extraction;
 pub mod lifecycle;
+pub mod ner_quality;
 pub mod poisoning;
 pub mod response_size;
 pub mod retrieval;
@@ -18,6 +19,7 @@ pub use end_to_end::EndToEndSuite;
 pub use external_retrieval::{ExternalRetrievalSuite, WorkerPolicy};
 pub use extraction::ExtractionSuite;
 pub use lifecycle::LifecycleReleaseSuite;
+pub use ner_quality::NerQualitySuite;
 pub use poisoning::PoisoningSuite;
 pub use response_size::ResponseSizeSuite;
 pub use retrieval::LocalRetrievalSuite as RetrievalSuite;
@@ -53,6 +55,7 @@ mod tests {
         "external_retrieval.rs",
         "extraction.rs",
         "lifecycle.rs",
+        "ner_quality.rs",
         "poisoning.rs",
         "response_size.rs",
         "retrieval.rs",

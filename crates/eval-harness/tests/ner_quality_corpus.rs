@@ -34,7 +34,8 @@ struct CorpusEntity {
 }
 
 fn load() -> CorpusFile {
-    let raw = std::fs::read_to_string(&corpus_path())
+    let path = corpus_path();
+    let raw = std::fs::read_to_string(path)
         .unwrap_or_else(|err| panic!("read corpus {}: {err}", corpus_path().display()));
     serde_json::from_str(&raw)
         .unwrap_or_else(|err| panic!("parse corpus {}: {err}", corpus_path().display()))
