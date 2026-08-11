@@ -64,7 +64,7 @@ The markdown report renders one suite summary per extractor:
 `entity_mention_precision`, `entity_mention_recall`, `entity_mention_f1` (mention matching is
 case-insensitive on canonical names, so type-vocabulary differences between backends
 do not distort the comparison). The artifact carries per-case diagnostics —
-`ner_typed_f1` and the list of missing/unexpected mentions — and the report surfaces
+`entity_mention_typed_f1` and the list of missing/unexpected mentions — and the report surfaces
 them on invalid cases. Selecting a suite whose checkpoint is missing produces explicit
 `invalid` cases — filter with `--suite` to what you have.
 

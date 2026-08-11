@@ -8,19 +8,6 @@ use eval_harness::ner_fixtures;
 use eval_harness::suites::ner_quality::{NerQualityCase, run_case};
 use memory_mcp::config::NerExtractorKind;
 
-fn load_cases() -> Vec<NerQualityCase> {
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../evals/corpora/ner/ner_quality.json");
-    let raw = std::fs::read_to_string(&path).expect("read corpus");
-    #[derive(serde::Deserialize)]
-    struct Corpus {
-        cases: Vec<NerQualityCase>,
-    }
-    serde_json::from_str::<Corpus>(&raw)
-        .expect("parse corpus")
-        .cases
-}
-
 #[tokio::test]
 #[ignore = "requires the local GLiNER checkpoint under crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1/"]
 async fn real_gliner_scores_quality_corpus() {
@@ -28,7 +15,8 @@ async fn real_gliner_scores_quality_corpus() {
     else {
         panic!("GLiNER fixture missing; run with the checkpoint in place");
     };
-    let cases = load_cases();
+    let cases: Vec<NerQualityCase> =
+        eval_harness::suites::ner_quality::load_cases().expect("read corpus");
     assert_eq!(cases.len(), 10);
     for case in &cases {
         let outcome = run_case("ner-quality-gliner", extractor.as_ref(), case).await;

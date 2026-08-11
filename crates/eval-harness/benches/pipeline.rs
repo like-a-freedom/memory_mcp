@@ -1,7 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
 use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
 
 fn bench_ingest(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -10,23 +9,12 @@ fn bench_ingest(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
-                IngestCapability::ingest(
-                    &service.build_context(),
-                    memory_mcp::models::IngestRequest {
-                        source_type: "bench".into(),
-                        source_id: "bench-001".into(),
-                        content: "Benchmark test content for ingestion timing.".into(),
-                        t_ref: chrono::Utc::now(),
-                        scope: "org".into(),
-                        project: None,
-                        t_ingested: None,
-                        visibility_scope: None,
-                        policy_tags: vec![],
-                    },
-                    None,
+                eval_harness::test_support::ingest_probe(
+                    &service,
+                    "bench-001",
+                    "Benchmark test content for ingestion timing.",
                 )
-                .await
-                .unwrap();
+                .await;
             });
         });
     });
@@ -40,30 +28,20 @@ fn bench_extract(c: &mut Criterion) {
             || {
                 rt.block_on(async {
                     let service = eval_harness::test_support::make_service().await;
-                    let episode_id = IngestCapability::ingest(
-                        &service.build_context(),
-
-                            memory_mcp::models::IngestRequest {
-                                source_type: "bench".into(),
-                                source_id: "bench-ext-001".into(),
-                                content: "The quarterly revenue report shows significant growth across all regions.".into(),
-                                t_ref: chrono::Utc::now(),
-                                scope: "org".into(),
-                                project: None,
-                                t_ingested: None,
-                                visibility_scope: None,
-                                policy_tags: vec![],
-                            },
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    let episode_id = eval_harness::test_support::ingest_probe(
+                        &service,
+                        "bench-ext-001",
+                        "The quarterly revenue report shows significant growth across all regions.",
+                    )
+                    .await;
                     (service, episode_id)
                 })
             },
             |(service, episode_id)| {
                 rt.block_on(async {
-                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await.unwrap();
+                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                        .await
+                        .unwrap();
                 });
             },
             criterion::BatchSize::SmallInput,
@@ -79,25 +57,14 @@ fn bench_retrieval(c: &mut Criterion) {
             rt.block_on(async {
                 let service = eval_harness::test_support::make_service().await;
                 for i in 0..10 {
-                    IngestCapability::ingest(
-                        &service.build_context(),
-                        memory_mcp::models::IngestRequest {
-                            source_type: "bench".into(),
-                            source_id: format!("bench-ret-{i}"),
-                            content: format!(
-                                "Fact {i}: The project status update shows milestone {i} completed."
-                            ),
-                            t_ref: chrono::Utc::now(),
-                            scope: "org".into(),
-                            project: None,
-                            t_ingested: None,
-                            visibility_scope: None,
-                            policy_tags: vec![],
-                        },
-                        None,
+                    eval_harness::test_support::ingest_probe(
+                        &service,
+                        &format!("bench-ret-{i}"),
+                        &format!(
+                            "Fact {i}: The project status update shows milestone {i} completed."
+                        ),
                     )
-                    .await
-                    .unwrap();
+                    .await;
                 }
                 AssembleContextCapability::assemble_context(
                     &service.build_context(),

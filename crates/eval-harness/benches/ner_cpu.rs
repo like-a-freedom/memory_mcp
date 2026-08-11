@@ -105,23 +105,12 @@ fn bench_default_service_probe(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let (service, episode_id) = rt.block_on(async {
         let service = eval_harness::test_support::make_service().await;
-        let episode_id = memory_mcp::service::capabilities::ingest::IngestCapability::ingest(
-            &service.build_context(),
-            memory_mcp::models::IngestRequest {
-                source_type: "bench".into(),
-                source_id: "probe-001".into(),
-                content: "Alice Smith from Acme Corp presented quarterly revenue.".into(),
-                t_ref: chrono::Utc::now(),
-                scope: "org".into(),
-                project: None,
-                t_ingested: None,
-                visibility_scope: None,
-                policy_tags: vec![],
-            },
-            None,
+        let episode_id = eval_harness::test_support::ingest_probe(
+            &service,
+            "probe-001",
+            "Alice Smith from Acme Corp presented quarterly revenue.",
         )
-        .await
-        .unwrap();
+        .await;
         (service, episode_id)
     });
 

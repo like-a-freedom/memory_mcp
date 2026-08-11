@@ -2,43 +2,10 @@
 
 use std::path::PathBuf;
 
-fn corpus_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../evals/corpora/ner/ner_quality.json")
-}
-
-#[derive(serde::Deserialize)]
-struct CorpusFile {
-    schema_version: u32,
-    fixture_status: String,
-    #[serde(default)]
-    languages: Vec<String>,
-    cases: Vec<CorpusCase>,
-}
-
-#[derive(serde::Deserialize)]
-struct CorpusCase {
-    id: String,
-    language: String,
-    text: String,
-    labels: Vec<String>,
-    #[serde(default)]
-    entities: Vec<CorpusEntity>,
-}
-
-#[derive(serde::Deserialize)]
-struct CorpusEntity {
-    start: usize,
-    end: usize,
-    text: String,
-    label: String,
-}
+use eval_harness::suites::ner_quality::{CorpusFile, load_corpus};
 
 fn load() -> CorpusFile {
-    let path = corpus_path();
-    let raw = std::fs::read_to_string(path)
-        .unwrap_or_else(|err| panic!("read corpus {}: {err}", corpus_path().display()));
-    serde_json::from_str(&raw)
-        .unwrap_or_else(|err| panic!("parse corpus {}: {err}", corpus_path().display()))
+    load_corpus().unwrap_or_else(|err| panic!("load corpus: {err}"))
 }
 
 #[test]

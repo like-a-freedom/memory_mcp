@@ -102,6 +102,7 @@ fn logger() -> StdoutLogger {
 async fn build_model_extractor(
     kind: NerExtractorKind,
     dir: &std::path::Path,
+    device: GlinerDeviceKind,
 ) -> Option<Arc<dyn EntityExtractor>> {
     match kind {
         NerExtractorKind::AnnoOnnx => {
@@ -142,7 +143,7 @@ async fn build_model_extractor(
                 1,    // batch_size
                 1536, // max_batch_tokens
                 1,    // max_concurrency
-                GlinerDeviceKind::Cpu,
+                device,
                 0, // idle_unload_secs (retain)
                 logger(),
             )
@@ -154,14 +155,18 @@ async fn build_model_extractor(
     }
 }
 
-/// Builds the extractor for `kind`, fixture-gated for model-backed kinds.
+/// Builds the extractor for `kind` on the requested device, fixture-gated for
+/// model-backed kinds.
 ///
 /// Lightweight kinds always build. A model-backed kind returns `None` when
 /// its fixture is absent, incomplete, or fails to construct — never a panic
 /// and never a download.
-pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
+pub async fn build_extractor_for(
+    kind: NerExtractorKind,
+    device: GlinerDeviceKind,
+) -> Option<Arc<dyn EntityExtractor>> {
     if let Some(dir) = fixture_dir(kind) {
-        return build_model_extractor(kind, &dir).await;
+        return build_model_extractor(kind, &dir, device).await;
     }
     match kind {
         NerExtractorKind::Anno => Some(
@@ -191,6 +196,11 @@ pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExt
         | NerExtractorKind::ClassicGliner
         | NerExtractorKind::SauerkrautLfm25 => None,
     }
+}
+
+/// Builds the extractor for `kind` on the CPU device.
+pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
+    build_extractor_for(kind, GlinerDeviceKind::Cpu).await
 }
 
 #[cfg(test)]
@@ -275,6 +285,7 @@ mod tests {
         let extractor = rt.block_on(build_model_extractor(
             NerExtractorKind::AnnoOnnx,
             temp.path(),
+            GlinerDeviceKind::Cpu,
         ));
         assert!(
             extractor.is_none(),

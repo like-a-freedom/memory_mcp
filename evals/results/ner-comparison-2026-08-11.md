@@ -19,7 +19,7 @@
 | `gliner` (`urchade/gliner_multi-v2.1`) | 0.9184 | 0.8654 | **0.9783** | 0.8770 | 145 ms | 508 ms | 217 µs (ctor) |
 | `vago` (`VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`) | **0.9302** | **1.0000** | 0.8696 | **0.9038** | 159 ms | 704 ms | 227 µs (ctor) |
 
-\* Typed F1 = per-case average of the `ner_typed_f1` diagnostic (name **and** label match); the
+\* Typed F1 = per-case average of the `entity_mention_typed_f1` diagnostic (name **and** label match); the
 report's suite F1 is the authoritative mention-level comparison (aggregated tp/fp/fn across cases).
 Per-case mention-F1 averages: regex 0.7626, anno 0.7767, anno-onnx 0.2214, gliner 0.9106, vago 0.9038.
 
@@ -78,7 +78,7 @@ Suite-aggregated mention metrics (authoritative):
 | `ner-quality-gliner` | 3/10 | 0.8654 | 0.9783 | 0.9184 |
 | `ner-quality-vago` | **7/10** | **1.0000** | 0.8696 | **0.9302** |
 
-Per-case diagnostic averages (mean of 10 cases; `ner_typed_f1` = name + label agreement):
+Per-case diagnostic averages (mean of 10 cases; `entity_mention_typed_f1` = name + label agreement):
 
 | Suite | mention_f1 avg | typed_f1 avg |
 |---|---|---|

@@ -68,6 +68,28 @@ pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>)
     (memory.service, memory.db_client)
 }
 
+/// Ingests one episode through the production path for benchmark probes.
+/// The request shape every bench used to hand-roll lives here.
+pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &str) -> String {
+    IngestCapability::ingest(
+        &service.build_context(),
+        IngestRequest {
+            source_type: "bench".into(),
+            source_id: source_id.to_string(),
+            content: content.to_string(),
+            t_ref: Utc::now(),
+            scope: "org".into(),
+            project: None,
+            t_ingested: None,
+            visibility_scope: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("probe ingest should succeed")
+}
+
 pub async fn seed_entity(
     db_client: &Arc<SurrealDbClient>,
     scope: &str,

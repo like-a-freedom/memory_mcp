@@ -37,26 +37,28 @@ pub struct NerQualityEntity {
     pub label: String,
 }
 
-#[derive(Deserialize)]
-struct CorpusFile {
-    #[allow(dead_code)]
-    schema_version: u32,
-    #[allow(dead_code)]
-    fixture_status: String,
-    #[allow(dead_code)]
-    languages: Vec<String>,
-    cases: Vec<NerQualityCase>,
+#[derive(Debug, Clone, Deserialize)]
+pub struct CorpusFile {
+    pub schema_version: u32,
+    pub fixture_status: String,
+    pub languages: Vec<String>,
+    pub cases: Vec<NerQualityCase>,
 }
 
 fn corpus_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../evals/corpora/ner/ner_quality.json")
 }
 
-fn load_cases() -> Result<Vec<NerQualityCase>, EvalError> {
+/// Loads the shared NER quality corpus with its structural metadata.
+pub fn load_corpus() -> Result<CorpusFile, EvalError> {
     let path = corpus_path();
     let raw = std::fs::read_to_string(&path).map_err(|source| EvalError::Io { path, source })?;
-    let corpus: CorpusFile = serde_json::from_str(&raw).map_err(EvalError::Artifact)?;
-    Ok(corpus.cases)
+    serde_json::from_str(&raw).map_err(EvalError::Artifact)
+}
+
+/// Loads just the cases of the shared NER quality corpus.
+pub fn load_cases() -> Result<Vec<NerQualityCase>, EvalError> {
+    Ok(load_corpus()?.cases)
 }
 
 /// Maps `ner-quality-*` suite ids to their extractor kind.
@@ -255,7 +257,7 @@ pub async fn run_case(
     } else {
         2.0 * typed_precision * typed_recall / (typed_precision + typed_recall)
     };
-    metrics.insert("ner_typed_f1".into(), typed_f1);
+    metrics.insert("entity_mention_typed_f1".into(), typed_f1);
 
     let mut failures = Vec::new();
     for expected in &case.entities {
@@ -452,7 +454,7 @@ mod tests {
             "mention match is perfect"
         );
         assert!(
-            outcome.metrics["ner_typed_f1"] < 1.0,
+            outcome.metrics["entity_mention_typed_f1"] < 1.0,
             "typed diagnostic must reflect the label mismatch"
         );
     }
