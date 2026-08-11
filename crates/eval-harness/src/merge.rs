@@ -93,10 +93,13 @@ pub fn merge_shards(
     expected_ids.sort();
 
     // Reduce through the suite reducers so a merged artifact cannot disagree
-    // with a direct run of the same suites.
+    // with a direct run of the same suites. `all_outcomes` is consumed by the
+    // grouping below; one copy (`pending_outcomes`) backs the gate-evaluation
+    // artifact and is then partially moved into the final artifact.
+    let pending_outcomes = all_outcomes.clone();
     let mut by_suite: std::collections::BTreeMap<String, Vec<EvalCaseOutcome>> =
         std::collections::BTreeMap::new();
-    for outcome in all_outcomes.clone() {
+    for outcome in all_outcomes {
         by_suite
             .entry(outcome.suite_id().to_string())
             .or_default()
@@ -112,6 +115,11 @@ pub fn merge_shards(
         .flatten()
         .collect::<Vec<_>>();
 
+    // Budget semantics match a direct run: the budget is checked against the
+    // merged wall-clock-equivalent duration. Shards are usually run in
+    // parallel, so the summed duration is conservative (total compute, not
+    // wall clock) — a merged artifact can fail the budget gate when every
+    // shard passed it, which is deliberate.
     let duration_ms = shards.iter().map(|s| s.duration_ms).sum::<u64>();
     let budget_status = if manifest.time_budget_seconds > 0 {
         let budget_ms = manifest.time_budget_seconds * 1000;
@@ -132,7 +140,7 @@ pub fn merge_shards(
         duration_ms,
         expected_case_ids: expected_ids.clone(),
         expected_cases: vec![],
-        outcomes: all_outcomes.clone(),
+        outcomes: pending_outcomes,
         suite_summaries: suite_summaries.clone(),
         gates: vec![],
         fingerprint: fingerprint.clone(),
@@ -142,7 +150,11 @@ pub fn merge_shards(
     };
     let gates = crate::evaluate_gates(&manifest.gates, &pending, None)?;
     let budget = budget_status.unwrap_or(GateStatus::Invalid);
-    let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &[]);
+    // Shard issues are intentionally not carried over: coverage and validity
+    // are re-derived from the merged outcome set (a shard that under/overran
+    // coverage fails the expected-case checks below), so stale per-shard
+    // issues would mislabel an otherwise complete merge.
+    let verdict = derive_run_verdict(&pending.outcomes, &gates, budget.clone(), &[]);
 
     let artifact = RunArtifact {
         schema_version: crate::EVAL_ARTIFACT_SCHEMA_V2.to_string(),
@@ -152,8 +164,8 @@ pub fn merge_shards(
         duration_ms,
         expected_case_ids: expected_ids,
         expected_cases: vec![],
-        outcomes: all_outcomes,
-        suite_summaries,
+        outcomes: pending.outcomes,
+        suite_summaries: pending.suite_summaries,
         gates,
         fingerprint,
         budget_status: Some(budget),

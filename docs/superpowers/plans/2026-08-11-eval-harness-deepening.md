@@ -48,24 +48,24 @@
 - Consumes: nothing (pure deletion).
 - Produces: `NerBenchmarkFixture { single_window, multi_window }` with `pub fn load() -> Self` (infallible), accessors `single_window()` / `multi_window()` / `multi_window_token_count()`. `ContentionObservation` unchanged.
 
-- [ ] **Step 1: Delete dead items** from `benchmark.rs`:
+- [x] **Step 1: Delete dead items** from `benchmark.rs`:
   - `NerRunner` (and `impl`), `NerOutput`, `NerEntity`, `NerOutput::canonical`, `UnsupportedDevice`, `BenchmarkProvenance`, `assert_candidate_parity`, `NerBenchmarkFixture::metadata_only`, and the fields `model_name`, `model_digest`, `labels`, `threshold` from `NerBenchmarkFixture`.
   - Their unit tests (`parity_check_*`).
   - Drop `use crate::error::EvalError;` if no longer referenced (it is not — `ContentionObservation` uses no `EvalError`).
   - Change `load()` to return `Self` (remove `Result`/`Ok` wrapper; the two window strings cannot fail).
 
-- [ ] **Step 2: Adapt call sites**
+- [x] **Step 2: Adapt call sites**
 
 ```rust
 // benches/ner_cpu.rs — was: NerBenchmarkFixture::load().unwrap()
 let fixture = eval_harness::benchmark::NerBenchmarkFixture::load();
 ```
 
-- [ ] **Step 3: Update remaining tests** in `benchmark.rs` — `ner_fixture_loads_with_required_fields` becomes `ner_fixture_loads_window_texts` (assert both windows non-empty and token counts positive); `multi_window_exceeds_single_window` unchanged.
+- [x] **Step 3: Update remaining tests** in `benchmark.rs` — `ner_fixture_loads_with_required_fields` becomes `ner_fixture_loads_window_texts` (assert both windows non-empty and token counts positive); `multi_window_exceeds_single_window` unchanged.
 
-- [ ] **Step 4: Verify** — `cargo test -p eval-harness`, then `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings`.
+- [x] **Step 4: Verify** — `cargo test -p eval-harness`, then `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings`.
 
-- [ ] **Step 5: Commit** — `refactor(eval): remove dead NER bench scaffolding and fabricated digest`
+- [x] **Step 5: Commit** — `refactor(eval): remove dead NER bench scaffolding and fabricated digest`
 
 ---
 
@@ -85,7 +85,7 @@ let fixture = eval_harness::benchmark::NerBenchmarkFixture::load();
   - `pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer>` in `suites::registry` — known ids return their suite reducer (ner-quality ids: `ClassificationReducer` when `ner_fixtures::fixture_present(kind)` else `CountReducer`); unknown ids return `CountReducer::new(suite_id)`.
   - `pub fn merge_shards(shards: &[RunArtifact], manifest: &ProfileManifest) -> Result<RunArtifact, EvalError>`.
 
-- [ ] **Step 1: Write the failing test** (merge must aggregate, not first-win; verdict must not be blindly Passed)
+- [x] **Step 1: Write the failing test** (merge must aggregate, not first-win; verdict must not be blindly Passed)
 
 ```rust
 // in merge.rs tests — merge of classification outcomes aggregates confusion counts
@@ -122,9 +122,9 @@ fn merged_verdict_reflects_quality_failures() {
 
 `test_manifest` helper: `ProfileManifest { schema_version: "memory-mcp-eval-profile/v1".into(), profile, time_budget_seconds: 600, suites: vec![], gates: vec![] }`. `make_shard_with_outcomes(suite, outcomes)` mirrors `make_shard_with_suite` but takes pre-built outcomes (expected ids derived from them).
 
-- [ ] **Step 2: Run to verify failure** — `cargo test -p eval-harness merged_` → FAIL (current merge produces `entity_f1` = 0.8 via first-wins and `verdict` = Passed).
+- [x] **Step 2: Run to verify failure** — `cargo test -p eval-harness merged_` → FAIL (current merge produces `entity_f1` = 0.8 via first-wins and `verdict` = Passed).
 
-- [ ] **Step 3: Add `reducer_for` to `suites/registry.rs`** and a `ner_quality::build_reducer`
+- [x] **Step 3: Add `reducer_for` to `suites/registry.rs`** and a `ner_quality::build_reducer`
 
 ```rust
 // ner_quality.rs
@@ -162,7 +162,7 @@ pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
 
 `ner_quality::reducer_for_suite(suite_id)` maps `ner-quality-*` ids via `kind_for_id` and calls `build_reducer`; returns `Option<Box<dyn SuiteReducer>>`. Move `E2E_SPECS` / `LIFECYCLE_SPECS` to module-level `const`/`static` in `suites/registry.rs` (copy the literal specs from the suites, or reference them if they become `pub(crate)` — prefer copying into registry and deleting the in-method statics in Task 4).
 
-- [ ] **Step 4: Rewrite `merge_shards(shards, manifest)`**
+- [x] **Step 4: Rewrite `merge_shards(shards, manifest)`**
 
 Keep: empty-shards check; schema/profile/fingerprint-config-hash equality checks (extend to `shard.profile != manifest.profile`); outcome dedup `(suite_id, case_id)`; expected-id coverage; outcome sort.
 
@@ -210,9 +210,9 @@ Ok(artifact)
 
 Delete `compute_suite_summaries` and the `metric_sums` block.
 
-- [ ] **Step 5: Update existing merge tests** to pass `&test_manifest(EvalProfile::Pr)` (shards built with `profile: EvalProfile::Pr` match the manifest; `ner-quality-*` shards keep working — `reducer_for` is fixture-dependent but both branches produce one summary per suite).
+- [x] **Step 5: Update existing merge tests** to pass `&test_manifest(EvalProfile::Pr)` (shards built with `profile: EvalProfile::Pr` match the manifest; `ner-quality-*` shards keep working — `reducer_for` is fixture-dependent but both branches produce one summary per suite).
 
-- [ ] **Step 6: Wire `cmd_merge` in `main.rs`**
+- [x] **Step 6: Wire `cmd_merge` in `main.rs`**
 
 ```rust
 let manifest = match ProfileManifest::load(&profile_path) { Ok(m) => m, Err(e) => { eprintln!("error: {e}"); return ExitCode::from(2); } };
@@ -221,11 +221,11 @@ eval_harness::merge_shards(&shards, &manifest)
 ```
 Rename `_profile_path` → `profile_path`.
 
-- [ ] **Step 7: Amend ADR-0025** — add to Consequences: *"Merged shard artifacts reduce through the same suite reducers and re-evaluate gates/verdict, so a merged artifact cannot disagree with a direct run of the same suites."*
+- [x] **Step 7: Amend ADR-0025** — add to Consequences: *"Merged shard artifacts reduce through the same suite reducers and re-evaluate gates/verdict, so a merged artifact cannot disagree with a direct run of the same suites."*
 
-- [ ] **Step 8: Verify** — `cargo test -p eval-harness`, clippy command, `cargo fmt --all --check`.
+- [x] **Step 8: Verify** — `cargo test -p eval-harness`, clippy command, `cargo fmt --all --check`.
 
-- [ ] **Step 9: Commit** — `fix(eval): merge shards through suite reducers with re-derived gates and verdict`
+- [x] **Step 9: Commit** — `fix(eval): merge shards through suite reducers with re-derived gates and verdict`
 
 ---
 
@@ -239,13 +239,13 @@ Rename `_profile_path` → `profile_path`.
 **Interfaces:**
 - Produces (all `pub(crate)`): `RetrievalEvalCase`, `SeedFact`, `SeedEntity`, `SeedCommunity`, `SeedEdge`, `RetrievalExpectation`, `fn load_cases() -> Result<Vec<RetrievalEvalCase>, EvalError>`, `fn case_as_of(case: &RetrievalEvalCase) -> DateTime<Utc>`, `fn fixture_path() -> PathBuf`.
 
-- [ ] **Step 1: Move the shared types + helpers** verbatim into `retrieval_cases.rs` (the union of both files' identical definitions; keep `#[allow(dead_code)]` markers from the *response_size* copy so lib-only builds don't flag fields used only by one suite).
+- [x] **Step 1: Move the shared types + helpers** verbatim into `retrieval_cases.rs` (the union of both files' identical definitions; keep `#[allow(dead_code)]` markers from the *response_size* copy so lib-only builds don't flag fields used only by one suite).
 
-- [ ] **Step 2: Rewrite `retrieval.rs` and `response_size.rs`** to `use crate::suites::retrieval_cases::*;` (or `use super::retrieval_cases::*;`) and delete the private copies.
+- [x] **Step 2: Rewrite `retrieval.rs` and `response_size.rs`** to `use crate::suites::retrieval_cases::*;` (or `use super::retrieval_cases::*;`) and delete the private copies.
 
-- [ ] **Step 3: Verify** — existing suite tests (`fixture_loads_and_has_cases`, `case_ids_are_deterministic`, `single_case_produces_valid_outcome`, response_size tests) pass unchanged: `cargo test -p eval-harness`.
+- [x] **Step 3: Verify** — existing suite tests (`fixture_loads_and_has_cases`, `case_ids_are_deterministic`, `single_case_produces_valid_outcome`, response_size tests) pass unchanged: `cargo test -p eval-harness`.
 
-- [ ] **Step 4: Commit** — `refactor(eval): share retrieval case layer between retrieval and response-size suites`
+- [x] **Step 4: Commit** — `refactor(eval): share retrieval case layer between retrieval and response-size suites`
 
 ---
 
@@ -275,11 +275,11 @@ impl EvalSuite for PoisoningSuite {
 }
 ```
 
-- [ ] **Step 1–11: One suite at a time** — for each file: add the field, construct it in `new()` (and `Default` where it delegates to `new()`), simplify `reducer()` to `&self.reducer`, delete the `static OnceLock` + `Box::leak` block. End-to-end/lifecycle move their `SPECS` into `new()` (keep the `static` for the spec array — it's a `&'static` slice; only the reducer box/leak goes away). Response-size stores `ResponseSizeReducer` directly.
+- [x] **Step 1–11: One suite at a time** — for each file: add the field, construct it in `new()` (and `Default` where it delegates to `new()`), simplify `reducer()` to `&self.reducer`, delete the `static OnceLock` + `Box::leak` block. End-to-end/lifecycle move their `SPECS` into `new()` (keep the `static` for the spec array — it's a `&'static` slice; only the reducer box/leak goes away). Response-size stores `ResponseSizeReducer` directly.
 
-- [ ] **Step 12: Verify** — `cargo test -p eval-harness`; clippy; fmt.
+- [x] **Step 12: Verify** — `cargo test -p eval-harness`; clippy; fmt.
 
-- [ ] **Step 13: Commit** — `refactor(eval): store suite reducers as fields instead of leaked statics`
+- [x] **Step 13: Commit** — `refactor(eval): store suite reducers as fields instead of leaked statics`
 
 ---
 
@@ -295,7 +295,7 @@ impl EvalSuite for PoisoningSuite {
   - `pub fn build_suite(decl: &SuiteDecl) -> Result<Option<Box<dyn EvalSuite>>, EvalError>` — `Ok(None)` for unknown ids; `Err` on construction failure (caller warns + records an empty-suite issue); the `external-retrieval` arm (corpus manifest load + normalize) moves here from `main.rs`.
   - `ner_quality::build_suite(suite_id) -> Result<Box<dyn EvalSuite>, EvalError>` replacing `register`.
 
-- [ ] **Step 1: Write the failing test** in `registry.rs`
+- [x] **Step 1: Write the failing test** in `registry.rs`
 
 ```rust
 #[test]
@@ -316,9 +316,9 @@ fn every_declared_suite_builds() {
 
 (Simplify: assert `build_suite(&decl).unwrap().is_some()` for each id and `None` for unknown; assert `reducer_for(id).reduce(&[])` never errors for known ids. `external-retrieval` without `corpus_root` must return `Err` — assert that separately.)
 
-- [ ] **Step 2: Implement `build_suite`** by moving the `match suite_decl.id.as_str()` body from `main.rs::cmd_run` (including the `external-retrieval` corpus-loading arm) into the registry. `reducer_for` stays as-is from Task 2.
+- [x] **Step 2: Implement `build_suite`** by moving the `match suite_decl.id.as_str()` body from `main.rs::cmd_run` (including the `external-retrieval` corpus-loading arm) into the registry. `reducer_for` stays as-is from Task 2.
 
-- [ ] **Step 3: Slim `cmd_run`** in `main.rs` to the loop:
+- [x] **Step 3: Slim `cmd_run`** in `main.rs` to the loop:
 
 ```rust
 for suite_decl in &manifest.suites {
@@ -333,11 +333,11 @@ for suite_decl in &manifest.suites {
 }
 ```
 
-- [ ] **Step 4: Delete `ner_quality::register`** (no callers remain) after adding `ner_quality::build_suite`.
+- [x] **Step 4: Delete `ner_quality::register`** (no callers remain) after adding `ner_quality::build_suite`.
 
-- [ ] **Step 5: Verify** — `cargo test -p eval-harness` (incl. `ner_quality_profile_loads_with_expected_suites` in profile.rs); clippy; fmt.
+- [x] **Step 5: Verify** — `cargo test -p eval-harness` (incl. `ner_quality_profile_loads_with_expected_suites` in profile.rs); clippy; fmt.
 
-- [ ] **Step 6: Commit** — `refactor(eval): centralize suite build and reduce in a registry`
+- [x] **Step 6: Commit** — `refactor(eval): centralize suite build and reduce in a registry`
 
 ---
 
@@ -353,19 +353,19 @@ for suite_decl in &manifest.suites {
   - `pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &str) -> String` (returns episode id; scope `org`, `source_type` `bench`).
   - `pub async fn build_extractor_for(kind: NerExtractorKind, device: GlinerDeviceKind) -> Option<Arc<dyn EntityExtractor>>`; `build_extractor(kind)` becomes `build_extractor_for(kind, GlinerDeviceKind::Cpu)`; VAGO arm takes `device`; anno-onnx/classic-gliner ignore it.
 
-- [ ] **Step 1: Add `ingest_probe` to `test_support.rs`** (extract the `IngestRequest` literal the four benches repeat; use `expect` like the rest of `test_support`).
+- [x] **Step 1: Add `ingest_probe` to `test_support.rs`** (extract the `IngestRequest` literal the four benches repeat; use `expect` like the rest of `test_support`).
 
-- [ ] **Step 2: Add `build_extractor_for` to `ner_fixtures.rs`**; keep the docstring's "never download, fixture-gated" contract; `build_extractor` delegates.
+- [x] **Step 2: Add `build_extractor_for` to `ner_fixtures.rs`**; keep the docstring's "never download, fixture-gated" contract; `build_extractor` delegates.
 
-- [ ] **Step 3: Update `ner_cpu.rs`** — `bench_default_service_probe` uses `test_support::ingest_probe`.
+- [x] **Step 3: Update `ner_cpu.rs`** — `bench_default_service_probe` uses `test_support::ingest_probe`.
 
-- [ ] **Step 4: Update `ner_metal.rs`** — `bench_ner_apple_silicon_single_window` uses `ingest_probe`; `bench_vago_apple_silicon_single_window` builds via `ner_fixtures::build_extractor_for(NerExtractorKind::SauerkrautLfm25, GlinerDeviceKind::Auto)` (skip note when `None`) and deletes its hand-rolled config + labels literal.
+- [x] **Step 4: Update `ner_metal.rs`** — `bench_ner_apple_silicon_single_window` uses `ingest_probe`; `bench_vago_apple_silicon_single_window` builds via `ner_fixtures::build_extractor_for(NerExtractorKind::SauerkrautLfm25, GlinerDeviceKind::Auto)` (skip note when `None`) and deletes its hand-rolled config + labels literal.
 
-- [ ] **Step 5: Update `contention.rs` / `pipeline.rs`** to use `ingest_probe`.
+- [x] **Step 5: Update `contention.rs` / `pipeline.rs`** to use `ingest_probe`.
 
-- [ ] **Step 6: Verify** — `cargo check -p eval-harness --benches`; `cargo test -p eval-harness`; clippy (`--all-targets` covers benches).
+- [x] **Step 6: Verify** — `cargo check -p eval-harness --benches`; `cargo test -p eval-harness`; clippy (`--all-targets` covers benches).
 
-- [ ] **Step 7: Commit** — `refactor(eval): share bench ingest probe and device-parameterized fixture builder`
+- [x] **Step 7: Commit** — `refactor(eval): share bench ingest probe and device-parameterized fixture builder`
 
 ---
 
@@ -380,28 +380,28 @@ for suite_decl in &manifest.suites {
 - Produces: `pub(crate) fn load_corpus() -> Result<CorpusFile, EvalError>`; `pub(crate) fn load_cases() -> Result<Vec<NerQualityCase>, EvalError>`; `CorpusFile` becomes `pub(crate)`.
 - Renames: metric key `ner_typed_f1` → `entity_mention_typed_f1` (in `run_case` + its unit test).
 
-- [ ] **Step 1: Grep** — confirm `ner_typed_f1` appears only in `suites/ner_quality.rs`.
+- [x] **Step 1: Grep** — confirm `ner_typed_f1` appears only in `suites/ner_quality.rs`.
 
-- [ ] **Step 2: Expose the loader** — make `CorpusFile` + `corpus_path` + `load_corpus` + `load_cases` `pub(crate)`; keep the `#[allow(dead_code)]` markers for lib-only builds.
+- [x] **Step 2: Expose the loader** — make `CorpusFile` + `corpus_path` + `load_corpus` + `load_cases` `pub(crate)`; keep the `#[allow(dead_code)]` markers for lib-only builds.
 
-- [ ] **Step 3: Rewrite `tests/ner_quality_corpus.rs`** to deserialize via `ner_quality::load_corpus()` (keep every assertion; the structural checks now exercise the shared shape).
+- [x] **Step 3: Rewrite `tests/ner_quality_corpus.rs`** to deserialize via `ner_quality::load_corpus()` (keep every assertion; the structural checks now exercise the shared shape).
 
-- [ ] **Step 4: Rewrite `tests/ner_quality_real_models.rs`** to use `ner_quality::load_cases()` (drop the private `Corpus` struct).
+- [x] **Step 4: Rewrite `tests/ner_quality_real_models.rs`** to use `ner_quality::load_cases()` (drop the private `Corpus` struct).
 
-- [ ] **Step 5: Rename the diagnostic key** in `run_case` and `typed_diagnostic_punishes_label_mismatch`.
+- [x] **Step 5: Rename the diagnostic key** in `run_case` and `typed_diagnostic_punishes_label_mismatch`.
 
-- [ ] **Step 6: Verify** — `cargo test -p eval-harness` (incl. corpus tests); clippy; fmt.
+- [x] **Step 6: Verify** — `cargo test -p eval-harness` (incl. corpus tests); clippy; fmt.
 
-- [ ] **Step 7: Commit** — `refactor(eval): share NER corpus loader and align metric key convention`
+- [x] **Step 7: Commit** — `refactor(eval): share NER corpus loader and align metric key convention`
 
 ---
 
 ## Final validation gate
 
-- [ ] `cargo test -p eval-harness` — all pass
-- [ ] `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` — zero warnings
-- [ ] `cargo fmt --all --check` — zero diff
-- [ ] `cargo bench -p eval-harness --bench ner_cpu -- --noplot` still compiles and runs (fixture-gated skip on machines without checkpoints)
+- [x] `cargo test -p eval-harness` — all pass
+- [x] `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` — zero warnings
+- [x] `cargo fmt --all --check` — zero diff
+- [x] `cargo bench -p eval-harness --bench ner_cpu -- --noplot` still compiles and runs (fixture-gated skip on machines without checkpoints)
 
 ## Self-Review
 

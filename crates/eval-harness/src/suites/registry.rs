@@ -157,4 +157,138 @@ mod tests {
         assert_eq!(summaries[0].suite_id, "nope");
         assert_eq!(summaries[0].total, 0);
     }
+
+    /// The merged-artifact guarantee (ADR-0025) holds only while `reducer_for`
+    /// constructs reducers identical to the suites'. Compare both paths on the
+    /// same outcome set for every suite that builds without external state, so
+    /// a drifted cutoff/prefix/spec becomes a test failure, not a silent
+    /// merged-vs-direct disagreement.
+    #[test]
+    fn registry_reducer_matches_built_suite_reducer() {
+        for id in [
+            "local-retrieval",
+            "extraction",
+            "claim-reconciliation",
+            "end-to-end",
+            "action-grounding",
+            "capacity",
+            "poisoning",
+            "lifecycle",
+            "downstream-qa",
+            "response-size",
+        ] {
+            let suite = build_suite(&decl(id)).unwrap().expect("suite builds");
+            let outcomes = equivalence_outcomes(id);
+            let from_registry = reducer_for(id).reduce(&outcomes).unwrap();
+            let from_suite = suite.reducer().reduce(&outcomes).unwrap();
+            assert_eq!(
+                from_registry, from_suite,
+                "{id}: registry reducer diverges from suite reducer"
+            );
+        }
+    }
+
+    fn equivalence_outcomes(suite_id: &str) -> Vec<crate::domain::EvalCaseOutcome> {
+        use crate::domain::*;
+        match suite_id {
+            "end-to-end" => vec![ratio_outcome("end-to-end", "e1", "context_match", 2, 3)],
+            "lifecycle" => vec![
+                ratio_outcome("lifecycle", "l1", "action_grounding", 2, 3),
+                ratio_outcome("lifecycle", "l2", "poisoning", 1, 4),
+            ],
+            "local-retrieval" => {
+                vec![retrieval_outcome("local-retrieval", "r1", 3, 2, Some(1))]
+            }
+            "extraction" => vec![classification_outcome("extraction", "c1", 2, 1, 1)],
+            "claim-reconciliation" => {
+                vec![classification_outcome(
+                    "claim-reconciliation",
+                    "c2",
+                    1,
+                    0,
+                    1,
+                )]
+            }
+            _ => vec![crate::domain::EvalCaseOutcome::new(
+                suite_id,
+                "x1",
+                EvalMode::Lifecycle,
+                CorpusSplit::Test,
+                LabelTrust::Official,
+                CaseStatus::Passed,
+            )],
+        }
+    }
+
+    fn ratio_outcome(
+        suite_id: &str,
+        id: &str,
+        key: &str,
+        num: u64,
+        den: u64,
+    ) -> crate::domain::EvalCaseOutcome {
+        use crate::domain::*;
+        let mut outcome = EvalCaseOutcome::new(
+            suite_id,
+            id,
+            EvalMode::Lifecycle,
+            CorpusSplit::Test,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        );
+        outcome.evidence.insert(
+            key.to_string(),
+            MetricEvidence::Ratio {
+                numerator: num,
+                denominator: den,
+            },
+        );
+        outcome
+    }
+
+    fn retrieval_outcome(
+        suite_id: &str,
+        id: &str,
+        relevant: u64,
+        hits: u64,
+        first_rank: Option<u32>,
+    ) -> crate::domain::EvalCaseOutcome {
+        use crate::domain::*;
+        let mut outcome = EvalCaseOutcome::new(
+            suite_id,
+            id,
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Test,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        );
+        outcome.evidence.insert(
+            "retrieval".to_string(),
+            MetricEvidence::retrieval(relevant, hits, first_rank, 5),
+        );
+        outcome
+    }
+
+    fn classification_outcome(
+        suite_id: &str,
+        id: &str,
+        tp: u64,
+        fp: u64,
+        fn_: u64,
+    ) -> crate::domain::EvalCaseOutcome {
+        use crate::domain::*;
+        let mut outcome = EvalCaseOutcome::new(
+            suite_id,
+            id,
+            EvalMode::EndToEnd,
+            CorpusSplit::Test,
+            LabelTrust::Official,
+            CaseStatus::QualityFailed,
+        );
+        outcome.evidence.insert(
+            "classification".to_string(),
+            MetricEvidence::classification(tp, fp, fn_, 0),
+        );
+        outcome
+    }
 }

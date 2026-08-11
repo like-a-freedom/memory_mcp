@@ -72,7 +72,7 @@ impl RunFingerprint {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SuiteSummary {
     pub suite_id: String,
     pub mode: EvalMode,

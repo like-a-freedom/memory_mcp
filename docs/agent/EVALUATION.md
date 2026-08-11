@@ -15,6 +15,26 @@ make eval-release
 make eval-nightly
 ```
 
+## Merging Shard Artifacts
+
+Run profiles in shards (one `memory-eval run --suite ...` per shard), then merge:
+
+```bash
+cargo run -p eval-harness --bin memory-eval -- merge \
+  --profile evals/profiles/pr.json \
+  --artifact target/eval-merged.json \
+  target/shard-1.json target/shard-2.json
+```
+
+Merged artifacts reduce through the same suite reducers as a direct run and
+re-derive gates, budget status, and verdict (ADR-0025): a merged artifact cannot
+disagree with a direct run of the same suites. Gates are re-evaluated **without a
+baseline** (the merge CLI takes none), so hard floors apply but regression
+budgets are ignored on merged runs. Model-backed `ner-quality-*` suites use the
+merge machine's local checkpoints: merging shards produced elsewhere on a
+machine without those checkpoints yields count-only summaries without the
+`entity_mention_*` metrics, and any gate on them becomes `Invalid`.
+
 ## Corpus Preparation (one-time, requires network)
 
 ```bash
