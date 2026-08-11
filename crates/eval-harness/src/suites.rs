@@ -8,6 +8,7 @@ pub mod extraction;
 pub mod lifecycle;
 pub mod ner_quality;
 pub mod poisoning;
+pub mod registry;
 pub mod response_size;
 pub mod retrieval;
 

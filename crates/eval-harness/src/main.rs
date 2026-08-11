@@ -2,10 +2,7 @@ use std::collections::BTreeSet;
 
 use eval_harness::cli::{self, Command};
 use eval_harness::{
-    ActionGroundingSuite, CapacitySuite, ClaimReconciliationSuite, CorpusManifest, DatasetKind,
-    DownstreamQaSuite, EndToEndSuite, ExternalRetrievalSuite, ExtractionSuite,
-    LifecycleReleaseSuite, PoisoningSuite, ProfileManifest, ResponseSizeSuite, RetrievalSuite,
-    RunArtifact, RunRequest, Runner, SuiteId, suites::ner_quality,
+    CorpusManifest, ProfileManifest, RunArtifact, RunRequest, Runner, SuiteId, suites::registry,
 };
 
 #[tokio::main]
@@ -58,95 +55,15 @@ async fn cmd_run(
             continue;
         }
 
-        match suite_decl.id.as_str() {
-            "local-retrieval" => match RetrievalSuite::new() {
-                Ok(s) => suites.push(Box::new(s)),
-                Err(e) => {
-                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                }
-            },
-            "extraction" => match ExtractionSuite::new() {
-                Ok(s) => suites.push(Box::new(s)),
-                Err(e) => {
-                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                }
-            },
-            "claim-reconciliation" => match ClaimReconciliationSuite::new() {
-                Ok(s) => suites.push(Box::new(s)),
-                Err(e) => {
-                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                }
-            },
-            "end-to-end" => {
-                suites.push(Box::new(EndToEndSuite::new()));
+        match registry::build_suite(suite_decl) {
+            Ok(Some(suite)) => suites.push(suite),
+            Ok(None) => {
+                eprintln!("warning: unknown suite {}", suite_decl.id);
+                issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
             }
-            "external-retrieval" => {
-                let Some(root) = suite_decl.corpus_root.as_deref() else {
-                    eprintln!("warning: external-retrieval requires corpus_root");
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                    continue;
-                };
-                let root = std::path::PathBuf::from(root);
-                let manifest_path = root.join("manifest.json");
-                let loaded = std::fs::read_to_string(&manifest_path)
-                    .map_err(|e| format!("read {}: {e}", manifest_path.display()))
-                    .and_then(|raw| CorpusManifest::parse(&raw).map_err(|e| e.to_string()))
-                    .and_then(|manifest| {
-                        let kind = DatasetKind::parse_name(&manifest.corpus_id)
-                            .ok_or_else(|| format!("unsupported corpus {}", manifest.corpus_id))?;
-                        let prepared = manifest.validate_at(&root).map_err(|e| e.to_string())?;
-                        eval_harness::corpus::adapters::load_and_normalize(kind, &prepared)
-                            .map(|cases| (kind, cases))
-                            .map_err(|e| e.to_string())
-                    });
-                match loaded {
-                    Ok((kind, cases)) => {
-                        suites.push(Box::new(ExternalRetrievalSuite::new(kind, cases)))
-                    }
-                    Err(e) => {
-                        eprintln!("warning: failed to load external corpus: {e}");
-                        issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                    }
-                }
-            }
-            "action-grounding" => {
-                suites.push(Box::new(ActionGroundingSuite::new()));
-            }
-            "capacity" => {
-                suites.push(Box::new(CapacitySuite::new()));
-            }
-            "poisoning" => {
-                suites.push(Box::new(PoisoningSuite::new()));
-            }
-            "lifecycle" => {
-                suites.push(Box::new(LifecycleReleaseSuite::new()));
-            }
-            "downstream-qa" => {
-                suites.push(Box::new(DownstreamQaSuite::new()));
-            }
-            "response-size" => match ResponseSizeSuite::new() {
-                Ok(s) => suites.push(Box::new(s)),
-                Err(e) => {
-                    eprintln!("warning: failed to load response-size: {e}");
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                }
-            },
-            "ner-quality-anno"
-            | "ner-quality-regex"
-            | "ner-quality-anno-onnx"
-            | "ner-quality-gliner"
-            | "ner-quality-vago" => {
-                if let Err(e) = ner_quality::register(&suite_decl.id, &mut suites) {
-                    eprintln!("warning: failed to load {}: {e}", suite_decl.id);
-                    issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
-                }
-            }
-            other => {
-                eprintln!("warning: unknown suite {other}");
-                issues.push(eval_harness::RunIssue::empty_suite(other));
+            Err(e) => {
+                eprintln!("warning: failed to load {}: {e}", suite_decl.id);
+                issues.push(eval_harness::RunIssue::empty_suite(&suite_decl.id));
             }
         }
     }
@@ -263,10 +180,18 @@ async fn cmd_prepare_corpus(
 }
 
 fn cmd_merge(
-    _profile_path: std::path::PathBuf,
+    profile_path: std::path::PathBuf,
     artifact_path: std::path::PathBuf,
     shard_paths: Vec<std::path::PathBuf>,
 ) -> std::process::ExitCode {
+    let manifest = match ProfileManifest::load(&profile_path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return std::process::ExitCode::from(2);
+        }
+    };
+
     let mut shards = Vec::new();
     for path in &shard_paths {
         let raw = match std::fs::read_to_string(path) {
@@ -285,7 +210,7 @@ fn cmd_merge(
         }
     }
 
-    match eval_harness::merge_shards(&shards) {
+    match eval_harness::merge_shards(&shards, &manifest) {
         Ok(merged) => {
             if let Err(e) = eval_harness::write_artifact(&artifact_path, &merged) {
                 eprintln!("error: failed to write merged artifact: {e}");

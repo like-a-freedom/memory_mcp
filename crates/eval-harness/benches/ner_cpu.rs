@@ -28,8 +28,8 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     eprintln!("{label} cold start: {:?}", build_start.elapsed());
 
     let fixture = eval_harness::benchmark::NerBenchmarkFixture::load();
-    let single = fixture.single_window.to_string();
-    let multi = fixture.multi_window.to_string();
+    let single = fixture.single_window().to_string();
+    let multi = fixture.multi_window().to_string();
 
     // Probe once before timing: a backend that constructs but fails at
     // inference (e.g. a loader/checkpoint protocol mismatch) must skip with a

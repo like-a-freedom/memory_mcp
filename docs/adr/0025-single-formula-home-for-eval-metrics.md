@@ -45,6 +45,9 @@ key naming move behind the reducer/metrics interface.
 - Adding a metric adds an arms upstream (evidence variant → renderer), not N
   case-build sites across N suites.
 - Gate evaluation and case reporting cannot disagree about the same number.
+- Merged shard artifacts reduce through the same suite reducers and re-derive
+  gates, budget status, and verdict, so a merged artifact cannot disagree with
+  a direct run of the same suites.
 - The report shape (artifact JSON) does not change; PR/Release/Nightly gate
   semantics are preserved by construction.
 

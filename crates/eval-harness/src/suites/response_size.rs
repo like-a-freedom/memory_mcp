@@ -320,12 +320,12 @@ use std::collections::BTreeMap;
 use crate::artifact::SuiteSummary;
 use crate::reducer::SuiteReducer;
 
-struct ResponseSizeReducer {
+pub(crate) struct ResponseSizeReducer {
     suite_id: SuiteId,
 }
 
 impl ResponseSizeReducer {
-    fn new(suite_id: impl Into<String>) -> Self {
+    pub(crate) fn new(suite_id: impl Into<String>) -> Self {
         Self {
             suite_id: SuiteId::parse(suite_id).expect("suite_id must not be empty"),
         }

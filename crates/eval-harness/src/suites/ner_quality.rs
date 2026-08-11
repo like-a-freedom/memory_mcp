@@ -71,14 +71,14 @@ fn kind_for_id(suite_id: &str) -> Option<NerExtractorKind> {
     }
 }
 
-/// Pushes the `NerQualitySuite` for `suite_id` (must be a `ner-quality-*` id).
-pub fn register(suite_id: &str, suites: &mut Vec<Box<dyn EvalSuite>>) -> Result<(), EvalError> {
+/// Builds the `NerQualitySuite` for `suite_id` (must be a `ner-quality-*`
+/// id). Returns `Ok(None)` for any other id.
+pub(crate) fn build_suite(suite_id: &str) -> Result<Option<Box<dyn EvalSuite>>, EvalError> {
     let Some(kind) = kind_for_id(suite_id) else {
-        return Ok(());
+        return Ok(None);
     };
     let suite = NerQualitySuite::new(suite_id.to_string(), kind)?;
-    suites.push(Box::new(suite));
-    Ok(())
+    Ok(Some(Box::new(suite)))
 }
 
 /// The reducer depends on fixture availability: when the checkpoint is absent
@@ -87,9 +87,20 @@ pub fn register(suite_id: &str, suites: &mut Vec<Box<dyn EvalSuite>>) -> Result<
 /// classification metrics. With a present fixture the classification reducer is
 /// used; it degrades to zeroes if an extractor produces no predictions rather
 /// than failing the run.
-enum NerSuiteReducer {
-    Class(ClassificationReducer),
-    Count(CountReducer),
+pub(crate) fn build_reducer(suite_id: &str, kind: NerExtractorKind) -> Box<dyn SuiteReducer> {
+    if ner_fixtures::fixture_present(kind) {
+        Box::new(ClassificationReducer::new(
+            suite_id.to_string(),
+            "entity_mention",
+        ))
+    } else {
+        Box::new(CountReducer::new(suite_id.to_string()))
+    }
+}
+
+/// The reducer registered for a `ner-quality-*` suite id, if any.
+pub(crate) fn reducer_for_suite(suite_id: &str) -> Option<Box<dyn SuiteReducer>> {
+    kind_for_id(suite_id).map(|kind| build_reducer(suite_id, kind))
 }
 
 pub struct NerQualitySuite {
@@ -97,7 +108,7 @@ pub struct NerQualitySuite {
     kind: NerExtractorKind,
     cases: Vec<NerQualityCase>,
     expected_ids: Vec<EvalCaseId>,
-    reducer: NerSuiteReducer,
+    reducer: Box<dyn SuiteReducer>,
 }
 
 impl NerQualitySuite {
@@ -107,11 +118,7 @@ impl NerQualitySuite {
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
-        let reducer = if ner_fixtures::fixture_present(kind) {
-            NerSuiteReducer::Class(ClassificationReducer::new(id.clone(), "entity_mention"))
-        } else {
-            NerSuiteReducer::Count(CountReducer::new(id.clone()))
-        };
+        let reducer = build_reducer(&id, kind);
         Ok(Self {
             id,
             kind,
@@ -137,10 +144,7 @@ impl EvalSuite for NerQualitySuite {
     }
 
     fn reducer(&self) -> &dyn SuiteReducer {
-        match &self.reducer {
-            NerSuiteReducer::Class(reducer) => reducer,
-            NerSuiteReducer::Count(reducer) => reducer,
-        }
+        self.reducer.as_ref()
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
