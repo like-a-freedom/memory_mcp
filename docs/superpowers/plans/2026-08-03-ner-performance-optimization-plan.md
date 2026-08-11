@@ -1,5 +1,10 @@
 # NER Performance Optimization Plan (v3 — verified)
 
+> ⚠️ **Historical plan — superseded.** The `NerProviderKind::LocalGliner` and
+> `NerDeviceKind` types this plan references were removed, and the proposed
+> Accelerate-as-default was reversed by ADR-0034. Keep this file as the audit
+> trail; the shipped performance evidence lives in `docs/performance/NER_PERFORMANCE.md`.
+
 > For agentic workers: use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]` checkboxes.
 
 **Goal:** Reduce GLiNER NER extraction latency and pipeline latency on the reference host (Apple Silicon) with **zero quality degradation** — bitwise-stable ordered candidates and unchanged eval-gate metrics.

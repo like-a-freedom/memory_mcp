@@ -5,7 +5,7 @@
 | Metric | Description | Success Criteria |
 |--------|-------------|-----------------|
 | Projection precision | Fraction of projected claims that participate in a relation | > 80% |
-| Contradiction recall | Fraction of seeded contradictions detected by the 8-gate engine | > 90% |
+| Contradiction recall | Fraction of seeded contradictions detected by the claim reconciliation suite (gate metric `claim_recall`) | > 90% |
 | Supersession recall | Fraction of seeded supersession pairs with correct outcome label | > 85% |
 | Temporal ambiguity rate | Fraction of valid-time incomparable pairs that receive `TemporalAmbiguity` | < 5% false negatives |
 | Projection latency (p50) | Time to extract claims from a fact payload | < 50 ms |
@@ -42,11 +42,11 @@ fixture cases and reports per-split confusion counts and case outcomes.
 # Run claim reconciliation as part of the PR profile
 make eval-pr
 
-# Run claim reconciliation suite directly
+# Run the claim reconciliation suite unit tests (parsing, schema, reducer)
 cargo test -p eval-harness suites::claims
 
 # Run the thin compatibility launcher
-cargo test --test eval_claim_reconciliation
+cargo test -p eval-harness --test eval_claim_reconciliation
 ```
 
 ## Promotion Gate
@@ -61,7 +61,7 @@ The default rollout stage is `Shadow` (projects claims but does not expose relat
 
 ## Test Fixtures
 
-Fixture files live in `tests/fixtures/claim_reconciliation/` as YAML with the schema defined by `ClaimCase` in `tests/eval_claim_reconciliation.rs`. To add a new case:
+Fixture files live in `crates/eval-harness/tests/fixtures/claim_reconciliation_cases.json` as a single JSON corpus; the case schema is defined by `ClaimCase` in `crates/eval-harness/tests/eval_claim_reconciliation.rs`. To add a new case:
 
 1. Choose `origin` (`anonymized_real`, `external_public`, `synthetic_adversarial`)
 2. Place it in the correct `split` (`development` or `test`)

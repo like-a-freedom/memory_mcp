@@ -8,7 +8,7 @@
 
 Version: `agent-memory-lifecycle/v1`
 
-Location: `tests/fixtures/evals/agent_memory_lifecycle_cases.json`
+Location: `crates/memory-mcp/tests/fixtures/agent_memory_lifecycle_cases.json`
 
 The corpus covers at least three coding-task families and every release-gate
 risk family:
@@ -31,7 +31,7 @@ The lifecycle evaluation is now part of the `eval-harness` profile-driven
 system. The `LifecycleReleaseSuite` implements the ADR-0017 release gate
 through wired `LifecycleCapture` and `LifecycleRecall` entry points.
 
-**Current baseline:** `fa57d49b` (master) on 2026-07-28.
+**Baseline:** `fa57d49b` (master) on 2026-07-28 — recorded at the time of the original gate run; master has since advanced.
 
 The lifecycle suite exercises:
 - Action grounding through all three modes (always_recall, selective_shadow, selective_enforced)
@@ -43,7 +43,7 @@ The lifecycle suite exercises:
 ### Surface freeze
 
 ```bash
-cargo test --test eval_agent_memory_lifecycle public_surface_snapshot -- --exact
+cargo test -p memory-mcp --test agent_memory_lifecycle_release_gate public_surface_snapshot -- --exact
 ```
 
 Asserts exactly eight MCP tool names and the ordinary CLI command snapshot,
@@ -53,7 +53,7 @@ and the absence of `prepare_task`, `record_event`, `hook`, `checkpoint`,
 ### Fixture coverage
 
 ```bash
-cargo test --test eval_agent_memory_lifecycle lifecycle_fixture_covers_core_risks -- --exact
+cargo test -p memory-mcp --test agent_memory_lifecycle_release_gate lifecycle_fixture_covers_core_risks -- --exact
 ```
 
 Asserts every required risk family is represented.

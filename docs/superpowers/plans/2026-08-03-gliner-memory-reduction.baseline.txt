@@ -5,5 +5,7 @@ MALLOC_LARGE: 1.6G virtual / 502.8M resident / 1.1G swapped (112 regions) - live
 MALLOC_SMALL: 892M virtual / 766M resident / 221M dirty (223 regions)
 MALLOC_SMALL (empty): 5.1G virtual / 5.1G resident / 1136K dirty (1317 regions) - retained arenas, dominant RSS term
 env: NER_PROVIDER=local-gliner, NER_MODEL=urchade/gliner_multi-v2.1, NER_DEVICE=auto, NER_MAX_CONCURRENCY=2, EMBEDDINGS_PROVIDER=openai-compatible, SURREALDB_EMBEDDED=true
+# NOTE (2026-08-11): NER_PROVIDER / NER_MODEL / NER_DEVICE were removed by ADR-0036;
+# the canonical selectors are NER_EXTRACTOR / NER_CACHE_DIR / GLINER_DEVICE. Historical snapshot.
 OS: macOS 26.5.2 (25F84), ARM64
 note: matches plan Evidence; RSS drifted 7.3G -> 6.7G over 2 days (arenas partially purged under pressure)

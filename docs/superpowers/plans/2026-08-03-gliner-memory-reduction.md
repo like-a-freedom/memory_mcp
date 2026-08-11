@@ -1,5 +1,12 @@
 # GLiNER Memory Reduction Implementation Plan
 
+> ⚠️ **Historical plan — superseded.** The environment variables this plan used
+> (`NER_PROVIDER`, `NER_MODEL`, `NER_MODEL_DIR`, `NER_DEVICE`, `GLINER_IDLE_UNLOAD_SECS`)
+> were removed by ADR-0036; the canonical NER variables are now `NER_EXTRACTOR`,
+> `NER_CACHE_DIR`, `NER_LABELS`, `NER_THRESHOLD`, `NER_MAX_CONCURRENCY`,
+> `NER_IDLE_UNLOAD_SECS`, `GLINER_BATCH_SIZE`, `GLINER_MAX_BATCH_TOKENS`, and
+> `GLINER_DEVICE`. Keep this file as the audit trail; do not use its variable names as current config.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reduce steady-state and peak RSS of the `memory_mcp` server (currently observed up to 7.3 GB on macOS) so that idle RSS collapses to the SurrealDB floor (~50–300 MB) and peak RSS during a single-shot GLiNER extract stays bounded (~1.6–2.2 GB), without changing the GLiNER model, entity quality, or the MCP tool surface. **Two metrics matter and are fixed by different levers** (see Evidence): unload alone collapses the physical footprint; the RSS number the user watches collapses only when unload is combined with the allocator fix.

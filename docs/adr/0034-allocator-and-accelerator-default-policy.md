@@ -79,10 +79,11 @@ in `docs/performance/NER_PERFORMANCE.md`.
    190 MB physical footprint does not offset the RSS regression for users and
    tools that monitor RSS.
 5. Keep `GLINER_IDLE_UNLOAD_SECS` default semantics unchanged (`0` remains the
-   compatibility default). Document `30` seconds as a measured recommendation
-   for infrequent local extraction workloads, not as a universal runtime
-   default; the current matrix covers one fresh-process workload, not every
-   long-lived concurrency pattern.
+   compatibility default; the variable was later renamed to `NER_IDLE_UNLOAD_SECS`
+   by ADR-0036, with identical semantics). Document `30` seconds as a measured
+   recommendation for infrequent local extraction workloads, not as a universal
+   runtime default; the current matrix covers one fresh-process workload, not
+   every long-lived concurrency pattern.
 6. Do not add the planned synthetic allocator probe or eval-harness global
    allocator solely to decide this default. `MEMORY_PROFILE.md` already records
    a real release-server MCP-stdio comparison with stronger workload fidelity.

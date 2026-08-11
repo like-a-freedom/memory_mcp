@@ -6,22 +6,22 @@ Records the hardening posture after remediation waves, and the work remaining be
 
 ### High-risk paths addressed in this pass
 
-- `crates/memory-mcp/src/service/core.rs::resolve()`
+- `crates/memory-mcp/src/tools/resolve.rs` → `crates/memory-mcp/src/service/capabilities/resolve.rs` / `entity_resolution.rs`
   - previous risk: built a raw `UPDATE {entity_id} SET aliases = $aliases` string
   - remediation: removed the follow-up query because aliases are already persisted in the initial `create()` payload
-- `crates/memory-mcp/src/storage.rs::select_table()`
+- `crates/memory-mcp/src/storage/client.rs::select_table()`
   - previous risk: interpolated any caller-supplied table name into `SELECT * FROM {table}`
   - remediation: table names are now restricted to an internal allow-list before query construction
 
 ### Medium-risk paths still present
 
-- `crates/memory-mcp/src/storage.rs::build_select_one_query()`
+- `crates/memory-mcp/src/storage/queries.rs::build_select_one_query()`
   - interpolates internal record/table identifiers for trusted record IDs
   - current assessment: acceptable for internally generated deterministic IDs, but should move to fully parameterized record access where the SDK permits it
-- `crates/memory-mcp/src/storage.rs::{build_create_query, build_update_query, build_relate_edge_query}`
+- `crates/memory-mcp/src/storage/queries.rs::{build_create_query, build_update_query, build_relate_edge_query}`
   - compose SurrealQL identifiers from internally generated record IDs and schema-owned field names
   - current assessment: lower risk because identifiers are not taken directly from end users, but still worth minimizing over time
-- migration execution in `crates/memory-mcp/src/storage.rs::apply_migrations_impl()`
+- migration execution in `crates/memory-mcp/src/storage/client.rs::apply_migrations_impl()`
   - executes repository-owned `.surql` files verbatim
   - current assessment: acceptable because files are trusted code, and checksums now detect post-apply drift
 

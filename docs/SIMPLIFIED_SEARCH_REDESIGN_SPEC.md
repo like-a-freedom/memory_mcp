@@ -1,11 +1,11 @@
 # Simplified Search Redesign Specification
 
-**Status:** Mostly implemented — Waves 1-4 complete, Wave 5 mostly complete
-**Date:** 2026-03-26 (updated 2026-04-12)
+**Status:** Implemented — Waves 1-5 complete
+**Date:** 2026-03-26 (updated 2026-04-12, refreshed 2026-08-11)
 **Scope:** Search and retrieval only
-**Precedence:** This spec defines the target design for the next wave. It does not claim the current runtime already matches it.
+**Precedence:** This spec defined the target design for the redesigned retrieval path, which is now the shipped runtime.
 
-> Companion note: this document covers **retrieval only**. The broader adaptive-memory target state that incorporates SOTA-aligned lifecycle, reflection, and evaluation work is documented separately in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`.
+> Companion note: this document covers **retrieval only**. The broader adaptive-memory target state is described by the current runtime specification, `docs/MEMORY_SYSTEM_SPEC.md`.
 
 ## Implementation Status (2026-04-12)
 
@@ -15,9 +15,9 @@
 | Wave 2 — Embedding removal | ✅ Complete | `EmbeddingProvider`, `NullEmbedder`, embedding writes, and config removed from runtime |
 | Wave 3 — Native graph + lexical | ✅ Complete | Native `in`/`out` relation endpoints; stronger lexical FTS ordering |
 | Wave 4 — Context assembly | ✅ Complete | Deterministic query-mode flags, bounded entity-anchor graph expansion, explainable graph traces, and richer retrieval diagnostics are implemented |
-| Wave 5 — Cleanup | ⚠️ Mostly complete | Obsolete tests/comments/docs cleaned up; verification suite passes |
+| Wave 5 — Cleanup | ✅ Complete | Obsolete tests/comments/docs cleaned up; verification suite passes |
 
-See `docs/superpowers/plans/2026-03-26-simplified-search-redesign-implementation-plan.md` for detailed task tracking.
+Executed evidence: breaking migration `006_simplified_search_redesign.surql`, removal of embedding provider/HNSW scaffolding, native `in`/`out` graph endpoints, deterministic query-mode flags and bounded entity-anchor expansion, and the verification suite in `crates/memory-mcp/tests/` (e.g. `service_acceptance.rs`, `service_integration.rs`).
 
 Wave 4 is complete when the default retrieval path uses deterministic query-mode flags, bounded entity-anchor graph expansion, and explainable graph traces in the assembled result provenance. Semantic retrieval may still exist as an optional later-stage source, but lexical/BM25 + graph must remain sufficient on their own.
 
@@ -25,7 +25,9 @@ Wave 4 is complete when the default retrieval path uses deterministic query-mode
 
 ## 1. Why this redesign exists
 
-The current repository contains a mixed retrieval story:
+> Historical context: this section describes the state **before** the redesign shipped (Waves 1-5 above are now complete). It is retained to explain the design rationale.
+
+The previous repository contained a mixed retrieval story:
 
 - lexical full-text retrieval is the active first-stage search path,
 - graph traversal is used for relationship-aware expansion,
@@ -440,4 +442,4 @@ The approved target direction is:
 - keep deployment **single-binary and startup-bootstrapped**,
 - aggressively delete obsolete search complexity.
 
-This document is the specification input for the next step: writing the implementation plan. Until code changes land, the current implementation-status documents remain descriptive of the existing runtime, not of the target redesign.
+This document was the specification input for the redesigned retrieval path. The redesign has shipped (see the implementation-status table above); the current runtime description is `docs/MEMORY_SYSTEM_SPEC.md`.

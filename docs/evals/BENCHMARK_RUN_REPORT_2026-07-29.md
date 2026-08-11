@@ -14,7 +14,7 @@
 
 | Test File | Tests | Passed | Failed | Ignored | Status |
 |-----------|-------|--------|--------|---------|--------|
-| `eval_agent_memory_lifecycle` | 5 | 4 | 0 | 1 | ✅ |
+| `eval_agent_memory_lifecycle` (ныне `agent_memory_lifecycle_release_gate`) | 5 | 4 | 0 | 1 | ✅ |
 | `eval_claim_reconciliation` | 1 | 1 | 0 | 0 | ✅ |
 | `eval_extraction` | 4 | 3 | 0 | 1 | ✅ |
 | `eval_retrieval` | 5 | 4 | 0 | 1 | ✅ |

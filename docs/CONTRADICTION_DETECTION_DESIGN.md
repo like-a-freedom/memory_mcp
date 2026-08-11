@@ -1,6 +1,6 @@
 # Claim Reconciliation and Contradiction Detection
 
-**Status:** Accepted design target; implementation pending<br>
+**Status:** Implemented — the claim reconciliation pipeline described here is the shipped runtime behavior (see `src/service/claims/` and migrations 029/030; refreshed 2026-08-11)<br>
 **Scope:** Local, deterministic, zero-configuration claim extraction and reconciliation<br>
 **Related ADRs:** 0002-0015
 
@@ -12,18 +12,20 @@ Runs in-process, requires no LLM or external service, and favors high precision 
 
 ## 2. Current State and Replacement Boundary
 
-The current implementation has two partial and independent mechanisms:
+> Historical note: this section describes the state **before** the claim pipeline shipped. The two legacy mechanisms below have been replaced by the target reconciliation engine (`src/service/claims/`); the section is retained to explain the replacement boundary.
 
-1. `detect_contradiction_warnings()` loads at most 500 active facts, filters them in memory by scope, compares equal `fact_type`, overlapping entity IDs, and different normalized content, and returns response-only warnings.
-2. Background regex triple extraction writes untyped string triples and uses a hard-coded singleton-predicate list to invalidate conflicting triple rows. This path is best-effort, swallows failures, and does not represent claim validity, project isolation, canonical comparison keys, or source authority.
+The pre-shipment implementation had two partial and independent mechanisms:
 
-Neither mechanism is the target reconciliation engine. During rollout:
+1. `detect_contradiction_warnings()` loaded at most 500 active facts, filtered them in memory by scope, compared equal `fact_type`, overlapping entity IDs, and different normalized content, and returned response-only warnings.
+2. Background regex triple extraction wrote untyped string triples and used a hard-coded singleton-predicate list to invalidate conflicting triple rows. This path was best-effort, swallowed failures, and did not represent claim validity, project isolation, canonical comparison keys, or source authority.
+
+Neither mechanism was the target reconciliation engine. The rollout replaced them as follows:
 
 - existing fact and triple records remain readable;
 - past migrations remain untouched;
 - the public `extract` warning shape remains compatible;
-- claim relations become the source for new warnings and lifecycle decisions;
-- legacy singleton triple invalidation is disabled once the claim path is active;
+- claim relations are now the source for new warnings and lifecycle decisions;
+- legacy singleton triple invalidation is disabled now that the claim path is active;
 - the triple table is not dropped or destructively rewritten.
 
 ## 3. Invariants

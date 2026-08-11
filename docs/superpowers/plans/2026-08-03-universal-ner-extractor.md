@@ -1,5 +1,11 @@
 # Universal NER Extractor — Implementation Plan
 
+> ⚠️ **Historical plan — superseded.** This plan's provider-selection design
+> (`NER_PROVIDER`) was replaced by the `NER_EXTRACTOR` selector surface
+> (ADR-0029/ADR-0036 and the 2026-08-07 zero-config plan). The backend registry
+> it proposed did land, but with the current selector names. Keep this file as
+> the audit trail; do not use `NER_PROVIDER` as current config.
+
 > For agentic workers: use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]` checkboxes.
 
 **Goal:** Eliminate the hard-coded GLiNER lock-in in the NER layer by converting the `EntityExtractor` trait into a pluggable backend architecture where GLiNER, Anno, Regex, and LLM each register as self-contained backends, without changing inference behavior, thresholds, or quality metrics.

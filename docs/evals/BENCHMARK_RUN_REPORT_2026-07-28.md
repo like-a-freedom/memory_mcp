@@ -10,11 +10,11 @@
 
 ## 1. Fixture-Coverage Tests
 
-Быстрые синхронные тесты проверяют корректность eval-фикстур и public surface. Запущены через `cargo test --test eval_retrieval --test eval_extraction --test eval_claim_reconciliation --test eval_agent_memory_lifecycle`.
+Быстрые синхронные тесты проверяют корректность eval-фикстур и public surface. Запущены через `cargo test --test eval_retrieval --test eval_extraction --test eval_claim_reconciliation --test eval_agent_memory_lifecycle` (target `eval_agent_memory_lifecycle` с тех пор переименован в `agent_memory_lifecycle_release_gate`).
 
 | Test File | Tests | Passed | Failed | Ignored |
 |-----------|-------|--------|--------|---------|
-| `eval_agent_memory_lifecycle` | 5 | 4 | 0 | 1 |
+| `eval_agent_memory_lifecycle` (ныне `agent_memory_lifecycle_release_gate`) | 5 | 4 | 0 | 1 |
 | `eval_claim_reconciliation` | 1 | 1 | 0 | 0 |
 | `eval_extraction` | 4 | 3 | 0 | 1 |
 | `eval_retrieval` | 5 | 4 | 0 | 1 |
@@ -180,7 +180,7 @@ Compiled under `bench` profile (optimized). All 4 benchmarks ran successfully.
 |-----------|---------|-------|
 | `ner_metal_single_window` | 39 | GPU/Metal-accelerated single-window NER |
 
-*(Current implementation is a lightweight stub; identical to CPU performance)*
+*(At the time of this run the Metal implementation was a lightweight stub; identical to CPU performance. Metal has since shipped real GPU inference — see the 2026-07-29 reports.)*
 
 ### 3.4 Contention Benchmarks (`benches/contention.rs`)
 

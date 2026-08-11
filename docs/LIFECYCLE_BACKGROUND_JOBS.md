@@ -92,6 +92,7 @@ If any hot facts exist, the episode is preserved regardless of age.
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | 86400 | Archival job interval |
 | `LIFECYCLE_DECAY_THRESHOLD` | 0.3 | Confidence threshold |
 | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | 90 | Episode age threshold |
+| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | 365 | Half-life used by the decay worker's confidence-decay formula |
 
 ## Implementation Status
 

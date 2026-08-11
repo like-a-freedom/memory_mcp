@@ -14,7 +14,7 @@ Entity resolution provides deterministic alias-based lookup with normalization a
 All entity names and aliases are normalized when written to the database:
 
 ```rust
-// In src/service/core.rs::resolve()
+// In src/service/capabilities/resolve.rs
 let normalized = super::normalize_text(&candidate.canonical_name);
 let aliases = candidate
     .aliases
@@ -31,7 +31,7 @@ let aliases = candidate
 
 ### 2. Entity Type Classification
 
-The `RegexEntityExtractor` classifies entities into types based on naming patterns:
+The `RegexEntityExtractor` classifies entities into types based on naming patterns. It is one selectable NER backend; the zero-config default is the lightweight Anno extractor (`NER_EXTRACTOR=anno`), with regex and model-backed GLiNER backends opt-in:
 
 | Pattern | Type | Examples |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ Regex::new(r"[\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+)+|[\p{Lu}][\p{L}\p{N}]{2,}
 ### Single Entity Lookup
 
 ```rust
-// In src/storage.rs::select_entity_lookup()
+// In src/storage/app_store.rs::select_entity_lookup()
 // Step 1: Canonical name match
 SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1
 
@@ -79,7 +79,7 @@ SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1
 ### Batch Entity Lookup
 
 ```rust
-// In src/storage.rs::select_entities_batch()
+// In src/storage/context_store.rs::select_entities_batch()
 SELECT * FROM entity 
 WHERE canonical_name_normalized IN $names 
    OR aliases CONTAINSANY $names
@@ -249,7 +249,8 @@ Potential improvements for later iterations:
 - `src/service/entity_extraction.rs` — extractor registry + trait
 - `src/service/entity_extraction/regex.rs` — regex backend (extraction)
 - `src/service/entity_extraction/classifier.rs` — entity-type classification
-- `src/service/core.rs::resolve()` — Entity resolution entry point
-- `src/storage.rs::select_entity_lookup()` — Single entity DB lookup
-- `src/storage.rs::select_entities_batch()` — Batch entity DB lookup
+- `src/service/capabilities/resolve.rs` — Entity resolution capability
+- `src/service/entity_resolution.rs` — entity normalization and alias helpers
+- `src/storage/app_store.rs::select_entity_lookup()` — Single entity DB lookup
+- `src/storage/context_store.rs::select_entities_batch()` — Batch entity DB lookup
 - `docs/MEMORY_SYSTEM_SPEC.md` — Full system specification (FR-ER section)
