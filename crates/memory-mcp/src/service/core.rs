@@ -10,8 +10,6 @@ use crate::logging::LogLevel;
 use crate::models::AccessPayload;
 
 use super::error::MemoryError;
-#[cfg(test)]
-use super::value_helpers::string_from_value;
 
 mod builder;
 mod helpers;
@@ -399,12 +397,9 @@ mod tests {
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::{AccessPayload, AccessScopeAllow, Provenance};
     use crate::service::EmbeddingProvider;
-    use crate::service::startup::{apply_startup_migrations, build_startup_versions_event};
-    use crate::service::util::rate_limiter::SafeMutex;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;
-    use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
@@ -472,37 +467,6 @@ mod tests {
         assert!(serialized.get("cross_scope_allow").is_some());
     }
 
-    #[test]
-    fn build_startup_versions_event_includes_both_versions() {
-        let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
-        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
-        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
-        assert_eq!(
-            evt.get("surrealdb_server_version").unwrap().as_str(),
-            Some("SurrealDB 3.0.0")
-        );
-    }
-
-    #[test]
-    fn build_startup_versions_event_omits_server_when_none() {
-        let evt = build_startup_versions_event("0.1.0", None);
-        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
-        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
-        assert!(!evt.contains_key("surrealdb_server_version"));
-    }
-
-    #[test]
-    fn build_fact_embedding_input_formats_correctly() {
-        let result = MemoryService::build_fact_embedding_input("note", "Hello world", "Hello!");
-        assert_eq!(result, "note\nHello world\nHello!");
-    }
-
-    #[test]
-    fn build_fact_embedding_input_handles_empty_parts() {
-        let result = MemoryService::build_fact_embedding_input("", "", "");
-        assert_eq!(result, "\n\n");
-    }
-
     /// Verifies that truncation is inside `generate_embedding` by checking
     /// that build_fact_embedding_input + generate_embedding together won't
     /// pass a 60k+ input to the provider. The truncation limit is 8,000 chars.
@@ -520,95 +484,6 @@ mod tests {
         // Truncation should produce at most 8,000 chars
         let truncated: String = full_input.chars().take(8_000).collect();
         assert_eq!(truncated.chars().count(), 8_000);
-    }
-
-    #[tokio::test]
-    async fn apply_startup_migrations_runs_for_every_namespace() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        struct StartupMigrationDbClient {
-            calls: Arc<Mutex<Vec<String>>>,
-            apply_count: AtomicUsize,
-        }
-
-        #[async_trait::async_trait]
-        impl DbClient for StartupMigrationDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
-                self.apply_count.fetch_add(1, Ordering::SeqCst);
-                self.calls.safe_lock().push(namespace.to_string());
-                Ok(())
-            }
-        }
-
-        let db_client = Arc::new(StartupMigrationDbClient {
-            calls: Arc::new(Mutex::new(Vec::new())),
-            apply_count: AtomicUsize::new(0),
-        });
-        let db_client_dyn: Arc<dyn DbClient> = db_client.clone();
-        let namespaces = vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ];
-
-        apply_startup_migrations(&db_client_dyn, &namespaces)
-            .await
-            .expect("startup migrations");
-
-        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 3);
-        assert_eq!(
-            db_client.calls.safe_lock().clone(),
-            vec![
-                "org".to_string(),
-                "personal".to_string(),
-                "private".to_string(),
-            ]
-        );
     }
 
     #[test]
@@ -663,61 +538,6 @@ mod tests {
             burst,
         )
         .unwrap()
-    }
-
-    #[test]
-    fn is_scope_allowed_returns_true_when_no_restrictions() {
-        let _service = create_test_service(vec!["org"]);
-        let access = AccessPayload::default();
-        assert!(access.is_scope_allowed("org"));
-    }
-
-    #[test]
-    fn is_scope_allowed_returns_true_for_allowed_scope() {
-        let _service = create_test_service(vec!["org"]);
-        let access = AccessPayload {
-            allowed_scopes: Some(vec!["org".to_string()]),
-            allowed_tags: None,
-            caller_id: None,
-            session_vars: None,
-            transport: None,
-            content_type: None,
-            cross_scope_allow: None,
-        };
-        assert!(access.is_scope_allowed("org"));
-    }
-
-    #[test]
-    fn is_scope_allowed_returns_false_for_disallowed_scope() {
-        let _service = create_test_service(vec!["org"]);
-        let access = AccessPayload {
-            allowed_scopes: Some(vec!["personal".to_string()]),
-            allowed_tags: None,
-            caller_id: None,
-            session_vars: None,
-            transport: None,
-            content_type: None,
-            cross_scope_allow: None,
-        };
-        assert!(!access.is_scope_allowed("org"));
-    }
-
-    #[test]
-    fn is_scope_allowed_allows_with_cross_scope_wildcard() {
-        let _service = create_test_service(vec!["org"]);
-        let access = AccessPayload {
-            allowed_scopes: Some(vec!["personal".to_string()]),
-            allowed_tags: None,
-            caller_id: None,
-            session_vars: None,
-            transport: None,
-            content_type: None,
-            cross_scope_allow: Some(vec![AccessScopeAllow {
-                from: "*".to_string(),
-                to: "org".to_string(),
-            }]),
-        };
-        assert!(access.is_scope_allowed("org"));
     }
 
     #[test]
@@ -1102,18 +922,6 @@ mod tests {
     }
 
     #[test]
-    fn string_from_value_handles_object_without_expected_keys() {
-        let value = json!({"Other": "value"});
-        assert_eq!(string_from_value(&value), None);
-    }
-
-    #[test]
-    fn string_from_value_handles_record_id_missing_fields() {
-        let value = json!({"RecordId": {"table": "entity"}});
-        assert_eq!(string_from_value(&value), None);
-    }
-
-    #[test]
     fn namespace_for_scope_handles_various_inputs() {
         let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
 
@@ -1127,28 +935,6 @@ mod tests {
         assert!(service.namespace_for_scope("unknown").is_err());
         assert!(service.namespace_for_scope("").is_err());
         assert_eq!(service.namespace_for_scope("ORG").unwrap(), "org");
-    }
-
-    #[test]
-    fn is_scope_allowed_with_empty_allowed_scopes() {
-        let _service = create_test_service(vec!["org"]);
-        let access = AccessPayload {
-            allowed_scopes: Some(vec![]),
-            ..Default::default()
-        };
-        assert!(!access.is_scope_allowed("org"));
-    }
-
-    #[test]
-    fn is_scope_allowed_with_multiple_allowed_scopes() {
-        let _service = create_test_service(vec!["org", "personal"]);
-        let access = AccessPayload {
-            allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
-            ..Default::default()
-        };
-        assert!(access.is_scope_allowed("org"));
-        assert!(access.is_scope_allowed("personal"));
-        assert!(!access.is_scope_allowed("private"));
     }
 
     #[test]

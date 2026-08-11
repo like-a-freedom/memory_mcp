@@ -1,3 +1,13 @@
+//! Fact re-embedding: rewrites every fact's embedding when the provider
+//! signature or dimension changes, with batched processing, resume support,
+//! and per-namespace progress tracking.
+//!
+//! [`reembed_all_facts`](MemoryService::reembed_all_facts) coordinates three
+//! phases: prepare (validate inputs + enumerate work), process (rewrite each
+//! batch with a resumable cursor), and finalize (recreate the HNSW index and
+//! persist completion). Progress is persisted after every fact so an
+//! interrupted pass resumes from the last completed cursor.
+
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
@@ -22,6 +32,41 @@ pub struct ReembedSummary {
     pub failed_facts: usize,
     /// IDs of facts that failed during this run (for `--retry-failed`).
     pub failed_fact_ids: Vec<String>,
+}
+
+/// Mutable state threaded through a single reembed pass, shared by the
+/// prepare / process / finalize phases.
+struct ReembedPass {
+    summary: ReembedSummary,
+    namespace_progress: serde_json::Map<String, Value>,
+    target_signature: String,
+    target_dimension: usize,
+    started_at: Instant,
+    started_at_rfc3339: String,
+    resumed: bool,
+    resumed_count: usize,
+    retry_failed_ids: std::collections::HashSet<String>,
+    resumable_job: Option<Value>,
+}
+
+/// Mutable per-namespace counters threaded through the batch loop.
+#[derive(Default)]
+struct NamespaceBatchState {
+    last_completed_fact_id: Option<String>,
+    processed: usize,
+    succeeded: usize,
+    failed: usize,
+    failed_fact_ids: Vec<String>,
+}
+
+/// Result of processing one batch: keep going or short-circuit the pass.
+enum BatchOutcome {
+    /// Batch processed; continue with the next batch.
+    Continue,
+    /// Cancellation observed mid-batch; job already persisted as `interrupted`.
+    Interrupted,
+    /// Failure quota exceeded; job already persisted as `failed`.
+    Failed,
 }
 
 impl MemoryService {
@@ -139,6 +184,86 @@ impl MemoryService {
         progress: &dyn ReembedProgressReporter,
         cancel_token: &CancellationToken,
     ) -> Result<(ReembedSummary, ReembedOutcome), MemoryError> {
+        let pass = self.prepare_reembed_pass(options).await?;
+
+        // Nothing to do: all embeddings match and no failed facts to retry.
+        if pass.summary.total_facts == 0 {
+            self.restore_semantic_readiness(&pass.target_signature, pass.target_dimension)
+                .await?;
+            progress.on_job_completed(&ReembedOutcome::NothingToDo, &pass.summary, Duration::ZERO);
+            return Ok((pass.summary, ReembedOutcome::NothingToDo));
+        }
+
+        let mut pass = pass;
+
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.job_started")),
+                (
+                    "target_signature".to_string(),
+                    json!(pass.target_signature.clone()),
+                ),
+                ("target_dimension".to_string(), json!(pass.target_dimension)),
+                (
+                    "provider".to_string(),
+                    json!(self.embedding_provider.provider_name()),
+                ),
+                (
+                    "model".to_string(),
+                    json!(self.current_embedding_model.clone()),
+                ),
+                ("resumed".to_string(), json!(pass.resumed)),
+                ("total_facts".to_string(), json!(pass.summary.total_facts)),
+            ]),
+            LogLevel::Info,
+        );
+
+        progress.on_job_started(pass.summary.total_facts, pass.resumed, pass.resumed_count);
+
+        self.persist_reembed_job(
+            &pass.summary,
+            &pass.target_signature,
+            pass.target_dimension,
+            &pass.namespace_progress,
+            Some(&pass.started_at_rfc3339),
+            None,
+            "running",
+            None,
+            None,
+            pass.started_at.elapsed(),
+        )
+        .await?;
+
+        // Drop the HNSW index in every namespace before rewriting facts.
+        // SurrealDB enforces vector dimension at the index level, so the
+        // index must be removed when the provider dimension changes.
+        for namespace in &self.namespaces {
+            self.remove_embedding_index(namespace).await?;
+        }
+
+        if let Some(outcome) = self
+            .process_reembed_pass(options, progress, cancel_token, &mut pass)
+            .await?
+        {
+            // Interrupted or failed — the processing phase already persisted
+            // the terminal job state; report and return.
+            return Ok((pass.summary, outcome));
+        }
+
+        let outcome = self.finalize_reembed_pass(progress, &pass).await?;
+        progress.on_job_completed(&outcome, &pass.summary, pass.started_at.elapsed());
+        Ok((pass.summary, outcome))
+    }
+
+    /// Phase 1 — validate inputs, load any resumable job, enumerate the work,
+    /// and snapshot the shared pass state.
+    ///
+    /// The HNSW index is intentionally left untouched here: the orchestrator
+    /// drops it only when there is actual work to do.
+    async fn prepare_reembed_pass(
+        &self,
+        options: &ReembedOptions,
+    ) -> Result<ReembedPass, MemoryError> {
         if !self.embedding_provider.is_enabled() {
             return Err(MemoryError::Validation(
                 "reembed requires an enabled embedding provider".to_string(),
@@ -159,7 +284,7 @@ impl MemoryService {
             job.get("target_signature").and_then(json_string) == Some(target_signature.as_str())
         });
         let resumed = resumable_job.is_some();
-        let mut namespace_progress = resumable_job
+        let namespace_progress = resumable_job
             .as_ref()
             .and_then(|job| job.get("namespace_progress"))
             .and_then(Value::as_object)
@@ -176,7 +301,7 @@ impl MemoryService {
             std::collections::HashSet::new()
         };
 
-        let mut summary = if options.retry_failed {
+        let summary = if options.retry_failed {
             ReembedSummary {
                 total_facts: retry_failed_ids.len(),
                 ..ReembedSummary::default()
@@ -188,72 +313,46 @@ impl MemoryService {
             }
         };
 
-        // Nothing to do: all embeddings match and no failed facts to retry.
-        if summary.total_facts == 0 {
-            self.restore_semantic_readiness(&target_signature, target_dimension)
-                .await?;
-            progress.on_job_completed(&ReembedOutcome::NothingToDo, &summary, Duration::ZERO);
-            return Ok((summary, ReembedOutcome::NothingToDo));
-        }
-
         let resumed_count = namespace_progress
             .values()
             .filter_map(|v| v.get("processed_facts").and_then(json_i64))
             .map(|n| n as usize)
             .sum::<usize>();
 
-        self.logger.log(
-            std::collections::HashMap::from([
-                ("op".to_string(), json!("reembed.job_started")),
-                (
-                    "target_signature".to_string(),
-                    json!(target_signature.clone()),
-                ),
-                ("target_dimension".to_string(), json!(target_dimension)),
-                (
-                    "provider".to_string(),
-                    json!(self.embedding_provider.provider_name()),
-                ),
-                (
-                    "model".to_string(),
-                    json!(self.current_embedding_model.clone()),
-                ),
-                ("resumed".to_string(), json!(resumed)),
-                ("total_facts".to_string(), json!(summary.total_facts)),
-            ]),
-            LogLevel::Info,
-        );
-
-        progress.on_job_started(summary.total_facts, resumed, resumed_count);
-
-        self.persist_reembed_job(
-            &summary,
-            &target_signature,
+        Ok(ReembedPass {
+            summary,
+            namespace_progress,
+            target_signature,
             target_dimension,
-            &namespace_progress,
-            Some(&started_at_rfc3339),
-            None,
-            "running",
-            None,
-            None,
-            started_at.elapsed(),
-        )
-        .await?;
+            started_at,
+            started_at_rfc3339,
+            resumed,
+            resumed_count,
+            retry_failed_ids,
+            resumable_job,
+        })
+    }
 
-        // Drop the HNSW index in every namespace before rewriting facts.
-        // SurrealDB enforces vector dimension at the index level, so the
-        // index must be removed when the provider dimension changes.
+    /// Phase 2 — rewrite facts namespace by namespace, batch by batch.
+    ///
+    /// Returns `None` when every namespace completed; `Some(outcome)` when the
+    /// pass was cut short (interrupted or failed) — in which case the terminal
+    /// job state has already been persisted.
+    async fn process_reembed_pass(
+        &self,
+        options: &ReembedOptions,
+        progress: &dyn ReembedProgressReporter,
+        cancel_token: &CancellationToken,
+        pass: &mut ReembedPass,
+    ) -> Result<Option<ReembedOutcome>, MemoryError> {
         for namespace in &self.namespaces {
-            self.remove_embedding_index(namespace).await?;
-        }
-
-        for namespace in &self.namespaces {
-            let mut last_completed_fact_id = resumable_job
+            let mut ns_state = NamespaceBatchState::default();
+            (ns_state.processed, ns_state.succeeded, ns_state.failed) =
+                existing_namespace_counters(&pass.namespace_progress, namespace);
+            ns_state.last_completed_fact_id = pass
+                .resumable_job
                 .as_ref()
                 .and_then(|job| namespace_last_completed_fact_id(job, namespace));
-            let (mut namespace_processed, mut namespace_succeeded, mut namespace_failed) =
-                existing_namespace_counters(&namespace_progress, namespace);
-            let mut namespace_failed_fact_ids: Vec<String> = Vec::new();
 
             self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
                 .await?;
@@ -264,7 +363,7 @@ impl MemoryService {
                     ("namespace".to_string(), json!(namespace)),
                     (
                         "resume_cursor".to_string(),
-                        json!(last_completed_fact_id.clone()),
+                        json!(ns_state.last_completed_fact_id.clone()),
                     ),
                 ]),
                 LogLevel::Info,
@@ -274,28 +373,16 @@ impl MemoryService {
             loop {
                 // Check for cancellation between batches (Ctrl+C responsiveness).
                 if cancel_token.is_cancelled() {
-                    progress.on_interrupted(&summary, started_at.elapsed());
-                    self.persist_reembed_job(
-                        &summary,
-                        &target_signature,
-                        target_dimension,
-                        &namespace_progress,
-                        Some(&started_at_rfc3339),
-                        Some(&chrono::Utc::now().to_rfc3339()),
-                        "interrupted",
-                        None,
-                        None,
-                        started_at.elapsed(),
-                    )
-                    .await?;
-                    return Ok((summary, ReembedOutcome::Interrupted));
+                    self.persist_interrupted(progress, pass).await?;
+                    return Ok(Some(ReembedOutcome::Interrupted));
                 }
+
                 let batch = self
                     .reembed_store()
                     .select_facts_needing_reembed(
                         namespace,
-                        &target_signature,
-                        last_completed_fact_id.as_deref(),
+                        &pass.target_signature,
+                        ns_state.last_completed_fact_id.as_deref(),
                         REEMBED_BATCH_SIZE,
                     )
                     .await?;
@@ -307,7 +394,7 @@ impl MemoryService {
                         ("count".to_string(), json!(batch.len())),
                         (
                             "after_cursor".to_string(),
-                            json!(last_completed_fact_id.clone()),
+                            json!(ns_state.last_completed_fact_id.clone()),
                         ),
                     ]),
                     LogLevel::Debug,
@@ -317,255 +404,38 @@ impl MemoryService {
                     break;
                 }
 
-                // In --retry-failed mode, filter batch to only failed fact IDs.
-                let batch: Vec<Value> = if options.retry_failed {
-                    batch
-                        .into_iter()
-                        .filter(|fact| {
-                            fact.get("fact_id")
-                                .and_then(json_string)
-                                .is_some_and(|id| retry_failed_ids.contains(id))
-                        })
-                        .collect()
-                } else {
-                    batch
-                };
-
-                if batch.is_empty() {
-                    // No retryable facts in this batch — continue to next batch.
-                    continue;
+                match self
+                    .process_reembed_batch(
+                        namespace,
+                        batch,
+                        options,
+                        progress,
+                        cancel_token,
+                        pass,
+                        &mut ns_state,
+                    )
+                    .await?
+                {
+                    BatchOutcome::Continue => {}
+                    BatchOutcome::Interrupted => return Ok(Some(ReembedOutcome::Interrupted)),
+                    BatchOutcome::Failed => return Ok(Some(ReembedOutcome::Failed)),
                 }
-
-                for fact in batch {
-                    // Check for cancellation (Ctrl+C) before processing each fact.
-                    if cancel_token.is_cancelled() {
-                        progress.on_interrupted(&summary, started_at.elapsed());
-                        self.persist_reembed_job(
-                            &summary,
-                            &target_signature,
-                            target_dimension,
-                            &namespace_progress,
-                            Some(&started_at_rfc3339),
-                            Some(&chrono::Utc::now().to_rfc3339()),
-                            "interrupted",
-                            None,
-                            None,
-                            started_at.elapsed(),
-                        )
-                        .await?;
-                        return Ok((summary, ReembedOutcome::Interrupted));
-                    }
-
-                    let fact_id = fact
-                        .get("fact_id")
-                        .and_then(json_string)
-                        .ok_or_else(|| MemoryError::Validation("missing fact_id".to_string()))?
-                        .to_string();
-
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("reembed.fact_rewrite_started")),
-                            ("namespace".to_string(), json!(namespace)),
-                            ("fact_id".to_string(), json!(fact_id.clone())),
-                        ]),
-                        LogLevel::Debug,
-                    );
-
-                    match self
-                        .rewrite_fact_embedding(
-                            namespace,
-                            fact,
-                            &target_signature,
-                            target_dimension,
-                        )
-                        .await
-                    {
-                        Ok(updated_fact_id) => {
-                            summary.processed_facts += 1;
-                            summary.succeeded_facts += 1;
-                            namespace_processed += 1;
-                            namespace_succeeded += 1;
-                            last_completed_fact_id = Some(updated_fact_id.clone());
-                            update_namespace_progress(
-                                &mut namespace_progress,
-                                namespace,
-                                "running",
-                                namespace_processed,
-                                namespace_succeeded,
-                                namespace_failed,
-                                last_completed_fact_id.as_deref(),
-                                &namespace_failed_fact_ids,
-                            );
-                            self.persist_reembed_job(
-                                &summary,
-                                &target_signature,
-                                target_dimension,
-                                &namespace_progress,
-                                Some(&started_at_rfc3339),
-                                None,
-                                "running",
-                                Some(namespace),
-                                None,
-                                started_at.elapsed(),
-                            )
-                            .await?;
-
-                            self.logger.log(
-                                std::collections::HashMap::from([
-                                    ("op".to_string(), json!("reembed.cursor_advanced")),
-                                    ("namespace".to_string(), json!(namespace)),
-                                    (
-                                        "last_completed_fact_id".to_string(),
-                                        json!(last_completed_fact_id.clone()),
-                                    ),
-                                ]),
-                                LogLevel::Debug,
-                            );
-                        }
-                        Err(err) => {
-                            // Continue-on-error: record the failure and proceed.
-                            //
-                            // Do NOT advance `last_completed_fact_id` past the
-                            // failed fact — the cursor must point at the last
-                            // *succeeded* fact so a resume retries the failed
-                            // one. Advancing here would skip it on the next run
-                            // (the query uses `fact_id > cursor`).
-                            summary.processed_facts += 1;
-                            summary.failed_facts += 1;
-                            namespace_processed += 1;
-                            namespace_failed += 1;
-                            namespace_failed_fact_ids.push(fact_id.clone());
-                            summary.failed_fact_ids.push(fact_id.clone());
-                            update_namespace_progress(
-                                &mut namespace_progress,
-                                namespace,
-                                "running",
-                                namespace_processed,
-                                namespace_succeeded,
-                                namespace_failed,
-                                last_completed_fact_id.as_deref(),
-                                &namespace_failed_fact_ids,
-                            );
-                            self.persist_reembed_job(
-                                &summary,
-                                &target_signature,
-                                target_dimension,
-                                &namespace_progress,
-                                Some(&started_at_rfc3339),
-                                None,
-                                "running",
-                                Some(namespace),
-                                None,
-                                started_at.elapsed(),
-                            )
-                            .await?;
-                            self.logger.log(
-                                std::collections::HashMap::from([
-                                    ("op".to_string(), json!("reembed.fact_failed")),
-                                    ("namespace".to_string(), json!(namespace)),
-                                    ("fact_id".to_string(), json!(fact_id.clone())),
-                                    ("error".to_string(), json!(err.to_string())),
-                                ]),
-                                LogLevel::Warn,
-                            );
-
-                            // Check quota: if failures exceed the limit, abort.
-                            let max_failures = options.effective_max_failures(summary.total_facts);
-                            if max_failures == 0 || summary.failed_facts > max_failures {
-                                self.write_embedding_state(
-                                    namespace,
-                                    "failed",
-                                    None,
-                                    Some(REEMBED_JOB_ID),
-                                )
-                                .await?;
-                                let error_message = format!(
-                                    "reembed exceeded max_failures ({max_failures}) after fact {fact_id}: {err}"
-                                );
-                                self.persist_reembed_job(
-                                    &summary,
-                                    &target_signature,
-                                    target_dimension,
-                                    &namespace_progress,
-                                    Some(&started_at_rfc3339),
-                                    Some(&chrono::Utc::now().to_rfc3339()),
-                                    "failed",
-                                    Some(namespace),
-                                    Some(&error_message),
-                                    started_at.elapsed(),
-                                )
-                                .await?;
-                                self.logger.log(
-                                    std::collections::HashMap::from([
-                                        ("op".to_string(), json!("reembed.job_failed")),
-                                        (
-                                            "processed_facts".to_string(),
-                                            json!(summary.processed_facts),
-                                        ),
-                                        (
-                                            "succeeded_facts".to_string(),
-                                            json!(summary.succeeded_facts),
-                                        ),
-                                        ("failed_facts".to_string(), json!(summary.failed_facts)),
-                                        ("total_facts".to_string(), json!(summary.total_facts)),
-                                        (
-                                            "facts_per_second".to_string(),
-                                            json!(facts_per_second(
-                                                started_at.elapsed(),
-                                                summary.processed_facts
-                                            )),
-                                        ),
-                                        (
-                                            "duration_ms".to_string(),
-                                            json!(started_at.elapsed().as_millis() as u64),
-                                        ),
-                                        (
-                                            "provider".to_string(),
-                                            json!(self.embedding_provider.provider_name()),
-                                        ),
-                                        (
-                                            "model".to_string(),
-                                            json!(self.current_embedding_model.clone()),
-                                        ),
-                                        ("target_dimension".to_string(), json!(target_dimension)),
-                                        (
-                                            "target_signature".to_string(),
-                                            json!(target_signature.clone()),
-                                        ),
-                                        ("resumed".to_string(), json!(resumed)),
-                                    ]),
-                                    LogLevel::Warn,
-                                );
-                                progress.on_job_completed(
-                                    &ReembedOutcome::Failed,
-                                    &summary,
-                                    started_at.elapsed(),
-                                );
-                                return Ok((summary, ReembedOutcome::Failed));
-                            }
-                        }
-                    }
-
-                    progress.on_fact_processed(namespace, &summary, started_at.elapsed());
-                }
-
-                self.log_reembed_progress(namespace, &summary, started_at.elapsed());
             }
 
             update_namespace_progress(
-                &mut namespace_progress,
+                &mut pass.namespace_progress,
                 namespace,
                 "completed",
-                namespace_processed,
-                namespace_succeeded,
-                namespace_failed,
-                last_completed_fact_id.as_deref(),
-                &namespace_failed_fact_ids,
+                ns_state.processed,
+                ns_state.succeeded,
+                ns_state.failed,
+                ns_state.last_completed_fact_id.as_deref(),
+                &ns_state.failed_fact_ids,
             );
             self.write_embedding_state(
                 namespace,
                 "ready",
-                Some(&target_signature),
+                Some(&pass.target_signature),
                 Some(REEMBED_JOB_ID),
             )
             .await?;
@@ -575,24 +445,296 @@ impl MemoryService {
                     ("namespace".to_string(), json!(namespace)),
                     (
                         "last_completed_fact_id".to_string(),
-                        json!(last_completed_fact_id.clone()),
+                        json!(ns_state.last_completed_fact_id.clone()),
                     ),
                 ]),
                 LogLevel::Info,
             );
             progress.on_namespace_completed(
                 namespace,
-                namespace_succeeded,
-                namespace_failed,
-                started_at.elapsed(),
+                ns_state.succeeded,
+                ns_state.failed,
+                pass.started_at.elapsed(),
             );
         }
 
+        Ok(None)
+    }
+
+    /// Processes a single fetched batch: applies the `--retry-failed` filter,
+    /// rewrites each fact's embedding, advances the resume cursor, and persists
+    /// progress after every fact.
+    ///
+    /// Returns [`BatchOutcome::Continue`] to keep processing, or a short-circuit
+    /// outcome when the pass must stop (cancellation or failure quota).
+    // Clippy: 7 args are cohesive parts of one batch-processing step (work,
+    // options, reporters, and the shared pass/namespace state). Splitting into
+    // a struct would add noise without clarity.
+    #[allow(clippy::too_many_arguments)]
+    async fn process_reembed_batch(
+        &self,
+        namespace: &str,
+        batch: Vec<Value>,
+        options: &ReembedOptions,
+        progress: &dyn ReembedProgressReporter,
+        cancel_token: &CancellationToken,
+        pass: &mut ReembedPass,
+        ns_state: &mut NamespaceBatchState,
+    ) -> Result<BatchOutcome, MemoryError> {
+        // In --retry-failed mode, filter batch to only failed fact IDs.
+        let batch: Vec<Value> = if options.retry_failed {
+            batch
+                .into_iter()
+                .filter(|fact| {
+                    fact.get("fact_id")
+                        .and_then(json_string)
+                        .is_some_and(|id| pass.retry_failed_ids.contains(id))
+                })
+                .collect()
+        } else {
+            batch
+        };
+
+        if batch.is_empty() {
+            // No retryable facts in this batch — continue to next batch.
+            return Ok(BatchOutcome::Continue);
+        }
+
+        for fact in batch {
+            // Check for cancellation (Ctrl+C) before processing each fact.
+            if cancel_token.is_cancelled() {
+                self.persist_interrupted(progress, pass).await?;
+                return Ok(BatchOutcome::Interrupted);
+            }
+
+            let fact_id = fact
+                .get("fact_id")
+                .and_then(json_string)
+                .ok_or_else(|| MemoryError::Validation("missing fact_id".to_string()))?
+                .to_string();
+
+            self.logger.log(
+                std::collections::HashMap::from([
+                    ("op".to_string(), json!("reembed.fact_rewrite_started")),
+                    ("namespace".to_string(), json!(namespace)),
+                    ("fact_id".to_string(), json!(fact_id.clone())),
+                ]),
+                LogLevel::Debug,
+            );
+
+            match self
+                .rewrite_fact_embedding(
+                    namespace,
+                    fact,
+                    &pass.target_signature,
+                    pass.target_dimension,
+                )
+                .await
+            {
+                Ok(updated_fact_id) => {
+                    pass.summary.processed_facts += 1;
+                    pass.summary.succeeded_facts += 1;
+                    ns_state.processed += 1;
+                    ns_state.succeeded += 1;
+                    ns_state.last_completed_fact_id = Some(updated_fact_id.clone());
+                    update_namespace_progress(
+                        &mut pass.namespace_progress,
+                        namespace,
+                        "running",
+                        ns_state.processed,
+                        ns_state.succeeded,
+                        ns_state.failed,
+                        ns_state.last_completed_fact_id.as_deref(),
+                        &ns_state.failed_fact_ids,
+                    );
+                    self.persist_reembed_job(
+                        &pass.summary,
+                        &pass.target_signature,
+                        pass.target_dimension,
+                        &pass.namespace_progress,
+                        Some(&pass.started_at_rfc3339),
+                        None,
+                        "running",
+                        Some(namespace),
+                        None,
+                        pass.started_at.elapsed(),
+                    )
+                    .await?;
+
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("reembed.cursor_advanced")),
+                            ("namespace".to_string(), json!(namespace)),
+                            (
+                                "last_completed_fact_id".to_string(),
+                                json!(ns_state.last_completed_fact_id.clone()),
+                            ),
+                        ]),
+                        LogLevel::Debug,
+                    );
+                }
+                Err(err) => {
+                    // Continue-on-error: record the failure and proceed.
+                    //
+                    // Do NOT advance `last_completed_fact_id` past the
+                    // failed fact — the cursor must point at the last
+                    // *succeeded* fact so a resume retries the failed
+                    // one. Advancing here would skip it on the next run
+                    // (the query uses `fact_id > cursor`).
+                    pass.summary.processed_facts += 1;
+                    pass.summary.failed_facts += 1;
+                    ns_state.processed += 1;
+                    ns_state.failed += 1;
+                    ns_state.failed_fact_ids.push(fact_id.clone());
+                    pass.summary.failed_fact_ids.push(fact_id.clone());
+                    update_namespace_progress(
+                        &mut pass.namespace_progress,
+                        namespace,
+                        "running",
+                        ns_state.processed,
+                        ns_state.succeeded,
+                        ns_state.failed,
+                        ns_state.last_completed_fact_id.as_deref(),
+                        &ns_state.failed_fact_ids,
+                    );
+                    self.persist_reembed_job(
+                        &pass.summary,
+                        &pass.target_signature,
+                        pass.target_dimension,
+                        &pass.namespace_progress,
+                        Some(&pass.started_at_rfc3339),
+                        None,
+                        "running",
+                        Some(namespace),
+                        None,
+                        pass.started_at.elapsed(),
+                    )
+                    .await?;
+                    self.logger.log(
+                        std::collections::HashMap::from([
+                            ("op".to_string(), json!("reembed.fact_failed")),
+                            ("namespace".to_string(), json!(namespace)),
+                            ("fact_id".to_string(), json!(fact_id.clone())),
+                            ("error".to_string(), json!(err.to_string())),
+                        ]),
+                        LogLevel::Warn,
+                    );
+
+                    // Check quota: if failures exceed the limit, abort.
+                    let max_failures = options.effective_max_failures(pass.summary.total_facts);
+                    if max_failures == 0 || pass.summary.failed_facts > max_failures {
+                        self.write_embedding_state(namespace, "failed", None, Some(REEMBED_JOB_ID))
+                            .await?;
+                        let error_message = format!(
+                            "reembed exceeded max_failures ({max_failures}) after fact {fact_id}: {err}"
+                        );
+                        self.persist_reembed_job(
+                            &pass.summary,
+                            &pass.target_signature,
+                            pass.target_dimension,
+                            &pass.namespace_progress,
+                            Some(&pass.started_at_rfc3339),
+                            Some(&chrono::Utc::now().to_rfc3339()),
+                            "failed",
+                            Some(namespace),
+                            Some(&error_message),
+                            pass.started_at.elapsed(),
+                        )
+                        .await?;
+                        self.logger.log(
+                            std::collections::HashMap::from([
+                                ("op".to_string(), json!("reembed.job_failed")),
+                                (
+                                    "processed_facts".to_string(),
+                                    json!(pass.summary.processed_facts),
+                                ),
+                                (
+                                    "succeeded_facts".to_string(),
+                                    json!(pass.summary.succeeded_facts),
+                                ),
+                                ("failed_facts".to_string(), json!(pass.summary.failed_facts)),
+                                ("total_facts".to_string(), json!(pass.summary.total_facts)),
+                                (
+                                    "facts_per_second".to_string(),
+                                    json!(facts_per_second(
+                                        pass.started_at.elapsed(),
+                                        pass.summary.processed_facts
+                                    )),
+                                ),
+                                (
+                                    "duration_ms".to_string(),
+                                    json!(pass.started_at.elapsed().as_millis() as u64),
+                                ),
+                                (
+                                    "provider".to_string(),
+                                    json!(self.embedding_provider.provider_name()),
+                                ),
+                                (
+                                    "model".to_string(),
+                                    json!(self.current_embedding_model.clone()),
+                                ),
+                                ("target_dimension".to_string(), json!(pass.target_dimension)),
+                                (
+                                    "target_signature".to_string(),
+                                    json!(pass.target_signature.clone()),
+                                ),
+                                ("resumed".to_string(), json!(pass.resumed)),
+                            ]),
+                            LogLevel::Warn,
+                        );
+                        progress.on_job_completed(
+                            &ReembedOutcome::Failed,
+                            &pass.summary,
+                            pass.started_at.elapsed(),
+                        );
+                        return Ok(BatchOutcome::Failed);
+                    }
+                }
+            }
+
+            progress.on_fact_processed(namespace, &pass.summary, pass.started_at.elapsed());
+        }
+
+        self.log_reembed_progress(namespace, &pass.summary, pass.started_at.elapsed());
+        Ok(BatchOutcome::Continue)
+    }
+
+    /// Cancel-path: report the interruption and persist the job as `interrupted`.
+    /// Shared by the between-batch and per-fact cancellation checks.
+    async fn persist_interrupted(
+        &self,
+        progress: &dyn ReembedProgressReporter,
+        pass: &ReembedPass,
+    ) -> Result<(), MemoryError> {
+        progress.on_interrupted(&pass.summary, pass.started_at.elapsed());
+        self.persist_reembed_job(
+            &pass.summary,
+            &pass.target_signature,
+            pass.target_dimension,
+            &pass.namespace_progress,
+            Some(&pass.started_at_rfc3339),
+            Some(&chrono::Utc::now().to_rfc3339()),
+            "interrupted",
+            None,
+            None,
+            pass.started_at.elapsed(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Phase 3 — recreate the HNSW index at the target dimension, persist the
+    /// completed job record, and log the final summary. Returns the outcome.
+    async fn finalize_reembed_pass(
+        &self,
+        progress: &dyn ReembedProgressReporter,
+        pass: &ReembedPass,
+    ) -> Result<ReembedOutcome, MemoryError> {
         // All facts rewritten successfully — recreate the HNSW index with
         // the new dimension.
         for namespace in &self.namespaces {
             progress.on_index_recreating(namespace);
-            self.define_embedding_index(namespace, target_dimension)
+            self.define_embedding_index(namespace, pass.target_dimension)
                 .await
                 .map_err(|err| {
                     MemoryError::Storage(format!(
@@ -603,19 +745,19 @@ impl MemoryService {
                 std::collections::HashMap::from([
                     ("op".to_string(), json!("reembed.index_recreated")),
                     ("namespace".to_string(), json!(namespace)),
-                    ("dimension".to_string(), json!(target_dimension)),
+                    ("dimension".to_string(), json!(pass.target_dimension)),
                 ]),
                 LogLevel::Info,
             );
             progress.on_index_recreated(namespace);
         }
 
-        let outcome = if summary.failed_facts == 0 {
+        let outcome = if pass.summary.failed_facts == 0 {
             ReembedOutcome::Completed
         } else {
             ReembedOutcome::CompletedWithErrors
         };
-        let final_status = if summary.failed_facts == 0 {
+        let final_status = if pass.summary.failed_facts == 0 {
             "completed"
         } else {
             "completed_with_errors"
@@ -623,16 +765,16 @@ impl MemoryService {
 
         let finished_at = chrono::Utc::now().to_rfc3339();
         self.persist_reembed_job(
-            &summary,
-            &target_signature,
-            target_dimension,
-            &namespace_progress,
-            Some(&started_at_rfc3339),
+            &pass.summary,
+            &pass.target_signature,
+            pass.target_dimension,
+            &pass.namespace_progress,
+            Some(&pass.started_at_rfc3339),
             Some(&finished_at),
             final_status,
             None,
             None,
-            started_at.elapsed(),
+            pass.started_at.elapsed(),
         )
         .await?;
         self.logger.log(
@@ -640,24 +782,24 @@ impl MemoryService {
                 ("op".to_string(), json!("reembed.job_completed")),
                 (
                     "processed_facts".to_string(),
-                    json!(summary.processed_facts),
+                    json!(pass.summary.processed_facts),
                 ),
                 (
                     "succeeded_facts".to_string(),
-                    json!(summary.succeeded_facts),
+                    json!(pass.summary.succeeded_facts),
                 ),
-                ("failed_facts".to_string(), json!(summary.failed_facts)),
-                ("total_facts".to_string(), json!(summary.total_facts)),
+                ("failed_facts".to_string(), json!(pass.summary.failed_facts)),
+                ("total_facts".to_string(), json!(pass.summary.total_facts)),
                 (
                     "facts_per_second".to_string(),
                     json!(facts_per_second(
-                        started_at.elapsed(),
-                        summary.processed_facts
+                        pass.started_at.elapsed(),
+                        pass.summary.processed_facts
                     )),
                 ),
                 (
                     "duration_ms".to_string(),
-                    json!(started_at.elapsed().as_millis() as u64),
+                    json!(pass.started_at.elapsed().as_millis() as u64),
                 ),
                 (
                     "provider".to_string(),
@@ -667,16 +809,17 @@ impl MemoryService {
                     "model".to_string(),
                     json!(self.current_embedding_model.clone()),
                 ),
-                ("target_dimension".to_string(), json!(target_dimension)),
-                ("target_signature".to_string(), json!(target_signature)),
-                ("resumed".to_string(), json!(resumed)),
+                ("target_dimension".to_string(), json!(pass.target_dimension)),
+                (
+                    "target_signature".to_string(),
+                    json!(pass.target_signature.clone()),
+                ),
+                ("resumed".to_string(), json!(pass.resumed)),
             ]),
             LogLevel::Info,
         );
 
-        progress.on_job_completed(&outcome, &summary, started_at.elapsed());
-
-        Ok((summary, outcome))
+        Ok(outcome)
     }
 
     async fn load_reembed_job(&self) -> Result<Option<Value>, MemoryError> {

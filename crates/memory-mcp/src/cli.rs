@@ -5,7 +5,12 @@ pub mod args;
 pub mod commands;
 pub mod runtime;
 
+use std::future::Future;
+use std::pin::Pin;
+
 use clap::{Parser, Subcommand};
+
+use crate::service::{MemoryError, MemoryService};
 
 pub use runtime::{
     WatchCommand, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
@@ -74,4 +79,68 @@ pub enum Command {
     /// Consumed by hook scripts, not a public tool. See ADR-0016 AD-5.
     #[command(hide = true)]
     LifecycleRecall(args::LifecycleRecallArgs),
+}
+
+/// Erased one-shot runner: executes a CLI tool subcommand against a built
+/// service. Each runner captures its own clap `*Args` at construction time,
+/// so dispatch can build the service once and run any one-shot subcommand
+/// through a single code path.
+// Clippy: the nested boxed-future type is inherent to erasing heterogeneous
+// async runners; unwrapping it into a struct adds noise without clarity.
+#[allow(clippy::type_complexity)]
+pub type OneShotRunner = Box<
+    dyn for<'a> FnOnce(
+            &'a MemoryService,
+        )
+            -> Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send + 'a>>
+        + Send,
+>;
+
+impl Command {
+    /// Stable log label for the startup log. Single source of truth for
+    /// mode names — `runner.rs` derives its startup log from here.
+    pub fn mode_label(&self) -> &'static str {
+        match self {
+            Command::Serve => "serve",
+            Command::Watch(_) => "watch",
+            Command::Reembed(_) => "reembed",
+            Command::Init(_) => "cli.init",
+            Command::Ingest(_) => "cli.ingest",
+            Command::Extract(_) => "cli.extract",
+            Command::Resolve(_) => "cli.resolve",
+            Command::Invalidate(_) => "cli.invalidate",
+            Command::Explain(_) => "cli.explain",
+            Command::AssembleContext(_) => "cli.assemble_context",
+            Command::LifecycleCapture(_) => "cli.lifecycle_capture",
+            Command::LifecycleRecall(_) => "cli.lifecycle_recall",
+        }
+    }
+
+    /// Returns the erased one-shot runner for one-shot tool subcommands.
+    ///
+    /// Each runner captures its clap `*Args`, so `runner.rs` can build the
+    /// service once and dispatch every one-shot subcommand through a single
+    /// code path. The four service modes (serve / watch / reembed / init)
+    /// return `None` and are dispatched before this is reached.
+    pub fn into_one_shot(self) -> Option<OneShotRunner> {
+        macro_rules! one_shot {
+            ($runner:ident, $args:expr) => {
+                Some(Box::new(move |service| {
+                    Box::pin(commands::$runner(service, $args))
+                }))
+            };
+        }
+
+        match self {
+            Command::Serve | Command::Watch(_) | Command::Reembed(_) | Command::Init(_) => None,
+            Command::Ingest(args) => one_shot!(run_ingest, args),
+            Command::Extract(args) => one_shot!(run_extract, args),
+            Command::Resolve(args) => one_shot!(run_resolve, args),
+            Command::Invalidate(args) => one_shot!(run_invalidate, args),
+            Command::Explain(args) => one_shot!(run_explain, args),
+            Command::AssembleContext(args) => one_shot!(run_assemble_context, args),
+            Command::LifecycleCapture(args) => one_shot!(run_lifecycle_capture, args),
+            Command::LifecycleRecall(args) => one_shot!(run_lifecycle_recall, args),
+        }
+    }
 }

@@ -419,6 +419,18 @@ mod tests {
     use super::*;
     use crate::service::mock_db::MockDbClient;
 
+    #[test]
+    fn build_fact_embedding_input_formats_correctly() {
+        let result = FactService::build_fact_embedding_input("note", "Hello world", "Hello!");
+        assert_eq!(result, "note\nHello world\nHello!");
+    }
+
+    #[test]
+    fn build_fact_embedding_input_handles_empty_parts() {
+        let result = FactService::build_fact_embedding_input("", "", "");
+        assert_eq!(result, "\n\n");
+    }
+
     #[tokio::test]
     async fn create_fact_persists_record() {
         let t = Utc::now();

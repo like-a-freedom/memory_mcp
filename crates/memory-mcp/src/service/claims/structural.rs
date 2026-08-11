@@ -102,8 +102,12 @@ pub(crate) fn parse_assertions(content: &str) -> Vec<StructuralAssertion> {
     assertions
 }
 
+// Priority-1 JSON-scalar leaf extraction is intentionally deferred: no plan
+// or ADR mandates the JSON-scalar claim format yet, so this slot always
+// returns `None` and parsing falls through to key-value / sentence patterns.
+// Re-visit with a plan before treating JSON blobs as a claim source.
+// See ADR-0004 (register claim schemas).
 fn try_parse_json_scalars(_content: &str) -> Option<Vec<StructuralAssertion>> {
-    // TODO: implement JSON scalar leaf extraction
     None
 }
 

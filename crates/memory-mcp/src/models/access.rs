@@ -48,6 +48,63 @@ mod tests {
     use super::*;
 
     #[test]
+    fn is_scope_allowed_returns_true_when_no_restrictions() {
+        let access = AccessPayload::default();
+        assert!(access.is_scope_allowed("org"));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_true_for_allowed_scope() {
+        let access = AccessPayload {
+            allowed_scopes: Some(vec!["org".to_string()]),
+            ..AccessPayload::default()
+        };
+        assert!(access.is_scope_allowed("org"));
+    }
+
+    #[test]
+    fn is_scope_allowed_returns_false_for_disallowed_scope() {
+        let access = AccessPayload {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            ..AccessPayload::default()
+        };
+        assert!(!access.is_scope_allowed("org"));
+    }
+
+    #[test]
+    fn is_scope_allowed_allows_with_cross_scope_wildcard() {
+        let access = AccessPayload {
+            allowed_scopes: Some(vec!["personal".to_string()]),
+            cross_scope_allow: Some(vec![AccessScopeAllow {
+                from: "*".to_string(),
+                to: "org".to_string(),
+            }]),
+            ..AccessPayload::default()
+        };
+        assert!(access.is_scope_allowed("org"));
+    }
+
+    #[test]
+    fn is_scope_allowed_with_empty_allowed_scopes() {
+        let access = AccessPayload {
+            allowed_scopes: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(!access.is_scope_allowed("org"));
+    }
+
+    #[test]
+    fn is_scope_allowed_with_multiple_allowed_scopes() {
+        let access = AccessPayload {
+            allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),
+            ..Default::default()
+        };
+        assert!(access.is_scope_allowed("org"));
+        assert!(access.is_scope_allowed("personal"));
+        assert!(!access.is_scope_allowed("private"));
+    }
+
+    #[test]
     fn access_context_from_payload_maps_fields() {
         let payload = AccessPayload {
             allowed_scopes: Some(vec!["org".to_string(), "personal".to_string()]),

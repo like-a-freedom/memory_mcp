@@ -60,75 +60,31 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
             .await
             .map_err(boxed_to_failure),
 
-        // One-shot CLI tool arms. Each builds the service once at the top of
-        // the arm and calls the corresponding command handler directly. No
-        // closures, no `Pin<Box>`, no `std::process::exit` inside async — see
-        // Risk R7.
-        Some(Command::Ingest(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::ingest::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::Extract(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::extract::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::Resolve(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::resolve::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::Invalidate(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::invalidate::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::Explain(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::explain::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::AssembleContext(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::assemble_context::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::LifecycleCapture(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::lifecycle_capture::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
-        Some(Command::LifecycleRecall(args)) => {
-            let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
-                .await
-                .map_err(boxed_to_failure)?;
-            commands::lifecycle_recall::run(&service, args)
-                .await
-                .map_err(report_cli_error)
-        }
+        // One-shot CLI tool subcommands: build the service once, then run the
+        // command's erased runner (label + error policy live in `cli.rs`). No
+        // closures, no `Pin<Box>` in this file, no `std::process::exit` inside
+        // async — see Risk R7.
+        Some(command) => run_one_shot(logger, command).await,
     }
+}
+
+/// Builds the service once and runs a one-shot CLI tool subcommand, mapping
+/// its `MemoryError` through the shared JSON envelope + exit-code policy.
+/// Defined once so the policy cannot drift between subcommands.
+/// See Risk R6 and Risk R7.
+async fn run_one_shot(logger: &StdoutLogger, command: Command) -> Result<(), ExitCode> {
+    let service = build_memory_service(logger, EmbeddingActivationMode::Standard)
+        .await
+        .map_err(boxed_to_failure)?;
+
+    let Some(runner) = command.into_one_shot() else {
+        // Defensive guard: `dispatch` matches the four service-mode variants
+        // above, so every command reaching here is a one-shot subcommand.
+        eprintln!("memory_mcp: internal dispatch error: not a one-shot subcommand");
+        return Err(ExitCode::FAILURE);
+    };
+
+    runner(&service).await.map_err(report_cli_error)
 }
 
 /// Shared error mapper for one-shot CLI tools. Prints the JSON envelope on
@@ -192,20 +148,7 @@ fn error_kind(err: &MemoryError) -> &'static str {
 }
 
 fn mode_label(cli: &Cli) -> &'static str {
-    match &cli.command {
-        None | Some(Command::Serve) => "serve",
-        Some(Command::Watch(_)) => "watch",
-        Some(Command::Reembed(_)) => "reembed",
-        Some(Command::Init(_)) => "cli.init",
-        Some(Command::Ingest(_)) => "cli.ingest",
-        Some(Command::Extract(_)) => "cli.extract",
-        Some(Command::Resolve(_)) => "cli.resolve",
-        Some(Command::Invalidate(_)) => "cli.invalidate",
-        Some(Command::Explain(_)) => "cli.explain",
-        Some(Command::AssembleContext(_)) => "cli.assemble_context",
-        Some(Command::LifecycleCapture(_)) => "cli.lifecycle_capture",
-        Some(Command::LifecycleRecall(_)) => "cli.lifecycle_recall",
-    }
+    cli.command.as_ref().map_or("serve", Command::mode_label)
 }
 
 fn watch_command_from_args(args: WatchArgs) -> WatchCommand {

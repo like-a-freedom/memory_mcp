@@ -157,6 +157,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn string_from_value_handles_object_without_expected_keys() {
+        let value = json!({"Other": "value"});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
+    fn string_from_value_handles_record_id_missing_fields() {
+        let value = json!({"RecordId": {"table": "entity"}});
+        assert_eq!(string_from_value(&value), None);
+    }
+
+    #[test]
     fn json_string_handles_plain_string() {
         let v = json!("hello");
         assert_eq!(json_string(&v), Some("hello"));

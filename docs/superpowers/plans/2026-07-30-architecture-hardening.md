@@ -40,9 +40,9 @@ ADR-0022 (compact responses) is already Draft — card 5 closes its Phase B.
 | 5 | ✅ complete | ADR-0022 Accepted on Phase B data (39.5% mean reduction, 66/66) |
 | 2 | ✅ complete | Six commits land the capability narrowing: stores in `storage/{context_store,app_store,fact_store,episode_store}.rs`; PR gates at v5 parity across every step |
 | 6 | ✅ partial | Builders moved to `models/request.rs`. Eval corpora move deliberately deferred: ADR-0020 pins digests on the current path; moving requires re-pinning across all profiles |
-| 1 | ⏸  blocked | Needs the full 14-variant command table against each arm's shape contract + confirmation policy. Descriptor table is in ADR-0023; implementation is the next focused step |
+| 1 | ✅ complete | ADR-0023 Accepted (2026-07-30); `service/apps/dispatch.rs` ships the `AppCommandDescriptor` table, `find_descriptor` dispatcher, and all `execute_*` handlers; no `unreachable!()` remains in `mcp/handlers.rs`. Verified by audit 2026-08-11 |
 | 3 | ⏸  planned | ADR-0025 defines the renderer; implementation touches every suite's evidence path across eval-harness (one follow-on PR) |
-| 4 | ⏸  blocked on 1 | Requires Card 1's dispatch so the MCP-layer trigger matrix is clean first |
+| 4 | ✅ complete | Composition-root end-state reached: capability seam fully migrated (tools call `*Capability::*` via `&ServiceContext`), `find_intro_chain` in `apps/graph.rs`, no one-line delegates on `MemoryService`; `core.rs` test module split into owning modules (startup / fact / value_helpers / models::access). Verified by audit 2026-08-11 (PR profile 7/7, 119/119) |
 
 Card 2 verified end-to-end: `cargo test --workspace --all-targets --features cli-watch,mcp-apps` passes; PR profile matches v5 observed values for every gate (7/7, 119/119).
 

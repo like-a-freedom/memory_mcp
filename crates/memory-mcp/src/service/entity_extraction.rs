@@ -83,10 +83,16 @@ pub type ExtractFn = dyn Fn(String) -> ExtractFuture + Send + Sync;
 
 /// LLM-backed entity extractor that delegates to a pluggable function.
 ///
-/// Activate via config flag `ENTITY_EXTRACTOR=llm`. The extraction function
-/// is injected at construction time — no HTTP client dependency required.
-/// Falls back gracefully: if the function returns an error, returns an
-/// empty candidate list (the caller can retry with [`RegexEntityExtractor`]).
+/// This is a code-injected extension seam — the extraction function is
+/// supplied via [`LlmEntityExtractor::new`] at construction time, so no HTTP
+/// client or other transport is bundled. It is intentionally absent from
+/// [`NerExtractorKind`] / the backend registry: there is no
+/// `ENTITY_EXTRACTOR=llm` config flag and no `NerExtractorKind::Llm` variant.
+/// Programmatic users (e.g. the eval harness) construct it directly. See
+/// ADR-0029 (`docs/adr/0029-registry-of-pluggable-ner-backends.md`).
+///
+/// Errors from the injected function are propagated to the caller; there is
+/// no silent fallback to an empty candidate list.
 pub struct LlmEntityExtractor {
     extract_fn: Box<ExtractFn>,
 }

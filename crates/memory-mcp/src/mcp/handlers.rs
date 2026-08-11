@@ -562,7 +562,6 @@ mod tests {
     }
 
     #[cfg(feature = "mcp-apps")]
-    #[cfg(feature = "mcp-apps")]
     async fn create_test_entity(mcp: &MemoryMcp, canonical_name: &str) -> String {
         ResolveCapability::resolve(
             &mcp.service().build_context(),

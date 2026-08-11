@@ -341,6 +341,116 @@ pub(crate) async fn resolve_embedding_startup(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::util::rate_limiter::SafeMutex;
+    use serde_json::Value;
+
+    #[test]
+    fn build_startup_versions_event_includes_both_versions() {
+        let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert_eq!(
+            evt.get("surrealdb_server_version").unwrap().as_str(),
+            Some("SurrealDB 3.0.0")
+        );
+    }
+
+    #[test]
+    fn build_startup_versions_event_omits_server_when_none() {
+        let evt = build_startup_versions_event("0.1.0", None);
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
+        assert!(!evt.contains_key("surrealdb_server_version"));
+    }
+
+    #[tokio::test]
+    async fn apply_startup_migrations_runs_for_every_namespace() {
+        use std::sync::Mutex;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct StartupMigrationDbClient {
+            calls: Arc<Mutex<Vec<String>>>,
+            apply_count: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl DbClient for StartupMigrationDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: &str,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            #[allow(clippy::too_many_arguments)]
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                _sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+                self.apply_count.fetch_add(1, Ordering::SeqCst);
+                self.calls.safe_lock().push(namespace.to_string());
+                Ok(())
+            }
+        }
+
+        let db_client = Arc::new(StartupMigrationDbClient {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            apply_count: AtomicUsize::new(0),
+        });
+        let db_client_dyn: Arc<dyn DbClient> = db_client.clone();
+        let namespaces = vec![
+            "org".to_string(),
+            "personal".to_string(),
+            "private".to_string(),
+        ];
+
+        apply_startup_migrations(&db_client_dyn, &namespaces)
+            .await
+            .expect("startup migrations");
+
+        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 3);
+        assert_eq!(
+            db_client.calls.safe_lock().clone(),
+            vec![
+                "org".to_string(),
+                "personal".to_string(),
+                "private".to_string(),
+            ]
+        );
+    }
 
     #[tokio::test]
     async fn resolve_embedding_startup_does_not_activate_unprobed_remote_target() {
