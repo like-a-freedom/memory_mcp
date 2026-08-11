@@ -446,7 +446,7 @@ The binary supports a few opt-in Cargo features:
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
 | `mcp-apps` | Enable the optional interactive MCP app-session surface. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps`. |
 
-The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `GLINER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
+The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `NER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 
 ### Scopes and namespaces
 
@@ -816,10 +816,10 @@ hardware.
 
 ```bash
 # Run with Metal GPU (requires --features metal)
-NER_DEVICE=metal cargo run --release --features metal -- serve
+GLINER_DEVICE=metal cargo run --release --features metal -- serve
 
 # Auto tries Metal and falls back to CPU; do not make it a deployment default before gating
-NER_DEVICE=auto cargo run --release --features metal -- serve
+GLINER_DEVICE=auto cargo run --release --features metal -- serve
 ```
 
 ### Binary entry points
@@ -871,10 +871,11 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
 │       └── tests/          # harness integration tests and fixtures
 ├── evals/
-│   ├── baselines/          # reviewed comparison artifacts
-│   ├── corpora/            # immutable corpus manifests
+│   ├── corpora/            # immutable corpus manifests + NER corpora
+│   ├── longmemeval_v2/     # prepared LoCoMo/LongMemEval corpora
 │   ├── performance/        # pinned-runner config
-│   ├── profiles/           # pr.json, release.json, nightly.json
+│   ├── profiles/           # pr.json, release.json, nightly.json, ner_quality.json
+│   ├── results/            # recorded comparison results (e.g. NER)
 │   └── schema/             # eval-artifact-v1.json
 └── docs/
 ```
