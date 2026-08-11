@@ -82,8 +82,17 @@ fn load_cases() -> Result<Vec<EndToEndCase>, EvalError> {
     serde_json::from_str(&raw).map_err(EvalError::Artifact)
 }
 
+/// Ratio specs shared with the suite registry (one formula home for the
+/// aggregate metric name).
+pub(crate) static E2E_SPECS: &[crate::reducer::RatioMetricSpec] =
+    &[crate::reducer::RatioMetricSpec {
+        evidence_key: "context_match",
+        metric_name: "context_match_rate",
+    }];
+
 pub struct EndToEndSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::RatioReducer,
 }
 
 impl Default for EndToEndSuite {
@@ -99,7 +108,10 @@ impl EndToEndSuite {
             .iter()
             .filter_map(|c| EvalCaseId::parse(&c.id).ok())
             .collect();
-        Self { expected_ids }
+        Self {
+            expected_ids,
+            reducer: crate::reducer::RatioReducer::new("end-to-end", E2E_SPECS),
+        }
     }
 }
 
@@ -118,18 +130,7 @@ impl EvalSuite for EndToEndSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        static SPECS: &[crate::reducer::RatioMetricSpec] = &[crate::reducer::RatioMetricSpec {
-            evidence_key: "context_match",
-            metric_name: "context_match_rate",
-        }];
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::RatioReducer::new(
-                "end-to-end",
-                SPECS,
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

@@ -335,6 +335,7 @@ fn evaluate_case(
 
 pub struct ClaimReconciliationSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::ClassificationReducer,
 }
 
 impl ClaimReconciliationSuite {
@@ -344,7 +345,10 @@ impl ClaimReconciliationSuite {
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { expected_ids })
+        Ok(Self {
+            expected_ids,
+            reducer: crate::reducer::ClassificationReducer::new("claim-reconciliation", "claim"),
+        })
     }
 }
 
@@ -363,14 +367,7 @@ impl EvalSuite for ClaimReconciliationSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::ClassificationReducer::new(
-                "claim-reconciliation",
-                "claim",
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

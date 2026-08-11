@@ -10,6 +10,7 @@ use crate::test_support;
 
 pub struct LocalRetrievalSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::RetrievalReducer,
 }
 
 impl LocalRetrievalSuite {
@@ -19,7 +20,10 @@ impl LocalRetrievalSuite {
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { expected_ids })
+        Ok(Self {
+            expected_ids,
+            reducer: crate::reducer::RetrievalReducer::new("local-retrieval", 5),
+        })
     }
 
     async fn run_case(case: &RetrievalEvalCase) -> EvalCaseOutcome {
@@ -245,14 +249,7 @@ impl EvalSuite for LocalRetrievalSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::RetrievalReducer::new(
-                "local-retrieval",
-                5,
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

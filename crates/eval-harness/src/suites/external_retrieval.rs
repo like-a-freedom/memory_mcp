@@ -30,6 +30,7 @@ pub struct ExternalRetrievalSuite {
     #[allow(dead_code)]
     dataset: String,
     worker_policy: WorkerPolicy,
+    reducer: crate::reducer::RetrievalReducer,
 }
 
 impl ExternalRetrievalSuite {
@@ -46,6 +47,7 @@ impl ExternalRetrievalSuite {
             expected_ids,
             dataset: dataset.dataset_name().to_string(),
             worker_policy: WorkerPolicy::default(),
+            reducer: crate::reducer::RetrievalReducer::new("external-retrieval", 5),
         }
     }
 
@@ -203,14 +205,7 @@ impl EvalSuite for ExternalRetrievalSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::RetrievalReducer::new(
-                "external-retrieval",
-                5,
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

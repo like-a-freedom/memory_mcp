@@ -6,8 +6,22 @@ use crate::suites::action_grounding::ActionGroundingSuite;
 use crate::suites::capacity::CapacitySuite;
 use crate::suites::poisoning::PoisoningSuite;
 
+/// Ratio specs shared with the suite registry (one formula home for the
+/// aggregate metric names).
+pub(crate) static LIFECYCLE_SPECS: &[crate::reducer::RatioMetricSpec] = &[
+    crate::reducer::RatioMetricSpec {
+        evidence_key: "action_grounding",
+        metric_name: "action_grounding_pass_rate",
+    },
+    crate::reducer::RatioMetricSpec {
+        evidence_key: "poisoning",
+        metric_name: "poisoning_pass_rate",
+    },
+];
+
 pub struct LifecycleReleaseSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::RatioReducer,
 }
 
 impl Default for LifecycleReleaseSuite {
@@ -25,6 +39,7 @@ impl LifecycleReleaseSuite {
                 EvalCaseId::parse("lifecycle-poisoning").unwrap(),
                 EvalCaseId::parse("lifecycle-public-surface").unwrap(),
             ],
+            reducer: crate::reducer::RatioReducer::new("lifecycle", LIFECYCLE_SPECS),
         }
     }
 }
@@ -44,24 +59,7 @@ impl EvalSuite for LifecycleReleaseSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static LIFECYCLE_SPECS: &[crate::reducer::RatioMetricSpec] = &[
-            crate::reducer::RatioMetricSpec {
-                evidence_key: "action_grounding",
-                metric_name: "action_grounding_pass_rate",
-            },
-            crate::reducer::RatioMetricSpec {
-                evidence_key: "poisoning",
-                metric_name: "poisoning_pass_rate",
-            },
-        ];
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::RatioReducer::new(
-                "lifecycle",
-                LIFECYCLE_SPECS,
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome> {

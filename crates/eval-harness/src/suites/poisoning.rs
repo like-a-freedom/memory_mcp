@@ -9,6 +9,7 @@ use crate::test_support;
 
 pub struct PoisoningSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::CountReducer,
 }
 
 impl Default for PoisoningSuite {
@@ -25,6 +26,7 @@ impl PoisoningSuite {
                 EvalCaseId::parse("poisoning-no-privileged-instruction").unwrap(),
                 EvalCaseId::parse("poisoning-envelope-bounded").unwrap(),
             ],
+            reducer: crate::reducer::CountReducer::new("poisoning"),
         }
     }
 
@@ -184,9 +186,7 @@ impl EvalSuite for PoisoningSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("poisoning"))))
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

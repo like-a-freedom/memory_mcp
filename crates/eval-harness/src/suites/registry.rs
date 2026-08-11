@@ -8,28 +8,13 @@
 use crate::error::EvalError;
 use crate::profile::SuiteDecl;
 use crate::reducer::{
-    ClassificationReducer, CountReducer, RatioMetricSpec, RatioReducer, RetrievalReducer,
-    SuiteReducer,
+    ClassificationReducer, CountReducer, RatioReducer, RetrievalReducer, SuiteReducer,
 };
 use crate::runner::EvalSuite;
+use crate::suites::end_to_end::E2E_SPECS;
+use crate::suites::lifecycle::LIFECYCLE_SPECS;
 use crate::suites::ner_quality;
 use crate::suites::response_size::ResponseSizeReducer;
-
-static E2E_SPECS: &[RatioMetricSpec] = &[RatioMetricSpec {
-    evidence_key: "context_match",
-    metric_name: "context_match_rate",
-}];
-
-static LIFECYCLE_SPECS: &[RatioMetricSpec] = &[
-    RatioMetricSpec {
-        evidence_key: "action_grounding",
-        metric_name: "action_grounding_pass_rate",
-    },
-    RatioMetricSpec {
-        evidence_key: "poisoning",
-        metric_name: "poisoning_pass_rate",
-    },
-];
 
 /// The reducer registered for a suite id. Unknown ids fall back to a
 /// count-only reducer so merged artifacts stay honest (explicit pass/fail/

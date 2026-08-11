@@ -35,6 +35,7 @@ async fn measure_storage(db_client: &Arc<memory_mcp::storage::SurrealDbClient>) 
 
 pub struct CapacitySuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::CountReducer,
 }
 
 impl Default for CapacitySuite {
@@ -51,6 +52,7 @@ impl CapacitySuite {
                 EvalCaseId::parse("capacity-ignored-no-growth").unwrap(),
                 EvalCaseId::parse("capacity-duplicate-no-growth").unwrap(),
             ],
+            reducer: crate::reducer::CountReducer::new("capacity"),
         }
     }
 
@@ -151,9 +153,7 @@ impl EvalSuite for CapacitySuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("capacity"))))
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

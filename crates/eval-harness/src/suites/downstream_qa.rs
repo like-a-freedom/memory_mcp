@@ -29,6 +29,7 @@ pub struct ReaderContract {
 pub struct DownstreamQaSuite {
     expected_ids: Vec<EvalCaseId>,
     reader_contract: Option<ReaderContract>,
+    reducer: crate::reducer::CountReducer,
 }
 
 impl Default for DownstreamQaSuite {
@@ -42,6 +43,7 @@ impl DownstreamQaSuite {
         Self {
             expected_ids: vec![EvalCaseId::parse("qa-diagnostic").unwrap()],
             reader_contract: None,
+            reducer: crate::reducer::CountReducer::new("downstream-qa"),
         }
     }
 
@@ -49,6 +51,7 @@ impl DownstreamQaSuite {
         Self {
             expected_ids: vec![EvalCaseId::parse("qa-diagnostic").unwrap()],
             reader_contract: Some(contract),
+            reducer: crate::reducer::CountReducer::new("downstream-qa"),
         }
     }
 
@@ -88,9 +91,7 @@ impl EvalSuite for DownstreamQaSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| &*Box::leak(Box::new(crate::reducer::CountReducer::new("downstream-qa"))))
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

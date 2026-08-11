@@ -287,6 +287,7 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
 
 pub struct ExtractionSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::ClassificationReducer,
 }
 
 impl ExtractionSuite {
@@ -296,7 +297,10 @@ impl ExtractionSuite {
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { expected_ids })
+        Ok(Self {
+            expected_ids,
+            reducer: crate::reducer::ClassificationReducer::new("extraction", "entity"),
+        })
     }
 }
 
@@ -315,14 +319,7 @@ impl EvalSuite for ExtractionSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::ClassificationReducer::new(
-                "extraction",
-                "entity",
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

@@ -14,6 +14,7 @@ use crate::test_support;
 
 pub struct ResponseSizeSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: ResponseSizeReducer,
 }
 
 impl ResponseSizeSuite {
@@ -23,7 +24,10 @@ impl ResponseSizeSuite {
             .iter()
             .map(|c| EvalCaseId::parse(&c.id))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { expected_ids })
+        Ok(Self {
+            expected_ids,
+            reducer: ResponseSizeReducer::new("response-size"),
+        })
     }
 }
 
@@ -42,9 +46,7 @@ impl EvalSuite for ResponseSizeSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<ResponseSizeReducer> = OnceLock::new();
-        R.get_or_init(|| ResponseSizeReducer::new("response-size"))
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {

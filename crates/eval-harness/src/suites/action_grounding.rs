@@ -47,6 +47,7 @@ pub fn evaluate_attempt(has_relevant_context: bool, action: &AttemptedAction) ->
 
 pub struct ActionGroundingSuite {
     expected_ids: Vec<EvalCaseId>,
+    reducer: crate::reducer::CountReducer,
 }
 
 impl Default for ActionGroundingSuite {
@@ -63,6 +64,7 @@ impl ActionGroundingSuite {
                 EvalCaseId::parse("grounding-selective-shadow").unwrap(),
                 EvalCaseId::parse("grounding-selective-enforced").unwrap(),
             ],
+            reducer: crate::reducer::CountReducer::new("action-grounding"),
         }
     }
 
@@ -201,13 +203,7 @@ impl EvalSuite for ActionGroundingSuite {
     }
 
     fn reducer(&self) -> &dyn crate::reducer::SuiteReducer {
-        use std::sync::OnceLock;
-        static R: OnceLock<&dyn crate::reducer::SuiteReducer> = OnceLock::new();
-        *R.get_or_init(|| {
-            &*Box::leak(Box::new(crate::reducer::CountReducer::new(
-                "action-grounding",
-            )))
-        })
+        &self.reducer
     }
 
     async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
