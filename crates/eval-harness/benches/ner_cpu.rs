@@ -31,6 +31,15 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     let single = fixture.single_window.to_string();
     let multi = fixture.multi_window.to_string();
 
+    // Probe once before timing: a backend that constructs but fails at
+    // inference (e.g. a loader/checkpoint protocol mismatch) must skip with a
+    // note, not panic the whole bench on the first timed iteration. This also
+    // warms the model, so the timed region measures steady-state only.
+    if let Err(err) = rt.block_on(extractor.extract_candidates(&single)) {
+        eprintln!("{label} benches skipped: extraction fails ({err})");
+        return;
+    }
+
     // Reuse the setup runtime: creating one per iteration adds ~50-200 µs of
     // noise that swamps the fast lightweight backends (measured warm single
     // window: regex ~1 µs, anno ~5 µs).

@@ -455,6 +455,42 @@ mod tests {
     }
 
     #[test]
+    fn adapt_weights_accepts_token_rep_layer_wrapped_checkpoint() {
+        // The upstream VAGO state dict wraps the GLiNER encoder tensors under
+        // a `token_rep_layer.` outer prefix (span-encoder wrapper) while the
+        // RNN/head tensors stay bare. The loader prepends the wrapper on
+        // `bert_layer.*` lookups only via `VarBuilder::rename_f`; this test
+        // pins the exact remap so a schema drift in either direction is caught.
+        let config = tiny_config();
+        let weights = tiny_weights(&config);
+        let mut wrapped: HashMap<String, Tensor> = weights
+            .into_iter()
+            .map(|(name, tensor)| (format!("token_rep_layer.{name}"), tensor))
+            .collect();
+        // Bare, non-wrapped sibling tensors (the upstream `rnn.lstm.*` family)
+        // must survive the rename untouched.
+        let bare_name = "rnn.lstm.weight_ih_l0";
+        let bare = Tensor::zeros((4, 2), DType::F32, &Device::Cpu).unwrap();
+        wrapped.insert(bare_name.to_string(), bare);
+        let vb = VarBuilder::from_tensors(wrapped, DType::F32, &Device::Cpu).rename_f(|name| {
+            if name.starts_with("bert_layer.") {
+                format!("token_rep_layer.{name}")
+            } else {
+                name.to_string()
+            }
+        });
+        adapt_weights(&vb, &config).expect("wrapped checkpoint must validate after remap");
+        assert!(
+            vb.contains_tensor(bare_name),
+            "bare rnn tensors stay findable"
+        );
+        assert!(
+            vb.contains_tensor("bert_layer.model.embed_tokens.weight"),
+            "wrapped encoder tensors stay findable"
+        );
+    }
+
+    #[test]
     fn adapt_weights_reports_first_missing_expected_tensor() {
         let config = tiny_config();
         let mut weights = tiny_weights(&config);

@@ -39,7 +39,9 @@ pub(crate) use model::LoadedLfm2Gliner;
 /// Artifact requirements for the verified
 /// `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` checkpoint. The upstream
 /// repository ships `pytorch_model.bin` (F32 torch format), `gliner_config.json`
-/// (GLiNER head config; there is NO `config.json`), and `tokenizer.json`.
+/// (GLiNER head config; there is NO `config.json`), and `tokenizer.json`. The
+/// state dict wraps the GLiNER encoder under a `token_rep_layer.` outer prefix
+/// (span-encoder wrapper); [`Lfm2Gliner::new_from_checkpoint`] strips it.
 pub(crate) const VAGO_GLINER_SPEC: NerArtifactSpec = NerArtifactSpec {
     extractor_id: "sauerkraut-lfm2.5-gliner",
     repository: SELECTOR_SAUKRAUT_LFM25,
@@ -101,7 +103,18 @@ impl Lfm2Gliner {
             DType::F32,
             device,
         )
-        .map_err(|err| MemoryError::Storage(format!("failed to load pytorch weights: {err}")))?;
+        .map_err(|err| MemoryError::Storage(format!("failed to load pytorch weights: {err}")))?
+        // The upstream checkpoint wraps the GLiNER encoder tensors under a
+        // `token_rep_layer.` outer prefix (span-encoder wrapper); the RNN and
+        // head tensors stay bare. The name builders query the unwrapped names,
+        // so rename_f prepends the wrapper only on `bert_layer.*` lookups.
+        .rename_f(|name| {
+            if name.starts_with("bert_layer.") {
+                format!("token_rep_layer.{name}")
+            } else {
+                name.to_string()
+            }
+        });
         LoadedLfm2Gliner::new_from_var_builder(
             vb,
             tokenizer,
