@@ -11,6 +11,7 @@ pub mod poisoning;
 pub mod registry;
 pub mod response_size;
 pub mod retrieval;
+pub(crate) mod retrieval_cases;
 
 pub use action_grounding::ActionGroundingSuite;
 pub use capacity::CapacitySuite;

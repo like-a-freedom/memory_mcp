@@ -1,127 +1,12 @@
-use std::path::PathBuf;
-
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use serde::Deserialize;
 
+use super::retrieval_cases::{case_as_of, load_cases};
 use crate::domain::*;
 use crate::error::EvalError;
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
-
-// ---------------------------------------------------------------------------
-// Case definitions — identical shape to retrieval suite (reuse the fixture)
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct RetrievalEvalCase {
-    id: String,
-    #[allow(dead_code)]
-    description: String,
-    query: String,
-    scope: String,
-    #[serde(default)]
-    project: Option<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    tags: Vec<String>,
-    #[serde(default = "default_budget")]
-    budget: i32,
-    facts: Vec<SeedFact>,
-    #[serde(default)]
-    entities: Vec<SeedEntity>,
-    #[serde(default)]
-    communities: Vec<SeedCommunity>,
-    #[serde(default)]
-    edges: Vec<SeedEdge>,
-    expected: RetrievalExpectation,
-}
-
-#[derive(Debug, Deserialize)]
-struct SeedFact {
-    content: String,
-    t_valid: String,
-    #[serde(default)]
-    project: Option<String>,
-    #[serde(default)]
-    source_id: Option<String>,
-    #[serde(default)]
-    entity_links: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SeedEntity {
-    entity_id: String,
-    entity_type: String,
-    canonical_name: String,
-    #[serde(default)]
-    aliases: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SeedCommunity {
-    community_id: String,
-    member_entities: Vec<String>,
-    summary: String,
-    updated_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct SeedEdge {
-    from_id: String,
-    relation: String,
-    to_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct RetrievalExpectation {
-    #[allow(dead_code)]
-    tier: String,
-    must_contain: Vec<String>,
-    #[serde(default)]
-    must_not_contain: Vec<String>,
-    #[serde(default = "default_min_recall_at_k")]
-    min_recall_at_k: f64,
-}
-
-fn default_budget() -> i32 {
-    5
-}
-
-fn default_min_recall_at_k() -> f64 {
-    1.0
-}
-
-fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/retrieval_cases.json")
-}
-
-fn load_cases() -> Result<Vec<RetrievalEvalCase>, EvalError> {
-    let raw = std::fs::read_to_string(fixture_path()).map_err(|source| EvalError::Io {
-        path: fixture_path(),
-        source,
-    })?;
-    serde_json::from_str(&raw).map_err(EvalError::Artifact)
-}
-
-fn case_as_of(case: &RetrievalEvalCase) -> DateTime<Utc> {
-    let latest = case
-        .facts
-        .iter()
-        .filter_map(|f| f.t_valid.parse::<DateTime<Utc>>().ok())
-        .chain(
-            case.communities
-                .iter()
-                .filter_map(|c| c.updated_at.parse::<DateTime<Utc>>().ok()),
-        )
-        .max()
-        .unwrap_or_else(Utc::now);
-
-    std::cmp::max(Utc::now(), latest) + Duration::seconds(1)
-}
 
 // ---------------------------------------------------------------------------
 // Suite
