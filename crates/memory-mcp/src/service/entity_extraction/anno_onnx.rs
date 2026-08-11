@@ -14,10 +14,15 @@
 //! (it downloads via HF internally) or `StackedNER::default()` (cache- and
 //! download-sensitive).
 //!
-//! **Inference contract (NuNER token mode):** four int64 inputs —
-//! `input_ids`, `attention_mask`, `words_mask`, `text_lengths` — and one
-//! float32 output of shape `[1, seq_len, num_entity_types]` (span-mode
-//! exports with `max_width=1` emit `[1, seq_len, 1, num_entity_types]`).
+//! **Inference contract (NuNER span mode, verified 2026-08-11 against the
+//! real export):** six inputs — `input_ids`, `attention_mask`, `words_mask`,
+//! `text_lengths` (int64) plus `span_idx` (int64) and `span_mask` (bool) — and
+//! one float32 `logits` output of shape `[1, num_words, 1, num_entity_types]`
+//! (the export fixes the span dimension to `max_width=1`). Spans enumerate one
+//! per word: `span_idx[i] = (i, i)` with `span_mask` all-`true`, mirroring the
+//! gliner `SpanProcessor` enumeration `[(i, i + j) for j in range(max_width)]`.
+//! `logits[s, 0, c]` therefore scores the single-word span at word `s` for
+//! class `c` (class ids are 0-based — `num_entity_types == labels.len()`).
 //! Each word's first token carries its 1-based word id in `words_mask`;
 //! continuation tokens are 0. Decoding takes, per word, the argmax logit
 //! across entity types, applies sigmoid, and emits a single-word entity when
@@ -280,6 +285,26 @@ fn tensor_i64(shape: Vec<usize>, data: Vec<i64>) -> ort::Result<ort::value::Tens
     ort::value::Tensor::from_array((shape, data.into_boxed_slice()))
 }
 
+/// Builds a bool ONNX tensor from `(shape, data)` (used for `span_mask`).
+fn tensor_bool(shape: Vec<usize>, data: Vec<bool>) -> ort::Result<ort::value::Tensor<bool>> {
+    ort::value::Tensor::from_array((shape, data.into_boxed_slice()))
+}
+
+/// Builds the GLiNER span inputs for this ONNX export (`max_width=1`).
+///
+/// Returns `(span_idx, span_mask)` where `span_idx[i] = (i, i)` marks the
+/// single-word span of word `i` and `span_mask` is all-`true` (a span ending
+/// at `num_words - 1` is always in bounds). Mirrors the gliner `SpanProcessor`
+/// enumeration `[(i, i + j) for j in range(max_width)]` with `max_width=1`.
+fn build_span_tensors(num_words: usize) -> (Vec<i64>, Vec<bool>) {
+    let mut span_idx = Vec::with_capacity(num_words.saturating_mul(2));
+    for i in 0..num_words {
+        span_idx.push(i as i64);
+        span_idx.push(i as i64);
+    }
+    (span_idx, vec![true; num_words])
+}
+
 /// CPU-only NuNER ONNX extractor. Holds the ONNX session inline (the session
 /// is cheap to retain) and honors `idle_unload_secs` by dropping the session
 /// after that many idle seconds and rebuilding it lazily from disk.
@@ -364,7 +389,7 @@ impl AnnoOnnxEntityExtractor {
         Ok(guard)
     }
 
-    /// Runs the four tensor inputs and returns the decoded output scores and
+    /// Runs the six tensor inputs and returns the decoded output scores and
     /// shape as owned data (ONNX `SessionOutputs` borrow the session, so they
     /// cannot outlive the session guard).
     fn run_inference(
@@ -373,6 +398,8 @@ impl AnnoOnnxEntityExtractor {
         attention_mask: ort::value::Tensor<i64>,
         words_mask: ort::value::Tensor<i64>,
         text_lengths: ort::value::Tensor<i64>,
+        span_idx: ort::value::Tensor<i64>,
+        span_mask: ort::value::Tensor<bool>,
     ) -> Result<(Vec<f32>, Vec<usize>), MemoryError> {
         let mut guard = self.session()?;
         let session = guard.as_mut().ok_or_else(|| {
@@ -384,6 +411,8 @@ impl AnnoOnnxEntityExtractor {
                 "attention_mask" => attention_mask.into_dyn(),
                 "words_mask" => words_mask.into_dyn(),
                 "text_lengths" => text_lengths.into_dyn(),
+                "span_idx" => span_idx.into_dyn(),
+                "span_mask" => span_mask.into_dyn(),
             ])
             .map_err(|e| MemoryError::Validation(format!("anno-onnx inference failed: {e}")))?;
 
@@ -430,6 +459,11 @@ impl AnnoOnnxEntityExtractor {
         let (input_ids, attention_mask, words_mask, text_lengths) =
             encode_prompt(&self.tokenizer, &text_words, &label_strs)?;
         let seq_len = input_ids.len();
+        let num_words = text_lengths as usize;
+
+        // The export fixes the span dimension to `max_width=1`, so each word
+        // is its own span and nothing is masked.
+        let (span_idx, span_mask) = build_span_tensors(num_words);
 
         let (scores, shape) = self.run_inference(
             tensor_i64(vec![1, seq_len], input_ids)
@@ -439,6 +473,10 @@ impl AnnoOnnxEntityExtractor {
             tensor_i64(vec![1, seq_len], words_mask)
                 .map_err(|e| MemoryError::Validation(format!("anno-onnx tensor build: {e}")))?,
             tensor_i64(vec![1, 1], vec![text_lengths])
+                .map_err(|e| MemoryError::Validation(format!("anno-onnx tensor build: {e}")))?,
+            tensor_i64(vec![1, num_words, 2], span_idx)
+                .map_err(|e| MemoryError::Validation(format!("anno-onnx tensor build: {e}")))?,
+            tensor_bool(vec![1, num_words], span_mask)
                 .map_err(|e| MemoryError::Validation(format!("anno-onnx tensor build: {e}")))?,
         )?;
 
@@ -681,6 +719,18 @@ mod tests {
         assert!(decode_scores(&[0.0; 4], &[1, 1, 2, 1], 1, 1, 0.5).is_err());
         // class-count mismatch with labels.
         assert!(decode_scores(&[0.0; 3], &[1, 1, 2], 1, 3, 0.5).is_err());
+    }
+
+    #[test]
+    fn span_protocol_builds_one_span_per_word() {
+        // gliner SpanProcessor enumeration with max_width=1: span (i, i) per
+        // word, nothing masked (end = i <= num_words - 1 always holds).
+        let (span_idx, span_mask) = build_span_tensors(3);
+        assert_eq!(span_idx, vec![0, 0, 1, 1, 2, 2]);
+        assert_eq!(span_mask, vec![true, true, true]);
+        let (empty_idx, empty_mask) = build_span_tensors(0);
+        assert!(empty_idx.is_empty());
+        assert!(empty_mask.is_empty());
     }
 
     #[test]

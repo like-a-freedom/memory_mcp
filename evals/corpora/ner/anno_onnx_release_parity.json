@@ -1,0 +1,421 @@
+{
+  "fixture_status": "release-parity-verified",
+  "cases": [
+    {
+      "id": "q-ru-1",
+      "text": "Иван Петров работает в компании Яндекс в Москве.",
+      "labels": [
+        "person",
+        "company",
+        "location"
+      ],
+      "entities": [
+        {
+          "name": "Иван",
+          "label": "person"
+        },
+        {
+          "name": "Петров",
+          "label": "person"
+        },
+        {
+          "name": "Яндекс",
+          "label": "company"
+        },
+        {
+          "name": "Москве.",
+          "label": "location"
+        }
+      ]
+    },
+    {
+      "id": "q-ru-2",
+      "text": "Мария Иванова представила продукт СберБизнес на конференции AI Journey в Санкт-Петербурге.",
+      "labels": [
+        "person",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "name": "Мария",
+          "label": "person"
+        },
+        {
+          "name": "Иванова",
+          "label": "person"
+        },
+        {
+          "name": "AI",
+          "label": "event"
+        },
+        {
+          "name": "Journey",
+          "label": "event"
+        },
+        {
+          "name": "Санкт-Петербурге.",
+          "label": "location"
+        }
+      ]
+    },
+    {
+      "id": "q-en-1",
+      "text": "Alice Smith from OpenAI presented the Surface Laptop 6 at Build 2026 in Seattle.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "name": "Alice",
+          "label": "person"
+        },
+        {
+          "name": "Smith",
+          "label": "person"
+        },
+        {
+          "name": "OpenAI",
+          "label": "company"
+        },
+        {
+          "name": "Surface",
+          "label": "product"
+        },
+        {
+          "name": "Laptop",
+          "label": "product"
+        },
+        {
+          "name": "6",
+          "label": "product"
+        },
+        {
+          "name": "Build",
+          "label": "event"
+        },
+        {
+          "name": "2026",
+          "label": "event"
+        },
+        {
+          "name": "Seattle.",
+          "label": "location"
+        }
+      ]
+    },
+    {
+      "id": "q-en-2",
+      "text": "At Cloud Summit 2026 in Berlin, Bob Jones and DeepMind compared Pixel 8 Pro with PostgreSQL.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location",
+        "technology"
+      ],
+      "entities": [
+        {
+          "name": "Cloud",
+          "label": "event"
+        },
+        {
+          "name": "Summit",
+          "label": "event"
+        },
+        {
+          "name": "2026",
+          "label": "event"
+        },
+        {
+          "name": "Berlin,",
+          "label": "location"
+        },
+        {
+          "name": "Bob",
+          "label": "person"
+        },
+        {
+          "name": "Jones",
+          "label": "person"
+        },
+        {
+          "name": "DeepMind",
+          "label": "company"
+        },
+        {
+          "name": "Pixel",
+          "label": "product"
+        },
+        {
+          "name": "8",
+          "label": "product"
+        },
+        {
+          "name": "Pro",
+          "label": "product"
+        },
+        {
+          "name": "PostgreSQL.",
+          "label": "technology"
+        }
+      ]
+    },
+    {
+      "id": "q-mixed-1",
+      "text": "Иван Петров from Microsoft unveiled Surface Laptop 6 at Build 2026 in Seattle using Kubernetes.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location",
+        "technology"
+      ],
+      "entities": [
+        {
+          "name": "Иван",
+          "label": "person"
+        },
+        {
+          "name": "Петров",
+          "label": "person"
+        },
+        {
+          "name": "Microsoft",
+          "label": "company"
+        },
+        {
+          "name": "Surface",
+          "label": "product"
+        },
+        {
+          "name": "Laptop",
+          "label": "product"
+        },
+        {
+          "name": "6",
+          "label": "product"
+        },
+        {
+          "name": "Build",
+          "label": "event"
+        },
+        {
+          "name": "2026",
+          "label": "event"
+        },
+        {
+          "name": "Seattle",
+          "label": "location"
+        },
+        {
+          "name": "Kubernetes.",
+          "label": "technology"
+        }
+      ]
+    },
+    {
+      "id": "q-mixed-2",
+      "text": "Наталья Смирнова of Yandex Cloud demoed сервис YandexGPT на AI Day в Москве.",
+      "labels": [
+        "person",
+        "company",
+        "product",
+        "event",
+        "location"
+      ],
+      "entities": [
+        {
+          "name": "Наталья",
+          "label": "person"
+        },
+        {
+          "name": "Смирнова",
+          "label": "person"
+        },
+        {
+          "name": "Yandex",
+          "label": "company"
+        },
+        {
+          "name": "Cloud",
+          "label": "company"
+        },
+        {
+          "name": "YandexGPT",
+          "label": "product"
+        },
+        {
+          "name": "AI",
+          "label": "event"
+        },
+        {
+          "name": "Day",
+          "label": "event"
+        },
+        {
+          "name": "Москве.",
+          "label": "location"
+        }
+      ]
+    },
+    {
+      "id": "q-en-3",
+      "text": "Elon Musk announced that Tesla will expand in Texas and SpaceX hired Anna Petrova as lead engineer.",
+      "labels": [
+        "person",
+        "company",
+        "location"
+      ],
+      "entities": [
+        {
+          "name": "Elon",
+          "label": "person"
+        },
+        {
+          "name": "Musk",
+          "label": "person"
+        },
+        {
+          "name": "Tesla",
+          "label": "company"
+        },
+        {
+          "name": "Texas",
+          "label": "location"
+        },
+        {
+          "name": "SpaceX",
+          "label": "company"
+        },
+        {
+          "name": "Anna",
+          "label": "person"
+        },
+        {
+          "name": "Petrova",
+          "label": "person"
+        }
+      ]
+    },
+    {
+      "id": "q-en-4",
+      "text": "Microsoft shipped the Surface Laptop 6 with PostgreSQL support at Build 2026.",
+      "labels": [
+        "company",
+        "product",
+        "technology",
+        "event"
+      ],
+      "entities": [
+        {
+          "name": "Microsoft",
+          "label": "company"
+        },
+        {
+          "name": "Surface",
+          "label": "product"
+        },
+        {
+          "name": "Laptop",
+          "label": "product"
+        },
+        {
+          "name": "6",
+          "label": "product"
+        },
+        {
+          "name": "PostgreSQL",
+          "label": "technology"
+        },
+        {
+          "name": "Build",
+          "label": "event"
+        },
+        {
+          "name": "2026.",
+          "label": "event"
+        }
+      ]
+    },
+    {
+      "id": "q-ru-3",
+      "text": "Иван Иванов посетил конференцию Yandex Day в Москве и рассказал о продукте YaDisk.",
+      "labels": [
+        "person",
+        "event",
+        "location",
+        "product"
+      ],
+      "entities": [
+        {
+          "name": "Иван",
+          "label": "person"
+        },
+        {
+          "name": "Иванов",
+          "label": "person"
+        },
+        {
+          "name": "Yandex",
+          "label": "event"
+        },
+        {
+          "name": "Day",
+          "label": "event"
+        },
+        {
+          "name": "Москве",
+          "label": "location"
+        },
+        {
+          "name": "YaDisk.",
+          "label": "product"
+        }
+      ]
+    },
+    {
+      "id": "q-mixed-3",
+      "text": "Сергей Козлов joined Acme Corp in Berlin and leads разработку платформы DataHub.",
+      "labels": [
+        "person",
+        "company",
+        "location",
+        "technology"
+      ],
+      "entities": [
+        {
+          "name": "Сергей",
+          "label": "person"
+        },
+        {
+          "name": "Козлов",
+          "label": "person"
+        },
+        {
+          "name": "Acme",
+          "label": "company"
+        },
+        {
+          "name": "Corp",
+          "label": "company"
+        },
+        {
+          "name": "Berlin",
+          "label": "location"
+        },
+        {
+          "name": "DataHub.",
+          "label": "technology"
+        }
+      ]
+    }
+  ]
+}

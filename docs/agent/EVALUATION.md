@@ -102,8 +102,11 @@ the folders under `crates/memory-mcp/tests/models/ner/`:
 - **regex / anno**: near-instant, zero-download, deterministic. Best for offline-first,
   privacy-sensitive, or high-throughput ingestion where recall of noisy mentions is
   acceptable.
-- **anno-onnx**: CPU NuNER, one model download, typed labels. Middle ground for
-  single-language precision without a GPU.
+- **anno-onnx**: CPU NuNER via ONNX Runtime; fastest neural backend (~37 ms/extraction, ~4×
+  faster than the Candle models) and never mislabels a kept mention. Limitation: the export is
+  `max_width=1` (single-word spans only), so multi-word entities are fragmented — recall is
+  poor against multi-word gold. Best for fast single-token extraction. Measured values in
+  `evals/results/ner-comparison-2026-08-11.md`.
 - **classic GLiNER**: best general-purpose quality/coverage across RU/EN; largest
   ecosystem default.
 - **VAGO LFM2**: strongest RU/EN multilingual zero-shot coverage in a native Candle
