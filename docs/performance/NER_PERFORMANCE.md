@@ -8,13 +8,13 @@ faster at p50 and 3.53× faster at the observed p95/max. These effects are not
 multiplied together: after vectorization, transformer inference and tokenization
 dominate the request.
 
-The accepted CPU default is `NER_BATCH_SIZE=1`. On this corpus, batching three
+The accepted CPU default is `GLINER_BATCH_SIZE=1`. On this corpus, batching three
 uneven windows increased padding work and was slower than three batch-one forward
 passes.
 
 ## Allocator and CPU-backend policy
 
-The fresh production-like allocator comparison is recorded in [`MEMORY_PROFILE.md`](MEMORY_PROFILE.md). It found that the default allocator plus `GLINER_IDLE_UNLOAD_SECS=30` reached about 430 MB post-unload RSS and 277 MB physical footprint, while mimalloc plus unload retained about 2.56 GB RSS despite a 190 MB physical footprint. Mimalloc therefore remains opt-in; the lower physical-footprint reading does not justify a default when RSS is the monitored process metric.
+The fresh production-like allocator comparison is recorded in [`MEMORY_PROFILE.md`](MEMORY_PROFILE.md). It found that the default allocator plus `NER_IDLE_UNLOAD_SECS=30` reached about 430 MB post-unload RSS and 277 MB physical footprint, while mimalloc plus unload retained about 2.56 GB RSS despite a 190 MB physical footprint. Mimalloc therefore remains opt-in; the lower physical-footprint reading does not justify a default when RSS is the monitored process metric.
 
 The `accelerate` Cargo feature is also opt-in and Apple-specific. The 2026-08-06 A/B used three Criterion runs for `ner_cpu` and `pipeline` on the same Apple Silicon host. The values below are the median of each run's Criterion point estimate:
 
@@ -135,8 +135,8 @@ itself still runs per decoded window. The accepted end-to-end CPU numbers use
 
 | Multi-window setting | p50 | p95/max | Padded execution shape |
 |---|---:|---:|---|
-| `NER_BATCH_SIZE=1` | 2546.692 ms | 2653.017 ms | 3 batches, largest batch 1 |
-| `NER_BATCH_SIZE=4` | 3039.927 ms | 3367.643 ms | 1 batch, 3 windows, 1152 padded tokens |
+| `GLINER_BATCH_SIZE=1` | 2546.692 ms | 2653.017 ms | 3 batches, largest batch 1 |
+| `GLINER_BATCH_SIZE=4` | 3039.927 ms | 3367.643 ms | 1 batch, 3 windows, 1152 padded tokens |
 
 Batch one was 16.2% faster at p50 and 21.2% faster at p95/max. Larger batches
 remain available for other models and window distributions, but must be enabled
@@ -170,9 +170,10 @@ This is a stability/oversubscription tradeoff, not a throughput gain. Raising
   cap, and actual maximum padded tokens.
 - Per-call custom labels are used when decoding scores; they no longer fall back to
   the extractor's default label list.
-- Criterion benchmarks under `crates/eval-harness/benches/ner_cpu.rs` record
-  candidate signatures, expected entities, and deterministic windowing as unit
-  tests that pass without measuring milliseconds.
+- Criterion benchmarks under `crates/eval-harness/benches/ner_cpu.rs` cover every
+  NER kind (regex, anno, anno-onnx, classic GLiNER, Sauerkraut LFM2.5) plus a
+  default-service probe. Candidate and entity-quality assertions live in the eval
+  suites (for example `ner_quality`), not as unit tests inside the benchmark file.
 
 The CPU tolerance is not an acceptance threshold for Metal. Metal needs its own
 candidate, quality, latency, contention, and memory measurements.
@@ -193,10 +194,10 @@ cooperative cancellation to rmcp 3.1 `TaskManager`.
 
 ## Device policy
 
-- `NER_DEVICE=cpu` is the production default.
-- `NER_DEVICE=metal` is strict: missing feature support or initialization failure is
+- `GLINER_DEVICE=cpu` is the production default.
+- `GLINER_DEVICE=metal` is strict: missing feature support or initialization failure is
   a configuration error, with no silent CPU fallback.
-- `NER_DEVICE=auto` may fall back to CPU and logs the selected backend.
+- `GLINER_DEVICE=auto` may fall back to CPU and logs the selected backend.
 
 Metal remains experimental. Its build and performance gates were not completed in
 this audit, so neither `metal` nor `auto` is a production recommendation.
@@ -214,9 +215,9 @@ this audit, so neither `metal` nor `auto` is a production recommendation.
 ## Production settings
 
 ```bash
-NER_DEVICE=cpu \
-NER_BATCH_SIZE=1 \
-NER_MAX_BATCH_TOKENS=1536 \
+GLINER_DEVICE=cpu \
+GLINER_BATCH_SIZE=1 \
+GLINER_MAX_BATCH_TOKENS=1536 \
 NER_MAX_CONCURRENCY=1 \
 cargo run --release -- serve
 ```

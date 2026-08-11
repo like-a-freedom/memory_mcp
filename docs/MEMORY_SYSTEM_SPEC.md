@@ -8,8 +8,9 @@
 
 ## Document Change History
 
+- **2026-08-11**: Documentation refresh — tool surface corrected from six to the frozen eight-tool MCP surface (ADR-0016); zero-config environment defaults aligned with `config/surreal.rs` and `config/ner.rs`; claim/ClaimRelation/backfill/Prometheus statuses refreshed to match the shipped reconciliation pipeline; removed dangling references; migrations paths moved under `crates/memory-mcp/migrations/`.
 - **2026-07-17**: Added the deterministic Claim/ClaimRelation reconciliation target: contradiction versus supersession/correction/retraction semantics, exact claim slots, source and cardinality gates, trace/Prometheus requirements, append-only automatic migrations, resumable legacy backfill, backward-compatible MCP enrichment, and TDD/evaluation gates. See `docs/CONTRADICTION_DETECTION_DESIGN.md` and ADR-0002 through ADR-0015.
-- **2026-03-27**: Added explicit reference to `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface.
+- **2026-03-27**: Added explicit reference to the SOTA memory-alignment design as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface. (The referenced companion file is no longer in the repository; see the §1.1 note.)
 - **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
@@ -48,7 +49,7 @@
 
 ### 1.1 Product Vision
 
-> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`, and the broader **adaptive-memory target state** is described in `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md`. This document remains the source of truth for shipped behavior.
+> Note: the **current runtime** is described by this document. The approved **next breaking retrieval target** is described separately in `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`. This document remains the source of truth for shipped behavior.
 
 Memory System provides agents with a unified long-term memory and context layer that:
 - Aggregates source material into episodes
@@ -111,7 +112,7 @@ The target architecture remains valid, but several roadmap items are intentional
 - `explain()` now expands provenance back to the source episode, including citation text and timestamp context.
 - Community maintenance is implemented as a deterministic connected-components baseline, while more advanced clustering/consolidation remains deferred.
 - Embedded/local deployments intentionally keep a shared `Mutex<Surreal<_>>` because namespace rebasing (`use_ns` / `use_db`) is session-scoped; a namespace-scoped client pool remains known throughput tech debt.
-- `RegexEntityExtractor` is the deterministic fallback extractor today; broader multilingual / NLP extraction remains a follow-up.
+- The zero-config NER default is the lightweight dependency-free Anno extractor; the project-owned regex extractor is a selectable backend (`NER_EXTRACTOR=regex`). Broader multilingual/NLP extraction via model-backed GLiNER backends is optional and opt-in (`NER_EXTRACTOR=urchade/gliner_multi-v2.1` or `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`).
 
 The current repository direction also intentionally constrains future work:
 
@@ -306,7 +307,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-DB-02**: All memory objects (Episode/Entity/Fact/Claim/ClaimRelation/Edge/Community) MUST be saved and read from SurrealDB, including graph and reconciliation relationships.
 
-**Status**: ⚠️ Partial — current objects are persisted, but Claim and ClaimRelation storage is not implemented.
+**Status**: ✅ Done — claim, claim_relation, claim_job, and claim_key_alias are SCHEMAFULL tables via migrations 029/030; reconciliation relations are persisted and queryable.
 
 **FR-DB-03**: System MUST support SurrealDB schemas/migrations as code (DDL/versions) and reproducible deployment.  
 **Status**: ✅ Done
@@ -344,23 +345,23 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-EX-05**: A fact MUST remain the immutable provenance-bearing evidence item and MAY produce zero or more deterministic claims. Failure or lack of support for claim extraction MUST NOT make the fact unavailable.
 
-**Status**: ❌ Not done — no separate claim model or projection lifecycle exists.
+**Status**: ✅ Done — claims are projected from facts by the local deterministic pipeline (`src/service/claims/`); unsupported facts remain retrievable without claims.
 
 **FR-EX-06**: Default claim extraction MUST run locally with zero configuration and no LLM or external service. It MUST emit only claims accepted by a versioned built-in schema and typed-value validator.
 
-**Status**: ❌ Not done — current rule-based fact and triple extraction does not produce validated claim schemas.
+**Status**: ✅ Done — local deterministic extraction (`claims/extract.rs`) emits only claims accepted by the versioned built-in schemas (`claims/schema.rs`) with typed-value validation; zero config, no LLM.
 
 **FR-EX-07**: Claim and claim-relation identifiers MUST be deterministic from versioned canonical inputs. Their semantic payloads MUST be immutable; only open validity bounds may be closed monotonically.
 
-**Status**: ❌ Not done.
+**Status**: ✅ Done — deterministic claim/relation IDs from canonical inputs; semantic payloads are immutable and only open validity bounds close monotonically.
 
 **FR-EX-08**: Historical claim projection MUST run outside startup migrations as a local, bounded, durable, idempotent, and resumable backfill with per-namespace progress and an extractor fingerprint. Legacy facts MUST remain retrievable while backfill is incomplete.
 
-**Status**: ❌ Not done — the existing `reembed` job provides a reusable operational pattern, but claim backfill does not exist.
+**Status**: ✅ Done — `src/service/claims/backfill.rs` implements local, bounded, durable, idempotent, resumable backfill with per-namespace progress and an extractor fingerprint; legacy facts stay retrievable during backfill.
 
 **FR-EX-09**: Automatic reconciliation candidate lookup MUST use indexed stable pagination within an exact claim slot: namespace, scope, project identity, access-policy fingerprint, canonical subject, compatible schema, comparison key, and qualifiers. It MUST NOT use a global scan, fuzzy entity overlap, or a fixed latest-N window.
 
-**Status**: ❌ Not done — the current warning detector scans at most 500 active facts and filters them by fact type and entity overlap.
+**Status**: ✅ Done — indexed claim-slot pagination (`claim_slot_cursor_idx`, `claim_job_lease_idx`, `fact_claim_backfill_cursor_idx`) over namespace/scope/project/policy/subject/schema/comparison-key/qualifier slot; no global scan or fixed latest-N window.
 
 ### 5.5 Entity Resolution (Deduplication)
 
@@ -403,7 +404,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-TM-02**: System MUST support explicit validity closure when a claim is confirmed to supersede an earlier claim. Supersession MUST close only the earlier claim's validity interval; a contradiction alone MUST NOT invalidate either source fact.
 
-**Status**: ⚠️ Partial — explicit manual fact invalidation exists, but automatic claim-level supersession and its separate lifecycle are not implemented, and current triple conflict resolution does not enforce this distinction.
+**Status**: ✅ Done — claim-level supersession closes only the earlier claim's validity interval (`valid_to`); contradiction alone leaves both source facts valid (see AT-02/AT-09).
 
 **FR-TM-03**: System MUST implement bi-temporal model: store validity time of fact (T) and transaction/ingest time (T′) for audit, retroactive corrections, and correct "as-of" answers.  
 **Status**: ✅ Done
@@ -413,27 +414,27 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **FR-TM-05**: When a new claim differs from an existing claim, the system MUST classify the relationship as duplicate, supersession, correction, contradiction, or temporal ambiguity and preserve the decision with provenance. Only confirmed supersession may close real-world validity, and only explicit correction may close an erroneous transaction-valid projection.
 
-**Status**: ❌ Not done — current extraction only returns non-persistent potential-contradiction warnings based on fact type, entity overlap, and different content.
+**Status**: ✅ Done — reconciliation (`claims/reconcile.rs`) persists the classified relation (duplicate/supersession/correction/contradiction/temporal ambiguity) with provenance; supersession closes real-world validity, correction closes the projection.
 
 **FR-TM-06**: Claim-level temporal evidence MUST distinguish observation time from the interval in which the claim is true. Missing validity information remains explicitly unknown and MUST NOT trigger automatic supersession.
 
-**Status**: ❌ Not done — extracted facts currently inherit the episode reference time as `t_valid` without representing whether that time was observed, explicit, inferred from a source contract, or unknown.
+**Status**: ✅ Done — claim fields `observed_at`, `valid_from`, `valid_to`, and `validity_source` distinguish observation from interval; missing validity stays explicitly unknown and never triggers automatic supersession.
 
 **FR-TM-07**: Every comparison key MUST have a cardinality policy. Unknown keys default to set-valued, and automatic supersession is permitted only for an explicitly single-valued key when subject, qualifiers, and temporal evidence establish the same logical slot.
 
-**Status**: ❌ Not done — the current triple resolver uses a global hard-coded singleton predicate list that includes naturally multi-valued relations such as employment, email, phone, and founder roles.
+**Status**: ✅ Done — per-claim `cardinality` policy; unknown keys default to set-valued and automatic supersession requires an explicitly single-valued key in the same logical slot.
 
 **FR-TM-08**: Automatic supersession MUST additionally require source continuity within the same source lineage or an explicitly authoritative source for the applicable claim schema and domain scope. In zero-configuration mode no source is authoritative by default, and ingestion order alone MUST NOT grant replacement authority.
 
-**Status**: ❌ Not done — current conflict handling does not model source lineage or authority and may close triples solely because a later extraction has a different object.
+**Status**: ✅ Done — `source_lineage` continuity or explicit authority gates supersession; ingestion order alone grants no authority.
 
 **FR-TM-09**: Claim supersession, targeted claim correction, and fact retraction MUST be distinct lifecycle operations. Supersession closes only the earlier claim's real-world validity interval. Correction closes the erroneous claim projection in transaction time for the same validity context. Retraction is reserved for erroneous, withdrawn, corrupted, or incorrectly ingested whole-source evidence. All operations preserve source evidence for audit.
 
-**Status**: ❌ Not done — the storage model has no separate claim entity, and the current `invalidate` operation acts on the whole fact.
+**Status**: ✅ Done — supersession closes claim validity, correction closes the claim projection (`t_invalid_ingested`), and retraction is the whole-fact `invalidate` operation; all preserve source evidence.
 
 **FR-TM-10**: Correction MUST require explicit correction or withdrawal evidence plus source continuity or scoped authority. A different value, newer observation, higher confidence, or later ingestion alone MUST NOT authorize correction.
 
-**Status**: ❌ Not done.
+**Status**: ✅ Done — correction requires explicit evidence (`derivation`) plus source continuity or scoped authority; recency/confidence alone never authorizes it.
 
 ### 5.8 Context Assembly
 
@@ -475,8 +476,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 ### 5.9 Agent Scenarios (Skills/Flows)
 
-**FR-AG-01**: System MUST expose six canonical memory operations: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, and `explain`.  
-**Status**: ✅ Done
+**FR-AG-01**: System MUST expose the frozen eight-tool MCP surface: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`, `open_app`, and `app_command`. The six core memory operations are also available as ordinary CLI subcommands.  
+**Status**: ✅ Done — per ADR-0016; `open_app`/`app_command` are MCP-only (not ordinary CLI) and gated behind the `mcp-apps` Cargo feature.
 
 **FR-AG-02**: Canonical memory operations MUST be accessible via MCP interface (stdio/http/socket) so IDEs/assistants can call them uniformly.  
 **Status**: ✅ Done
@@ -526,8 +527,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 | **Episode** | `id`, `source_type`, `source_id`, `content`, `t_ref`, `t_ingested` | For any fact, can open source episode and see exact quote/fragment. |
 | **Entity** | `id`, `type`, `canonical_name`, `aliases[]` | Search by any alias returns canonical entity. `embedding` and `merge_history[]` remain target-state fields, not current implementation facts. |
 | **Fact/Item** | `id`, `type`, `content`, `quote`, `entity_links[]`, `t_valid`, `t_invalid?`, `confidence`, `source_episode`, `index_keys[]`, `access_count`, `last_accessed?` | Every fact retains source evidence and provenance. Only explicit retraction excludes the fact from active truth selection; claim supersession leaves it unchanged. `index_keys` populated at ingest with entity names, aliases, and temporal markers for enriched BM25 retrieval. `access_count` and `last_accessed` updated on retrieval and explain for heat-aware lifecycle. |
-| **Claim** | `id`, `source_fact`, `schema`, `subject`, `comparison_key`, `value`, `qualifiers`, `cardinality`, `observed_at?`, `valid_from?`, `valid_to?`, `derivation`, `t_ingested`, `t_invalid_ingested?` | Atomic propositions are created only when deterministic extraction can populate a supported schema. Unsupported facts remain valid without claims. Real-world and transaction validity are separate from the source fact lifecycle. Target state; not implemented. |
-| **ClaimRelation** | `id`, `left_claim`, `right_claim`, `predecessor_claim?`, `successor_claim?`, `outcome`, `reason_code`, `evidence`, `evaluator_version`, `context_fingerprint`, `evaluated_at`, `supersedes_relation?`, `t_ingested`, `t_invalid_ingested?` | Reconciliation decisions are append-only and versioned. Direction is explicit for supersession and correction; symmetric outcomes use only the canonical pair. The active relation classifies the pair as duplicate, supersession, correction, contradiction, or temporal ambiguity; prior versions remain auditable. Target state; not implemented. |
+| **Claim** | `id`, `source_fact`, `schema`, `subject`, `comparison_key`, `value`, `qualifiers`, `cardinality`, `observed_at?`, `valid_from?`, `valid_to?`, `derivation`, `t_ingested`, `t_invalid_ingested?` | Atomic propositions are created only when deterministic extraction can populate a supported schema. Unsupported facts remain valid without claims. Real-world and transaction validity are separate from the source fact lifecycle. Implemented as part of the claim reconciliation pipeline (ADR-0014). |
+| **ClaimRelation** | `id`, `left_claim`, `right_claim`, `predecessor_claim?`, `successor_claim?`, `outcome`, `reason_code`, `evidence`, `evaluator_version`, `context_fingerprint`, `evaluated_at`, `supersedes_relation?`, `t_ingested`, `t_invalid_ingested?` | Reconciliation decisions are append-only and versioned. Direction is explicit for supersession and correction; symmetric outcomes use only the canonical pair. The active relation classifies the pair as duplicate, supersession, correction, contradiction, or temporal ambiguity; prior versions remain auditable. Implemented; the design contract is `docs/CONTRADICTION_DETECTION_DESIGN.md`. |
 | **Edge** | `id`, `from_entity`, `to_entity`, `relation_type`, `strength`, `confidence`, `provenance`, `t_valid`, `t_invalid?` | Relationships are stored, but conflict invalidation and provenance fidelity are still incomplete. |
 | **Community** | `id`, `member_entities[]`, `summary`, `updated_at` | Communities are maintained as connected components over persisted graph links and can expand retrieval through summary matches. |
 
@@ -571,10 +572,12 @@ All IDs MUST be deterministic to ensure idempotence:
 | `invalidate` | Retract an erroneous or withdrawn source fact while preserving audit history | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
 | `assemble_context` | Build recency-first context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
 | `explain` | Return citation-shaped context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
+| `open_app` | Open a Memory MCP app session (inspector, diff, graph, ingestion review, lifecycle) for operator workflows | `app`, `scope`, app-specific fields | `ToolResponse` with `session_id` and `resource_uri` |
+| `app_command` | Execute a coarse-grained command for an active app session | `session_id`, `action`, action-specific fields | `ToolResponse` with command status |
 
 ### 7.2 Contract Design Notes
 
-- Public MCP surface is intentionally limited to the six canonical memory tools above.
+- Public MCP surface is intentionally limited to the frozen eight-tool set above (ADR-0016).
 - Claim projection, reconciliation, supersession, and correction remain internal domain behavior; no new public MCP tool is added without a concrete user workflow.
 - Legacy UI/draft/helper tools are not part of the current public contract.
 - `extract` returns a graceful partial response with an empty typed result when neither `episode_id` nor content is supplied.
@@ -645,7 +648,7 @@ Logging levels:
 ### 8.6 Maintainability
 
 **NFR-M-01 (Maintainability)**: All schemas, policies, and pipelines MUST be managed as code (Git) with migrations and versioning.  
-**Status**: ⚠️ Partial — existing schema migrations are versioned, but ClaimSchema, canonicalization, alias, cardinality, and reconciliation policy versions are not implemented.
+**Status**: ⚠️ Partial — schema migrations and the claim/relation schema families are versioned and checksum-verified; canonicalization, alias, and cardinality policy versions are not tracked as separate versioned artifacts.
 
 ### 8.7 Observability
 
@@ -654,7 +657,7 @@ Logging levels:
 
 **NFR-AO-02 (Claim Reconciliation Observability)**: Claim extraction, key matching, candidate selection, and reconciliation MUST emit trace-level structured events containing correlation IDs, claim/fact IDs, claim schema, full comparison key, match mode, candidate count, outcome, reason code, and stage duration. Prometheus MUST expose counters and histograms aggregated only by bounded-cardinality dimensions such as claim schema, stage, match mode, outcome, and reason code. Raw comparison keys, entity IDs, claim IDs, and fact IDs MUST NOT be used as Prometheus labels.
 
-**Status**: ❌ Not done — structured event logging exists, but the current text formatter truncates individual values to 200 characters; full-key claim traces, reconciliation instrumentation, and a Prometheus exporter are not implemented.
+**Status**: ✅ Done — trace-level claim events carry correlation IDs, claim/fact IDs, claim schema, full comparison key, match mode, candidate count, outcome, reason code, and stage duration. The `prometheus` feature exposes counters and histograms aggregated only by bounded-cardinality dimensions (claim schema, stage, match mode, outcome, reason code); raw comparison keys, entity IDs, claim IDs, and fact IDs are not used as labels. Covered by `tests/prometheus_claim_metrics.rs`.
 
 ### 8.8 Error Handling
 
@@ -690,7 +693,7 @@ Logging levels:
 - [x] Rewrite MCP server on rmcp (Rust), preserving functional parity of tool surface
 - [x] Rewrite domain logic `MemoryService` in Rust
 - [x] Implement SurrealDB client and storage/search/update operations
-- [x] Support migrations from `migrations/*.surql`
+- [x] Support migrations from `crates/memory-mcp/migrations/*.surql`
 - [x] Update configuration and `mcp.json` examples for stdio-only
 - [x] Preserve/migrate test harness (acceptance/e2e/unit)
 
@@ -710,11 +713,15 @@ memory_mcp/
 │   ├── models/           # Data models (Episode, Entity, Fact, etc.)
 │   ├── config/           # Configuration parsing
 │   ├── errors/           # Error types
-│   └── logging/          # StdoutLogger
+│   ├── logging/          # StdoutLogger
 ├── migrations/           # SurrealQL migrations
 ├── tests/                # Integration tests
 └── Cargo.toml
 ```
+
+> Historical layout sketch from `rusty_memory_mcp/SPEC.md`; the current tree is
+> `crates/memory-mcp/src/...` with migrations under `crates/memory-mcp/migrations/`
+> (see `docs/agent/REPOSITORY_LAYOUT.md`).
 
 **Responsibility boundaries:**
 
@@ -734,8 +741,9 @@ memory_mcp/
 #### 9.2.5 Tool Surface and Consolidation
 
 - [x] Canonical tools: `ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`
-- [x] Minimal public tool surface enforced (memory-only)
-- [x] Consolidation policy: canonical six-tool surface
+- [x] App-session tools: `open_app`, `app_command` (MCP-only, feature-gated behind `mcp-apps`)
+- [x] Minimal public tool surface enforced (memory-only, frozen at eight tools per ADR-0016)
+- [x] Consolidation policy: canonical frozen eight-tool surface
 - [x] Soft-fallbacks for intent-based calls (normalize empty strings, soft-fallbacks for `extract` with no input)
 - [x] Tool call logging (start/done/error) with Info/Warn levels
 
@@ -746,10 +754,10 @@ memory_mcp/
 - [x] Sync tables and fields with current schema (episode, entity, fact, edge, community, task, event_log)
 - [x] Deterministic ID rules (episode/entity/fact/edge/community)
 - [x] Scope/namespace rules and `scope → namespace` mapping
-- [ ] Add Claim, ClaimRelation, comparison-key alias, and durable claim-job records through a new migration
-- [ ] Add deterministic bi-temporal claim and relation IDs and indexed claim-slot queries
+- [x] Add Claim, ClaimRelation, comparison-key alias, and durable claim-job records through a new migration
+- [x] Add deterministic bi-temporal claim and relation IDs and indexed claim-slot queries
 
-**Status**: ⚠️ Partial
+**Status**: ✅ Done — claim reconciliation (migration 029/030) plus claim-key aliases, durable claim jobs, and resumable legacy backfill are implemented; see `src/service/claims/` and `docs/CONTRADICTION_DETECTION_DESIGN.md`.
 
 #### 9.2.7 Migrations
 
@@ -759,10 +767,10 @@ memory_mcp/
 - [x] Integration test: apply migrations to embedded SurrealDB, verify indexes/tables
 - [x] Versioned multi-file migrations with checksum verification
 - [x] Apply pending embedded migrations to every configured namespace before serving
-- [ ] Treat every released migration as immutable and add only new monotonically ordered migrations
+- [x] Treat every released migration as immutable and add only new monotonically ordered migrations
 - [ ] Test sequential automatic upgrades from every explicitly supported historical database version
 
-**Status**: ⚠️ Partial — startup application and checksum validation exist; immutable-history and historical-upgrade coverage remain pending.
+**Status**: ⚠️ Partial — append-only monotonic history and checksum validation are enforced; sequential historical-upgrade test coverage remains pending (migration-declaration tests exist in `tests/claim_migration_upgrade.rs`).
 
 #### 9.2.8 Configuration and Environment
 
@@ -806,10 +814,11 @@ memory_mcp/
 - [x] Unit tests for service layer and infrastructure (including `StdoutLogger`)
 - [x] Test fixtures/embedded in-memory SurrealDB (`kv-mem`)
 - [x] Code formatted (`cargo fmt`) and checked (`cargo clippy`)
-- [ ] Labeled claim reconciliation corpus with adversarial negatives
-- [ ] Historical database upgrade, resumable backfill, concurrency, and MCP compatibility tests
+- [x] Labeled claim reconciliation corpus with adversarial negatives
+- [x] Resumable legacy backfill, claim concurrency, and MCP compatibility tests
+- [ ] Sequential automatic upgrade from every explicitly supported historical database version
 
-**Status**: ⚠️ Partial
+**Status**: ⚠️ Partial — claim corpus, backfill, and reconciliation coverage shipped (`claim_reconciliation_cases.json`, `tests/claim_reconciliation_e2e.rs`, `src/service/claims/backfill.rs`); only sequential historical-upgrade tests remain pending.
 
 #### 9.2.13 Compatibility and Contracts
 
@@ -852,7 +861,7 @@ memory_mcp/
 
 **Completed:**
 - Rust MCP server with rmcp + SurrealDB backend
-- Canonical memory-only MCP surface (`ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`)
+- Canonical memory-only MCP surface (`ingest`, `extract`, `resolve`, `invalidate`, `assemble_context`, `explain`), plus MCP-only app-session tools (`open_app`, `app_command`) — frozen at eight tools per ADR-0016
 - Migrations with embedded/filesystem fallback
 - Logging with StdoutLogger (human-readable text format)
 - Tests (unit/integration/e2e)
@@ -907,7 +916,7 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 
 **AT-02**: If a later source states "ARR grew to $3M", the old source fact remains auditable. The earlier ARR claim is superseded only when single-valued cardinality, explicit validity, and source-lineage or authority gates are satisfied; otherwise the system records contradiction or temporal ambiguity.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — covered by `tests/claim_reconciliation_e2e.rs` (contradiction/supersession outcome vocabulary, persisted relations).
 
 **AT-03**: User without `hr.salary` scope cannot extract/see salary facts via UI or agent skill.  
 **Status**: ✅ Done
@@ -929,27 +938,27 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 
 **AT-09**: Two incompatible claims with overlapping validity are both preserved and returned with a persisted contradiction relation and source evidence; neither source fact is invalidated.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — `relation_outcomes_use_the_accepted_persisted_vocabulary` in `tests/claim_reconciliation_e2e.rs`.
 
 **AT-10**: A fact containing several claims remains retrievable when one claim is superseded or corrected; unrelated claims and the original quote are unchanged.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — distinct claims under one fact stay independent (`same_value_under_distinct_keys_produces_distinct_claims`); supersession marks the relation, not the source fact.
 
 **AT-11**: An explicitly corrected claim closes in transaction time without inventing a real-world transition, while audit can reconstruct the pre-correction view.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — correction/temporal-ambiguity outcomes are part of the persisted relation vocabulary; invalidation is transaction-time and never deletes the auditable source fact.
 
 **AT-12**: Upgrading a supported historical database automatically applies only new append-only migrations, serves legacy facts without claims, and resumes claim backfill after interruption without duplicates.
 
-**Status**: ❌ Not done
+**Status**: ⚠️ Partial — append-only migrations and resumable legacy backfill are implemented (`src/service/claims/backfill.rs`); sequential upgrade from explicitly supported historical snapshots is still pending coverage (see §9.2.7/9.2.12).
 
 **AT-13**: Claims in different scope, project, or access-policy partitions never reconcile and never leak relation metadata across authorization boundaries.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — `reconciliation_never_crosses_scope_project_or_policy` in `tests/claim_reconciliation_e2e.rs`.
 
 **AT-14**: `extract`, `assemble_context`, and `explain` preserve existing required response fields while adding reconciliation information only through optional backward-compatible fields.
 
-**Status**: ❌ Not done
+**Status**: ✅ Done — reconciliation metadata is additive and optional; existing typed responses are unchanged.
 
 ### 10.3 Test Coverage
 
@@ -970,13 +979,19 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
-| `SURREALDB_URL` | ✅ | SurrealDB connection URL (e.g., `rocksdb://./data/surreal.db` or `ws://localhost:8000`) | — |
-| `SURREALDB_DB_NAME` | ✅ | Database name | — |
-| `SURREALDB_NAMESPACES` | ✅ | Comma-separated namespaces (e.g., `user_123,team_456,org_789`) | — |
-| `SURREALDB_USERNAME` | ✅ | Username for authentication | — |
-| `SURREALDB_PASSWORD` | ✅ | Password for authentication | — |
-| `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | `false` |
-| `SURREALDB_DATA_DIR` | ❌ | Optional embedded RocksDB data directory (`./data/surrealdb` by default) | `./data/surrealdb` |
+| `SURREALDB_URL` | ❌ | SurrealDB connection URL. Remote schemes (`http(s)://`, `ws(s)://`) require explicit credentials; unset selects embedded mode | embedded (inferred) |
+| `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | inferred from URL (`true` when URL unset) |
+| `SURREALDB_DB_NAME` | ❌ | Database name | `memory` |
+| `SURREALDB_NAMESPACES` | ❌ | Comma-separated namespaces (e.g., `org,personal`) | `org` |
+| `SURREALDB_USERNAME` | ✅ (remote) | Username; `root` in embedded mode | `root` |
+| `SURREALDB_PASSWORD` | ✅ (remote) | Password; `root` in embedded mode | `root` |
+| `SURREALDB_DATA_DIR` | ❌ | Embedded RocksDB data directory | `$XDG_DATA_HOME/memory_mcp` → `~/.local/share/memory_mcp` → `./.memory_mcp` |
+| `QUERY_LOGGING_ENABLED` | ❌ | Persist `assemble_context` analytics to `query_log` | `false` |
+| `QUERY_LOG_RETENTION_DAYS` | ❌ | Days to retain persisted `query_log` analytics | `90` |
+| `NER_EXTRACTOR` | ❌ | NER extractor: `anno`, `regex`, `anno-onnx`, `urchade/gliner_multi-v2.1`, `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` | `anno` (zero-config) |
+| `GLINER_BATCH_SIZE` / `GLINER_MAX_BATCH_TOKENS` / `GLINER_DEVICE` | ❌ | Native GLiNER inference tuning (batch, token cap, device `cpu`/`metal`/`auto`) | `1` / `1536` / `cpu` |
+| `NER_MAX_CONCURRENCY` / `NER_IDLE_UNLOAD_SECS` | ❌ | Model-backed concurrency and idle unload | `1` / `0` |
+| `EMBEDDINGS_ENABLED` | ❌ | Enable embedding provider; disabled by default (lexical/graph retrieval) | `false` |
 | `RUST_LOG` | ❌ | Log level: `trace`, `debug`, `info`, `warn`, `error` | `info` |
 
 ### 11.2 Installation
@@ -1008,21 +1023,25 @@ memory_mcp
 ./target/release/memory_mcp
 ```
 
-**With environment:**
+**With environment (optional overrides):**
 
 ```bash
-SURREALDB_URL=rocksdb://./data/surreal.db \
-SURREALDB_DB_NAME=memory \
-SURREALDB_NAMESPACES=user_solovey \
-SURREALDB_USERNAME=root \
-SURREALDB_PASSWORD=root \
+# Zero-config: start with no environment variables for embedded storage,
+# database `memory`, namespace `org`, embedded root/root credentials,
+# Anno entity extraction, and disabled embeddings.
+memory_mcp
+
+# Power users override individual settings:
+SURREALDB_NAMESPACES=org,personal \
+QUERY_LOGGING_ENABLED=true \
+NER_EXTRACTOR=urchade/gliner_multi-v2.1 \
 RUST_LOG=info \
 memory_mcp
 ```
 
 ### 11.4 MCP Configuration
 
-**`.vscode/mcp.json` (stdio)**:
+**`.vscode/mcp.json` (stdio)** — zero-config (no env overrides needed):
 
 ```json
 {
@@ -1030,20 +1049,13 @@ memory_mcp
     "memory-mcp": {
       "command": "cargo",
       "args": ["run", "--quiet", "--bin", "memory_mcp"],
-      "cwd": "/path/to/memory_mcp",
-      "env": {
-        "SURREALDB_URL": "rocksdb://./data/surreal.db",
-        "SURREALDB_DB_NAME": "memory",
-        "SURREALDB_NAMESPACES": "user_solovey",
-        "SURREALDB_USERNAME": "root",
-        "SURREALDB_PASSWORD": "root",
-        "RUST_LOG": "info"
-      }
+      "cwd": "/path/to/memory_mcp"
     }
   }
 }
 ```
 
+Power users may add explicit overrides under `env` (see §11.1).
 For an installed binary, replace the command block with `"command": "memory_mcp"` and omit `cwd`.
 
 ### 11.5 Migrations
@@ -1061,7 +1073,7 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 - Migrations must be deterministic, restart-safe, and preserve legacy records and provenance
 - The current application must automatically upgrade every explicitly supported older database version
 - Migration failure stops startup before requests are served against a partially upgraded schema
-- Canonical initial migration: `migrations/__Initial.surql`
+- Canonical initial migration: `crates/memory-mcp/migrations/__Initial.surql`
 
 ---
 
@@ -1073,10 +1085,7 @@ For an installed binary, replace the command block with `"command": "memory_mcp"
 - [MCP, Skills, and Agents](https://cra.mr/mcp-skills-and-agents)
 - `docs/CONTRADICTION_DETECTION_DESIGN.md` — deterministic claim-reconciliation target architecture
 - `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` — retrieval target-state specification
-- `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` — adaptive-memory target-state specification
 - `docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md` — evaluation architecture and design
-- [Memory Agent](/.github/agents/memory.agent.md) — Full 1100+ line agent specification
-- [PDM Agent](/.github/agents/pdm.agent.md) — Product Manager Agent
 
 ### 12.2 Implementation
 
@@ -1094,8 +1103,6 @@ These documents are superseded by this specification:
 
 - `.agent/docs/SPEC.md` (deprecated)
 - `.agent/rusty_memory_mcp/SPEC.md` (deprecated)
-
-**Note:** `memory-agent-architecture.md` remains as a high-level overview and quick reference.
 
 ---
 

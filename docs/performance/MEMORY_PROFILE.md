@@ -10,7 +10,7 @@ For the reported local-use case (CPU GLiNER, one extraction, long-lived stdio
 server), the best observed configuration is:
 
 ```text
-GLINER_IDLE_UNLOAD_SECS=30
+NER_IDLE_UNLOAD_SECS=30
 # default allocator; do not enable mimalloc by default
 ```
 
@@ -42,7 +42,7 @@ seconds, sent exactly one successful `tools/call` request for `extract`, and
 then observed after extraction. The idle-unload cases were observed for at
 least 45 seconds; the combined `mimalloc` case was observed for 90 seconds.
 
-| Variant | `GLINER_IDLE_UNLOAD_SECS` | Idle before extract: footprint / RSS | Active peak: footprint / RSS | Post-extract observed: footprint / RSS |
+| Variant | `NER_IDLE_UNLOAD_SECS` | Idle before extract: footprint / RSS | Active peak: footprint / RSS | Post-extract observed: footprint / RSS |
 |---|---:|---:|---:|---:|
 | Current default allocator, no unload | unset (`0` effective) | 113 MB / 135 MB | 2,566 MB / 2,644 MB | 1,458 MB / 1,541 MB |
 | Default allocator + idle unload | `30` | 113 MB / 135 MB | 2,565 MB / 2,643 MB | **277 MB / 430 MB** |
@@ -111,10 +111,11 @@ cargo build --release --features mimalloc --locked \
 Runtime settings for every controlled row:
 
 ```text
-NER_PROVIDER=local-gliner
-NER_MODEL=urchade/gliner_multi-v2.1
-NER_MODEL_DIR=crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1
-NER_DEVICE=cpu
+NER_EXTRACTOR=urchade/gliner_multi-v2.1
+NER_CACHE_DIR=crates/memory-mcp/tests/models/ner/urchade--gliner_multi-v2.1
+GLINER_DEVICE=cpu
+GLINER_BATCH_SIZE=1
+GLINER_MAX_BATCH_TOKENS=1536
 NER_MAX_CONCURRENCY=1
 EMBEDDINGS_ENABLED=false
 SURREALDB_EMBEDDED=true
@@ -151,7 +152,7 @@ measurement.
 The current implementation is lazy: the model is not loaded before the first
 extraction. Therefore the “idle before extract” rows measure a server with no
 GLiNER weights resident. This is a separate improvement from idle unloading.
-With `GLINER_IDLE_UNLOAD_SECS` unset or `0`, the loaded model remains cached for
+With `NER_IDLE_UNLOAD_SECS` unset or `0`, the loaded model remains cached for
 process lifetime after first use; with a positive value, it is released after
 inactivity.
 
@@ -168,7 +169,7 @@ symptom.
 ### Recommendation
 
 1. Keep the current default allocator.
-2. Recommend `GLINER_IDLE_UNLOAD_SECS=30` (or another workload-appropriate
+2. Recommend `NER_IDLE_UNLOAD_SECS=30` (or another workload-appropriate
    positive value) for local single-shot or infrequent extraction workloads.
 3. Keep `mimalloc` as an explicit opt-in feature for users who care about
    physical footprint and have verified their own workload; do not make it the

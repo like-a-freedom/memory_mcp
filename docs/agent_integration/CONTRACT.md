@@ -1,6 +1,6 @@
 # Agent Integration Contract
 
-Canonical contract for agent-host lifecycle integration with `memory_mcp`. Host-specific mappings live in `CLAUDE_CODE.md` and `CODEX.md`.
+Canonical contract for agent-host lifecycle integration with `memory_mcp`. Host-specific hook wiring examples live in [`hooks/README.md`](../../hooks/README.md).
 
 ## Public surface (frozen)
 
@@ -53,11 +53,16 @@ SurrealDB service, API key, configuration file, network request, or model downlo
 Power users override the same executable with the canonical runtime variables
 `SURREALDB_URL`, `SURREALDB_EMBEDDED`, `SURREALDB_DB_NAME`,
 `SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`,
-`SURREALDB_DATA_DIR`, `NER_PROVIDER`, `NER_MODEL`, `NER_MODEL_DIR`,
-`EMBEDDINGS_ENABLED`, `EMBEDDINGS_PROVIDER`, `EMBEDDINGS_MODEL`,
-`EMBEDDINGS_MODEL_DIR`, `EMBEDDINGS_BASE_URL`, and `EMBEDDINGS_API_KEY`, plus
-the documented tuning variables. Runtime settings are orthogonal; users do not
-select a Cargo feature to obtain the normal product experience.
+`SURREALDB_DATA_DIR`, `NER_EXTRACTOR` (one of `anno`, `regex`, `anno-onnx`,
+`urchade/gliner_multi-v2.1`, `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`),
+`NER_CACHE_DIR`, `GLINER_BATCH_SIZE`, `GLINER_MAX_BATCH_TOKENS`,
+`GLINER_DEVICE`, `EMBEDDINGS_ENABLED`, `EMBEDDINGS_PROVIDER`,
+`EMBEDDINGS_MODEL`, `EMBEDDINGS_MODEL_DIR`, `EMBEDDINGS_BASE_URL`, and
+`EMBEDDINGS_API_KEY`, plus the documented tuning variables. The removed
+`NER_PROVIDER`/`NER_MODEL`/`NER_MODEL_DIR` family is rejected with migration
+guidance; `crates/memory-mcp/src/config/ner.rs` is the single source of truth
+for the NER variable set. Runtime settings are orthogonal; users do not select
+a Cargo feature to obtain the normal product experience.
 
 Remote storage requires non-empty explicit `SURREALDB_USERNAME` and
 `SURREALDB_PASSWORD`. Missing or invalid explicit configuration fails with an
@@ -80,10 +85,18 @@ outcomes.
 
 ### 2. Hooks (supplementary, host-dependent)
 
-External shell scripts installed per-host. Hooks fire on lifecycle events
-(SessionStart, PostToolUse, Stop) and invoke either the ordinary CLI (for
-agent-visible operations) or the internal lifecycle CLI (for selective
-capture/recall with policy classification):
+External shell scripts installed per-host. The shipped scripts
+`hooks/memory_stop_hook.sh` and `hooks/memory_precompact_hook.sh` fire on stop
+and pre-compaction events and speak newline-delimited JSON-RPC over MCP stdio:
+they start the server (via `MEMORY_MCP_SERVER_CMD`), perform the minimal
+handshake (`initialize` → `notifications/initialized`), and call the `ingest`
+tool with `source_type="session_summary"`. See `hooks/README.md` for wiring
+and optional variables (`MEMORY_HOOK_PROJECT`, `MEMORY_HOOK_SCOPE`, ...).
+
+Hosts that prefer direct invocation may call the CLI themselves. The examples
+below are illustrative CLI usage (not the shipped scripts): the ordinary CLI
+for agent-visible operations and the internal lifecycle CLI for selective
+capture/recall with policy classification:
 
 ```bash
 # SessionStart hook → recall (ordinary CLI, agent-visible)
@@ -181,11 +194,10 @@ Remembered content is never concatenated into system or developer instructions.
 ## Degraded behavior
 
 If the memory server is unavailable (MCP connection dropped, CLI call failed),
-the hook script emits the configured degraded result (typically an empty
-string or a warning comment) and never pretends enforcement succeeded. An
-outage must produce a documented degraded event — the hook script writes a
-warning to stderr and exits with a non-zero code that the host treats as
-non-blocking.
+the hook script does not emit a degraded result payload. It writes a warning
+to stderr and exits with a non-zero code that the host treats as non-blocking,
+and it never pretends capture succeeded. An outage therefore surfaces as a
+visible stderr warning plus a non-zero exit, not as fabricated output.
 
 ## Rollout stages
 
