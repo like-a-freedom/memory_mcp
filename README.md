@@ -500,8 +500,9 @@ LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 # EMBEDDINGS_PROVIDER=local-candle
 # EMBEDDINGS_MODEL=intfloat/multilingual-e5-small
 # EMBEDDINGS_MODEL_DIR=./data/models/intfloat/multilingual-e5-small
-# NER_PROVIDER=local-gliner
-# NER_MODEL=urchade/gliner_multi-v2.1
+# NER_EXTRACTOR=urchade/gliner_multi-v2.1
+# NER_CACHE_DIR=./data/models/ner
+# GLINER_DEVICE=cpu
 ```
 
 ### Embedding providers and switching
