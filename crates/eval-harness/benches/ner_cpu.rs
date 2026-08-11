@@ -27,7 +27,7 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     };
     eprintln!("{label} cold start: {:?}", build_start.elapsed());
 
-    let fixture = eval_harness::benchmark::NerBenchmarkFixture::load().unwrap();
+    let fixture = eval_harness::benchmark::NerBenchmarkFixture::load();
     let single = fixture.single_window.to_string();
     let multi = fixture.multi_window.to_string();
 
