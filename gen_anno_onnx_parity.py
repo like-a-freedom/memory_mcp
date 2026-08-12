@@ -52,7 +52,7 @@ def extract(text, labels):
         "span_idx": np.array(spans, dtype=np.int64).reshape(1, -1, 2),
         "span_mask": np.ones((1, len(spans)), dtype=bool),
     }
-    logits = sess.run(None, feeds)[0]
+    logits = np.asarray(sess.run(None, feeds)[0])
     probs = 1.0 / (1.0 + np.exp(-logits))[0]
     entities = []
     seen = set()

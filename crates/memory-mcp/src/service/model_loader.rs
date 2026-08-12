@@ -69,12 +69,12 @@ pub async fn ensure_model_cached_with_files(
         ))
     })?;
 
-    let api = hf_hub::api::tokio::ApiBuilder::from_env()
-        .with_cache_dir(cache_dir.to_path_buf())
-        .with_progress(false)
+    let api = hf_hub::HFClient::builder()
+        .cache_dir(cache_dir.to_path_buf())
         .build()
         .map_err(|e| MemoryError::Storage(format!("failed to init hf-hub api: {e}")))?;
-    let repo = api.model(repo_id.to_string());
+    let (owner, name) = hf_hub::split_id(repo_id);
+    let repo = api.model(owner, name);
 
     for file_name in required_files {
         let target_path = cache_dir.join(file_name);
@@ -89,7 +89,12 @@ pub async fn ensure_model_cached_with_files(
 
         let mut last_err: Option<String> = None;
         for attempt in 1..=MAX_RETRIES {
-            match repo.get(file_name).await {
+            match repo
+                .download_file()
+                .filename(file_name.to_string())
+                .send()
+                .await
+            {
                 Ok(downloaded_path) => {
                     match tokio::fs::copy(&downloaded_path, &target_path).await {
                         Ok(_) => {

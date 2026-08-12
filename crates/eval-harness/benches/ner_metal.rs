@@ -29,7 +29,7 @@ fn bench_ner_apple_silicon_single_window(c: &mut Criterion) {
                     "Alice Smith from Acme Corp presented the quarterly revenue report.",
                 )
                 .await;
-                criterion::black_box(
+                std::hint::black_box(
                     ExtractCapability::extract(&memory.build_context(), &episode, None, None)
                         .await
                         .expect("extract"),
@@ -65,9 +65,9 @@ fn bench_vago_apple_silicon_single_window(c: &mut Criterion) {
             let start = std::time::Instant::now();
             for _ in 0..iters {
                 rt.block_on(async {
-                    criterion::black_box(
+                    std::hint::black_box(
                         extractor
-                            .extract_candidates(criterion::black_box(&text))
+                            .extract_candidates(std::hint::black_box(&text))
                             .await
                             .expect("extract"),
                     );

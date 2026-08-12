@@ -17,6 +17,9 @@ docs/BACKLOG.md
 *.rlib
 /scripts
 
+# Python dev tooling (see pyproject.toml)
+.venv/
+
 # Cargo.lock
 # - Keep for binaries and applications
 # - Ignore for libraries (uncomment below)

@@ -138,6 +138,19 @@ sources.
   procedure revocation remain separate operations.
 - Never let recall or a background worker manufacture a corrective fact as a
   retrieval side effect.
+- Memory MCP uses one Active Namespace per server process. Namespace is storage
+  configuration, not a per-memory domain partition or data-plane request field.
+- Scope, project, collection, basket, tenant, and vault are not Memory MCP
+  partitioning concepts.
+- Zero-configuration startup uses embedded SurrealDB, Active Namespace `main`,
+  and database `memory`; it requires no `SURREALDB_*` variables, external
+  service, or credentials.
+- `SURREALDB_NAMESPACE` may select one Active Namespace for the whole process.
+  Changing it takes effect only after restart and never moves, merges, copies,
+  or deletes data in another namespace.
+- Zero-configuration embedded storage uses the existing platform-conventional
+  user-data resolution and compatibility rule. `SURREALDB_DATA_DIR` is the sole
+  explicit override; storage location never depends on the executable.
 
 ## Evaluation domain language
 
@@ -193,6 +206,10 @@ temporal change, and disagreement between sources.
 
 ### Vocabulary
 
+**Active Namespace**:
+The single native SurrealDB namespace selected for one Memory MCP server process. All memory operations in that process use it implicitly; `main` is selected when no override is configured.
+_Avoid_: Scope, project, collection, basket, tenant, vault, default namespace
+
 **Fact**:
 A durable, provenance-backed evidence item derived from an episode. A fact may contain zero or more claims. Claim supersession does not modify or invalidate the source fact.
 _Avoid_: Claim, assertion
@@ -206,8 +223,8 @@ A persisted, versioned reconciliation decision connecting two claims. Its outcom
 _Avoid_: Claim, unversioned warning
 
 **Claim Slot**:
-The exact comparison boundary formed by namespace, scope, project, access-policy fingerprint, canonical subject, comparison key, and normalized qualifiers. Only claims in the same slot are candidates for automatic reconciliation.
-_Avoid_: Fuzzy topic, entity overlap
+The exact comparison boundary formed by access-policy fingerprint, canonical subject, comparison key, and normalized qualifiers within the Active Namespace. Only claims in the same slot are candidates for automatic reconciliation.
+_Avoid_: Fuzzy topic, entity overlap, scope, project
 
 **Claim Projection**:
 The versioned deterministic derivation of zero or more claims from an immutable source fact. Recomputing a projection may replace the current derived claims in transaction time but does not modify the fact.
@@ -254,7 +271,7 @@ A sequence of observations that represent successive versions or snapshots of th
 _Avoid_: Source type, ingestion order
 
 **Authoritative Source**:
-A source explicitly trusted to determine the current value for a defined claim schema or domain scope. No source is authoritative merely because it is newer.
+A source explicitly trusted to determine the current value for a defined claim schema or knowledge domain. No source is authoritative merely because it is newer.
 _Avoid_: Latest source, preferred source
 
 **Contradiction**:

@@ -16,7 +16,7 @@
 - Ship and document one ordinary release artifact per supported platform. Do not create, compare, publish, or require an alternate onboarding artifact.
 - The ordinary artifact must retain embedded SurrealDB, lightweight Anno, regex NER, explicit Anno ONNX NuNER, both catalogued native Candle GLiNER extractors, local Candle embeddings, OpenAI-compatible embeddings, Ollama embeddings, remote SurrealDB, and existing platform acceleration capabilities.
 - Cargo features remain valid only for genuine platform/build concerns already present in the project (`accelerate`, `metal`, `cli-watch`, `mcp-apps`, `prometheus`, `mimalloc`, and `eval-support`). They must not select the normal provider experience. The existing `mcp-apps` feature remains an optional interactive UI surface and is not required for the eight core tools or first value.
-- With all application configuration variables absent, defaults are embedded RocksDB, database `memory`, namespace `org`, embedded credentials `root/root`, Anno NER, disabled embeddings, and immediate lexical/graph retrieval.
+- With all application configuration variables absent, defaults are embedded RocksDB, database `memory`, namespace `main`, embedded credentials `root/root`, Anno NER, disabled embeddings, and immediate lexical/graph retrieval.
 - The no-environment first-value path must not access the network or download a model.
 - Only `ws`, `wss`, `http`, and `https` `SURREALDB_URL` schemes select remote mode. Remote mode requires non-empty explicit `SURREALDB_USERNAME` and `SURREALDB_PASSWORD` and fails before connection when configuration is incomplete.
 - Fresh local state uses `$XDG_DATA_HOME/memory_mcp`, then `$HOME/.local/share/memory_mcp`, then the existing deterministic current-directory fallback. Existing legacy data follows the already-implemented compatibility rule.
@@ -34,7 +34,7 @@ Use these exact spellings in code, tests, generated snippets, README tables, and
 
 | Group | Canonical variables |
 |---|---|
-| Storage | `SURREALDB_URL`, `SURREALDB_EMBEDDED`, `SURREALDB_DB_NAME`, `SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`, `SURREALDB_DATA_DIR`, `SURREALDB_EMBEDDING_DIMENSION` |
+| Storage | `SURREALDB_URL`, `SURREALDB_EMBEDDED`, `SURREALDB_DB_NAME`, `SURREALDB_NAMESPACE`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`, `SURREALDB_DATA_DIR`, `SURREALDB_EMBEDDING_DIMENSION` |
 | Embeddings | `EMBEDDINGS_ENABLED`, `EMBEDDINGS_PROVIDER`, `EMBEDDINGS_MODEL`, `EMBEDDINGS_MODEL_DIR`, `EMBEDDINGS_BASE_URL`, `EMBEDDINGS_API_KEY`, `EMBEDDINGS_TIMEOUT_SECS`, `EMBEDDINGS_MAX_TOKENS`, `EMBEDDINGS_SIMILARITY_THRESHOLD` |
 | NER | `NER_EXTRACTOR`, `NER_CACHE_DIR`, `NER_LABELS`, `NER_THRESHOLD`, `NER_MAX_CONCURRENCY`, `NER_IDLE_UNLOAD_SECS`, `GLINER_BATCH_SIZE`, `GLINER_MAX_BATCH_TOKENS`, `GLINER_DEVICE` |
 | Logging/query analytics | `RUST_LOG`, `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` |
@@ -49,7 +49,7 @@ Canonical documented extractor/provider values are:
 - `EMBEDDINGS_PROVIDER`: `local-candle`, `openai-compatible`, `ollama`.
 - `GLINER_DEVICE`: `cpu`, `metal`, `auto`.
 
-`NER_PROVIDER`, `NER_MODEL`, `NER_MODEL_DIR`, `NER_BATCH_SIZE`, `NER_MAX_BATCH_TOKENS`, `NER_DEVICE`, and `GLINER_IDLE_UNLOAD_SECS` are removed names and must produce migration guidance rather than aliases. `SURREALDB_EMBEDDING_DIMENSION` remains canonical because it is the existing public name, even though `EmbeddingConfig::from_env()` consumes it. `NER_IDLE_UNLOAD_SECS` defaults to `0` and applies only to model-backed extractors.
+`NER_PROVIDER`, `NER_MODEL`, `NER_MODEL_DIR`, `NER_BATCH_SIZE`, `NER_MAX_BATCH_TOKENS`, `NER_DEVICE`, `GLINER_IDLE_UNLOAD_SECS`, and `SURREALDB_NAMESPACES` are removed names and must produce migration guidance rather than aliases. `SURREALDB_NAMESPACE` selects the one Active Namespace for a server process and defaults to `main` when absent, as decided by ADR-0038. `SURREALDB_EMBEDDING_DIMENSION` remains canonical because it is the existing public name, even though `EmbeddingConfig::from_env()` consumes it. `NER_IDLE_UNLOAD_SECS` defaults to `0` and applies only to model-backed extractors.
 
 ## Evidence and Design Rationale
 
@@ -61,7 +61,7 @@ Canonical documented extractor/provider values are:
 
 ## Verified Repository Baseline — 2026-08-07
 
-Tasks 1–9 from the earlier plan are committed at `97a3edd8` and are prerequisites, not work to repeat:
+Tasks 1–9 from the earlier plan are committed at `97a3edd8` and are prerequisites, not work to repeat. ADR-0038 and the follow-on plan `2026-08-12-one-active-namespace.md` amend only the namespace/scope contract on top of this baseline:
 
 1. User-owned embedded data directory and legacy compatibility selection.
 2. No-environment embedded defaults in `SurrealConfig::from_env()`.

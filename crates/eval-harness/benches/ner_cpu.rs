@@ -5,11 +5,12 @@
 //! everywhere. `default_service_probe` measures the Anno + DB path and is
 //! intentionally kept separate — do not compare across it.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use eval_harness::ner_fixtures;
 use memory_mcp::config::NerExtractorKind;
 use memory_mcp::service::EntityExtractor;
 use memory_mcp::service::capabilities::extract::ExtractCapability;
+use std::hint::black_box;
 use std::sync::Arc;
 use std::time::Instant;
 
