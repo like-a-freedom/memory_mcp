@@ -1,0 +1,23 @@
+# Python dev tooling for memory-mcp.
+#
+# Only used by the standalone dev script `gen_anno_onnx_parity.py`
+# (generates the anno-onnx release-parity reference). The Rust workspace
+# is unaffected by this file. Create the environment with:
+#
+#   uv sync --python 3.11
+[project]
+name = "memory-mcp-scripts"
+version = "0.1.0"
+description = "Python dev tooling for memory-mcp (NER parity reference generation)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2",
+    "onnxruntime>=1.19",
+    "tokenizers>=0.20",
+]
+
+[tool.uv]
+package = false
+
+[tool.ty.environment]
+python = ".venv/bin/python"
