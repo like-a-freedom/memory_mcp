@@ -1,6 +1,6 @@
 ---
 name: memory-cli
-description: "Memory CLI workflows for shell automation and operations. Use when invoking `memory_mcp` commands to capture or recall memory, start the stdio server, watch files, re-embed facts, or integrate memory into scripts and hooks."
+description: "Use when invoking the `memory_mcp` binary from a shell, script, hook, or terminal to capture or recall memory, canonicalize entities, start the stdio server, watch files, or re-embed facts."
 compatibility: Requires the `memory_mcp` binary in the current environment. This skill is CLI-only; use `memory-mcp` when the server is already connected as MCP tools.
 ---
 
@@ -10,15 +10,8 @@ Use the CLI for shell scripts, one-shot automation, hooks, server operation, fil
 watching, and re-embedding. Do not route an MCP-connected agent through the
 shell merely because the CLI exposes equivalent memory operations.
 
-Choose one branch before running a command:
-
-- **capture** — store a source and extract facts through JSON-producing
-  subcommands;
-- **recall** — read facts and provenance without writes;
-- **canonicalize** — create or update a canonical entity and its aliases;
-- **serve** — start the stdio MCP server;
-- **watch** — continuously ingest files;
-- **re-embed** — rebuild stored fact embeddings.
+Choose one branch — capture, canonicalize, recall, serve, watch, or re-embed —
+before running a command.
 
 ## Principles
 

@@ -1,21 +1,15 @@
 ---
 name: memory-mcp
-description: "Memory MCP tools for durable capture and evidence-backed recall. Use when an MCP-connected agent must ingest a verified source, extract facts, resolve entities, assemble context, explain provenance, invalidate a fact, or operate a Memory MCP app session."
+description: "Use when an MCP-connected agent must store a verified source, extract facts, resolve entity aliases, recall assembled context, explain provenance, invalidate a fact, or operate a Memory MCP app session."
 compatibility: Requires a configured `memory-mcp` MCP server. This skill is MCP-only; use `memory-cli` for shell commands, scripts, server startup, watch mode, or re-embedding.
 ---
 
 # Memory MCP
 
-Use the MCP surface for agent-initiated memory work. Choose one branch before
-calling a tool:
-
-- **capture** stores a source and extracts facts;
-- **canonicalize** creates or updates canonical entities and aliases;
-- **recall** reads facts and provenance;
-- **app session** performs interactive operator work and may mutate state.
-
-Finish the chosen branch before switching. Use an app only when a canonical
-tool cannot express the session-backed intent.
+Use the MCP surface for agent-initiated memory work. Choose one branch —
+capture, canonicalize, recall, or app session — before calling a tool, and
+finish it before switching. Use an app only when a canonical tool cannot
+express the session-backed intent.
 
 ## Principles
 
@@ -39,13 +33,12 @@ empty, failed, or conflicting result.
 
 ## MCP surface
 
-The raw tool names are `ingest`, `extract`, `resolve`, `assemble_context`,
-`explain`, `invalidate`, `open_app`, and `app_command`. Always call the fully
-qualified name exposed by the host; never call a bare raw name.
+The eight operations are `ingest`, `extract`, `resolve`, `assemble_context`,
+`explain`, `invalidate`, `open_app`, and `app_command`. Call them by their fully
+qualified host name — never a bare raw name.
 
-Read [MCP tool reference](references/mcp-tools.md) when constructing arguments,
-handling a response, or using app tools. The reference owns exact fields,
-response expectations, and app routing; this file owns behavior and order.
+Read [MCP tool reference](references/mcp-tools.md) for exact fields, responses,
+and app routing. The reference owns details; this file owns behavior and order.
 
 ## SOP: capture
 
@@ -67,7 +60,7 @@ Use when verified source material must outlive the current session.
    Inspect every fact and warning; do not infer success from the episode alone.
 
    *Completion:* the result is classified as `verified`, `episode-only`, or
-   `pending`, using the shared contract.
+   `pending`, using the memory contract.
 
 4. **Reconcile supersession when required.** If verified newer evidence replaces
    an active fact, call the qualified `invalidate` tool for the old fact and
