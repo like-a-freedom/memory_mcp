@@ -419,6 +419,12 @@ impl PolicyFingerprint {
         }
         Self(hex::encode(hasher.finalize()))
     }
+
+    /// The canonical hex-encoded fingerprint string.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

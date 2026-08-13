@@ -48,7 +48,6 @@ pub(crate) struct ClaimDraftCandidate {
     pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
     pub validity_source: ClaimValiditySource,
-    pub source_lineage: Option<String>,
     // Byte offset range in the original source content. Asserted by extract tests;
     // persisted through `Claim.source_span` in a later step.
     #[allow(dead_code)]
@@ -176,7 +175,6 @@ impl ClaimSchema for AttributeV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
             return Ok(());
@@ -213,7 +211,6 @@ impl ClaimSchema for AttributeV1 {
                     valid_from: assertion.valid_from,
                     valid_to: assertion.valid_to,
                     validity_source: ClaimValiditySource::Explicit,
-                    source_lineage: None,
                     source_span: Some((assertion.source_span.start, assertion.source_span.end)),
                 });
             }
@@ -246,7 +243,6 @@ impl ClaimSchema for AttributeV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: Some((span_start, span_end)),
             });
             return Ok(());
@@ -273,7 +269,6 @@ impl ClaimSchema for AttributeV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
         }
@@ -388,7 +383,6 @@ impl ClaimSchema for QuantityV1 {
                         valid_from: None,
                         valid_to: None,
                         validity_source: ClaimValiditySource::Explicit,
-                        source_lineage: None,
                         source_span: None,
                     });
                 }
@@ -426,7 +420,6 @@ impl ClaimSchema for QuantityV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
             return Ok(());
@@ -466,7 +459,6 @@ impl ClaimSchema for QuantityV1 {
                     valid_from: None,
                     valid_to: None,
                     validity_source: ClaimValiditySource::Explicit,
-                    source_lineage: None,
                     source_span: Some((span_start, span_end)),
                 });
             }
@@ -498,7 +490,6 @@ impl ClaimSchema for QuantityV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
         }
@@ -551,7 +542,6 @@ impl ClaimSchema for RelationV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
             return Ok(());
@@ -577,7 +567,6 @@ impl ClaimSchema for RelationV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: Some((span_start, span_end)),
             });
         }
@@ -699,7 +688,6 @@ impl ClaimSchema for CommitmentV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
         } else if input.fact_type == "promise"
@@ -723,7 +711,6 @@ impl ClaimSchema for CommitmentV1 {
                 valid_from: None,
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
-                source_lineage: None,
                 source_span: None,
             });
         }

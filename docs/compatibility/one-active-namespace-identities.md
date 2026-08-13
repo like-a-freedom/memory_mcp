@@ -141,6 +141,27 @@ qualifiers are evaluated during reconciliation. Legacy claims with colliding
 scope/project-free identity may coexist. They are not automatically
 invalidated, merged, or assigned to a guessed v2 slot.
 
+### Stored namespace metadata
+
+`claim.namespace` and `claim_job.namespace` remain required, written, string
+columns. They are audit/provenance metadata recording the namespace a record
+was created in; they are never a routing input and are not hashed into any v2
+identity. They are intentionally **not** made optional in the expand migration
+because they preserve origin provenance without changing write-path behavior.
+This is a deliberate, recorded deviation from the plan's idealized "remove
+namespace from claim domain types": the field is retained for audit while the
+bound store owns all routing.
+
+### Source lineage and correction/supersession authority
+
+`source_lineage` is populated from the normalized episode `source_id` (trimmed,
+`None` when empty). The `source_gate` used before automatic correction or
+supersession requires differing source facts **and** a present, byte-equal
+`source_lineage` on both sides (ADR-0008). Missing or differing lineage cannot
+produce automatic correction/supersession; it falls through to contradiction or
+temporal ambiguity. There is no source-authority registry in this release, so
+same-lineage continuity is the only automatic-invalidation path.
+
 A compatibility reader may lazily project a v2 slot for a legacy claim only
 when the mapping is unambiguous. If the legacy policy context cannot be
 reconstructed safely, retain the legacy claim and make the compatibility state

@@ -108,18 +108,31 @@ pub fn deterministic_candidate_id(
     format!("procedure_candidate:{hash}")
 }
 
-/// Compute the v2 candidate ID from the active namespace and task fingerprint.
+/// Compute the v2 candidate ID from the canonical identity tuple.
 ///
-/// Legacy `scope` and `project` metadata are deliberately not accepted here.
+/// The Active Namespace is implicit in the bound store and is never hashed.
+/// The tuple is `(identity_version=2, task_fingerprint, trust_floor,
+/// policy_fingerprint_v2)`, encoded as `u32` big-endian byte length followed by
+/// exact UTF-8 bytes, in that order. This matches the checked-in compatibility
+/// contract (`docs/compatibility/one-active-namespace-identities.md`).
 #[must_use]
-pub fn deterministic_candidate_id_v2(namespace: &str, task_fingerprint: &str) -> String {
+pub fn deterministic_candidate_id_v2(
+    task_fingerprint: &str,
+    trust_floor: &str,
+    policy_fingerprint_v2: &crate::models::claim::PolicyFingerprint,
+) -> String {
     use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
-    for value in [namespace.as_bytes(), task_fingerprint.as_bytes()] {
-        let length = u64::try_from(value.len()).unwrap_or(u64::MAX);
+    for value in [
+        V2_IDENTITY_VERSION.to_string(),
+        task_fingerprint.to_string(),
+        trust_floor.to_string(),
+        policy_fingerprint_v2.as_str().to_string(),
+    ] {
+        let length = u32::try_from(value.len()).unwrap_or(u32::MAX);
         hasher.update(length.to_be_bytes());
-        hasher.update(value);
+        hasher.update(value.as_bytes());
     }
     let hash = hex::encode(hasher.finalize());
     format!("procedure_candidate:v{V2_IDENTITY_VERSION}:{hash}")
@@ -171,19 +184,55 @@ mod tests {
 
     #[test]
     fn deterministic_candidate_id_v2_ignores_legacy_partition_metadata() {
+        use crate::models::claim::PolicyFingerprint;
+
         let legacy_org = deterministic_candidate_id("test", "org", Some("p1"), "task:1");
         let legacy_private = deterministic_candidate_id("test", "private", Some("p2"), "task:1");
         assert_ne!(legacy_org, legacy_private);
 
-        let id1 = deterministic_candidate_id_v2("test", "task:1");
-        let id2 = deterministic_candidate_id_v2("test", "task:1");
+        let policy = PolicyFingerprint::compute_v2(&[]);
+        let id1 = deterministic_candidate_id_v2("task:1", "lifecycle_evidence", &policy);
+        let id2 = deterministic_candidate_id_v2("task:1", "lifecycle_evidence", &policy);
         assert_eq!(id1, id2);
         assert!(id1.starts_with("procedure_candidate:v2:"));
 
-        let other_namespace = deterministic_candidate_id_v2("other", "task:1");
-        let other_task = deterministic_candidate_id_v2("test", "task:2");
-        assert_ne!(id1, other_namespace);
+        // Active Namespace is implicit; the same tuple must yield the same ID
+        // regardless of storage namespace (so the formula is portable).
+        let other_task = deterministic_candidate_id_v2("task:2", "lifecycle_evidence", &policy);
+        let other_trust = deterministic_candidate_id_v2("task:1", "verified_connector", &policy);
+        let other_policy = deterministic_candidate_id_v2(
+            "task:1",
+            "lifecycle_evidence",
+            &PolicyFingerprint::compute_v2(&["confidential".to_string()]),
+        );
         assert_ne!(id1, other_task);
+        assert_ne!(id1, other_trust);
+        assert_ne!(id1, other_policy);
+    }
+
+    #[test]
+    fn deterministic_candidate_id_v2_pins_canonical_encoding() {
+        use crate::models::claim::PolicyFingerprint;
+        use sha2::{Digest, Sha256};
+
+        // Reproduce the documented tuple/encoding by hand and compare.
+        let policy = PolicyFingerprint::compute_v2(&[]);
+        let mut hasher = Sha256::new();
+        for value in [
+            "2".to_string(),
+            "task:1".to_string(),
+            "lifecycle_evidence".to_string(),
+            policy.as_str().to_string(),
+        ] {
+            let length = u32::try_from(value.len()).unwrap_or(u32::MAX);
+            hasher.update(length.to_be_bytes());
+            hasher.update(value.as_bytes());
+        }
+        let expected = format!("procedure_candidate:v2:{}", hex::encode(hasher.finalize()));
+        assert_eq!(
+            deterministic_candidate_id_v2("task:1", "lifecycle_evidence", &policy),
+            expected
+        );
     }
 
     #[test]

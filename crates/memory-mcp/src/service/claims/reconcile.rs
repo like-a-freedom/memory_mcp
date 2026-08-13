@@ -235,7 +235,14 @@ fn validity_relation(left: &Claim, right: &Claim) -> ValidityRelation {
 }
 
 fn source_gate(left: &Claim, right: &Claim) -> bool {
+    // ADR-0008: automatic correction/supersession requires continuity within
+    // the same source lineage. Without a source-authority registry, the only
+    // available gate is a matching, present lineage identifier on both sides.
     left.source_fact_id != right.source_fact_id
+        && match (&left.source_lineage, &right.source_lineage) {
+            (Some(l), Some(r)) => l == r,
+            _ => false,
+        }
 }
 
 fn correction_evidence(left: &Claim, right: &Claim) -> bool {
@@ -504,6 +511,11 @@ mod tests {
         }
     }
 
+    fn with_lineage(mut claim: Claim, lineage: Option<&str>) -> Claim {
+        claim.source_lineage = lineage.map(str::to_string);
+        claim
+    }
+
     fn default_input<'a>(left: &'a Claim, right: &'a Claim) -> ReconciliationInput<'a> {
         static DEFAULT_ALIASES: std::sync::OnceLock<ConfirmedAliasSet> = std::sync::OnceLock::new();
         let aliases = DEFAULT_ALIASES.get_or_init(ConfirmedAliasSet::default);
@@ -767,6 +779,83 @@ mod tests {
     fn correction_with_source_gate() {
         let mut quals_left = BTreeMap::new();
         quals_left.insert("correction".to_string(), "true".to_string());
+        let left = with_lineage(
+            make_claim_with_fact(
+                "a",
+                ClaimValue::Boolean(false),
+                "personal",
+                None,
+                quals_left,
+                None,
+                None,
+                "fact:old",
+            ),
+            Some("lineage:shared"),
+        );
+        let right = with_lineage(
+            make_claim_with_fact(
+                "b",
+                ClaimValue::Boolean(true),
+                "personal",
+                None,
+                BTreeMap::new(),
+                None,
+                None,
+                "fact:new",
+            ),
+            Some("lineage:shared"),
+        );
+        let input = default_input(&left, &right);
+        match reconcile(&input) {
+            ReconciliationDecision::Persist(draft) => {
+                assert_eq!(draft.outcome, ClaimRelationOutcome::Correction);
+                assert_eq!(draft.reason_code, ReconciliationReasonCode::Correction);
+            }
+            other => panic!("expected Persist(Correction), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn correction_requires_matching_source_lineage() {
+        let mut quals_left = BTreeMap::new();
+        quals_left.insert("correction".to_string(), "true".to_string());
+        let left = with_lineage(
+            make_claim_with_fact(
+                "a",
+                ClaimValue::Boolean(false),
+                "personal",
+                None,
+                quals_left,
+                None,
+                None,
+                "fact:old",
+            ),
+            Some("lineage:a"),
+        );
+        let right = with_lineage(
+            make_claim_with_fact(
+                "b",
+                ClaimValue::Boolean(true),
+                "personal",
+                None,
+                BTreeMap::new(),
+                None,
+                None,
+                "fact:new",
+            ),
+            Some("lineage:b"),
+        );
+        let input = default_input(&left, &right);
+        assert!(
+            !matches!(reconcile(&input), ReconciliationDecision::Persist(ref d) if d.reason_code == ReconciliationReasonCode::Correction)
+        );
+    }
+
+    #[test]
+    fn correction_requires_present_source_lineage() {
+        let mut quals_left = BTreeMap::new();
+        quals_left.insert("correction".to_string(), "true".to_string());
+        // Both lineages absent → no automatic correction (ADR-0008).
         let left = make_claim_with_fact(
             "a",
             ClaimValue::Boolean(false),
@@ -788,38 +877,40 @@ mod tests {
             "fact:new",
         );
         let input = default_input(&left, &right);
-        match reconcile(&input) {
-            ReconciliationDecision::Persist(draft) => {
-                assert_eq!(draft.outcome, ClaimRelationOutcome::Correction);
-                assert_eq!(draft.reason_code, ReconciliationReasonCode::Correction);
-            }
-            other => panic!("expected Persist(Correction), got {:?}", other),
-        }
+        assert!(
+            !matches!(reconcile(&input), ReconciliationDecision::Persist(ref d) if d.reason_code == ReconciliationReasonCode::Correction)
+        );
     }
 
     #[test]
     fn supersession_with_transition_and_source_gate() {
         let mut quals_left = BTreeMap::new();
         quals_left.insert("transition".to_string(), "phase2".to_string());
-        let left = make_claim_with_fact(
-            "a",
-            ClaimValue::Text(NormalizedText::new("old value")),
-            "personal",
-            None,
-            quals_left,
-            None,
-            None,
-            "fact:old",
+        let left = with_lineage(
+            make_claim_with_fact(
+                "a",
+                ClaimValue::Text(NormalizedText::new("old value")),
+                "personal",
+                None,
+                quals_left,
+                None,
+                None,
+                "fact:old",
+            ),
+            Some("lineage:shared"),
         );
-        let right = make_claim_with_fact(
-            "b",
-            ClaimValue::Text(NormalizedText::new("new value")),
-            "personal",
-            None,
-            BTreeMap::new(),
-            None,
-            None,
-            "fact:new",
+        let right = with_lineage(
+            make_claim_with_fact(
+                "b",
+                ClaimValue::Text(NormalizedText::new("new value")),
+                "personal",
+                None,
+                BTreeMap::new(),
+                None,
+                None,
+                "fact:new",
+            ),
+            Some("lineage:shared"),
         );
         let input = default_input(&left, &right);
         match reconcile(&input) {

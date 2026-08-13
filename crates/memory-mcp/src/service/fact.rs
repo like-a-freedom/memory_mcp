@@ -214,7 +214,8 @@ impl FactService {
         let entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
             ctx.find_entity_records_by_ids(&entity_links).await?;
 
-        // Pre-fetch episode source_id.
+        // Pre-fetch episode source_id; also serves as the ADR-0008 source
+        // lineage for claim projection (the connector's stable record identifier).
         let (episode_record, _) = ctx.find_episode_record(source_episode).await?;
         let episode_source_id = episode_record
             .as_ref()
@@ -318,6 +319,7 @@ impl FactService {
             policy_tags: &policy_tags,
             entity_links: &claim_entity_links,
             t_valid: claim_t_valid,
+            source_lineage: episode_source_id.as_deref(),
         };
         match claim_svc.after_fact_persisted(&claim_params).await {
             Ok(summary) => claim_svc.record_post_fact_success(

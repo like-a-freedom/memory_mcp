@@ -29,6 +29,22 @@
 > SurrealDB permission/concurrent-migration verification, and Linux CI remain open;
 > the eval commands were run without baselines because none exist in this branch.
 >
+> **Code-review fixes (2026-08-13):** (1) Implemented the ADR-0008 same-lineage
+> `source_gate` (plan Task 12 step 7): automatic correction/supersession now
+> requires differing source facts AND a matching, present `source_lineage` on both
+> sides. `source_lineage` is populated from the normalized episode `source_id`
+> (the connector's stable record identifier); missing/different lineage falls
+> through to contradiction/temporal ambiguity, never automatic invalidation. The
+> five correction/supersession eval cases were rebased so setup and source share
+> one `source_id`, and the claim suite lineage map now merges fact IDs. (2)
+> Corrected `deterministic_candidate_id_v2` to the documented canonical tuple
+> `(identity_version=2, task_fingerprint, trust_floor, policy_fingerprint_v2)`
+> with `u32` length prefixes and an implicit Active Namespace (previously it
+> hashed only namespace+task with `u64` prefixes). (3) Recorded that
+> `claim.namespace`/`claim_job.namespace` remain required audit/provenance
+> columns (never routing inputs) — see the compatibility matrix's "Stored
+> namespace metadata" section.
+>
 > **Relationship to existing work:** Tasks 1–9 of
 > [Zero-Config Runtime Onboarding](2026-08-04-zero-config-defaults.md) shipped at
 > `97a3edd8` with the then-current default namespace `org` and plural
@@ -678,6 +694,10 @@ quarantine, authority, or bounded-growth guarantee.
 
 1. Remove scope/project/namespace fields from current claim and relation domain
    types where namespace is implicit in storage. Keep optional legacy DTO fields.
+   **Recorded deviation:** `claim.namespace` and `claim_job.namespace` remain
+   required, written audit/provenance columns (never routing inputs, never
+   hashed into identity). See the compatibility matrix's "Stored namespace
+   metadata" section.
 2. Change `PolicyFingerprint::compute` to a versioned v2 policy over sorted
    `policy_tags` only. An absent tag policy is not equivalent to a fabricated
    scope.

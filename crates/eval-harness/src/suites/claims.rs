@@ -423,7 +423,10 @@ impl EvalSuite for ClaimReconciliationSuite {
                 .await
                 {
                     Ok((_extraction, extracted)) => {
-                        lineage.insert(extracted.source_id, extracted.fact_ids);
+                        lineage
+                            .entry(extracted.source_id)
+                            .or_default()
+                            .extend(extracted.fact_ids);
                     }
                     Err(err) => {
                         setup_failed = true;

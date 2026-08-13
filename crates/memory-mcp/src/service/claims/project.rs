@@ -43,6 +43,10 @@ pub(crate) struct FactPersistedParams<'a> {
     pub policy_tags: &'a [String],
     pub entity_links: &'a [String],
     pub t_valid: chrono::DateTime<chrono::Utc>,
+    /// Stable source-lineage identifier from the episode's source identity.
+    /// Populated from the episode `source_id`; `None` means no lineage was
+    /// recorded, so automatic correction/supersession is not authorized.
+    pub source_lineage: Option<&'a str>,
 }
 
 impl ClaimService {
@@ -146,7 +150,13 @@ impl ClaimService {
                 valid_from: draft.valid_from,
                 valid_to: draft.valid_to,
                 validity_source: draft.validity_source,
-                source_lineage: draft.source_lineage.clone(),
+                // ADR-0008 lineage gate: a present, normalized source lineage is
+                // the only available authority for automatic correction/supersession.
+                source_lineage: params
+                    .source_lineage
+                    .map(str::trim)
+                    .filter(|lineage| !lineage.is_empty())
+                    .map(str::to_string),
             };
 
             let claim = build_claim(ClaimBuildInput {
@@ -365,6 +375,7 @@ mod tests {
             policy_tags: &[],
             entity_links: &[],
             t_valid: chrono::Utc::now(),
+            source_lineage: None,
         }
     }
 

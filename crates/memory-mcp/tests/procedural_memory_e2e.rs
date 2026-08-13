@@ -83,10 +83,18 @@ fn deterministic_ids_and_evidence() {
     let id3 = deterministic_candidate_id("test", "org", Some("p"), "task:2");
     assert_ne!(id1, id3);
 
-    let v2_id = deterministic_candidate_id_v2("test", "task:1");
+    let v2_id = deterministic_candidate_id_v2(
+        "task:1",
+        "lifecycle_evidence",
+        &memory_mcp::models::claim::PolicyFingerprint::compute_v2(&[]),
+    );
     assert_eq!(
         v2_id,
-        deterministic_candidate_id_v2("test", "task:1"),
+        deterministic_candidate_id_v2(
+            "task:1",
+            "lifecycle_evidence",
+            &memory_mcp::models::claim::PolicyFingerprint::compute_v2(&[]),
+        ),
         "v2 identity is independent of legacy scope/project metadata"
     );
     assert!(v2_id.starts_with("procedure_candidate:v2:"));
