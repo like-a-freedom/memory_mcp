@@ -8,16 +8,18 @@ help is authoritative.
 
 | Command | Required input |
 |---|---|
-| `memory_mcp ingest` | `--source-type`, `--source-id`, `--content`, `--t-ref`; pass `--scope` explicitly |
+| `memory_mcp ingest` | `--source-type`, `--source-id`, `--content`, `--t-ref`; optional repeatable `--policy-tag` |
 | `memory_mcp extract` | `--episode-id`, or inline content plus its source metadata |
 | `memory_mcp resolve` | `--entity-type`, `--canonical-name`; aliases are repeatable |
-| `memory_mcp assemble-context` | `--query`; pass `--scope` explicitly |
+| `memory_mcp assemble-context` | `--query`; optional fact type, `as_of`, budget, view mode, temporal windows |
 | `memory_mcp explain` | `--context-items` containing the JSON array from assembly |
 | `memory_mcp invalidate` | `--fact-id`, `--reason`, `--t-invalid` |
 
 Flag names are kebab-case forms of the shared snake_case parameter names.
-Repeatable values use repeated flags. Optional assembly controls include project,
-fact type, `as_of`, budget, view mode, and temporal windows.
+Repeatable values use repeated flags. Optional assembly controls include fact
+type, `as_of`, budget, view mode, and temporal windows. No ordinary command
+accepts a `--scope`, `--project`, or `--namespace` flag: the Active Namespace is
+server startup configuration and is never selected per command.
 
 One-shot commands print structured responses to stdout. Capture stderr and the
 exit status independently. Validation and configuration failures are terminal
@@ -31,8 +33,8 @@ therefore belongs to the canonicalize workflow, not read-only recall.
 
 - `memory_mcp serve` starts the stdio MCP server. With no subcommand, the binary
   also defaults to server mode.
-- `memory_mcp watch <DIR>` watches one resolved directory. Project, scope, and
-  polling interval are optional flags; pass policy-sensitive values explicitly.
+- `memory_mcp watch <DIR>` watches one resolved directory. Polling interval is
+  an optional flag.
 - `memory_mcp reembed` rebuilds fact embeddings. `--max-failures 0` is
   fail-fast; `--retry-failed` limits work to facts recorded as failed by a prior
   run.

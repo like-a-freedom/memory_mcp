@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Сделай shell-последовательность для сохранения проверенного решения через memory_mcp и честно определи итоговый статус.",
-      "expected_output": "Agent uses ingest then extract with explicit scope, separates stdout, stderr, and exit status, and classifies the structured result as verified, episode-only, or pending.",
+      "expected_output": "Agent uses ingest then extract, separates stdout, stderr, and exit status, and classifies the structured result as verified, episode-only, or pending.",
       "files": []
     },
     {

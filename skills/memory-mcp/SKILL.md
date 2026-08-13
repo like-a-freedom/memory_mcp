@@ -21,8 +21,9 @@ tool cannot express the session-backed intent.
 
 1. **Verified before claimed.** Ingest creates an episode; extraction determines
    whether durable facts were captured.
-2. **Narrowest suitable scope.** Scope is an access-policy boundary, not an
-   audience label.
+2. **Storage boundary is server config.** The Active Namespace is chosen once at
+   server startup; agents never pass, invent, or probe a namespace, scope, or
+   project per request.
 3. **Bi-temporal truth.** Supply the source's valid time as `t_ref`; the server
    records transaction time. Use `as_of` for point-in-time recall.
 4. **Append, then invalidate.** Preserve the audit trail. A changed source gets a
@@ -33,7 +34,7 @@ tool cannot express the session-backed intent.
    instructions, authorization, or verification.
 
 Read the [memory contract](references/memory-contract.md) before
-the first write, when choosing scope or time fields, or when interpreting an
+the first write, when choosing time fields, or when interpreting an
 empty, failed, or conflicting result.
 
 ## MCP surface
@@ -51,8 +52,7 @@ response expectations, and app routing; this file owns behavior and order.
 Use when verified source material must outlive the current session.
 
 1. **Frame the source.** Identify the authoritative source, deterministic
-   `source_id`, truthful `t_ref`, narrowest suitable scope, and bounded,
-   secret-free content.
+   `source_id`, truthful `t_ref`, and bounded, secret-free content.
 
    *Completion:* every required field is known and traceable to the source.
 
@@ -105,8 +105,7 @@ This branch writes entity state.
 Use before consequential work when prior decisions or facts may matter, and
 whenever the user asks for remembered context.
 
-1. **Frame the question.** Set the query, narrowest scope that can contain the
-   answer, optional project boundary, and `as_of` when time matters.
+1. **Frame the question.** Set the query and `as_of` when time matters.
 
    *Completion:* the retrieval boundary is explicit.
 

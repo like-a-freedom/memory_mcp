@@ -15,6 +15,29 @@ make eval-release
 make eval-nightly
 ```
 
+## Approved baselines
+
+Approved `RunArtifact` baselines live under `evals/baselines/` and are passed to
+`memory-eval run --baseline`. The PR and release `make` targets already pass
+them, so regression budgets are enforced against the approved state:
+
+```bash
+cargo run -p eval-harness --bin memory-eval -- run \
+  --profile evals/profiles/pr.json \
+  --artifact target/evals/one-active-namespace-pr.json \
+  --baseline evals/baselines/one-active-namespace-pr.json
+
+cargo run -p eval-harness --bin memory-eval -- run \
+  --profile evals/profiles/release.json \
+  --artifact target/evals/one-active-namespace-release.json \
+  --baseline evals/baselines/one-active-namespace-release.json
+```
+
+Baselines are frozen approved artifacts. Replacing one requires review,
+before/after evidence, and a reason (see the plan's final validation gate).
+A baseline that no longer matches the live profiles should be re-approved
+rather than silently dropped from the command.
+
 ## Merging Shard Artifacts
 
 Run profiles in shards (one `memory-eval run --suite ...` per shard), then merge:

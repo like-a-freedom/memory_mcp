@@ -24,10 +24,13 @@
 > (`ret-051..055`) and one stale claim case (`cr-021`, an impossible
 > `project=zeus` qualifier duplicate of `cr-001`) were removed; profile coverage
 > counts updated. The entity-extraction projection write path now omits `scope`,
-> matching the `triple` precedent from migration `037`. The distributed memory-mcp
-> skill, approved pre-change eval baselines (`evals/baselines/`), remote
-> SurrealDB permission/concurrent-migration verification, and Linux CI remain open;
-> the eval commands were run without baselines because none exist in this branch.
+> matching the `triple` precedent from migration `037`. Approved PR/release eval
+> baselines are frozen under `evals/baselines/` with a dated review note in
+> `docs/evals/BASELINE_REVIEW_2026-08-13-one-active-namespace.md`; `make eval-pr`
+> and `make eval-release` enforce them. Repository-owned copies of the
+> `memory-mcp`/`memory-cli` skills are updated to the scope-free contract. Remote
+> SurrealDB permission/concurrent-migration verification, Linux CI, and global
+> skill-directory publication remain open.
 >
 > **Code-review fixes (2026-08-13):** (1) Implemented the ADR-0008 same-lineage
 > `source_gate` (plan Task 12 step 7): automatic correction/supersession now
@@ -1240,7 +1243,7 @@ these occur:
 
 ## Completion checklist
 
-- [x] Frozen legacy `org` fixture exists; reviewed PR/release baselines remain open (no `evals/baselines/` in this branch).
+- [x] Frozen legacy `org` fixture exists (executable `zero_config_embedded` subprocess tests); PR/release baselines approved under `evals/baselines/` with the dated review note in `docs/evals/BASELINE_REVIEW_2026-08-13-one-active-namespace.md`.
 - [x] Migration execution checks all statement results and is crash/concurrency safe.
 - [x] Initial-schema conflicts are narrowly classified and final schema postconditions are verified; migration `034` repairs edge provenance validity.
 - [x] New append-only migration `032` supports read-old/write-new without bulk source rewrites; migrations `033` and `034` extend compatibility/validity without source rewrites.
@@ -1259,12 +1262,12 @@ these occur:
 - [x] MCP exposes exactly eight scope-free tools with exact schemas and strict legacy-key rejection.
 - [x] Ordinary CLI, watch, hidden lifecycle, apps, and hooks are scope-free and reject legacy inputs non-mutatingly.
 - [x] Real subprocess switching proves `main` and another namespace remain isolated across restarts.
-- [x] PR/release eval artifacts pass exact coverage, validity, gates, and time limits (run without approved baselines; baseline budgets unverified because `evals/baselines/` does not exist in this branch).
+- [x] PR/release eval artifacts pass exact coverage, validity, gates, regression budgets against approved baselines, and time limits (verified with `--baseline evals/baselines/…`).
 - [x] Release-binary TTV succeeds with p90 total ≤ 300 seconds (median 0.78 s, p90 1.53 s).
 - [ ] Linux and macOS strict clippy, workspace tests/build, and release smoke tests pass (macOS gates verified locally; Linux CI pending).
 - [ ] README, examples, ADRs, glossary, system/security/contradiction docs, hooks, generated config, and skill agree.
   Repository-owned docs are synchronized with the implemented boundary; distributed
-  skill publication and remote/evaluation evidence are still open.
+  skill publication (global skill directory) and remote/evaluation evidence are still open.
 - [ ] Compatible distributed skill/hooks are published before or atomically with the hard-break server.
 
 ## Plan self-review

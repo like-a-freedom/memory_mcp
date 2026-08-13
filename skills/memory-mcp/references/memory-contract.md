@@ -1,6 +1,6 @@
 # Memory Contract
 
-Load this reference before a write, when choosing scope or time boundaries, or
+Load this reference before a write, when choosing time boundaries, or
 when recovering from a non-success result. Live MCP schemas remain authoritative
 for accepted fields and enums.
 
@@ -15,15 +15,16 @@ for accepted fields and enums.
 - Changed evidence gets a new source identity. Superseded facts are invalidated,
   never deleted.
 
-## Scope
+## Storage boundary
 
-Choose from the content's access policy: `personal` for owner-only, `team` for a
-defined working group, `org` for organization-wide access, and
-`private-domain:<domain>` for a configured sensitive domain. When two fit,
-choose the narrower. Empty recall is not authority to widen.
+One Active Namespace is bound at server startup (environment configuration, not
+per-request input). No tool accepts a `scope`, `project`, or `namespace`
+argument, and none should be invented or probed. `policy_tags` on ingest are
+the content-governance mechanism: tag sources so recall-time policy filtering
+has evidence to work with. Empty recall is not authority to widen a boundary.
 
 Credentials never enter memory. Sensitive business data is eligible only when
-the configured private-domain policy explicitly permits it.
+the server's configured policy explicitly permits it.
 
 ## Time
 
@@ -53,7 +54,6 @@ not absence from reality.
 - Empty extraction: report `episode-only`.
 - Failure or timeout: preserve identifiers, report `pending`, and retry only
   according to returned guidance and idempotency guarantees.
-- Scope denial: stop at the denied boundary.
 - Empty recall: reframe terms within the same authorized boundary.
 
 After a mutation, require a response or subsequent read that demonstrates

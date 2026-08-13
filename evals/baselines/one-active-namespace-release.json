@@ -1,0 +1,3249 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1786646247",
+  "profile": "release",
+  "started_at": "2026-08-13T18:37:27.422882Z",
+  "duration_ms": 4178,
+  "expected_case_ids": [
+    "cr-001",
+    "cr-002",
+    "cr-003",
+    "cr-004",
+    "cr-005",
+    "cr-006",
+    "cr-007",
+    "cr-008",
+    "cr-009",
+    "cr-010",
+    "cr-011",
+    "cr-012",
+    "cr-013",
+    "cr-014",
+    "cr-015",
+    "cr-016",
+    "cr-017",
+    "cr-018",
+    "cr-019",
+    "cr-020",
+    "cr-022",
+    "cr-023",
+    "cr-024",
+    "cr-025",
+    "cr-026",
+    "cr-027",
+    "cr-028",
+    "cr-029",
+    "cr-030",
+    "cr-031",
+    "cr-032",
+    "cr-033",
+    "cr-034",
+    "cr-035",
+    "cr-036",
+    "cr-037",
+    "cr-038",
+    "cr-039",
+    "cr-040",
+    "cr-041",
+    "cr-042",
+    "ext-001",
+    "ext-002",
+    "ext-003",
+    "ext-004",
+    "ext-005",
+    "ext-006",
+    "ext-007",
+    "ext-008",
+    "ext-009",
+    "first-person-rescue-profile",
+    "graph-anchor-alice-neighbor",
+    "lifecycle-action-grounding",
+    "lifecycle-capacity",
+    "lifecycle-poisoning",
+    "lifecycle-public-surface",
+    "longmemeval-cleaned:eval-mini-001",
+    "longmemeval-cleaned:eval-mini-002",
+    "ret-001",
+    "ret-002",
+    "ret-003",
+    "ret-004",
+    "ret-005",
+    "ret-006",
+    "ret-007",
+    "ret-008",
+    "ret-009",
+    "ret-010",
+    "ret-011",
+    "ret-012",
+    "ret-013",
+    "ret-014",
+    "ret-015",
+    "ret-016",
+    "ret-017",
+    "ret-018",
+    "ret-019",
+    "ret-020",
+    "ret-021",
+    "ret-022",
+    "ret-023",
+    "ret-024",
+    "ret-025",
+    "ret-026",
+    "ret-027",
+    "ret-028",
+    "ret-029",
+    "ret-030",
+    "ret-031",
+    "ret-032",
+    "ret-033",
+    "ret-034",
+    "ret-035",
+    "ret-036",
+    "ret-037",
+    "ret-038",
+    "ret-039",
+    "ret-040",
+    "ret-041",
+    "ret-042",
+    "ret-043",
+    "ret-044",
+    "ret-045",
+    "ret-046",
+    "ret-047",
+    "ret-048",
+    "ret-049",
+    "ret-050",
+    "ret-056",
+    "ret-057",
+    "ret-058",
+    "ret-059",
+    "ret-060",
+    "ret-061",
+    "ret-062",
+    "ret-063",
+    "timeline-auto-atlas-history"
+  ],
+  "expected_cases": [],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-003"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-004"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-005"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-006"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-007"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-008"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-009"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-010"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-011"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-012"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-013"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-014"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-016"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-017"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 27,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-018"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 29,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-019"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-020"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-022"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-023"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 27,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-024"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-025"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-026"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 29,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-027"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-028"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-029"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-030"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-031"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-032"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-033"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-034"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-035"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 29,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-036"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-037"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-038"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-039"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 28,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-040"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 1.0,
+        "predicted_warnings": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-041"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-042"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_warnings": 0.0,
+        "predicted_warnings": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 27,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "external-retrieval",
+        "case_id": "longmemeval-cleaned:eval-mini-001"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "query_ms": 2.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "external-retrieval",
+        "case_id": "longmemeval-cleaned:eval-mini-002"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "query_ms": 3.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.0,
+        "entity_precision": 0.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 0,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 42,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-003"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.5,
+        "entity_precision": 0.3333333333333333,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-004"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.5,
+        "entity_precision": 0.3333333333333333,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-005"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "entity_precision": 0.5,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 1,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-006"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-007"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-008"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 29,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-009"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.8,
+        "entity_precision": 0.6666666666666666,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 1,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 35,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "lifecycle",
+        "case_id": "lifecycle-action-grounding"
+      },
+      "mode": "lifecycle",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {},
+      "evidence": {
+        "action_grounding": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 110,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "lifecycle",
+        "case_id": "lifecycle-capacity"
+      },
+      "mode": "lifecycle",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {},
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 198,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "lifecycle",
+        "case_id": "lifecycle-poisoning"
+      },
+      "mode": "lifecycle",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {},
+      "evidence": {
+        "poisoning": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 290,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "lifecycle",
+        "case_id": "lifecycle-public-surface"
+      },
+      "mode": "lifecycle",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {},
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 290,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "first-person-rescue-profile"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 0.5,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 0.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 2,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "graph-anchor-alice-neighbor"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-001"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 70,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-002"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-003"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-004"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-005"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-006"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-007"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-008"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-009"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-010"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-011"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-012"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-013"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-014"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-015"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-016"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-017"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-018"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 35,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-019"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-020"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-021"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-022"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-023"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-024"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-025"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-026"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-027"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-028"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-029"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-030"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-031"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-032"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-033"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-034"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-035"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-036"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-037"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 30,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-038"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-039"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-040"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-041"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-042"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-043"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-044"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-045"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-046"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-047"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-048"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-049"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-050"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-056"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-057"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-058"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-059"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-060"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-061"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 67,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-062"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 58,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-063"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "timeline-auto-atlas-history"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 2,
+          "hits_at_k": 2,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "local-retrieval",
+      "mode": "retrieval_only",
+      "total": 61,
+      "passed": 61,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "mrr": 0.9918032786885246,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 0.9836065573770492
+      }
+    },
+    {
+      "suite_id": "extraction",
+      "mode": "end_to_end",
+      "total": 9,
+      "passed": 9,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "entity_f1": 0.7499999999999999,
+        "entity_precision": 0.6,
+        "entity_recall": 1.0
+      }
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "mode": "end_to_end",
+      "total": 41,
+      "passed": 41,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "claim_f1": 1.0,
+        "claim_precision": 1.0,
+        "claim_recall": 1.0
+      }
+    },
+    {
+      "suite_id": "lifecycle",
+      "mode": "lifecycle",
+      "total": 4,
+      "passed": 4,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "action_grounding_pass_rate": 1.0,
+        "poisoning_pass_rate": 1.0
+      }
+    },
+    {
+      "suite_id": "external-retrieval",
+      "mode": "retrieval_only",
+      "total": 2,
+      "passed": 2,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "mrr": 1.0,
+        "recall_at_5": 1.0,
+        "top_1_hit_rate": 1.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "local-retrieval",
+      "metric": "recall_at_5",
+      "observed": 1.0,
+      "hard_floor": 0.9,
+      "baseline": null,
+      "regression_budget": 0.05,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "metric": "mrr",
+      "observed": 0.9918032786885246,
+      "hard_floor": 0.85,
+      "baseline": null,
+      "regression_budget": 0.05,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "metric": "top_1_hit_rate",
+      "observed": 0.9836065573770492,
+      "hard_floor": 0.8,
+      "baseline": null,
+      "regression_budget": 0.05,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "extraction",
+      "metric": "entity_f1",
+      "observed": 0.7499999999999999,
+      "hard_floor": 0.7,
+      "baseline": null,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "metric": "claim_precision",
+      "observed": 1.0,
+      "hard_floor": 0.8,
+      "baseline": null,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "metric": "claim_recall",
+      "observed": 1.0,
+      "hard_floor": 0.9,
+      "baseline": null,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "lifecycle",
+      "metric": "action_grounding_pass_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "lifecycle",
+      "metric": "poisoning_pass_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "external-retrieval",
+      "metric": "recall_at_5",
+      "observed": 1.0,
+      "hard_floor": 0.9,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "1.97.1",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "uncomputed",
+    "git_commit": null,
+    "evaluator_versions": {},
+    "profile_digest": "uncomputed"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

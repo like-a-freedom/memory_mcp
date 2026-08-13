@@ -1,6 +1,6 @@
 # Memory Contract
 
-Load this reference before a write, when choosing scope or time boundaries, or
+Load this reference before a write, when choosing time boundaries, or
 when recovering from a non-success result. Live CLI help remains authoritative
 for accepted flags and values.
 
@@ -16,17 +16,16 @@ for accepted flags and values.
 - Changed evidence gets a new source identity. Superseded facts are invalidated,
   never deleted.
 
-## Scope
+## Storage boundary
 
-Choose from the content's access policy: `personal` for owner-only, `team` for a
-defined working group, `org` for organization-wide access, and
-`private-domain:<domain>` for a configured sensitive domain. Pass scope
-explicitly: a CLI default is not a policy decision. Empty recall is not
-authority to widen.
+One Active Namespace is bound at server startup (environment configuration, not
+per-command input). No ordinary command accepts a `--scope`, `--project`, or
+`--namespace` flag, and none should be invented or probed. Use repeatable
+`--policy-tag` on ingest for content governance so recall-time policy filtering
+has evidence to work with. Empty recall is not authority to widen a boundary.
 
 Credentials never enter arguments or persisted content. Sensitive business data
-is eligible only when the configured private-domain policy explicitly permits
-it.
+is eligible only when the server's configured policy explicitly permits it.
 
 ## Time and results
 
@@ -48,7 +47,6 @@ than the structured response provides.
 - Empty extraction: report `episode-only`.
 - Nonzero exit or invalid structured output: preserve identifiers and report
   `pending`.
-- Scope denial: stop at the denied boundary.
 - Empty recall: reframe terms within the same authorized boundary.
 
 After a mutation, require structured output or a subsequent read that

@@ -24,8 +24,9 @@ Choose one branch before running a command:
 
 1. **Verified before claimed.** `ingest` alone records an episode; `extract`
    establishes the durable-fact outcome.
-2. **Narrowest suitable scope.** Defaults are convenience values, not policy
-   decisions. Pass the intended scope explicitly.
+2. **Storage boundary is server config.** The Active Namespace is chosen once at
+   server startup; commands never pass, invent, or probe a namespace, scope, or
+   project.
 3. **Bi-temporal truth.** Use the source's time for `--t-ref`; use `--as-of` for
    historical recall.
 4. **Append, then invalidate.** Preserve source identity and the audit trail.
@@ -35,7 +36,7 @@ Choose one branch before running a command:
    state; verify its response or a subsequent read.
 
 Read the [memory contract](references/memory-contract.md) before
-the first write, when choosing scope or time fields, or when interpreting an
+the first write, when choosing time fields, or when interpreting an
 empty, failed, or conflicting result.
 
 Read the [CLI command reference](references/commands.md) before constructing a
@@ -45,8 +46,7 @@ Exact flags remain behind that pointer; this file owns behavior and order.
 ## Workflow: one-shot capture
 
 1. **Frame the source.** Establish the authoritative source, stable
-   `source_id`, truthful reference time, explicit scope, and bounded,
-   secret-free content.
+   `source_id`, truthful reference time, and bounded, secret-free content.
 
    *Completion:* every required value is traceable and safe to place on the
    command line in the current environment.
@@ -84,7 +84,7 @@ leave the operation `pending`.
 
 ## Workflow: one-shot recall
 
-1. Frame the query, explicit scope, project boundary, and time boundary.
+1. Frame the query and time boundary.
 2. Run `memory_mcp assemble-context` and parse the complete JSON envelope.
 3. Run `memory_mcp explain` for every item used as evidence.
 
@@ -103,7 +103,7 @@ or startup is reported failed with the process status and diagnostic.
 
 ## Workflow: watch
 
-1. Resolve the exact directory, project, and explicit scope.
+1. Resolve the exact directory to watch.
 2. Start `memory_mcp watch` only after confirming continuous ingestion is
    intended.
 3. Observe per-file results; distinguish successful episode creation, empty
