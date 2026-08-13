@@ -20,7 +20,6 @@ struct ExtractionEvalCase {
     description: String,
     source_type: String,
     source_id: String,
-    scope: String,
     content: String,
     #[serde(default)]
     setup_episodes: Vec<SetupEpisode>,
@@ -71,7 +70,6 @@ fn warning_matches(expected: &ExpectedWarning, actual: &ContradictionWarning) ->
 
 async fn ingest_and_extract(
     service: &memory_mcp::service::MemoryService,
-    scope: &str,
     source_type: &str,
     source_id: &str,
     content: &str,
@@ -85,10 +83,7 @@ async fn ingest_and_extract(
             t_ref: "2026-04-07T10:00:00Z"
                 .parse::<DateTime<Utc>>()
                 .expect("static timestamp should parse"),
-            scope: scope.to_string(),
-            project: None,
             t_ingested: Some("2026-04-07T10:00:00Z".parse().expect("static timestamp")),
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -113,7 +108,6 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
     for setup in &case.setup_episodes {
         if let Err(err) = ingest_and_extract(
             &service,
-            &case.scope,
             &setup.source_type,
             &setup.source_id,
             &setup.content,
@@ -136,32 +130,26 @@ async fn run_case(case: &ExtractionEvalCase) -> EvalCaseOutcome {
         }
     }
 
-    let extraction = match ingest_and_extract(
-        &service,
-        &case.scope,
-        &case.source_type,
-        &case.source_id,
-        &case.content,
-    )
-    .await
-    {
-        Ok(result) => result,
-        Err(err) => {
-            return EvalCaseOutcome {
-                case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
-                mode: EvalMode::EndToEnd,
-                split: CorpusSplit::Development,
-                label_trust: LabelTrust::Official,
-                status: CaseStatus::Invalid,
-                metrics: std::collections::BTreeMap::new(),
-                evidence: std::collections::BTreeMap::new(),
-                invalid_reason: Some(format!("extraction failed: {err}")),
-                failures: vec![],
-                duration_ms: start.elapsed().as_millis() as u64,
-                attempts: 1,
-            };
-        }
-    };
+    let extraction =
+        match ingest_and_extract(&service, &case.source_type, &case.source_id, &case.content).await
+        {
+            Ok(result) => result,
+            Err(err) => {
+                return EvalCaseOutcome {
+                    case_key: CaseKey::parse("extraction", case_id.as_str()).unwrap(),
+                    mode: EvalMode::EndToEnd,
+                    split: CorpusSplit::Development,
+                    label_trust: LabelTrust::Official,
+                    status: CaseStatus::Invalid,
+                    metrics: std::collections::BTreeMap::new(),
+                    evidence: std::collections::BTreeMap::new(),
+                    invalid_reason: Some(format!("extraction failed: {err}")),
+                    failures: vec![],
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    attempts: 1,
+                };
+            }
+        };
 
     let result = CaseResult {
         predicted_fact_types: extraction
@@ -376,7 +364,6 @@ mod tests {
             description: "test".into(),
             source_type: "chat".into(),
             source_id: "ext-warning-check-current".into(),
-            scope: "personal".into(),
             content: "Alice Smith reports ARR is $7M.".into(),
             setup_episodes: vec![SetupEpisode {
                 source_type: "chat".into(),

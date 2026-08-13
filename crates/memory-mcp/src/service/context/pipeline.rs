@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 use crate::service::decayed_confidence;
-use crate::service::error::{MemoryError, error_messages};
+use crate::service::error::MemoryError;
 use crate::service::log_event;
 use crate::service::service_context::ServiceContext;
 
@@ -46,7 +46,6 @@ pub(super) struct PreparedContextParams {
     pub cutoff: DateTime<Utc>,
     pub cutoff_iso: String,
     pub cleaned_query: String,
-    pub project_opt: Option<String>,
     pub fact_types: Vec<String>,
     pub query_terms: Vec<String>,
     pub resolved_view_mode_opt: Option<String>,
@@ -60,31 +59,19 @@ pub(super) async fn prepare_context_params(
     request: &AssembleContextRequest,
     access_opt: Option<AccessPayload>,
 ) -> Result<PreparedContextParams, MemoryError> {
-    if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation(
-            error_messages::SCOPE_REQUIRED.into(),
-        ));
-    }
-
     let cutoff = request.as_of.unwrap_or_else(super::super::query::now);
-    let access = access_opt.unwrap_or_else(|| AccessPayload {
-        allowed_scopes: Some(vec![request.scope.clone()]),
+    let access = access_opt.unwrap_or(AccessPayload {
         allowed_tags: None,
         caller_id: None,
         session_vars: None,
         transport: None,
         content_type: None,
-        cross_scope_allow: None,
     });
 
-    let namespace = service.namespace_for_scope(&request.scope)?;
+    let namespace = service.active_namespace.clone();
     let cutoff_iso = super::super::normalize_dt(cutoff);
     let cleaned_query = super::super::preprocess_search_query(&request.query);
-    let project_opt = request
-        .project
-        .as_deref()
-        .filter(|project| !project.trim().is_empty())
-        .map(str::to_string);
+
     let requested_view_mode = request
         .view_mode
         .as_deref()
@@ -118,10 +105,8 @@ pub(super) async fn prepare_context_params(
     let resolved_view_mode_opt = resolved_view_mode.as_option_str().map(str::to_string);
     let cache_key = CacheKey::new(
         &request.query,
-        &request.scope,
         cutoff,
         request.budget,
-        request.project.as_deref(),
         &request.fact_types,
         CacheView::new(
             resolved_view_mode.as_option_str(),
@@ -137,7 +122,6 @@ pub(super) async fn prepare_context_params(
         cutoff,
         cutoff_iso,
         cleaned_query,
-        project_opt,
         fact_types,
         query_terms,
         resolved_view_mode_opt,
@@ -174,7 +158,7 @@ pub(super) fn log_context_start(
     service.logger.log(
         log_event(
             "assemble_context.start",
-            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"query": request.query, "budget": request.budget}),
             json!({}),
             access,
             None,
@@ -238,44 +222,34 @@ pub(super) async fn assemble_default_context(
     let lexical_result = select_fact_records_for_query(
         service,
         FactQueryParams {
-            namespace: params.namespace,
-            scope: params.scope,
             cutoff_iso: params.cutoff_iso,
             query_opt: params.query_opt,
             limit: params.budget,
-            project: params.project_opt,
             fact_types: params.fact_types,
         },
     )
     .await?;
 
     let direct_retrieval_tier = lexical_result.retrieval_tier;
-    let mut direct_facts = filter_facts_by_constraints(
-        lexical_result.records,
-        params.access,
-        params.project_opt,
-        params.fact_types,
-    );
+    let mut direct_facts =
+        filter_facts_by_constraints(lexical_result.records, params.access, params.fact_types);
 
     let mut expanded_facts = Vec::new();
     let mut ranked_facts = if let Some(query) = params.query_opt {
         let temporal_facts = collect_temporal_facts(
             service,
             CollectTemporalFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff_iso: params.cutoff_iso,
                 cutoff: params.cutoff,
                 query,
                 access: params.access,
-                project: params.project_opt,
                 fact_types: params.fact_types,
                 budget: params.budget,
             },
         )
         .await?;
 
-        let expanded_queries = expand_query_with_aliases(service, query, params.namespace).await;
+        let expanded_queries = expand_query_with_aliases(service, query).await;
         let direct_fact_ids: HashSet<_> = direct_facts
             .iter()
             .chain(temporal_facts.iter())
@@ -289,22 +263,16 @@ pub(super) async fn assemble_default_context(
             let extra_records = select_fact_records_for_query(
                 service,
                 FactQueryParams {
-                    namespace: params.namespace,
-                    scope: params.scope,
                     cutoff_iso: params.cutoff_iso,
                     query_opt: Some(expanded_query),
                     limit: params.budget,
-                    project: params.project_opt,
                     fact_types: params.fact_types,
                 },
             )
             .await?;
-            for fact in filter_facts_by_constraints(
-                extra_records.records,
-                params.access,
-                params.project_opt,
-                params.fact_types,
-            ) {
+            for fact in
+                filter_facts_by_constraints(extra_records.records, params.access, params.fact_types)
+            {
                 if !direct_fact_ids.contains(&fact.fact_id) {
                     expanded_facts.push(fact);
                 }
@@ -327,10 +295,7 @@ pub(super) async fn assemble_default_context(
         let mut experience_facts = collect_recent_experience_facts(
             service,
             RecentExperienceRequest {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff: params.cutoff,
-                project: params.project_opt,
                 access: params.access,
                 budget: params.budget,
                 fact_types: params.fact_types,
@@ -352,15 +317,8 @@ pub(super) async fn assemble_default_context(
         }
 
         // Triple-expanded facts: facts linked via matching triples.
-        let triple_facts = collect_triple_facts(
-            service,
-            params.namespace,
-            params.scope,
-            params.cutoff_iso,
-            query,
-            params.budget,
-        )
-        .await?;
+        let triple_facts =
+            collect_triple_facts(service, params.cutoff_iso, query, params.budget).await?;
         for fact in triple_facts {
             if !base_direct_ids.contains(&fact.fact_id) {
                 expanded_facts.push(fact);
@@ -386,12 +344,9 @@ pub(super) async fn assemble_default_context(
         let graph_facts = collect_graph_facts(
             service,
             CollectGraphFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff_iso: params.cutoff_iso,
                 raw_query: query,
                 access: params.access,
-                project: params.project_opt,
                 fact_types: params.fact_types,
                 direct_fact_ids: &direct_fact_ids,
                 lexical_facts: &direct_facts,
@@ -412,12 +367,9 @@ pub(super) async fn assemble_default_context(
         let community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff_iso: params.cutoff_iso,
                 query,
                 access: params.access,
-                project: params.project_opt,
                 fact_types: params.fact_types,
                 direct_fact_ids: &all_direct_ids,
                 budget: params.budget,
@@ -438,12 +390,9 @@ pub(super) async fn assemble_default_context(
         let semantic_facts = collect_semantic_facts(
             service,
             CollectSemanticFactsRequest {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff: params.cutoff,
                 query,
                 access: params.access,
-                project: params.project_opt,
                 fact_types: params.fact_types,
                 excluded_fact_ids: &excluded_fact_ids,
                 budget: params.budget,
@@ -474,7 +423,6 @@ pub(super) async fn assemble_default_context(
                 semantic_facts,
                 query_opt: params.raw_query_opt,
                 semantic_available: service.embedding_service.embedding_provider().is_enabled(),
-                scope: params.scope,
                 cutoff: params.cutoff,
             },
             decayed_confidence,
@@ -491,7 +439,6 @@ pub(super) async fn assemble_default_context(
                 semantic_facts: Vec::new(),
                 query_opt: params.raw_query_opt,
                 semantic_available: service.embedding_service.embedding_provider().is_enabled(),
-                scope: params.scope,
                 cutoff: params.cutoff,
             },
             decayed_confidence,
@@ -509,7 +456,7 @@ pub(super) async fn assemble_default_context(
             return Ok(episode_fallback_items);
         }
 
-        unreachable!("ranked_facts is empty but no query provided")
+        return Ok(Vec::new());
     }
 
     apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
@@ -548,7 +495,7 @@ pub(super) async fn assemble_default_context(
         service.logger.log(
             log_event(
                 "assemble_context.episode_rescue",
-                json!({"scope": params.scope, "query": params.query_opt}),
+                json!({"namespace": params.namespace, "query": params.query_opt}),
                 build_episode_rescue_log_result(
                     episode_fallback_items.len(),
                     selected_ranked.len(),

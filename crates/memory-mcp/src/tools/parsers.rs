@@ -37,7 +37,6 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                     content: String::new(),
                     quote: String::new(),
                     source_episode: s.trim().to_string(),
-                    scope: None,
                     t_ref: None,
                     t_ingested: None,
                     provenance: Value::Null,
@@ -72,7 +71,6 @@ pub fn parse_context_items(raw: &str) -> Result<Vec<ExplainItem>, String> {
                         content,
                         quote,
                         source_episode,
-                        scope: None,
                         t_ref: None,
                         t_ingested: None,
                         provenance: Value::Null,
@@ -334,11 +332,6 @@ mod tests {
     #[test]
     fn parse_datetime_returns_none_for_empty() {
         assert!(parse_datetime("").is_none());
-    }
-
-    #[test]
-    fn default_scope_returns_org() {
-        assert_eq!(crate::models::default_scope(), "org");
     }
 
     #[test]

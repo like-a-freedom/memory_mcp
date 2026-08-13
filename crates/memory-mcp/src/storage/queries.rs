@@ -181,27 +181,18 @@ pub fn build_update_query(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_select_facts_filtered_query(
-    scope: &str,
     cutoff: &str,
     query_contains: Option<&str>,
     limit: i32,
-    project: Option<&str>,
     fact_types: &[String],
 ) -> (String, Value) {
-    let mut where_clauses = vec!["scope = $scope".to_string(), BI_TEMPORAL_WHERE.to_string()];
+    let mut where_clauses = vec![BI_TEMPORAL_WHERE.to_string()];
 
     let mut vars = serde_json::Map::from_iter([
-        ("scope".to_string(), json!(scope)),
         ("cutoff".to_string(), json!(cutoff)),
         ("limit".to_string(), json!(limit)),
     ]);
-
-    if let Some(project) = project.filter(|project| !project.trim().is_empty()) {
-        vars.insert("project".to_string(), json!(project));
-        where_clauses.push("project = $project".to_string());
-    }
 
     if !fact_types.is_empty() {
         vars.insert("fact_types".to_string(), json!(fact_types));
@@ -255,17 +246,15 @@ pub(crate) fn surreal_string_literal(value: &str) -> String {
 }
 
 pub fn build_select_facts_by_entity_links_query(
-    scope: &str,
     cutoff: &str,
     entity_links: &[String],
     limit: i32,
 ) -> (String, Value) {
     (
         format!(
-            "SELECT * FROM fact WHERE scope = $scope AND {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
+            "SELECT * FROM fact WHERE {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
         ),
         json!({
-            "scope": scope,
             "cutoff": cutoff,
             "entity_links": entity_links,
             "limit": limit,
@@ -275,7 +264,6 @@ pub fn build_select_facts_by_entity_links_query(
 
 /// Build a query to find nearest-neighbor facts via vector similarity (ANN).
 pub fn build_select_facts_ann_query(
-    scope: &str,
     cutoff: &str,
     query_vec: &[f64],
     limit: i32,
@@ -286,8 +274,7 @@ pub fn build_select_facts_ann_query(
     let sql = format!(
         "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
          FROM fact \
-         WHERE scope = $scope \
-           AND embedding IS NOT NONE \
+         WHERE embedding IS NOT NONE \
            AND embedding IS NOT NULL \
            AND {BI_TEMPORAL_WHERE} \
            AND embedding <|{ann_limit}, {ef_search}|> $query_vec \
@@ -297,7 +284,6 @@ pub fn build_select_facts_ann_query(
     (
         sql,
         json!({
-            "scope": scope,
             "cutoff": cutoff,
             "query_vec": query_vec,
             "limit": limit,
@@ -314,26 +300,18 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
 }
 
 pub fn build_select_episodes_by_content_query(
-    scope: &str,
     cutoff: &str,
     query_contains: Option<&str>,
     limit: i32,
-    project: Option<&str>,
 ) -> (String, Value) {
-    let mut where_clauses = vec![
-        "scope = $scope AND t_ref <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff))".to_string(),
+    let where_clauses = [
+        "t_ref <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff))".to_string(),
     ];
 
     let mut vars = serde_json::Map::from_iter([
-        ("scope".to_string(), json!(scope)),
         ("cutoff".to_string(), json!(cutoff)),
         ("limit".to_string(), json!(limit)),
     ]);
-
-    if let Some(project) = project.filter(|project| !project.trim().is_empty()) {
-        vars.insert("project".to_string(), json!(project));
-        where_clauses.push("project = $project".to_string());
-    }
 
     let base_where = where_clauses.join(" AND ");
 
@@ -707,11 +685,9 @@ mod tests {
     #[test]
     fn build_select_facts_filtered_query_uses_safe_literal_for_fts_operand() {
         let (sql, vars) = build_select_facts_filtered_query(
-            "org",
             "2026-05-13T00:00:00Z",
             Some("Alice \"launch\""),
             10,
-            None,
             &[],
         );
 
@@ -719,7 +695,8 @@ mod tests {
         assert!(sql.contains("content @1@ \"Alice \\\"launch\\\"\""));
         assert!(sql.contains("index_keys @1@ \"Alice \\\"launch\\\"\""));
         assert!(!sql.contains("@1@ $query"));
-        assert_eq!(vars["scope"], "org");
+        assert!(!sql.contains("scope"));
+        assert!(!sql.contains("project"));
         assert_eq!(vars["limit"], 10);
     }
 

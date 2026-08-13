@@ -4,6 +4,10 @@
 
 Accepted
 
+Amended by ADR-0038: “domain scope” below is the authority domain for a claim
+schema, not the removed request/storage-routing `MemoryScope`; the migration must
+not broaden source authority.
+
 ## Context
 
 Claims from official systems, documents, conversations, and informal observations can disagree. A newer observation is not necessarily more trustworthy; letting ingestion order determine truth would let an unrelated or low-authority source rewrite established memory.

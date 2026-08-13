@@ -319,7 +319,8 @@ pub(crate) fn infer_temporal_window(query: &str, cutoff: DateTime<Utc>) -> Optio
         .filter_map(|token| token.parse::<i32>().ok())
         .collect::<HashSet<_>>();
     let shared_year = (explicit_years.len() == 1)
-        .then(|| *explicit_years.iter().next().expect("shared year exists"));
+        .then(|| explicit_years.iter().next().copied())
+        .flatten();
 
     let mut ranges = Vec::<(NaiveDate, NaiveDate)>::new();
     let mut index = 0;
@@ -417,17 +418,29 @@ pub(crate) fn infer_temporal_window(query: &str, cutoff: DateTime<Utc>) -> Optio
 }
 
 fn month_date_range(year: i32, month: u32) -> (NaiveDate, NaiveDate) {
-    let start = NaiveDate::from_ymd_opt(year, month, 1).expect("valid month start");
-    let (next_year, next_month) = if month == 12 {
-        (year + 1, 1)
-    } else {
-        (year, month + 1)
+    let Some(start) = NaiveDate::from_ymd_opt(year, month, 1) else {
+        return (NaiveDate::MIN, NaiveDate::MIN);
     };
-    let next_start = NaiveDate::from_ymd_opt(next_year, next_month, 1).expect("valid next month");
+    let (next_year, next_month) = if month == 12 {
+        let Some(next_year) = year.checked_add(1) else {
+            return (start, start);
+        };
+        (next_year, 1)
+    } else if (1..=11).contains(&month) {
+        (year, month + 1)
+    } else {
+        return (start, start);
+    };
+    let Some(next_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) else {
+        return (start, start);
+    };
     (start, next_start - chrono::Duration::days(1))
 }
 
 fn quarter_date_range(year: i32, quarter: u32) -> (NaiveDate, NaiveDate) {
+    if !(1..=4).contains(&quarter) {
+        return (NaiveDate::MIN, NaiveDate::MIN);
+    }
     let start_month = ((quarter - 1) * 3) + 1;
     let end_month = start_month + 2;
     let (start, _) = month_date_range(year, start_month);
@@ -446,24 +459,20 @@ fn previous_quarter_date_range(cutoff: DateTime<Utc>) -> (NaiveDate, NaiveDate) 
 }
 
 fn start_of_day(date: NaiveDate) -> DateTime<Utc> {
-    DateTime::from_naive_utc_and_offset(date.and_hms_opt(0, 0, 0).expect("valid start of day"), Utc)
+    let time = chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap_or(chrono::NaiveTime::MIN);
+    DateTime::from_naive_utc_and_offset(date.and_time(time), Utc)
 }
 
 fn end_of_day(date: NaiveDate) -> DateTime<Utc> {
-    DateTime::from_naive_utc_and_offset(
-        date.and_hms_opt(23, 59, 59).expect("valid end of day"),
-        Utc,
-    )
+    let time = chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap_or(chrono::NaiveTime::MIN);
+    DateTime::from_naive_utc_and_offset(date.and_time(time), Utc)
 }
 
 pub(crate) struct CollectTemporalFactsRequest<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff_iso: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) query: &'a str,
     pub(crate) access: &'a crate::models::AccessPayload,
-    pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) budget: i32,
 }
@@ -491,23 +500,19 @@ pub(crate) async fn collect_temporal_facts(
     if let Some(temporal_window) = infer_temporal_window(request.query, request.cutoff) {
         let records = service
             .context_store()
-            .select_table("fact", request.namespace)
+            .select_table("fact")
             .await
             .map_err(|err| {
                 crate::service::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
             })?;
 
-        let mut facts = filter_facts_by_constraints(
-            records,
-            request.access,
-            request.project,
-            request.fact_types,
-        )
-        .into_iter()
-        .filter(|fact| fact.scope == request.scope)
-        .filter(|fact| fact_is_active_at(fact, request.cutoff))
-        .filter(|fact| fact.t_valid >= temporal_window.start && fact.t_valid <= temporal_window.end)
-        .collect::<Vec<_>>();
+        let mut facts = filter_facts_by_constraints(records, request.access, request.fact_types)
+            .into_iter()
+            .filter(|fact| fact_is_active_at(fact, request.cutoff))
+            .filter(|fact| {
+                fact.t_valid >= temporal_window.start && fact.t_valid <= temporal_window.end
+            })
+            .collect::<Vec<_>>();
 
         rank_temporal_candidate_facts(
             &mut facts,
@@ -532,23 +537,15 @@ pub(crate) async fn collect_temporal_facts(
             let records = service
                 .context_store()
                 .select_facts_filtered(ContextFactQuery {
-                    namespace: request.namespace,
-                    scope: request.scope,
                     cutoff: request.cutoff_iso,
                     query_contains: Some(&temporal_query),
                     limit: search_limit,
-                    project: request.project,
                     fact_types: request.fact_types,
                 })
                 .await
                 .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-            for fact in filter_facts_by_constraints(
-                records,
-                request.access,
-                request.project,
-                request.fact_types,
-            ) {
+            for fact in filter_facts_by_constraints(records, request.access, request.fact_types) {
                 group_fact_ids.insert(fact.fact_id.clone());
                 matched_facts_by_id
                     .entry(fact.fact_id.clone())

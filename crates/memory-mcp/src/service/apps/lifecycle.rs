@@ -12,7 +12,6 @@ use crate::service::{
 #[cfg(feature = "mcp-apps")]
 pub(crate) async fn execute_lifecycle_command(
     service: &crate::service::MemoryService,
-    scope: &str,
     command: LifecycleCommand,
 ) -> Result<LifecycleCommandOutcome, MemoryError> {
     match command {
@@ -32,9 +31,7 @@ pub(crate) async fn execute_lifecycle_command(
                 ));
             }
             Ok(LifecycleCommandOutcome::ArchiveCandidates(
-                service
-                    .archive_candidates(scope, &target_ids, dry_run)
-                    .await?,
+                service.archive_candidates(&target_ids, dry_run).await?,
             ))
         }
         LifecycleCommand::RestoreArchived {
@@ -52,7 +49,7 @@ pub(crate) async fn execute_lifecycle_command(
                 ));
             }
             Ok(LifecycleCommandOutcome::RestoreArchived(
-                service.restore_archived(scope, &target_ids).await?,
+                service.restore_archived(&target_ids).await?,
             ))
         }
         LifecycleCommand::RecomputeDecay { dry_run, confirmed } => {
@@ -79,8 +76,8 @@ pub(crate) async fn execute_lifecycle_command(
 }
 
 impl crate::service::MemoryService {
-    pub async fn build_lifecycle_view(&self, scope: &str) -> Result<LifecycleView, MemoryError> {
-        let dashboard = self.lifecycle_dashboard(scope).await?;
+    pub async fn build_lifecycle_view(&self) -> Result<LifecycleView, MemoryError> {
+        let dashboard = self.lifecycle_dashboard().await?;
         let policy = self.lifecycle_policy();
 
         Ok(LifecycleView {
@@ -94,24 +91,17 @@ impl crate::service::MemoryService {
         })
     }
 
-    pub async fn lifecycle_dashboard(
-        &self,
-        scope: &str,
-    ) -> Result<LifecycleDashboard, MemoryError> {
-        let namespace = self.namespace_for_scope(scope)?;
-        let active_facts = self
-            .app_store()
-            .select_active_facts(&namespace, 10_000)
-            .await?;
+    pub async fn lifecycle_dashboard(&self) -> Result<LifecycleDashboard, MemoryError> {
+        let active_facts = self.app_store().select_active_facts(10_000).await?;
         let policy = self.lifecycle_policy();
         let cutoff = crate::service::normalize_dt(
             Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
         );
         let archival_candidates = self
             .app_store()
-            .select_episodes_for_archival(&namespace, &cutoff, 1_000)
+            .select_episodes_for_archival(&cutoff, 1_000)
             .await?;
-        let communities = self.app_store().select_communities(&namespace).await?;
+        let communities = self.app_store().select_communities().await?;
 
         Ok(LifecycleDashboard {
             active_facts: active_facts.len(),
@@ -131,11 +121,9 @@ impl crate::service::MemoryService {
 
     pub async fn archive_candidates(
         &self,
-        scope: &str,
         target_ids: &[String],
         dry_run: bool,
     ) -> Result<ArchiveCandidatesOutcome, MemoryError> {
-        let namespace = self.namespace_for_scope(scope)?;
         if !dry_run {
             for episode_id in target_ids {
                 self.app_store()
@@ -145,7 +133,6 @@ impl crate::service::MemoryService {
                             "status": "archived",
                             "archived_at": crate::service::normalize_dt(Utc::now()),
                         }),
-                        &namespace,
                     )
                     .await?;
             }
@@ -160,10 +147,8 @@ impl crate::service::MemoryService {
 
     pub async fn restore_archived(
         &self,
-        scope: &str,
         target_ids: &[String],
     ) -> Result<RestoreArchivedOutcome, MemoryError> {
-        let namespace = self.namespace_for_scope(scope)?;
         for episode_id in target_ids {
             self.app_store()
                 .update_record(
@@ -172,7 +157,6 @@ impl crate::service::MemoryService {
                         "status": "active",
                         "archived_at": serde_json::Value::Null,
                     }),
-                    &namespace,
                 )
                 .await?;
         }

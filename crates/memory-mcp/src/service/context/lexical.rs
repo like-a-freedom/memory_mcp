@@ -13,9 +13,7 @@ use crate::service::query::{
 use crate::service::value_helpers::{json_f64, json_string};
 use crate::storage::ContextFactQuery;
 
-use super::filtering::{
-    fact_record_matches_project, fact_record_matches_type, raw_array, raw_object,
-};
+use super::filtering::{fact_record_matches_type, raw_array, raw_object};
 use super::types::RetrievalTier;
 
 #[derive(Debug)]
@@ -25,12 +23,9 @@ pub(crate) struct LexicalQueryResult {
 }
 
 pub(crate) struct FactQueryParams<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff_iso: &'a str,
     pub(crate) query_opt: Option<&'a str>,
     pub(crate) limit: i32,
-    pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
 }
 
@@ -44,12 +39,9 @@ pub(crate) async fn select_fact_records_for_query(
     let initial = service
         .context_store()
         .select_facts_filtered(ContextFactQuery {
-            namespace: params.namespace,
-            scope: params.scope,
             cutoff: params.cutoff_iso,
             query_contains: params.query_opt,
             limit: candidate_limit,
-            project: params.project,
             fact_types: params.fact_types,
         })
         .await
@@ -70,12 +62,9 @@ pub(crate) async fn select_fact_records_for_query(
         let term_records = service
             .context_store()
             .select_facts_filtered(ContextFactQuery {
-                namespace: params.namespace,
-                scope: params.scope,
                 cutoff: params.cutoff_iso,
                 query_contains: Some(term.as_str()),
                 limit: candidate_limit,
-                project: params.project,
                 fact_types: params.fact_types,
             })
             .await
@@ -270,18 +259,12 @@ async fn scan_fact_records_by_query_terms(
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("fact", params.namespace)
+        .select_table("fact")
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
     let filtered = records
         .into_iter()
-        .filter(|record| {
-            raw_object(record)
-                .and_then(|map: &serde_json::Map<String, Value>| map.get("scope"))
-                .and_then(json_string)
-                .is_some_and(|value| value == params.scope)
-        })
         .filter(|record| {
             raw_object(record)
                 .and_then(|map: &serde_json::Map<String, Value>| map.get("t_valid"))
@@ -294,7 +277,6 @@ async fn scan_fact_records_by_query_terms(
                 .and_then(json_string)
                 .is_none_or(|value| value > params.cutoff_iso)
         })
-        .filter(|record| fact_record_matches_project(record, params.project))
         .filter(|record| fact_record_matches_type(record, params.fact_types))
         .filter(|record| lexical_query_overlap(record, query_terms) > 0)
         .map(|mut record| {
@@ -800,16 +782,13 @@ fn lexical_fact_id(record: &Value) -> String {
 
 pub(crate) async fn select_episode_records_for_query(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
-    scope: &str,
     cutoff_iso: &str,
     query_opt: Option<&str>,
     limit: i32,
-    project: Option<&str>,
 ) -> Result<Vec<Value>, MemoryError> {
     let initial = service
         .context_store()
-        .select_episodes_by_content(namespace, scope, cutoff_iso, query_opt, limit, project)
+        .select_episodes_by_content(cutoff_iso, query_opt, limit)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
@@ -831,14 +810,7 @@ pub(crate) async fn select_episode_records_for_query(
     for term in fallback_terms {
         let term_records = service
             .context_store()
-            .select_episodes_by_content(
-                namespace,
-                scope,
-                cutoff_iso,
-                Some(term.as_str()),
-                limit,
-                project,
-            )
+            .select_episodes_by_content(cutoff_iso, Some(term.as_str()), limit)
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
         fallback_records.extend(term_records);
@@ -1259,7 +1231,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(DedupFallbackDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1269,12 +1241,9 @@ mod tests {
         let lexical_result = select_fact_records_for_query(
             &service.build_context(),
             FactQueryParams {
-                namespace: "org",
-                scope: "org",
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("atlas launch checklist"),
                 limit: 10,
-                project: None,
                 fact_types: &[],
             },
         )
@@ -1406,7 +1375,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(FallbackPreferenceDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1416,12 +1385,9 @@ mod tests {
         let lexical_result = select_fact_records_for_query(
             &service.build_context(),
             FactQueryParams {
-                namespace: "org",
-                scope: "org",
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("lgbtq support group"),
                 limit: 10,
-                project: None,
                 fact_types: &[],
             },
         )
@@ -1549,7 +1515,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(ShortQueryFallbackDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1559,12 +1525,9 @@ mod tests {
         let lexical_result = select_fact_records_for_query(
             &service.build_context(),
             FactQueryParams {
-                namespace: "org",
-                scope: "org",
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("What degree did I graduate with?"),
                 limit: 5,
-                project: None,
                 fact_types: &[],
             },
         )

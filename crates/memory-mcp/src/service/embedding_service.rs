@@ -17,7 +17,7 @@ use crate::service::embedding::EmbeddingProvider;
 use crate::service::embedding::task_runner::BackgroundTaskRunner;
 use crate::service::embedding_runtime::CachedQueryEmbedding;
 use crate::service::error::MemoryError;
-use crate::storage::DbClient;
+use crate::storage::{BoundDbClient, DbClient};
 
 /// Maximum input length accepted by embedding providers. Inputs longer than
 /// this are truncated before being sent to the provider.
@@ -29,7 +29,7 @@ const MAX_EMBEDDING_INPUT_CHARS: usize = 8_000;
 /// pipeline, `FactService::add_fact`, `reembed`, and capability modules.
 #[derive(Clone)]
 pub(crate) struct EmbeddingService {
-    db_client: Arc<dyn DbClient>,
+    db: BoundDbClient,
     logger: StdoutLogger,
     embedding_provider: Arc<dyn EmbeddingProvider>,
     embedding_similarity_threshold: f64,
@@ -45,6 +45,7 @@ impl EmbeddingService {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         db_client: Arc<dyn DbClient>,
+        namespace: impl Into<String>,
         logger: StdoutLogger,
         embedding_provider: Arc<dyn EmbeddingProvider>,
         embedding_similarity_threshold: f64,
@@ -56,7 +57,7 @@ impl EmbeddingService {
         task_runner: Arc<BackgroundTaskRunner>,
     ) -> Self {
         Self {
-            db_client,
+            db: BoundDbClient::new(db_client, namespace),
             logger,
             embedding_provider,
             embedding_similarity_threshold,
@@ -380,7 +381,7 @@ impl EmbeddingService {
     /// Captures the `Arc`-based fields needed by background embedding tasks.
     fn embedding_background_snapshot(&self) -> EmbeddingBackgroundSnapshot {
         EmbeddingBackgroundSnapshot {
-            db_client: self.db_client.clone(),
+            db: self.db.clone(),
             logger: self.logger.clone(),
             embedding_provider: self.embedding_provider.clone(),
             current_embedding_signature: self.current_embedding_signature.clone(),
@@ -397,7 +398,7 @@ impl EmbeddingService {
 /// in a spawned task, so they receive an owned snapshot of the `Arc` fields
 /// they need.
 struct EmbeddingBackgroundSnapshot {
-    db_client: Arc<dyn DbClient>,
+    db: BoundDbClient,
     logger: StdoutLogger,
     embedding_provider: Arc<dyn EmbeddingProvider>,
     current_embedding_signature: Option<String>,
@@ -442,8 +443,7 @@ impl EmbeddingBackgroundSnapshot {
         for attempt in 1..=crate::service::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
             match self.generate_embedding(input).await {
                 Ok(Some(embedding)) => {
-                    self.store_embedding_on_fact(namespace, fact_id, embedding)
-                        .await?;
+                    self.store_embedding_on_fact(fact_id, embedding).await?;
                     self.logger.log(
                         std::collections::HashMap::from([
                             ("op".to_string(), json!("embedding.background_succeeded")),
@@ -687,12 +687,10 @@ impl EmbeddingBackgroundSnapshot {
 
     async fn store_embedding_on_fact(
         &self,
-        namespace: &str,
         fact_id: &str,
         embedding: Vec<f64>,
     ) -> Result<(), MemoryError> {
-        let Some(Value::Object(mut record)) = self.db_client.select_one(fact_id, namespace).await?
-        else {
+        let Some(Value::Object(mut record)) = self.db.select_one(fact_id).await? else {
             return Err(MemoryError::NotFound(format!(
                 "fact_id not found for background embedding: {fact_id}"
             )));
@@ -704,15 +702,9 @@ impl EmbeddingBackgroundSnapshot {
             return Ok(());
         }
 
-        let scope = record
-            .get("scope")
-            .and_then(crate::service::value_helpers::string_from_value)
-            .unwrap_or_else(|| namespace.to_string());
         self.insert_current_embedding_fields(&mut record, embedding)?;
-        self.db_client
-            .update(fact_id, Value::Object(record), namespace)
-            .await?;
-        crate::service::cache::invalidate_cache_by_scope(&self.context_cache, &scope).await;
+        self.db.update(fact_id, Value::Object(record)).await?;
+        crate::service::cache::invalidate_cache(&self.context_cache).await;
         Ok(())
     }
 

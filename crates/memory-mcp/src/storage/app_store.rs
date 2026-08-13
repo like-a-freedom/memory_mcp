@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 use crate::service::MemoryError;
 use crate::storage::helpers::is_missing_table_error;
-use crate::storage::{DbClient, GraphDirection};
+use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
 /// Concrete store for app-facing graph + entity + record reads and mutations.
 ///
@@ -18,52 +18,98 @@ use crate::storage::{DbClient, GraphDirection};
 /// the call graph is visible without an opaqueness layer.
 #[derive(Clone)]
 pub struct AppStoreClient {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl AppStoreClient {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
+    }
+
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
         Self { db }
     }
 
-    pub async fn select_entities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("entity", namespace).await
+    pub async fn select_record(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(record_id).await
     }
 
-    pub async fn select_entity(
+    pub async fn select_records(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table(table).await
+    }
+
+    pub async fn select_entities(&self) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table("entity").await
+    }
+
+    pub async fn select_entity(&self, entity_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(entity_id).await
+    }
+
+    pub async fn select_entities_by_ids(
         &self,
-        entity_id: &str,
-        namespace: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        self.db.select_one(entity_id, namespace).await
+        entity_ids: &[String],
+    ) -> Result<Vec<Value>, MemoryError> {
+        if entity_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let sql = "SELECT entity_id, canonical_name, aliases FROM entity WHERE entity_id IN $ids";
+        match self.db.query(sql, Some(json!({"ids": entity_ids}))).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
-    pub async fn select_communities(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("community", namespace).await
+    pub async fn select_communities(&self) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table("community").await
     }
 
-    pub async fn select_facts(&self, namespace: &str) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("fact", namespace).await
+    pub async fn select_community(&self, community_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(community_id).await
     }
 
-    pub async fn select_edge(
+    pub async fn upsert_community(
         &self,
-        edge_id: &str,
-        namespace: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        self.db.select_one(edge_id, namespace).await
+        community_id: &str,
+        content: Value,
+    ) -> Result<(), MemoryError> {
+        if self.db.select_one(community_id).await?.is_some() {
+            self.db.update(community_id, content).await?;
+        } else {
+            self.db.create(community_id, content).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn delete_record(&self, record_id: &str) -> Result<Value, MemoryError> {
+        self.db
+            .query(
+                "DELETE type::record($record_id);",
+                Some(json!({"record_id": record_id})),
+            )
+            .await
+    }
+
+    pub async fn select_facts(&self) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table("fact").await
+    }
+
+    pub async fn select_edge(&self, edge_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(edge_id).await
     }
 
     pub async fn select_graph_neighbors(
         &self,
-        namespace: &str,
         node_id: &str,
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -73,14 +119,13 @@ impl AppStoreClient {
     /// One page of active edges in stable order.
     pub async fn select_edges_filtered_page(
         &self,
-        namespace: &str,
         cutoff: &str,
         start: usize,
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edges_filtered_page_query(cutoff, limit, start);
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -89,18 +134,13 @@ impl AppStoreClient {
 
     pub async fn select_entity_lookup(
         &self,
-        namespace: &str,
         normalized_name: &str,
     ) -> Result<Option<Value>, MemoryError> {
         // Canonical-name index lookup first (fast path), then alias lookup.
         let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
         let canonical_result = match self
             .db
-            .query(
-                canonical_sql,
-                Some(json!({ "name": normalized_name })),
-                namespace,
-            )
+            .query(canonical_sql, Some(json!({ "name": normalized_name })))
             .await
         {
             Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
@@ -115,11 +155,7 @@ impl AppStoreClient {
         let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
         match self
             .db
-            .query(
-                alias_sql,
-                Some(json!({ "name": normalized_name })),
-                namespace,
-            )
+            .query(alias_sql, Some(json!({ "name": normalized_name })))
             .await
         {
             Ok(value) => Ok(value.as_array().and_then(|arr| arr.first()).cloned()),
@@ -128,16 +164,12 @@ impl AppStoreClient {
         }
     }
 
-    pub async fn select_active_facts(
-        &self,
-        namespace: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
+    pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) = crate::storage::queries::build_select_active_facts_query(
             &crate::service::normalize_dt(crate::service::now()),
             limit,
         );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -146,14 +178,13 @@ impl AppStoreClient {
 
     pub async fn select_episodes_for_archival(
         &self,
-        namespace: &str,
         cutoff: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let sql = "SELECT * FROM episode WHERE status != 'archived' \
                    AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit";
         let vars = json!({ "cutoff": cutoff, "limit": limit });
-        match self.db.query(sql, Some(vars), namespace).await {
+        match self.db.query(sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -164,8 +195,11 @@ impl AppStoreClient {
         &self,
         record_id: &str,
         content: Value,
-        namespace: &str,
     ) -> Result<Value, MemoryError> {
-        self.db.update(record_id, content, namespace).await
+        self.db.update(record_id, content).await
+    }
+
+    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
+        self.db.query(sql, vars).await
     }
 }

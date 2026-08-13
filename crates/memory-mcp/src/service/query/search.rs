@@ -20,14 +20,18 @@ pub fn preprocess_search_query(raw: &str) -> String {
 
 /// Extract normalized search terms from a natural-language query.
 pub fn search_query_terms(raw: &str) -> Vec<String> {
-    static EPISODE_REF: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)episode:[a-z0-9_-]+").expect("episode_ref regex is valid")
-    });
-    static QUOTED: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r#""([^"]*)""#).expect("quoted regex is valid"));
+    static EPISODE_REF: LazyLock<Result<Regex, regex::Error>> =
+        LazyLock::new(|| Regex::new(r"(?i)episode:[a-z0-9_-]+"));
+    static QUOTED: LazyLock<Result<Regex, regex::Error>> =
+        LazyLock::new(|| Regex::new(r#""([^\"]*)""#));
 
-    let s = EPISODE_REF.replace_all(raw, " ");
-    let s = QUOTED.replace_all(&s, " $1 ");
+    let mut s = raw.to_string();
+    if let Ok(regex) = EPISODE_REF.as_ref() {
+        s = regex.replace_all(&s, " ").into_owned();
+    }
+    if let Ok(regex) = QUOTED.as_ref() {
+        s = regex.replace_all(&s, " $1 ").into_owned();
+    }
 
     let mut terms = Vec::new();
     for token in s.split_whitespace() {

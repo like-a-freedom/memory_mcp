@@ -36,7 +36,6 @@ async fn explain_returns_direct_provenance_source() {
             episode_content,
             &episode_id,
             Utc::now(),
-            "personal",
             0.9,
             vec![],
             vec![],
@@ -52,7 +51,6 @@ async fn explain_returns_direct_provenance_source() {
             content: "Alice will deliver the report".to_string(),
             quote: episode_content.to_string(),
             source_episode: episode_id.clone(),
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: json!({"source_episode": episode_id}),
@@ -105,7 +103,6 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             "Backward compatibility provenance test",
             &episode_id,
             Utc::now(),
-            "personal",
             0.8,
             vec![],
             vec![],
@@ -121,7 +118,6 @@ async fn explain_backward_compatible_with_empty_all_sources() {
             content: String::new(),
             quote: String::new(),
             source_episode: episode_id,
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: json!({}),
@@ -164,7 +160,6 @@ async fn explain_populates_all_sources_field() {
             "Task completed",
             &episode_id,
             Utc::now(),
-            "personal",
             0.95,
             vec![],
             vec![],
@@ -180,7 +175,6 @@ async fn explain_populates_all_sources_field() {
             content: "Task completed".to_string(),
             quote: "Task completed".to_string(),
             source_episode: episode_id,
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: json!({}),
@@ -233,19 +227,14 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     let entity_id = memory_mcp::service::deterministic_entity_id("person", "Alice Smith");
 
     // Episode A
-    let episode_a_id =
-        memory_mcp::service::deterministic_episode_id("email", "linked-ep-a", t_ref, scope);
-    IngestCapability::ingest(
+    let episode_a_id = IngestCapability::ingest(
         &service.build_context(),
         memory_mcp::models::IngestRequest {
             source_type: "email".into(),
             source_id: "linked-ep-a".into(),
             content: "Alice Smith closed a deal".into(),
             t_ref,
-            scope: scope.into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -261,7 +250,6 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             "Alice Smith closed a $5M deal",
             &episode_a_id,
             t_ref,
-            scope,
             0.9,
             vec![entity_id.clone()],
             vec![],
@@ -271,19 +259,14 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
         .expect("add fact A");
 
     // Episode B
-    let episode_b_id =
-        memory_mcp::service::deterministic_episode_id("email", "linked-ep-b", t_ref, scope);
-    IngestCapability::ingest(
+    let episode_b_id = IngestCapability::ingest(
         &service.build_context(),
         memory_mcp::models::IngestRequest {
             source_type: "email".into(),
             source_id: "linked-ep-b".into(),
             content: "Alice Smith presented results".into(),
             t_ref,
-            scope: scope.into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -299,7 +282,6 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             "Alice Smith presented quarterly results",
             &episode_b_id,
             t_ref,
-            scope,
             0.85,
             vec![entity_id.clone()],
             vec![],
@@ -313,7 +295,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     for (fact_id, _edge_suffix) in [(&fact_a_id, "a"), (&fact_b_id, "b")] {
         let edge_id =
             memory_mcp::service::deterministic_edge_id(&entity_id, "involved_in", fact_id, t_ref);
-        memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
+        memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), scope)
             .relate_edge(
                 &edge_id,
                 &entity_id,
@@ -323,10 +305,10 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
                     "relation": "involved_in",
                     "strength": 0.8,
                     "confidence": 0.85,
+                    "provenance": {"source_episode": episode_b_id},
                     "t_valid": memory_mcp::service::normalize_dt(t_ref),
                     "t_ingested": memory_mcp::service::normalize_dt(now),
                 }),
-                scope,
             )
             .await
             .expect("relate edge");
@@ -339,7 +321,6 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
             content: "Alice Smith closed $5M deal".into(),
             quote: "Alice Smith closed a $5M deal".into(),
             source_episode: episode_a_id.clone(),
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: json!({"source_episode": episode_a_id}),
@@ -385,7 +366,6 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
             "Explain access boost note",
             "episode:explain-boost",
             Utc::now(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -402,7 +382,6 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
                 content: "Explain access boost note".to_string(),
                 quote: "Explain access boost note".to_string(),
                 source_episode: "episode:explain-boost".to_string(),
-                scope: None,
                 t_ref: None,
                 t_ingested: None,
                 provenance: json!({"source_episode": "episode:explain-boost"}),
@@ -446,7 +425,6 @@ async fn explain_with_empty_source_episode_returns_validation_error() {
             content: "Some content".to_string(),
             quote: "Some quote".to_string(),
             source_episode: String::new(), // empty — triggers the bug
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: serde_json::Value::Null,
@@ -484,7 +462,6 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
                 content: String::new(),
                 quote: String::new(),
                 source_episode: String::new(), // missing from original JSON
-                scope: None,
                 t_ref: None,
                 t_ingested: None,
                 provenance: serde_json::Value::Null,
@@ -500,7 +477,6 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
                 content: String::new(),
                 quote: String::new(),
                 source_episode: String::new(), // missing from original JSON
-                scope: None,
                 t_ref: None,
                 t_ingested: None,
                 provenance: serde_json::Value::Null,
@@ -558,10 +534,7 @@ async fn explain_batch_shares_graph_insights() {
             source_id: "batch-ep-a".into(),
             content: "Alice met Bob".into(),
             t_ref,
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -575,7 +548,6 @@ async fn explain_batch_shares_graph_insights() {
             "Alice met Bob",
             &ep_a,
             t_ref,
-            "org",
             0.9,
             vec![alice_id.clone(), bob_id.clone()],
             vec![],
@@ -592,10 +564,7 @@ async fn explain_batch_shares_graph_insights() {
             source_id: "batch-ep-b".into(),
             content: "Bob talked to Alice again".into(),
             t_ref,
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -609,7 +578,6 @@ async fn explain_batch_shares_graph_insights() {
             "Bob talked to Alice again",
             &ep_b,
             t_ref,
-            "org",
             0.9,
             vec![bob_id.clone(), alice_id.clone()],
             vec![],
@@ -677,10 +645,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
             source_id: "mixed-ep-1".into(),
             content: "Fact content here".into(),
             t_ref,
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -698,7 +663,6 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
             "Fact content here",
             &ep_with,
             t_ref,
-            "org",
             0.9,
             vec![alice_id],
             vec![],
@@ -715,10 +679,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
             source_id: "mixed-ep-2".into(),
             content: "Just an episode, no fact".into(),
             t_ref,
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -814,6 +775,5 @@ async fn explain_skips_unknown_episode() {
     // Should return the item as-is (no enrichment)
     assert_eq!(result[0].source_episode, "episode:nonexistent-99999");
     assert_eq!(result[0].content, "some content");
-    assert_eq!(result[0].scope, None);
     assert_eq!(result[0].all_sources.len(), 0);
 }

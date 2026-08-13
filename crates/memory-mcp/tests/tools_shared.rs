@@ -22,10 +22,7 @@ async fn tools_ingest_returns_validation_error_for_bad_t_ref() {
         source_id: "t-1".to_string(),
         content: "hello".to_string(),
         t_ref: "not-a-date".to_string(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 
@@ -50,7 +47,6 @@ async fn tools_extract_rejects_both_episode_and_inline() {
         source_type: None,
         source_id: None,
         t_ref: None,
-        scope: None,
         zero_shot_labels: None,
     };
 
@@ -78,7 +74,6 @@ async fn tools_extract_rejects_no_input() {
         source_type: None,
         source_id: None,
         t_ref: None,
-        scope: None,
         zero_shot_labels: None,
     };
 
@@ -104,10 +99,7 @@ async fn tools_ingest_and_extract_happy_path() {
         source_id: "t-2".to_string(),
         content: "Alice works at Acme Corp and promised to deliver the API by Friday.".to_string(),
         t_ref: Utc::now().to_rfc3339(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 
@@ -133,7 +125,6 @@ async fn tools_ingest_and_extract_happy_path() {
         source_type: None,
         source_id: None,
         t_ref: None,
-        scope: None,
         zero_shot_labels: None,
     };
 
@@ -201,8 +192,6 @@ async fn tools_assemble_context_returns_empty_for_empty_db() {
 
     let params = AssembleContextParams {
         query: "nothing relevant".to_string(),
-        scope: "personal".to_string(),
-        project: None,
         fact_types: vec![],
         as_of: String::new(),
         budget: 5,

@@ -16,9 +16,7 @@ struct EndToEndCase {
     id: String,
     #[allow(dead_code)]
     description: String,
-    scope: String,
-    #[serde(default)]
-    project: Option<String>,
+
     t_ref: chrono::DateTime<chrono::Utc>,
     as_of: chrono::DateTime<chrono::Utc>,
     sources: Vec<SourceSpec>,
@@ -192,13 +190,10 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
                 source_id: source.source_id.clone(),
                 content: source.content.clone(),
                 t_ref: case.t_ref,
-                scope: case.scope.clone(),
-                project: case.project.clone(),
                 // Keep transaction time inside the fixture's as_of window;
                 // leaving this unset would use Utc::now() and hide the fact
                 // from a deterministic historical query.
                 t_ingested: Some(case.t_ref),
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -250,10 +245,8 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),
-            scope: case.scope.clone(),
             as_of: Some(case.as_of),
             budget: 5,
-            project: case.project.clone(),
             fact_types: vec![],
             view_mode: None,
             window_start: None,

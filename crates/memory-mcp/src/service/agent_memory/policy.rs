@@ -1,8 +1,7 @@
 //! Deterministic capture policy for lifecycle events.
 //!
 //! Inputs: a normalized host event, an internal invocation context,
-//! scope/project/policy, the current capture budget, and bounded content
-//! metadata.
+//! policy tags, the current capture budget, and bounded content metadata.
 //!
 //! Outputs: a `CaptureDecision` with disposition, trust class, sanitized
 //! content, reason codes, and persistence budget.
@@ -230,7 +229,7 @@ mod tests {
         CaptureBudget {
             remaining_session_captures: 100,
             remaining_session_bytes: 1024 * 1024,
-            remaining_project_daily_bytes: 10 * 1024 * 1024,
+            remaining_process_daily_bytes: 10 * 1024 * 1024,
             exhausted: false,
         }
     }
@@ -239,7 +238,7 @@ mod tests {
         CaptureBudget {
             remaining_session_captures: 0,
             remaining_session_bytes: 0,
-            remaining_project_daily_bytes: 0,
+            remaining_process_daily_bytes: 0,
             exhausted: true,
         }
     }
@@ -249,8 +248,6 @@ mod tests {
             event_kind: LifecycleEventKind::UserPrompt,
             task_fingerprint: "task:1".to_string(),
             normalized_task: "do work".to_string(),
-            scope: "org".to_string(),
-            project: Some("p".to_string()),
             policy_tags: vec![],
             content: content.map(str::to_string),
             artifact_uris: vec![],

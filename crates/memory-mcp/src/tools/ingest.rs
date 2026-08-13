@@ -38,10 +38,7 @@ pub async fn ingest(
         source_id: params.source_id,
         content: params.content,
         t_ref,
-        scope: params.scope,
-        project: params.project,
         t_ingested,
-        visibility_scope: params.visibility_scope,
         policy_tags: params.policy_tags,
     };
 
@@ -50,7 +47,7 @@ pub async fn ingest(
     let source_id = request.source_id.clone();
     ctx.log_tool_event(
         "ingest.start",
-        json!({"source_type": &request.source_type, "source_id": &source_id, "scope": &request.scope}),
+        json!({"source_type": &request.source_type, "source_id": &source_id}),
         json!({}),
         LogLevel::Info,
         Some(&request_id),

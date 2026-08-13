@@ -2,7 +2,12 @@
 
 **Status:** Implemented — the claim reconciliation pipeline described here is the shipped runtime behavior (see `src/service/claims/` and migrations 029/030; refreshed 2026-08-11)<br>
 **Scope:** Local, deterministic, zero-configuration claim extraction and reconciliation<br>
-**Related ADRs:** 0002-0015
+**Related ADRs:** 0002-0015, amended by [ADR-0038](adr/0038-one-active-namespace-per-server.md)
+
+> **Current boundary:** claim reconciliation runs inside the process's one Active
+> Namespace. `scope` and partitioning `project` are legacy compatibility fields,
+> not active claim-slot or authorization dimensions. Independent policy tags,
+> trust, quarantine, source authority, and caller controls remain active.
 
 ## 1. Outcome
 
@@ -35,7 +40,7 @@ Neither mechanism was the target reconciliation engine. The rollout replaced the
 3. Correction closes only the erroneous claim projection in transaction time.
 4. Whole-fact retraction is reserved for invalid or withdrawn source evidence.
 5. Ingestion order, confidence, recency, fuzzy similarity, and an unconfirmed alias never select a winner.
-6. Automatic reconciliation never crosses namespace, scope, project, access-policy, canonical-subject, comparison-key, or qualifier boundaries.
+6. Automatic reconciliation never crosses the Active Namespace, access-policy, canonical-subject, comparison-key, or qualifier boundaries. Legacy scope/project metadata is not an active v2 boundary; policy and trust controls remain enforced.
 7. Unknown claim keys are set-valued by default.
 8. Missing validity remains unknown; observation time is not promoted to validity.
 9. Every stored decision is explainable from immutable inputs and a versioned evaluator fingerprint.
@@ -68,7 +73,8 @@ Target fields:
 |---|---|
 | `claim_id` | Deterministic immutable identifier |
 | `source_fact_id`, `source_episode_id` | Provenance back to exact evidence |
-| `scope`, `project`, `policy_tags` | Isolation and access inheritance |
+| `policy_tags` | Independent policy filtering and access inheritance |
+| `scope`, `project` | Optional legacy metadata retained for compatibility/audit; never active v2 routing |
 | `schema_id`, `schema_version` | Compositional structural form |
 | `subject` | Canonical entity or stable source-record reference; unresolved subjects are non-comparable |
 | `comparison_key`, `comparison_key_hash` | Versioned canonical dimension or relation |
@@ -82,7 +88,7 @@ Target fields:
 | `derivation` | Rule, source span, canonicalization version, and extractor fingerprint |
 | `t_ingested`, `t_invalid_ingested` | Transaction-valid projection interval |
 
-Claims copy the fact's isolation metadata. A missing canonical subject, comparison key, or required qualifier does not reject the claim as evidence; it makes the claim ineligible for automatic reconciliation.
+Claims retain policy tags and provenance from the fact. Legacy scope/project fields may be read from old claims but are not copied into new active isolation semantics. A missing canonical subject, comparison key, or required qualifier does not reject the claim as evidence; it makes the claim ineligible for automatic reconciliation.
 
 ### 5.2 ClaimRelation
 
@@ -100,7 +106,8 @@ Target fields:
 | `context_fingerprint` | Schema, alias, policy, and evaluator versions |
 | `evaluated_at` | Evaluation time |
 | `supersedes_relation_id` | Previous relation version when re-evaluated |
-| `scope`, `project`, `policy_tags` | Most restrictive shared visibility boundary |
+| `policy_tags` | Shared policy restrictions required for relation visibility |
+| `scope`, `project` | Optional legacy metadata retained only when present in old records |
 | `t_ingested`, `t_invalid_ingested` | Transaction-valid decision interval |
 
 Relation visibility requires access to both source facts. A relation never leaks the existence or content of a more restricted fact.
@@ -110,12 +117,12 @@ Relation visibility requires access to both source facts. A relation never leaks
 Projection and reconciliation jobs are persisted with:
 
 - job kind and extractor/evaluator fingerprint;
-- namespace and stable cursor;
+- Active Namespace and stable cursor;
 - `pending`, `running`, `completed`, or `failed` state;
 - lease owner and expiry for crash recovery;
 - processed, succeeded, skipped, and failed counters;
 - last error and retry count;
-- timestamps and per-namespace progress.
+- timestamps and Active-Namespace-local progress.
 
 Claim creation and its reconciliation-job creation are atomic. A job is complete only after its stable candidate cursor is exhausted.
 
@@ -152,18 +159,20 @@ Text normalization performs Unicode normalization, case and whitespace normaliza
 
 The comparison key excludes the value and temporal interval. It is a versioned canonical serialization of schema-defined dimension or relation components. Qualifiers are normalized and sorted separately.
 
-The indexed claim slot is:
+The indexed v2 claim slot is:
 
 ```text
-namespace
-+ scope
-+ project identity, including absent project
+Active Namespace
 + access-policy fingerprint
 + canonical subject
 + compatible schema family
 + comparison-key hash
-+ qualifier hash
 ```
+
+Qualifiers remain part of the claim proposition and are evaluated by the
+reconciliation engine. They do not create separate v2 candidate slots. Legacy
+claims keep their historical scope/project/qualifier identity and are compared
+conservatively under the legacy compatibility path.
 
 Candidate lookup uses a composite index and stable pagination. It never scans the full fact or claim table and never uses a fixed latest-N window. A processing budget may pause work only when a durable job retains the remaining cursor.
 
@@ -213,7 +222,7 @@ Concurrent workers are safe because claims, claim pairs, and reconciliation cont
 
 The additive migration planned for this subsystem is a new migration after the current highest version; no existing `.surql` file is changed. It creates claim, relation, alias/policy, and durable-job tables plus indexes. Historical fact processing is not part of the migration transaction.
 
-After the server is ready, a local worker backfills legacy facts with conservative built-in concurrency and batch size. It follows the proven `reembed` operational pattern: stable fact-ID cursor, per-namespace progress, persisted status, resume after restart, and no cursor advance past a failed fact. The reusable job mechanism should be shared; extraction and embedding business logic should remain separate.
+After the server is ready, a local worker backfills legacy facts with conservative built-in concurrency and batch size. It follows the proven `reembed` operational pattern: stable fact-ID cursor, Active-Namespace-local progress, persisted status, resume after restart, and no cursor advance past a failed fact. Historical aggregate records may retain per-namespace entries for compatibility, but a process reads and advances only the selected Active Namespace. The reusable job mechanism should be shared; extraction and embedding business logic should remain separate.
 
 Changing the extractor fingerprint schedules a new projection pass without blocking startup. Until a fact has a current claim projection, existing fact retrieval is the compatibility fallback.
 
@@ -278,7 +287,7 @@ The current human-readable logger truncates individual values, so it cannot by i
 
 ## 13. Security and Isolation
 
-- Claims inherit scope, project, and policy tags from their facts.
+- Claims inherit policy tags and provenance from their facts. Legacy scope/project fields are not active authorization semantics.
 - The claim slot includes an access-policy fingerprint.
 - A relation inherits the union of both restrictions and is visible only when the caller can access both sources.
 - Automatic reconciliation across access-policy fingerprints is forbidden. A future cross-policy administrative review flow must be explicit and is outside this design.
@@ -329,13 +338,13 @@ Implementation begins with a labeled corpus and a baseline of the current warnin
 
 ### Evaluation gates
 
-- zero cross-scope, cross-project, or access-policy violations;
+- zero cross-Active-Namespace or access-policy violations; legacy records must not bypass compatibility boundaries;
 - zero automatic supersession/correction false positives in the release corpus;
 - deterministic claim extraction precision at least 0.98 on supported cases;
 - contradiction precision at least 0.95; recall and schema coverage are reported separately and may improve without weakening precision;
 - candidate recall 1.00 for comparable claims in the same indexed slot;
 - no regression beyond the existing ingest and `assemble_context` latency gates;
-- backfill restart, idempotency, and bounded-memory tests pass on multi-namespace fixtures.
+- backfill restart, idempotency, and bounded-memory tests pass on Active-Namespace-local fixtures, including namespace-switch isolation.
 
 Every quality claim reports corpus version, split, case counts, per-schema metrics, confusion matrix, and latency percentiles. Synthetic positives alone are not sufficient.
 

@@ -10,10 +10,7 @@ pub async fn run(service: &MemoryService, args: IngestArgs) -> Result<(), Memory
         source_id: args.source_id,
         content: args.content,
         t_ref: args.t_ref,
-        scope: args.scope,
-        project: args.project,
         t_ingested: args.t_ingested,
-        visibility_scope: args.visibility_scope,
         policy_tags: args.policy_tags,
     };
     let response = crate::tools::ingest(&service.build_context(), params).await?;

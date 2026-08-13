@@ -35,7 +35,6 @@ impl LocalRetrievalSuite {
         for entity in &case.entities {
             test_support::seed_entity(
                 &db_client,
-                &case.scope,
                 &entity.entity_id,
                 &entity.entity_type,
                 &entity.canonical_name,
@@ -84,7 +83,6 @@ impl LocalRetrievalSuite {
             };
             test_support::seed_community(
                 &db_client,
-                &case.scope,
                 &community.community_id,
                 &community.member_entities,
                 &community.summary,
@@ -111,13 +109,11 @@ impl LocalRetrievalSuite {
                     };
                 }
             };
-            test_support::seed_fact_with_links_and_project(
+            test_support::seed_fact_with_links(
                 &service,
-                &case.scope,
                 &fact.content,
                 t_valid,
                 fact.entity_links.clone(),
-                fact.project.as_deref(),
                 fact.source_id.as_deref(),
             )
             .await;
@@ -128,10 +124,8 @@ impl LocalRetrievalSuite {
             &service.build_context(),
             memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),
-                scope: case.scope.clone(),
                 as_of: Some(as_of),
                 budget: case.budget,
-                project: case.project.clone(),
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,

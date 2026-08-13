@@ -129,8 +129,6 @@ def main() -> int:
     event_name = os.environ.get("MEMORY_HOOK_EVENT", "precompact")
     payload, raw_fallback = load_hook_input()
     content = build_content(payload, raw_fallback, event_name)
-    scope = os.environ.get("MEMORY_HOOK_SCOPE", "org").strip() or "org"
-    project = os.environ.get("MEMORY_HOOK_PROJECT", "").strip()
     source_type = os.environ.get("MEMORY_HOOK_SOURCE_TYPE", "session_summary").strip() or "session_summary"
     policy_tags = [
         tag.strip()
@@ -143,18 +141,15 @@ def main() -> int:
         "source_id": source_id_for(content, payload, event_name),
         "content": content,
         "t_ref": utc_now_rfc3339(),
-        "scope": scope,
         "policy_tags": policy_tags,
     }
-    if project:
-        ingest_arguments["project"] = project
 
     server_cmd = os.environ.get("MEMORY_MCP_SERVER_CMD", "cargo run --quiet --bin memory_mcp")
     server_cwd = os.environ.get("MEMORY_MCP_SERVER_CWD", os.environ.get("MEMORY_HOOK_REPO_ROOT", str(pathlib.Path.cwd())))
     env = os.environ.copy()
     env.setdefault("SURREALDB_DB_NAME", "memory")
     env.setdefault("SURREALDB_EMBEDDED", "true")
-    env.setdefault("SURREALDB_NAMESPACES", scope)
+    env.setdefault("SURREALDB_NAMESPACE", "main")
     env.setdefault("SURREALDB_USERNAME", "root")
     env.setdefault("SURREALDB_PASSWORD", "root")
     env.setdefault("SURREALDB_DATA_DIR", str(pathlib.Path(server_cwd) / "data" / "surrealdb"))
@@ -214,7 +209,7 @@ def main() -> int:
                 proc.kill()
 
     if os.environ.get("MEMORY_HOOK_VERBOSE", "") == "1":
-        print(f"memory-precompact-hook ingested summary into scope={scope}")
+        print("memory-precompact-hook ingested summary")
     return 0
 
 

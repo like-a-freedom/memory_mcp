@@ -17,11 +17,7 @@ async fn setup_embedded_service_with_client()
 
     let service = MemoryService::new(
         db_client.clone(),
-        vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ],
+        "org".to_string(),
         "warn".to_string(),
         50,
         100,
@@ -42,7 +38,6 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
             "ARR is $1M",
             "episode:1",
             now - Duration::days(1),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -56,10 +51,8 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
         &service.build_context(),
         AssembleContextRequest {
             query: "ARR".to_string(),
-            scope: "org".to_string(),
             as_of: Some(as_of_before),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -87,10 +80,8 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
         &service.build_context(),
         AssembleContextRequest {
             query: "ARR".to_string(),
-            scope: "org".to_string(),
             as_of: Some(as_of_after),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,

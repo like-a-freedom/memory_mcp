@@ -13,43 +13,40 @@ use serde_json::{Value, json};
 use crate::service::MemoryError;
 use crate::storage::helpers::is_missing_table_error;
 use crate::storage::queries::BI_TEMPORAL_WHERE;
-use crate::storage::{ContextFactQuery, DbClient, GraphDirection};
+use crate::storage::{BoundDbClient, ContextFactQuery, DbClient, GraphDirection};
 
 /// Read-side context assembly store. Holds the `DbClient` adapter and owns
 /// the queries that context modules execute across it.
 #[derive(Clone)]
 pub struct ContextStoreClient {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl ContextStoreClient {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
     }
 
-    /// Facts matching a query at query-time with bi-temporal, scope, project, and fact-type filters.
+    /// Facts matching a query at query-time with bi-temporal and fact-type filters.
     pub async fn select_facts_filtered(
         &self,
         query: ContextFactQuery<'_>,
     ) -> Result<Vec<Value>, MemoryError> {
         let ContextFactQuery {
-            namespace,
-            scope,
             cutoff,
             query_contains,
             limit,
-            project,
             fact_types,
         } = query;
         let (sql, vars) = crate::storage::queries::build_select_facts_filtered_query(
-            scope,
             cutoff,
             query_contains,
             limit,
-            project,
             fact_types,
         );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -59,19 +56,16 @@ impl ContextStoreClient {
     /// Facts linked to a set of normalized entity ids.
     pub async fn select_facts_by_entity_links(
         &self,
-        namespace: &str,
-        scope: &str,
         cutoff: &str,
         entity_links: &[String],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) = crate::storage::queries::build_select_facts_by_entity_links_query(
-            scope,
             cutoff,
             entity_links,
             limit,
         );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -84,7 +78,6 @@ impl ContextStoreClient {
     /// object matches `query_text`, then retrieves the linked `fact` records.
     pub async fn select_facts_by_triple(
         &self,
-        namespace: &str,
         query_text: &str,
         cutoff: &str,
         limit: usize,
@@ -93,21 +86,17 @@ impl ContextStoreClient {
             "SELECT * FROM fact \
              WHERE fact_id IN ( \
                SELECT source_fact_id FROM triple \
-               WHERE namespace = $ns \
-                 AND (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
+               WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
              ) \
                AND {BI_TEMPORAL_WHERE} \
              LIMIT $limit"
         );
-        let mut vars = json!({
-            "ns": "__placeholder__",
+        let vars = json!({
             "query": query_text,
             "cutoff": cutoff,
             "limit": limit,
         });
-        vars.as_object_mut()
-            .map(|map| map.insert("ns".to_string(), json!(namespace)));
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -117,15 +106,13 @@ impl ContextStoreClient {
     /// Approximate nearest-neighbour facts for an embedding query.
     pub async fn select_facts_ann(
         &self,
-        namespace: &str,
-        scope: &str,
         cutoff: &str,
         query_vec: &[f64],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
-            crate::storage::queries::build_select_facts_ann_query(scope, cutoff, query_vec, limit);
-        match self.db.query(&sql, Some(vars), namespace).await {
+            crate::storage::queries::build_select_facts_ann_query(cutoff, query_vec, limit);
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -136,14 +123,13 @@ impl ContextStoreClient {
     /// cutoff-bounded.
     pub async fn select_edge_neighbors(
         &self,
-        namespace: &str,
         node_id: &str,
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -153,7 +139,6 @@ impl ContextStoreClient {
     /// Entities matching a batch of normalized names (alias-resolution hot path).
     pub async fn select_entities_batch(
         &self,
-        namespace: &str,
         normalized_names: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         if normalized_names.is_empty() {
@@ -162,7 +147,7 @@ impl ContextStoreClient {
         let sql = "SELECT * FROM entity WHERE canonical_name_normalized IN $names \
                    OR aliases CONTAINSANY $names";
         let vars = json!({ "names": normalized_names });
-        match self.db.query(sql, Some(vars), namespace).await {
+        match self.db.query(sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -172,7 +157,6 @@ impl ContextStoreClient {
     /// Communities whose summary matches a free-text hint.
     pub async fn select_communities_matching_summary(
         &self,
-        namespace: &str,
         query: &str,
     ) -> Result<Vec<Value>, MemoryError> {
         let query_literal = crate::storage::queries::surreal_string_literal(query);
@@ -181,7 +165,7 @@ impl ContextStoreClient {
              ORDER BY ft_score DESC, summary ASC LIMIT 25"
         );
         let vars = json!({ "query": query });
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -189,45 +173,33 @@ impl ContextStoreClient {
     }
 
     /// Full table scan (used by graph views and the occasional admin operation).
-    pub async fn select_table(
-        &self,
-        table: &str,
-        namespace: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table(table, namespace).await
+    pub async fn select_table(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table(table).await
     }
 
     /// Episode contents matching a query, bi-temporally scoped.
     pub async fn select_episodes_by_content(
         &self,
-        namespace: &str,
-        scope: &str,
         cutoff: &str,
         query: Option<&str>,
         limit: i32,
-        project: Option<&str>,
     ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) = crate::storage::queries::build_select_episodes_by_content_query(
-            scope, cutoff, query, limit, project,
-        );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        let (sql, vars) =
+            crate::storage::queries::build_select_episodes_by_content_query(cutoff, query, limit);
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
         }
     }
 
-    /// Active (not-yet-invalidated) facts for a namespace.
-    pub async fn select_active_facts(
-        &self,
-        namespace: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
+    /// Active (not-yet-invalidated) facts in the bound Active Namespace.
+    pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) = crate::storage::queries::build_select_active_facts_query(
             &crate::service::normalize_dt(crate::service::now()),
             limit,
         );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -240,29 +212,21 @@ impl ContextStoreClient {
 /// `DbClient` through a trait.
 #[derive(Clone)]
 pub struct ContextAccessLogClient {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl ContextAccessLogClient {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
     }
 
-    pub async fn create(
-        &self,
-        record_id: &str,
-        content: Value,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content, namespace).await
+    pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
+        self.db.create(record_id, content).await
     }
 
-    pub async fn query(
-        &self,
-        sql: &str,
-        vars: Option<Value>,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        self.db.query(sql, vars, namespace).await
+    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
+        self.db.query(sql, vars).await
     }
 }

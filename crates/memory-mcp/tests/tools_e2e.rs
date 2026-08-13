@@ -29,7 +29,7 @@ impl StdioMcpProcess {
             .env("SURREALDB_EMBEDDED", "true")
             .env("SURREALDB_DATA_DIR", temp_dir.path())
             .env("SURREALDB_DB_NAME", "memory_tasks_e2e")
-            .env("SURREALDB_NAMESPACES", "org")
+            .env("SURREALDB_NAMESPACE", "org")
             .env("SURREALDB_USERNAME", "root")
             .env("SURREALDB_PASSWORD", "root")
             .env("EMBEDDINGS_ENABLED", "false")
@@ -161,8 +161,7 @@ async fn test_mcp_tools_flow() {
         "source_type": "email",
         "source_id": "MSG-203",
         "content": "I will finish it by Friday. ARR $2M",
-        "t_ref": "2026-01-10T00:00:00Z",
-        "scope": "org"
+        "t_ref": "2026-01-10T00:00:00Z"
     });
     let episode_id = mcp
         .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
@@ -190,7 +189,6 @@ async fn test_mcp_tools_flow() {
 
     let assemble_request: AssembleContextRequest = serde_json::from_value(serde_json::json!({
         "query": "ARR",
-        "scope": "org",
         "as_of": Utc::now().to_rfc3339(),
         "budget": 5,
         "compact": false,
@@ -255,8 +253,7 @@ async fn test_mcp_tools_flow() {
         "source_type": "email",
         "source_id": "MSG-204",
         "content": "Follow-up: ARR $500k",
-        "t_ref": "2026-01-11T00:00:00Z",
-        "scope": "org"
+        "t_ref": "2026-01-11T00:00:00Z"
     });
     let episode_id2 = mcp
         .ingest(Parameters(serde_json::from_value(ingest_params2).unwrap()))
@@ -294,8 +291,7 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
                 "source_type": "email",
                 "source_id": "TASK-E2E-1",
                 "content": "Alice Smith will deliver ARR $1M by Friday.",
-                "t_ref": "2026-02-05T00:00:00Z",
-                "scope": "org"
+                "t_ref": "2026-02-05T00:00:00Z"
             }
         }),
     );
@@ -335,8 +331,7 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
                 "source_type": "email",
                 "source_id": "TASK-E2E-1",
                 "content": "Alice Smith will deliver ARR $1M by Friday.",
-                "t_ref": "2026-02-05T00:00:00Z",
-                "scope": "org"
+                "t_ref": "2026-02-05T00:00:00Z"
             }
         }),
     );
@@ -449,8 +444,7 @@ fn test_mcp_extract_task_lifecycle_over_stdio() {
                 "source_type": "document",
                 "source_id": "TASK-E2E-CANCEL",
                 "content": long_content,
-                "t_ref": "2026-02-05T00:00:00Z",
-                "scope": "org"
+                "t_ref": "2026-02-05T00:00:00Z"
             }
         }),
     );
@@ -550,8 +544,7 @@ async fn test_mcp_full_flow_end_to_end() {
         "source_type": "email",
         "source_id": "E2E-1",
         "content": "I will deliver ARR $1M by next week.",
-        "t_ref": "2026-02-05T00:00:00Z",
-        "scope": "org"
+        "t_ref": "2026-02-05T00:00:00Z"
     });
     let episode_id = mcp
         .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
@@ -573,7 +566,6 @@ async fn test_mcp_full_flow_end_to_end() {
 
     let assemble_request: AssembleContextRequest = serde_json::from_value(serde_json::json!({
         "query": "ARR",
-        "scope": "org",
         "as_of": Utc::now().to_rfc3339(),
         "budget": 5,
         "compact": false,
@@ -612,7 +604,6 @@ async fn test_mcp_full_flow_end_to_end() {
     let assemble_request_after: AssembleContextRequest =
         serde_json::from_value(serde_json::json!({
             "query": "ARR",
-            "scope": "org",
             "as_of": Utc::now().to_rfc3339(),
             "budget": 5,
             "compact": false,
@@ -640,8 +631,7 @@ async fn test_mcp_ingest_validation_error() {
         "source_type": "",
         "source_id": "MSG-204",
         "content": "Missing source_type",
-        "t_ref": "2026-01-10T00:00:00Z",
-        "scope": "org"
+        "t_ref": "2026-01-10T00:00:00Z"
     });
 
     let err = match mcp
@@ -767,8 +757,7 @@ async fn test_mcp_explain_loads_episode_context() {
         "source_type": "email",
         "source_id": "EXPLAIN-CTX-1",
         "content": "Customer confirmed ARR is now $3M and expects renewal next quarter.",
-        "t_ref": "2026-02-15T08:30:00Z",
-        "scope": "org"
+        "t_ref": "2026-02-15T08:30:00Z"
     });
     let episode_id = mcp
         .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
@@ -797,7 +786,7 @@ async fn test_mcp_explain_loads_episode_context() {
 
     assert_eq!(explanation.len(), 1);
     assert_eq!(explanation[0].source_episode, episode_id);
-    assert_eq!(explanation[0].scope.as_deref(), Some("org"));
+
     assert_eq!(
         explanation[0].t_ref.map(|dt| dt.to_rfc3339()),
         Some("2026-02-15T08:30:00+00:00".to_string())
@@ -843,7 +832,6 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
     let mcp = MemoryMcp::new(service);
     let params = serde_json::json!({
         "query": "atlas",
-        "scope": "personal",
         "as_of": Utc::now().to_rfc3339(),
         "budget": 10,
         "view_mode": "timeline",
@@ -887,8 +875,7 @@ async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found
         "source_type": "ad-hoc",
         "source_id": "reproducer:bare-hex-bug",
         "content": "Test content: meeting notes about EPS reduction decision.",
-        "t_ref": "2026-07-31T18:00:00Z",
-        "scope": "org"
+        "t_ref": "2026-07-31T18:00:00Z"
     });
     let canonical_id = mcp
         .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))

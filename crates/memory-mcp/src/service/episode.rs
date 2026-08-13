@@ -566,7 +566,7 @@ mod tests {
 
         let mut service = crate::service::MemoryService::new(
             db_client,
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -584,7 +584,6 @@ mod tests {
         let _ = extract_entities(
             &service.build_context(),
             "episode:blocking-test",
-            "org",
             "Atlas project status",
             None,
         )
@@ -698,7 +697,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(NeighborOnlyDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -708,7 +707,6 @@ mod tests {
         let connected = collect_connected_entity_component(
             &service.build_context(),
             &["entity:alice".to_string()],
-            "org",
         )
         .await
         .unwrap();
@@ -794,7 +792,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(IndexLookupDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -803,7 +801,6 @@ mod tests {
 
         let _ = find_overlapping_communities(
             &service.build_context(),
-            "org",
             &["entity:alice".to_string(), "entity:bob".to_string()],
         )
         .await;

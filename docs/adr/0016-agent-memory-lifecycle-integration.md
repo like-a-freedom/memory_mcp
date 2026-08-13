@@ -2,7 +2,12 @@
 
 Status: Accepted (2026-07-23; implemented)
 
-Amended by: ADR-0030 (`memory_mcp init` is the sole output-only exception to the ordinary CLI freeze).
+Amended by:
+
+- ADR-0030 (`memory_mcp init` is the sole output-only exception to the ordinary CLI freeze).
+- ADR-0038 (authorizes the scope-free breaking schema revision while preserving
+  the eight MCP tool names and command set; removes scope routing/enforcement;
+  replaces project daily budgets with an Active-Namespace/process budget).
 
 ## Context
 
@@ -81,9 +86,10 @@ operates through three complementary surfaces:
 
 The lifecycle integration uses these three surfaces only — no bridge adapters,
 no host normalization code, no custom transport. Hook scripts call the ordinary
-CLI directly; the CLI enforces scope, trust, and policy through the existing
-path. Stable event identity and deduplication are handled by `LifecycleCapture`
-via `load_event` + `compute_event_id`.
+CLI directly. As amended by ADR-0038, there is no request-scope enforcement;
+channel-derived trust and independent policy-tag enforcement remain on the
+existing path. Stable event identity and deduplication are handled by
+`LifecycleCapture` via `load_event` + `compute_event_id`.
 
 ### AD-5 — Selective recall over existing `assemble_context`
 
@@ -115,9 +121,9 @@ bounded trace link. This proves exposure, not causal use.
 
 The database stays append-oriented for evidence and facts. Growth is controlled
 at ingestion: ignored and duplicate events create zero new durable rows;
-accepted content is stored once; lifecycle content is bounded; quotas and
-project daily budgets prevent unbounded automatic ingestion while preserving
-immutable-domain growth.
+accepted content is stored once; lifecycle content is bounded. As amended by
+ADR-0038, quotas and a process/Active-Namespace daily budget replace project
+daily budgets while preserving the same bounded-growth intent.
 
 ## Consequences
 

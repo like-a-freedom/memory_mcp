@@ -15,19 +15,12 @@ pub const DEFAULT_WATCH_INTERVAL_SECS: u64 = 2;
 pub struct FsWatcher;
 
 impl FsWatcher {
-    pub async fn run(
-        dir: PathBuf,
-        project: Option<String>,
-        scope: String,
-        service: MemoryService,
-    ) -> Result<(), MemoryError> {
-        Self::run_with_interval(dir, project, scope, DEFAULT_WATCH_INTERVAL_SECS, service).await
+    pub async fn run(dir: PathBuf, service: MemoryService) -> Result<(), MemoryError> {
+        Self::run_with_interval(dir, DEFAULT_WATCH_INTERVAL_SECS, service).await
     }
 
     pub async fn run_with_interval(
         dir: PathBuf,
-        project: Option<String>,
-        scope: String,
         interval_secs: u64,
         service: MemoryService,
     ) -> Result<(), MemoryError> {
@@ -63,8 +56,6 @@ impl FsWatcher {
                 "watcher.ready",
                 json!({
                     "dir": dir.display().to_string(),
-                    "scope": scope,
-                    "project": project,
                     "interval_secs": interval_secs.max(1),
                 }),
                 json!({"status": "listening"}),
@@ -113,8 +104,6 @@ impl FsWatcher {
                         json!({
                             "path": path.display().to_string(),
                             "source_type": source_type,
-                            "scope": scope,
-                            "project": project,
                         }),
                         json!({}),
                         None,
@@ -131,10 +120,7 @@ impl FsWatcher {
                         source_id: format!("watch:{}", path.display()),
                         content: path.to_string_lossy().into_owned(),
                         t_ref: now(),
-                        scope: scope.clone(),
-                        project: project.clone(),
                         t_ingested: None,
-                        visibility_scope: None,
                         policy_tags: vec![],
                     },
                     None,
@@ -165,8 +151,6 @@ impl FsWatcher {
                                 json!({
                                     "path": path.display().to_string(),
                                     "source_type": source_type,
-                                    "scope": scope,
-                                    "project": project,
                                 }),
                                 json!({"error": err.to_string()}),
                                 None,

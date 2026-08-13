@@ -98,7 +98,7 @@ const REQUIRED_TOOL_FIELDS: &[(&str, &[&str])] = &[
     ("resolve", &["entity_type", "canonical_name"]),
     ("invalidate", &["fact_id", "reason", "t_invalid"]),
     ("explain", &["context_items"]),
-    ("assemble_context", &["query", "scope"]),
+    ("assemble_context", &["query"]),
 ];
 
 const CORPUS_PATH: &str = "tests/fixtures/agent_memory_lifecycle_cases.json";
@@ -233,14 +233,8 @@ async fn public_surface_matches_live_tool_registry() {
         .await
         .expect("apply migrations");
 
-    let service = MemoryService::new(
-        db_client,
-        vec!["test".to_string()],
-        "warn".to_string(),
-        50,
-        100,
-    )
-    .expect("create service");
+    let service = MemoryService::new(db_client, "test".to_string(), "warn".to_string(), 50, 100)
+        .expect("create service");
     let mcp = MemoryMcp::new(service);
 
     // Every expected tool must exist in the live registry.

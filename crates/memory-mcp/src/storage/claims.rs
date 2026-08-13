@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
-use super::DbClient;
+use super::{BoundDbClient, DbClient};
 use crate::models::FactId;
-use crate::models::claim::{Claim, ClaimJob, ClaimRelation};
+use crate::models::claim::{Claim, ClaimIdentityVersion, ClaimJob, ClaimRelation};
 use crate::service::MemoryError;
 
 // ─── ClaimStore Trait ─────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ pub(crate) trait ClaimStore: Send + Sync {
 
     async fn persist_projection(
         &self,
-        request: PersistProjectionRequest<'_>,
+        request: PersistProjectionRequest,
     ) -> Result<(), MemoryError>;
 
     async fn select_candidates_page(
@@ -43,10 +43,7 @@ pub(crate) trait ClaimStore: Send + Sync {
         query: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError>;
 
-    async fn count_active_relations(
-        &self,
-        namespace: &str,
-    ) -> Result<Vec<ActiveRelationCount>, MemoryError>;
+    async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError>;
 
     async fn select_facts_for_backfill(
         &self,
@@ -69,35 +66,31 @@ pub(crate) trait ClaimStore: Send + Sync {
 
 /// Lease request for the next pending job.
 pub(crate) struct LeaseJobRequest<'a> {
-    pub namespace: &'a str,
     pub lease_owner: &'a str,
     pub lease_duration: std::time::Duration,
 }
 
 /// Persist projection output (claims + jobs).
-pub(crate) struct PersistProjectionRequest<'a> {
-    pub namespace: &'a str,
+pub(crate) struct PersistProjectionRequest {
     pub claims: Vec<Claim>,
     pub jobs: Vec<ClaimJob>,
 }
 
 /// Query for candidate claims in a slot.
 pub(crate) struct ClaimCandidateQuery<'a> {
-    pub namespace: &'a str,
     pub slot_fingerprint: &'a str,
+    pub identity_version: ClaimIdentityVersion,
     pub after_claim_id: Option<&'a crate::models::ClaimId>,
     pub limit: usize,
 }
 
 /// Query for claims belonging to specific facts.
 pub(crate) struct ClaimsForFactsQuery<'a> {
-    pub namespace: &'a str,
     pub fact_ids: &'a [FactId],
 }
 
 /// Query for relations involving specific facts.
 pub(crate) struct RelationsForFactsQuery<'a> {
-    pub namespace: &'a str,
     pub fact_ids: &'a [FactId],
 }
 
@@ -111,14 +104,12 @@ pub(crate) struct ActiveRelationCount {
 
 /// Query for facts eligible for backfill.
 pub(crate) struct BackfillFactQuery<'a> {
-    pub namespace: &'a str,
     pub after_fact_id: Option<&'a FactId>,
     pub limit: usize,
 }
 
 /// Request to retract a fact and all its claims/relations.
 pub(crate) struct RetractFactAndClaimsRequest<'a> {
-    pub namespace: &'a str,
     pub fact_id: &'a FactId,
     pub retract_reason: &'a str,
 }
@@ -134,7 +125,6 @@ pub(crate) struct JobCounters {
 
 /// Commit one reconciliation page with cursor update.
 pub(crate) struct CommitReconciliationPageRequest<'a> {
-    pub namespace: &'a str,
     pub job_id: &'a crate::models::ClaimJobId,
     pub expected_lease_owner: &'a str,
     pub relations: &'a [crate::models::claim::ClaimRelation],
@@ -147,12 +137,14 @@ pub(crate) struct CommitReconciliationPageRequest<'a> {
 
 /// SurrealDB-backed claim store.
 pub(crate) struct SurrealClaimStore {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl SurrealClaimStore {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
     }
 
     fn upsert_one_sql(table: &str, record_id: &str) -> Result<String, MemoryError> {
@@ -189,6 +181,14 @@ impl SurrealClaimStore {
             _ => None,
         }
     }
+
+    fn candidate_query_sql(after_claim_id: bool) -> &'static str {
+        if after_claim_id {
+            "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp AND (identity_version = $identity_version OR ($identity_version = 'legacy' AND identity_version IS NONE)) AND claim_id > $after ORDER BY claim_id LIMIT $limit"
+        } else {
+            "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp AND (identity_version = $identity_version OR ($identity_version = 'legacy' AND identity_version IS NONE)) ORDER BY claim_id LIMIT $limit"
+        }
+    }
 }
 
 #[async_trait]
@@ -197,7 +197,7 @@ impl ClaimStore for SurrealClaimStore {
         let content = Self::serialize(job)?;
         let sql = Self::upsert_one_sql("claim_job", job.job_id.as_ref())?;
         let vars = serde_json::json!({"content": content});
-        self.db.query(&sql, Some(vars), &job.namespace).await?;
+        self.db.query(&sql, Some(vars)).await?;
         Ok(())
     }
 
@@ -220,7 +220,7 @@ impl ClaimStore for SurrealClaimStore {
             "expires": crate::service::normalize_dt(expires),
             "now": crate::service::normalize_dt(chrono::Utc::now()),
         });
-        let result = self.db.query(sql, Some(vars), request.namespace).await?;
+        let result = self.db.query(sql, Some(vars)).await?;
         match Self::extract_first(result) {
             Some(v) => serde_json::from_value(v)
                 .map(Some)
@@ -231,14 +231,13 @@ impl ClaimStore for SurrealClaimStore {
 
     async fn persist_projection(
         &self,
-        request: PersistProjectionRequest<'_>,
+        request: PersistProjectionRequest,
     ) -> Result<(), MemoryError> {
-        let namespace = request.namespace;
         for claim in &request.claims {
             let content = serde_json::to_value(claim)
                 .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
             self.db
-                .create(claim.claim_id.as_ref(), content, namespace)
+                .create(claim.claim_id.as_ref(), content)
                 .await
                 .map_err(|e| MemoryError::Storage(format!("persist claim: {e}")))?;
         }
@@ -246,7 +245,7 @@ impl ClaimStore for SurrealClaimStore {
             let content = serde_json::to_value(job)
                 .map_err(|e| MemoryError::Storage(format!("serialize job: {e}")))?;
             self.db
-                .create(job.job_id.as_ref(), content, namespace)
+                .create(job.job_id.as_ref(), content)
                 .await
                 .map_err(|e| MemoryError::Storage(format!("persist job: {e}")))?;
         }
@@ -260,24 +259,25 @@ impl ClaimStore for SurrealClaimStore {
         if query.limit == 0 {
             return Ok(vec![]);
         }
-        let sql = match query.after_claim_id {
-            Some(_) => {
-                "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp AND claim_id > $after ORDER BY claim_id LIMIT $limit"
-            }
-            None => {
-                "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp ORDER BY claim_id LIMIT $limit"
-            }
+        let sql = Self::candidate_query_sql(query.after_claim_id.is_some());
+        let identity_version = match query.identity_version {
+            ClaimIdentityVersion::Legacy => "legacy",
+            ClaimIdentityVersion::V2 => "v2",
         };
         let mut vars = serde_json::json!({
             "slot_fp": query.slot_fingerprint,
+            "identity_version": identity_version,
             "limit": query.limit,
         });
         if let Some(after) = query.after_claim_id {
-            vars.as_object_mut()
-                .unwrap()
-                .insert("after".to_string(), Value::String(after.to_string()));
+            let Some(vars) = vars.as_object_mut() else {
+                return Err(MemoryError::Storage(
+                    "claim pagination variables must be a JSON object".to_string(),
+                ));
+            };
+            vars.insert("after".to_string(), Value::String(after.to_string()));
         }
-        let result = self.db.query(sql, Some(vars), query.namespace).await?;
+        let result = self.db.query(sql, Some(vars)).await?;
         let records = Self::deserialize_vec(result);
         records
             .into_iter()
@@ -295,7 +295,7 @@ impl ClaimStore for SurrealClaimStore {
         let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
         let sql = "SELECT * FROM claim WHERE source_fact_id IN $fact_ids";
         let vars = serde_json::json!({"fact_ids": fact_ids});
-        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let result = self.db.query(sql, Some(vars)).await?;
         let records = Self::deserialize_vec(result);
         records
             .into_iter()
@@ -313,7 +313,7 @@ impl ClaimStore for SurrealClaimStore {
         let fact_ids: Vec<&str> = q.fact_ids.iter().map(|f| f.as_ref()).collect();
         let sql = "SELECT * FROM claim_relation WHERE (left_fact_id IN $fact_ids OR right_fact_id IN $fact_ids) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars = serde_json::json!({"fact_ids": fact_ids});
-        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let result = self.db.query(sql, Some(vars)).await?;
         let records = Self::deserialize_vec(result);
         records
             .into_iter()
@@ -324,12 +324,9 @@ impl ClaimStore for SurrealClaimStore {
             .collect()
     }
 
-    async fn count_active_relations(
-        &self,
-        namespace: &str,
-    ) -> Result<Vec<ActiveRelationCount>, MemoryError> {
+    async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {
         let sql = "SELECT schema_family, outcome, count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL GROUP BY schema_family, outcome";
-        let result = self.db.query(sql, None, namespace).await?;
+        let result = self.db.query(sql, None).await?;
         let records = Self::deserialize_vec(result);
         records
             .into_iter()
@@ -355,11 +352,14 @@ impl ClaimStore for SurrealClaimStore {
         };
         let mut vars = serde_json::json!({"limit": q.limit});
         if let Some(after) = q.after_fact_id {
-            vars.as_object_mut()
-                .unwrap()
-                .insert("after".to_string(), Value::String(after.to_string()));
+            let Some(vars) = vars.as_object_mut() else {
+                return Err(MemoryError::Storage(
+                    "fact backfill variables must be a JSON object".to_string(),
+                ));
+            };
+            vars.insert("after".to_string(), Value::String(after.to_string()));
         }
-        let result = self.db.query(sql, Some(vars), q.namespace).await?;
+        let result = self.db.query(sql, Some(vars)).await?;
         Ok(Self::deserialize_vec(result))
     }
 
@@ -374,17 +374,17 @@ impl ClaimStore for SurrealClaimStore {
             "id": request.fact_id.as_ref(),
             "reason": request.retract_reason,
         });
-        self.db.query(sql1, Some(vars1), request.namespace).await?;
+        self.db.query(sql1, Some(vars1)).await?;
         let sql2 = "UPDATE claim SET t_invalid_ingested = time::now() WHERE source_fact_id = $fact_id AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars2 = serde_json::json!({
             "fact_id": request.fact_id.as_ref(),
         });
-        self.db.query(sql2, Some(vars2), request.namespace).await?;
+        self.db.query(sql2, Some(vars2)).await?;
         let sql3 = "UPDATE claim_relation SET t_invalid_ingested = time::now() WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
         let vars3 = serde_json::json!({
             "fact_id": request.fact_id.as_ref(),
         });
-        self.db.query(sql3, Some(vars3), request.namespace).await?;
+        self.db.query(sql3, Some(vars3)).await?;
         Ok(())
     }
 
@@ -415,7 +415,7 @@ impl ClaimStore for SurrealClaimStore {
             let record_id = relation.claim_relation_id.as_ref();
             let content = Self::serialize(relation)?;
             self.db
-                .create(record_id, content, request.namespace)
+                .create(record_id, content)
                 .await
                 .map_err(|e| MemoryError::Storage(format!("persist relation: {e}")))?;
         }
@@ -446,7 +446,7 @@ impl ClaimStore for SurrealClaimStore {
                 request.job_id.body()
             );
             self.db
-                .query(&sql, Some(Value::Object(vars.clone())), request.namespace)
+                .query(&sql, Some(Value::Object(vars.clone())))
                 .await?;
         } else {
             let sql = format!(
@@ -456,9 +456,7 @@ impl ClaimStore for SurrealClaimStore {
                  WHERE lease_owner = $owner",
                 request.job_id.body()
             );
-            self.db
-                .query(&sql, Some(Value::Object(vars)), request.namespace)
-                .await?;
+            self.db.query(&sql, Some(Value::Object(vars))).await?;
         }
 
         Ok(())
@@ -467,13 +465,179 @@ impl ClaimStore for SurrealClaimStore {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use super::*;
+    use crate::models::claim::ClaimIdentityVersion;
+    use async_trait::async_trait;
+
+    #[derive(Clone, Default)]
+    struct NamespaceRecorder {
+        namespaces: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[async_trait]
+    impl DbClient for NamespaceRecorder {
+        async fn select_one(
+            &self,
+            _record_id: &str,
+            namespace: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(None)
+        }
+
+        async fn select_table(
+            &self,
+            _table: &str,
+            namespace: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(Vec::new())
+        }
+
+        async fn create(
+            &self,
+            _record_id: &str,
+            _content: Value,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _record_id: &str,
+            _content: Value,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            _sql: &str,
+            _vars: Option<Value>,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(Value::Array(Vec::new()))
+        }
+
+        async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+            self.namespaces
+                .lock()
+                .expect("recorder lock")
+                .push(namespace.to_string());
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn claim_store_routes_historical_job_metadata_to_startup_namespace() {
+        let recorder = Arc::new(NamespaceRecorder::default());
+        let store = SurrealClaimStore::new(recorder.clone(), "main");
+
+        store
+            .select_candidates_page(ClaimCandidateQuery {
+                slot_fingerprint: "v2:slot",
+                identity_version: ClaimIdentityVersion::V2,
+                after_claim_id: None,
+                limit: 1,
+            })
+            .await
+            .expect("candidate lookup should succeed");
+
+        assert_eq!(
+            recorder
+                .namespaces
+                .lock()
+                .expect("recorder lock")
+                .as_slice(),
+            ["main"]
+        );
+    }
 
     #[test]
-    fn migration_031_is_last_registered() {
+    fn candidate_lookup_is_versioned_and_namespace_bound() {
+        let query = ClaimCandidateQuery {
+            slot_fingerprint: "v2:slot",
+            identity_version: ClaimIdentityVersion::V2,
+            after_claim_id: None,
+            limit: 10,
+        };
+        let sql = SurrealClaimStore::candidate_query_sql(query.after_claim_id.is_some());
+
+        assert!(sql.contains("slot_fingerprint = $slot_fp"));
+        assert!(sql.contains("identity_version = $identity_version"));
+        assert!(sql.contains("identity_version IS NONE"));
+        assert!(!sql.contains("scope ="));
+        assert!(!sql.contains("project ="));
+        assert_eq!(query.identity_version, ClaimIdentityVersion::V2);
+    }
+
+    #[test]
+    fn legacy_relation_partition_fields_are_optional_on_deserialize() {
+        let raw = serde_json::json!({
+            "claim_relation_id": "claim_relation:r",
+            "left_claim_id": "claim:l",
+            "right_claim_id": "claim:r",
+            "pair_fingerprint": "pair",
+            "outcome": "duplicate",
+            "predecessor_claim_id": null,
+            "successor_claim_id": null,
+            "reason_code": "duplicate",
+            "evidence": {"reason_code": "duplicate", "description": null},
+            "evaluator_version": "test",
+            "context_fingerprint": "ctx",
+            "evaluated_at": "2026-08-13T00:00:00Z",
+            "supersedes_relation_id": null,
+            "policy_tags": [],
+            "t_ingested": "2026-08-13T00:00:00Z",
+            "t_invalid_ingested": null
+        });
+
+        let relation: ClaimRelation = serde_json::from_value(raw).unwrap();
+        assert_eq!(relation.scope, None);
+        assert_eq!(relation.project, None);
+    }
+
+    #[test]
+    fn latest_registered_migration_is_expected() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "031_entity_extraction_projection.surql");
+        assert_eq!(last.file_name, "037_triple_legacy_namespace_optional.surql");
+    }
+
+    #[test]
+    fn migration_033_defines_identity_version() {
+        let migrations = crate::storage::migrations::versioned_migrations();
+        let migration = migrations
+            .iter()
+            .find(|entry| entry.file_name == "033_claim_identity_version.surql");
+        assert!(migration.is_some());
+        assert!(migration.is_some_and(|entry| {
+            entry
+                .sql
+                .contains("DEFINE FIELD OVERWRITE identity_version ON claim")
+        }));
     }
 
     #[test]

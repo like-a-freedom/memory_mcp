@@ -16,12 +16,7 @@ use crate::service::service_context::ServiceContext;
 /// [`TRIPLE_EXTRACTION_MAX_CONCURRENCY`](crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY).
 /// If the limit is reached, the task is skipped with a warning log
 /// (best-effort backpressure).
-pub(crate) fn spawn_triple_extraction(
-    service: &ServiceContext,
-    fact_id: &str,
-    content: &str,
-    namespace: &str,
-) {
+pub(crate) fn spawn_triple_extraction(service: &ServiceContext, fact_id: &str, content: &str) {
     let permit = match service
         .triple_extraction_semaphore
         .clone()
@@ -35,7 +30,6 @@ pub(crate) fn spawn_triple_extraction(
                         "op".to_string(),
                         json!("triple_extraction.skipped_concurrency_limit"),
                     ),
-                    ("namespace".to_string(), json!(namespace)),
                     ("fact_id".to_string(), json!(fact_id)),
                 ]),
                 LogLevel::Warn,
@@ -47,7 +41,6 @@ pub(crate) fn spawn_triple_extraction(
     let extractor = service.triple_extractor.clone();
     let fact_id = fact_id.to_string();
     let content = content.to_string();
-    let namespace = namespace.to_string();
     let entity_service = service.entity_service.clone();
 
     tokio::spawn(async move {
@@ -58,7 +51,6 @@ pub(crate) fn spawn_triple_extraction(
             for triple in &triples {
                 let sql = r#"
                     CREATE TYPE::thing("triple", rand::guid()) SET
-                        namespace = $ns,
                         subject = $subject,
                         predicate = $predicate,
                         object = $object,
@@ -66,19 +58,17 @@ pub(crate) fn spawn_triple_extraction(
                         source_fact_id = $source_fact_id
                 "#;
                 let vars = json!({
-                    "ns": namespace,
                     "subject": triple.subject,
                     "predicate": triple.predicate,
                     "object": triple.object,
                     "confidence": triple.confidence,
                     "source_fact_id": triple.source_fact_id,
                 });
-                let _ = entity_service.execute_query(sql, vars, &namespace).await;
+                let _ = entity_service.execute_query(sql, vars).await;
 
                 if crate::service::triple_extractor::is_singleton_predicate(&triple.predicate) {
                     let _ = crate::service::conflict_resolver::resolve_conflicts_for_triple(
                         &entity_service,
-                        &namespace,
                         triple,
                     )
                     .await;

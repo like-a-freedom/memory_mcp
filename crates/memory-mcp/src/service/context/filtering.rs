@@ -40,7 +40,6 @@ pub(crate) fn raw_array(value: &Value) -> Option<&Vec<Value>> {
 pub(crate) fn filter_facts_by_constraints(
     records: Vec<Value>,
     access: &AccessPayload,
-    project: Option<&str>,
     fact_types: &[String],
 ) -> Vec<Fact> {
     let mut facts = Vec::new();
@@ -59,7 +58,7 @@ pub(crate) fn filter_facts_by_constraints(
                 item
             };
 
-            if !fact_record_allowed(fact_item, access, project, fact_types) {
+            if !fact_record_allowed(fact_item, access, fact_types) {
                 continue;
             }
 
@@ -75,12 +74,9 @@ pub(crate) fn filter_facts_by_constraints(
 pub(crate) fn fact_record_allowed(
     record: &Value,
     access: &AccessPayload,
-    project: Option<&str>,
     fact_types: &[String],
 ) -> bool {
-    fact_record_matches_project(record, project)
-        && fact_record_matches_type(record, fact_types)
-        && fact_record_allowed_by_policy(record, access)
+    fact_record_matches_type(record, fact_types) && fact_record_allowed_by_policy(record, access)
 }
 
 fn fact_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
@@ -110,11 +106,10 @@ fn fact_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool
 pub(crate) fn filter_episodes_by_constraints(
     records: Vec<Value>,
     access: &AccessPayload,
-    project: Option<&str>,
 ) -> Vec<Episode> {
     records
         .into_iter()
-        .filter(|record| episode_record_allowed(record, access, project))
+        .filter(|record| episode_record_allowed(record, access))
         .filter_map(|record| match record {
             Value::Object(map) => episode_from_record(&map),
             _ => record
@@ -125,13 +120,8 @@ pub(crate) fn filter_episodes_by_constraints(
         .collect()
 }
 
-pub(crate) fn episode_record_allowed(
-    record: &Value,
-    access: &AccessPayload,
-    project: Option<&str>,
-) -> bool {
-    episode_record_matches_project(record, project)
-        && episode_record_allowed_by_policy(record, access)
+pub(crate) fn episode_record_allowed(record: &Value, access: &AccessPayload) -> bool {
+    episode_record_allowed_by_policy(record, access)
 }
 
 fn episode_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
@@ -156,28 +146,6 @@ fn episode_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> b
         .map(String::as_str)
         .collect::<HashSet<_>>();
     tags.iter().any(|tag| allowed.contains(tag))
-}
-
-pub(crate) fn fact_record_matches_project(record: &Value, project: Option<&str>) -> bool {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return true;
-    };
-
-    raw_object(record)
-        .and_then(|map| map.get("project"))
-        .and_then(json_string)
-        .is_some_and(|value| value == project)
-}
-
-pub(crate) fn episode_record_matches_project(record: &Value, project: Option<&str>) -> bool {
-    let Some(project) = project.filter(|project| !project.trim().is_empty()) else {
-        return true;
-    };
-
-    raw_object(record)
-        .and_then(|map| map.get("project"))
-        .and_then(json_string)
-        .is_some_and(|value| value == project)
 }
 
 pub(crate) fn fact_record_matches_type(record: &Value, fact_types: &[String]) -> bool {
@@ -206,47 +174,11 @@ mod tests {
     fn make_access_context(allowed_tags: Option<Vec<String>>) -> AccessPayload {
         AccessPayload {
             caller_id: None,
-            allowed_scopes: None,
             allowed_tags,
             session_vars: None,
             transport: None,
             content_type: None,
-            cross_scope_allow: None,
         }
-    }
-
-    // -----------------------------------------------------------------------
-    // fact_record_matches_project tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn fact_record_matches_project_returns_true_when_no_project_filter() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(fact_record_matches_project(&record, None));
-    }
-
-    #[test]
-    fn fact_record_matches_project_returns_true_when_empty_project_filter() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(fact_record_matches_project(&record, Some("")));
-    }
-
-    #[test]
-    fn fact_record_matches_project_returns_true_when_match() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(fact_record_matches_project(&record, Some("alpha")));
-    }
-
-    #[test]
-    fn fact_record_matches_project_returns_false_when_mismatch() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(!fact_record_matches_project(&record, Some("beta")));
-    }
-
-    #[test]
-    fn fact_record_matches_project_returns_true_when_record_has_no_project() {
-        let record = serde_json::json!({"fact": "test"});
-        assert!(!fact_record_matches_project(&record, Some("alpha")));
     }
 
     // -----------------------------------------------------------------------
@@ -320,22 +252,6 @@ mod tests {
         let record = serde_json::json!({"policy_tags": ["secret"]});
         let access = make_access_context(Some(vec!["public".to_string()]));
         assert!(!fact_record_allowed_by_policy(&record, &access));
-    }
-
-    // -----------------------------------------------------------------------
-    // episode_record_matches_project tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn episode_record_matches_project_true_when_no_filter() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(episode_record_matches_project(&record, None));
-    }
-
-    #[test]
-    fn episode_record_matches_project_false_when_mismatch() {
-        let record = serde_json::json!({"project": "alpha"});
-        assert!(!episode_record_matches_project(&record, Some("beta")));
     }
 
     // -----------------------------------------------------------------------
@@ -568,7 +484,7 @@ mod tests {
     #[test]
     fn filter_facts_by_policy_returns_empty_for_empty_input() {
         let access = AccessPayload::default();
-        let result = filter_facts_by_constraints(vec![], &access, None, &[]);
+        let result = filter_facts_by_constraints(vec![], &access, &[]);
         assert!(result.is_empty());
     }
 
@@ -576,7 +492,7 @@ mod tests {
     fn filter_facts_by_policy_skips_invalid_records() {
         let access = AccessPayload::default();
         let records = vec![serde_json::json!({"invalid": "data"})];
-        let result = filter_facts_by_constraints(records, &access, None, &[]);
+        let result = filter_facts_by_constraints(records, &access, &[]);
         assert!(result.is_empty());
     }
 
@@ -589,13 +505,11 @@ mod tests {
         fact2.policy_tags = vec!["blocked".to_string()];
 
         let access = AccessPayload {
-            allowed_scopes: None,
             allowed_tags: Some(vec!["allowed".to_string()]),
             caller_id: None,
             session_vars: None,
             transport: None,
             content_type: None,
-            cross_scope_allow: None,
         };
 
         let records = vec![
@@ -621,7 +535,7 @@ mod tests {
             }),
         ];
 
-        let result = filter_facts_by_constraints(records, &access, None, &[]);
+        let result = filter_facts_by_constraints(records, &access, &[]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].fact_id, "fact:1");
     }
@@ -629,13 +543,11 @@ mod tests {
     #[test]
     fn filter_facts_by_policy_allows_all_when_no_tags_specified() {
         let access = AccessPayload {
-            allowed_scopes: None,
             allowed_tags: None,
             caller_id: None,
             session_vars: None,
             transport: None,
             content_type: None,
-            cross_scope_allow: None,
         };
 
         let records = vec![
@@ -660,7 +572,7 @@ mod tests {
             }),
         ];
 
-        let result = filter_facts_by_constraints(records, &access, None, &[]);
+        let result = filter_facts_by_constraints(records, &access, &[]);
         assert_eq!(result.len(), 2);
     }
 
@@ -680,7 +592,7 @@ mod tests {
             }
         })];
 
-        let result = filter_facts_by_constraints(records, &access, None, &[]);
+        let result = filter_facts_by_constraints(records, &access, &[]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].fact_id, "fact:1");
     }
@@ -716,7 +628,7 @@ mod tests {
             ]
         })];
 
-        let result = filter_facts_by_constraints(records, &access, None, &[]);
+        let result = filter_facts_by_constraints(records, &access, &[]);
         assert_eq!(result.len(), 2);
     }
 }

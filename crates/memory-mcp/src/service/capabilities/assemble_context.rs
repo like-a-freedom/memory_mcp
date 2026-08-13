@@ -38,8 +38,6 @@ mod tests {
         let ctx = make_context_base(db);
         let request = AssembleContextRequest {
             query: "nonexistent query".to_string(),
-            scope: "org".to_string(),
-            project: None,
             fact_types: vec![],
             as_of: None,
             budget: 5,

@@ -4,6 +4,16 @@
 **Date:** July 17, 2026<br>
 **Status:** Consolidated (supersedes all previous SPEC.md versions)
 
+> **Current contract notice (ADR-0038, 2026-08-12):** this specification is
+> amended by [ADR-0038](adr/0038-one-active-namespace-per-server.md). A running
+> server has one immutable native SurrealDB **Active Namespace** selected at
+> startup. Ordinary MCP, CLI, lifecycle, app, and worker operations do not
+> accept `scope`, partitioning `project`, or request-level `namespace` inputs.
+> Existing `scope`/`project`/`visibility_scope` fields remain only as legacy
+> compatibility metadata; they are not an isolation mechanism. The historical
+> requirements below are retained where useful for audit, but any conflicting
+> requirement is superseded by ADR-0038.
+
 ---
 
 ## Document Change History
@@ -11,7 +21,7 @@
 - **2026-08-11**: Documentation refresh — tool surface corrected from six to the frozen eight-tool MCP surface (ADR-0016); zero-config environment defaults aligned with `config/surreal.rs` and `config/ner.rs`; claim/ClaimRelation/backfill/Prometheus statuses refreshed to match the shipped reconciliation pipeline; removed dangling references; migrations paths moved under `crates/memory-mcp/migrations/`.
 - **2026-07-17**: Added the deterministic Claim/ClaimRelation reconciliation target: contradiction versus supersession/correction/retraction semantics, exact claim slots, source and cardinality gates, trace/Prometheus requirements, append-only automatic migrations, resumable legacy backfill, backward-compatible MCP enrichment, and TDD/evaluation gates. See `docs/CONTRADICTION_DETECTION_DESIGN.md` and ADR-0002 through ADR-0015.
 - **2026-03-27**: Added explicit reference to the SOTA memory-alignment design as the adaptive-memory target-state companion to this runtime spec. Clarified that SOTA alignment work must preserve the approved lexical/BM25 + graph direction and should generally land under the existing MCP tool surface. (The referenced companion file is no longer in the repository; see the §1.1 note.)
-- **2026-03-27**: Fixed critical issues from code review: (1) `namespace_for_scope()` now normalizes scope to lowercase before prefix matching and logs warn for unknown scopes; (2) confirmed `select_entities_batch()` is already used in hot path (`expand_query_with_aliases`); (3) entity aliases are normalized at write time via `normalize_text()`, ensuring consistent lookup. Updated entity extraction status to reflect Unicode-aware regex with `person`/`technology` classification.
+- **Historical (2026-03-27):** Earlier scope-to-namespace routing and related normalization work was superseded by ADR-0038. Entity alias normalization and Unicode-aware extraction remain current; `scope` is no longer an active routing input.
 - **2026-03-26**: Added `docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md` as the target-state specification for the upcoming breaking search redesign. That redesign removes embedding/HNSW runtime support in favor of BM25/full-text primary retrieval plus bounded graph expansion and deterministic fusion.
 - **2026-03-25**: Completed remediation waves for indexed entity lookup, provenance persistence, edge invalidation, native `RELATE` graph storage, DB-side intro traversal, semantic scaffolding, community-aware retrieval, and checksum-enforced versioned migrations. Verified in this pass with `cargo test semantic_scaffolding --test service_integration` (2 passed), `cargo test --test service_acceptance` (11 passed), and `cargo test --test service_integration` (11 passed).
 - **2026-03-25 (embedding follow-up)**: Added configurable `SURREALDB_EMBEDDING_DIMENSION`, DB-side community summary full-text search, and an explicit manual-reindex warning for dimension changes. Verified with strict `cargo clippy --all-targets -- -D warnings` and full `cargo test`.
@@ -55,14 +65,14 @@ Memory System provides agents with a unified long-term memory and context layer 
 - Aggregates source material into episodes
 - Transforms episodes into a **bi-temporal knowledge graph** (facts + relationships) backed by native SurrealDB relation edges and native `datetime` temporal fields
 - Delivers compact context packs to LLMs on-demand with minimal token budget; current implementation combines lexical retrieval, community summaries, and graph traversal, while full hybrid embedding ranking remains gated behind the default `NullEmbedder`
-- Supports personal, team, and organizational scopes with strict access control
+- Provides one owner-controlled memory space per running server process, with provenance, policy-tag filtering, and channel-derived trust
 
 ### 1.2 Key Design Principles
 
 1. **Separation of Concerns**: A specialized Memory Agent handles all memory operations, while the Product Manager Agent delegates via `runSubagent`
 2. **Bi-temporal Modeling**: Track both "when was it true" (validity time) and "when did we learn it" (transaction time) to support accurate historical queries and reliable audit trails
 3. **Determinism**: All operations produce stable, reproducible results, with no randomness and consistent sort order
-4. **Access Control**: Strict scope isolation (personal/team/org/private-domain) with policy-based filtering
+4. **Access Control**: Policy tags, trust, quarantine, source authority, and caller identity are enforced without pretending that one personal process provides internal personal/corporate isolation
 5. **Single Source of Truth**: SurrealDB as the only storage backend (no in-memory alternatives)
 
 ### 1.3 Architecture Overview
@@ -111,7 +121,7 @@ The target architecture remains valid, but several roadmap items are intentional
 - Retrieval is currently lexical-first, then augmented by community-summary and graph signals; embedding retrieval remains scaffolded but disabled by the default `NullEmbedder`.
 - `explain()` now expands provenance back to the source episode, including citation text and timestamp context.
 - Community maintenance is implemented as a deterministic connected-components baseline, while more advanced clustering/consolidation remains deferred.
-- Embedded/local deployments intentionally keep a shared `Mutex<Surreal<_>>` because namespace rebasing (`use_ns` / `use_db`) is session-scoped; a namespace-scoped client pool remains known throughput tech debt.
+- The storage client binds one namespace/database context at startup. Embedded RocksDB remains single-process/single-lock; switching namespace requires a clean process restart and never moves data.
 - The zero-config NER default is the lightweight dependency-free Anno extractor; the project-owned regex extractor is a selectable backend (`NER_EXTRACTOR=regex`). Broader multilingual/NLP extraction via model-backed GLiNER backends is optional and opt-in (`NER_EXTRACTOR=urchade/gliner_multi-v2.1` or `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`).
 
 The current repository direction also intentionally constrains future work:
@@ -199,7 +209,8 @@ runSubagent({
 | **ClaimRelation** | Versioned reconciliation decision between two claims: duplicate, supersession, correction, contradiction, or temporal ambiguity |
 | **Bi-temporal** | Separating real-world validity (`valid_from`/`valid_to`) from transaction validity (`t_ingested`/`t_invalid_ingested`) for correct historical queries and audit |
 | **Community/Cluster** | Cluster of densely connected entities with aggregated summary for faster context assembly |
-| **Scope** | Isolation level: `personal`, `team`, `org`, or `private-domain` (e.g., `hr.salary`, `deal.pipeline`) |
+| **Active Namespace** | The one native SurrealDB namespace selected for the whole server process; it is storage configuration, not a per-memory field |
+| **Legacy scope metadata** | Historical `scope` values retained for compatibility/audit; not active isolation, routing, or authorization |
 | **Provenance** | Complete lineage from episode to fact to claim and versioned reconciliation/lifecycle decisions |
 
 ### 3.2 Data Model Conventions
@@ -224,43 +235,41 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 | Role | Access | Description |
 |------|--------|-------------|
-| **Owner (personal)** | Full access to personal scope | Individual user's private memory |
-| **Org Admin** | Manage org scope, policies, connectors, retention | Controls organizational memory |
-| **Team Member** | Access to assigned team scopes (projects/deals) | Collaborative project memory |
-| **HR/Finance** | Access to private-domain scopes (e.g., `hr.salary`, `finance.budget`) | Restricted sensitive data |
-| **Agent (service role)** | Access via policy-bound tokens/scopes | Automated processes with limited permissions |
+| **Owner** | Full access to the selected Active Namespace | The current product is a personal, single-owner system |
+| **Agent** | Access through the configured MCP/CLI channel and derived trust policy | The agent cannot choose a namespace or elevate trust |
+| **Future operator domains** | Not provided by the current process | Separate authorization domains require separately designed process/configuration support |
 
 ### 4.2 Functional Requirements: Access Control
 
-**FR-AC-01**: System MUST support context levels: `personal` / `team` / `org` / `private-domain` (e.g., `hr.salary`, `deal.pipeline`, `personal.health`).  
-**Status**: ✅ Done
+**FR-AC-01**: A running server MUST use one immutable Active Namespace selected at startup; ordinary requests MUST NOT select or cross namespaces.
+**Status**: ✅ Implemented; the concrete client rejects namespace mismatches, while deeper namespace-free storage interfaces remain planned.
 
-**FR-AC-02**: Each memory object MUST have `visibility_scope` and `policy_tags`.  
-**Status**: ✅ Done
+**FR-AC-02**: New memory writes MUST use provenance, `policy_tags`, and channel-derived trust; legacy `visibility_scope` is readable compatibility metadata only.
+**Status**: ✅ Implemented
 
-**FR-AC-03**: Retrieval queries MUST filter by policies **before** execution (no post-filtering of LLM responses).  
-**Status**: ✅ Done
+**FR-AC-03**: Retrieval queries MUST filter by independent policy tags and access rules before execution (no post-filtering of LLM responses).
+**Status**: ✅ Implemented
 
-**FR-AC-04**: Agent access MUST use authentication (JWT/external auth server) and scope-bound tokens (audience/claims) when using SurrealDB Cloud/SurrealMCP.  
-**Status**: ✅ Done
+**FR-AC-04**: Agent access MUST use the configured transport and trust policy; public arguments MUST NOT set final trust or authorization.
+**Status**: ✅ Implemented
 
-**FR-AC-05**: Rate limits MUST be implemented at MCP/gateway layer (RPS/burst) to prevent abuse and unauthorized extraction.  
-**Status**: ✅ Done
+**FR-AC-05**: Rate limits MUST be implemented at MCP/gateway layer (RPS/burst) to prevent abuse and unauthorized extraction.
+**Status**: ✅ Implemented
 
-**FR-AC-06**: System MUST separate `personal` and `corporate` contexts in different namespaces within the same database.  
-**Status**: ✅ Done
+**FR-AC-06**: The current personal product MUST NOT claim to separate personal, corporate, family, or project memories inside one Active Namespace. Separate authorization domains are a future capability requiring a separate process/configuration design.
+**Status**: ✅ Implemented as an explicit limitation
 
-**FR-AC-07**: Cross-scope references MUST be resolved only through policy rules (explicit allow/deny) with mandatory logging.  
-**Status**: ✅ Done
+**FR-AC-07**: Source authority, quarantine, trust, caller identity, and policy-tag restrictions MUST remain independent of namespace selection and MUST be logged where required.
+**Status**: ✅ Implemented
 
-**FR-AC-08**: Cross-scope retrieval MUST pre-check policies and scope-claims.  
-**Status**: ✅ Done
+**FR-AC-08**: Retrieval MUST enforce the same independent policy controls for every item in the Active Namespace; there is no cross-scope retrieval path.
+**Status**: ✅ Implemented
 
 **FR-AC-09**: System MUST maintain immutable execution/event log for all MCP operations (who/what/when/args/result) with replay capability for debugging and audit.  
 **Status**: ✅ Done
 
-**FR-AC-10**: Authentication/authorization for HTTP/RPC MUST comply with FR-AC requirements (JWT, scope/claims, ns/db headers for HTTP).  
-**Status**: ✅ Done
+**FR-AC-10**: Remote authentication/authorization MUST protect the configured namespace/database; the current stdio-first personal deployment does not expose a multi-tenant scope/claims model.
+**Status**: ⚠️ Partial — remote RBAC remains a follow-up item.
 
 ---
 
@@ -280,8 +289,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-IN-04**: For each episode, MUST record `t_ref` (reference time of event) and `t_ingested` (when added to system) for bi-temporal logic.  
 **Status**: ✅ Done
 
-**FR-IN-05**: Ingestion MUST use a deterministic `episode_id` based on `source_type`, `source_id`, `t_ref`, and `scope`.  
-**Status**: ✅ Done
+**FR-IN-05**: Ingestion MUST use a deterministic `episode_id` based on `source_type`, `source_id`, and `t_ref`; the Active Namespace is supplied by the storage context, not by the record identity.
+**Status**: ✅ Implemented with legacy identity fallback.
 
 **FR-IN-06**: Normalization rules for sources and identifiers MUST be documented and applied before computing deterministic IDs (trim/unicode normalization, timezone normalization, email/case canonicalization) to avoid collisions and ensure stability across repeated ingestion runs.  
 **Status**: ✅ Done
@@ -325,7 +334,7 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **Status**: ⚠️ Partial — applied scripts are recorded with checksums and checksum drift fails validation, but an explicit historical-migration compatibility gate is not documented in the current test matrix.
 
-**FR-DB-08**: On startup, the application MUST automatically upgrade every configured namespace from each explicitly supported older database version before serving requests. Migrations MUST be deterministic, restart-safe, data-preserving, and compatible with legacy records missing newly introduced optional fields. Migration failure MUST stop startup before the application serves against a partially upgraded schema.
+**FR-DB-08**: On startup, the application MUST automatically upgrade the selected Active Namespace from each explicitly supported older database version before serving requests. Migrations MUST be deterministic, restart-safe, data-preserving, and compatible with legacy records missing newly introduced optional fields. Migration failure MUST stop startup before the application serves against a partially upgraded schema. Inactive namespaces are untouched until explicitly selected by a later process restart.
 
 **Status**: ⚠️ Partial — startup applies pending embedded migrations per namespace, but sequential upgrade coverage from a declared set of historical database versions is not established.
 
@@ -355,13 +364,13 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 **Status**: ✅ Done — deterministic claim/relation IDs from canonical inputs; semantic payloads are immutable and only open validity bounds close monotonically.
 
-**FR-EX-08**: Historical claim projection MUST run outside startup migrations as a local, bounded, durable, idempotent, and resumable backfill with per-namespace progress and an extractor fingerprint. Legacy facts MUST remain retrievable while backfill is incomplete.
+**FR-EX-08**: Historical claim projection MUST run outside startup migrations as a local, bounded, durable, idempotent, and resumable backfill with Active-Namespace-local progress and an extractor fingerprint. Legacy facts MUST remain retrievable while backfill is incomplete. Historical aggregate records may retain compatibility entries for other namespaces, but one process must never advance them.
 
-**Status**: ✅ Done — `src/service/claims/backfill.rs` implements local, bounded, durable, idempotent, resumable backfill with per-namespace progress and an extractor fingerprint; legacy facts stay retrievable during backfill.
+**Status**: ✅ Done — `src/service/claims/backfill.rs` implements local, bounded, durable, idempotent, resumable backfill for the selected Active Namespace; legacy facts stay retrievable during backfill. Remote/concurrent evidence remains a release gate, not an unverified claim.
 
-**FR-EX-09**: Automatic reconciliation candidate lookup MUST use indexed stable pagination within an exact claim slot: namespace, scope, project identity, access-policy fingerprint, canonical subject, compatible schema, comparison key, and qualifiers. It MUST NOT use a global scan, fuzzy entity overlap, or a fixed latest-N window.
+**FR-EX-09**: Automatic reconciliation candidate lookup MUST use indexed stable pagination within the Active Namespace and exact claim slot: access-policy fingerprint, canonical subject, compatible schema, and comparison key. Qualifiers are evaluated during reconciliation, not used to create a separate v2 slot. It MUST NOT use a global scan, fuzzy entity overlap, or a fixed latest-N window.
 
-**Status**: ✅ Done — indexed claim-slot pagination (`claim_slot_cursor_idx`, `claim_job_lease_idx`, `fact_claim_backfill_cursor_idx`) over namespace/scope/project/policy/subject/schema/comparison-key/qualifier slot; no global scan or fixed latest-N window.
+**Status**: ✅ Implemented for v2 claims; legacy claim fields remain readable and legacy identity comparison remains conservative.
 
 ### 5.5 Entity Resolution (Deduplication)
 
@@ -485,8 +494,8 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 **FR-AG-03**: Entity resolution and fact invalidation MUST remain explainable and auditable: all merges and invalidations are logged, and callers can request citations and explanations via `explain`.
 **Status**: ✅ Done — invalidations are logged and `explain()` performs full provenance tracing back to source episodes with multi-source lineage. Entity-merge history tracking remains a follow-up item (merge workflows not yet implemented).
 
-**FR-AG-04**: System MUST support agent types: personal, team (2 owners), collective (group visibility) at minimum via scope/ACL.  
-**Status**: ✅ Done
+**FR-AG-04**: The current system MUST support one owner and agent access within one Active Namespace. Multi-owner/team/collective authorization is explicitly outside the current personal release.
+**Status**: ✅ Implemented as the current product boundary
 
 ### 5.10 UI/UX (Minimum for "Context Graph")
 
@@ -536,10 +545,11 @@ For consistency, all schemas/APIs/skills MUST use these field names:
 
 All IDs MUST be deterministic to ensure idempotence:
 
-- **Episode ID**: `hash(source_type + source_id + t_ref + scope)`
-- **Entity ID**: `hash(canonical_name + type + scope)` after normalization
-- **Fact ID**: `hash(content + source_episode + source_position + scope)`
-- **Edge ID**: `hash(from_entity + to_entity + relation_type + t_valid + scope)`
+- **Episode ID**: `hash(source_type + source_id + t_ref)`; the Active Namespace is implicit in the selected database context
+- **Entity ID**: `hash(canonical_name + type)` after normalization within the Active Namespace
+- **Fact ID**: `hash(content + source_episode + source_position)` within the Active Namespace
+- **Edge ID**: `hash(from_entity + to_entity + relation_type + t_valid)` within the Active Namespace
+- Legacy records whose identities included scope remain readable through the compatibility readers.
 
 **Normalization rules** (FR-IN-06):
 - Trim whitespace
@@ -547,16 +557,20 @@ All IDs MUST be deterministic to ensure idempotence:
 - Timezone normalization (all timestamps → UTC)
 - Email/case canonicalization (lowercase, domain normalization)
 
-### 6.3 Scope and Namespace Mapping
+### 6.3 Active Namespace
 
-- **Scope** → **SurrealDB Namespace** mapping:
-  - `personal` → `user_<user_id>`
-  - `team` → `team_<team_id>`
-  - `org` → `org_<org_id>`
-  - `private-domain` (e.g., `hr.salary`) → `private_<domain>`
-
-- All objects within a scope stored in corresponding namespace
-- Cross-scope queries require explicit policy allow-list
+- One server process selects one native SurrealDB namespace at startup.
+- If `SURREALDB_NAMESPACE` is absent, the namespace is `main`; the database is
+  `memory` unless `SURREALDB_DB_NAME` overrides it.
+- Changing `SURREALDB_NAMESPACE` requires a clean process restart. It selects a
+  different physical storage context but never moves, copies, merges, or deletes
+  records.
+- Inactive namespaces are not enumerated or migrated by the running process.
+- The Active Namespace does not internally separate personal, corporate, family,
+  or project memories. Policy tags, trust, quarantine, source authority, and
+  caller controls remain independent governance mechanisms.
+- Historical scope/project values may remain in stored records for compatibility;
+  they are not mapped to namespaces or used as active routing.
 
 ---
 
@@ -566,13 +580,13 @@ All IDs MUST be deterministic to ensure idempotence:
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
-| `ingest` | Store raw episode | `source_type`, `source_id`, `content`, `t_ref`, `scope` | `ToolResponse<String>` with `episode_id` in `result` |
+| `ingest` | Store raw episode | `source_type`, `source_id`, `content`, `t_ref`, `policy_tags?` | `ToolResponse<String>` with `episode_id` in `result` |
 | `extract` | Extract entities, facts, and links from an episode or inline content | `episode_id` or non-empty `content`/`text` | `ToolResponse<ExtractResult>` |
 | `resolve` | Deduplicate/resolve canonical entities | `entity_type`, `canonical_name`, `aliases[]` | `ToolResponse<String>` with canonical `entity_id` |
 | `invalidate` | Retract an erroneous or withdrawn source fact while preserving audit history | `fact_id`, `reason`, `t_invalid` | `ToolResponse<String>` |
-| `assemble_context` | Build recency-first context pack for query | `query`, `scope`, `as_of?`, `budget` | `ToolResponse<Vec<AssembledContextItem>>` |
+| `assemble_context` | Build recency-first context pack for query | `query`, `as_of?`, `budget`, policy/access filters | `ToolResponse<Vec<AssembledContextItem>>` |
 | `explain` | Return citation-shaped context items | `context_items` | `ToolResponse<Vec<ExplainItem>>` |
-| `open_app` | Open a Memory MCP app session (inspector, diff, graph, ingestion review, lifecycle) for operator workflows | `app`, `scope`, app-specific fields | `ToolResponse` with `session_id` and `resource_uri` |
+| `open_app` | Open a Memory MCP app session (inspector, diff, graph, ingestion review, lifecycle) for operator workflows | `app`, app-specific fields; storage uses the Active Namespace | `ToolResponse` with `session_id` and `resource_uri` |
 | `app_command` | Execute a coarse-grained command for an active app session | `session_id`, `action`, action-specific fields | `ToolResponse` with command status |
 
 ### 7.2 Contract Design Notes
@@ -616,8 +630,8 @@ Logging levels:
 **NFR-P-01 (Latency)**: p95 context assembly latency SHOULD be ≤100–300ms for typical queries, assuming pre-built indexes (vector/text/graph); "raw episode search" may be slower.  
 **Status**: ✅ Done
 
-**NFR-P-02 (Scalability)**: System MUST support scaling to "10 humans + 10,000 agents" via scope isolation, caching, rate limiting, and limited traversal depth.  
-**Status**: ✅ Done
+**NFR-P-02 (Scalability):** The current personal system MUST remain bounded through caching, rate limiting, limited traversal depth, and one-process/one-namespace storage. Multi-user tenant scaling is outside this release.
+**Status**: ⚠️ Partial — the personal bound is implemented; multi-tenant scaling is not a current requirement.
 
 ### 8.2 Reliability
 
@@ -626,8 +640,8 @@ Logging levels:
 
 ### 8.3 Security
 
-**NFR-S-01 (Security)**: MUST enforce strict data segregation and token/authentication management at MCP level; MCP transport should support local and network modes (stdio/http/unix socket) depending on deployment model.  
-**Status**: ⚠️ Partial — stdio/local-first operation is documented and embedded mode now uses `Capabilities::default()`, but remote RBAC/capability lockdown remains a follow-up item.
+**NFR-S-01 (Security):** MUST enforce provenance, policy-tag filtering, trust/quarantine controls, caller identity, and authentication at the MCP/storage boundary. One personal Active Namespace is not an internal personal/corporate segregation boundary.
+**Status**: ⚠️ Partial — stdio/local-first operation and embedded capability defaults are implemented; remote RBAC/capability lockdown remains a follow-up item.
 
 ### 8.4 Auditability
 
@@ -753,7 +767,7 @@ memory_mcp/
 
 - [x] Sync tables and fields with current schema (episode, entity, fact, edge, community, task, event_log)
 - [x] Deterministic ID rules (episode/entity/fact/edge/community)
-- [x] Scope/namespace rules and `scope → namespace` mapping
+- [x] One Active Namespace selected at startup; legacy scope metadata remains readable but does not route requests
 - [x] Add Claim, ClaimRelation, comparison-key alias, and durable claim-job records through a new migration
 - [x] Add deterministic bi-temporal claim and relation IDs and indexed claim-slot queries
 
@@ -766,7 +780,7 @@ memory_mcp/
 - [x] Expectations: `script_migration` schema or canonical initial migration (`__Initial.surql`)
 - [x] Integration test: apply migrations to embedded SurrealDB, verify indexes/tables
 - [x] Versioned multi-file migrations with checksum verification
-- [x] Apply pending embedded migrations to every configured namespace before serving
+- [x] Apply pending migrations only to the selected Active Namespace before serving
 - [x] Treat every released migration as immutable and add only new monotonically ordered migrations
 - [ ] Test sequential automatic upgrades from every explicitly supported historical database version
 
@@ -774,7 +788,7 @@ memory_mcp/
 
 #### 9.2.8 Configuration and Environment
 
-- [x] Required env vars: `SURREALDB_DB_NAME`, `SURREALDB_URL`, `SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`
+- [x] Storage env vars: `SURREALDB_DB_NAME`, `SURREALDB_URL`, `SURREALDB_NAMESPACE`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`; `SURREALDB_NAMESPACE` is optional and defaults to `main`
 - [x] Optional: `RUST_LOG` (standard Rust logging variable)
 - [x] Fail-fast behavior on missing/invalid config
 - [x] Documentation: recommend `cargo install --locked memory_mcp`, provide examples for installed and built binaries
@@ -815,7 +829,7 @@ memory_mcp/
 - [x] Test fixtures/embedded in-memory SurrealDB (`kv-mem`)
 - [x] Code formatted (`cargo fmt`) and checked (`cargo clippy`)
 - [x] Labeled claim reconciliation corpus with adversarial negatives
-- [x] Resumable legacy backfill, claim concurrency, and MCP compatibility tests
+- [x] Resumable legacy backfill, claim concurrency, namespace-switch, and MCP compatibility tests
 - [ ] Sequential automatic upgrade from every explicitly supported historical database version
 
 **Status**: ⚠️ Partial — claim corpus, backfill, and reconciliation coverage shipped (`claim_reconciliation_cases.json`, `tests/claim_reconciliation_e2e.rs`, `src/service/claims/backfill.rs`); only sequential historical-upgrade tests remain pending.
@@ -982,7 +996,7 @@ Every memory tool is reachable both via stdio MCP and via a CLI subcommand, shar
 | `SURREALDB_URL` | ❌ | SurrealDB connection URL. Remote schemes (`http(s)://`, `ws(s)://`) require explicit credentials; unset selects embedded mode | embedded (inferred) |
 | `SURREALDB_EMBEDDED` | ❌ | Force embedded RocksDB mode if `true`; if unset it is inferred from `SURREALDB_URL` | inferred from URL (`true` when URL unset) |
 | `SURREALDB_DB_NAME` | ❌ | Database name | `memory` |
-| `SURREALDB_NAMESPACES` | ❌ | Comma-separated namespaces (e.g., `org,personal`) | `org` |
+| `SURREALDB_NAMESPACE` | ❌ | One Active Namespace for the whole process; the removed plural name is rejected | `main` |
 | `SURREALDB_USERNAME` | ✅ (remote) | Username; `root` in embedded mode | `root` |
 | `SURREALDB_PASSWORD` | ✅ (remote) | Password; `root` in embedded mode | `root` |
 | `SURREALDB_DATA_DIR` | ❌ | Embedded RocksDB data directory | `$XDG_DATA_HOME/memory_mcp` → `~/.local/share/memory_mcp` → `./.memory_mcp` |
@@ -1027,12 +1041,12 @@ memory_mcp
 
 ```bash
 # Zero-config: start with no environment variables for embedded storage,
-# database `memory`, namespace `org`, embedded root/root credentials,
+# database `memory`, namespace `main`, embedded root/root credentials,
 # Anno entity extraction, and disabled embeddings.
 memory_mcp
 
 # Power users override individual settings:
-SURREALDB_NAMESPACES=org,personal \
+SURREALDB_NAMESPACE=org \
 QUERY_LOGGING_ENABLED=true \
 NER_EXTRACTOR=urchade/gliner_multi-v2.1 \
 RUST_LOG=info \

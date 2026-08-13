@@ -44,11 +44,10 @@ struct SourceSample {
     source_type: String,
     source_id: String,
     content: String,
-    scope: String,
-    #[serde(default)]
-    project: Option<String>,
     #[serde(default)]
     policy_tags: Vec<String>,
+    #[serde(default)]
+    trust_class: Option<String>,
     t_ref: String,
 }
 
@@ -122,9 +121,10 @@ fn parse_reference_time(raw: &str) -> Result<DateTime<Utc>, EvalError> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct BoundaryKey {
-    scope: String,
-    project: Option<String>,
+    namespace: String,
     policy_tags: BTreeSet<String>,
+    /// Eval-only channel/trust metadata. Trust is not persisted on relations.
+    trust_class: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,6 +132,8 @@ enum WarningLabel {
     TruePositive,
     FalsePositive,
     IsolationViolation,
+    PolicyMismatch,
+    TrustMismatch,
     UnresolvedLineage,
 }
 
@@ -147,10 +149,16 @@ fn classify_warning(
     let left_boundary = boundaries.get(&warning.conflicting_fact_id);
     let right_boundary = boundaries.get(&warning.new_fact_id);
 
-    if let (Some(left), Some(right)) = (left_boundary, right_boundary)
-        && left != right
-    {
-        return WarningLabel::IsolationViolation;
+    if let (Some(left), Some(right)) = (left_boundary, right_boundary) {
+        if left.namespace != right.namespace {
+            return WarningLabel::IsolationViolation;
+        }
+        if left.policy_tags != right.policy_tags {
+            return WarningLabel::PolicyMismatch;
+        }
+        if left.trust_class != right.trust_class {
+            return WarningLabel::TrustMismatch;
+        }
     }
 
     if left_boundary.is_none() || right_boundary.is_none() {
@@ -191,8 +199,6 @@ fn count_isolation_violations(
 }
 
 struct IngestParams<'a> {
-    scope: &'a str,
-    project: Option<&'a str>,
     source_type: &'a str,
     source_id: &'a str,
     content: &'a str,
@@ -213,10 +219,7 @@ async fn ingest_and_extract(
             source_id: params.source_id.to_string(),
             content: params.content.to_string(),
             t_ref: t_ref_datetime,
-            scope: params.scope.to_string(),
-            project: params.project.map(str::to_string),
             t_ingested: Some(t_ref_datetime),
-            visibility_scope: None,
             policy_tags: params.policy_tags.to_vec(),
         },
         None,
@@ -410,8 +413,6 @@ impl EvalSuite for ClaimReconciliationSuite {
                 match ingest_and_extract(
                     &service,
                     &IngestParams {
-                        scope: &setup.scope,
-                        project: setup.project.as_deref(),
                         source_type: &setup.source_type,
                         source_id: &setup.source_id,
                         content: &setup.content,
@@ -455,8 +456,6 @@ impl EvalSuite for ClaimReconciliationSuite {
             let (extraction, source_extracted) = match ingest_and_extract(
                 &service,
                 &IngestParams {
-                    scope: &case.source.scope,
-                    project: case.source.project.as_deref(),
                     source_type: &case.source.source_type,
                     source_id: &case.source.source_id,
                     content: &case.source.content,
@@ -494,9 +493,12 @@ impl EvalSuite for ClaimReconciliationSuite {
                 std::collections::BTreeMap::new();
             for setup in &case.setup {
                 let key = BoundaryKey {
-                    scope: setup.scope.clone(),
-                    project: setup.project.clone(),
+                    namespace: test_support::ACTIVE_NAMESPACE.to_string(),
                     policy_tags: setup.policy_tags.iter().cloned().collect(),
+                    trust_class: setup
+                        .trust_class
+                        .clone()
+                        .unwrap_or_else(|| case.origin.clone()),
                 };
                 if let Some(facts) = lineage.get(&setup.source_id) {
                     for fact_id in facts {
@@ -505,9 +507,13 @@ impl EvalSuite for ClaimReconciliationSuite {
                 }
             }
             let source_key = BoundaryKey {
-                scope: case.source.scope.clone(),
-                project: case.source.project.clone(),
+                namespace: test_support::ACTIVE_NAMESPACE.to_string(),
                 policy_tags: case.source.policy_tags.iter().cloned().collect(),
+                trust_class: case
+                    .source
+                    .trust_class
+                    .clone()
+                    .unwrap_or_else(|| case.origin.clone()),
             };
             for fact_id in &source_extracted.fact_ids {
                 boundaries.insert(fact_id.clone(), source_key.clone());
@@ -756,9 +762,9 @@ mod tests {
 
     fn same_boundary_boundaries() -> std::collections::BTreeMap<String, BoundaryKey> {
         let key = BoundaryKey {
-            scope: "org".into(),
-            project: Some("proj-a".into()),
+            namespace: test_support::ACTIVE_NAMESPACE.into(),
             policy_tags: BTreeSet::new(),
+            trust_class: "official".into(),
         };
         let mut m = std::collections::BTreeMap::new();
         m.insert("fact:old".into(), key.clone());
@@ -766,22 +772,14 @@ mod tests {
         m
     }
 
-    fn cross_project_boundaries() -> std::collections::BTreeMap<String, BoundaryKey> {
-        let mut m = std::collections::BTreeMap::new();
-        m.insert(
-            "fact:old".into(),
-            BoundaryKey {
-                scope: "org".into(),
-                project: Some("proj-a".into()),
-                policy_tags: BTreeSet::new(),
-            },
-        );
+    fn different_policy_boundaries() -> std::collections::BTreeMap<String, BoundaryKey> {
+        let mut m = same_boundary_boundaries();
         m.insert(
             "fact:new".into(),
             BoundaryKey {
-                scope: "org".into(),
-                project: Some("proj-b".into()),
-                policy_tags: BTreeSet::new(),
+                namespace: test_support::ACTIVE_NAMESPACE.into(),
+                policy_tags: ["public".into()].into_iter().collect(),
+                trust_class: "official".into(),
             },
         );
         m
@@ -822,13 +820,43 @@ mod tests {
     }
 
     #[test]
-    fn warning_crossing_project_boundary_is_isolation_violation() {
+    fn same_namespace_different_policy_tags_are_not_namespace_isolation() {
         let label = classify_warning(
             &[],
             &same_boundary_lineage(),
-            &cross_project_boundaries(),
+            &different_policy_boundaries(),
             &test_warning(),
         );
+        assert_eq!(label, WarningLabel::PolicyMismatch);
+    }
+
+    #[test]
+    fn trust_mismatch_is_not_namespace_isolation() {
+        let mut boundaries = same_boundary_boundaries();
+        boundaries.insert(
+            "fact:new".into(),
+            BoundaryKey {
+                namespace: test_support::ACTIVE_NAMESPACE.into(),
+                policy_tags: BTreeSet::new(),
+                trust_class: "untrusted".into(),
+            },
+        );
+        let label = classify_warning(&[], &same_boundary_lineage(), &boundaries, &test_warning());
+        assert_eq!(label, WarningLabel::TrustMismatch);
+    }
+
+    #[test]
+    fn namespace_mismatch_isolation_is_distinct_from_policy_mismatch() {
+        let mut boundaries = same_boundary_boundaries();
+        boundaries.insert(
+            "fact:new".into(),
+            BoundaryKey {
+                namespace: "other".into(),
+                policy_tags: BTreeSet::new(),
+                trust_class: "official".into(),
+            },
+        );
+        let label = classify_warning(&[], &same_boundary_lineage(), &boundaries, &test_warning());
         assert_eq!(label, WarningLabel::IsolationViolation);
     }
 

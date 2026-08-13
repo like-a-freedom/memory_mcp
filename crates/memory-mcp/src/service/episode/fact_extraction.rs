@@ -65,7 +65,6 @@ pub(super) async fn add_extracted_fact(
             quote,
             &episode.episode_id,
             episode.t_ref,
-            &episode.scope,
             0.7,
             entity_links.to_vec(),
             episode.policy_tags.clone(),
@@ -229,16 +228,14 @@ pub async fn extract_facts(
 pub(super) async fn detect_contradiction_warnings(
     service: &ServiceContext,
     facts: &[ExtractedFact],
-    namespace: &str,
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
-    claim_based_contradiction_warnings(service, facts, namespace).await
+    claim_based_contradiction_warnings(service, facts).await
 }
 
 /// Query claim relations for active contradictions involving the extracted facts.
 async fn claim_based_contradiction_warnings(
     service: &ServiceContext,
     facts: &[ExtractedFact],
-    namespace: &str,
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
     let fact_ids: Vec<_> = facts
         .iter()
@@ -248,7 +245,6 @@ async fn claim_based_contradiction_warnings(
         return Ok(Vec::new());
     }
     let query = crate::storage::claims::RelationsForFactsQuery {
-        namespace,
         fact_ids: &fact_ids,
     };
     let relations = service
@@ -359,9 +355,7 @@ pub async fn extract_from_episode(
         LogLevel::Info,
     );
 
-    let (record, namespace) = service.find_episode_record(episode_id).await?;
-    let namespace =
-        namespace.ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
+    let (record, _namespace) = service.find_episode_record(episode_id).await?;
     let record = record.ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
     let episode = episode_from_record(&record)
@@ -371,14 +365,13 @@ pub async fn extract_from_episode(
     let entities = extract_entities(
         service,
         episode_id,
-        &namespace,
         &entity_extraction_content,
         zero_shot_labels,
     )
     .await?;
     let fact_outcome = extract_facts(service, &episode, &entities).await?;
     let facts = fact_outcome.facts;
-    let warnings = detect_contradiction_warnings(service, &facts, &namespace).await?;
+    let warnings = detect_contradiction_warnings(service, &facts).await?;
     let mut links = Vec::new();
     let edge_ingested = now();
 
@@ -401,7 +394,7 @@ pub async fn extract_from_episode(
             t_invalid: None,
             t_invalid_ingested: None,
         };
-        store_edge(service, &edge, &namespace).await?;
+        store_edge(service, &edge).await?
     }
 
     for fact in &facts {
@@ -427,7 +420,7 @@ pub async fn extract_from_episode(
                 t_invalid: None,
                 t_invalid_ingested: None,
             };
-            store_edge(service, &edge, &namespace).await?;
+            store_edge(service, &edge).await?
         }
     }
 
@@ -436,7 +429,7 @@ pub async fn extract_from_episode(
         .map(|entity| entity.entity_id.clone())
         .collect();
 
-    update_communities(service, &entity_ids, &episode.scope).await?;
+    update_communities(service, &entity_ids).await?;
 
     service.logger.log(
         log_event(
@@ -474,7 +467,6 @@ pub async fn extract_from_episode(
             .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
             .collect();
         let query = crate::storage::claims::RelationsForFactsQuery {
-            namespace: &namespace,
             fact_ids: &fact_ids,
         };
         let relations = service

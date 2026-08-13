@@ -252,7 +252,7 @@ impl ServerHandler for MemoryMcp {
 #[tool_router]
 impl MemoryMcp {
     #[tool(
-        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and `scope` (optional: `project`, `t_ingested`, `visibility_scope`, `policy_tags`). Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
+        description = "Store a new episode in long-term memory. Use this tool when you need to persist source material before extracting entities or facts. Do not use this tool for retrieval. Arguments must be a flat snake_case object with `source_type`, `source_id`, `content`, `t_ref`, and optional `t_ingested` and `policy_tags`. Do not wrap arguments in `payload`. Returns the created or existing `episode_id`. On error, fix the input fields and retry."
     )]
     pub async fn ingest(
         &self,
@@ -278,7 +278,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, `scope`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
+        description = "Extract entities, facts, and relationships from remembered content. Use this tool when you need structured knowledge from an existing episode or from new inline content. Prefer task-based invocation when the client supports MCP Tasks or when local NER may exceed the client's synchronous timeout. Do not use this tool for retrieval. Arguments must be a flat snake_case object. Provide exactly one input source: `episode_id` for stored content, or inline `content`/`text`; optional fields are `source_type`, `source_id`, `t_ref`, and `zero_shot_labels`. Do not wrap arguments in `payload`. If you pass inline content, the server ingests it first and then extracts facts. Returns extracted entities, facts, and links."
     )]
     pub async fn extract(
         &self,
@@ -316,7 +316,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> `scope` plus optional `source_text` or `draft_episode_id`; lifecycle -> `scope` only. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
+        description = "Open a Memory MCP app through the minimal public launcher. Use this tool only when an interactive app workflow is required and no canonical memory tool already matches the intent. Arguments must be a flat snake_case object. Required fields depend on `app`: inspector -> `target_type` + `target_id`; diff -> `as_of_left` + `as_of_right`; graph -> `from_entity_id` + `to_entity_id`; ingestion_review -> optional `source_text` or `draft_episode_id`; lifecycle -> no partition field. Do not wrap arguments in `payload`. Returns `session_id`, `resource_uri`, `fallback`, and `guidance`."
     )]
     pub async fn open_app(
         &self,
@@ -340,7 +340,7 @@ impl MemoryMcp {
 
             self.service.log_tool_event(
                 "open_app.start",
-                json!({"app": app, "scope": p.scope}),
+                json!({"app": app}),
                 json!({}),
                 LogLevel::Info,
                 Some(&request_id),
@@ -438,7 +438,6 @@ impl MemoryMcp {
                     service: &self.service,
                     session_id: &p.session_id,
                     app: &session.app,
-                    scope: &session.scope,
                     payload: session.payload.clone(),
                 };
                 let outcome = (descriptor.execute)(&ctx, &command).await?;
@@ -498,7 +497,7 @@ impl MemoryMcp {
     }
 
     #[tool(
-        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments must be a flat snake_case object with `query`, `scope`, and optional `project`, `fact_types`, `as_of`, `budget`, `view_mode`, `window_start`, and `window_end`. Do not wrap arguments in `payload`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
+        description = "Assemble the most relevant active memory context for a query. Use this tool when you need retrieval across stored facts before answering or planning. Do not use this tool to ingest new content. Arguments must be a flat snake_case object with `query`, `fact_types`, `as_of`, `budget`, `view_mode`, `window_start`, and `window_end`. Do not wrap arguments in `payload`. Returns ranked context items with confidence and rationale. On error, fix the query parameters and retry."
     )]
     pub async fn assemble_context(
         &self,
@@ -534,11 +533,7 @@ mod tests {
     use serde_json::{Value, json};
 
     async fn create_test_mcp() -> MemoryMcp {
-        let namespaces = vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ];
+        let namespaces = vec!["org".to_string()];
         let db_client = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces(
                 "memory_mcp_handlers_test",
@@ -556,7 +551,7 @@ mod tests {
                 .expect("apply test migrations");
         }
 
-        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
             .expect("create test service");
         MemoryMcp::new(service)
     }
@@ -709,7 +704,6 @@ mod tests {
             "content",
             "quote",
             "source_episode",
-            "scope",
             "t_ref",
             "t_ingested",
             "provenance",
@@ -717,6 +711,11 @@ mod tests {
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
+
+        assert!(
+            !properties.contains_key("scope"),
+            "ExplainItem schema must not expose the legacy scope field"
+        );
 
         for key in ["sourceEpisode", "tRef", "tIngested", "citationContext"] {
             assert!(
@@ -871,7 +870,6 @@ mod tests {
         let response = mcp
             .open_app(Parameters(OpenAppParams {
                 app: "inspector".to_string(),
-                scope: "org".to_string(),
                 target_type: Some("entity".to_string()),
                 target_id: Some(entity_id.clone()),
                 from_entity_id: None,
@@ -917,7 +915,6 @@ mod tests {
         let open_result = mcp
             .open_app(Parameters(OpenAppParams {
                 app: "ingestion_review".to_string(),
-                scope: "org".to_string(),
                 target_type: None,
                 target_id: None,
                 from_entity_id: None,
@@ -967,7 +964,6 @@ mod tests {
         let open_result = mcp
             .open_app(Parameters(OpenAppParams {
                 app: "ingestion_review".to_string(),
-                scope: "org".to_string(),
                 target_type: None,
                 target_id: None,
                 from_entity_id: None,
@@ -1074,10 +1070,7 @@ mod tests {
                 source_id: "stale-lifecycle-episode".to_string(),
                 content: "Legacy launch plan that should be archived.".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2025, 1, 10, 9, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -1088,7 +1081,6 @@ mod tests {
         let open_result = mcp
             .open_app(Parameters(OpenAppParams {
                 app: "lifecycle".to_string(),
-                scope: "org".to_string(),
                 target_type: None,
                 target_id: None,
                 from_entity_id: None,
@@ -1208,7 +1200,6 @@ mod tests {
         let open_result = mcp
             .open_app(Parameters(OpenAppParams {
                 app: "lifecycle".to_string(),
-                scope: "org".to_string(),
                 target_type: None,
                 target_id: None,
                 from_entity_id: None,
@@ -1323,11 +1314,10 @@ mod tests {
     #[test]
     fn enrich_session_payload_adds_meta_with_expiry() {
         let payload = json!({"data": "value"});
-        let enriched =
-            session::enrich_session_payload("inspector", "ses:1", "org", Some(3600), payload);
+        let enriched = session::enrich_session_payload("inspector", "ses:1", Some(3600), payload);
         assert_eq!(enriched["app"], "inspector");
         assert_eq!(enriched["session_id"], "ses:1");
-        assert_eq!(enriched["scope"], "org");
+
         assert!(enriched["meta"]["expires_at"].is_string());
         assert_eq!(enriched["meta"]["ttl_seconds"], 3600);
         assert_eq!(enriched["data"], "value");
@@ -1336,7 +1326,7 @@ mod tests {
     #[test]
     fn enrich_session_payload_handles_no_ttl() {
         let payload = json!({});
-        let enriched = session::enrich_session_payload("diff", "ses:2", "personal", None, payload);
+        let enriched = session::enrich_session_payload("diff", "ses:2", None, payload);
         assert_eq!(enriched["app"], "diff");
         assert_eq!(enriched["meta"]["ttl_seconds"], serde_json::Value::Null);
         assert!(enriched["meta"]["expires_at"].is_null());

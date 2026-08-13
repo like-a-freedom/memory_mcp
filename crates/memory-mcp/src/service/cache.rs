@@ -1,6 +1,6 @@
 //! Context cache management.
 
-pub use invalidation::invalidate_cache_by_scope;
+pub use invalidation::invalidate_cache;
 pub use key::{CacheKey, CacheView};
 
 mod invalidation;
@@ -21,34 +21,15 @@ mod tests {
     #[test]
     fn cache_key_new_normalizes_query() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 0).unwrap();
-        let key = CacheKey::new(
-            "  Test Query  ",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
+        let key = CacheKey::new("  Test Query  ", cutoff, 5, &[], CacheView::default(), None);
         assert_eq!(key.query, "test query");
-        assert_eq!(key.scope, "org");
         assert_eq!(key.budget, 5);
     }
 
     #[test]
     fn cache_key_new_buckets_cutoff_to_five_minutes() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 45).unwrap();
-        let key = CacheKey::new(
-            "query",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
+        let key = CacheKey::new("query", cutoff, 5, &[], CacheView::default(), None);
         assert_eq!(key.cutoff, "2024-01-01T12:30:00Z");
     }
 
@@ -56,20 +37,16 @@ mod tests {
     fn cache_key_new_distinguishes_adjacent_five_minute_buckets() {
         let key1 = CacheKey::new(
             "query",
-            "org",
             Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 59).unwrap(),
             5,
-            None,
             &[],
             CacheView::default(),
             None,
         );
         let key2 = CacheKey::new(
             "query",
-            "org",
             Utc.with_ymd_and_hms(2024, 1, 1, 12, 35, 0).unwrap(),
             5,
-            None,
             &[],
             CacheView::default(),
             None,
@@ -92,17 +69,13 @@ mod tests {
 
     #[test]
     fn cache_key_new_sorts_tags() {
-        let cutoff = Utc::now();
-        let tags = Some(vec!["zebra".to_string(), "apple".to_string()]);
         let key = CacheKey::new(
             "query",
-            "org",
-            cutoff,
+            Utc::now(),
             5,
-            None,
             &[],
             CacheView::default(),
-            tags,
+            Some(vec!["zebra".to_string(), "apple".to_string()]),
         );
         assert_eq!(
             key.tags,
@@ -112,7 +85,6 @@ mod tests {
 
     #[test]
     fn cache_key_new_sorts_and_deduplicates_fact_types() {
-        let cutoff = Utc::now();
         let fact_types = vec![
             "promise".to_string(),
             "metric".to_string(),
@@ -120,91 +92,26 @@ mod tests {
         ];
         let key = CacheKey::new(
             "query",
-            "org",
-            cutoff,
+            Utc::now(),
             5,
-            Some("atlas"),
             &fact_types,
             CacheView::default(),
             None,
         );
 
-        assert_eq!(key.project.as_deref(), Some("atlas"));
         assert_eq!(
             key.fact_types,
             vec!["metric".to_string(), "promise".to_string()]
         );
     }
 
-    #[test]
-    fn cache_key_matches_scope_returns_true_for_same_scope() {
-        let cutoff = Utc::now();
-        let key = CacheKey::new(
-            "query",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
-        assert!(key.matches_scope("org"));
-    }
-
-    #[test]
-    fn cache_key_matches_scope_returns_false_for_different_scope() {
-        let cutoff = Utc::now();
-        let key = CacheKey::new(
-            "query",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
-        assert!(!key.matches_scope("personal"));
-    }
-
     #[tokio::test]
-    async fn invalidate_cache_by_scope_removes_matching_entries() {
+    async fn invalidate_cache_clears_all_process_local_entries() {
         let cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>> =
             Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
-
         let cutoff = Utc::now();
-
-        let key1 = CacheKey::new(
-            "query1",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
-        let key2 = CacheKey::new(
-            "query2",
-            "org",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
-        let key3 = CacheKey::new(
-            "query3",
-            "personal",
-            cutoff,
-            5,
-            None,
-            &[],
-            CacheView::default(),
-            None,
-        );
+        let key1 = CacheKey::new("query1", cutoff, 5, &[], CacheView::default(), None);
+        let key2 = CacheKey::new("query2", cutoff, 5, &[], CacheView::default(), None);
 
         {
             let mut guard = cache.write().await;
@@ -221,14 +128,13 @@ mod tests {
             };
             guard.put(key1.clone(), vec![item("fact:1")]);
             guard.put(key2.clone(), vec![item("fact:2")]);
-            guard.put(key3.clone(), vec![item("fact:3")]);
         }
 
-        invalidate_cache_by_scope(&cache, "org").await;
+        invalidate_cache(&cache).await;
 
         let mut guard = cache.write().await;
         assert!(guard.get(&key1).is_none());
         assert!(guard.get(&key2).is_none());
-        assert!(guard.get(&key3).is_some());
+        assert!(guard.is_empty());
     }
 }

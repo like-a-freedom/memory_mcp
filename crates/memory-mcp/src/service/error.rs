@@ -46,11 +46,6 @@ pub fn is_transient_db_error(err: &MemoryError) -> bool {
     }
 }
 
-/// Shared validation error messages.
-pub mod error_messages {
-    pub const SCOPE_REQUIRED: &str = "scope is required";
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

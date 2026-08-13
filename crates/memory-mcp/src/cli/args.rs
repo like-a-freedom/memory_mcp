@@ -15,18 +15,11 @@ pub struct IngestArgs {
     /// Reference (valid) time in ISO 8601 — e.g. "2026-06-30T10:00:00Z"
     #[arg(long)]
     pub t_ref: String,
-    /// Access scope — "org", "team", "personal", or "private-domain:<domain>"
-    #[arg(long, default_value = "org")]
-    pub scope: String,
-    /// Project or namespace tag for grouping episodes
-    #[arg(long)]
-    pub project: Option<String>,
+
     /// Override ingestion timestamp in ISO 8601 (defaults to now)
     #[arg(long)]
     pub t_ingested: Option<String>,
-    /// Visibility scope override for entity resolution visibility
-    #[arg(long)]
-    pub visibility_scope: Option<String>,
+
     /// Policy tags for content governance (repeatable: --policy-tag tag1 --policy-tag tag2)
     #[arg(long = "policy-tag")]
     pub policy_tags: Vec<String>,
@@ -52,9 +45,7 @@ pub struct ExtractArgs {
     /// Reference time in ISO 8601 for inline content (required if --content/--text used)
     #[arg(long)]
     pub t_ref: Option<String>,
-    /// Access scope for inline content extraction
-    #[arg(long)]
-    pub scope: Option<String>,
+
     /// Zero-shot classification labels for entity type detection (repeatable)
     #[arg(long = "zero-shot-label")]
     pub zero_shot_labels: Option<Vec<String>>,
@@ -99,12 +90,7 @@ pub struct AssembleContextArgs {
     /// Natural language query — facts will be ranked by relevance to this text
     #[arg(long)]
     pub query: String,
-    /// Access scope filter — "org", "team", "personal", or "private-domain:<domain>"
-    #[arg(long, default_value = "org")]
-    pub scope: String,
-    /// Project filter to narrow results to a specific namespace
-    #[arg(long)]
-    pub project: Option<String>,
+
     /// Filter by fact type (repeatable: --fact-type commitment --fact-type preference)
     #[arg(long = "fact-type")]
     pub fact_types: Vec<String>,
@@ -150,12 +136,7 @@ pub struct InitArgs {
 pub struct WatchArgs {
     /// Directory to watch for new files
     pub dir: PathBuf,
-    /// Project namespace for auto-ingested files
-    #[arg(long)]
-    pub project: Option<String>,
-    /// Access scope for auto-ingested files (default: team)
-    #[arg(long, default_value = "team")]
-    pub scope: String,
+
     /// Polling interval in seconds (default: 2)
     #[arg(long, default_value_t = 2)]
     pub interval_secs: u64,
@@ -167,7 +148,7 @@ pub struct WatchArgs {
 /// See ADR-0016 AD-4 and `docs/agent_integration/CONTRACT.md`.
 #[derive(Debug, Args)]
 pub struct LifecycleCaptureArgs {
-    /// JSON-encoded `NormalizedHostEvent` (event_kind, task_fingerprint, scope, etc.)
+    /// JSON-encoded scope-free `NormalizedHostEvent` (event kind, task fingerprint, policy tags, and bounded content).
     #[arg(long)]
     pub event: String,
     /// JSON-encoded `InvocationContext` (origin, session_id, etc.)
@@ -181,7 +162,7 @@ pub struct LifecycleCaptureArgs {
 /// See ADR-0016 AD-5 and `docs/agent_integration/CONTRACT.md`.
 #[derive(Debug, Args)]
 pub struct LifecycleRecallArgs {
-    /// JSON-encoded `NormalizedHostEvent` (event_kind, task_fingerprint, scope, etc.)
+    /// JSON-encoded scope-free `NormalizedHostEvent` (event kind, task fingerprint, policy tags, and bounded content).
     #[arg(long)]
     pub event: String,
     /// JSON-encoded `InvocationContext` (origin, session_id, etc.)

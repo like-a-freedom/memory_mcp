@@ -30,7 +30,7 @@ async fn ingest_source(
     source_type: &str,
     source_id: &str,
     content: &str,
-    scope: &str,
+    _scope: &str,
     t_ref: &str,
 ) -> String {
     let episode_id = IngestCapability::ingest(
@@ -40,10 +40,7 @@ async fn ingest_source(
             source_id: source_id.to_string(),
             content: content.to_string(),
             t_ref: parse_t_ref(t_ref),
-            scope: scope.to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -61,7 +58,7 @@ async fn claim_count_for_episode(db_client: &Arc<SurrealDbClient>, ep: &str) -> 
         .query(
             "SELECT count() AS cnt FROM claim WHERE source_episode_id = $ep",
             Some(serde_json::json!({"ep": ep})),
-            "personal",
+            "org",
         )
         .await
         .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
@@ -78,7 +75,7 @@ async fn job_count_with_source_fact(db_client: &Arc<SurrealDbClient>) -> usize {
         .query(
             "SELECT count() AS cnt FROM claim_job WHERE source_fact_id IS NOT NONE",
             None,
-            "personal",
+            "org",
         )
         .await
         .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
@@ -95,7 +92,7 @@ async fn fetch_claim_keys_for_episode(db_client: &Arc<SurrealDbClient>, ep: &str
         .query(
             "SELECT comparison_key_hash FROM claim WHERE source_episode_id = $ep",
             Some(serde_json::json!({"ep": ep})),
-            "personal",
+            "org",
         )
         .await
         .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
@@ -151,7 +148,7 @@ async fn new_fact_eventually_has_projection_and_reconcile_jobs() {
         .query(
             "SELECT count() AS cnt FROM fact WHERE source_episode = $ep",
             Some(serde_json::json!({"ep": ep})),
-            "personal",
+            "org",
         )
         .await
         .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
@@ -294,7 +291,7 @@ async fn relation_outcomes_use_the_accepted_persisted_vocabulary() {
 
     // Check that any persisted relation outcomes match accepted vocabulary
     let outcomes: Vec<String> = db_client
-        .query("SELECT outcome FROM claim_relation", None, "personal")
+        .query("SELECT outcome FROM claim_relation", None, "org")
         .await
         .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
         .map(|rows| {

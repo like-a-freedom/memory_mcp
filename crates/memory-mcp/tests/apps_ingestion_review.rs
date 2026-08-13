@@ -17,7 +17,6 @@ async fn prepare_ingestion_review_uses_episode_backed_drafts() {
 
     let bundle = service
         .prepare_ingestion_review(PrepareIngestionReviewRequest {
-            scope: "personal".to_string(),
             source_text: None,
             draft_episode_id: Some(episode_id.clone()),
         })
@@ -40,7 +39,6 @@ async fn commit_ingestion_review_persists_approved_items_as_facts() {
     let (service, db_client) = common::make_service_with_client().await;
     let bundle = service
         .prepare_ingestion_review(PrepareIngestionReviewRequest {
-            scope: "org".to_string(),
             source_text: Some("Beta launch is scheduled for Friday.".to_string()),
             draft_episode_id: None,
         })
@@ -51,10 +49,7 @@ async fn commit_ingestion_review_persists_approved_items_as_facts() {
     approved[0].status = "approved".to_string();
 
     let outcome = service
-        .commit_ingestion_review(CommitIngestionReviewRequest {
-            scope: "org".to_string(),
-            items: approved,
-        })
+        .commit_ingestion_review(CommitIngestionReviewRequest { items: approved })
         .await
         .expect("commit ingestion review");
 

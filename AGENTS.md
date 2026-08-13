@@ -66,7 +66,7 @@ cargo run -- reembed                     # Rebuild embeddings
 2. **Business logic in `src/service/`** — MCP layer is a thin adapter
 3. **Tool responses are decision-ready** — includes `guidance` for next steps
 4. **Bi-temporal model** — `t_ref` (valid time) and `t_ingested` (transaction time); never delete, only invalidate
-5. **Scope discipline** — use the narrowest scope that fits (`personal` / `team` / `org`)
+5. **One Active Namespace** — storage is selected once at startup; do not add request-level partitioning
 6. **Feature flags are additive** — `default = []`, no implicit dependencies
 7. **Errors are thiserror-based** — `MemoryError` with descriptive variants
 
@@ -95,7 +95,7 @@ Full contract: [`docs/agent_integration/CONTRACT.md`](docs/agent_integration/CON
 |----------|-------------|
 | `SURREALDB_URL` | Connection URL (`mem://` or `rocksdb://path`) |
 | `SURREALDB_DB_NAME` | Database name |
-| `SURREALDB_NAMESPACES` | Namespace list (comma-separated) |
+| `SURREALDB_NAMESPACE` | One namespace (default: `main`) |
 | `SURREALDB_USERNAME` | Auth username |
 | `SURREALDB_PASSWORD` | Auth password |
 

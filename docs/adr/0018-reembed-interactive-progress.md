@@ -2,6 +2,11 @@
 
 > Status: Accepted (2026-07-24)
 > Related: ADR-0016 (public surface freeze — reembed is CLI-only, not an MCP tool)
+>
+> **Current runtime amendment (ADR-0038):** reembed runs one pass over the
+> process's Active Namespace. The historical `namespace_progress[ns]` shape and
+> namespace-labelled callbacks remain readable/observable for compatibility, but
+> a process never iterates over or selects multiple namespaces.
 
 ## Context
 
@@ -55,7 +60,9 @@ Instead of fail-fast, continue processing after a fact error:
 - If quota exceeded → status `"failed"`, exit code 1.
 - If all processed with some failures → status `"completed_with_errors"`,
   exit code 0.
-- Persist `failed_fact_ids` per namespace in job state for `--retry-failed`.
+- Persist `failed_fact_ids` for the Active Namespace in job state for
+  `--retry-failed`; legacy per-namespace entries are imported only for the
+  currently selected namespace.
 
 New job statuses: `running`, `completed`, `completed_with_errors`, `failed`,
 `interrupted`.
@@ -90,9 +97,10 @@ After the progress bar clears, print a compact summary to stdout:
   backward-compatible change — `memory_mcp reembed` with no flags still works.
 - **No MCP tool surface change:** reembed remains CLI-only. ADR-0016 public
   surface freeze is respected.
-- **Job state schema extended:** `namespace_progress[ns]` now includes
-  `failed_fact_ids` array. Old job records without this field are handled
-  gracefully (defaults to empty array).
+- **Job state schema extended:** historical `namespace_progress[ns]` entries
+  include `failed_fact_ids`. The one-active-namespace runtime reads only the
+  selected namespace's legacy entry and leaves other entries untouched. Old job
+  records without this field are handled gracefully (defaults to empty array).
 - **New statuses:** `interrupted` and `completed_with_errors` are persisted in
   the job record. The startup embedding-state check already treats any
   non-`ready` state as "semantic retrieval disabled", so these are safe.

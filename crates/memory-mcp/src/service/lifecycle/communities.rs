@@ -84,21 +84,20 @@ async fn run_community_rebuild_pass_inner(service: &ServiceContext) -> Result<us
     let updated_at = crate::service::normalize_dt(Utc::now());
     let mut rebuilt_total = 0;
 
-    for namespace in &service.namespaces {
-        service.logger.log(
-            crate::service::log_event(
-                "lifecycle.communities.namespace_start",
-                json!({"namespace": namespace, "cutoff": cutoff}),
-                json!({}),
-                None,
-                None,
-                None,
-            ),
-            crate::logging::LogLevel::Debug,
-        );
-        rebuilt_total +=
-            rebuild_namespace_communities(service, namespace, &cutoff, &updated_at).await?;
-    }
+    let namespace = &service.active_namespace;
+    service.logger.log(
+        crate::service::log_event(
+            "lifecycle.communities.namespace_start",
+            json!({"namespace": namespace, "cutoff": cutoff}),
+            json!({}),
+            None,
+            None,
+            None,
+        ),
+        crate::logging::LogLevel::Debug,
+    );
+    rebuilt_total +=
+        rebuild_namespace_communities(service, namespace, &cutoff, &updated_at).await?;
 
     Ok(rebuilt_total)
 }
@@ -124,13 +123,15 @@ async fn rebuild_namespace_communities_with_batch_size(
     batch_size: usize,
 ) -> Result<usize, MemoryError> {
     let (edge_records, edge_scan_batches) = collect_active_edge_records(
-        &crate::storage::AppStoreClient::new(service.db_client.clone()),
-        namespace,
+        &crate::storage::AppStoreClient::new(
+            service.db_client.clone(),
+            service.active_namespace.clone(),
+        ),
         cutoff,
         batch_size,
     )
     .await?;
-    let rebuilt = build_communities_from_active_edges(service, namespace, &edge_records).await?;
+    let rebuilt = build_communities_from_active_edges(service, &edge_records).await?;
     let active_ids = rebuilt
         .iter()
         .map(|community| community.community_id.clone())
@@ -144,30 +145,14 @@ async fn rebuild_namespace_communities_with_batch_size(
             "updated_at": updated_at,
         });
 
-        if service
-            .db_client
-            .select_one(&community.community_id, namespace)
-            .await?
-            .is_some()
-        {
-            service
-                .db_client
-                .update(&community.community_id, payload, namespace)
-                .await?;
-        } else {
-            service
-                .db_client
-                .create(&community.community_id, payload, namespace)
-                .await?;
-        }
+        service
+            .app_store()
+            .upsert_community(&community.community_id, payload)
+            .await?;
     }
 
     let mut stale_deleted = 0;
-    for stale in service
-        .db_client
-        .select_table("community", namespace)
-        .await?
-    {
+    for stale in service.app_store().select_communities().await? {
         let Some(community_id) = stale
             .get("community_id")
             .and_then(super::super::episode::unwrap_record_string)
@@ -181,14 +166,7 @@ async fn rebuild_namespace_communities_with_batch_size(
         };
 
         if !active_ids.contains(&community_id) {
-            service
-                .db_client
-                .query(
-                    "DELETE type::record($community_id);",
-                    Some(json!({"community_id": community_id})),
-                    namespace,
-                )
-                .await?;
+            service.app_store().delete_record(&community_id).await?;
             stale_deleted += 1;
         }
     }
@@ -216,7 +194,6 @@ async fn rebuild_namespace_communities_with_batch_size(
 
 async fn collect_active_edge_records(
     app_store: &crate::storage::AppStoreClient,
-    namespace: &str,
     cutoff: &str,
     batch_size: usize,
 ) -> Result<(Vec<Value>, usize), MemoryError> {
@@ -227,7 +204,7 @@ async fn collect_active_edge_records(
 
     loop {
         let batch = app_store
-            .select_edges_filtered_page(namespace, cutoff, start, batch_size)
+            .select_edges_filtered_page(cutoff, start, batch_size)
             .await?;
         if batch.is_empty() {
             break;
@@ -248,7 +225,6 @@ async fn collect_active_edge_records(
 
 async fn build_communities_from_active_edges(
     service: &ServiceContext,
-    namespace: &str,
     edge_records: &[serde_json::Value],
 ) -> Result<Vec<RebuiltCommunity>, MemoryError> {
     let grouped_entities = group_entity_components_from_active_edges(edge_records);
@@ -256,8 +232,7 @@ async fn build_communities_from_active_edges(
     let mut rebuilt = Vec::new();
     for member_entities in grouped_entities {
         let summary =
-            super::super::episode::build_community_summary(service, namespace, &member_entities)
-                .await?;
+            super::super::episode::build_community_summary(service, &member_entities).await?;
         let community_id = crate::service::deterministic_community_id(&member_entities);
 
         rebuilt.push(RebuiltCommunity {
@@ -351,7 +326,7 @@ mod tests {
 
     /// Seeds an active edge record (visible at the test cutoff) via RELATE.
     async fn seed_edge(db: &Arc<SurrealDbClient>, edge_id: &str, from_id: &str, to_id: &str) {
-        crate::storage::EpisodeStoreClient::new(db.clone())
+        crate::storage::EpisodeStoreClient::new(db.clone(), "org")
             .relate_edge(
                 edge_id,
                 from_id,
@@ -364,10 +339,10 @@ mod tests {
                     "origin": "inferred",
                     "strength": 1.0,
                     "confidence": 0.8,
+                    "provenance": {},
                     "t_valid": "2026-01-01T00:00:00Z",
                     "t_ingested": "2026-01-01T00:00:00Z",
                 }),
-                "org",
             )
             .await
             .expect("seed edge");
@@ -518,12 +493,11 @@ mod tests {
         seed_edge(&db, "edge:1", "entity:alice", "entity:bob").await;
         seed_edge(&db, "edge:2", "entity:bob", "entity:carol").await;
         seed_edge(&db, "edge:3", "entity:carol", "entity:dana").await;
-        let app_store = crate::storage::AppStoreClient::new(db);
+        let app_store = crate::storage::AppStoreClient::new(db, "org");
 
-        let (edges, batches) =
-            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
-                .await
-                .expect("paged edge scan should succeed");
+        let (edges, batches) = collect_active_edge_records(&app_store, "2026-05-13T00:00:00Z", 2)
+            .await
+            .expect("paged edge scan should succeed");
 
         assert_eq!(edges.len(), 3);
         assert_eq!(batches, 2);
@@ -532,12 +506,11 @@ mod tests {
     #[tokio::test]
     async fn collect_active_edge_records_returns_empty_when_first_page_is_empty() {
         let db = make_in_memory_db().await;
-        let app_store = crate::storage::AppStoreClient::new(db);
+        let app_store = crate::storage::AppStoreClient::new(db, "org");
 
-        let (edges, batches) =
-            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
-                .await
-                .expect("empty paged edge scan should succeed");
+        let (edges, batches) = collect_active_edge_records(&app_store, "2026-05-13T00:00:00Z", 2)
+            .await
+            .expect("empty paged edge scan should succeed");
 
         assert!(edges.is_empty());
         assert_eq!(batches, 0);
@@ -550,12 +523,11 @@ mod tests {
         seed_edge(&db, "edge:2", "entity:bob", "entity:carol").await;
         seed_edge(&db, "edge:3", "entity:carol", "entity:dana").await;
         seed_edge(&db, "edge:4", "entity:dana", "entity:erin").await;
-        let app_store = crate::storage::AppStoreClient::new(db);
+        let app_store = crate::storage::AppStoreClient::new(db, "org");
 
-        let (edges, batches) =
-            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
-                .await
-                .expect("exact-multiple paged edge scan should succeed");
+        let (edges, batches) = collect_active_edge_records(&app_store, "2026-05-13T00:00:00Z", 2)
+            .await
+            .expect("exact-multiple paged edge scan should succeed");
 
         assert_eq!(edges.len(), 4);
         assert_eq!(batches, 2);
@@ -568,12 +540,11 @@ mod tests {
         seed_edge(&db, "edge:2", "entity:bob", "episode:shared").await;
         seed_edge(&db, "edge:3", "entity:bob", "fact:joint").await;
         seed_edge(&db, "edge:4", "entity:carol", "fact:joint").await;
-        let app_store = crate::storage::AppStoreClient::new(db);
+        let app_store = crate::storage::AppStoreClient::new(db, "org");
 
-        let (edges, batches) =
-            collect_active_edge_records(&app_store, "org", "2026-05-13T00:00:00Z", 2)
-                .await
-                .expect("paged edge scan should succeed");
+        let (edges, batches) = collect_active_edge_records(&app_store, "2026-05-13T00:00:00Z", 2)
+            .await
+            .expect("paged edge scan should succeed");
         let grouped = group_entity_components_from_active_edges(&edges);
 
         assert_eq!(batches, 2);

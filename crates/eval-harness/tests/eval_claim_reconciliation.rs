@@ -31,11 +31,10 @@ struct SourceSample {
     source_type: String,
     source_id: String,
     content: String,
-    scope: String,
-    #[serde(default)]
-    project: Option<String>,
     #[serde(default)]
     policy_tags: Vec<String>,
+    #[serde(default)]
+    trust_class: Option<String>,
     t_ref: String,
 }
 
@@ -189,6 +188,11 @@ fn claim_fixture_covers_every_schema_outcome_and_isolation_boundary() {
 
     assert!(has_dev_split, "missing development split");
     assert!(has_test_split, "missing test split");
+    assert!(all_coverage.contains("same_namespace"));
+    assert!(all_coverage.contains("policy_tags"));
+    assert!(all_coverage.contains("trust_semantics"));
+    assert!(!all_coverage.contains("cross_scope"));
+    assert!(!all_coverage.contains("cross_project"));
 
     let required_coverage: BTreeSet<String> = [
         "alias".to_string(),
@@ -199,9 +203,9 @@ fn claim_fixture_covers_every_schema_outcome_and_isolation_boundary() {
         "disjoint_interval".to_string(),
         "correction".to_string(),
         "supersession".to_string(),
-        "cross_scope".to_string(),
-        "cross_project".to_string(),
-        "cross_policy".to_string(),
+        "same_namespace".to_string(),
+        "policy_tags".to_string(),
+        "trust_semantics".to_string(),
         "unresolved_subject".to_string(),
         "qualifier_mismatch".to_string(),
         "set_valued".to_string(),

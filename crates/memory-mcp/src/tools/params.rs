@@ -18,15 +18,8 @@ pub struct IngestParams {
     pub content: String,
     /// Reference timestamp (ISO 8601 format)
     pub t_ref: String,
-    /// Scope (default: "org")
-    #[serde(default = "crate::models::default_scope")]
-    pub scope: String,
-    /// Optional project tag for project-scoped retrieval
-    pub project: Option<String>,
     /// Ingestion timestamp (ISO 8601 format, optional)
     pub t_ingested: Option<String>,
-    /// Visibility scope (optional)
-    pub visibility_scope: Option<String>,
     /// Policy tags (optional)
     #[serde(default)]
     pub policy_tags: Vec<String>,
@@ -63,8 +56,7 @@ pub struct ExtractParams {
     pub source_id: Option<String>,
     /// Reference timestamp (ISO 8601 format, optional)
     pub t_ref: Option<String>,
-    /// Scope (default: "org")
-    pub scope: Option<String>,
+
     /// Custom zero-shot entity labels for GLiNER (opt-in, overrides default labels)
     pub zero_shot_labels: Option<Vec<String>>,
 }
@@ -100,10 +92,7 @@ pub struct InvalidateParams {
 pub struct AssembleContextParams {
     /// The query to assemble context for
     pub query: String,
-    /// The scope to search within
-    pub scope: String,
-    /// Optional project tag to restrict retrieval to one project
-    pub project: Option<String>,
+
     /// Optional fact types to include in the response
     #[serde(default)]
     pub fact_types: Vec<String>,
@@ -144,23 +133,13 @@ mod tests {
             "source_id",
             "content",
             "t_ref",
-            "scope",
-            "project",
             "t_ingested",
-            "visibility_scope",
             "policy_tags",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
 
-        for key in [
-            "sourceType",
-            "sourceId",
-            "tRef",
-            "tIngested",
-            "visibilityScope",
-            "policyTags",
-        ] {
+        for key in ["sourceType", "sourceId", "tRef", "tIngested", "policyTags"] {
             assert!(
                 !properties.contains_key(key),
                 "unexpected camelCase property {key}"
@@ -169,13 +148,35 @@ mod tests {
     }
 
     #[test]
+    fn ingest_params_reject_legacy_partition_fields() {
+        let err = serde_json::from_value::<IngestParams>(serde_json::json!({
+            "source_type": "email",
+            "source_id": "msg-1",
+            "content": "hello",
+            "t_ref": "2026-01-01T00:00:00Z",
+            "scope": "org"
+        }))
+        .expect_err("legacy scope must be rejected");
+        assert!(err.to_string().contains("scope"));
+
+        let err = serde_json::from_value::<IngestParams>(serde_json::json!({
+            "source_type": "email",
+            "source_id": "msg-1",
+            "content": "hello",
+            "t_ref": "2026-01-01T00:00:00Z",
+            "project": "atlas"
+        }))
+        .expect_err("legacy project must be rejected");
+        assert!(err.to_string().contains("project"));
+    }
+
+    #[test]
     fn ingest_params_reject_camel_case_fields() {
         let err = serde_json::from_value::<IngestParams>(serde_json::json!({
             "sourceType": "email",
             "sourceId": "msg-1",
             "content": "hello",
-            "tRef": "2026-01-01T00:00:00Z",
-            "scope": "org"
+            "tRef": "2026-01-01T00:00:00Z"
         }))
         .expect_err("camelCase ingest params should be rejected");
 
@@ -230,7 +231,6 @@ mod tests {
             "source_type",
             "source_id",
             "t_ref",
-            "scope",
             "zero_shot_labels",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
@@ -293,11 +293,8 @@ mod tests {
 
         // Public MCP tool parameters use snake_case keys only.
         assert_eq!(properties["query"]["type"], "string");
-        assert_eq!(properties["scope"]["type"], "string");
-        assert_eq!(
-            properties["project"]["type"],
-            serde_json::json!(["string", "null"])
-        );
+        assert!(!properties.contains_key("scope"));
+        assert!(!properties.contains_key("project"));
         assert_eq!(properties["fact_types"]["type"], "array");
         assert_eq!(properties["as_of"]["type"], "string");
         assert_eq!(properties["budget"]["type"], "integer");
@@ -333,10 +330,16 @@ mod tests {
     #[test]
     fn assemble_context_params_compact_defaults_true_when_omitted() {
         let params: AssembleContextParams = serde_json::from_value(serde_json::json!({
-            "query": "q",
-            "scope": "org"
+            "query": "q"
         }))
         .unwrap();
+        assert!(
+            serde_json::from_value::<AssembleContextParams>(serde_json::json!({
+                "query": "q",
+                "scope": "org"
+            }))
+            .is_err()
+        );
         assert!(params.compact, "compact must default to true");
     }
 }

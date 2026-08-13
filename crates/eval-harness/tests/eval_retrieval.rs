@@ -9,9 +9,6 @@ struct RetrievalEvalCase {
     #[serde(default)]
     #[allow(dead_code)]
     tags: Vec<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    project: Option<String>,
     expected: RetrievalExpectation,
 }
 
@@ -19,8 +16,6 @@ struct RetrievalEvalCase {
 struct RetrievalExpectation {
     #[allow(dead_code)]
     tier: String,
-    #[serde(default)]
-    must_not_contain: Vec<String>,
 }
 
 fn fixture_path() -> PathBuf {
@@ -84,27 +79,6 @@ fn retrieval_fixture_provides_minimum_tier_coverage() {
             "expected at least 10 retrieval cases for tier {tier}, got {count}"
         );
     }
-}
-
-#[test]
-fn retrieval_fixture_provides_project_filter_coverage() {
-    let cases = load_cases();
-    let project_cases = cases
-        .iter()
-        .filter(|case| case.project.is_some())
-        .collect::<Vec<_>>();
-
-    assert!(
-        project_cases.len() >= 5,
-        "expected at least 5 project-filter retrieval cases, got {}",
-        project_cases.len()
-    );
-    assert!(
-        project_cases
-            .iter()
-            .all(|case| !case.expected.must_not_contain.is_empty()),
-        "every project-filter retrieval case should define must_not_contain"
-    );
 }
 
 #[test]

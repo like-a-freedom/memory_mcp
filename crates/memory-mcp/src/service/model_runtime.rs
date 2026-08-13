@@ -54,7 +54,11 @@ impl<T: Send + Sync + 'static> LoadedModel<T> {
             if let Some(handle) = guard.unload_handle.take() {
                 handle.abort();
             }
-            let loaded = guard.loaded.as_ref().expect("checked above");
+            let Some(loaded) = guard.loaded.as_ref() else {
+                return Err(MemoryError::Storage(
+                    "loaded model disappeared while accessing the cache".to_string(),
+                ));
+            };
             return Ok(Arc::clone(loaded));
         }
         let loaded = tokio::task::spawn_blocking(load)

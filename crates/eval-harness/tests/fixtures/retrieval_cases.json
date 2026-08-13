@@ -3,7 +3,6 @@
         "id": "ret-001",
         "description": "direct lexical retrieval for deployment window",
         "query": "deployment window thursday",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -23,7 +22,6 @@
         "id": "ret-002",
         "description": "direct lexical retrieval for budget update",
         "query": "atlas budget",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -43,7 +41,6 @@
         "id": "ret-003",
         "description": "alias expansion retrieves fact through canonical company name",
         "query": "orbital labs",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -76,7 +73,6 @@
         "id": "ret-004",
         "description": "graph expansion retrieves fact through matching community summary",
         "query": "atlas migration risk register",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -109,7 +105,6 @@
         "id": "ret-005",
         "description": "direct retrieval for incident bridge",
         "query": "zephyr incident bridge",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -129,7 +124,6 @@
         "id": "ret-006",
         "description": "direct retrieval for release cutoff",
         "query": "orion release cutoff friday",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -149,7 +143,6 @@
         "id": "ret-007",
         "description": "direct retrieval for vendor renewal",
         "query": "helios vendor renewal april",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -169,7 +162,6 @@
         "id": "ret-008",
         "description": "direct retrieval for staffing review",
         "query": "mercury staffing review tuesday",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -189,7 +181,6 @@
         "id": "ret-009",
         "description": "direct retrieval for legal memo location",
         "query": "beacon legal memo beta",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -209,7 +200,6 @@
         "id": "ret-010",
         "description": "direct retrieval for budget variance",
         "query": "lighthouse budget variance",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -229,7 +219,6 @@
         "id": "ret-011",
         "description": "direct retrieval for postmortem start",
         "query": "juniper outage postmortem 09:15",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -249,7 +238,6 @@
         "id": "ret-012",
         "description": "direct retrieval for travel freeze",
         "query": "summit travel freeze may 12",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -269,7 +257,6 @@
         "id": "ret-013",
         "description": "harbor analytics alias retrieval",
         "query": "harbor analytics incident deck",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -302,7 +289,6 @@
         "id": "ret-014",
         "description": "northwind systems alias retrieval",
         "query": "northwind systems compliance memo",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -335,7 +321,6 @@
         "id": "ret-015",
         "description": "apex finance alias retrieval",
         "query": "apex finance platform settlement file",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -368,7 +353,6 @@
         "id": "ret-016",
         "description": "meridian support alias retrieval",
         "query": "meridian support hub escalation board",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -401,7 +385,6 @@
         "id": "ret-017",
         "description": "skyline commerce alias retrieval",
         "query": "skyline commerce suite pricing audit",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -434,7 +417,6 @@
         "id": "ret-018",
         "description": "delta research alias retrieval",
         "query": "delta research lab experiment review",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -467,7 +449,6 @@
         "id": "ret-019",
         "description": "blue harbor alias retrieval",
         "query": "blue harbor warehouse forklift checklist",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -500,7 +481,6 @@
         "id": "ret-020",
         "description": "aurora benefits alias retrieval",
         "query": "aurora benefits portal enrollment batch",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -533,7 +513,6 @@
         "id": "ret-021",
         "description": "terra field ops alias retrieval",
         "query": "terra field ops dispatch rota",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -566,7 +545,6 @@
         "id": "ret-022",
         "description": "phoenix graph retrieval",
         "query": "phoenix launch risk ledger",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -599,7 +577,6 @@
         "id": "ret-023",
         "description": "cedar graph retrieval",
         "query": "cedar billing escalation map",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -632,7 +609,6 @@
         "id": "ret-024",
         "description": "lantern graph retrieval",
         "query": "lantern onboarding dependency chart",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -665,7 +641,6 @@
         "id": "ret-025",
         "description": "harbor graph retrieval",
         "query": "harbor export incident notebook",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -698,7 +673,6 @@
         "id": "ret-026",
         "description": "solstice graph retrieval",
         "query": "solstice audit exception ledger",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -731,7 +705,6 @@
         "id": "ret-027",
         "description": "quartz graph retrieval",
         "query": "quartz migration readiness board",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -764,7 +737,6 @@
         "id": "ret-028",
         "description": "horizon graph retrieval",
         "query": "horizon partner renewal matrix",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -797,7 +769,6 @@
         "id": "ret-029",
         "description": "meadow graph retrieval",
         "query": "meadow support defect ledger",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -830,7 +801,6 @@
         "id": "ret-030",
         "description": "ridge graph retrieval",
         "query": "ridge compliance waiver tracker",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -863,7 +833,6 @@
         "id": "ret-031",
         "description": "temporal retrieval for monday review",
         "query": "board review monday",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -883,7 +852,6 @@
         "id": "ret-032",
         "description": "temporal retrieval for tuesday sync",
         "query": "tuesday sync 11:30",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -903,7 +871,6 @@
         "id": "ret-033",
         "description": "temporal retrieval for wednesday checkpoint",
         "query": "wednesday checkpoint april 9",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -923,7 +890,6 @@
         "id": "ret-034",
         "description": "temporal retrieval for thursday maintenance",
         "query": "thursday maintenance window",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -943,7 +909,6 @@
         "id": "ret-035",
         "description": "temporal retrieval for friday cutoff",
         "query": "friday cutoff payroll",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -963,7 +928,6 @@
         "id": "ret-036",
         "description": "temporal retrieval for weekend freeze",
         "query": "weekend freeze saturday",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -983,7 +947,6 @@
         "id": "ret-037",
         "description": "temporal retrieval for q1 memo",
         "query": "q1 closeout friday",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1003,7 +966,6 @@
         "id": "ret-038",
         "description": "temporal retrieval for march filing",
         "query": "march filing deadline",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -1023,7 +985,6 @@
         "id": "ret-039",
         "description": "temporal retrieval for april renewal",
         "query": "april renewal thursday",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1043,7 +1004,6 @@
         "id": "ret-040",
         "description": "temporal retrieval for may rehearsal",
         "query": "may rehearsal monday",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1063,7 +1023,6 @@
         "id": "ret-041",
         "description": "reasoning retrieval for launch delay",
         "query": "why was phoenix launch delayed",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1083,7 +1042,6 @@
         "id": "ret-042",
         "description": "reasoning retrieval for hiring slowdown",
         "query": "why did cedar hiring slow down",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1103,7 +1061,6 @@
         "id": "ret-043",
         "description": "reasoning retrieval for billing rollback",
         "query": "why was lantern billing rolled back",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1123,7 +1080,6 @@
         "id": "ret-044",
         "description": "reasoning retrieval for export delay",
         "query": "why did harbor export miss the window",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -1143,7 +1099,6 @@
         "id": "ret-045",
         "description": "reasoning retrieval for audit extension",
         "query": "why did solstice audit get an extension",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1163,7 +1118,6 @@
         "id": "ret-046",
         "description": "reasoning retrieval for migration pause",
         "query": "why did quartz migration pause",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1183,7 +1137,6 @@
         "id": "ret-047",
         "description": "reasoning retrieval for partner renewal",
         "query": "why did horizon partner renewal slip",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1203,7 +1156,6 @@
         "id": "ret-048",
         "description": "reasoning retrieval for hotfix",
         "query": "why did meadow ship a hotfix",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -1223,7 +1175,6 @@
         "id": "ret-049",
         "description": "reasoning retrieval for waiver",
         "query": "why was ridge waiver escalated",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1243,7 +1194,6 @@
         "id": "ret-050",
         "description": "reasoning retrieval for support backlog",
         "query": "why did summit support backlog grow",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1260,160 +1210,9 @@
         }
     },
     {
-        "id": "ret-051",
-        "description": "project filter isolates atlas budget facts from beacon",
-        "query": "budget review",
-        "scope": "org",
-        "project": "atlas",
-        "budget": 5,
-        "facts": [
-            {
-                "content": "Atlas budget review closes Friday",
-                "t_valid": "2026-04-22T09:00:00Z",
-                "project": "atlas"
-            },
-            {
-                "content": "Beacon budget review closes Friday",
-                "t_valid": "2026-04-23T09:00:00Z",
-                "project": "beacon"
-            }
-        ],
-        "expected": {
-            "tier": "direct",
-            "must_contain": [
-                "Atlas budget review closes Friday"
-            ],
-            "must_not_contain": [
-                "Beacon budget review closes Friday"
-            ],
-            "min_recall_at_k": 1.0
-        }
-    },
-    {
-        "id": "ret-052",
-        "description": "project filter isolates beacon launch checklist facts from atlas",
-        "query": "launch checklist",
-        "scope": "org",
-        "project": "beacon",
-        "budget": 5,
-        "facts": [
-            {
-                "content": "Atlas launch checklist needs legal signoff",
-                "t_valid": "2026-04-24T10:00:00Z",
-                "project": "atlas"
-            },
-            {
-                "content": "Beacon launch checklist needs legal signoff",
-                "t_valid": "2026-04-25T10:00:00Z",
-                "project": "beacon"
-            }
-        ],
-        "expected": {
-            "tier": "direct",
-            "must_contain": [
-                "Beacon launch checklist needs legal signoff"
-            ],
-            "must_not_contain": [
-                "Atlas launch checklist needs legal signoff"
-            ],
-            "min_recall_at_k": 1.0
-        }
-    },
-    {
-        "id": "ret-053",
-        "description": "project filter isolates atlas risk ledger facts from beacon",
-        "query": "risk ledger",
-        "scope": "org",
-        "project": "atlas",
-        "budget": 5,
-        "facts": [
-            {
-                "content": "Atlas risk ledger requires finance review",
-                "t_valid": "2026-04-26T11:00:00Z",
-                "project": "atlas"
-            },
-            {
-                "content": "Beacon risk ledger requires finance review",
-                "t_valid": "2026-04-27T11:00:00Z",
-                "project": "beacon"
-            }
-        ],
-        "expected": {
-            "tier": "direct",
-            "must_contain": [
-                "Atlas risk ledger requires finance review"
-            ],
-            "must_not_contain": [
-                "Beacon risk ledger requires finance review"
-            ],
-            "min_recall_at_k": 1.0
-        }
-    },
-    {
-        "id": "ret-054",
-        "description": "project filter isolates beacon vendor memo facts from atlas",
-        "query": "vendor memo",
-        "scope": "org",
-        "project": "beacon",
-        "budget": 5,
-        "facts": [
-            {
-                "content": "Atlas vendor memo was shared with procurement",
-                "t_valid": "2026-04-28T12:00:00Z",
-                "project": "atlas"
-            },
-            {
-                "content": "Beacon vendor memo was shared with procurement",
-                "t_valid": "2026-04-29T12:00:00Z",
-                "project": "beacon"
-            }
-        ],
-        "expected": {
-            "tier": "direct",
-            "must_contain": [
-                "Beacon vendor memo was shared with procurement"
-            ],
-            "must_not_contain": [
-                "Atlas vendor memo was shared with procurement"
-            ],
-            "min_recall_at_k": 1.0
-        }
-    },
-    {
-        "id": "ret-055",
-        "description": "project filter isolates atlas staffing sync facts from beacon",
-        "query": "staffing sync",
-        "scope": "org",
-        "project": "atlas",
-        "budget": 5,
-        "facts": [
-            {
-                "content": "Atlas staffing sync moved to Thursday",
-                "t_valid": "2026-04-30T13:00:00Z",
-                "project": "atlas"
-            },
-            {
-                "content": "Beacon staffing sync moved to Thursday",
-                "t_valid": "2026-05-01T13:00:00Z",
-                "project": "beacon"
-            }
-        ],
-        "expected": {
-            "tier": "direct",
-            "must_contain": [
-                "Atlas staffing sync moved to Thursday"
-            ],
-            "must_not_contain": [
-                "Beacon staffing sync moved to Thursday"
-            ],
-            "min_recall_at_k": 1.0
-        }
-    },
-    {
         "id": "ret-056",
         "description": "graph bridge retrieval via community co-membership for aurora",
         "query": "aurora board handoff queue",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1447,7 +1246,6 @@
         "id": "ret-057",
         "description": "graph bridge retrieval via community co-membership for cedar",
         "query": "cedar reimbursement exception board",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1481,7 +1279,6 @@
         "id": "ret-058",
         "description": "graph bridge retrieval via community co-membership for delta",
         "query": "delta partner onboarding mesh",
-        "scope": "private",
         "budget": 5,
         "facts": [
             {
@@ -1515,7 +1312,6 @@
         "id": "ret-059",
         "description": "graph bridge retrieval via community co-membership for ember",
         "query": "ember release dependency map",
-        "scope": "org",
         "budget": 5,
         "facts": [
             {
@@ -1549,7 +1345,6 @@
         "id": "ret-060",
         "description": "graph bridge retrieval via community co-membership for harbor",
         "query": "harbor audit remediation chain",
-        "scope": "personal",
         "budget": 5,
         "facts": [
             {
@@ -1583,7 +1378,6 @@
         "id": "ret-061",
         "description": "breadth query covers march-april product decisions without collapsing to a single source episode",
         "query": "march april 2026 alpha suite delta control signal monitor orbit portal decisions",
-        "scope": "org",
         "budget": 6,
         "facts": [
             {
@@ -1640,7 +1434,6 @@
         "id": "ret-062",
         "description": "breadth query keeps atlas and beacon blockers spread across source episodes instead of noisy consolidated digests",
         "query": "march april 2026 atlas beacon blockers decisions",
-        "scope": "org",
         "budget": 6,
         "facts": [
             {
@@ -1697,7 +1490,6 @@
         "id": "ret-063",
         "description": "time-scoped breadth query prefers april 2026 product updates over a dense but stale umbrella summary",
         "query": "april 2026 alpha suite delta control signal monitor orbit portal updates",
-        "scope": "org",
         "budget": 6,
         "facts": [
             {
@@ -1754,7 +1546,6 @@
         "id": "timeline-auto-atlas-history",
         "description": "Auto timeline routing should return Atlas history in chronological order.",
         "query": "timeline of atlas changes in q1 2026",
-        "scope": "org",
         "tags": [
             "timeline_auto"
         ],
@@ -1786,7 +1577,6 @@
         "id": "graph-anchor-alice-neighbor",
         "description": "Named entity anchors should expand to connected facts even without lexical overlap.",
         "query": "Alice Stone",
-        "scope": "org",
         "tags": [
             "graph_anchor"
         ],
@@ -1833,7 +1623,6 @@
         "id": "first-person-rescue-profile",
         "description": "First-person rescue should retain user-profile facts when they add unique grounding.",
         "query": "I'm planning a weekend getaway and want something creatively fulfilling",
-        "scope": "personal",
         "tags": [
             "first_person_rescue"
         ],

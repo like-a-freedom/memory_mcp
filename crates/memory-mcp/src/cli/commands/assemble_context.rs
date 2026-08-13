@@ -7,8 +7,6 @@ use crate::tools::params::AssembleContextParams;
 pub async fn run(service: &MemoryService, args: AssembleContextArgs) -> Result<(), MemoryError> {
     let params = AssembleContextParams {
         query: args.query,
-        scope: args.scope,
-        project: args.project,
         fact_types: args.fact_types,
         as_of: args.as_of,
         budget: args.budget,

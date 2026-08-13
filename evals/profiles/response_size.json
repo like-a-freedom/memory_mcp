@@ -6,7 +6,7 @@
     {
       "id": "response-size",
       "expected_coverage": {
-        "exact_cases": 66
+        "exact_cases": 61
       }
     }
   ],

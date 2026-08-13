@@ -12,64 +12,69 @@ use serde_json::{Value, json};
 use crate::service::MemoryError;
 use crate::storage::helpers::is_missing_table_error;
 use crate::storage::queries::build_fact_visibility_clause;
-use crate::storage::{DbClient, GraphDirection};
+use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
 #[derive(Clone)]
 pub struct EpisodeStoreClient {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl EpisodeStoreClient {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
     }
 
-    pub async fn select_one(
+    pub async fn select_one(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(record_id).await
+    }
+
+    pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
+        self.db.create(record_id, content).await
+    }
+
+    pub async fn update(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
+        self.db.update(record_id, content).await
+    }
+
+    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
+        self.db.query(sql, vars).await
+    }
+
+    /// Finds episodes by the stable source identity used by both legacy and
+    /// scope-free episode IDs. The caller decides how many matches are safe.
+    pub async fn select_by_source_identity(
         &self,
-        record_id: &str,
-        namespace: &str,
-    ) -> Result<Option<Value>, MemoryError> {
-        self.db.select_one(record_id, namespace).await
+        source_type: &str,
+        source_id: &str,
+        t_ref: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let sql = "SELECT * FROM episode WHERE source_type = $source_type AND source_id = $source_id AND t_ref = type::datetime($t_ref) ORDER BY episode_id ASC LIMIT $limit";
+        let vars = json!({
+            "source_type": source_type,
+            "source_id": source_id,
+            "t_ref": t_ref,
+            "limit": limit,
+        });
+        match self.db.query(sql, Some(vars)).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
     }
 
-    pub async fn create(
-        &self,
-        record_id: &str,
-        content: Value,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content, namespace).await
-    }
-
-    pub async fn update(
-        &self,
-        record_id: &str,
-        content: Value,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        self.db.update(record_id, content, namespace).await
-    }
-
-    pub async fn query(
-        &self,
-        sql: &str,
-        vars: Option<Value>,
-        namespace: &str,
-    ) -> Result<Value, MemoryError> {
-        self.db.query(sql, vars, namespace).await
-    }
-
-    /// Neighbors around a graph node within a namespace.
+    /// Neighbors around a graph node in the Active Namespace.
     pub async fn select_edge_neighbors(
         &self,
-        namespace: &str,
         node_id: &str,
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -79,7 +84,6 @@ impl EpisodeStoreClient {
     /// Entities matching a set of canonical id strings.
     pub async fn select_entities_by_ids(
         &self,
-        namespace: &str,
         entity_ids: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         if entity_ids.is_empty() {
@@ -87,7 +91,7 @@ impl EpisodeStoreClient {
         }
         let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
         let vars = json!({ "entity_ids": entity_ids });
-        match self.db.query(sql, Some(vars), namespace).await {
+        match self.db.query(sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -97,7 +101,6 @@ impl EpisodeStoreClient {
     /// Active (not-yet-invalidated) facts linked to an episode.
     pub async fn select_active_facts_by_episode(
         &self,
-        namespace: &str,
         episode_id: &str,
         cutoff: &str,
         limit: i32,
@@ -107,7 +110,7 @@ impl EpisodeStoreClient {
             "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
         );
         let vars = json!({ "episode_id": episode_id, "cutoff": cutoff, "limit": limit });
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -117,14 +120,13 @@ impl EpisodeStoreClient {
     /// Communities containing any of the listed member entities.
     pub async fn select_communities_by_member_entities(
         &self,
-        namespace: &str,
         member_entities: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_communities_by_member_entities_query(
                 member_entities,
             );
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -136,7 +138,6 @@ impl EpisodeStoreClient {
     /// Used for targeted invalidation without full table scans.
     pub async fn select_edges_for_triple(
         &self,
-        namespace: &str,
         in_id: &str,
         relation: &str,
         out_id: &str,
@@ -144,25 +145,24 @@ impl EpisodeStoreClient {
         let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
                    AND out = <record> $out_id";
         let vars = json!({ "in_id": in_id, "relation": relation, "out_id": out_id });
-        match self.db.query(sql, Some(vars), namespace).await {
+        match self.db.query(sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
         }
     }
 
-    /// Link two records through an edge.
+    /// Link two records through an edge in the Active Namespace.
     pub async fn relate_edge(
         &self,
         edge_id: &str,
         from_id: &str,
         to_id: &str,
         content: Value,
-        namespace: &str,
     ) -> Result<Value, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_relate_edge_query(edge_id, from_id, to_id, content);
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value
                 .as_array()
                 .and_then(|rows| rows.first().cloned())
@@ -262,11 +262,11 @@ mod tests {
             .await
             .expect("connect in memory db"),
         );
-        let store = EpisodeStoreClient::new(db_client.clone());
+        let store = EpisodeStoreClient::new(db_client.clone(), "org");
         let cutoff = normalize_dt(chrono::Utc::now());
 
         let facts = store
-            .select_active_facts_by_episode("org", "episode:seed", &cutoff, 10)
+            .select_active_facts_by_episode("episode:seed", &cutoff, 10)
             .await
             .expect("must not error on missing table");
         assert!(facts.is_empty());
@@ -278,11 +278,11 @@ mod tests {
         seed_fact(&db_client, "fact:1", false).await;
         seed_fact(&db_client, "fact:2", true).await;
         seed_fact(&db_client, "fact:3", false).await;
-        let store = EpisodeStoreClient::new(db_client.clone());
+        let store = EpisodeStoreClient::new(db_client.clone(), "org");
         let cutoff = normalize_dt(chrono::Utc::now() + chrono::Duration::seconds(1));
 
         let facts = store
-            .select_active_facts_by_episode("org", "episode:seed", &cutoff, 2)
+            .select_active_facts_by_episode("episode:seed", &cutoff, 2)
             .await
             .expect("select active facts");
         let ids: Vec<&str> = facts

@@ -304,7 +304,7 @@ jobs:
           for selector in anno regex; do
             NER_EXTRACTOR=$selector SURREALDB_EMBEDDED=true \
               SURREALDB_DATA_DIR=$(mktemp -d) SURREALDB_DB_NAME=smoke \
-              SURREALDB_NAMESPACES=org SURREALDB_USERNAME=root SURREALDB_PASSWORD=root \
+              SURREALDB_NAMESPACE=org SURREALDB_USERNAME=root SURREALDB_PASSWORD=root \
               EMBEDDINGS_ENABLED=false \
               target/${{ matrix.platform.target }}/release/memory_mcp ingest \
               --source-type smoke --source-id selector-$selector \
@@ -321,7 +321,7 @@ jobs:
             $env:SURREALDB_EMBEDDED = 'true'
             $env:SURREALDB_DATA_DIR = (New-Item -ItemType Directory -Force "$env:TEMP\ner-smoke-$selector").FullName
             $env:SURREALDB_DB_NAME = 'smoke'
-            $env:SURREALDB_NAMESPACES = 'org'
+            $env:SURREALDB_NAMESPACE = 'org'
             $env:SURREALDB_USERNAME = 'root'
             $env:SURREALDB_PASSWORD = 'root'
             $env:EMBEDDINGS_ENABLED = 'false'

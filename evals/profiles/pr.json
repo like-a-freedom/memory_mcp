@@ -6,7 +6,7 @@
     {
       "id": "local-retrieval",
       "expected_coverage": {
-        "exact_cases": 66
+        "exact_cases": 61
       }
     },
     {
@@ -18,7 +18,7 @@
     {
       "id": "claim-reconciliation",
       "expected_coverage": {
-        "exact_cases": 42
+        "exact_cases": 41
       }
     },
     {

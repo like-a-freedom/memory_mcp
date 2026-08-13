@@ -18,10 +18,9 @@ impl ResolveCapability {
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
         ctx.enforce_rate_limit(access.as_ref())?;
-        let namespace = ctx.default_namespace.clone();
         let (entity_id, _was_created) = ctx
             .entity_resolver
-            .resolve_or_create(&ctx.entity_service, candidate, &namespace)
+            .resolve_or_create(&ctx.entity_service, candidate)
             .await?;
         Ok(entity_id)
     }
@@ -95,14 +94,9 @@ mod tests {
                 json!([{"entity_id": "entity:existing"}]),
             );
 
-        let service = MemoryService::new(
-            Arc::new(db),
-            vec!["org".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .unwrap();
+        let service =
+            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
+                .unwrap();
 
         let ctx = service.build_context();
         let resolved = crate::service::capabilities::resolve::ResolveCapability::resolve(

@@ -46,13 +46,13 @@ The optional `mcp-apps` Cargo feature adds interactive app-session UI surfaces b
 is not required for the core MCP tools or zero-config first value. A casual user
 can start with no application environment variables: storage uses
 embedded RocksDB in a user-owned data directory, database `memory`, namespace
-`org`, embedded `root/root` credentials, Anno entity extraction, disabled
+`main`, embedded `root/root` credentials, Anno entity extraction, disabled
 embeddings, and lexical/graph retrieval. This path does not require an external
 SurrealDB service, API key, configuration file, network request, or model download.
 
 Power users override the same executable with the canonical runtime variables
 `SURREALDB_URL`, `SURREALDB_EMBEDDED`, `SURREALDB_DB_NAME`,
-`SURREALDB_NAMESPACES`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`,
+`SURREALDB_NAMESPACE`, `SURREALDB_USERNAME`, `SURREALDB_PASSWORD`,
 `SURREALDB_DATA_DIR`, `NER_EXTRACTOR` (one of `anno`, `regex`, `anno-onnx`,
 `urchade/gliner_multi-v2.1`, `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`),
 `NER_CACHE_DIR`, `GLINER_BATCH_SIZE`, `GLINER_MAX_BATCH_TOKENS`,
@@ -91,7 +91,7 @@ and pre-compaction events and speak newline-delimited JSON-RPC over MCP stdio:
 they start the server (via `MEMORY_MCP_SERVER_CMD`), perform the minimal
 handshake (`initialize` → `notifications/initialized`), and call the `ingest`
 tool with `source_type="session_summary"`. See `hooks/README.md` for wiring
-and optional variables (`MEMORY_HOOK_PROJECT`, `MEMORY_HOOK_SCOPE`, ...).
+and optional content/policy variables; storage uses the server's configured Active Namespace.
 
 Hosts that prefer direct invocation may call the CLI themselves. The examples
 below are illustrative CLI usage (not the shipped scripts): the ordinary CLI
@@ -100,24 +100,24 @@ capture/recall with policy classification:
 
 ```bash
 # SessionStart hook → recall (ordinary CLI, agent-visible)
-memory_mcp assemble-context --query "$(cat /dev/stdin)" --scope org
+memory_mcp assemble-context --query "$(cat /dev/stdin)"
 
 # PostToolUse hook → capture (ordinary CLI, agent-visible)
 memory_mcp ingest --source-type agent_lifecycle --source-id "$EVENT_ID" \
-  --content "$(cat /dev/stdin)" --t-ref "$(date -u +%FT%TZ)" --scope org
+  --content "$(cat /dev/stdin)" --t-ref "$(date -u +%FT%TZ)"
 
 # PostToolUse hook → selective capture (internal, policy-classified)
 # Hidden subcommand — not in --help. Constructs NormalizedHostEvent +
 # InvocationContext and calls LifecycleCapture::execute().
 memory_mcp lifecycle-capture \
-  --event '{"event_kind":"post_tool_result","task_fingerprint":"$TASK_FP","normalized_task":"$TASK","scope":"org","content":"$CONTENT","capture_signal":"verified_success"}' \
+  --event '{"event_kind":"post_tool_result","task_fingerprint":"$TASK_FP","normalized_task":"$TASK","content":"$CONTENT","capture_signal":"verified_success"}' \
   --context '{"origin":{"kind":"lifecycle_adapter","adapter_id":"claude_code","adapter_version":"1","host_event":"post_tool_result"},"session_id":"$SESSION_ID"}'
 
 # SessionStart hook → selective recall (internal, policy-classified)
 # Hidden subcommand — not in --help. Constructs NormalizedHostEvent +
 # InvocationContext and calls LifecycleRecall::execute().
 memory_mcp lifecycle-recall \
-  --event '{"event_kind":"session_start","task_fingerprint":"$TASK_FP","normalized_task":"$TASK","scope":"org"}' \
+  --event '{"event_kind":"session_start","task_fingerprint":"$TASK_FP","normalized_task":"$TASK"}' \
   --context '{"origin":{"kind":"lifecycle_adapter","adapter_id":"claude_code","adapter_version":"1","host_event":"session_start"},"session_id":"$SESSION_ID"}'
 ```
 
@@ -171,7 +171,7 @@ not assumed to exist for another.
 |---|---|
 | Session/subagent start | Recall once for the resolved task; wake-up view only when the task is empty |
 | User prompt | Recall when the normalized task changes; capture only an explicit preference, constraint, decision, commitment, or correction |
-| Consequential pre-tool/permission boundary | Recall only when no fresh trace exists for the same task/scope/project/policy key |
+| Consequential pre-tool/permission boundary | Recall only when no fresh trace exists for the same task/policy key; storage uses the process Active Namespace |
 | Significant post-tool result | Capture a bounded verified success/failure summary and artifact references |
 | Pre-compaction | Capture one idempotent checkpoint summary |
 | Post-compaction/resume | Force one recall even if the previous key matches |
@@ -209,7 +209,7 @@ shadow:
   run recall/capture policy; do not inject context or persist accepted evidence
 
 opt_in_enforced:
-  inject context and persist accepted events for explicit projects/users
+  inject context and persist accepted events for the configured process/user
 
 default_on_per_adapter:
   enable only for host versions passing contract, security, quality,

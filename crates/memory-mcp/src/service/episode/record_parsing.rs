@@ -58,7 +58,13 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
         content: json_string(record.get("content")?)?.to_string(),
         t_ref: parse_iso(json_string(record.get("t_ref")?)?)?,
         t_ingested: parse_iso(json_string(record.get("t_ingested")?)?)?,
-        scope: json_string(record.get("scope")?)?.to_string(),
+        // Legacy partition fields are optional in the scope-free schema. They
+        // remain readable for old records but are never used for routing.
+        scope: record
+            .get("scope")
+            .and_then(json_string)
+            .unwrap_or_default()
+            .to_string(),
         visibility_scope: record
             .get("visibility_scope")
             .and_then(json_string)

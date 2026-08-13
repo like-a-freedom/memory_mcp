@@ -99,6 +99,30 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "031_entity_extraction_projection.surql",
             sql: include_str!("../../migrations/031_entity_extraction_projection.surql"),
         },
+        MigrationScript {
+            file_name: "032_scope_free_active_namespace_expand.surql",
+            sql: include_str!("../../migrations/032_scope_free_active_namespace_expand.surql"),
+        },
+        MigrationScript {
+            file_name: "033_claim_identity_version.surql",
+            sql: include_str!("../../migrations/033_claim_identity_version.surql"),
+        },
+        MigrationScript {
+            file_name: "034_edge_provenance_schema_fix.surql",
+            sql: include_str!("../../migrations/034_edge_provenance_schema_fix.surql"),
+        },
+        MigrationScript {
+            file_name: "035_claim_legacy_identity_optional.surql",
+            sql: include_str!("../../migrations/035_claim_legacy_identity_optional.surql"),
+        },
+        MigrationScript {
+            file_name: "036_migration_runner_state.surql",
+            sql: include_str!("../../migrations/036_migration_runner_state.surql"),
+        },
+        MigrationScript {
+            file_name: "037_triple_legacy_namespace_optional.surql",
+            sql: include_str!("../../migrations/037_triple_legacy_namespace_optional.surql"),
+        },
     ]
 }
 
@@ -129,7 +153,12 @@ fn is_dynamic_embedding_migration(file_name: &str) -> bool {
     matches!(file_name, "008_fact_semantic_embeddings.surql")
 }
 
-pub fn validate_applied_migration(
+/// Validates the immutable identity fields shared by every migration-ledger state.
+///
+/// In-progress records deliberately do not require `executed_at`: they must be
+/// recoverable after a process crash. The caller is responsible for applying the
+/// state-specific timestamp requirements.
+pub(crate) fn validate_migration_identity(
     existing: &Value,
     expected_file_name: &str,
     expected_checksum: &str,
@@ -143,31 +172,47 @@ pub fn validate_applied_migration(
     let applied_name = map
         .get("script_name")
         .and_then(json_string)
-        .ok_or_else(|| {
-            MemoryError::Storage("applied migration record missing script_name".to_string())
-        })?;
-    let applied_checksum = map.get("checksum").and_then(json_string).ok_or_else(|| {
-        MemoryError::Storage("applied migration record missing checksum".to_string())
-    })?;
-    let executed_at = map
-        .get("executed_at")
+        .ok_or_else(|| MemoryError::Storage("migration record missing script_name".to_string()))?;
+    let applied_checksum = map
+        .get("checksum")
         .and_then(json_string)
-        .ok_or_else(|| {
-            MemoryError::Storage("applied migration record missing executed_at".to_string())
-        })?;
+        .ok_or_else(|| MemoryError::Storage("migration record missing checksum".to_string()))?;
 
     if applied_name != expected_file_name {
         return Err(MemoryError::ConfigInvalid(format!(
-            "applied migration name mismatch for {expected_file_name}: found {applied_name}"
+            "migration name mismatch for {expected_file_name}: found {applied_name}"
         )));
     }
 
     if applied_checksum != expected_checksum && !is_dynamic_embedding_migration(expected_file_name)
     {
         return Err(MemoryError::ConfigInvalid(format!(
-            "applied migration {expected_file_name} was modified after execution"
+            "migration {expected_file_name} was modified after execution"
         )));
     }
+
+    Ok(())
+}
+
+pub fn validate_applied_migration(
+    existing: &Value,
+    expected_file_name: &str,
+    expected_checksum: &str,
+) -> Result<(), MemoryError> {
+    let Some(map) = existing.as_object() else {
+        return Err(MemoryError::Storage(
+            "stored migration bookkeeping record must be an object".to_string(),
+        ));
+    };
+
+    validate_migration_identity(existing, expected_file_name, expected_checksum)?;
+
+    let executed_at = map
+        .get("executed_at")
+        .and_then(json_string)
+        .ok_or_else(|| {
+            MemoryError::Storage("applied migration record missing executed_at".to_string())
+        })?;
 
     if chrono::DateTime::parse_from_rfc3339(executed_at).is_err() {
         return Err(MemoryError::Storage(format!(
@@ -244,6 +289,39 @@ mod tests {
     }
 
     #[test]
+    fn versioned_migrations_includes_032_scope_free_expand() {
+        let migrations = versioned_migrations();
+        assert!(migrations.iter().any(|migration| {
+            migration.file_name == "032_scope_free_active_namespace_expand.surql"
+        }));
+    }
+
+    #[test]
+    fn versioned_migrations_includes_edge_provenance_schema_fix() {
+        assert!(
+            versioned_migrations()
+                .iter()
+                .any(|migration| { migration.file_name == "034_edge_provenance_schema_fix.surql" })
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_optional_claim_legacy_identity() {
+        assert!(versioned_migrations().iter().any(|migration| {
+            migration.file_name == "035_claim_legacy_identity_optional.surql"
+        }));
+    }
+
+    #[test]
+    fn versioned_migrations_includes_migration_runner_state() {
+        assert!(
+            versioned_migrations()
+                .iter()
+                .any(|migration| { migration.file_name == "036_migration_runner_state.surql" })
+        );
+    }
+
+    #[test]
     fn versioned_migrations_have_no_duplicate_file_names() {
         let mut names: Vec<&str> = versioned_migrations()
             .iter()
@@ -257,6 +335,68 @@ mod tests {
             initial_len,
             "duplicate migration file names detected"
         );
+    }
+
+    #[test]
+    fn validate_migration_identity_accepts_recoverable_in_progress_records() {
+        for status in ["applying", "failed"] {
+            let existing = serde_json::json!({
+                "script_name": "032_scope_free_active_namespace_expand.surql",
+                "checksum": "expected-checksum",
+                "status": status
+            });
+
+            assert!(
+                validate_migration_identity(
+                    &existing,
+                    "032_scope_free_active_namespace_expand.surql",
+                    "expected-checksum"
+                )
+                .is_ok()
+            );
+        }
+    }
+
+    #[test]
+    fn validate_migration_identity_rejects_changed_name_or_checksum() {
+        let existing = serde_json::json!({
+            "script_name": "032_scope_free_active_namespace_expand.surql",
+            "checksum": "expected-checksum",
+            "status": "applying"
+        });
+
+        let name_error = validate_migration_identity(
+            &existing,
+            "033_claim_identity_version.surql",
+            "expected-checksum",
+        )
+        .expect_err("a changed migration name must fail closed");
+        assert!(name_error.to_string().contains("name mismatch"));
+
+        let checksum_error = validate_migration_identity(
+            &existing,
+            "032_scope_free_active_namespace_expand.surql",
+            "different-checksum",
+        )
+        .expect_err("a changed migration checksum must fail closed");
+        assert!(checksum_error.to_string().contains("modified"));
+    }
+
+    #[test]
+    fn validate_applied_migration_requires_executed_at() {
+        let existing = serde_json::json!({
+            "script_name": "032_scope_free_active_namespace_expand.surql",
+            "checksum": "expected-checksum",
+            "status": "applied"
+        });
+
+        let error = validate_applied_migration(
+            &existing,
+            "032_scope_free_active_namespace_expand.surql",
+            "expected-checksum",
+        )
+        .expect_err("applied records need a valid completion timestamp");
+        assert!(error.to_string().contains("executed_at"));
     }
 
     #[test]

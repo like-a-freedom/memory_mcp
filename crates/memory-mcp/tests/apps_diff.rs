@@ -39,8 +39,7 @@ async fn build_diff_reports_added_and_removed_facts_across_timepoints() {
 
     let diff = service
         .build_diff(DiffRequest {
-            scope: "org".to_string(),
-            target_type: "scope".to_string(),
+            target_type: "all".to_string(),
             target_id: None,
             as_of_left: Utc.with_ymd_and_hms(2026, 3, 1, 10, 0, 0).unwrap(),
             as_of_right: Utc.with_ymd_and_hms(2026, 3, 3, 10, 0, 0).unwrap(),

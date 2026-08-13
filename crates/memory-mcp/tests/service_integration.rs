@@ -56,10 +56,7 @@ async fn test_service_ingest_and_extract_flow() {
         source_id: "integration-test-1".to_string(),
         content: "Meeting with Alice Inc and Bob Corp. Discussed ARR growth to $5M. Alice will deliver the prototype by Friday.".to_string(),
         t_ref: Utc::now(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 
@@ -105,10 +102,7 @@ async fn extractor_fingerprint_projection() {
         source_id: "fingerprint-projection-1".to_string(),
         content: "Alice Inc and Bob Corp discussed the Atlas launch with Carol.".to_string(),
         t_ref: Utc::now(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 
@@ -132,7 +126,10 @@ async fn extractor_fingerprint_projection() {
 
     let row = &rows[0];
     assert_eq!(row["episode_id"].as_str(), Some(episode_id.as_str()));
-    assert_eq!(row["scope"].as_str(), Some("org"));
+    assert!(
+        row.get("scope").is_none(),
+        "new projection rows must not persist the removed scope partition field: {row:?}"
+    );
     assert!(
         !row["t_ingested"].is_null(),
         "projection row must carry its ingestion timestamp"
@@ -241,7 +238,6 @@ async fn test_service_add_fact_and_assemble_context() {
             "ARR reached $5M",
             "episode:test",
             t_valid,
-            "org",
             0.9,
             vec![],
             vec!["finance".to_string()],
@@ -254,10 +250,8 @@ async fn test_service_add_fact_and_assemble_context() {
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "ARR metric".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -292,7 +286,6 @@ async fn test_service_add_fact_persists_provenance() {
             "ARR reached $7M",
             "episode:provenance",
             Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
-            "org",
             0.95,
             vec![],
             vec![],
@@ -325,10 +318,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
             source_id: "edge-prov-1".to_string(),
             content: "Meeting with Alice Smith about ARR goals".to_string(),
             t_ref: Utc.with_ymd_and_hms(2024, 3, 2, 12, 0, 0).unwrap(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -368,10 +358,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
             t_ref: "2026-03-01T10:00:00Z"
                 .parse()
                 .expect("static timestamp should parse"),
-            scope: "personal".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -402,10 +389,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
             t_ref: "2026-03-01T10:00:00Z"
                 .parse()
                 .expect("static timestamp should parse"),
-            scope: "personal".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -459,7 +443,7 @@ async fn test_service_extract_persists_index_keys_for_entities_and_temporal_mark
     )
     .await;
 
-    let facts = db_client.select_table("fact", "personal").await.unwrap();
+    let facts = db_client.select_table("fact", "org").await.unwrap();
     let fact = facts
         .iter()
         .find(|record| {
@@ -526,10 +510,7 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
             source_id: "semantic-slot-1".to_string(),
             content: "Alice Smith reviewed ARR improvements".to_string(),
             t_ref: Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -548,7 +529,6 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
             "Alice Smith reviewed ARR improvements",
             &episode_id,
             Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.8,
             vec![entity_id.clone()],
             vec![],
@@ -589,7 +569,6 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
             "Compensation increase approved",
             "episode:semantic-similarity",
             Utc.with_ymd_and_hms(2024, 4, 3, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -602,10 +581,8 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "salary raise".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now()),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -647,10 +624,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
                 source_id: source_id.to_string(),
                 content: content.to_string(),
                 t_ref: Utc.with_ymd_and_hms(2024, 4, 2, 10, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -695,7 +669,6 @@ async fn test_service_fact_invalidation() {
             "ARR $3M",
             "episode:test",
             t_valid,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -706,10 +679,8 @@ async fn test_service_fact_invalidation() {
 
     let request_before = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -738,10 +709,8 @@ async fn test_service_fact_invalidation() {
 
     let request_after = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc.with_ymd_and_hms(2024, 12, 1, 0, 0, 0).unwrap()),
         budget: 10,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -769,7 +738,6 @@ async fn test_service_cache_behavior() {
             "Test quote",
             "episode:cache-test",
             t_valid,
-            "org",
             0.8,
             vec![],
             vec![],
@@ -780,10 +748,8 @@ async fn test_service_cache_behavior() {
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "Test content".to_string(),
-        scope: "org".to_string(),
         as_of: None,
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -814,7 +780,6 @@ async fn test_service_assemble_context_records_fact_access_heat() {
             "Heat tracking note for retrieval",
             "episode:heat-retrieval",
             Utc::with_ymd_and_hms(&Utc, 2026, 3, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -827,10 +792,8 @@ async fn test_service_assemble_context_records_fact_access_heat() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "heat tracking retrieval".to_string(),
-            scope: "org".to_string(),
             as_of: None,
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -868,7 +831,6 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
             "Heat tracking note for retrieval",
             "episode:heat-cache",
             Utc::with_ymd_and_hms(&Utc, 2026, 3, 2, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -881,10 +843,8 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "heat tracking retrieval".to_string(),
-        scope: "org".to_string(),
         as_of: Some(as_of),
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -945,7 +905,6 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
             "Default disabled query logging note",
             "episode:query-log-default-off",
             Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -958,10 +917,8 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "default disabled query logging".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -993,7 +950,6 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
             "Query analytics retrieval note",
             "episode:query-log-direct",
             Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1006,10 +962,8 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "query analytics retrieval".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1031,9 +985,9 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
     );
 
     let row = query_logs.first().expect("query_log row should exist");
-    assert_eq!(
-        row.get("scope").and_then(|value| value.as_str()),
-        Some("org")
+    assert!(
+        row.get("scope").is_none(),
+        "query logs must not persist the removed scope partition field: {row:?}"
     );
     assert_eq!(
         row.get("query").and_then(|value| value.as_str()),
@@ -1085,10 +1039,8 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
-            scope: "org".to_string(),
             as_of: None,
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1132,7 +1084,6 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
             "Cache hit analytics retrieval",
             "episode:query-log-cache",
             Utc.with_ymd_and_hms(2026, 4, 8, 11, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1143,10 +1094,8 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "cache hit analytics retrieval".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -1210,7 +1159,6 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
             "Default retention pruning note",
             "episode:query-log-retention-default",
             Utc.with_ymd_and_hms(2026, 4, 8, 13, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1223,10 +1171,8 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "default retention pruning".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 13, 5, 0).unwrap()),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1285,7 +1231,6 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
             "Custom retention pruning note",
             "episode:query-log-retention-custom",
             Utc.with_ymd_and_hms(2026, 4, 8, 14, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1298,10 +1243,8 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "custom retention pruning".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 14, 5, 0).unwrap()),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1340,7 +1283,7 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
 }
 
 #[tokio::test]
-async fn test_service_scope_isolation() {
+async fn test_service_active_namespace_contains_legacy_scope_records_without_filtering() {
     let service = common::make_service().await;
 
     let t_valid = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
@@ -1352,7 +1295,6 @@ async fn test_service_scope_isolation() {
             "Org quote",
             "episode:org",
             t_valid,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1368,7 +1310,6 @@ async fn test_service_scope_isolation() {
             "Personal quote",
             "episode:personal",
             t_valid,
-            "personal",
             0.9,
             vec![],
             vec![],
@@ -1379,10 +1320,8 @@ async fn test_service_scope_isolation() {
 
     let request_org = memory_mcp::models::AssembleContextRequest {
         query: "scope fact".to_string(),
-        scope: "org".to_string(),
         as_of: None,
         budget: 10,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -1394,7 +1333,8 @@ async fn test_service_scope_isolation() {
         AssembleContextCapability::assemble_context(&service.build_context(), request_org)
             .await
             .unwrap();
-    assert!(org_results.iter().all(|r| { r.content.contains("Org") }));
+    assert!(org_results.iter().any(|r| r.content.contains("Org")));
+    assert!(org_results.iter().any(|r| r.content.contains("Personal")));
 }
 
 #[tokio::test]
@@ -1427,10 +1367,8 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "atlas".to_string(),
-            scope: "personal".to_string(),
             as_of: None,
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: Some("timeline".to_string()),
             window_start: Some(Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap()),
@@ -1482,10 +1420,8 @@ async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mod
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
-            scope: "personal".to_string(),
             as_of: None,
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1537,10 +1473,8 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "Alice Stone".to_string(),
-            scope: "org".to_string(),
             as_of: None,
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -1560,7 +1494,7 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
 }
 
 #[tokio::test]
-async fn test_service_assemble_context_filters_by_project_and_fact_type() {
+async fn test_service_assemble_context_filters_by_fact_type_within_active_namespace() {
     let service = common::make_service().await;
     let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
 
@@ -1571,11 +1505,8 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             source_id: "project-atlas-budget".to_string(),
             content: "Atlas budget source note".to_string(),
             t_ref: t_valid,
-            scope: "org".to_string(),
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
-            project: Some("atlas".to_string()),
         },
         None,
     )
@@ -1589,11 +1520,8 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             source_id: "project-beacon-budget".to_string(),
             content: "Beacon budget source note".to_string(),
             t_ref: t_valid,
-            scope: "org".to_string(),
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
-            project: Some("beacon".to_string()),
         },
         None,
     )
@@ -1607,7 +1535,6 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             "Atlas budget is $2M",
             &atlas_episode,
             t_valid,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1623,7 +1550,6 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             "Atlas budget owner will review the plan",
             &atlas_episode,
             t_valid,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1639,7 +1565,6 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
             "Beacon budget is $3M",
             &beacon_episode,
             t_valid,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1653,14 +1578,12 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
-            scope: "org".to_string(),
             as_of: Some(as_of),
             budget: 10,
             view_mode: None,
             window_start: None,
             window_end: None,
             access: None,
-            project: Some("atlas".to_string()),
             fact_types: vec!["metric".to_string()],
             compact: false,
         },
@@ -1673,7 +1596,10 @@ async fn test_service_assemble_context_filters_by_project_and_fact_type() {
         .map(|item| item.content.as_str())
         .collect::<Vec<_>>();
 
-    assert_eq!(contents, vec!["Atlas budget is $2M"]);
+    assert_eq!(
+        contents,
+        vec!["Atlas budget is $2M", "Beacon budget is $3M"]
+    );
 }
 
 #[tokio::test]
@@ -1690,11 +1616,8 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             source_id: "experience-primary-match".to_string(),
             content: "Atlas source episode".to_string(),
             t_ref: note_time,
-            scope: "org".to_string(),
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
-            project: None,
         },
         None,
     )
@@ -1708,7 +1631,6 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             "Atlas budget is $2M",
             &source_episode,
             note_time,
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1724,7 +1646,6 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
             "Alice prefers weekly launch updates",
             &source_episode,
             experience_time,
-            "org",
             0.8,
             vec![],
             vec![],
@@ -1737,14 +1658,12 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 5,
             view_mode: None,
             window_start: None,
             window_end: None,
             access: None,
-            project: None,
             fact_types: vec![],
             compact: false,
         },
@@ -1776,11 +1695,11 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
 }
 
 #[tokio::test]
-async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_scope() {
+async fn test_service_assemble_context_facets_view_groups_by_policy_tags() {
     let service = common::make_service().await;
     let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
 
-    for (source_id, content, project, policy_tags, t_ref) in [
+    for (source_id, content, _project, policy_tags, t_ref) in [
         (
             "facet-atlas",
             "Atlas roadmap note",
@@ -1810,11 +1729,8 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
                 source_id: source_id.to_string(),
                 content: content.to_string(),
                 t_ref,
-                scope: "org".to_string(),
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: policy_tags.into_iter().map(str::to_string).collect(),
-                project: project.map(str::to_string),
             },
             None,
         )
@@ -1828,14 +1744,12 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
-            scope: "org".to_string(),
             as_of: Some(as_of),
             budget: 10,
             view_mode: Some("facets".to_string()),
             window_start: None,
             window_end: None,
             access: None,
-            project: None,
             fact_types: vec![],
             compact: false,
         },
@@ -1843,23 +1757,17 @@ async fn test_service_assemble_context_facets_view_groups_by_project_policy_or_s
     .await
     .unwrap();
 
-    let atlas = items
+    let uncategorized = items
         .iter()
-        .find(|item| item.content == "atlas")
-        .expect("atlas facet should exist");
+        .find(|item| item.content == "uncategorized")
+        .expect("uncategorized facet should exist");
     let persona = items
         .iter()
         .find(|item| item.content == "persona")
         .expect("persona facet should exist");
-    let org = items
-        .iter()
-        .find(|item| item.content == "org")
-        .expect("scope facet should exist");
-
-    assert_eq!(atlas.provenance.get("count"), Some(&json!(1)));
+    assert_eq!(uncategorized.provenance.get("count"), Some(&json!(2)));
     assert_eq!(persona.provenance.get("count"), Some(&json!(1)));
-    assert_eq!(org.provenance.get("count"), Some(&json!(1)));
-    assert!(atlas.rationale.contains("view_mode=facets"));
+    assert!(uncategorized.rationale.contains("view_mode=facets"));
 }
 
 #[tokio::test]
@@ -1874,7 +1782,6 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             "I prefer concise weekly digests",
             "episode:persona",
             t_valid,
-            "org",
             0.9,
             vec![],
             vec!["persona".to_string()],
@@ -1890,7 +1797,6 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             "Old checklist note",
             "episode:old",
             t_valid - chrono::Duration::days(2),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1906,7 +1812,6 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
             "Reviewed Atlas risk register yesterday",
             "episode:recent",
             t_valid + chrono::Duration::hours(2),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -1921,14 +1826,12 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "ignored".to_string(),
-            scope: "org".to_string(),
             as_of: Some(as_of),
             budget: 2,
             view_mode: Some("wake_up".to_string()),
             window_start: None,
             window_end: None,
             access: None,
-            project: None,
             fact_types: vec![],
             compact: false,
         },
@@ -1976,10 +1879,8 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 3,
-            project: None,
             fact_types: vec![],
             view_mode: Some("map".to_string()),
             window_start: None,
@@ -2038,10 +1939,8 @@ async fn test_service_assemble_context_map_view_includes_communities() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: Some("map".to_string()),
             window_start: None,
@@ -2095,7 +1994,6 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
                 content,
                 &format!("episode:timeline-{content}"),
                 t,
-                "org",
                 0.9,
                 vec![],
                 vec![],
@@ -2109,10 +2007,8 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "event".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: Some("timeline".to_string()),
             window_start: None,
@@ -2142,7 +2038,6 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
             "Cache hit access tracking",
             "episode:cache-hit-access",
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2153,10 +2048,8 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "access tracking".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -2202,10 +2095,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             source_id: "experience-browse-base".to_string(),
             content: "Atlas source episode".to_string(),
             t_ref: Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -2220,7 +2110,6 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             "budget allocation for Q4",
             &source_episode,
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2236,7 +2125,6 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
             "Alice prefers weekly launch updates",
             &source_episode,
             Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 0).unwrap(),
-            "org",
             0.8,
             vec![],
             vec![],
@@ -2249,10 +2137,8 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -2287,7 +2173,6 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
             "Query logging enabled test fact",
             "episode:ql-enabled",
             Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2300,10 +2185,8 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "query logging enabled".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -2366,7 +2249,6 @@ async fn test_service_add_fact_logs_warning_on_embedding_error_and_still_persist
             "Embedding error skip test",
             "episode:embed-error",
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2402,7 +2284,6 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
             "ARR $10M",
             "episode:invalidate-cache",
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2414,10 +2295,8 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
     // Warm the cache.
     let request = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -2447,10 +2326,8 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
     // Re-query with a later as_of — invalidated fact must be excluded.
     let after_request = memory_mcp::models::AssembleContextRequest {
         query: "ARR".to_string(),
-        scope: "org".to_string(),
         as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
         budget: 5,
-        project: None,
         fact_types: vec![],
         view_mode: None,
         window_start: None,
@@ -2509,10 +2386,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
             source_id: "explain-graph-1".to_string(),
             content: "Bob Explain coordinated the partner review".to_string(),
             t_ref,
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -2527,7 +2401,6 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
             "Bob Explain coordinated the partner review",
             &episode_id,
             t_ref,
-            "org",
             0.9,
             vec![bob_id.clone()],
             vec![],
@@ -2544,7 +2417,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
                 content: "Bob Explain coordinated the partner review".to_string(),
                 quote: "Bob Explain coordinated the partner review".to_string(),
                 source_episode: episode_id.clone(),
-                scope: None,
+
                 t_ref: None,
                 t_ingested: None,
                 provenance: serde_json::json!({"source_episode": &episode_id}),
@@ -2588,10 +2461,10 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
 }
 
 #[tokio::test]
-async fn test_service_multi_namespace_scope_isolation() {
+async fn test_service_active_namespace_does_not_route_by_legacy_scope() {
     let service = common::make_service().await;
 
-    // Seed a fact in the "personal" namespace.
+    // Both legacy scope values are stored in the single Active Namespace.
     let personal_fact_id = service
         .add_fact(
             "note",
@@ -2599,7 +2472,6 @@ async fn test_service_multi_namespace_scope_isolation() {
             "personal scope isolated fact",
             "episode:ns-personal",
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "personal",
             0.9,
             vec![],
             vec![],
@@ -2608,7 +2480,7 @@ async fn test_service_multi_namespace_scope_isolation() {
         .await
         .unwrap();
 
-    // Seed a different fact in the "org" namespace.
+    // The second legacy scope value does not select a different namespace.
     let org_fact_id = service
         .add_fact(
             "note",
@@ -2616,7 +2488,6 @@ async fn test_service_multi_namespace_scope_isolation() {
             "org scope isolated fact",
             "episode:ns-org",
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2625,15 +2496,13 @@ async fn test_service_multi_namespace_scope_isolation() {
         .await
         .unwrap();
 
-    // Query "personal" scope — should only return the personal fact.
+    // A query cannot select a legacy scope; both records are candidates.
     let personal_items = AssembleContextCapability::assemble_context(
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
-            scope: "personal".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -2652,21 +2521,19 @@ async fn test_service_multi_namespace_scope_isolation() {
         "personal scope query should return personal fact"
     );
     assert!(
-        !personal_items
+        personal_items
             .iter()
             .any(|item| item.fact_id == org_fact_id),
-        "personal scope query should NOT return org fact"
+        "Active Namespace query should include the other legacy scope record"
     );
 
-    // Query "org" scope — should only return the org fact.
+    // Repeating the query has the same process-bound routing.
     let org_items = AssembleContextCapability::assemble_context(
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 10,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -2683,10 +2550,10 @@ async fn test_service_multi_namespace_scope_isolation() {
         "org scope query should return org fact"
     );
     assert!(
-        !org_items
+        org_items
             .iter()
             .any(|item| item.fact_id == personal_fact_id),
-        "org scope query should NOT return personal fact"
+        "Active Namespace query should include the personal legacy scope record"
     );
 }
 
@@ -2705,7 +2572,6 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
             "oven preheated",
             "episode:semantic-disabled",
             Utc.with_ymd_and_hms(2026, 4, 1, 10, 0, 0).unwrap(),
-            "org",
             0.9,
             vec![],
             vec![],
@@ -2718,10 +2584,8 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "quantum entanglement photon superposition".to_string(),
-            scope: "org".to_string(),
             as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
             budget: 5,
-            project: None,
             fact_types: vec![],
             view_mode: None,
             window_start: None,
@@ -2751,7 +2615,6 @@ async fn test_service_decay_pass_with_real_surrealdb_invalidates_old_low_confide
             "very old low confidence metric",
             "episode:decay-real",
             old_date,
-            "org",
             0.35,
             vec![],
             vec![],
@@ -2792,7 +2655,6 @@ async fn test_service_decay_pass_skips_already_invalidated_facts() {
             "pre-invalidated",
             "episode:decay-skip",
             old_date,
-            "org",
             0.2,
             vec![],
             vec![],
@@ -2843,10 +2705,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
             source_id: "archival-real-1".to_string(),
             content: "Old episode for archival".to_string(),
             t_ref: old_date,
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -2861,7 +2720,6 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
             "Old fact for archival",
             &episode_id,
             old_date,
-            "org",
             0.2,
             vec![],
             vec![],
@@ -2916,10 +2774,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
             source_id: "archival-recent-skip".to_string(),
             content: "Recent episode should not be archived".to_string(),
             t_ref: recent_date,
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -2934,7 +2789,6 @@ async fn test_service_archival_pass_skips_recent_episodes() {
             "Recent fact for archival skip",
             &episode_id,
             recent_date,
-            "org",
             0.2,
             vec![],
             vec![],
@@ -2972,10 +2826,7 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
                 source_id: "summary-requirement-1".to_string(),
                 content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2025, 7, 10, 9, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: None,
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -3004,10 +2855,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
                 source_id: "meeting-summary-line-facts-1".to_string(),
                 content: "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n- Fact: Working release milestone targeted for early May.".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2026, 4, 13, 9, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: Some("cloud-products".to_string()),
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -3035,9 +2883,8 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         "expected at least one fact/note record, got {extraction:?}"
     );
 
-    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
+    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), "org")
         .select_active_facts_by_episode(
-            "org",
             &episode_id,
             &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),
             20,
@@ -3081,10 +2928,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
                 source_id: "meeting-summary-thematic-sections-1".to_string(),
                 content: "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.".to_string(),
                 t_ref: Utc.with_ymd_and_hms(2026, 4, 13, 11, 0, 0).unwrap(),
-                scope: "org".to_string(),
-                project: Some("general-ops".to_string()),
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -3105,9 +2949,8 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         "expected thematic section lines to become note facts, got {extraction:?}"
     );
 
-    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
+    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), "org")
         .select_active_facts_by_episode(
-            "org",
             &episode_id,
             &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),
             20,

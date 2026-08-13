@@ -8,28 +8,29 @@ use std::sync::Arc;
 
 use crate::models::ProcedureCandidateRecord;
 use crate::service::MemoryError;
-use crate::storage::DbClient;
+use crate::storage::{BoundDbClient, DbClient};
 
 /// Narrow store for procedure candidates.
 pub struct ProcedureStore {
-    client: Arc<dyn DbClient>,
+    client: BoundDbClient,
 }
 
 impl ProcedureStore {
-    /// Create a new store over an existing client.
+    /// Create a new store bound to the process Active Namespace.
     #[must_use]
-    pub fn new(client: Arc<dyn DbClient>) -> Self {
-        Self { client }
+    pub fn new(client: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            client: BoundDbClient::new(client, namespace),
+        }
     }
 
     /// Load a candidate by its deterministic ID.
     pub async fn load_candidate(
         &self,
         candidate_id: &str,
-        namespace: &str,
     ) -> Result<Option<ProcedureCandidateRecord>, MemoryError> {
         let record_id = format!("procedure_candidate:{candidate_id}");
-        let existing = self.client.select_one(&record_id, namespace).await?;
+        let existing = self.client.select_one(&record_id).await?;
         match existing {
             Some(value) => {
                 let record: ProcedureCandidateRecord =
@@ -46,83 +47,55 @@ impl ProcedureStore {
     pub async fn create_candidate(
         &self,
         record: &ProcedureCandidateRecord,
-        namespace: &str,
     ) -> Result<(), MemoryError> {
         let record_id = format!("procedure_candidate:{}", record.candidate_id);
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize procedure_candidate: {e}"))
         })?;
-        self.client
-            .create(&record_id, value, namespace)
-            .await
-            .map(|_| ())
+        self.client.create(&record_id, value).await.map(|_| ())
     }
 
     /// Update an existing candidate (e.g., append evidence, change status).
     pub async fn update_candidate(
         &self,
         record: &ProcedureCandidateRecord,
-        namespace: &str,
     ) -> Result<(), MemoryError> {
         let record_id = format!("procedure_candidate:{}", record.candidate_id);
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize procedure_candidate: {e}"))
         })?;
-        self.client
-            .update(&record_id, value, namespace)
-            .await
-            .map(|_| ())
+        self.client.update(&record_id, value).await.map(|_| ())
     }
 
-    /// List candidates filtered by namespace, scope, project, and status.
+    /// List candidates in the active namespace, optionally filtered by status.
+    ///
+    /// The database namespace is the only partition boundary. Legacy `scope`
+    /// and `project` fields are returned as metadata but never used for filtering.
     pub async fn list_candidates(
         &self,
-        namespace: &str,
-        scope: &str,
-        project: Option<&str>,
         status: Option<&str>,
     ) -> Result<Vec<ProcedureCandidateRecord>, MemoryError> {
-        let sql = if project.is_some() && status.is_some() {
-            "SELECT * FROM procedure_candidate WHERE scope = $scope AND project = $project AND status = $status ORDER BY updated_at DESC"
-        } else if project.is_some() {
-            "SELECT * FROM procedure_candidate WHERE scope = $scope AND project = $project ORDER BY updated_at DESC"
-        } else if status.is_some() {
-            "SELECT * FROM procedure_candidate WHERE scope = $scope AND status = $status ORDER BY updated_at DESC"
-        } else {
-            "SELECT * FROM procedure_candidate WHERE scope = $scope ORDER BY updated_at DESC"
+        let (sql, vars) = match status {
+            Some(status) => (
+                "SELECT * FROM procedure_candidate WHERE status = $status ORDER BY updated_at DESC",
+                serde_json::json!({"status": status}),
+            ),
+            None => (
+                "SELECT * FROM procedure_candidate ORDER BY updated_at DESC",
+                serde_json::json!({}),
+            ),
         };
-        let mut vars = serde_json::Map::new();
-        vars.insert(
-            "scope".to_string(),
-            serde_json::Value::String(scope.to_string()),
-        );
-        if let Some(project) = project {
-            vars.insert(
-                "project".to_string(),
-                serde_json::Value::String(project.to_string()),
-            );
-        }
-        if let Some(status) = status {
-            vars.insert(
-                "status".to_string(),
-                serde_json::Value::String(status.to_string()),
-            );
-        }
-        let rows = self
-            .client
-            .query(sql, Some(serde_json::Value::Object(vars)), namespace)
-            .await?;
+        let rows = self.client.query(sql, Some(vars)).await?;
 
-        let mut candidates = Vec::new();
-        if let Some(arr) = rows.as_array() {
-            for row in arr {
-                if let Ok(record) = serde_json::from_value::<ProcedureCandidateRecord>(row.clone())
-                {
-                    candidates.push(record);
-                }
-            }
-        }
-        Ok(candidates)
+        let Some(arr) = rows.as_array() else {
+            return Ok(Vec::new());
+        };
+
+        arr.iter()
+            .cloned()
+            .map(serde_json::from_value::<ProcedureCandidateRecord>)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| MemoryError::Storage(format!("failed to parse procedure_candidate: {e}")))
     }
 }
 
@@ -135,7 +108,8 @@ mod tests {
         ProcedureCandidateRecord {
             candidate_id: id.to_string(),
             namespace: "test".to_string(),
-            scope: scope.to_string(),
+            identity_version: 2,
+            scope: Some(scope.to_string()),
             project: project.map(str::to_string),
             task_fingerprint: "task:1".to_string(),
             normalized_task: "do work".to_string(),

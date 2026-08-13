@@ -154,8 +154,6 @@ fn mode_label(cli: &Cli) -> &'static str {
 fn watch_command_from_args(args: WatchArgs) -> WatchCommand {
     WatchCommand {
         dir: args.dir,
-        project: args.project,
-        scope: args.scope,
         interval_secs: args.interval_secs,
     }
 }

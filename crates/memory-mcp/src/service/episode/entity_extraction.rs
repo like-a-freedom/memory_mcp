@@ -27,14 +27,12 @@ fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
 /// * `service` - The memory service containing the entity extractor.
 /// * `episode_id` - The episode being extracted; recorded on the append-only
 ///   extraction projection row written after a successful run.
-/// * `namespace` - The persistence namespace for the episode and projection.
 /// * `content` - The text content to extract entities from.
 /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
 ///   When provided, these labels override the default NER configuration.
 pub async fn extract_entities(
     service: &ServiceContext,
     episode_id: &str,
-    namespace: &str,
     content: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<Vec<ExtractedEntity>, MemoryError> {
@@ -110,11 +108,7 @@ pub async fn extract_entities(
 
         let entity_id = service
             .entity_resolver
-            .resolve_or_create(
-                &service.entity_service,
-                candidate.clone(),
-                &service.default_namespace,
-            )
+            .resolve_or_create(&service.entity_service, candidate.clone())
             .await
             .map(|(id, _created)| id)
             .inspect_err(|err| {
@@ -144,7 +138,7 @@ pub async fn extract_entities(
         }
     }
 
-    persist_extraction_projection(service, episode_id, namespace, &entities).await?;
+    persist_extraction_projection(service, episode_id, &entities).await?;
 
     Ok(entities)
 }
@@ -159,7 +153,6 @@ pub async fn extract_entities(
 pub(super) async fn persist_extraction_projection(
     service: &ServiceContext,
     episode_id: &str,
-    namespace: &str,
     entities: &[ExtractedEntity],
 ) -> Result<(), MemoryError> {
     let ingested_at = crate::service::now();
@@ -174,11 +167,13 @@ pub(super) async fn persist_extraction_projection(
         .collect::<Vec<_>>();
 
     // Record id: `entity_extraction_projection:<episode-key>:<projection-id>`.
-    // The projection suffix is deterministic over the episode, scope, and
-    // ingestion timestamp, so each extraction run appends a distinct row.
+    // The projection suffix is deterministic over the episode, ingestion
+    // timestamp, and extractor selector, so each extraction run appends a
+    // distinct row. The Active Namespace is process-bound and never part of
+    // the projection identity.
     let episode_key = episode_id.strip_prefix("episode:").unwrap_or(episode_id);
     let projection_suffix = crate::service::ids::hash_prefix(&format!(
-        "{episode_id}|{namespace}|{}|{}",
+        "{episode_id}|{}|{}",
         crate::service::normalize_dt(ingested_at),
         fingerprint.selector,
     ));
@@ -191,23 +186,19 @@ pub(super) async fn persist_extraction_projection(
     // strings into `datetime`-typed schema fields.
     let sql = format!(
         "CREATE entity_extraction_projection:⟨{record_body}⟩ SET \
-         episode_id = $episode_id, scope = $scope, \
+         episode_id = $episode_id, \
          t_ingested = type::datetime($t_ingested), t_created = type::datetime($t_created), \
          fingerprint = $fingerprint, entity_ids = $entity_ids RETURN *"
     );
     let vars = serde_json::json!({
         "episode_id": episode_id,
-        "scope": namespace,
         "t_ingested": crate::service::normalize_dt(ingested_at),
         "t_created": crate::service::normalize_dt(ingested_at),
         "fingerprint": fingerprint_value,
         "entity_ids": entity_ids,
     });
 
-    service
-        .episode_store()
-        .query(&sql, Some(vars), namespace)
-        .await?;
+    service.episode_store().query(&sql, Some(vars)).await?;
 
     Ok(())
 }

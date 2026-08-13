@@ -73,7 +73,7 @@ pub(crate) mod value_helpers;
 #[cfg(test)]
 pub mod mock_db;
 
-pub(crate) use scope::{LifecyclePolicy, MemoryScope};
+pub(crate) use scope::LifecyclePolicy;
 
 #[cfg(test)]
 pub(crate) use apps::edge_neighbor;
@@ -93,7 +93,7 @@ mod constants {
 /// Re-export fact decay constants for backwards compatibility.
 pub use crate::models::Fact;
 
-pub use cache::{CacheKey, invalidate_cache_by_scope};
+pub use cache::{CacheKey, invalidate_cache};
 #[cfg(feature = "cli-watch")]
 pub use content_extraction::watcher::FsWatcher;
 pub(crate) use episode::build_extract_log_result;

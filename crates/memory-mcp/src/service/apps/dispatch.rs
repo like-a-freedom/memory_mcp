@@ -34,7 +34,6 @@ pub struct AppContext<'a> {
     pub service: &'a MemoryService,
     pub session_id: &'a str,
     pub app: &'a str,
-    pub scope: &'a str,
     pub payload: Value,
 }
 
@@ -231,12 +230,12 @@ async fn run_lifecycle(
     command: LifecycleCommand,
     action: &'static str,
 ) -> Result<(AppCommandOutcome, LifecycleCommandOutcome, Value), ErrorData> {
-    let outcome = execute_lifecycle_command(ctx.service, ctx.scope, command)
+    let outcome = execute_lifecycle_command(ctx.service, command)
         .await
         .map_err(mcp_error)?;
     let lifecycle_value = serde_json::to_value(
         ctx.service
-            .build_lifecycle_view(ctx.scope)
+            .build_lifecycle_view()
             .await
             .map_err(mcp_error)?,
     )
@@ -244,7 +243,6 @@ async fn run_lifecycle(
     let enriched = crate::mcp::session::enrich_session_payload(
         ctx.app,
         ctx.session_id,
-        ctx.scope,
         ctx.payload
             .get("meta")
             .and_then(|meta| meta.get("ttl_seconds"))
@@ -434,10 +432,7 @@ fn execute_commit_review<'a>(
             })?;
         let outcome = ctx
             .service
-            .commit_ingestion_review(CommitIngestionReviewRequest {
-                scope: ctx.scope.to_string(),
-                items,
-            })
+            .commit_ingestion_review(CommitIngestionReviewRequest { items })
             .await
             .map_err(mcp_error)?;
         Ok(AppCommandOutcome::closed(
@@ -639,13 +634,8 @@ fn execute_expand_neighbors<'a>(
             .and_then(Value::as_str)
             .and_then(parse_datetime)
             .unwrap_or_else(chrono::Utc::now);
-        let namespace = ctx
-            .service
-            .namespace_for_scope(ctx.scope)
-            .map_err(mcp_error)?;
         let expansion = crate::service::graph_neighbor_expansion(
             &ctx.service.app_store(),
-            &namespace,
             target_id,
             direction,
             *depth,
@@ -681,14 +671,10 @@ fn execute_open_edge_details<'a>(
         let AppCommand::OpenEdgeDetails { edge_id } = cmd else {
             return Err(internal("validated app command did not match action"));
         };
-        let namespace = ctx
-            .service
-            .namespace_for_scope(ctx.scope)
-            .map_err(mcp_error)?;
         let edge = ctx
             .service
             .app_store()
-            .select_edge(edge_id, &namespace)
+            .select_edge(edge_id)
             .await
             .map_err(mcp_error)?
             .ok_or_else(|| invalid_params(format!("Unknown graph edge: {edge_id}")))?;

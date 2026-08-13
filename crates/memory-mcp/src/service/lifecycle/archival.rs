@@ -86,37 +86,33 @@ pub async fn run_archival_pass(
     let cutoff_str = crate::service::normalize_dt(cutoff);
     let mut archived = 0;
 
-    for namespace in &service.namespaces {
-        let episodes = service
-            .app_store()
-            .select_episodes_for_archival(namespace, &cutoff_str, ARCHIVAL_BATCH_LIMIT)
-            .await?;
+    let episodes = service
+        .app_store()
+        .select_episodes_for_archival(&cutoff_str, ARCHIVAL_BATCH_LIMIT)
+        .await?;
 
-        for record in episodes {
-            let episode_id = record
-                .get("episode_id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
+    for record in episodes {
+        let episode_id = record
+            .get("episode_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MemoryError::Validation("missing episode_id".into()))?;
 
-            let has_active_facts =
-                check_episode_has_active_facts(service, episode_id, namespace).await?;
-            let has_recent_heat =
-                check_episode_has_recent_fact_access(service, episode_id, namespace, age_days)
-                    .await?;
+        let has_active_facts = check_episode_has_active_facts(service, episode_id).await?;
+        let has_recent_heat =
+            check_episode_has_recent_fact_access(service, episode_id, age_days).await?;
 
-            if !has_active_facts && !has_recent_heat {
-                let payload = json!({
-                    "status": "archived",
-                    "archived_at": crate::service::normalize_dt(now),
-                });
+        if !has_active_facts && !has_recent_heat {
+            let payload = json!({
+                "status": "archived",
+                "archived_at": crate::service::normalize_dt(now),
+            });
 
-                service
-                    .db_client
-                    .update(episode_id, payload, namespace)
-                    .await?;
+            service
+                .app_store()
+                .update_record(episode_id, payload)
+                .await?;
 
-                archived += 1;
-            }
+            archived += 1;
         }
     }
 
@@ -127,12 +123,11 @@ pub async fn run_archival_pass(
 async fn check_episode_has_active_facts(
     service: &MemoryService,
     episode_id: &str,
-    namespace: &str,
 ) -> Result<bool, MemoryError> {
     let cutoff = crate::service::normalize_dt(Utc::now());
     let facts = service
         .episode_store()
-        .select_active_facts_by_episode(namespace, episode_id, &cutoff, 1)
+        .select_active_facts_by_episode(episode_id, &cutoff, 1)
         .await?;
 
     Ok(!facts.is_empty())
@@ -141,17 +136,15 @@ async fn check_episode_has_active_facts(
 async fn check_episode_has_recent_fact_access(
     service: &MemoryService,
     episode_id: &str,
-    namespace: &str,
     age_days: u32,
 ) -> Result<bool, MemoryError> {
     let hot_cutoff =
         crate::service::normalize_dt(Utc::now() - chrono::Duration::days(age_days as i64));
     let result = service
-        .db_client
+        .app_store()
         .query(
             "SELECT fact_id FROM fact WHERE source_episode = $episode_id AND last_accessed IS NOT NONE AND last_accessed >= type::datetime($hot_cutoff) LIMIT 1",
             Some(json!({"episode_id": episode_id, "hot_cutoff": hot_cutoff})),
-            namespace,
         )
         .await?;
 

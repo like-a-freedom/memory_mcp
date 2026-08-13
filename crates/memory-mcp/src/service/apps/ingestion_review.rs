@@ -12,11 +12,6 @@ impl crate::service::MemoryService {
         &self,
         request: PrepareIngestionReviewRequest,
     ) -> Result<IngestionReviewBundle, MemoryError> {
-        let scope = request.scope.trim();
-        if scope.is_empty() {
-            return Err(MemoryError::Validation("scope is required".to_string()));
-        }
-
         let episode_id = match (
             request
                 .source_text
@@ -41,10 +36,7 @@ impl crate::service::MemoryService {
                         ),
                         content: source_text.to_string(),
                         t_ref: now,
-                        scope: scope.to_string(),
-                        project: None,
                         t_ingested: Some(now),
-                        visibility_scope: None,
                         policy_tags: vec![],
                     },
                     None,
@@ -69,13 +61,6 @@ impl crate::service::MemoryService {
             .as_ref()
             .and_then(crate::service::episode_from_record)
             .ok_or_else(|| MemoryError::NotFound(format!("episode not found: {episode_id}")))?;
-
-        if episode.scope != scope {
-            return Err(MemoryError::Validation(format!(
-                "draft episode scope mismatch: requested {scope}, episode uses {}",
-                episode.scope
-            )));
-        }
 
         let item = IngestionReviewItem {
             item_id: format!("draft:{}", episode.episode_id),
@@ -106,11 +91,6 @@ impl crate::service::MemoryService {
         &self,
         request: CommitIngestionReviewRequest,
     ) -> Result<CommitIngestionReviewOutcome, MemoryError> {
-        let scope = request.scope.trim();
-        if scope.is_empty() {
-            return Err(MemoryError::Validation("scope is required".to_string()));
-        }
-
         let mut fact_ids = Vec::new();
         for item in request
             .items
@@ -124,7 +104,6 @@ impl crate::service::MemoryService {
                     &item.quote,
                     &item.source_episode,
                     item.t_valid,
-                    scope,
                     item.confidence,
                     item.entity_links.clone(),
                     vec![],

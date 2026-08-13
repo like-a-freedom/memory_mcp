@@ -17,7 +17,7 @@ use serde_json::json;
 mod common;
 
 #[tokio::test]
-async fn archival_pass_processes_all_configured_namespaces() {
+async fn archival_pass_processes_only_active_namespace() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(150);
 
@@ -28,10 +28,7 @@ async fn archival_pass_processes_all_configured_namespaces() {
             source_id: "personal-archival-1".to_string(),
             content: "Personal archival candidate".to_string(),
             t_ref: old_date,
-            scope: "personal".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -46,7 +43,6 @@ async fn archival_pass_processes_all_configured_namespaces() {
             "Personal archival fact",
             &episode_id,
             old_date,
-            "personal",
             0.2,
             vec![],
             vec![],
@@ -71,10 +67,10 @@ async fn archival_pass_processes_all_configured_namespaces() {
         .await
         .expect("archival pass completed");
 
-    assert_eq!(count, 1, "archival should include non-default namespaces");
+    assert_eq!(count, 1, "archival should process the active namespace");
 
     let episode = db_client
-        .select_one(&episode_id, "personal")
+        .select_one(&episode_id, "org")
         .await
         .expect("select episode")
         .expect("stored episode");
@@ -93,10 +89,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
             source_id: "personal-archival-hot-1".to_string(),
             content: "Personal hot archival candidate".to_string(),
             t_ref: old_date,
-            scope: "personal".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -111,7 +104,6 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
             "Personal hot archival fact",
             &episode_id,
             old_date,
-            "personal",
             0.2,
             vec![],
             vec![],
@@ -139,7 +131,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
                 "access_count": 5,
                 "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
             }),
-            "personal",
+            "org",
         )
         .await
         .expect("touch fact");
@@ -154,7 +146,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     );
 
     let episode = db_client
-        .select_one(&episode_id, "personal")
+        .select_one(&episode_id, "org")
         .await
         .expect("select episode")
         .expect("stored episode");

@@ -32,22 +32,6 @@ pub fn parse_bool_env(var_name: &str) -> Option<bool> {
     })
 }
 
-/// Parses a comma-separated list from an environment variable.
-///
-/// # Errors
-///
-/// Returns `MemoryError::ConfigMissing` if the variable is not set.
-pub fn parse_comma_list(var_name: &str) -> Result<Vec<String>, MemoryError> {
-    let raw = env::var(var_name).map_err(|_| MemoryError::ConfigMissing(var_name.to_string()))?;
-
-    Ok(raw
-        .split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .collect())
-}
-
 /// Returns whether a URL selects a supported remote SurrealDB connection.
 pub(crate) fn is_remote_url(url: Option<&str>) -> bool {
     let Some(raw) = url.map(str::trim) else {

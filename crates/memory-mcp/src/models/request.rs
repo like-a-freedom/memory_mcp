@@ -12,12 +12,7 @@ pub struct IngestRequest {
     pub source_id: String,
     pub content: String,
     pub t_ref: DateTime<Utc>,
-    #[serde(default = "super::default_scope")]
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     pub t_ingested: Option<DateTime<Utc>>,
-    pub visibility_scope: Option<String>,
     #[serde(default)]
     pub policy_tags: Vec<String>,
 }
@@ -49,8 +44,6 @@ pub struct ExplainItem {
     )]
     pub quote: String,
     pub source_episode: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scope: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub t_ref: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -86,7 +79,6 @@ impl Default for ExplainItem {
             content: String::new(),
             quote: String::new(),
             source_episode: String::new(),
-            scope: None,
             t_ref: None,
             t_ingested: None,
             provenance: serde_json::Value::Null,
@@ -159,9 +151,6 @@ pub struct InvalidateRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AssembleContextRequest {
     pub query: String,
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     #[serde(default)]
     pub fact_types: Vec<String>,
     pub as_of: Option<DateTime<Utc>>,
@@ -344,10 +333,7 @@ pub struct IngestRequestBuilder {
     source_id: Option<String>,
     content: Option<String>,
     t_ref: Option<DateTime<Utc>>,
-    scope: Option<String>,
-    project: Option<String>,
     t_ingested: Option<DateTime<Utc>>,
-    visibility_scope: Option<String>,
     policy_tags: Vec<String>,
 }
 
@@ -376,27 +362,9 @@ impl IngestRequestBuilder {
         self
     }
 
-    /// Sets the scope.
-    pub fn scope(mut self, value: impl Into<String>) -> Self {
-        self.scope = Some(value.into());
-        self
-    }
-
-    /// Sets the project.
-    pub fn project(mut self, value: impl Into<String>) -> Self {
-        self.project = Some(value.into());
-        self
-    }
-
     /// Sets the ingestion timestamp.
     pub fn t_ingested(mut self, value: DateTime<Utc>) -> Self {
         self.t_ingested = Some(value);
-        self
-    }
-
-    /// Sets the visibility scope.
-    pub fn visibility_scope(mut self, value: impl Into<String>) -> Self {
-        self.visibility_scope = Some(value.into());
         self
     }
 
@@ -413,10 +381,7 @@ impl IngestRequestBuilder {
             source_id: self.source_id.ok_or("source_id is required")?,
             content: self.content.ok_or("content is required")?,
             t_ref: self.t_ref.ok_or("t_ref is required")?,
-            scope: self.scope.ok_or("scope is required")?,
-            project: self.project,
             t_ingested: self.t_ingested,
-            visibility_scope: self.visibility_scope,
             policy_tags: self.policy_tags,
         })
     }
@@ -477,10 +442,8 @@ impl AssembleContextRequest {
 #[derive(Default)]
 pub struct AssembleContextRequestBuilder {
     query: Option<String>,
-    scope: Option<String>,
     as_of: Option<DateTime<Utc>>,
     budget: Option<i32>,
-    project: Option<String>,
     fact_types: Vec<String>,
     view_mode: Option<String>,
     window_start: Option<DateTime<Utc>>,
@@ -495,21 +458,9 @@ impl AssembleContextRequestBuilder {
         self
     }
 
-    /// Sets the scope.
-    pub fn scope(mut self, value: impl Into<String>) -> Self {
-        self.scope = Some(value.into());
-        self
-    }
-
     /// Sets the budget.
     pub fn budget(mut self, value: i32) -> Self {
         self.budget = Some(value);
-        self
-    }
-
-    /// Sets the project.
-    pub fn project(mut self, value: impl Into<String>) -> Self {
-        self.project = Some(value.into());
         self
     }
 
@@ -547,10 +498,8 @@ impl AssembleContextRequestBuilder {
     pub fn build(self) -> Result<AssembleContextRequest, String> {
         Ok(AssembleContextRequest {
             query: self.query.ok_or("query is required")?,
-            scope: self.scope.ok_or("scope is required")?,
             as_of: self.as_of,
             budget: self.budget.unwrap_or(5),
-            project: self.project,
             fact_types: self.fact_types,
             view_mode: self.view_mode,
             window_start: self.window_start,

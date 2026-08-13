@@ -145,7 +145,7 @@ impl ClaimSchema for AttributeV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
             family: ClaimSchemaFamily::Attribute,
-            version: std::num::NonZeroU16::new(1).unwrap(),
+            version: std::num::NonZeroU16::MIN,
         }
     }
 
@@ -343,7 +343,7 @@ impl ClaimSchema for QuantityV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
             family: ClaimSchemaFamily::Quantity,
-            version: std::num::NonZeroU16::new(1).unwrap(),
+            version: std::num::NonZeroU16::MIN,
         }
     }
 
@@ -519,7 +519,7 @@ impl ClaimSchema for RelationV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
             family: ClaimSchemaFamily::Relation,
-            version: std::num::NonZeroU16::new(1).unwrap(),
+            version: std::num::NonZeroU16::MIN,
         }
     }
 
@@ -646,7 +646,7 @@ fn commitment_key(action: &str, target: &str) -> Result<ComparisonKey, MemoryErr
     ComparisonKey::new(
         ClaimSchemaRef {
             family: ClaimSchemaFamily::Commitment,
-            version: std::num::NonZeroU16::new(1).unwrap(),
+            version: std::num::NonZeroU16::MIN,
         },
         components,
     )
@@ -658,7 +658,7 @@ impl ClaimSchema for CommitmentV1 {
     fn schema_ref(&self) -> ClaimSchemaRef {
         ClaimSchemaRef {
             family: ClaimSchemaFamily::Commitment,
-            version: std::num::NonZeroU16::new(1).unwrap(),
+            version: std::num::NonZeroU16::MIN,
         }
     }
 

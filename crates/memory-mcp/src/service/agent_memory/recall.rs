@@ -1,6 +1,6 @@
 //! Selective recall over the existing `assemble_context` pipeline.
 //!
-//! `LifecycleRecall` resolves scope/project, evaluates recall eligibility,
+//! `LifecycleRecall` evaluates recall eligibility,
 //! calls the existing context service once, preserves claim/provenance
 //! metadata, writes the in-memory trace, and returns a bounded host-injection
 //! envelope.
@@ -20,15 +20,12 @@ use crate::models::{
 };
 use crate::service::error::MemoryError;
 
-/// A recall key computed over host, session, task fingerprint, scope, project,
-/// policy, and retrieval fingerprint.
+/// A recall key computed over host, session, task fingerprint, and policy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecallKey {
     pub host: String,
     pub session_id: Option<String>,
     pub task_fingerprint: String,
-    pub scope: String,
-    pub project: Option<String>,
     pub policy_fingerprint: String,
 }
 
@@ -39,8 +36,6 @@ impl RecallKey {
         host: &str,
         session_id: Option<&str>,
         task_fingerprint: &str,
-        scope: &str,
-        project: Option<&str>,
         policy_tags: &[String],
     ) -> Self {
         let policy_fingerprint = policy_fingerprint(policy_tags);
@@ -48,8 +43,6 @@ impl RecallKey {
             host: host.to_string(),
             session_id: session_id.map(str::to_string),
             task_fingerprint: task_fingerprint.to_string(),
-            scope: scope.to_string(),
-            project: project.map(str::to_string),
             policy_fingerprint,
         }
     }
@@ -58,12 +51,10 @@ impl RecallKey {
     #[must_use]
     pub fn as_string(&self) -> String {
         format!(
-            "{}/{}/{}/{}/{}/{}",
+            "v2/{}/{}/{}/{}",
             self.host,
             self.session_id.as_deref().unwrap_or("-"),
             self.task_fingerprint,
-            self.scope,
-            self.project.as_deref().unwrap_or("-"),
             self.policy_fingerprint,
         )
     }
@@ -260,8 +251,7 @@ pub trait RecallPipeline: Send + Sync {
 ///
 /// Not registered in `tools/list` or as a CLI subcommand. Delegates to the
 /// existing `assemble_context` pipeline exactly once per recall-eligible event
-/// and records an ephemeral exposure trace keyed by host/session/task/scope/
-/// project/policy.
+/// and records an ephemeral exposure trace keyed by host/session/task/policy.
 pub struct LifecycleRecall {
     trace_registry: Arc<SessionTraceRegistry>,
 }
@@ -311,8 +301,6 @@ impl LifecycleRecall {
             &host,
             context.session_id.as_deref(),
             &event.task_fingerprint,
-            &event.scope,
-            event.project.as_deref(),
             &event.policy_tags,
         );
 
@@ -349,8 +337,6 @@ impl LifecycleRecall {
         };
         let request = AssembleContextRequest {
             query,
-            scope: event.scope.clone(),
-            project: event.project.clone(),
             fact_types: Vec::new(),
             as_of: None,
             budget: crate::models::default_budget(),
@@ -499,8 +485,6 @@ mod orchestrator_tests {
             event_kind: LifecycleEventKind::UserPrompt,
             task_fingerprint: format!("fp:{task}"),
             normalized_task: task.to_string(),
-            scope: "org".to_string(),
-            project: Some("p".to_string()),
             policy_tags: vec![],
             content: None,
             artifact_uris: vec![],
@@ -513,8 +497,6 @@ mod orchestrator_tests {
             event_kind: LifecycleEventKind::SessionStart,
             task_fingerprint: format!("fp:{task}"),
             normalized_task: task.to_string(),
-            scope: "org".to_string(),
-            project: Some("p".to_string()),
             policy_tags: vec![],
             content: None,
             artifact_uris: vec![],
@@ -527,8 +509,6 @@ mod orchestrator_tests {
             event_kind: LifecycleEventKind::PostCompactionResume,
             task_fingerprint: format!("fp:{task}"),
             normalized_task: task.to_string(),
-            scope: "org".to_string(),
-            project: Some("p".to_string()),
             policy_tags: vec![],
             content: None,
             artifact_uris: vec![],
@@ -564,8 +544,7 @@ mod orchestrator_tests {
         );
         let last = pipeline.last_request();
         assert_eq!(last.query, "Add OAuth login");
-        assert_eq!(last.scope, "org");
-        assert_eq!(last.project.as_deref(), Some("p"));
+
         assert!(last.access.is_none());
     }
 
@@ -681,14 +660,7 @@ mod orchestrator_tests {
         assert_eq!(store.len(), 1, "exactly one trace should be recorded");
 
         // Build the key the same way the orchestrator does to look it up.
-        let key = RecallKey::from_event(
-            "claude_code",
-            Some("s1"),
-            "fp:Add OAuth login",
-            "org",
-            Some("p"),
-            &[],
-        );
+        let key = RecallKey::from_event("claude_code", Some("s1"), "fp:Add OAuth login", &[]);
         let trace = store
             .get(&key.as_string())
             .expect("trace for the recall key must exist");
@@ -714,7 +686,7 @@ mod tests {
     use super::*;
 
     fn make_key(task: &str) -> RecallKey {
-        RecallKey::from_event("claude_code", Some("s1"), task, "org", Some("p"), &[])
+        RecallKey::from_event("claude_code", Some("s1"), task, &[])
     }
 
     #[test]
@@ -881,8 +853,8 @@ mod tests {
 
     #[test]
     fn recall_key_is_deterministic() {
-        let key1 = RecallKey::from_event("host", Some("s1"), "task", "org", Some("p"), &[]);
-        let key2 = RecallKey::from_event("host", Some("s1"), "task", "org", Some("p"), &[]);
+        let key1 = RecallKey::from_event("host", Some("s1"), "task", &[]);
+        let key2 = RecallKey::from_event("host", Some("s1"), "task", &[]);
         assert_eq!(key1, key2);
         assert_eq!(key1.as_string(), key2.as_string());
     }
@@ -893,16 +865,12 @@ mod tests {
             "host",
             Some("s1"),
             "task",
-            "org",
-            Some("p"),
             &["a".to_string(), "b".to_string()],
         );
         let key2 = RecallKey::from_event(
             "host",
             Some("s1"),
             "task",
-            "org",
-            Some("p"),
             &["b".to_string(), "a".to_string()],
         );
         assert_eq!(key1.policy_fingerprint, key2.policy_fingerprint);

@@ -47,7 +47,7 @@ impl EnvGuard {
                 "SURREALDB_DATA_DIR",
                 data_dir.to_str().expect("utf8 data dir"),
             ),
-            ("SURREALDB_NAMESPACES", "org"),
+            ("SURREALDB_NAMESPACE", "main"),
             ("SURREALDB_USERNAME", "root"),
             ("SURREALDB_PASSWORD", "root"),
             ("RUST_LOG", "warn"),
@@ -83,22 +83,22 @@ async fn embedded_rocksdb_root_root_round_trip() {
     let temp_dir = TempDir::new().expect("temporary RocksDB directory");
     let config = SurrealConfigBuilder::new()
         .db_name("memory")
-        .namespace("org")
+        .namespace("main")
         .credentials("root", "root")
         .embedded(true)
         .data_dir(temp_dir.path().display().to_string())
         .build()
         .expect("valid embedded config");
 
-    let client = SurrealDbClient::connect(&config, "org")
+    let client = SurrealDbClient::connect(&config)
         .await
         .expect("embedded RocksDB connection with root/root");
     client
-        .create("zero_config_smoke", json!({"value": "ok"}), "org")
+        .create("zero_config_smoke", json!({"value": "ok"}), "main")
         .await
         .expect("create record");
     let record = client
-        .select_one("zero_config_smoke", "org")
+        .select_one("zero_config_smoke", "main")
         .await
         .expect("select record")
         .expect("record exists");
@@ -132,10 +132,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
             source_id: "zero-config-1".to_string(),
             content: "Alice Smith presented Project Atlas at OpenAI".to_string(),
             t_ref: chrono::Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: Vec::new(),
         },
         None,
@@ -160,8 +157,6 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
         &service.build_context(),
         memory_mcp::models::AssembleContextRequest {
             query: "Who presented Project Atlas?".to_string(),
-            scope: "org".to_string(),
-            project: None,
             fact_types: Vec::new(),
             as_of: None,
             budget: 5,
@@ -181,6 +176,135 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     assert!(
         !data_dir.join("models").join("ner").exists(),
         "extraction must not create a model cache with the lightweight extractor"
+    );
+}
+
+#[tokio::test]
+async fn namespace_switching_survives_process_restart_without_moving_data() {
+    let test_dir = TempDir::new().expect("temporary namespace-switch directory");
+    let data_dir = test_dir.path().join("memory");
+    let binary = std::path::Path::new(env!("CARGO_BIN_EXE_memory_mcp"));
+
+    fn run_ingest(
+        binary: &std::path::Path,
+        data_dir: &std::path::Path,
+        namespace: &str,
+        source_id: &str,
+        content: &str,
+    ) -> String {
+        let output = Command::new(binary)
+            .env_clear()
+            .env("SURREALDB_EMBEDDED", "true")
+            .env("SURREALDB_DATA_DIR", data_dir)
+            .env("SURREALDB_DB_NAME", "memory")
+            .env("SURREALDB_NAMESPACE", namespace)
+            .env("SURREALDB_USERNAME", "root")
+            .env("SURREALDB_PASSWORD", "root")
+            .env("EMBEDDINGS_ENABLED", "false")
+            .env("NER_EXTRACTOR", "anno")
+            .env("RUST_LOG", "error")
+            .arg("ingest")
+            .arg("--source-type")
+            .arg("test")
+            .arg("--source-id")
+            .arg(source_id)
+            .arg("--content")
+            .arg(content)
+            .arg("--t-ref")
+            .arg("2026-08-13T00:00:00Z")
+            .output()
+            .expect("run namespace-switch process");
+        assert!(
+            output.status.success(),
+            "namespace={namespace} ingest failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let response: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .expect("ingest subprocess must emit a JSON response");
+        response["result"]
+            .as_str()
+            .expect("ingest response must contain an episode id")
+            .to_string()
+    }
+
+    fn run_extract(
+        binary: &std::path::Path,
+        data_dir: &std::path::Path,
+        namespace: &str,
+        episode_id: &str,
+    ) -> std::process::Output {
+        Command::new(binary)
+            .env_clear()
+            .env("SURREALDB_EMBEDDED", "true")
+            .env("SURREALDB_DATA_DIR", data_dir)
+            .env("SURREALDB_DB_NAME", "memory")
+            .env("SURREALDB_NAMESPACE", namespace)
+            .env("SURREALDB_USERNAME", "root")
+            .env("SURREALDB_PASSWORD", "root")
+            .env("EMBEDDINGS_ENABLED", "false")
+            .env("NER_EXTRACTOR", "anno")
+            .env("RUST_LOG", "error")
+            .arg("extract")
+            .arg("--episode-id")
+            .arg(episode_id)
+            .output()
+            .expect("run namespace-switch extract process")
+    }
+
+    let main_episode_1 = run_ingest(
+        binary,
+        &data_dir,
+        "main",
+        "switch-main-1",
+        "main namespace evidence",
+    );
+    let org_episode = run_ingest(
+        binary,
+        &data_dir,
+        "org",
+        "switch-org-1",
+        "org namespace evidence",
+    );
+    let main_episode_2 = run_ingest(
+        binary,
+        &data_dir,
+        "main",
+        "switch-main-2",
+        "main namespace remains intact",
+    );
+
+    let main_first = run_extract(binary, &data_dir, "main", &main_episode_1);
+    assert!(
+        main_first.status.success(),
+        "main episode disappeared after namespace switch: stdout={} stderr={}",
+        String::from_utf8_lossy(&main_first.stdout),
+        String::from_utf8_lossy(&main_first.stderr)
+    );
+    let main_second = run_extract(binary, &data_dir, "main", &main_episode_2);
+    assert!(
+        main_second.status.success(),
+        "second main episode disappeared after namespace switch: stdout={} stderr={}",
+        String::from_utf8_lossy(&main_second.stdout),
+        String::from_utf8_lossy(&main_second.stderr)
+    );
+    let main_cannot_read_org = run_extract(binary, &data_dir, "main", &org_episode);
+    assert!(
+        !main_cannot_read_org.status.success(),
+        "main namespace must not read an org episode"
+    );
+
+    let org_can_read_own = run_extract(binary, &data_dir, "org", &org_episode);
+    assert!(
+        org_can_read_own.status.success(),
+        "org episode disappeared after restart: stdout={} stderr={}",
+        String::from_utf8_lossy(&org_can_read_own.stdout),
+        String::from_utf8_lossy(&org_can_read_own.stderr)
+    );
+    let org_cannot_read_main = run_extract(binary, &data_dir, "org", &main_episode_1);
+    assert!(
+        !org_cannot_read_main.status.success(),
+        "org namespace must not read a main episode"
     );
 }
 

@@ -12,12 +12,15 @@ use std::sync::LazyLock;
 /// Whitespace/punctuation word splitter matching the classic GLiNER backend
 /// (`\w+(?:[-_]\w+)*|\S`). Yields byte offsets, so `&text[start..end]`
 /// round-trips for any UTF-8 input.
-static WHITESPACE_WORD_SPLITTER: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S").expect("valid splitter regex"));
+static WHITESPACE_WORD_SPLITTER: LazyLock<Result<regex::Regex, regex::Error>> =
+    LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S"));
 
 /// Splits `text` into words with byte offsets (classic `split_text_words`).
 pub(crate) fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
-    WHITESPACE_WORD_SPLITTER
+    let Ok(splitter) = WHITESPACE_WORD_SPLITTER.as_ref() else {
+        return Vec::new();
+    };
+    splitter
         .find_iter(text)
         .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
         .collect()

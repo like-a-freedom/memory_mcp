@@ -10,14 +10,8 @@ use serde_json::json;
 
 static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
-fn namespace_for_scope(scope: &str) -> &str {
-    match scope {
-        "personal" => "personal",
-        "team" => "team",
-        "private" | "private-domain" | "private_domain" => "private-domain",
-        _ => "org",
-    }
-}
+/// Every eval service is bound to one explicit Active Namespace.
+pub const ACTIVE_NAMESPACE: &str = "main";
 
 fn next_test_db_name() -> String {
     let seq = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -32,12 +26,7 @@ pub struct TestMemory {
 
 impl TestMemory {
     pub async fn new() -> Self {
-        let namespaces = vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "team".to_string(),
-            "private-domain".to_string(),
-        ];
+        let namespaces = vec![ACTIVE_NAMESPACE.to_string()];
         let db_name = next_test_db_name();
         let db_client = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces(&db_name, &namespaces, "warn")
@@ -51,9 +40,14 @@ impl TestMemory {
                 .expect("apply in-memory migrations");
         }
 
-        let service =
-            MemoryService::new(db_client.clone(), namespaces, "warn".to_string(), 50, 100)
-                .expect("service init");
+        let service = MemoryService::new(
+            db_client.clone(),
+            ACTIVE_NAMESPACE.to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service init");
 
         Self { service, db_client }
     }
@@ -78,10 +72,7 @@ pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &st
             source_id: source_id.to_string(),
             content: content.to_string(),
             t_ref: Utc::now(),
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -92,7 +83,6 @@ pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &st
 
 pub async fn seed_entity(
     db_client: &Arc<SurrealDbClient>,
-    scope: &str,
     entity_id: &str,
     entity_type: &str,
     canonical_name: &str,
@@ -108,7 +98,7 @@ pub async fn seed_entity(
                 "canonical_name_normalized": normalize_text(canonical_name),
                 "aliases": aliases,
             }),
-            namespace_for_scope(scope),
+            ACTIVE_NAMESPACE,
         )
         .await
         .expect("seed entity should succeed");
@@ -116,7 +106,6 @@ pub async fn seed_entity(
 
 pub async fn seed_community(
     db_client: &Arc<SurrealDbClient>,
-    scope: &str,
     community_id: &str,
     member_entities: &[String],
     summary: &str,
@@ -131,25 +120,22 @@ pub async fn seed_community(
                 "summary": summary,
                 "updated_at": normalize_dt(updated_at),
             }),
-            namespace_for_scope(scope),
+            ACTIVE_NAMESPACE,
         )
         .await
         .expect("seed community should succeed");
 }
 
-pub async fn seed_fact_with_links_and_project(
+pub async fn seed_fact_with_links(
     service: &MemoryService,
-    scope: &str,
     content: &str,
     t_valid: DateTime<Utc>,
     entity_links: Vec<String>,
-    project: Option<&str>,
     source_id: Option<&str>,
 ) -> String {
-    let normalized_project = project.filter(|p| !p.trim().is_empty());
     let normalized_source_id = source_id.filter(|s| !s.trim().is_empty());
 
-    if normalized_project.is_none() && normalized_source_id.is_none() {
+    if normalized_source_id.is_none() {
         return service
             .add_fact(
                 "note",
@@ -157,7 +143,6 @@ pub async fn seed_fact_with_links_and_project(
                 content,
                 "episode:seed",
                 t_valid,
-                scope,
                 0.9,
                 entity_links,
                 vec![],
@@ -167,14 +152,9 @@ pub async fn seed_fact_with_links_and_project(
             .expect("seed fact should succeed");
     }
 
-    let source_id = normalized_source_id.map(str::to_string).unwrap_or_else(|| {
-        format!(
-            "seed:{}:{}:{}",
-            scope,
-            normalized_project.unwrap_or("default"),
-            normalize_text(content)
-        )
-    });
+    let source_id = normalized_source_id
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("seed:{}", normalize_text(content)));
 
     let episode_id = IngestCapability::ingest(
         &service.build_context(),
@@ -183,10 +163,7 @@ pub async fn seed_fact_with_links_and_project(
             source_id,
             content: format!("seed source for {content}"),
             t_ref: t_valid,
-            scope: scope.to_string(),
-            project: normalized_project.map(str::to_string),
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -201,7 +178,6 @@ pub async fn seed_fact_with_links_and_project(
             content,
             &episode_id,
             t_valid,
-            scope,
             0.9,
             entity_links,
             vec![],

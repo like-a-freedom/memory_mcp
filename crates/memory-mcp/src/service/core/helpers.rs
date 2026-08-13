@@ -38,12 +38,10 @@ pub(crate) fn log_event(
 pub(crate) fn serialize_access(access: &AccessPayload) -> Value {
     json!({
         "caller_id": access.caller_id,
-        "allowed_scopes": access.allowed_scopes,
         "allowed_tags": access.allowed_tags,
         "session_vars": access.session_vars,
         "transport": access.transport,
         "content_type": access.content_type,
-        "cross_scope_allow": access.cross_scope_allow,
     })
 }
 
@@ -78,25 +76,28 @@ pub(crate) fn build_embedding_log_result(
 
 /// Extracts temporal index keys from content and `t_valid` date.
 pub(crate) fn extract_temporal_index_keys(content: &str, t_valid: DateTime<Utc>) -> Vec<String> {
-    static MONTH_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    static MONTH_YEAR_RE: LazyLock<Result<Regex, regex::Error>> = LazyLock::new(|| {
         Regex::new(
             r"(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
         )
-        .expect("valid regex")
     });
-    static ISO_DATE_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b").expect("valid regex"));
+    static ISO_DATE_RE: LazyLock<Result<Regex, regex::Error>> =
+        LazyLock::new(|| Regex::new(r"\b\d{4}-\d{2}(?:-\d{2})?\b"));
 
     let mut keys = HashSet::from([
         crate::service::normalize_text(&t_valid.format("%B %Y").to_string()),
         t_valid.format("%Y-%m").to_string(),
     ]);
 
-    for capture in MONTH_YEAR_RE.find_iter(content) {
-        keys.insert(crate::service::normalize_text(capture.as_str()));
+    if let Ok(regex) = MONTH_YEAR_RE.as_ref() {
+        for capture in regex.find_iter(content) {
+            keys.insert(crate::service::normalize_text(capture.as_str()));
+        }
     }
-    for capture in ISO_DATE_RE.find_iter(content) {
-        keys.insert(capture.as_str().to_lowercase());
+    if let Ok(regex) = ISO_DATE_RE.as_ref() {
+        for capture in regex.find_iter(content) {
+            keys.insert(capture.as_str().to_lowercase());
+        }
     }
 
     let mut keys = keys

@@ -65,21 +65,18 @@ fn stored_edge_version_for_community(record: &Value) -> Option<StoredEdgeVersion
 pub(crate) async fn update_communities(
     service: &ServiceContext,
     entity_ids: &[String],
-    scope: &str,
 ) -> Result<(), MemoryError> {
     if entity_ids.len() < 2 {
         return Ok(());
     }
 
-    let namespace = service.namespace_for_scope(scope)?;
-    let member_entities =
-        collect_connected_entity_component(service, entity_ids, &namespace).await?;
+    let member_entities = collect_connected_entity_component(service, entity_ids).await?;
     if member_entities.len() < 2 {
         return Ok(());
     }
 
-    let summary = build_community_summary(service, &namespace, &member_entities).await?;
-    let overlapping = find_overlapping_communities(service, &namespace, &member_entities).await?;
+    let summary = build_community_summary(service, &member_entities).await?;
+    let overlapping = find_overlapping_communities(service, &member_entities).await?;
     let community_id = overlapping
         .iter()
         .map(|c| c.community_id.clone())
@@ -93,19 +90,16 @@ pub(crate) async fn update_communities(
         "updated_at": normalize_dt(now()),
     });
 
-    let existing = service
-        .episode_store()
-        .select_one(&community_id, &namespace)
-        .await?;
+    let existing = service.episode_store().select_one(&community_id).await?;
     if existing.is_some() {
         service
             .episode_store()
-            .update(&community_id, payload, &namespace)
+            .update(&community_id, payload)
             .await?;
     } else {
         service
             .episode_store()
-            .create(&community_id, payload, &namespace)
+            .create(&community_id, payload)
             .await?;
     }
 
@@ -118,7 +112,6 @@ pub(crate) async fn update_communities(
             .query(
                 "DELETE type::record($community_id);",
                 Some(json!({"community_id": stale.community_id})),
-                &namespace,
             )
             .await?;
     }
@@ -130,7 +123,6 @@ pub(crate) async fn update_communities(
 pub(crate) async fn collect_connected_entity_component(
     service: &ServiceContext,
     entity_ids: &[String],
-    namespace: &str,
 ) -> Result<Vec<String>, MemoryError> {
     let cutoff = normalize_dt(now());
     let mut visited = BTreeSet::new();
@@ -151,7 +143,7 @@ pub(crate) async fn collect_connected_entity_component(
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             let edges = service
                 .episode_store()
-                .select_edge_neighbors(namespace, &current, &cutoff, direction)
+                .select_edge_neighbors(&current, &cutoff, direction)
                 .await?;
 
             for edge in edges.iter().filter_map(stored_edge_version_for_community) {
@@ -188,12 +180,11 @@ fn is_traversable_context_node(record_id: &str) -> bool {
 /// Build a human-readable summary of community members.
 pub(crate) async fn build_community_summary(
     service: &ServiceContext,
-    namespace: &str,
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
     let records = service
         .episode_store()
-        .select_entities_by_ids(namespace, member_entities)
+        .select_entities_by_ids(member_entities)
         .await?;
     let mut names = records
         .iter()
@@ -239,14 +230,13 @@ fn condense_community_labels(labels: &[String]) -> String {
 
 pub(crate) async fn find_overlapping_communities(
     service: &ServiceContext,
-    namespace: &str,
     member_entities: &[String],
 ) -> Result<Vec<StoredCommunity>, MemoryError> {
     let member_set: HashSet<_> = member_entities.iter().cloned().collect();
 
     let communities = service
         .episode_store()
-        .select_communities_by_member_entities(namespace, member_entities)
+        .select_communities_by_member_entities(member_entities)
         .await?;
 
     Ok(communities

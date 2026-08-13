@@ -10,7 +10,6 @@
                 "source_type": "chat",
                 "source_id": "cr-001-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -19,7 +18,6 @@
             "source_type": "chat",
             "source_id": "cr-001",
             "content": "Alice Smith reports ARR is $7M.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -60,8 +58,6 @@
             "source_type": "email",
             "source_id": "cr-002",
             "content": "The project launches on 2026-06-01.",
-            "scope": "org",
-            "project": "atlas",
             "policy_tags": [],
             "t_ref": "2026-05-01T09:00:00Z"
         },
@@ -95,7 +91,6 @@
             "source_type": "meeting",
             "source_id": "cr-003",
             "content": "Alice Smith reports to Bob Jones.",
-            "scope": "team",
             "policy_tags": [],
             "t_ref": "2026-03-15T14:00:00Z"
         },
@@ -129,7 +124,6 @@
             "source_type": "chat",
             "source_id": "cr-004",
             "content": "Bob Jones will deliver the report by Friday.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-02T11:00:00Z"
         },
@@ -163,7 +157,6 @@
                 "source_type": "chat",
                 "source_id": "cr-005-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -172,7 +165,6 @@
             "source_type": "chat",
             "source_id": "cr-005",
             "content": "Alice Smith reports ARR is $5M.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -213,7 +205,6 @@
             "source_type": "email",
             "source_id": "cr-006",
             "content": "Alice Smith prefers dark mode. Bob Jones prefers light mode.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-03T09:00:00Z"
         },
@@ -258,7 +249,6 @@
                 "source_type": "chat",
                 "source_id": "cr-007-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -267,7 +257,6 @@
             "source_type": "chat",
             "source_id": "cr-007",
             "content": "Correction: Alice Smith reports ARR is actually $6M.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -308,7 +297,6 @@
                 "source_type": "chat",
                 "source_id": "cr-008-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -317,7 +305,6 @@
             "source_type": "chat",
             "source_id": "cr-008",
             "content": "Alice Smith's ARR has been updated to $7M, superseding the earlier report.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-10T10:00:00Z"
         },
@@ -358,7 +345,6 @@
             "source_type": "chat",
             "source_id": "cr-009",
             "content": "Alice Smith reports ARR is $5M in USD. Bob Jones reports ARR is 5000000 EUR.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -403,7 +389,6 @@
             "source_type": "meeting",
             "source_id": "cr-010",
             "content": "Alice Smith works in Engineering. Bob Jones works in Marketing.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-05T09:00:00Z"
         },
@@ -448,8 +433,6 @@
             "source_type": "chat",
             "source_id": "cr-011",
             "content": "The server is located in Frankfurt. The backup server is in Tokyo.",
-            "scope": "org",
-            "project": "infra",
             "policy_tags": [],
             "t_ref": "2026-04-06T08:00:00Z"
         },
@@ -494,7 +477,6 @@
                 "source_type": "chat",
                 "source_id": "cr-012-setup",
                 "content": "Алиса Смит сообщает, что ARR составляет 5 миллионов долларов.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -503,7 +485,6 @@
             "source_type": "chat",
             "source_id": "cr-012",
             "content": "Алиса Смит сообщает, что ARR составляет 7 миллионов долларов.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -544,7 +525,6 @@
                 "source_type": "chat",
                 "source_id": "cr-013-setup",
                 "content": "张三报告ARR为500万美元。",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -553,7 +533,6 @@
             "source_type": "chat",
             "source_id": "cr-013",
             "content": "张三报告ARR为700万美元。",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -594,7 +573,6 @@
             "source_type": "chat",
             "source_id": "cr-014",
             "content": "Alice Smith is 170cm tall. Alice Smith weighs 65kg.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-05T12:00:00Z"
         },
@@ -639,7 +617,6 @@
             "source_type": "chat",
             "source_id": "cr-015",
             "content": "Alice Smith is 170cm tall, equivalent to 5.58ft.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-05T12:00:00Z"
         },
@@ -673,7 +650,6 @@
             "source_type": "chat",
             "source_id": "cr-016",
             "content": "Alice Smith scored 42 widgets on the test.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-05T12:00:00Z"
         },
@@ -695,7 +671,6 @@
             "source_type": "chat",
             "source_id": "cr-017",
             "content": "The budget was approved with no date specified.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -717,8 +692,6 @@
                 "source_type": "email",
                 "source_id": "cr-018-setup",
                 "content": "The project runs from January to March 2026.",
-                "scope": "org",
-                "project": "atlas",
                 "policy_tags": [],
                 "t_ref": "2026-01-01T09:00:00Z"
             }
@@ -727,8 +700,6 @@
             "source_type": "email",
             "source_id": "cr-018",
             "content": "The project was extended through June 2026.",
-            "scope": "org",
-            "project": "atlas",
             "policy_tags": [],
             "t_ref": "2026-03-15T09:00:00Z"
         },
@@ -769,7 +740,6 @@
             "source_type": "meeting",
             "source_id": "cr-019",
             "content": "Alice Smith manages the Engineering team. Bob Jones manages the Marketing team.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -814,7 +784,6 @@
                 "source_type": "chat",
                 "source_id": "cr-020-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -823,7 +792,6 @@
             "source_type": "chat",
             "source_id": "cr-020",
             "content": "Alice Smith reports ARR is $7M.",
-            "scope": "team",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -841,55 +809,10 @@
                     "source_span": "0-33"
                 }
             ],
-            "relations": [],
-            "skip_reason_codes": ["cross_scope"]
+            "relations": [{"setup_source_id": "cr-020-setup", "source_id": "cr-020", "outcome": "contradiction", "reason_code": "mutually_exclusive_values"}],
+            "skip_reason_codes": []
         },
-        "coverage": ["free_sentence_source", "cross_scope", "domain_finance"]
-    },
-    {
-        "id": "cr-021",
-        "corpus_version": "claim-reconciliation/v1",
-        "split": "development",
-        "origin": "synthetic_adversarial",
-        "language": "en",
-        "setup": [
-            {
-                "source_type": "chat",
-                "source_id": "cr-021-setup",
-                "content": "Alice Smith reports ARR is $5M.",
-                "scope": "org",
-                "project": "atlas",
-                "policy_tags": [],
-                "t_ref": "2026-04-01T10:00:00Z"
-            }
-        ],
-        "source": {
-            "source_type": "chat",
-            "source_id": "cr-021",
-            "content": "Alice Smith reports ARR is $7M.",
-            "scope": "org",
-            "project": "zeus",
-            "policy_tags": [],
-            "t_ref": "2026-04-07T10:00:00Z"
-        },
-        "expected": {
-            "claims": [
-                {
-                    "schema": "quantity/v1",
-                    "subject": "Alice Smith",
-                    "comparison_key": {"measure": "ARR"},
-                    "value": {"number": 7000000},
-                    "qualifiers": {"project": "zeus"},
-                    "cardinality": "set_valued",
-                    "valid_from": "2026-04-07T10:00:00Z",
-                    "valid_to": null,
-                    "source_span": "0-33"
-                }
-            ],
-            "relations": [],
-            "skip_reason_codes": ["cross_project"]
-        },
-        "coverage": ["free_sentence_source", "cross_project", "domain_finance"]
+        "coverage": ["free_sentence_source", "same_namespace", "domain_finance"]
     },
     {
         "id": "cr-022",
@@ -902,8 +825,8 @@
                 "source_type": "chat",
                 "source_id": "cr-022-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "org",
                 "policy_tags": ["confidential"],
+                "trust_class": "official",
                 "t_ref": "2026-04-01T10:00:00Z"
             }
         ],
@@ -911,8 +834,8 @@
             "source_type": "chat",
             "source_id": "cr-022",
             "content": "Alice Smith reports ARR is $7M.",
-            "scope": "org",
             "policy_tags": ["public"],
+            "trust_class": "untrusted",
             "t_ref": "2026-04-07T10:00:00Z"
         },
         "expected": {
@@ -930,9 +853,9 @@
                 }
             ],
             "relations": [],
-            "skip_reason_codes": ["cross_policy"]
+            "skip_reason_codes": []
         },
-        "coverage": ["free_sentence_source", "cross_policy", "domain_finance"]
+        "coverage": ["free_sentence_source", "same_namespace", "policy_tags", "trust_semantics", "domain_finance"]
     },
     {
         "id": "cr-023",
@@ -945,7 +868,6 @@
             "source_type": "chat",
             "source_id": "cr-023",
             "content": "Someone reported the server is down.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -967,7 +889,6 @@
             "source_type": "meeting",
             "source_id": "cr-024",
             "content": "Alice Smith works in Engineering since Q1. Alice Smith works in Marketing since Q2.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -1012,7 +933,6 @@
             "source_type": "chat",
             "source_id": "cr-025",
             "content": "Alice Smith is also known as A. Smith.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1046,7 +966,6 @@
             "source_type": "chat",
             "source_id": "cr-026",
             "content": "Alice Smith's title is Senior Engineer.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1080,7 +999,6 @@
             "source_type": "chat",
             "source_id": "cr-027",
             "content": "Alice Smith prefers dark mode. Bob Jones prefers dark mode. Charlie Brown prefers light mode.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1136,7 +1054,6 @@
                 "source_type": "email",
                 "source_id": "cr-028-setup",
                 "content": "Q1 revenue was $2.3M.",
-                "scope": "org",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T09:00:00Z"
             }
@@ -1145,7 +1062,6 @@
             "source_type": "email",
             "source_id": "cr-028",
             "content": "Correction: Q1 revenue was $2.5M, not $2.3M as previously reported.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-10T09:00:00Z"
         },
@@ -1186,7 +1102,6 @@
             "source_type": "meeting",
             "source_id": "cr-029",
             "content": "The incident was resolved on April 3rd. The post-mortem is scheduled for next week.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -1220,7 +1135,6 @@
             "source_type": "chat",
             "source_id": "cr-030",
             "content": "Alice Smith joined the team on January 15th, 2026.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1254,7 +1168,6 @@
                 "source_type": "chat",
                 "source_id": "cr-031-setup",
                 "content": "Alice Smith reports MRR is $120K.",
-                "scope": "org",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -1263,7 +1176,6 @@
             "source_type": "chat",
             "source_id": "cr-031",
             "content": "Alice Smith reports MRR is $140K.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1304,7 +1216,6 @@
             "source_type": "email",
             "source_id": "cr-032",
             "content": "Bob Jones will deliver the report by Friday. Bob Jones will deliver the report by next Monday.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-02T11:00:00Z"
         },
@@ -1356,7 +1267,6 @@
             "source_type": "meeting",
             "source_id": "cr-033",
             "content": "Alice Smith reports to Bob Jones in the Engineering org.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -1390,7 +1300,6 @@
                 "source_type": "email",
                 "source_id": "cr-034-setup",
                 "content": "The system processes 1000 requests per second.",
-                "scope": "org",
                 "policy_tags": [],
                 "t_ref": "2026-01-01T09:00:00Z"
             }
@@ -1399,7 +1308,6 @@
             "source_type": "email",
             "source_id": "cr-034",
             "content": "The system now processes 1500 requests per second after optimization.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-06-01T09:00:00Z"
         },
@@ -1440,7 +1348,6 @@
             "source_type": "chat",
             "source_id": "cr-035",
             "content": "Alice Smith prefers dark mode. Alice Smith also prefers large fonts.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1485,8 +1392,6 @@
             "source_type": "meeting",
             "source_id": "cr-036",
             "content": "Проект запускается 1 июня 2026 года.",
-            "scope": "org",
-            "project": "atlas",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -1520,8 +1425,6 @@
                 "source_type": "chat",
                 "source_id": "cr-037-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
-                "project": "atlas",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -1530,8 +1433,6 @@
             "source_type": "chat",
             "source_id": "cr-037",
             "content": "Alice Smith reports ARR is $5M.",
-            "scope": "personal",
-            "project": "atlas",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1572,7 +1473,6 @@
             "source_type": "chat",
             "source_id": "cr-038",
             "content": "The compliance audit is scheduled for December 2026. The regulatory review follows in January 2027.",
-            "scope": "org",
             "policy_tags": ["compliance"],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1617,8 +1517,6 @@
             "source_type": "meeting",
             "source_id": "cr-039",
             "content": "Configuration: max connections = 100. Timeout = 30s.",
-            "scope": "org",
-            "project": "infra",
             "policy_tags": [],
             "t_ref": "2026-04-05T14:00:00Z"
         },
@@ -1663,7 +1561,6 @@
                 "source_type": "chat",
                 "source_id": "cr-040-setup",
                 "content": "Alice Smith reports ARR is $5M.",
-                "scope": "personal",
                 "policy_tags": [],
                 "t_ref": "2026-04-01T10:00:00Z"
             }
@@ -1672,7 +1569,6 @@
             "source_type": "chat",
             "source_id": "cr-040",
             "content": "Alice Smith reports ARR is $7M.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1713,7 +1609,6 @@
             "source_type": "chat",
             "source_id": "cr-041",
             "content": "Alice Smith reports ARR is $5M. Bob Jones joined the team in March.",
-            "scope": "personal",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },
@@ -1758,7 +1653,6 @@
             "source_type": "email",
             "source_id": "cr-042",
             "content": "Someone from the team reported the server is down.",
-            "scope": "org",
             "policy_tags": [],
             "t_ref": "2026-04-07T10:00:00Z"
         },

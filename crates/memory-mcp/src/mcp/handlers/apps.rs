@@ -116,13 +116,10 @@ impl MemoryMcp {
     pub(super) async fn create_session(
         &self,
         app: &str,
-        scope: &str,
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
-        self.session_manager
-            .create(app, scope, ttl_seconds, payload)
-            .await
+        self.session_manager.create(app, ttl_seconds, payload).await
     }
 
     pub(super) fn app_command_result_from_details(
@@ -154,18 +151,17 @@ impl MemoryMcp {
 
     async fn inspector_payload(
         &self,
-        scope: &str,
         target_type: &str,
         target_id: &str,
         as_of: Option<&str>,
     ) -> Result<Value, ErrorData> {
-        let namespace = self.service.namespace_for_scope(scope).map_err(mcp_error)?;
+        let namespace = self.service.active_namespace.clone();
         let (record, record_namespace) = match target_type {
             "entity" => {
                 let record = self
                     .service
                     .app_store()
-                    .select_entity(target_id, &namespace)
+                    .select_entity(target_id)
                     .await
                     .map_err(mcp_error)?;
                 (record, Some(namespace.clone()))
@@ -204,7 +200,7 @@ impl MemoryMcp {
                 "target_type": target_type,
                 "target_id": target_id,
                 "as_of": as_of,
-                "namespace": record_namespace.unwrap_or(namespace),
+                "active_namespace": record_namespace.unwrap_or(namespace),
             },
             "record": record,
             "summary": {
@@ -215,11 +211,11 @@ impl MemoryMcp {
         }))
     }
 
-    pub(super) async fn lifecycle_payload(&self, scope: &str) -> Result<Value, ErrorData> {
+    pub(super) async fn lifecycle_payload(&self) -> Result<Value, ErrorData> {
         serde_json::to_value(
             &self
                 .service
-                .build_lifecycle_view(scope)
+                .build_lifecycle_view()
                 .await
                 .map_err(mcp_error)?,
         )
@@ -228,25 +224,16 @@ impl MemoryMcp {
 
     async fn graph_payload(
         &self,
-        scope: &str,
         from_entity_id: &str,
         to_entity_id: &str,
         as_of: Option<&str>,
         max_depth: i32,
     ) -> Result<Value, ErrorData> {
-        let namespace = self.service.namespace_for_scope(scope).map_err(mcp_error)?;
         let cutoff = as_of.and_then(parse_datetime).unwrap_or_else(Utc::now);
         let store = self.service.app_store();
-        crate::service::graph_payload(
-            &store,
-            &namespace,
-            from_entity_id,
-            to_entity_id,
-            cutoff,
-            max_depth,
-        )
-        .await
-        .map_err(mcp_error)
+        crate::service::graph_payload(&store, from_entity_id, to_entity_id, cutoff, max_depth)
+            .await
+            .map_err(mcp_error)
     }
 
     pub(super) async fn open_inspector_app(
@@ -262,14 +249,9 @@ impl MemoryMcp {
             .as_deref()
             .ok_or_else(|| Self::missing_app_field("inspector", "target_id"))?;
         let payload = self
-            .inspector_payload(
-                &params.scope,
-                target_type,
-                target_id,
-                params.as_of.as_deref(),
-            )
+            .inspector_payload(target_type, target_id, params.as_of.as_deref())
             .await?;
-        self.create_session("inspector", &params.scope, params.ttl_seconds, payload)
+        self.create_session("inspector", params.ttl_seconds, payload)
             .await
     }
 
@@ -288,12 +270,11 @@ impl MemoryMcp {
         let diff = self
             .service
             .build_diff(crate::service::DiffRequest {
-                scope: params.scope.clone(),
                 target_type: params.target_type.clone().unwrap_or_else(|| {
                     if params.target_id.is_some() {
                         "entity".to_string()
                     } else {
-                        "scope".to_string()
+                        "all".to_string()
                     }
                 }),
                 target_id: params.target_id.clone(),
@@ -313,7 +294,7 @@ impl MemoryMcp {
         let mut payload =
             serde_json::to_value(&diff).map_err(|error| Self::internal_error(error.to_string()))?;
         upsert_json_field(&mut payload, "exports", json!([]));
-        self.create_session("diff", &params.scope, params.ttl_seconds, payload)
+        self.create_session("diff", params.ttl_seconds, payload)
             .await
     }
 
@@ -324,7 +305,6 @@ impl MemoryMcp {
         let bundle = self
             .service
             .prepare_ingestion_review(crate::service::PrepareIngestionReviewRequest {
-                scope: params.scope.clone(),
                 source_text: params.source_text.clone(),
                 draft_episode_id: params.draft_episode_id.clone(),
             })
@@ -332,21 +312,16 @@ impl MemoryMcp {
             .map_err(mcp_error)?;
         let payload = serde_json::to_value(&bundle)
             .map_err(|error| Self::internal_error(error.to_string()))?;
-        self.create_session(
-            "ingestion_review",
-            &params.scope,
-            params.ttl_seconds,
-            payload,
-        )
-        .await
+        self.create_session("ingestion_review", params.ttl_seconds, payload)
+            .await
     }
 
     pub(super) async fn open_lifecycle_app(
         &self,
         params: &OpenAppParams,
     ) -> Result<OpenAppResult, ErrorData> {
-        let payload = self.lifecycle_payload(&params.scope).await?;
-        self.create_session("lifecycle", &params.scope, params.ttl_seconds, payload)
+        let payload = self.lifecycle_payload().await?;
+        self.create_session("lifecycle", params.ttl_seconds, payload)
             .await
     }
 
@@ -364,14 +339,13 @@ impl MemoryMcp {
             .ok_or_else(|| Self::missing_app_field("graph", "to_entity_id"))?;
         let payload = self
             .graph_payload(
-                &params.scope,
                 from_entity_id,
                 to_entity_id,
                 params.as_of.as_deref(),
                 params.max_depth.unwrap_or(4).max(1),
             )
             .await?;
-        self.create_session("graph", &params.scope, params.ttl_seconds, payload)
+        self.create_session("graph", params.ttl_seconds, payload)
             .await
     }
 

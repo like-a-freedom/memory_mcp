@@ -128,7 +128,8 @@ mod tests {
         ProcedureCandidateRecord {
             candidate_id: id.to_string(),
             namespace: "test".to_string(),
-            scope: "org".to_string(),
+            identity_version: 2,
+            scope: Some("org".to_string()),
             project: Some("p".to_string()),
             task_fingerprint: task.to_string(),
             normalized_task: task.to_string(),

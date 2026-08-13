@@ -14,7 +14,6 @@ use crate::service::triple_extractor::SemanticTriple;
 /// with the same (subject, predicate) but a different object and invalidate them.
 pub async fn resolve_conflicts_for_triple(
     entity_service: &EntityService,
-    namespace: &str,
     new_triple: &SemanticTriple,
 ) -> Result<Vec<String>, MemoryError> {
     if !crate::service::triple_extractor::is_singleton_predicate(&new_triple.predicate) {
@@ -24,7 +23,6 @@ pub async fn resolve_conflicts_for_triple(
     // Find conflicting triples: same (subject, predicate), different object.
     let conflicting = find_conflicting_triples(
         entity_service,
-        namespace,
         &new_triple.subject,
         &new_triple.predicate,
         &new_triple.object,
@@ -38,7 +36,7 @@ pub async fn resolve_conflicts_for_triple(
     // Invalidate conflicting triples via bi-temporal close.
     let mut invalidated = Vec::with_capacity(conflicting.len());
     for triple_id in &conflicting {
-        invalidate_triple(entity_service, namespace, triple_id).await?;
+        invalidate_triple(entity_service, triple_id).await?;
         invalidated.push(triple_id.clone());
     }
 
@@ -48,22 +46,20 @@ pub async fn resolve_conflicts_for_triple(
 /// Find active triples with the same (subject, predicate) but a different object.
 async fn find_conflicting_triples(
     entity_service: &EntityService,
-    namespace: &str,
     subject: &str,
     predicate: &str,
     exclude_object: &str,
 ) -> Result<Vec<String>, MemoryError> {
     let sql = r#"
         SELECT id FROM triple
-        WHERE namespace = $ns
-          AND subject = $subject
+        WHERE subject = $subject
           AND predicate = $predicate
           AND object != $object
           AND t_invalid IS NONE
         LIMIT 10
     "#;
     let result = entity_service
-        .query_triples(sql, namespace, subject, predicate, exclude_object)
+        .query_triples(sql, subject, predicate, exclude_object)
         .await?;
 
     Ok(result
@@ -90,12 +86,9 @@ async fn find_conflicting_triples(
 /// fact/edge invalidation path in `lifecycle/decay.rs`.
 async fn invalidate_triple(
     entity_service: &EntityService,
-    namespace: &str,
     triple_id: &str,
 ) -> Result<(), MemoryError> {
     let sql =
         "UPDATE type::record($id) SET t_invalid = time::now(), t_invalid_ingested = time::now()";
-    entity_service
-        .invalidate_triple_by_id(sql, namespace, triple_id)
-        .await
+    entity_service.invalidate_triple_by_id(sql, triple_id).await
 }

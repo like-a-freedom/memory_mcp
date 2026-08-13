@@ -34,7 +34,9 @@ pub use agent_memory::{
     AgentMemoryStore, EventProjectionJobRecord, MemoryCaptureAuditRecord, MemoryEventRecord,
     disposition_str, origin_kind_str, reason_codes_str, source_kind_str, trust_class_str,
 };
+
 pub use app_store::AppStoreClient;
+pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use episode_store::EpisodeStoreClient;

@@ -37,7 +37,8 @@ pub fn is_missing_table_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("table")
 }
 
-pub fn is_table_already_exists_error(message: &str) -> bool {
+#[cfg(test)]
+fn is_table_already_exists_error(message: &str) -> bool {
     let lowered = message.to_lowercase();
     lowered.contains("already exists") && lowered.contains("table")
 }
@@ -149,12 +150,13 @@ fn normalize_surreal_json(v: &Value) -> Value {
 pub fn find_version_in_json(v: &Value) -> Option<String> {
     use std::sync::LazyLock;
 
-    static VERSION_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"\d+\.\d+(?:\.\d+)?").expect("valid version regex"));
+    static VERSION_RE: LazyLock<Result<Regex, regex::Error>> =
+        LazyLock::new(|| Regex::new(r"\d+\.\d+(?:\.\d+)?"));
 
     match v {
         Value::String(s) => {
-            if VERSION_RE.is_match(s) || s.to_lowercase().contains("surreal") {
+            let version_match = VERSION_RE.as_ref().is_ok_and(|regex| regex.is_match(s));
+            if version_match || s.to_lowercase().contains("surreal") {
                 Some(s.clone())
             } else {
                 None

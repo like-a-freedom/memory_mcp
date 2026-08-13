@@ -16,7 +16,7 @@ pub use ner::{
     NerExtractorKind, SELECTOR_CLASSIC_GLINER, SELECTOR_SAUKRAUT_LFM25,
 };
 pub(crate) use surreal::StorageBackend;
-pub use surreal::{SurrealConfig, SurrealConfigBuilder};
+pub use surreal::{ActiveNamespace, SurrealConfig, SurrealConfigBuilder};
 
 #[cfg(test)]
 pub(crate) fn env_lock() -> &'static std::sync::Mutex<()> {

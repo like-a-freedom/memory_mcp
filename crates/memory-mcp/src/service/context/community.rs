@@ -12,12 +12,9 @@ use crate::storage::GraphDirection;
 use super::filtering::{compare_facts_by_recency, filter_facts_by_constraints};
 
 pub(crate) struct CollectCommunityFactsRequest<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff_iso: &'a str,
     pub(crate) query: &'a str,
     pub(crate) access: &'a crate::models::AccessPayload,
-    pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) direct_fact_ids: &'a HashSet<String>,
     pub(crate) budget: i32,
@@ -52,8 +49,7 @@ pub(crate) async fn collect_community_facts(
     service: &crate::service::service_context::ServiceContext,
     request: CollectCommunityFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String, f64)>, MemoryError> {
-    let matched_communities =
-        find_matching_communities(service, request.namespace, request.query).await?;
+    let matched_communities = find_matching_communities(service, request.query).await?;
     if matched_communities.is_empty() {
         return Ok(Vec::new());
     }
@@ -67,13 +63,7 @@ pub(crate) async fn collect_community_facts(
 
     let fallback_records = service
         .context_store()
-        .select_facts_by_entity_links(
-            request.namespace,
-            request.scope,
-            request.cutoff_iso,
-            &member_ids,
-            request.budget.max(1),
-        )
+        .select_facts_by_entity_links(request.cutoff_iso, &member_ids, request.budget.max(1))
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let community_summary_by_member = matched_communities
@@ -97,20 +87,16 @@ pub(crate) async fn collect_community_facts(
         })
         .collect::<HashMap<_, _>>();
 
-    let mut facts = filter_facts_by_constraints(
-        fallback_records,
-        request.access,
-        request.project,
-        request.fact_types,
-    )
-    .into_iter()
-    .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
-    .filter(|fact| {
-        fact.entity_links
-            .iter()
-            .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
-    })
-    .collect::<Vec<_>>();
+    let mut facts =
+        filter_facts_by_constraints(fallback_records, request.access, request.fact_types)
+            .into_iter()
+            .filter(|fact| !request.direct_fact_ids.contains(&fact.fact_id))
+            .filter(|fact| {
+                fact.entity_links
+                    .iter()
+                    .any(|entity_id| member_ids.iter().any(|member_id| member_id == entity_id))
+            })
+            .collect::<Vec<_>>();
     facts.sort_by(|left, right| {
         let left_rank = best_community_match(left, &community_summary_by_member)
             .map(|m| m.rank)
@@ -139,7 +125,6 @@ pub(crate) async fn collect_community_facts(
         );
         let origin_factor = community_origin_factor_for_fact(
             service,
-            request.namespace,
             request.cutoff_iso,
             &fact,
             &community_summary_by_member,
@@ -164,7 +149,6 @@ fn best_community_match<'a>(
 
 async fn community_origin_factor_for_fact(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
     cutoff_iso: &str,
     fact: &Fact,
     matches_by_entity: &HashMap<String, CommunityMatch>,
@@ -177,14 +161,9 @@ async fn community_origin_factor_for_fact(
         .iter()
         .filter(|e| matches_by_entity.contains_key(*e))
     {
-        let factor = entity_origin_factor(
-            service,
-            namespace,
-            cutoff_iso,
-            entity_id,
-            entity_origin_factor_cache,
-        )
-        .await?;
+        let factor =
+            entity_origin_factor(service, cutoff_iso, entity_id, entity_origin_factor_cache)
+                .await?;
         best_factor = Some(best_factor.map_or(factor, |c| c.max(factor)));
     }
 
@@ -193,7 +172,6 @@ async fn community_origin_factor_for_fact(
 
 async fn entity_origin_factor(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
     cutoff_iso: &str,
     entity_id: &str,
     cache: &mut HashMap<String, f64>,
@@ -206,7 +184,7 @@ async fn entity_origin_factor(
     for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
         for edge in service
             .context_store()
-            .select_edge_neighbors(namespace, entity_id, cutoff_iso, direction)
+            .select_edge_neighbors(entity_id, cutoff_iso, direction)
             .await?
         {
             let factor = edge_origin_factor(&edge);
@@ -240,12 +218,11 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 
 pub(crate) async fn find_matching_communities(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
     let communities = service
         .context_store()
-        .select_communities_matching_summary(namespace, query)
+        .select_communities_matching_summary(query)
         .await?;
 
     let mut matched = communities

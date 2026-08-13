@@ -83,7 +83,7 @@ fn render(target: InitTarget) -> Result<serde_json::Value, MemoryError> {
             "env",
             "shell",
             "shell profile or .env",
-            "# Embedded zero-config mode requires no environment variables.\n# Optional remote configuration; omit these for embedded zero-config mode.\n# export SURREALDB_URL=ws://localhost:8000\n# export SURREALDB_DB_NAME=memory\n# export SURREALDB_NAMESPACES=org\n# export SURREALDB_USERNAME=<your-remote-username>\n# export SURREALDB_PASSWORD=<your-remote-password>\n"
+            "# Embedded zero-config mode requires no environment variables.\n# Optional remote configuration; omit these for embedded zero-config mode.\n# export SURREALDB_URL=ws://localhost:8000\n# export SURREALDB_DB_NAME=memory\n# export SURREALDB_NAMESPACE=work\n# export SURREALDB_USERNAME=<your-remote-username>\n# export SURREALDB_PASSWORD=<your-remote-password>\n"
                 .to_string(),
         ),
     };
@@ -197,6 +197,8 @@ mod tests {
         assert_eq!(value["format"], "shell");
         assert!(shell.contains("embedded zero-config"));
         assert!(shell.contains("SURREALDB_USERNAME"));
+        assert!(shell.contains("SURREALDB_NAMESPACE=work"));
+        assert!(!shell.contains("SURREALDB_NAMESPACE=org"));
         assert!(!shell.contains("root"));
         assert!(!shell.contains("secret"));
     }

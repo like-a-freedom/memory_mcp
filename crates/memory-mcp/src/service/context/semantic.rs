@@ -10,12 +10,9 @@ use crate::service::error::MemoryError;
 use super::filtering::{fact_is_active_at, fact_record_allowed};
 
 pub(crate) struct CollectSemanticFactsRequest<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) query: &'a str,
     pub(crate) access: &'a crate::models::AccessPayload,
-    pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) excluded_fact_ids: &'a std::collections::HashSet<String>,
     pub(crate) budget: i32,
@@ -65,8 +62,6 @@ pub(crate) async fn collect_semantic_facts(
     let fact_records = service
         .context_store()
         .select_facts_ann(
-            request.namespace,
-            request.scope,
             &crate::service::normalize_dt(request.cutoff),
             &query_embedding,
             search_limit,
@@ -76,7 +71,7 @@ pub(crate) async fn collect_semantic_facts(
 
     let mut ranked_facts = Vec::new();
     for record in fact_records {
-        if !fact_record_allowed(&record, request.access, request.project, request.fact_types) {
+        if !fact_record_allowed(&record, request.access, request.fact_types) {
             continue;
         }
 
@@ -84,8 +79,7 @@ pub(crate) async fn collect_semantic_facts(
             continue;
         };
 
-        if fact.scope != request.scope
-            || request.excluded_fact_ids.contains(&fact.fact_id)
+        if request.excluded_fact_ids.contains(&fact.fact_id)
             || !fact_is_active_at(&fact, request.cutoff)
         {
             continue;

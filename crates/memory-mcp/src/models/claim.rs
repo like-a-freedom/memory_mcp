@@ -292,6 +292,24 @@ pub enum ClaimCardinality {
     SingleValued,
 }
 
+/// Version of the identity contract used by a persisted claim or slot.
+///
+/// Missing values are legacy records. New projections always write `v2`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimIdentityVersion {
+    #[default]
+    Legacy,
+    V2,
+}
+
+impl ClaimIdentityVersion {
+    #[must_use]
+    pub fn is_v2(self) -> bool {
+        matches!(self, Self::V2)
+    }
+}
+
 // ─── Comparison Key ───────────────────────────────────────────────────────────
 
 /// A structural comparison key: schema reference + ordered components.
@@ -368,6 +386,7 @@ impl QualifierHash {
 pub struct PolicyFingerprint(String);
 
 impl PolicyFingerprint {
+    /// Legacy policy fingerprint. Kept for compatibility with legacy records and tests.
     pub fn compute(scope: &str, project: Option<&str>, policy_tags: &[String]) -> Self {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
@@ -381,6 +400,22 @@ impl PolicyFingerprint {
         for tag in &sorted_tags {
             hasher.update(b"\x00tag\x00");
             hasher.update(tag.as_bytes());
+        }
+        Self(hex::encode(hasher.finalize()))
+    }
+
+    /// V2 policy fingerprint. The active namespace is the storage boundary;
+    /// only policy tags participate in the claim identity.
+    pub fn compute_v2(policy_tags: &[String]) -> Self {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(b"claim-policy:v2\0");
+        let mut sorted_tags = policy_tags.to_vec();
+        sorted_tags.sort();
+        for tag in &sorted_tags {
+            hasher.update(b"tag\0");
+            hasher.update(tag.as_bytes());
+            hasher.update([0]);
         }
         Self(hex::encode(hasher.finalize()))
     }
@@ -452,18 +487,56 @@ impl CanonicalPayloadHash {
 
 // ─── Claim Slot ───────────────────────────────────────────────────────────────
 
-/// The exact slot a claim occupies: namespace + scope + project + policy + schema + subject + comparison key.
-/// Two claims in different slots are never compared.
+/// The exact slot a claim occupies.
+///
+/// V2 identity is schema + subject + comparison key + policy within the
+/// process-bound Active Namespace. The namespace is the storage context, not a
+/// second identity dimension. Qualifiers remain part of the claim proposition
+/// and are evaluated during reconciliation, not candidate-slot identity. The
+/// scope/project fields are retained only as legacy metadata. Two claims in
+/// different slots are never compared.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ClaimSlot {
+    #[serde(default)]
+    pub identity_version: ClaimIdentityVersion,
     pub namespace: String,
-    pub scope: String,
-    pub project_identity: String,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub project_identity: Option<String>,
     pub access_policy_fingerprint: PolicyFingerprint,
     pub schema_ref: ClaimSchemaRef,
     pub subject_key: String,
     pub comparison_key_hash: ComparisonKeyHash,
     pub qualifier_hash: QualifierHash,
+}
+
+impl ClaimSlot {
+    /// Compute the v2 slot identity using an optionally canonicalized subject.
+    #[must_use]
+    pub fn v2_fingerprint(&self) -> String {
+        self.v2_fingerprint_for_subject(&self.subject_key)
+    }
+
+    /// Compute the v2 slot identity for alias-aware reconciliation.
+    #[must_use]
+    pub fn v2_fingerprint_for_subject(&self, subject_key: &str) -> String {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(b"claim-slot:v2\0");
+        // Active Namespace is already enforced by the bound ClaimStore. Do not
+        // include its label in the v2 slot identity: the same semantic slot
+        // must retain the same formula if artifacts are compared externally.
+        hasher.update((self.schema_ref.family as u8).to_be_bytes());
+        hasher.update(self.schema_ref.version.get().to_be_bytes());
+        hasher.update([0]);
+        hasher.update(subject_key.as_bytes());
+        hasher.update([0]);
+        hasher.update(self.comparison_key_hash.0.as_bytes());
+        hasher.update([0]);
+        hasher.update(self.access_policy_fingerprint.0.as_bytes());
+        format!("v2:{}", hex::encode(hasher.finalize()))
+    }
 }
 
 // ─── Claim Draft ──────────────────────────────────────────────────────────────
@@ -513,13 +586,18 @@ pub enum ClaimValiditySource {
 /// A persisted, immutable-after-creation claim record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claim {
+    #[serde(default)]
+    pub identity_version: ClaimIdentityVersion,
     pub claim_id: ClaimId,
     pub namespace: String,
     pub source_fact_id: FactId,
     pub source_episode_id: EpisodeId,
-    pub scope: String,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
     pub project: Option<String>,
-    pub project_identity: String,
+    #[serde(default)]
+    pub project_identity: Option<String>,
     pub policy_tags: Vec<String>,
     pub access_policy_fingerprint: PolicyFingerprint,
     pub schema_family: ClaimSchemaFamily,
@@ -597,7 +675,9 @@ pub struct ClaimRelation {
     pub context_fingerprint: ReconciliationContextFingerprint,
     pub evaluated_at: chrono::DateTime<chrono::Utc>,
     pub supersedes_relation_id: Option<ClaimRelationId>,
-    pub scope: String,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
     pub project: Option<String>,
     pub policy_tags: Vec<String>,
     pub t_ingested: chrono::DateTime<chrono::Utc>,
@@ -674,8 +754,6 @@ pub struct ClaimBuildInput<'a> {
     pub namespace: &'a str,
     pub source_fact_id: &'a FactId,
     pub source_episode_id: &'a EpisodeId,
-    pub scope: &'a str,
-    pub project: Option<&'a str>,
     pub policy_tags: &'a [String],
     pub draft: ClaimDraft,
     pub extractor_fingerprint: &'a ExtractorFingerprint,
@@ -729,33 +807,29 @@ pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
 
     let comparison_key_hash = ComparisonKeyHash::compute(&draft.comparison_key);
     let qualifier_hash = QualifierHash::compute(&draft.qualifiers);
-    let access_policy_fingerprint =
-        PolicyFingerprint::compute(input.scope, input.project, input.policy_tags);
-    let project_identity = input.project.unwrap_or("__none__").to_string();
-    let slot_fingerprint = format!(
-        "{}:{}:{}:{}:{}:{}:{}",
-        input.namespace,
-        input.scope,
-        project_identity,
-        draft.schema_ref.version.get(),
-        draft.subject.subject_key,
-        comparison_key_hash.0,
-        access_policy_fingerprint.0,
-    );
+    let access_policy_fingerprint = PolicyFingerprint::compute_v2(input.policy_tags);
+    let mut subject = draft.subject.clone();
+    subject.identity_version = ClaimIdentityVersion::V2;
+    subject.namespace = input.namespace.to_string();
+    subject.access_policy_fingerprint = access_policy_fingerprint.clone();
+    subject.comparison_key_hash = comparison_key_hash.clone();
+    subject.qualifier_hash = qualifier_hash.clone();
+    let slot_fingerprint = subject.v2_fingerprint();
 
     Ok(Claim {
+        identity_version: ClaimIdentityVersion::V2,
         claim_id,
         namespace: input.namespace.to_string(),
         source_fact_id: input.source_fact_id.clone(),
         source_episode_id: input.source_episode_id.clone(),
-        scope: input.scope.to_string(),
-        project: input.project.map(String::from),
-        project_identity,
+        scope: None,
+        project: None,
+        project_identity: None,
         policy_tags: input.policy_tags.to_vec(),
         access_policy_fingerprint,
         schema_family: draft.schema_ref.family,
         schema_version: draft.schema_ref.version.get(),
-        subject: draft.subject.clone(),
+        subject,
         subject_key: draft.subject.subject_key.clone(),
         comparison_key: draft.comparison_key.clone(),
         comparison_key_hash,
@@ -908,6 +982,135 @@ mod tests {
     }
 
     #[test]
+    fn new_claim_identity_is_v2_and_ignores_legacy_partition_fields() {
+        let tags = vec!["private".to_string(), "source:chat".to_string()];
+        let personal = build_identity_test_claim("personal", Some("project-a"), &tags);
+        let team = build_identity_test_claim("team", Some("project-b"), &tags);
+
+        assert_eq!(
+            personal.access_policy_fingerprint,
+            team.access_policy_fingerprint
+        );
+        assert_eq!(personal.slot_fingerprint, team.slot_fingerprint);
+        assert_eq!(
+            serde_json::to_value(&personal).unwrap()["identity_version"],
+            "v2"
+        );
+        assert_eq!(
+            serde_json::to_value(&personal.subject).unwrap()["identity_version"],
+            "v2"
+        );
+    }
+
+    #[test]
+    fn v2_slot_identity_ignores_storage_label_and_qualifiers() {
+        let schema = ClaimSchemaRef::new(ClaimSchemaFamily::Attribute, 1);
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "status".to_string());
+        let comparison_key = ComparisonKey::new(schema, components).unwrap();
+        let mut first_qualifiers = BTreeMap::new();
+        first_qualifiers.insert("source".to_string(), "email".to_string());
+        let mut second_qualifiers = BTreeMap::new();
+        second_qualifiers.insert("source".to_string(), "chat".to_string());
+        let base = ClaimSlot {
+            identity_version: ClaimIdentityVersion::V2,
+            namespace: "main".to_string(),
+            scope: None,
+            project_identity: None,
+            access_policy_fingerprint: PolicyFingerprint::compute_v2(&[]),
+            schema_ref: schema,
+            subject_key: "entity:abc".to_string(),
+            comparison_key_hash: ComparisonKeyHash::compute(&comparison_key),
+            qualifier_hash: QualifierHash::compute(&first_qualifiers),
+        };
+        let mut other = base.clone();
+        other.namespace = "work".to_string();
+        other.qualifier_hash = QualifierHash::compute(&second_qualifiers);
+
+        assert_eq!(base.v2_fingerprint(), other.v2_fingerprint());
+    }
+
+    #[test]
+    fn v2_slot_identity_changes_with_policy_tags() {
+        let tags_a = vec!["private".to_string()];
+        let tags_b = vec!["public".to_string()];
+        let claim_a = build_identity_test_claim("personal", Some("project-a"), &tags_a);
+        let claim_b = build_identity_test_claim("team", Some("project-b"), &tags_b);
+
+        assert_ne!(
+            claim_a.access_policy_fingerprint,
+            claim_b.access_policy_fingerprint
+        );
+        assert_ne!(claim_a.slot_fingerprint, claim_b.slot_fingerprint);
+    }
+
+    #[test]
+    fn legacy_claim_fields_are_optional_and_identity_defaults_to_legacy() {
+        let claim = build_identity_test_claim("personal", None, &[]);
+        let mut raw = serde_json::to_value(&claim).unwrap();
+        let object = raw.as_object_mut().unwrap();
+        object.remove("identity_version");
+        object.remove("scope");
+        object.remove("project");
+        let subject = object.get_mut("subject").unwrap().as_object_mut().unwrap();
+        subject.remove("identity_version");
+
+        let decoded: Claim = serde_json::from_value(raw).unwrap();
+        let encoded = serde_json::to_value(decoded).unwrap();
+        assert_eq!(encoded["identity_version"], "legacy");
+        assert_eq!(encoded["scope"], serde_json::Value::Null);
+        assert_eq!(encoded["project"], serde_json::Value::Null);
+        assert_eq!(encoded["subject"]["identity_version"], "legacy");
+    }
+
+    fn build_identity_test_claim(
+        scope: &str,
+        project: Option<&str>,
+        policy_tags: &[String],
+    ) -> Claim {
+        let schema = ClaimSchemaRef::new(ClaimSchemaFamily::Attribute, 1);
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "status".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let qualifiers = BTreeMap::new();
+        let subject = ClaimSlot {
+            identity_version: ClaimIdentityVersion::Legacy,
+            namespace: "ns".to_string(),
+            scope: Some(scope.to_string()),
+            project_identity: project.map(str::to_string),
+            access_policy_fingerprint: PolicyFingerprint::compute(scope, project, policy_tags),
+            schema_ref: schema,
+            subject_key: "entity:abc".to_string(),
+            comparison_key_hash: ComparisonKeyHash::compute(&key),
+            qualifier_hash: QualifierHash::compute(&qualifiers),
+        };
+        let fact_id = FactId::from("fact:identity-test");
+        let episode_id = EpisodeId::from("episode:identity-test");
+        build_claim(ClaimBuildInput {
+            namespace: "ns",
+            source_fact_id: &fact_id,
+            source_episode_id: &episode_id,
+            policy_tags,
+            draft: ClaimDraft {
+                schema_ref: schema,
+                subject,
+                comparison_key: key,
+                qualifiers,
+                value: ClaimValue::Boolean(true),
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at: chrono::Utc::now(),
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+            },
+            extractor_fingerprint: &ExtractorFingerprint::compute(1, "test"),
+            t_ingested: chrono::Utc::now(),
+        })
+        .unwrap()
+    }
+
+    #[test]
     fn comparison_key_rejects_empty_name() {
         let schema = ClaimSchemaRef {
             family: ClaimSchemaFamily::Attribute,
@@ -1052,9 +1255,10 @@ mod tests {
         let hash = ComparisonKeyHash::compute(&key);
         // An empty subject_key signals unresolved subject
         let slot = ClaimSlot {
+            identity_version: ClaimIdentityVersion::Legacy,
             namespace: "ns".to_string(),
-            scope: "personal".to_string(),
-            project_identity: "__none__".to_string(),
+            scope: Some("personal".to_string()),
+            project_identity: Some("__none__".to_string()),
             access_policy_fingerprint: PolicyFingerprint::compute("personal", None, &[]),
             schema_ref: schema,
             subject_key: String::new(),
@@ -1076,9 +1280,10 @@ mod tests {
         let hash = ComparisonKeyHash::compute(&key);
 
         let subject = ClaimSlot {
+            identity_version: ClaimIdentityVersion::Legacy,
             namespace: "ns".to_string(),
-            scope: "personal".to_string(),
-            project_identity: "__none__".to_string(),
+            scope: Some("personal".to_string()),
+            project_identity: Some("__none__".to_string()),
             access_policy_fingerprint: PolicyFingerprint::compute("personal", None, &[]),
             schema_ref: schema,
             subject_key: "entity:abc".to_string(),
@@ -1108,8 +1313,6 @@ mod tests {
             namespace: "ns",
             source_fact_id: &fact_id,
             source_episode_id: &episode_id,
-            scope: "personal",
-            project: None,
             policy_tags: &[],
             draft,
             extractor_fingerprint: &ext_fp,
@@ -1125,8 +1328,6 @@ mod tests {
             namespace: "ns",
             source_fact_id: &fact_id2,
             source_episode_id: &episode_id2,
-            scope: "personal",
-            project: None,
             policy_tags: &[],
             draft: ClaimDraft {
                 schema_ref: schema,

@@ -26,27 +26,26 @@ the scripts will work with these defaults:
 
 - start the MCP server with `cargo run --quiet --bin memory_mcp`
 - run that command from the repository root
-- ingest into scope `org`
+- use the server's Active Namespace (default `main`)
 - store the entry as `source_type="session_summary"`
 - auto-generate a deterministic `source_id`
 - apply sensible default `policy_tags` for stop vs precompact events
 - fall back to a local embedded SurrealDB if no DB env vars are already configured
 
-That means environment variables are mainly for **power users**: custom binary paths, non-default scopes, project tagging, manual summaries, or debugging.
+That means environment variables are mainly for **power users**: custom binary paths, server configuration, manual summaries, or debugging.
 
 ## What gets ingested
 
 Both scripts call `ingest` with:
 
 - `source_type = "session_summary"` by default
-- `scope = "org"` by default
-- optional `project` tag (unset by default)
+
 - deterministic `source_id` based on hook event + session id + content hash
 - default `policy_tags`:
   - stop: `hook:stop,session_summary`
   - precompact: `hook:precompact,session_summary,emergency_save`
 
-In other words: if you do nothing, both hooks save a session snapshot into the normal org-level memory using the semantic source type `session_summary`.
+In other words: if you do nothing, both hooks save a session snapshot into the configured Active Namespace using the semantic source type `session_summary`.
 
 Content is resolved in this order:
 
@@ -67,8 +66,7 @@ These are the only variables most teams will ever need.
 
 | Variable | Default | Expected values | Purpose / when to use |
 | --- | --- | --- | --- |
-| `MEMORY_HOOK_PROJECT` | unset | Short project tag such as `memory_mcp`, `payments-api`, `agent-platform` | Adds a `project` field to ingested records so you can later filter or facet by project. Leave unset if you want the hooks to write into general shared memory. |
-| `MEMORY_HOOK_SCOPE` | `org` | Any non-empty scope string. In practice, stick to scopes your deployment already uses, such as `org`, `personal`, or `private`. | Controls the logical memory scope written by `ingest`. Change this only if you already separate memories by scope. Important: retrieval must use the same scope later. |
+
 | `MEMORY_MCP_SERVER_CMD` | `cargo run --quiet --bin memory_mcp` | Any shell command that starts this MCP server, for example `cargo run --quiet --bin memory_mcp` or `./target/release/memory_mcp` | Use this when you want the hook to start a prebuilt binary, a wrapper script, or a differently located command instead of `cargo run`. |
 | `MEMORY_MCP_SERVER_CWD` | repo root | Directory path | The working directory used when launching `MEMORY_MCP_SERVER_CMD`. Usually keep the default. Change it only if your command depends on relative paths, a nearby `Cargo.toml`, local data files, or `.env` resolution from another directory. |
 
@@ -90,7 +88,7 @@ If SurrealDB env vars are absent, both scripts fall back to local embedded defau
 
 - `SURREALDB_DB_NAME=memory`
 - `SURREALDB_EMBEDDED=true`
-- `SURREALDB_NAMESPACES=$MEMORY_HOOK_SCOPE`
+- `SURREALDB_NAMESPACE=main` (unless already set for the process)
 - `SURREALDB_USERNAME=root`
 - `SURREALDB_PASSWORD=root`
 - `SURREALDB_DATA_DIR=<repo>/data/surrealdb`
@@ -144,13 +142,7 @@ Project-local `.claude/settings.json` example:
 }
 ```
 
-Optional: if you want project tagging, set just one variable:
 
-```bash
-export MEMORY_HOOK_PROJECT="memory_mcp"
-```
-
-If you do not need project-level filtering later, skip even that.
 
 ## Cursor
 
@@ -200,11 +192,11 @@ export const MemoryHooks: Plugin = async ({ $, worktree }) => {
   return {
     event: async ({ event }) => {
       if (event.type === "session.idle") {
-        await $`MEMORY_HOOK_PROJECT=memory_mcp MEMORY_HOOK_CONTENT="OpenCode session became idle" ${worktree}/hooks/memory_stop_hook.sh`
+        await $`MEMORY_HOOK_CONTENT="OpenCode session became idle" ${worktree}/hooks/memory_stop_hook.sh`
       }
     },
     "experimental.session.compacting": async () => {
-      await $`MEMORY_HOOK_PROJECT=memory_mcp MEMORY_HOOK_CONTENT="OpenCode session is compacting" ${worktree}/hooks/memory_precompact_hook.sh`
+      await $`MEMORY_HOOK_CONTENT="OpenCode session is compacting" ${worktree}/hooks/memory_precompact_hook.sh`
     },
   }
 }

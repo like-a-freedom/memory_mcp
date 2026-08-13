@@ -13,10 +13,7 @@ async fn test_promise_detection_extracts_promise_fact() {
         source_id: "PROMISE-1".to_string(),
         content: "I will finish the integration by next Monday.".to_string(),
         t_ref: Utc::now(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 

@@ -80,10 +80,6 @@ pub async fn assemble_context(
 
     let params = pipeline::prepare_context_params(ctx, &request, access).await?;
 
-    if !params.access.is_scope_allowed(&request.scope) {
-        return Ok(vec![]);
-    }
-
     let query_log_diagnostics = logging::QueryLogDiagnostics {
         resolved_view_mode: params.resolved_view_mode_opt.as_deref(),
         query_flags: &params.query_flags.as_labels(),
@@ -96,7 +92,7 @@ pub async fn assemble_context(
         ctx.logger.log(
             log_event(
                 "assemble_context.cache_hit",
-                json!({"scope": request.scope, "query": request.query}),
+                json!({"namespace": params.namespace, "query": request.query}),
                 json!({"count": cached.len()}),
                 Some(&params.access),
                 None,
@@ -122,7 +118,7 @@ pub async fn assemble_context(
     ctx.logger.log(
         log_event(
             "assemble_context.cache_miss",
-            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"namespace": params.namespace, "query": request.query, "budget": request.budget}),
             json!({"status": "computing"}),
             Some(&params.access),
             None,
@@ -135,10 +131,9 @@ pub async fn assemble_context(
         log_event(
             "assemble_context.features",
             json!({
-                "scope": request.scope,
+                "namespace": params.namespace,
                 "query": request.query,
                 "budget": request.budget,
-                "project": params.project_opt,
                 "resolved_view_mode": params.resolved_view_mode_opt,
                 "fact_type_count": params.fact_types.len(),
                 "window_start": request.window_start.map(normalize_dt),
@@ -159,9 +154,7 @@ pub async fn assemble_context(
             build_facets_view(
                 ctx,
                 &params.namespace,
-                &request.scope,
                 params.cutoff,
-                params.project_opt.as_deref(),
                 request.budget,
                 &params.access,
             )
@@ -171,10 +164,7 @@ pub async fn assemble_context(
             build_wake_up_view(
                 ctx,
                 views::FactFilterParams {
-                    namespace: &params.namespace,
-                    scope: &request.scope,
                     cutoff: params.cutoff,
-                    project: params.project_opt.as_deref(),
                     fact_types: &params.fact_types,
                     access: &params.access,
                 },
@@ -184,16 +174,7 @@ pub async fn assemble_context(
             )
             .await?
         }
-        Some("map") => {
-            build_map_view(
-                ctx,
-                &params.namespace,
-                params.cutoff,
-                request.budget,
-                normalize_dt,
-            )
-            .await?
-        }
+        Some("map") => build_map_view(ctx, params.cutoff, request.budget, normalize_dt).await?,
         _ => {
             let query_opt = if params.cleaned_query.is_empty() {
                 None
@@ -209,13 +190,11 @@ pub async fn assemble_context(
                 ctx,
                 DefaultContextParams {
                     namespace: &params.namespace,
-                    scope: &request.scope,
                     cutoff_iso: &params.cutoff_iso,
                     cutoff: params.cutoff,
                     raw_query_opt,
                     query_opt,
                     query_terms: &params.query_terms,
-                    project_opt: params.project_opt.as_deref(),
                     fact_types: &params.fact_types,
                     budget: request.budget,
                     window_start: request.window_start,
@@ -239,10 +218,7 @@ pub async fn assemble_context(
             &mut results,
             ctx,
             RecentExperienceRequest {
-                namespace: &params.namespace,
-                scope: &request.scope,
                 cutoff: params.cutoff,
-                project: params.project_opt.as_deref(),
                 access: &params.access,
                 budget: request.budget,
                 fact_types: &params.fact_types,
@@ -254,7 +230,7 @@ pub async fn assemble_context(
             ctx.logger.log(
                 log_event(
                     "assemble_context.experience_appended",
-                    json!({"scope": request.scope, "query": request.query}),
+                    json!({"namespace": params.namespace, "query": request.query}),
                     json!({"count": appended}),
                     Some(&params.access),
                     None,
@@ -270,10 +246,9 @@ pub async fn assemble_context(
         log_event(
             "assemble_context.results",
             json!({
-                "scope": request.scope,
+                "namespace": params.namespace,
                 "query": request.query,
                 "view_mode": params.resolved_view_mode_opt,
-                "project": params.project_opt,
             }),
             json!({
                 "count": results.len(),
@@ -293,7 +268,7 @@ pub async fn assemble_context(
     ctx.logger.log(
         log_event(
             "assemble_context.cache_set",
-            json!({"scope": request.scope, "query": request.query, "budget": request.budget}),
+            json!({"namespace": params.namespace, "query": request.query, "budget": request.budget}),
             json!({"count": results.len()}),
             Some(&params.access),
             None,
@@ -458,7 +433,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(FallbackTierDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -469,10 +444,8 @@ mod tests {
             &service.build_context(),
             AssembleContextRequest {
                 query: "atlas launch checklist".to_string(),
-                scope: "org".to_string(),
                 as_of: None,
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -564,7 +537,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(EpisodeContentFallbackDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -575,10 +548,8 @@ mod tests {
             &service.build_context(),
             AssembleContextRequest {
                 query: "hello world".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -717,7 +688,7 @@ mod tests {
         });
         let service = crate::service::MemoryService::new(
             db_client.clone(),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -728,10 +699,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "alice atlas".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -755,7 +724,7 @@ mod tests {
         let db_client = Arc::new(crate::service::mock_db::MockDbClient::new());
         let service = crate::service::MemoryService::new(
             db_client.clone(),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -766,10 +735,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "alice platform".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -885,7 +852,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(FusionDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -896,10 +863,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "atlas launch".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1037,7 +1002,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(CommunityRankingDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1048,10 +1013,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "launch workstream".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1208,7 +1171,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(CommunityOriginWeightDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1219,10 +1182,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "launch workstream".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1342,7 +1303,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new_with_embedding_provider(
             Arc::new(SemanticDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1356,10 +1317,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "salary raise".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1433,7 +1392,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             Arc::new(EmptyCommunityFactDbClient),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1444,10 +1403,8 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "orphan community query".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1511,7 +1468,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             db_client,
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1523,14 +1480,12 @@ mod tests {
             crate::models::AssembleContextRequest {
                 query: "Which hotel is better if I want somewhere quieter away from nightlife?"
                     .to_string(),
-                scope: "org".to_string(),
                 as_of: Some(
                     chrono::DateTime::parse_from_rfc3339("2026-02-14T10:00:00Z")
                         .expect("timestamp")
                         .with_timezone(&Utc),
                 ),
                 budget: 1,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -1601,7 +1556,7 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             db_client,
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1612,14 +1567,12 @@ mod tests {
             &service.build_context(),
             crate::models::AssembleContextRequest {
                 query: "Which venue would work best for my conference?".to_string(),
-                scope: "org".to_string(),
                 as_of: Some(
                     chrono::DateTime::parse_from_rfc3339("2026-02-14T10:00:00Z")
                         .expect("timestamp")
                         .with_timezone(&Utc),
                 ),
                 budget: 1,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,

@@ -33,7 +33,7 @@ mod tests {
     async fn ingest_delegates_to_ingestion_service() {
         let t_ref = chrono::Utc::now();
         let expected_id =
-            crate::service::util::deterministic_episode_id("inline", "cap-ingest", t_ref, "org");
+            crate::service::util::deterministic_episode_id_v2("inline", "cap-ingest", t_ref);
         let db = MockDbClient::new()
             .expect_select_one(&expected_id, None)
             .expect_create(&expected_id, serde_json::Value::Null);
@@ -46,10 +46,7 @@ mod tests {
                 source_id: "cap-ingest".into(),
                 content: "hello world".into(),
                 t_ref,
-                scope: "org".into(),
-                project: None,
                 t_ingested: None,
-                visibility_scope: None,
                 policy_tags: vec![],
             },
             None,
@@ -75,10 +72,7 @@ mod tests {
             source_id: "x".into(),
             content: "c".into(),
             t_ref,
-            scope: "org".into(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         };
 

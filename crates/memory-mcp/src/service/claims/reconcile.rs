@@ -113,13 +113,29 @@ pub(crate) struct ReconciliationInput<'a> {
 // ─── Pure Gate Functions ──────────────────────────────────────────────────────
 
 fn same_exact_slot(left: &Claim, right: &Claim, aliases: &ConfirmedAliasSet) -> bool {
-    // Resolve subject aliases: if left.subject_key is a known alias for
-    // right.subject_key (or vice versa), treat them as the same slot.
     let subjects_match = left.subject_key == right.subject_key
         || aliases.resolve(&left.subject_key) == Some(right.subject_key.as_str())
         || aliases.resolve(&right.subject_key) == Some(left.subject_key.as_str());
 
-    left.scope == right.scope
+    if left.identity_version.is_v2() && right.identity_version.is_v2() {
+        if !left.subject.identity_version.is_v2() || !right.subject.identity_version.is_v2() {
+            return false;
+        }
+        let left_subject = aliases
+            .resolve(&left.subject_key)
+            .unwrap_or(left.subject_key.as_str());
+        let right_subject = aliases
+            .resolve(&right.subject_key)
+            .unwrap_or(right.subject_key.as_str());
+        return subjects_match
+            && left.subject.v2_fingerprint_for_subject(left_subject)
+                == right.subject.v2_fingerprint_for_subject(right_subject);
+    }
+
+    // Legacy records retain their historical partition identity. Never use
+    // v2's scope-free semantics to compare a legacy record with another claim.
+    left.identity_version == right.identity_version
+        && left.scope == right.scope
         && left.project_identity == right.project_identity
         && left.access_policy_fingerprint == right.access_policy_fingerprint
         && left.schema_family == right.schema_family
@@ -389,9 +405,9 @@ fn build_relation_draft(
 mod tests {
     use super::*;
     use crate::models::claim::{
-        ClaimCardinality, ClaimSchemaFamily, ClaimSchemaRef, ClaimSlot, ClaimValiditySource,
-        ClaimValue, ComparisonKey, ComparisonKeyHash, ExtractorFingerprint, NormalizedText,
-        PolicyFingerprint, QualifierHash,
+        ClaimCardinality, ClaimIdentityVersion, ClaimSchemaFamily, ClaimSchemaRef, ClaimSlot,
+        ClaimValiditySource, ClaimValue, ComparisonKey, ComparisonKeyHash, ExtractorFingerprint,
+        NormalizedText, PolicyFingerprint, QualifierHash,
     };
     use crate::models::{EpisodeId, FactId};
     use std::collections::BTreeMap;
@@ -441,21 +457,23 @@ mod tests {
         let project_identity = project.unwrap_or("__none__").to_string();
 
         Claim {
+            identity_version: ClaimIdentityVersion::Legacy,
             claim_id: ClaimId::from_raw(format!("claim:{id}")),
             namespace: "test".to_string(),
             source_fact_id: FactId::from(fact_id),
             source_episode_id: EpisodeId::from("ep:test"),
-            scope: scope.to_string(),
+            scope: Some(scope.to_string()),
             project: project.map(String::from),
-            project_identity,
+            project_identity: Some(project_identity),
             policy_tags: vec![],
             access_policy_fingerprint: access_policy_fingerprint.clone(),
             schema_family: ClaimSchemaFamily::Attribute,
             schema_version: 1,
             subject: ClaimSlot {
+                identity_version: ClaimIdentityVersion::Legacy,
                 namespace: "test".to_string(),
-                scope: scope.to_string(),
-                project_identity: project.unwrap_or("__none__").to_string(),
+                scope: Some(scope.to_string()),
+                project_identity: Some(project.unwrap_or("__none__").to_string()),
                 access_policy_fingerprint: access_policy_fingerprint.clone(),
                 schema_ref: schema,
                 subject_key: "entity:s1".to_string(),
@@ -515,6 +533,71 @@ mod tests {
             context_fingerprint: ctx_fp,
             evaluated_at: chrono::Utc::now(),
         }
+    }
+
+    #[test]
+    fn v2_same_exact_slot_ignores_legacy_partition_metadata() {
+        let mut left = make_claim(
+            "a",
+            ClaimValue::Boolean(true),
+            "personal",
+            Some("project-a"),
+            BTreeMap::new(),
+            None,
+            None,
+        );
+        let mut right = make_claim(
+            "b",
+            ClaimValue::Boolean(true),
+            "team",
+            Some("project-b"),
+            BTreeMap::new(),
+            None,
+            None,
+        );
+        let identity_version = ClaimIdentityVersion::V2;
+        let policy_tags = vec!["private".to_string()];
+        let policy = PolicyFingerprint::compute_v2(&policy_tags);
+        left.identity_version = identity_version;
+        right.identity_version = identity_version;
+        left.subject.identity_version = identity_version;
+        right.subject.identity_version = identity_version;
+        left.access_policy_fingerprint = policy.clone();
+        right.access_policy_fingerprint = policy.clone();
+        left.subject.access_policy_fingerprint = policy.clone();
+        right.subject.access_policy_fingerprint = policy;
+        left.project_identity = Some("project-a".to_string());
+        right.project_identity = Some("project-b".to_string());
+        left.subject.project_identity = Some("project-a".to_string());
+        right.subject.project_identity = Some("project-b".to_string());
+        left.slot_fingerprint = left.subject.v2_fingerprint();
+        right.slot_fingerprint = right.subject.v2_fingerprint();
+
+        let input = default_input(&left, &right);
+        assert!(
+            matches!(reconcile(&input), ReconciliationDecision::Persist(draft) if draft.outcome == ClaimRelationOutcome::Duplicate)
+        );
+    }
+
+    #[test]
+    fn legacy_claims_remain_conservative_when_partition_metadata_is_missing() {
+        let claim = make_claim(
+            "a",
+            ClaimValue::Boolean(true),
+            "personal",
+            None,
+            BTreeMap::new(),
+            None,
+            None,
+        );
+        let mut raw = serde_json::to_value(&claim).unwrap();
+        let object = raw.as_object_mut().unwrap();
+        object.remove("identity_version");
+        object.remove("scope");
+        object.remove("project");
+        let decoded: Claim = serde_json::from_value(raw).unwrap();
+        let input = default_input(&claim, &decoded);
+        assert!(matches!(reconcile(&input), ReconciliationDecision::Skip));
     }
 
     #[test]

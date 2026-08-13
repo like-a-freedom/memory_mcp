@@ -207,7 +207,7 @@ temporal change, and disagreement between sources.
 ### Vocabulary
 
 **Active Namespace**:
-The single native SurrealDB namespace selected for one Memory MCP server process. All memory operations in that process use it implicitly; `main` is selected when no override is configured.
+The single native SurrealDB namespace selected for one Memory MCP server process. All memory operations in that process use it implicitly; `main` is selected when no override is configured. This is the implemented runtime language from ADR-0038; compatibility work for historical records and the remaining release gates is tracked in the one-active-namespace plan.
 _Avoid_: Scope, project, collection, basket, tenant, vault, default namespace
 
 **Fact**:
@@ -223,8 +223,8 @@ A persisted, versioned reconciliation decision connecting two claims. Its outcom
 _Avoid_: Claim, unversioned warning
 
 **Claim Slot**:
-The exact comparison boundary formed by access-policy fingerprint, canonical subject, comparison key, and normalized qualifiers within the Active Namespace. Only claims in the same slot are candidates for automatic reconciliation.
-_Avoid_: Fuzzy topic, entity overlap, scope, project
+The exact comparison boundary formed by access-policy fingerprint, canonical subject, compatible claim schema, and comparison key within the Active Namespace. Qualifiers do not define the slot; their differences are evaluated during reconciliation. Only claims in the same slot are candidates for automatic reconciliation.
+_Avoid_: Fuzzy topic, entity overlap, qualifier barrier, scope, project
 
 **Claim Projection**:
 The versioned deterministic derivation of zero or more claims from an immutable source fact. Recomputing a projection may replace the current derived claims in transaction time but does not modify the fact.

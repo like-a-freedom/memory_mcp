@@ -5,7 +5,7 @@
   "suites": [
     {
       "id": "local-retrieval",
-      "expected_coverage": { "exact_cases": 66 }
+      "expected_coverage": { "exact_cases": 61 }
     },
     {
       "id": "extraction",
@@ -13,7 +13,7 @@
     },
     {
       "id": "claim-reconciliation",
-      "expected_coverage": { "exact_cases": 42 }
+      "expected_coverage": { "exact_cases": 41 }
     },
     {
       "id": "lifecycle",

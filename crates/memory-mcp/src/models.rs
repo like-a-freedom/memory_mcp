@@ -24,11 +24,6 @@ pub use provenance::*;
 pub use request::*;
 
 #[must_use]
-pub fn default_scope() -> String {
-    "org".to_string()
-}
-
-#[must_use]
 pub fn default_budget() -> i32 {
     5
 }
@@ -63,11 +58,6 @@ mod tests {
 
         let edge = EdgeId::from("edge:1");
         assert_eq!(edge.0, "edge:1");
-    }
-
-    #[test]
-    fn default_scope_returns_org() {
-        assert_eq!(default_scope(), "org");
     }
 
     #[test]

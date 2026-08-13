@@ -21,7 +21,6 @@ pub(crate) struct EpisodeFallbackParams<'a, F> {
     pub(crate) episodes: Vec<Episode>,
     pub(crate) query_opt: Option<&'a str>,
     pub(crate) semantic_available: bool,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
     pub(crate) window_start: Option<DateTime<Utc>>,
     pub(crate) window_end: Option<DateTime<Utc>>,
@@ -34,7 +33,7 @@ pub(crate) fn build_episode_fallback_items<F>(
     params: EpisodeFallbackParams<'_, F>,
 ) -> Vec<AssembledContextItem>
 where
-    F: FnOnce(Option<&str>, &str, DateTime<Utc>) -> String,
+    F: for<'query> FnOnce(Option<&'query str>, DateTime<Utc>) -> String,
 {
     let mut episodes = params.episodes;
     apply_episode_time_window(&mut episodes, params.window_start, params.window_end);
@@ -56,8 +55,7 @@ where
 
     episodes = dedupe_episode_fallbacks(episodes);
 
-    let rationale_detail =
-        (params.fallback_rationale_fn)(params.query_opt, params.scope, params.cutoff);
+    let rationale_detail = (params.fallback_rationale_fn)(params.query_opt, params.cutoff);
     let query_terms = params
         .query_opt
         .map(crate::service::query::search_query_terms)
@@ -205,16 +203,14 @@ fn apply_episode_time_window(
 
 pub(crate) async fn build_facets_view(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
-    scope: &str,
+    _namespace: &str,
     cutoff: DateTime<Utc>,
-    project: Option<&str>,
     budget: i32,
     access: &AccessPayload,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("episode", namespace)
+        .select_table("episode")
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
@@ -227,10 +223,9 @@ pub(crate) async fn build_facets_view(
         let Some(episode) = crate::service::episode::episode_from_record(map) else {
             continue;
         };
-        if episode.scope != scope
-            || episode.t_ref > cutoff
+        if episode.t_ref > cutoff
             || episode.t_ingested > cutoff
-            || !episode_record_allowed(&record, access, project)
+            || !episode_record_allowed(&record, access)
         {
             continue;
         }
@@ -241,7 +236,7 @@ pub(crate) async fn build_facets_view(
             .filter(|value| !value.trim().is_empty())
             .map(ToString::to_string)
             .or_else(|| episode.policy_tags.first().cloned())
-            .unwrap_or_else(|| scope.to_string());
+            .unwrap_or_else(|| "uncategorized".to_string());
 
         buckets
             .entry(label)
@@ -276,7 +271,7 @@ pub(crate) async fn build_facets_view(
                     "count": count,
                     "max_t_ingested": crate::service::normalize_dt(latest),
                 }),
-                rationale: "view_mode=facets grouped episodes by project/policy/scope".to_string(),
+                rationale: "view_mode=facets grouped episodes by policy tags".to_string(),
                 retrieval_tier: None,
                 ..Default::default()
             }
@@ -286,7 +281,7 @@ pub(crate) async fn build_facets_view(
     service.logger.log(
         log_event(
             "assemble_context.facets_view",
-            json!({"scope": scope, "project": project}),
+            json!({}),
             json!({"count": items.len()}),
             Some(access),
             None,
@@ -299,10 +294,7 @@ pub(crate) async fn build_facets_view(
 }
 
 pub(crate) struct FactFilterParams<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
-    pub(crate) project: Option<&'a str>,
     pub(crate) fact_types: &'a [String],
     pub(crate) access: &'a AccessPayload,
 }
@@ -316,16 +308,14 @@ pub(crate) async fn build_wake_up_view(
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("fact", params.namespace)
+        .select_table("fact")
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
-    let mut facts =
-        filter_facts_by_constraints(records, params.access, params.project, params.fact_types)
-            .into_iter()
-            .filter(|fact| fact.scope == params.scope)
-            .filter(|fact| fact_is_active_at(fact, params.cutoff))
-            .collect::<Vec<_>>();
+    let mut facts = filter_facts_by_constraints(records, params.access, params.fact_types)
+        .into_iter()
+        .filter(|fact| fact_is_active_at(fact, params.cutoff))
+        .collect::<Vec<_>>();
 
     facts.sort_by(|left, right| {
         let left_persona = left.policy_tags.iter().any(|tag| tag == "persona");
@@ -375,9 +365,11 @@ pub(crate) async fn build_wake_up_view(
     service.logger.log(
         log_event(
             "assemble_context.wake_up_view",
-            json!({"scope": params.scope, "project": params.project, "fact_type_count": params.fact_types.len()}),
+            json!({"fact_type_count": params.fact_types.len()}),
             json!({"count": items.len(), "persona_count": persona_count}),
-            Some(params.access), None, None,
+            Some(params.access),
+            None,
+            None,
         ),
         LogLevel::Debug,
     );
@@ -387,26 +379,24 @@ pub(crate) async fn build_wake_up_view(
 
 pub(crate) async fn build_map_view(
     service: &crate::service::service_context::ServiceContext,
-    namespace: &str,
     cutoff: DateTime<Utc>,
     budget: i32,
     normalize_dt_fn: impl Fn(DateTime<Utc>) -> String,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let hub_entities = crate::service::apps::graph::find_hub_entities(
         service,
-        namespace,
         cutoff,
         budget,
         crate::service::apps::graph::GraphTraversalBudget::FULL,
     )
     .await?;
     let communities =
-        crate::service::apps::graph::list_communities(service, namespace, cutoff, budget).await?;
+        crate::service::apps::graph::list_communities(service, cutoff, budget).await?;
 
     service.logger.log(
         log_event(
             "assemble_context.map_view",
-            json!({"namespace": namespace, "budget": budget}),
+            json!({"budget": budget}),
             json!({"hub_entities": hub_entities.len(), "communities": communities.len()}),
             None,
             None,
@@ -471,11 +461,7 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
 
-    fn fallback_rationale(
-        _query_opt: Option<&str>,
-        _scope: &str,
-        _cutoff: DateTime<Utc>,
-    ) -> String {
+    fn fallback_rationale(_query_opt: Option<&str>, _cutoff: DateTime<Utc>) -> String {
         "fallback".to_string()
     }
 
@@ -509,7 +495,6 @@ mod tests {
             ],
             query_opt: Some("platform planning notes july 2025"),
             semantic_available: false,
-            scope: "org",
             cutoff,
             window_start: None,
             window_end: None,
@@ -576,7 +561,6 @@ mod tests {
             ],
             query_opt: Some("release checklist archive review"),
             semantic_available: false,
-            scope: "org",
             cutoff,
             window_start: None,
             window_end: None,
@@ -620,7 +604,6 @@ mod tests {
             ],
             query_opt: Some("release checklist archive review"),
             semantic_available: false,
-            scope: "org",
             cutoff,
             window_start: None,
             window_end: None,

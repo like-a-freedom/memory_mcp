@@ -38,7 +38,6 @@ pub struct ExternalCase {
     pub dataset: String,
     pub description: String,
     pub query: String,
-    pub scope: String,
     pub budget: i32,
     pub facts: Vec<SeedFact>,
     pub expected: RetrievalExpectation,
@@ -184,7 +183,6 @@ fn normalize_longmemeval_record(record: LongMemEvalRecord) -> Result<ExternalCas
         dataset,
         description: format!("{} [{}]", record.question, record.question_type),
         query: record.question.clone(),
-        scope: "org".to_string(),
         budget: 5,
         facts,
         expected: RetrievalExpectation {
@@ -330,7 +328,6 @@ fn normalize_locomo_record(
                 dataset: dataset.clone(),
                 description: format!("{} [category={}]", qa.question, qa.category),
                 query: qa.question,
-                scope: "org".to_string(),
                 budget: 5,
                 facts: facts.clone(),
                 expected: RetrievalExpectation {
@@ -524,7 +521,6 @@ fn normalize_personamem_question(
             question.user_question_or_message, question.question_type
         ),
         query: question.user_question_or_message,
-        scope: "org".to_string(),
         budget: 5,
         facts,
         expected: RetrievalExpectation {
@@ -604,7 +600,6 @@ fn normalize_prefeval_record(
         dataset,
         description: format!("{} [{}]", record.question, track),
         query: record.question,
-        scope: "org".to_string(),
         budget: 5,
         facts,
         expected: RetrievalExpectation {

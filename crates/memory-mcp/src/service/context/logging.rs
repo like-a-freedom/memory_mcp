@@ -55,13 +55,7 @@ pub(crate) async fn record_query_log(
     latency_ms: f64,
     diagnostics: &QueryLogDiagnostics<'_>,
 ) -> Result<(), MemoryError> {
-    let namespace = service.namespace_for_scope(&request.scope)?;
     let logged_at = crate::service::query::now();
-    let project = request
-        .project
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
     let view_mode = request
         .view_mode
         .as_deref()
@@ -84,10 +78,8 @@ pub(crate) async fn record_query_log(
     let record_id = format!(
         "query_log:{}",
         crate::service::hash_prefix(&format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
-            crate::service::normalize_text(&request.scope),
+            "{}|{}|{}|{}|{}|{}|{}|{}",
             crate::service::normalize_text(&request.query),
-            crate::service::normalize_text(project.unwrap_or_default()),
             crate::service::normalize_text(view_mode.unwrap_or_default()),
             crate::service::normalize_text(resolved_view_mode.unwrap_or_default()),
             crate::service::normalize_text(&query_flags.join(",")),
@@ -104,16 +96,12 @@ pub(crate) async fn record_query_log(
             "logged_at".to_string(),
             json!(crate::service::normalize_dt(logged_at)),
         ),
-        ("scope".to_string(), json!(request.scope.clone())),
         ("query".to_string(), json!(request.query.clone())),
         ("result_count".to_string(), json!(results.len() as i64)),
         ("latency_ms".to_string(), json!(latency_ms)),
         ("cache_hit".to_string(), json!(cache_hit)),
     ]);
 
-    if let Some(project) = project {
-        payload.insert("project".to_string(), json!(project));
-    }
     if let Some(view_mode) = view_mode {
         payload.insert("view_mode".to_string(), json!(view_mode));
     }
@@ -133,7 +121,7 @@ pub(crate) async fn record_query_log(
 
     service
         .context_access_log()
-        .create(&record_id, Value::Object(payload), &namespace)
+        .create(&record_id, Value::Object(payload))
         .await?;
 
     Ok(())
@@ -153,7 +141,7 @@ pub(crate) async fn maybe_record_query_log(
             log_event(
                 "assemble_context.query_log_skipped",
                 json!({
-                    "scope": request.scope,
+                    "namespace": service.active_namespace,
                     "query": request.query,
                     "cache_hit": cache_hit,
                 }),
@@ -182,7 +170,7 @@ pub(crate) async fn maybe_record_query_log(
                 log_event(
                     "assemble_context.query_log_recorded",
                     json!({
-                        "scope": request.scope,
+                        "namespace": service.active_namespace,
                         "query": request.query,
                         "cache_hit": cache_hit,
                     }),
@@ -200,13 +188,13 @@ pub(crate) async fn maybe_record_query_log(
                 LogLevel::Debug,
             );
 
-            match prune_expired_query_logs(service, &request.scope).await {
+            match prune_expired_query_logs(service).await {
                 Ok(pruned_count) if pruned_count > 0 => {
                     service.logger.log(
                         log_event(
                             "assemble_context.query_log_pruned",
                             json!({
-                                "scope": request.scope,
+                                "namespace": service.active_namespace,
                                 "retention_days": service.query_log_retention_days(),
                             }),
                             json!({"count": pruned_count}),
@@ -223,7 +211,7 @@ pub(crate) async fn maybe_record_query_log(
                         log_event(
                             "assemble_context.query_log_prune_error",
                             json!({
-                                "scope": request.scope,
+                                "namespace": service.active_namespace,
                                 "retention_days": service.query_log_retention_days(),
                             }),
                             json!({"error": err.to_string()}),
@@ -241,7 +229,7 @@ pub(crate) async fn maybe_record_query_log(
                 log_event(
                     "assemble_context.query_log_error",
                     json!({
-                        "scope": request.scope,
+                        "namespace": service.active_namespace,
                         "query": request.query,
                         "cache_hit": cache_hit,
                     }),
@@ -258,9 +246,7 @@ pub(crate) async fn maybe_record_query_log(
 
 async fn prune_expired_query_logs(
     service: &crate::service::service_context::ServiceContext,
-    scope: &str,
 ) -> Result<usize, MemoryError> {
-    let namespace = service.namespace_for_scope(scope)?;
     let cutoff = crate::service::query::now()
         - chrono::Duration::days(i64::from(service.query_log_retention_days()));
     let deleted = service
@@ -268,7 +254,6 @@ async fn prune_expired_query_logs(
         .query(
             "DELETE query_log WHERE logged_at IS NOT NONE AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
             Some(json!({"cutoff": crate::service::normalize_dt(cutoff)})),
-            &namespace,
         )
         .await?;
 

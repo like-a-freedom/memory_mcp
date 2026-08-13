@@ -19,9 +19,6 @@ pub(super) struct RetrievalEvalCase {
     #[allow(dead_code)]
     pub(super) description: String,
     pub(super) query: String,
-    pub(super) scope: String,
-    #[serde(default)]
-    pub(super) project: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
     pub(super) tags: Vec<String>,
@@ -41,8 +38,6 @@ pub(super) struct RetrievalEvalCase {
 pub(super) struct SeedFact {
     pub(super) content: String,
     pub(super) t_valid: String,
-    #[serde(default)]
-    pub(super) project: Option<String>,
     #[serde(default)]
     pub(super) source_id: Option<String>,
     #[serde(default)]

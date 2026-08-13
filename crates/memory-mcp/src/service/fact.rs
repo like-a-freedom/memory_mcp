@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{FactId, Provenance};
-use crate::service::cache::invalidate_cache_by_scope;
+use crate::service::cache::invalidate_cache;
 use crate::service::error::MemoryError;
 use crate::service::util::{deterministic_fact_id, validate_fact_input};
 #[cfg(test)]
@@ -61,20 +61,17 @@ impl FactService {
         quote: &str,
         source_episode: &str,
         t_valid: DateTime<Utc>,
-        scope: &str,
         confidence: f64,
         entity_links: &[String],
         policy_tags: &[String],
         provenance: &Provenance,
-        namespace: &str,
-        project: Option<&str>,
         embedding_fields: Option<EmbeddingPayload>,
         index_keys: Vec<String>,
     ) -> Result<String, MemoryError> {
-        validate_fact_input(fact_type, content, quote, source_episode, scope)?;
+        validate_fact_input(fact_type, content, quote, source_episode, "")?;
 
         let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
-        let existing = self.db.select_one(&fact_id, namespace).await?;
+        let existing = self.db.select_one(&fact_id).await?;
         if existing.is_some() {
             return Ok(fact_id);
         }
@@ -92,13 +89,9 @@ impl FactService {
             ("index_keys".to_string(), json!(index_keys)),
             ("access_count".to_string(), json!(0)),
             ("entity_links".to_string(), json!(entity_links)),
-            ("scope".to_string(), json!(scope)),
             ("policy_tags".to_string(), json!(policy_tags)),
             ("provenance".to_string(), provenance.to_json_value()),
         ]);
-        if let Some(project) = project {
-            payload.insert("project".to_string(), json!(project));
-        }
         if let Some(ep) = embedding_fields {
             payload.insert("embedding".to_string(), json!(ep.embedding));
             payload.insert("embedding_provider".to_string(), json!(ep.provider));
@@ -112,10 +105,7 @@ impl FactService {
             payload.insert("embedding_updated_at".to_string(), json!(ep.updated_at));
         }
 
-        let created = self
-            .db
-            .create(&fact_id, Value::Object(payload), namespace)
-            .await?;
+        let created = self.db.create(&fact_id, Value::Object(payload)).await?;
         if created.is_null() {
             return Err(MemoryError::Storage(
                 "failed to persist fact record".to_string(),
@@ -186,12 +176,11 @@ impl FactService {
 // ─── Fact creation orchestration ───────────────────────────────────────────
 //
 // `add_fact` orchestrates the full fact-creation pipeline: validation,
-// namespace resolution, index-key building, embedding generation (with
-// transient-failure background retry), fact persistence, cache
-// invalidation, triple extraction, and claim projection. It lives on
-// `FactService` but takes `&ServiceContext` as the seam that bundles the
-// infrastructure handles (embedding service, entity lookups, claim service,
-// logger, namespaces) it needs.
+// index-key building, embedding generation (with transient-failure background
+// retry), fact persistence, cache invalidation, triple extraction, and claim
+// projection. It lives on `FactService` but takes `&ServiceContext` as the seam
+// that bundles the infrastructure handles (embedding service, entity lookups,
+// claim service, logger, and the bound Active Namespace) it needs.
 
 impl FactService {
     /// Adds a new fact, orchestrating embedding generation, triple extraction,
@@ -209,16 +198,16 @@ impl FactService {
         quote: &str,
         source_episode: &str,
         t_valid: DateTime<Utc>,
-        scope: &str,
         confidence: f64,
         entity_links: Vec<String>,
         policy_tags: Vec<String>,
         provenance: Provenance,
     ) -> Result<String, MemoryError> {
-        validate_fact_input(fact_type, content, quote, source_episode, scope)?;
+        validate_fact_input(fact_type, content, quote, source_episode, "")?;
 
-        let namespace = ctx.namespace_for_scope(scope)?;
-        let project = ctx.project_for_source_episode(source_episode).await?;
+        // Storage routing comes from the process-bound stores in the context;
+        // this value is retained only for derived job/diagnostic metadata.
+        let namespace = ctx.active_namespace.clone();
 
         // Pre-fetch linked entity records in a single batch query per namespace,
         // avoiding O(N) round-trips. Returns None for missing IDs.
@@ -298,33 +287,26 @@ impl FactService {
                 quote,
                 source_episode,
                 t_valid,
-                scope,
                 confidence,
                 &entity_links,
                 &policy_tags,
                 &provenance,
-                &namespace,
-                project.as_deref(),
                 embedding_fields,
                 index_keys,
             )
             .await?;
 
         // Invalidate caches immediately after ingestion to ensure isolation.
-        invalidate_cache_by_scope(&ctx.context_cache, scope).await;
+        invalidate_cache(&ctx.context_cache).await;
 
         // Background processes: triple extraction and pending embedding retries.
-        crate::service::episode::triples::spawn_triple_extraction(
-            ctx, &fact_id, content, &namespace,
-        );
+        crate::service::episode::triples::spawn_triple_extraction(ctx, &fact_id, content);
 
         // Synchronous claim projection for deterministic extract visibility.
         let claim_svc = ctx.claim_service.clone();
         let claim_fact_id = FactId::from(fact_id.clone());
         let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
         let claim_content = content.to_string();
-        let claim_scope = scope.to_string();
-        let claim_project = project.clone();
         let claim_entity_links = entity_links.clone();
         let claim_t_valid = t_valid;
         let claim_params = crate::service::claims::project::FactPersistedParams {
@@ -333,8 +315,6 @@ impl FactService {
             source_episode_id: &claim_episode_id,
             fact_type,
             content: &claim_content,
-            scope: &claim_scope,
-            project: claim_project.as_deref(),
             policy_tags: &policy_tags,
             entity_links: &claim_entity_links,
             t_valid: claim_t_valid,
@@ -439,7 +419,7 @@ mod tests {
             &fact_id,
             json!({"fact_id": fact_id.clone(), "status": "ok"}),
         );
-        let svc = FactService::new(FactStoreClient::new(Arc::new(db)));
+        let svc = FactService::new(FactStoreClient::new(Arc::new(db), "org"));
         let provenance = Provenance::agent_observation("episode:test");
 
         let fact_id = svc
@@ -449,13 +429,10 @@ mod tests {
                 "hello",
                 "episode:test",
                 t,
-                "org",
                 0.9,
                 &[],
                 &[],
                 &provenance,
-                "org",
-                None,
                 None,
                 vec![],
             )
@@ -471,7 +448,7 @@ mod tests {
         let fact_id = deterministic_fact_id("note", "dup", "episode:test", t);
         let db = MockDbClient::new()
             .expect_select_one(&fact_id, Some(json!({"fact_id": fact_id.clone()})));
-        let svc = FactService::new(FactStoreClient::new(Arc::new(db)));
+        let svc = FactService::new(FactStoreClient::new(Arc::new(db), "org"));
         let provenance = Provenance::agent_observation("episode:test");
 
         let result = svc
@@ -481,13 +458,10 @@ mod tests {
                 "dup",
                 "episode:test",
                 t,
-                "org",
                 0.9,
                 &[],
                 &[],
                 &provenance,
-                "org",
-                None,
                 None,
                 vec![],
             )

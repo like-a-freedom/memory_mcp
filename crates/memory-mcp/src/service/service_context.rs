@@ -32,8 +32,7 @@ use crate::storage::DbClient;
 /// [`EmbeddingService`], and triple extraction in `episode::triples`.
 pub struct ServiceContext {
     pub(crate) db_client: Arc<dyn DbClient>,
-    pub(crate) namespaces: Vec<String>,
-    pub(crate) default_namespace: String,
+    pub(crate) active_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
     pub(crate) ingestion_service: IngestionService,
@@ -55,7 +54,7 @@ pub struct ServiceContext {
 }
 
 impl ServiceContext {
-    /// Scans all namespaces for a record by its ID, returning the payload and owning namespace.
+    /// Looks up a record in the process-bound Active Namespace.
     pub(crate) async fn find_record_by_id(
         &self,
         record_id: &str,
@@ -66,17 +65,12 @@ impl ServiceContext {
         ),
         MemoryError,
     > {
-        // Validate the record-id shape up-front so callers can't mask bugs as
-        // silent 'not found' by passing bare hex (the query builder used to
-        // turn such inputs into a no-op SELECT).
         crate::storage::validate_record_id(record_id)?;
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(record_id, namespace).await?;
-            if let Some(serde_json::Value::Object(map)) = record {
-                return Ok((Some(map), Some(namespace.clone())));
-            }
-        }
-        Ok((None, None))
+        let record = self.app_store().select_record(record_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.active_namespace.clone()),
+        ))
     }
 
     /// Enforces rate limit based on the caller ID in the access payload.
@@ -91,11 +85,6 @@ impl ServiceContext {
             return Err(MemoryError::Validation("rate limit exceeded".into()));
         }
         Ok(())
-    }
-
-    /// Returns the namespace for a given scope.
-    pub(crate) fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
-        crate::service::MemoryScope::parse(scope)?.namespace(&self.namespaces)
     }
 
     /// Returns the episode record for the given episode ID.
@@ -181,24 +170,41 @@ impl ServiceContext {
 
     /// Returns the context store handle (the db client).
     pub(crate) fn context_store(&self) -> crate::storage::ContextStoreClient {
-        crate::storage::ContextStoreClient::new(self.db_client.clone())
+        crate::storage::ContextStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
-    /// Returns the context access log handle (the db client).
+    /// Returns the context access log handle bound to the Active Namespace.
     pub(crate) fn context_access_log(&self) -> crate::storage::ContextAccessLogClient {
-        crate::storage::ContextAccessLogClient::new(self.db_client.clone())
+        crate::storage::ContextAccessLogClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
+    }
+
+    /// Returns the app store handle bound to the Active Namespace.
+    pub(crate) fn app_store(&self) -> crate::storage::AppStoreClient {
+        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    }
+
+    /// Returns the fact store handle bound to the Active Namespace.
+    pub(crate) fn fact_store(&self) -> crate::storage::FactStoreClient {
+        crate::storage::FactStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
     /// Returns the episode store handle (the db client).
     pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
-        crate::storage::EpisodeStoreClient::new(self.db_client.clone())
+        crate::storage::EpisodeStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
-    /// Batch-fetch entity records by IDs across all namespaces.
+    /// Batch-fetch entity records by IDs in the Active Namespace.
     ///
-    /// Returns a map of entity ID to (canonical_name, aliases). Missing IDs are
-    /// omitted from the result (caller checks `map.get`).Namespace precedence
-    /// follows `self.namespaces` order: first namespace containing the ID wins.
+    /// Missing IDs are omitted from the result (caller checks `map.get`).
     pub(crate) async fn find_entity_records_by_ids(
         &self,
         entity_ids: &[String],
@@ -208,66 +214,42 @@ impl ServiceContext {
         if entity_ids.is_empty() {
             return Ok(result);
         }
-        let names = entity_ids.to_vec();
-        for namespace in &self.namespaces {
-            let sql =
-                "SELECT entity_id, canonical_name, aliases FROM entity WHERE entity_id IN $ids";
-            let rows = self
-                .db_client
-                .query(
-                    sql,
-                    Some(serde_json::json!({ "ids": names.clone() })),
-                    namespace,
-                )
-                .await?;
-            if let serde_json::Value::Array(rows) = rows {
-                for row in rows {
-                    let serde_json::Value::Object(map) = row else {
-                        continue;
-                    };
-                    let entity_id = map
-                        .get("entity_id")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_string();
-                    let canonical = map
-                        .get("canonical_name")
-                        .and_then(Value::as_str)
-                        .unwrap_or(entity_id.as_str())
-                        .to_string();
-                    let aliases = map
-                        .get("aliases")
-                        .and_then(Value::as_array)
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(Value::as_str)
-                                .map(str::to_string)
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    result.entry(entity_id).or_insert((canonical, aliases));
-                }
+        let rows = self.app_store().select_entities_by_ids(entity_ids).await?;
+        {
+            for row in rows {
+                let serde_json::Value::Object(map) = row else {
+                    continue;
+                };
+                let entity_id = map
+                    .get("entity_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
+                let canonical = map
+                    .get("canonical_name")
+                    .and_then(Value::as_str)
+                    .unwrap_or(entity_id.as_str())
+                    .to_string();
+                let aliases = map
+                    .get("aliases")
+                    .and_then(Value::as_array)
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                result.entry(entity_id).or_insert((canonical, aliases));
             }
         }
         Ok(result)
-    }
-
-    /// Returns the project associated with a source episode, if any.
-    pub(crate) async fn project_for_source_episode(
-        &self,
-        source_episode: &str,
-    ) -> Result<Option<String>, MemoryError> {
-        let (record, _) = self.find_episode_record(source_episode).await?;
-        Ok(record
-            .as_ref()
-            .and_then(|map| map.get("project"))
-            .and_then(crate::service::value_helpers::string_from_value))
     }
 }
 
 impl crate::service::apps::graph::GraphContext for ServiceContext {
     fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone())
+        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger

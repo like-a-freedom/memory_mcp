@@ -173,14 +173,8 @@ mod tests {
             .apply_migrations_impl("test")
             .await
             .expect("migrations");
-        MemoryService::new(
-            db_client,
-            vec!["test".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .expect("create service")
+        MemoryService::new(db_client, "test".to_string(), "warn".to_string(), 50, 100)
+            .expect("create service")
     }
 
     #[tokio::test]

@@ -36,8 +36,6 @@ pub async fn assemble_context(
     let window_end = params.window_end.as_deref().and_then(parse_datetime);
     let request = AssembleContextRequest {
         query: params.query,
-        scope: params.scope,
-        project: params.project,
         fact_types: params.fact_types,
         as_of,
         budget: params.budget,
@@ -52,7 +50,7 @@ pub async fn assemble_context(
     let request_id = next_request_id();
     ctx.log_tool_event(
         "assemble_context.start",
-        json!({"scope": request.scope, "query": request.query}),
+        json!({"query": request.query}),
         json!({}),
         LogLevel::Info,
         Some(&request_id),

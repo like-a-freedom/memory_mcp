@@ -13,7 +13,6 @@ use super::query_mode::query_phrase_candidates;
 pub(crate) async fn expand_query_with_aliases(
     service: &crate::service::service_context::ServiceContext,
     query: &str,
-    namespace: &str,
 ) -> Vec<String> {
     let terms: Vec<&str> = query.split_whitespace().collect();
     if terms.is_empty() {
@@ -47,7 +46,7 @@ pub(crate) async fn expand_query_with_aliases(
     // Single batch query instead of O(N²) individual lookups
     let entities = service
         .context_store()
-        .select_entities_batch(namespace, &normalized_names)
+        .select_entities_batch(&normalized_names)
         .await
         .unwrap_or_default();
 
@@ -112,9 +111,8 @@ pub(crate) async fn expand_query_with_aliases(
 pub(crate) async fn expand_query_with_aliases_for_test(
     service: &crate::service::service_context::ServiceContext,
     query: &str,
-    namespace: &str,
 ) -> Vec<String> {
-    expand_query_with_aliases(service, query, namespace).await
+    expand_query_with_aliases(service, query).await
 }
 
 #[cfg(test)]
@@ -165,19 +163,15 @@ mod tests {
 
         let service = crate::service::MemoryService::new(
             db_client,
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
         )
         .expect("service");
 
-        let expanded = expand_query_with_aliases_for_test(
-            &service.build_context(),
-            "alice smith atlas",
-            "org",
-        )
-        .await;
+        let expanded =
+            expand_query_with_aliases_for_test(&service.build_context(), "alice smith atlas").await;
 
         assert!(
             expanded.iter().any(|query| query == "alice s. atlas"),

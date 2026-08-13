@@ -9,7 +9,7 @@
 use memory_mcp::storage::EventProjectionJobRecord;
 use memory_mcp::storage::MemoryCaptureAuditRecord;
 use memory_mcp::storage::MemoryEventRecord;
-use memory_mcp::storage::{AgentMemoryStore, SurrealDbClient};
+use memory_mcp::storage::{AgentMemoryStore, DbClient, SurrealDbClient};
 
 async fn setup_client() -> SurrealDbClient {
     let client = SurrealDbClient::connect_in_memory("test_db", "test", "warn")
@@ -33,8 +33,6 @@ fn make_event(event_id: &str, disposition: &str) -> MemoryEventRecord {
         event_kind: "post_tool_result".to_string(),
         task_fingerprint: "task:1".to_string(),
         normalized_task: Some("do work".to_string()),
-        scope: "org".to_string(),
-        project: Some("copper-palm".to_string()),
         policy_tags: vec![],
         capture_signal: Some("verified_success".to_string()),
         disposition: disposition.to_string(),
@@ -60,8 +58,6 @@ fn make_job(job_id: &str, event_id: &str) -> EventProjectionJobRecord {
         job_id: job_id.to_string(),
         event_id: event_id.to_string(),
         episode_id: Some("episode:1".to_string()),
-        scope: "org".to_string(),
-        project: Some("copper-palm".to_string()),
         status: "pending".to_string(),
         attempts: 0,
         max_attempts: 5,
@@ -79,22 +75,19 @@ fn make_job(job_id: &str, event_id: &str) -> EventProjectionJobRecord {
 #[tokio::test]
 async fn accepted_event_creates_one_event_and_job() {
     let client = setup_client().await;
-    let store = AgentMemoryStore::new(std::sync::Arc::new(client));
+    let store = AgentMemoryStore::new(std::sync::Arc::new(client), "test");
 
     let event = make_event("evt-1", "accepted");
-    store
-        .create_event(&event, "test")
-        .await
-        .expect("create event");
+    store.create_event(&event).await.expect("create event");
 
     let job = make_job("job-1", "evt-1");
-    store.create_job(&job, "test").await.expect("create job");
+    store.create_job(&job).await.expect("create job");
 
-    let loaded = store.load_event("evt-1", "test").await.expect("load event");
+    let loaded = store.load_event("evt-1").await.expect("load event");
     assert!(loaded.is_some());
     assert_eq!(loaded.unwrap().disposition, "accepted");
 
-    let loaded_job = store.load_job("job-1", "test").await.expect("load job");
+    let loaded_job = store.load_job("job-1").await.expect("load job");
     assert!(loaded_job.is_some());
     assert_eq!(loaded_job.unwrap().status, "pending");
 }
@@ -102,17 +95,14 @@ async fn accepted_event_creates_one_event_and_job() {
 #[tokio::test]
 async fn duplicate_event_load_returns_existing() {
     let client = setup_client().await;
-    let store = AgentMemoryStore::new(std::sync::Arc::new(client));
+    let store = AgentMemoryStore::new(std::sync::Arc::new(client), "test");
 
     let event = make_event("evt-dup", "accepted");
-    store
-        .create_event(&event, "test")
-        .await
-        .expect("first create");
+    store.create_event(&event).await.expect("first create");
 
     // Loading the same ID returns the existing record, so the caller can
     // detect the duplicate.
-    let existing = store.load_event("evt-dup", "test").await.expect("load");
+    let existing = store.load_event("evt-dup").await.expect("load");
     assert!(existing.is_some());
     assert_eq!(existing.unwrap().event_id, "evt-dup");
 }
@@ -120,7 +110,7 @@ async fn duplicate_event_load_returns_existing() {
 #[tokio::test]
 async fn rejected_secret_creates_audit_without_raw_content() {
     let client = setup_client().await;
-    let store = AgentMemoryStore::new(std::sync::Arc::new(client));
+    let store = AgentMemoryStore::new(std::sync::Arc::new(client), "test");
 
     let audit = MemoryCaptureAuditRecord {
         audit_id: "audit-1".to_string(),
@@ -129,18 +119,13 @@ async fn rejected_secret_creates_audit_without_raw_content() {
         content_byte_len: 24,
         disposition: "rejected".to_string(),
         reason_codes: vec!["secret_like_content".to_string()],
-        scope: "org".to_string(),
-        project: Some("copper-palm".to_string()),
         created_at: "2026-07-23T00:00:00Z".to_string(),
         expires_at: Some("2026-08-22T00:00:00Z".to_string()),
     };
-    store
-        .create_audit(&audit, "test")
-        .await
-        .expect("create audit");
+    store.create_audit(&audit).await.expect("create audit");
 
     let loaded = store
-        .load_audit_by_event("evt-reject", "test")
+        .load_audit_by_event("evt-reject")
         .await
         .expect("load audit");
     assert!(loaded.is_some());
@@ -168,9 +153,29 @@ async fn fresh_db_migration_passes() {
         .await
         .expect("migrations on fresh db");
 
+    let migration_rows = client
+        .select_table("script_migration", "test")
+        .await
+        .expect("migration ledger should be queryable");
+    assert!(
+        !migration_rows.is_empty(),
+        "migration ledger should not be empty"
+    );
+    assert!(migration_rows.iter().all(|row| {
+        row.get("status").and_then(serde_json::Value::as_str) == Some("applied")
+            && row
+                .get("script_name")
+                .and_then(serde_json::Value::as_str)
+                .is_some()
+            && row
+                .get("checksum")
+                .and_then(serde_json::Value::as_str)
+                .is_some()
+    }));
+
     // Verify the new tables are queryable.
-    let store = AgentMemoryStore::new(std::sync::Arc::new(client));
-    let result = store.load_event("nonexistent", "test").await;
+    let store = AgentMemoryStore::new(std::sync::Arc::new(client), "test");
+    let result = store.load_event("nonexistent").await;
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
 }
@@ -189,7 +194,7 @@ async fn lifecycle_capture_wiring_returns_none_when_disabled() {
         .expect("migrations");
     let service = memory_mcp::MemoryService::new(
         std::sync::Arc::new(client),
-        vec!["org".to_string()],
+        "org".to_string(),
         "warn".to_string(),
         50,
         100,
@@ -211,7 +216,7 @@ async fn lifecycle_capture_wiring_returns_capture_when_enabled() {
         .expect("migrations");
     let service = memory_mcp::MemoryService::new(
         std::sync::Arc::new(client),
-        vec!["org".to_string()],
+        "org".to_string(),
         "warn".to_string(),
         50,
         100,

@@ -66,10 +66,15 @@ impl RotaryCache {
     /// Returns `(cos, sin)` of shape `[seq_len, head_dim / 2]` — the exact input
     /// contract of `candle_nn::rope`.
     fn cos_sin(&self, seq_len: usize, device: &Device) -> candle_core::Result<(Tensor, Tensor)> {
-        if let Some((cached_len, cos, sin)) = self.cache.lock().unwrap().as_ref()
-            && *cached_len == seq_len
         {
-            return Ok((cos.clone(), sin.clone()));
+            let cache = self.cache.lock().map_err(|_| {
+                candle_core::Error::Msg("RoPE cache mutex poisoned while reading".to_string())
+            })?;
+            if let Some((cached_len, cos, sin)) = cache.as_ref()
+                && *cached_len == seq_len
+            {
+                return Ok((cos.clone(), sin.clone()));
+            }
         }
         let positions =
             Tensor::arange(0u32, seq_len as u32, device)?.to_dtype(candle_core::DType::F32)?;
@@ -78,7 +83,10 @@ impl RotaryCache {
             .matmul(&self.inv_freq.unsqueeze(0)?)?;
         let cos = freqs.cos()?;
         let sin = freqs.sin()?;
-        *self.cache.lock().unwrap() = Some((seq_len, cos.clone(), sin.clone()));
+        let mut cache = self.cache.lock().map_err(|_| {
+            candle_core::Error::Msg("RoPE cache mutex poisoned while writing".to_string())
+        })?;
+        *cache = Some((seq_len, cos.clone(), sin.clone()));
         Ok((cos, sin))
     }
 }

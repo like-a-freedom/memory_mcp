@@ -9,8 +9,9 @@ pub struct EvaluatedRelation {
     pub right_fact_id: String,
     pub outcome: ClaimRelationOutcome,
     pub reason_code: String,
-    pub scope: String,
-    pub project: Option<String>,
+    /// The Active Namespace associated with this eval relation.
+    pub namespace: String,
+    /// Active policy identity derived from policy tags.
     pub policy_fingerprint: String,
 }
 
@@ -51,9 +52,9 @@ impl SourceLineageMap {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IsolationBoundary {
+    /// The process-bound Active Namespace is the storage isolation boundary.
     pub namespace: String,
-    pub scope: String,
-    pub project: Option<String>,
+    /// Policy/tag identity is evaluated independently of namespace isolation.
     pub policy_fingerprint: String,
 }
 
@@ -69,20 +70,12 @@ pub fn classify_isolation_violation(
     relation: &EvaluatedRelation,
     expected: &IsolationBoundary,
 ) -> Option<IsolationViolation> {
-    if relation.scope != expected.scope {
+    if relation.namespace != expected.namespace {
         return Some(IsolationViolation {
             relation_id: relation.relation_id.clone(),
-            boundary_field: "scope".into(),
-            expected: expected.scope.clone(),
-            actual: relation.scope.clone(),
-        });
-    }
-    if relation.project != expected.project {
-        return Some(IsolationViolation {
-            relation_id: relation.relation_id.clone(),
-            boundary_field: "project".into(),
-            expected: expected.project.clone().unwrap_or_default(),
-            actual: relation.project.clone().unwrap_or_default(),
+            boundary_field: "namespace".into(),
+            expected: expected.namespace.clone(),
+            actual: relation.namespace.clone(),
         });
     }
     if relation.policy_fingerprint != expected.policy_fingerprint {
@@ -102,9 +95,7 @@ mod tests {
 
     fn same_boundary() -> IsolationBoundary {
         IsolationBoundary {
-            namespace: "org".into(),
-            scope: "team".into(),
-            project: Some("proj-a".into()),
+            namespace: "main".into(),
             policy_fingerprint: "fp-1".into(),
         }
     }
@@ -116,8 +107,7 @@ mod tests {
             right_fact_id: right.into(),
             outcome,
             reason_code: "test".into(),
-            scope: "team".into(),
-            project: Some("proj-a".into()),
+            namespace: "main".into(),
             policy_fingerprint: "fp-1".into(),
         }
     }
@@ -129,25 +119,18 @@ mod tests {
     }
 
     #[test]
-    fn cross_scope_is_an_isolation_violation() {
+    fn namespace_mismatch_is_an_isolation_violation() {
         let mut rel = relation("f1", "f2", ClaimRelationOutcome::Contradiction);
-        rel.scope = "other".into();
+        rel.namespace = "other".into();
         let violation = classify_isolation_violation(&rel, &same_boundary());
-        assert!(violation.is_some());
-        assert_eq!(violation.unwrap().boundary_field, "scope");
+        assert_eq!(
+            violation.as_ref().map(|v| v.boundary_field.as_str()),
+            Some("namespace")
+        );
     }
 
     #[test]
-    fn cross_project_is_an_isolation_violation() {
-        let mut rel = relation("f1", "f2", ClaimRelationOutcome::Contradiction);
-        rel.project = Some("other-proj".into());
-        let violation = classify_isolation_violation(&rel, &same_boundary());
-        assert!(violation.is_some());
-        assert_eq!(violation.unwrap().boundary_field, "project");
-    }
-
-    #[test]
-    fn different_policy_fingerprint_is_an_isolation_violation() {
+    fn different_policy_fingerprint_is_reported_separately_from_namespace() {
         let mut rel = relation("f1", "f2", ClaimRelationOutcome::Contradiction);
         rel.policy_fingerprint = "fp-2".into();
         let violation = classify_isolation_violation(&rel, &same_boundary());

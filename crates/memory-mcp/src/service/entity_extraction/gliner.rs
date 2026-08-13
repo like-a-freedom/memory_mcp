@@ -25,8 +25,8 @@ const DEFAULT_MAX_SEQ_LEN: usize = 384;
 const FALLBACK_BACKBONE_MAX_POSITION_EMBEDDINGS: usize = 512;
 const BACKBONE_PREFIX: &str = "token_rep_layer.bert_layer.model";
 
-static WHITESPACE_WORD_SPLITTER: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S").expect("valid splitter regex"));
+static WHITESPACE_WORD_SPLITTER: LazyLock<Result<regex::Regex, regex::Error>> =
+    LazyLock::new(|| regex::Regex::new(r"\w+(?:[-_]\w+)*|\S"));
 
 /// Splits `text` into whitespace/punctuation-delimited words with byte offsets.
 /// Pure utility over `WHITESPACE_WORD_SPLITTER`; lives at module scope (not on
@@ -34,7 +34,10 @@ static WHITESPACE_WORD_SPLITTER: LazyLock<regex::Regex> =
 /// `LoadedGliner::extract_inner_with_labels` and from `batching::tests` via
 /// the absolute path (descendant re-entry allows the private item).
 fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
-    WHITESPACE_WORD_SPLITTER
+    let Ok(splitter) = WHITESPACE_WORD_SPLITTER.as_ref() else {
+        return Vec::new();
+    };
+    splitter
         .find_iter(text)
         .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
         .collect()

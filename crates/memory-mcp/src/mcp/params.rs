@@ -17,8 +17,7 @@ pub(crate) use crate::tools::params::{
 pub struct OpenAppParams {
     /// Public app identifier (for example: inspector, diff, ingestion_review, lifecycle, graph).
     pub app: String,
-    /// Scope for the app session.
-    pub scope: String,
+
     /// Target kind for entity/fact/episode-driven apps.
     pub target_type: Option<String>,
     /// Target identifier for entity/fact/episode-driven apps.
@@ -94,13 +93,12 @@ mod tests {
     }
 
     #[test]
-    fn open_app_params_schema_preserves_historical_snake_case_contract() {
+    fn open_app_params_schema_is_scope_free() {
         let schema = schema_json::<OpenAppParams>();
         let properties = schema["properties"].as_object().expect("properties object");
 
         for key in [
             "app",
-            "scope",
             "target_type",
             "target_id",
             "from_entity_id",
@@ -120,10 +118,18 @@ mod tests {
             assert!(properties.contains_key(key), "missing property {key}");
         }
 
+        assert!(!properties.contains_key("scope"));
         assert!(
             !properties.contains_key("targetType"),
             "open_app should keep snake_case field names for parity"
         );
+
+        let err = serde_json::from_value::<OpenAppParams>(serde_json::json!({
+            "app": "graph",
+            "scope": "org"
+        }))
+        .expect_err("legacy app scope must be rejected");
+        assert!(err.to_string().contains("scope"));
     }
 
     #[test]

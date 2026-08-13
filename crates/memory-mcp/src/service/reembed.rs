@@ -85,7 +85,7 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        match self.db_client.query(&sql, None, namespace).await {
+        match self.reembed_store().execute_ddl(&sql).await {
             Ok(_) => {
                 self.logger.log(
                     std::collections::HashMap::from([
@@ -145,10 +145,7 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        self.db_client
-            .query(&sql, None, namespace)
-            .await
-            .map(|_| ())
+        self.reembed_store().execute_ddl(&sql).await.map(|_| ())
     }
 
     async fn restore_semantic_readiness(
@@ -156,25 +153,24 @@ impl MemoryService {
         target_signature: &str,
         target_dimension: usize,
     ) -> Result<(), MemoryError> {
-        for namespace in &self.namespaces {
-            self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
-                .await?;
-            self.remove_embedding_index(namespace).await?;
-            self.define_embedding_index(namespace, target_dimension)
-                .await
-                .map_err(|err| {
-                    MemoryError::Storage(format!(
-                        "failed to restore embedding index in namespace {namespace}: {err}"
-                    ))
-                })?;
-            self.write_embedding_state(
-                namespace,
-                "ready",
-                Some(target_signature),
-                Some(REEMBED_JOB_ID),
-            )
+        let namespace = &self.active_namespace;
+        self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
             .await?;
-        }
+        self.remove_embedding_index(namespace).await?;
+        self.define_embedding_index(namespace, target_dimension)
+            .await
+            .map_err(|err| {
+                MemoryError::Storage(format!(
+                    "failed to restore embedding index in namespace {namespace}: {err}"
+                ))
+            })?;
+        self.write_embedding_state(
+            namespace,
+            "ready",
+            Some(target_signature),
+            Some(REEMBED_JOB_ID),
+        )
+        .await?;
         Ok(())
     }
 
@@ -234,12 +230,10 @@ impl MemoryService {
         )
         .await?;
 
-        // Drop the HNSW index in every namespace before rewriting facts.
+        // Drop the HNSW index before rewriting facts.
         // SurrealDB enforces vector dimension at the index level, so the
         // index must be removed when the provider dimension changes.
-        for namespace in &self.namespaces {
-            self.remove_embedding_index(namespace).await?;
-        }
+        self.remove_embedding_index(&self.active_namespace).await?;
 
         if let Some(outcome) = self
             .process_reembed_pass(options, progress, cancel_token, &mut pass)
@@ -291,11 +285,13 @@ impl MemoryService {
             .cloned()
             .unwrap_or_default();
 
-        // Collect failed fact IDs from prior run for --retry-failed mode.
+        // A legacy job may contain progress for several namespaces. The
+        // current process imports only the Active Namespace entry; all other
+        // entries remain untouched for a later process selecting that namespace.
+        let active_namespace = &self.active_namespace;
         let retry_failed_ids: std::collections::HashSet<String> = if options.retry_failed {
-            namespace_progress
-                .keys()
-                .flat_map(|ns| existing_failed_fact_ids(&namespace_progress, ns))
+            existing_failed_fact_ids(&namespace_progress, active_namespace)
+                .into_iter()
                 .collect()
         } else {
             std::collections::HashSet::new()
@@ -314,10 +310,10 @@ impl MemoryService {
         };
 
         let resumed_count = namespace_progress
-            .values()
-            .filter_map(|v| v.get("processed_facts").and_then(json_i64))
-            .map(|n| n as usize)
-            .sum::<usize>();
+            .get(active_namespace)
+            .and_then(|value| value.get("processed_facts"))
+            .and_then(json_i64)
+            .unwrap_or(0) as usize;
 
         Ok(ReembedPass {
             summary,
@@ -345,118 +341,116 @@ impl MemoryService {
         cancel_token: &CancellationToken,
         pass: &mut ReembedPass,
     ) -> Result<Option<ReembedOutcome>, MemoryError> {
-        for namespace in &self.namespaces {
-            let mut ns_state = NamespaceBatchState::default();
-            (ns_state.processed, ns_state.succeeded, ns_state.failed) =
-                existing_namespace_counters(&pass.namespace_progress, namespace);
-            ns_state.last_completed_fact_id = pass
-                .resumable_job
-                .as_ref()
-                .and_then(|job| namespace_last_completed_fact_id(job, namespace));
+        let namespace = &self.active_namespace;
+        let mut ns_state = NamespaceBatchState::default();
+        (ns_state.processed, ns_state.succeeded, ns_state.failed) =
+            existing_namespace_counters(&pass.namespace_progress, namespace);
+        ns_state.last_completed_fact_id = pass
+            .resumable_job
+            .as_ref()
+            .and_then(|job| namespace_last_completed_fact_id(job, namespace));
 
-            self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
+        self.write_embedding_state(namespace, "rebuilding", None, Some(REEMBED_JOB_ID))
+            .await?;
+
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.namespace_started")),
+                ("namespace".to_string(), json!(namespace)),
+                (
+                    "resume_cursor".to_string(),
+                    json!(ns_state.last_completed_fact_id.clone()),
+                ),
+            ]),
+            LogLevel::Info,
+        );
+        progress.on_namespace_started(namespace, 0);
+
+        loop {
+            // Check for cancellation between batches (Ctrl+C responsiveness).
+            if cancel_token.is_cancelled() {
+                self.persist_interrupted(progress, pass).await?;
+                return Ok(Some(ReembedOutcome::Interrupted));
+            }
+
+            let batch = self
+                .reembed_store()
+                .select_facts_needing_reembed(
+                    &pass.target_signature,
+                    ns_state.last_completed_fact_id.as_deref(),
+                    REEMBED_BATCH_SIZE,
+                )
                 .await?;
 
             self.logger.log(
                 std::collections::HashMap::from([
-                    ("op".to_string(), json!("reembed.namespace_started")),
+                    ("op".to_string(), json!("reembed.batch_fetched")),
                     ("namespace".to_string(), json!(namespace)),
+                    ("count".to_string(), json!(batch.len())),
                     (
-                        "resume_cursor".to_string(),
+                        "after_cursor".to_string(),
                         json!(ns_state.last_completed_fact_id.clone()),
                     ),
                 ]),
-                LogLevel::Info,
+                LogLevel::Debug,
             );
-            progress.on_namespace_started(namespace, 0);
 
-            loop {
-                // Check for cancellation between batches (Ctrl+C responsiveness).
-                if cancel_token.is_cancelled() {
-                    self.persist_interrupted(progress, pass).await?;
-                    return Ok(Some(ReembedOutcome::Interrupted));
-                }
-
-                let batch = self
-                    .reembed_store()
-                    .select_facts_needing_reembed(
-                        namespace,
-                        &pass.target_signature,
-                        ns_state.last_completed_fact_id.as_deref(),
-                        REEMBED_BATCH_SIZE,
-                    )
-                    .await?;
-
-                self.logger.log(
-                    std::collections::HashMap::from([
-                        ("op".to_string(), json!("reembed.batch_fetched")),
-                        ("namespace".to_string(), json!(namespace)),
-                        ("count".to_string(), json!(batch.len())),
-                        (
-                            "after_cursor".to_string(),
-                            json!(ns_state.last_completed_fact_id.clone()),
-                        ),
-                    ]),
-                    LogLevel::Debug,
-                );
-
-                if batch.is_empty() {
-                    break;
-                }
-
-                match self
-                    .process_reembed_batch(
-                        namespace,
-                        batch,
-                        options,
-                        progress,
-                        cancel_token,
-                        pass,
-                        &mut ns_state,
-                    )
-                    .await?
-                {
-                    BatchOutcome::Continue => {}
-                    BatchOutcome::Interrupted => return Ok(Some(ReembedOutcome::Interrupted)),
-                    BatchOutcome::Failed => return Ok(Some(ReembedOutcome::Failed)),
-                }
+            if batch.is_empty() {
+                break;
             }
 
-            update_namespace_progress(
-                &mut pass.namespace_progress,
-                namespace,
-                "completed",
-                ns_state.processed,
-                ns_state.succeeded,
-                ns_state.failed,
-                ns_state.last_completed_fact_id.as_deref(),
-                &ns_state.failed_fact_ids,
-            );
-            self.write_embedding_state(
-                namespace,
-                "ready",
-                Some(&pass.target_signature),
-                Some(REEMBED_JOB_ID),
-            )
-            .await?;
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("reembed.namespace_completed")),
-                    ("namespace".to_string(), json!(namespace)),
-                    (
-                        "last_completed_fact_id".to_string(),
-                        json!(ns_state.last_completed_fact_id.clone()),
-                    ),
-                ]),
-                LogLevel::Info,
-            );
-            progress.on_namespace_completed(
-                namespace,
-                ns_state.succeeded,
-                ns_state.failed,
-                pass.started_at.elapsed(),
-            );
+            match self
+                .process_reembed_batch(
+                    namespace,
+                    batch,
+                    options,
+                    progress,
+                    cancel_token,
+                    pass,
+                    &mut ns_state,
+                )
+                .await?
+            {
+                BatchOutcome::Continue => {}
+                BatchOutcome::Interrupted => return Ok(Some(ReembedOutcome::Interrupted)),
+                BatchOutcome::Failed => return Ok(Some(ReembedOutcome::Failed)),
+            }
         }
+
+        update_namespace_progress(
+            &mut pass.namespace_progress,
+            namespace,
+            "completed",
+            ns_state.processed,
+            ns_state.succeeded,
+            ns_state.failed,
+            ns_state.last_completed_fact_id.as_deref(),
+            &ns_state.failed_fact_ids,
+        );
+        self.write_embedding_state(
+            namespace,
+            "ready",
+            Some(&pass.target_signature),
+            Some(REEMBED_JOB_ID),
+        )
+        .await?;
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.namespace_completed")),
+                ("namespace".to_string(), json!(namespace)),
+                (
+                    "last_completed_fact_id".to_string(),
+                    json!(ns_state.last_completed_fact_id.clone()),
+                ),
+            ]),
+            LogLevel::Info,
+        );
+        progress.on_namespace_completed(
+            namespace,
+            ns_state.succeeded,
+            ns_state.failed,
+            pass.started_at.elapsed(),
+        );
 
         Ok(None)
     }
@@ -523,12 +517,7 @@ impl MemoryService {
             );
 
             match self
-                .rewrite_fact_embedding(
-                    namespace,
-                    fact,
-                    &pass.target_signature,
-                    pass.target_dimension,
-                )
+                .rewrite_fact_embedding(fact, &pass.target_signature, pass.target_dimension)
                 .await
             {
                 Ok(updated_fact_id) => {
@@ -732,25 +721,24 @@ impl MemoryService {
     ) -> Result<ReembedOutcome, MemoryError> {
         // All facts rewritten successfully — recreate the HNSW index with
         // the new dimension.
-        for namespace in &self.namespaces {
-            progress.on_index_recreating(namespace);
-            self.define_embedding_index(namespace, pass.target_dimension)
-                .await
-                .map_err(|err| {
-                    MemoryError::Storage(format!(
-                        "failed to recreate embedding index in namespace {namespace}: {err}"
-                    ))
-                })?;
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("reembed.index_recreated")),
-                    ("namespace".to_string(), json!(namespace)),
-                    ("dimension".to_string(), json!(pass.target_dimension)),
-                ]),
-                LogLevel::Info,
-            );
-            progress.on_index_recreated(namespace);
-        }
+        let namespace = &self.active_namespace;
+        progress.on_index_recreating(namespace);
+        self.define_embedding_index(namespace, pass.target_dimension)
+            .await
+            .map_err(|err| {
+                MemoryError::Storage(format!(
+                    "failed to recreate embedding index in namespace {namespace}: {err}"
+                ))
+            })?;
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.index_recreated")),
+                ("namespace".to_string(), json!(namespace)),
+                ("dimension".to_string(), json!(pass.target_dimension)),
+            ]),
+            LogLevel::Info,
+        );
+        progress.on_index_recreated(namespace);
 
         let outcome = if pass.summary.failed_facts == 0 {
             ReembedOutcome::Completed
@@ -823,28 +811,20 @@ impl MemoryService {
     }
 
     async fn load_reembed_job(&self) -> Result<Option<Value>, MemoryError> {
-        self.db_client
-            .select_one(REEMBED_JOB_ID, self.default_namespace.as_str())
-            .await
+        self.reembed_store().load_record(REEMBED_JOB_ID).await
     }
 
     async fn count_facts_needing_reembed(
         &self,
         target_signature: &str,
     ) -> Result<usize, MemoryError> {
-        let mut total = 0;
-        for namespace in &self.namespaces {
-            total += self
-                .reembed_store()
-                .count_facts_needing_reembed(namespace, target_signature)
-                .await?;
-        }
-        Ok(total)
+        self.reembed_store()
+            .count_facts_needing_reembed(target_signature)
+            .await
     }
 
     async fn rewrite_fact_embedding(
         &self,
-        namespace: &str,
         fact: Value,
         target_signature: &str,
         target_dimension: usize,
@@ -904,15 +884,15 @@ impl MemoryService {
             json!(normalize_dt(chrono::Utc::now())),
         );
 
-        self.db_client
-            .update(&fact_id, Value::Object(updated), namespace)
+        self.reembed_store()
+            .upsert_record(&fact_id, Value::Object(updated))
             .await?;
         Ok(fact_id)
     }
 
     async fn write_embedding_state(
         &self,
-        namespace: &str,
+        _namespace: &str,
         status: &str,
         active_signature: Option<&str>,
         last_job_id: Option<&str>,
@@ -943,22 +923,9 @@ impl MemoryService {
             payload.insert("last_job_id".to_string(), json!(last_job_id));
         }
 
-        if self
-            .db_client
-            .select_one(EMBEDDING_STATE_RECORD_ID, namespace)
-            .await?
-            .is_some()
-        {
-            self.db_client
-                .update(EMBEDDING_STATE_RECORD_ID, Value::Object(payload), namespace)
-                .await?;
-        } else {
-            self.db_client
-                .create(EMBEDDING_STATE_RECORD_ID, Value::Object(payload), namespace)
-                .await?;
-        }
-
-        Ok(())
+        self.reembed_store()
+            .upsert_record(EMBEDDING_STATE_RECORD_ID, Value::Object(payload))
+            .await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -982,7 +949,7 @@ impl MemoryService {
             "provider": self.embedding_provider.provider_name(),
             "model": self.current_embedding_model.clone(),
             "dimension": target_dimension,
-            "namespaces": self.namespaces.clone(),
+            "namespaces": vec![self.active_namespace.clone()],
             "requested_at": started_at,
             "total_facts": summary.total_facts,
             "processed_facts": summary.processed_facts,
@@ -998,22 +965,9 @@ impl MemoryService {
             "finished_at": finished_at,
         });
 
-        if self
-            .db_client
-            .select_one(REEMBED_JOB_ID, self.default_namespace.as_str())
-            .await?
-            .is_some()
-        {
-            self.db_client
-                .update(REEMBED_JOB_ID, payload, self.default_namespace.as_str())
-                .await?;
-        } else {
-            self.db_client
-                .create(REEMBED_JOB_ID, payload, self.default_namespace.as_str())
-                .await?;
-        }
-
-        Ok(())
+        self.reembed_store()
+            .upsert_record(REEMBED_JOB_ID, payload)
+            .await
     }
 
     fn log_reembed_progress(
@@ -1221,7 +1175,10 @@ mod tests {
         }
     }
 
+    const TEST_NAMESPACE: &str = "org";
+
     async fn make_in_memory_db(namespaces: &[&str]) -> Arc<SurrealDbClient> {
+        assert_eq!(namespaces, &[TEST_NAMESPACE]);
         let namespaces = namespaces
             .iter()
             .map(|value| value.to_string())
@@ -1291,16 +1248,14 @@ mod tests {
 
     fn make_reembed_service(
         db_client: Arc<SurrealDbClient>,
-        namespaces: Vec<&str>,
+        active_namespace: &str,
         provider: Arc<dyn EmbeddingProvider>,
         dimension: usize,
     ) -> MemoryService {
+        assert_eq!(active_namespace, TEST_NAMESPACE);
         let mut service = MemoryService::new_with_embedding_provider(
             db_client,
-            namespaces
-                .into_iter()
-                .map(|value| value.to_string())
-                .collect(),
+            active_namespace.to_string(),
             "warn".to_string(),
             50,
             100,
@@ -1317,7 +1272,7 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_rewrites_all_facts_and_marks_job_completed() {
-        let db = make_in_memory_db(&["org", "personal"]).await;
+        let db = make_in_memory_db(&["org"]).await;
         seed_fact_with_embedding(
             &db,
             "org",
@@ -1329,7 +1284,7 @@ mod tests {
         .await;
         seed_fact_with_embedding(
             &db,
-            "personal",
+            "org",
             "fact:two",
             "second fact",
             vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
@@ -1339,7 +1294,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org", "personal"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1403,7 +1358,7 @@ mod tests {
 
         let interrupted = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
                 DEFAULT_EMBEDDING_DIMENSION,
                 2,
@@ -1424,7 +1379,7 @@ mod tests {
 
         let resumed = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1472,7 +1427,7 @@ mod tests {
 
         let first = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
                 DEFAULT_EMBEDDING_DIMENSION,
                 2,
@@ -1493,7 +1448,7 @@ mod tests {
 
         let resumed = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1534,7 +1489,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
                 DEFAULT_EMBEDDING_DIMENSION,
                 1,
@@ -1564,11 +1519,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reembed_signature_change_two_namespaces() {
+    async fn reembed_signature_change_two_facts() {
         // NOTE: SurrealDB 3 in-memory count() returns unexpected results
         // when multiple facts share the same namespace, so we verify
         // end-state assertions rather than summary.total_facts.
-        let db = make_in_memory_db(&["org", "personal"]).await;
+        let db = make_in_memory_db(&["org"]).await;
         let facts = [
             ("org", "fact:one", "first fact"),
             ("org", "fact:two", "second fact"),
@@ -1587,7 +1542,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org", "personal"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1656,7 +1611,7 @@ mod tests {
         let db = make_in_memory_db(&["org"]).await;
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(super::super::DisabledEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1683,7 +1638,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1732,7 +1687,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1814,7 +1769,7 @@ mod tests {
         // write, so the HNSW index is never affected.
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1845,8 +1800,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reembed_signature_change_multi_namespace() {
-        let db = make_in_memory_db(&["org", "personal"]).await;
+    async fn reembed_signature_change_two_facts_in_one_namespace() {
+        let db = make_in_memory_db(&["org"]).await;
         seed_fact_with_embedding(
             &db,
             "org",
@@ -1858,9 +1813,9 @@ mod tests {
         .await;
         seed_fact_with_embedding(
             &db,
-            "personal",
+            "org",
             "fact:p1",
-            "personal fact 1",
+            "second org fact",
             vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
             "embsig:old",
         )
@@ -1868,7 +1823,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org", "personal"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1881,32 +1836,32 @@ mod tests {
         let (summary, _outcome) = service
             .reembed_all_facts(&options, &progress, &cancel)
             .await
-            .expect("multi-namespace signature change should succeed");
+            .expect("single-namespace signature change should succeed");
 
         assert_eq!(summary.total_facts, 2);
         assert_eq!(summary.succeeded_facts, 2);
         assert_eq!(summary.failed_facts, 0);
 
-        for (ns, fid) in [("org", "fact:o1"), ("personal", "fact:p1")] {
+        for fid in ["fact:o1", "fact:p1"] {
             let updated = db
-                .select_one(fid, ns)
+                .select_one(fid, "org")
                 .await
                 .expect("select fact")
                 .expect("stored fact");
             assert_eq!(
                 updated.get("embedding_dimension"),
                 Some(&json!(DEFAULT_EMBEDDING_DIMENSION)),
-                "fact {fid} in namespace {ns} should preserve dimension"
+                "fact {fid} in namespace org should preserve dimension"
             );
             assert_eq!(
                 updated.get("embedding_signature"),
                 Some(&json!("embsig:new")),
-                "fact {fid} in namespace {ns} should have new signature"
+                "fact {fid} in namespace org should have new signature"
             );
             assert_eq!(
                 updated.get("embedding_provider"),
                 Some(&json!("test")),
-                "fact {fid} in namespace {ns} should have test provider"
+                "fact {fid} in namespace org should have test provider"
             );
         }
     }
@@ -1936,7 +1891,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -1971,7 +1926,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -2019,7 +1974,7 @@ mod tests {
         // Run reembed with a failing provider
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::fails_on_call(
                 DEFAULT_EMBEDDING_DIMENSION,
                 1,
@@ -2072,7 +2027,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -2103,20 +2058,13 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_continue_on_error_completes_within_quota() {
-        // One fact per namespace — SurrealDB 3 in-memory count() returns
-        // unreliable totals when multiple facts share a namespace, so we
-        // spread facts across namespaces to get exact summary assertions.
-        //
-        // Three namespaces keeps the count query stable (more than ~2
-        // facts per namespace or many namespaces triggers SurrealDB
-        // in-memory count() drift documented in
-        // reembed_signature_change_two_namespaces).
-        let namespaces = ["ns0", "ns1", "ns2"];
-        let db = make_in_memory_db(&namespaces).await;
-        for (i, ns) in namespaces.iter().enumerate() {
+        // Keep several facts in the single active namespace so the test
+        // exercises the failure quota without relying on multiple namespaces.
+        let db = make_in_memory_db(&["org"]).await;
+        for i in 0..3 {
             seed_fact_with_embedding(
                 &db,
-                ns,
+                "org",
                 &format!("fact:{i}"),
                 &format!("content {i}"),
                 vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
@@ -2129,12 +2077,7 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
             2,
         ));
-        let service = make_reembed_service(
-            db,
-            namespaces.to_vec(),
-            provider,
-            DEFAULT_EMBEDDING_DIMENSION,
-        );
+        let service = make_reembed_service(db, "org", provider, DEFAULT_EMBEDDING_DIMENSION);
 
         let options = ReembedOptions {
             max_failures: Some(10),
@@ -2149,12 +2092,9 @@ mod tests {
             .expect("reembed should not hard-fail within quota");
 
         assert_eq!(outcome, ReembedOutcome::CompletedWithErrors);
-        // SurrealDB 3 in-memory count() and select() drift with multiple
-        // namespaces/facts (documented in
-        // reembed_signature_change_two_namespaces), so summary counters may
-        // over-count. The key behavioral assertions are: the run completed
-        // within quota (outcome == CompletedWithErrors, not Failed) and at
-        // least one failure was recorded without aborting.
+        // The key behavioral assertions are: the run completed within quota
+        // (outcome == CompletedWithErrors, not Failed) and at least one
+        // failure was recorded without aborting.
         assert!(
             summary.processed_facts >= 3,
             "processed_facts undercounted: {}",
@@ -2174,12 +2114,11 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_fail_fast_when_max_failures_zero() {
-        let namespaces = ["ns0", "ns1", "ns2", "ns3", "ns4"];
-        let db = make_in_memory_db(&namespaces).await;
-        for (i, ns) in namespaces.iter().enumerate() {
+        let db = make_in_memory_db(&["org"]).await;
+        for i in 0..5 {
             seed_fact_with_embedding(
                 &db,
-                ns,
+                "org",
                 &format!("fact:{i}"),
                 &format!("content {i}"),
                 vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
@@ -2192,12 +2131,7 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
             2,
         ));
-        let service = make_reembed_service(
-            db,
-            namespaces.to_vec(),
-            provider,
-            DEFAULT_EMBEDDING_DIMENSION,
-        );
+        let service = make_reembed_service(db, "org", provider, DEFAULT_EMBEDDING_DIMENSION);
 
         let options = ReembedOptions {
             max_failures: Some(0),
@@ -2217,12 +2151,11 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_cancellation_produces_interrupted_outcome() {
-        let namespaces = ["ns0", "ns1", "ns2"];
-        let db = make_in_memory_db(&namespaces).await;
-        for (i, ns) in namespaces.iter().enumerate() {
+        let db = make_in_memory_db(&["org"]).await;
+        for i in 0..3 {
             seed_fact_with_embedding(
                 &db,
-                ns,
+                "org",
                 &format!("fact:{i}"),
                 &format!("content {i}"),
                 vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
@@ -2234,12 +2167,7 @@ mod tests {
         let provider = Arc::new(SequenceTestEmbeddingProvider::new(
             DEFAULT_EMBEDDING_DIMENSION,
         ));
-        let service = make_reembed_service(
-            db,
-            namespaces.to_vec(),
-            provider,
-            DEFAULT_EMBEDDING_DIMENSION,
-        );
+        let service = make_reembed_service(db, "org", provider, DEFAULT_EMBEDDING_DIMENSION);
 
         let options = ReembedOptions::default();
         let progress = NoopProgressReporter;
@@ -2265,15 +2193,14 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_nothing_to_do_when_all_match_signature() {
-        let namespaces = ["ns0", "ns1", "ns2"];
-        let db = make_in_memory_db(&namespaces).await;
+        let db = make_in_memory_db(&["org"]).await;
         // Seed facts that already match the target signature ("embsig:new")
         // set by make_reembed_service. Facts with matching signatures are
         // excluded by the count query, yielding total_facts == 0.
-        for (i, ns) in namespaces.iter().enumerate() {
+        for i in 0..3 {
             seed_fact_with_embedding(
                 &db,
-                ns,
+                "org",
                 &format!("fact:{i}"),
                 &format!("content {i}"),
                 vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
@@ -2285,12 +2212,7 @@ mod tests {
         let provider = Arc::new(SequenceTestEmbeddingProvider::new(
             DEFAULT_EMBEDDING_DIMENSION,
         ));
-        let service = make_reembed_service(
-            db,
-            namespaces.to_vec(),
-            provider,
-            DEFAULT_EMBEDDING_DIMENSION,
-        );
+        let service = make_reembed_service(db, "org", provider, DEFAULT_EMBEDDING_DIMENSION);
 
         let options = ReembedOptions::default();
         let progress = NoopProgressReporter;
@@ -2322,7 +2244,7 @@ mod tests {
 
         let service = make_reembed_service(
             db,
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -2372,7 +2294,7 @@ mod tests {
 
         let service = make_reembed_service(
             db.clone(),
-            vec!["org"],
+            "org",
             Arc::new(SequenceTestEmbeddingProvider::new(
                 DEFAULT_EMBEDDING_DIMENSION,
             )),
@@ -2403,10 +2325,8 @@ mod tests {
         assert_eq!(state.get("status"), Some(&json!("ready")));
         assert_eq!(state.get("active_signature"), Some(&json!("embsig:new")));
 
-        let matches = crate::storage::ContextStoreClient::new(db.clone())
+        let matches = crate::storage::ContextStoreClient::new(db.clone(), "org")
             .select_facts_ann(
-                "org",
-                "org",
                 &normalize_dt(Utc::now()),
                 &vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
                 1,

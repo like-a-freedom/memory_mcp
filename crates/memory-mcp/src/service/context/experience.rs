@@ -15,10 +15,7 @@ use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fac
 const REPEATED_TOPIC_MATCH_BOOST: f64 = 5.0;
 
 pub(crate) struct RecentExperienceRequest<'a> {
-    pub(crate) namespace: &'a str,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
-    pub(crate) project: Option<&'a str>,
     pub(crate) access: &'a AccessPayload,
     pub(crate) budget: i32,
     pub(crate) fact_types: &'a [String],
@@ -86,26 +83,24 @@ pub(crate) async fn collect_recent_experience_facts(
 
     let records = service
         .context_store()
-        .select_active_facts(request.namespace, 500)
+        .select_active_facts(500)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
     let experience_filter = vec![FactType::Experience.as_str().to_string()];
-    let mut facts =
-        filter_facts_by_constraints(records, request.access, request.project, &experience_filter)
-            .into_iter()
-            .filter(|fact| fact.scope == request.scope)
-            .filter(|fact| fact_is_active_at(fact, request.cutoff))
-            .filter(|fact| !excluded_fact_ids.contains(&fact.fact_id))
-            .filter(|fact| {
-                let topical_overlap = lexical_query_overlap_for_fact(fact, topical_terms);
-                let query_overlap = lexical_query_overlap_for_fact(fact, query_terms);
-                if !topical_terms.is_empty() {
-                    topical_overlap > 0 || query_overlap > 0
-                } else {
-                    query_terms.is_empty() || query_overlap > 0
-                }
-            })
-            .collect::<Vec<_>>();
+    let mut facts = filter_facts_by_constraints(records, request.access, &experience_filter)
+        .into_iter()
+        .filter(|fact| fact_is_active_at(fact, request.cutoff))
+        .filter(|fact| !excluded_fact_ids.contains(&fact.fact_id))
+        .filter(|fact| {
+            let topical_overlap = lexical_query_overlap_for_fact(fact, topical_terms);
+            let query_overlap = lexical_query_overlap_for_fact(fact, query_terms);
+            if !topical_terms.is_empty() {
+                topical_overlap > 0 || query_overlap > 0
+            } else {
+                query_terms.is_empty() || query_overlap > 0
+            }
+        })
+        .collect::<Vec<_>>();
 
     for fact in &mut facts {
         if !query_terms.is_empty() {

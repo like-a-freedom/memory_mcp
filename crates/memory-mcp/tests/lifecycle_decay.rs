@@ -27,7 +27,6 @@ async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
             "old metric in default namespace",
             "episode:default_decay_none",
             old_date,
-            "org",
             0.4,
             vec![],
             vec![],
@@ -51,18 +50,17 @@ async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
 }
 
 #[tokio::test]
-async fn decay_pass_processes_all_configured_namespaces() {
+async fn decay_pass_processes_only_active_namespace() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(400);
 
     let fact_id = service
         .add_fact(
             "metric",
-            "old metric in personal namespace",
-            "old metric in personal namespace",
+            "old metric in active namespace",
+            "old metric in active namespace",
             "episode:personal_decay_old",
             old_date,
-            "personal",
             0.4,
             vec![],
             vec![],
@@ -75,10 +73,10 @@ async fn decay_pass_processes_all_configured_namespaces() {
         .await
         .expect("decay pass completed");
 
-    assert_eq!(count, 1, "decay should include non-default namespaces");
+    assert_eq!(count, 1, "decay should process the active namespace");
 
     let stored = db_client
-        .select_one(&fact_id, "personal")
+        .select_one(&fact_id, "org")
         .await
         .expect("select fact")
         .expect("stored fact");
@@ -97,7 +95,6 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
             "old but hot metric",
             "episode:hot_decay_skip",
             old_date,
-            "personal",
             0.4,
             vec![],
             vec![],
@@ -113,7 +110,7 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
                 "access_count": 5,
                 "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
             }),
-            "personal",
+            "org",
         )
         .await
         .expect("touch fact");
@@ -125,7 +122,7 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
     assert_eq!(count, 0, "recently accessed fact should stay active");
 
     let stored = db_client
-        .select_one(&fact_id, "personal")
+        .select_one(&fact_id, "org")
         .await
         .expect("select fact")
         .expect("stored fact");
@@ -158,7 +155,6 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
             "recent promise content for decay test",
             "episode:recent_decay_test",
             recent_date,
-            "org",
             0.95, // high confidence, won't decay below threshold
             vec![],
             vec![],
@@ -192,7 +188,6 @@ async fn decay_pass_invalidates_old_low_confidence_facts() {
             "old metric",
             "episode:old_decay_test",
             old_date,
-            "org",
             0.4, // moderate confidence, will decay
             vec![],
             vec![],
@@ -224,7 +219,6 @@ async fn decay_pass_respects_threshold_parameter() {
             "high confidence",
             "episode:high_conf_decay",
             old_date,
-            "org",
             0.8,
             vec![],
             vec![],
@@ -241,7 +235,6 @@ async fn decay_pass_respects_threshold_parameter() {
             "low confidence",
             "episode:low_conf_decay",
             old_date,
-            "org",
             0.3,
             vec![],
             vec![],
@@ -272,7 +265,6 @@ async fn decay_pass_skips_already_invalidated_facts() {
             "pre-invalidated",
             "episode:pre_invalid_decay",
             old_date,
-            "org",
             0.2,
             vec![],
             vec![],
@@ -318,7 +310,6 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "short half-life",
             "episode:short_halflife",
             old_date,
-            "org",
             0.5,
             vec![],
             vec![],
@@ -334,7 +325,6 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "long half-life",
             "episode:long_halflife",
             old_date,
-            "org",
             0.5,
             vec![],
             vec![],
@@ -356,7 +346,6 @@ async fn decay_pass_half_life_affects_decay_rate() {
             "long half-life 2",
             "episode:long_halflife_2",
             old_date,
-            "org",
             0.5,
             vec![],
             vec![],
@@ -395,7 +384,6 @@ async fn decay_confidence_calculation_exponential() {
             "exponential decay",
             "episode:exponential_decay",
             old_date,
-            "org",
             0.5, // base confidence
             vec![],
             vec![],

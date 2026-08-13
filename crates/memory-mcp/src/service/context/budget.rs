@@ -76,21 +76,14 @@ pub(super) async fn collect_episode_fallback_items(
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let episode_records = lexical::select_episode_records_for_query(
         service,
-        params.namespace,
-        params.scope,
         params.cutoff_iso,
         Some(query),
         params.budget,
-        params.project_opt,
     )
     .await?;
 
     let query_terms = crate::service::query::search_query_terms(query);
-    let mut episodes = filtering::filter_episodes_by_constraints(
-        episode_records,
-        params.access,
-        params.project_opt,
-    );
+    let mut episodes = filtering::filter_episodes_by_constraints(episode_records, params.access);
 
     episodes.sort_by(|left, right| {
         lexical::lexical_query_score_for_text(&right.content, &query_terms)
@@ -108,7 +101,6 @@ pub(super) async fn collect_episode_fallback_items(
         episodes,
         query_opt: Some(query),
         semantic_available: service.embedding_service.embedding_provider().is_enabled(),
-        scope: params.scope,
         cutoff: params.cutoff,
         window_start: params.window_start,
         window_end: params.window_end,

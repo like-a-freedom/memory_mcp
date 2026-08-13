@@ -12,7 +12,6 @@ pub async fn run(service: &MemoryService, args: ExtractArgs) -> Result<(), Memor
         source_type: args.source_type,
         source_id: args.source_id,
         t_ref: args.t_ref,
-        scope: args.scope,
         zero_shot_labels: args.zero_shot_labels,
     };
     let response = crate::tools::extract(&service.build_context(), params).await?;

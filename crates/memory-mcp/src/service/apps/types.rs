@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrepareIngestionReviewRequest {
-    pub scope: String,
     pub source_text: Option<String>,
     pub draft_episode_id: Option<String>,
 }
@@ -48,7 +47,6 @@ pub struct IngestionReviewBundle {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CommitIngestionReviewRequest {
-    pub scope: String,
     pub items: Vec<IngestionReviewItem>,
 }
 
@@ -60,7 +58,6 @@ pub struct CommitIngestionReviewOutcome {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DiffRequest {
-    pub scope: String,
     pub target_type: String,
     pub target_id: Option<String>,
     pub as_of_left: DateTime<Utc>,

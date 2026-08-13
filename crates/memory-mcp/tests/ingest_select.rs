@@ -13,10 +13,7 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
         source_id: "test-1".to_string(),
         content: "Meeting with Alice Inc and Bob Corp. Budget $100k".to_string(),
         t_ref: Utc::now(),
-        scope: "org".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
 

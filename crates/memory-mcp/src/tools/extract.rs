@@ -32,7 +32,6 @@ pub async fn extract(
     let source_type = params.source_type;
     let source_id = params.source_id;
     let t_ref = params.t_ref;
-    let scope = params.scope;
     let zero_shot_labels = params.zero_shot_labels;
     let timer = Instant::now();
     let request_id = next_request_id();
@@ -138,7 +137,9 @@ pub async fn extract(
         }
     }
 
-    let content = inline_content.expect("validated extract inline content");
+    let content = inline_content.ok_or_else(|| {
+        MemoryError::Validation("inline extract content was unexpectedly missing".to_string())
+    })?;
 
     let source_type = source_type.unwrap_or_else(|| "ad-hoc".to_string());
     let source_id = source_id.unwrap_or_else(|| content_hash(&content));
@@ -146,8 +147,6 @@ pub async fn extract(
         .as_ref()
         .and_then(|s| parse_datetime(s))
         .unwrap_or_else(Utc::now);
-    let scope = scope.unwrap_or_else(|| "org".to_string());
-
     match IngestCapability::ingest(
         ctx,
         IngestRequest {
@@ -155,10 +154,7 @@ pub async fn extract(
             source_id,
             content,
             t_ref,
-            scope,
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: Vec::new(),
         },
         Some(access.clone()),

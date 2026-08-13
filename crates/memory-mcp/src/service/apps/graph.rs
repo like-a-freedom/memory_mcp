@@ -19,7 +19,7 @@ pub(crate) trait GraphContext: Send + Sync {
 
 impl GraphContext for MemoryService {
     fn app_store(&self) -> AppStoreClient {
-        AppStoreClient::new(self.db_client.clone())
+        AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
@@ -37,15 +37,7 @@ impl MemoryService {
         max_hops: i32,
         as_of: Option<DateTime<Utc>>,
     ) -> Result<Vec<String>, MemoryError> {
-        find_intro_chain(
-            self,
-            &self.namespaces,
-            &self.default_namespace,
-            target_name,
-            max_hops,
-            as_of,
-        )
-        .await
+        find_intro_chain(self, target_name, max_hops, as_of).await
     }
 
     /// Resolves an entity by its type and canonical name.
@@ -91,8 +83,7 @@ impl MemoryService {
             t_invalid: None,
             t_invalid_ingested: None,
         };
-        crate::service::episode::store_edge(&self.build_context(), &edge, &self.default_namespace)
-            .await
+        crate::service::episode::store_edge(&self.build_context(), &edge).await
     }
 }
 
@@ -146,7 +137,6 @@ pub(crate) struct GraphCommunity {
 
 pub(crate) async fn find_hub_entities(
     ctx: &impl GraphContext,
-    namespace: &str,
     cutoff: DateTime<Utc>,
     limit: i32,
     budget: GraphTraversalBudget,
@@ -155,7 +145,7 @@ pub(crate) async fn find_hub_entities(
     ctx.logger().log(
         crate::service::log_event(
             "graph.hubs.start",
-            json!({"namespace": namespace, "cutoff": cutoff_iso, "limit": limit}),
+            json!({"cutoff": cutoff_iso, "limit": limit}),
             json!({}),
             None,
             None,
@@ -163,7 +153,7 @@ pub(crate) async fn find_hub_entities(
         ),
         LogLevel::Debug,
     );
-    let entity_records = ctx.app_store().select_entities(namespace).await?;
+    let entity_records = ctx.app_store().select_entities().await?;
     let mut hubs = Vec::new();
     let candidate_scan_limit =
         (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
@@ -193,7 +183,7 @@ pub(crate) async fn find_hub_entities(
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             for edge in ctx
                 .app_store()
-                .select_graph_neighbors(namespace, &entity_id, &cutoff_iso, direction)
+                .select_graph_neighbors(&entity_id, &cutoff_iso, direction)
                 .await?
             {
                 if let Some(edge_key) = edge_identity(&edge) {
@@ -224,7 +214,7 @@ pub(crate) async fn find_hub_entities(
     ctx.logger().log(
         crate::service::log_event(
             "graph.hubs.done",
-            json!({"namespace": namespace, "limit": limit}),
+            json!({"limit": limit}),
             json!({"count": hubs.len()}),
             None,
             None,
@@ -237,14 +227,13 @@ pub(crate) async fn find_hub_entities(
 
 pub(crate) async fn list_communities(
     ctx: &impl GraphContext,
-    namespace: &str,
     cutoff: DateTime<Utc>,
     limit: i32,
 ) -> Result<Vec<GraphCommunity>, MemoryError> {
     ctx.logger().log(
         crate::service::log_event(
             "graph.communities.start",
-            json!({"namespace": namespace, "limit": limit}),
+            json!({"limit": limit}),
             json!({}),
             None,
             None,
@@ -254,7 +243,7 @@ pub(crate) async fn list_communities(
     );
     let mut communities = ctx
         .app_store()
-        .select_communities(namespace)
+        .select_communities()
         .await?
         .into_iter()
         .filter_map(|record| graph_community_from_value(&record))
@@ -275,7 +264,7 @@ pub(crate) async fn list_communities(
     ctx.logger().log(
         crate::service::log_event(
             "graph.communities.done",
-            json!({"namespace": namespace, "limit": limit}),
+            json!({"limit": limit}),
             json!({"count": communities.len()}),
             None,
             None,
@@ -288,7 +277,6 @@ pub(crate) async fn list_communities(
 
 pub(crate) async fn find_surprising_connections(
     ctx: &impl GraphContext,
-    namespace: &str,
     source_entity: &str,
     max_depth: i32,
     budget: GraphTraversalBudget,
@@ -297,9 +285,11 @@ pub(crate) async fn find_surprising_connections(
         ctx.logger().log(
             crate::service::log_event(
                 "graph.surprising_connections.skipped",
-                json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
+                json!({"source_entity": source_entity, "max_depth": max_depth}),
                 json!({"reason": "invalid_source_or_depth"}),
-                None, None, None,
+                None,
+                None,
+                None,
             ),
             LogLevel::Trace,
         );
@@ -309,7 +299,7 @@ pub(crate) async fn find_surprising_connections(
     ctx.logger().log(
         crate::service::log_event(
             "graph.surprising_connections.start",
-            json!({"namespace": namespace, "source_entity": source_entity, "max_depth": max_depth}),
+            json!({"source_entity": source_entity, "max_depth": max_depth}),
             json!({}),
             None,
             None,
@@ -321,15 +311,14 @@ pub(crate) async fn find_surprising_connections(
     let cutoff_iso = normalize_dt(crate::service::now());
     let communities = ctx
         .app_store()
-        .select_communities(namespace)
+        .select_communities()
         .await?
         .into_iter()
         .filter_map(|record| graph_community_from_value(&record))
         .collect::<Vec<_>>();
     let source_community_ids = community_ids_for_member(&communities, source_entity);
     let mut name_cache = HashMap::new();
-    let source_entity_name =
-        cached_entity_name(ctx, namespace, source_entity, &mut name_cache).await?;
+    let source_entity_name = cached_entity_name(ctx, source_entity, &mut name_cache).await?;
 
     let mut visited = HashSet::from([source_entity.to_string()]);
     let mut frontier = VecDeque::from([(
@@ -364,7 +353,7 @@ pub(crate) async fn find_surprising_connections(
             neighbor_queries += 1;
             for edge in ctx
                 .app_store()
-                .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
+                .select_graph_neighbors(&current, &cutoff_iso, direction)
                 .await?
             {
                 let Some(neighbor) = neighbor_node(&edge, direction, &current) else {
@@ -387,7 +376,7 @@ pub(crate) async fn find_surprising_connections(
                     )
                 {
                     let target_entity_name =
-                        cached_entity_name(ctx, namespace, &neighbor, &mut name_cache).await?;
+                        cached_entity_name(ctx, &neighbor, &mut name_cache).await?;
                     connections
                         .entry(neighbor.clone())
                         .or_insert_with(|| SurprisingConnection {
@@ -423,7 +412,7 @@ pub(crate) async fn find_surprising_connections(
     ctx.logger().log(
         crate::service::log_event(
             "graph.surprising_connections.done",
-            json!({"namespace": namespace, "source_entity": source_entity}),
+            json!({"source_entity": source_entity}),
             json!({"count": surprising_connections.len()}),
             None,
             None,
@@ -533,7 +522,6 @@ fn is_surprising_target(
 
 async fn cached_entity_name(
     ctx: &impl GraphContext,
-    namespace: &str,
     entity_id: &str,
     cache: &mut HashMap<String, String>,
 ) -> Result<String, MemoryError> {
@@ -543,7 +531,7 @@ async fn cached_entity_name(
 
     let name = ctx
         .app_store()
-        .select_entity(entity_id, namespace)
+        .select_entity(entity_id)
         .await?
         .as_ref()
         .and_then(Value::as_object)
@@ -611,13 +599,11 @@ pub(crate) fn intro_chain_from_start(
 /// `MemoryService` construction into the call.
 pub(crate) async fn find_intro_chain(
     ctx: &impl GraphContext,
-    namespaces: &[String],
-    default_namespace: &str,
     target_name: &str,
     max_hops: i32,
     as_of: Option<DateTime<Utc>>,
 ) -> Result<Vec<String>, MemoryError> {
-    let target_id = find_entity_id_by_name(ctx, default_namespace, namespaces, target_name).await?;
+    let target_id = find_entity_id_by_name(ctx, target_name).await?;
     let Some(target_id) = target_id else {
         return Ok(vec![]);
     };
@@ -635,29 +621,22 @@ pub(crate) async fn find_intro_chain(
         let mut next_frontier = Vec::new();
 
         for node_id in &frontier {
-            for namespace in namespaces {
-                for record in ctx
-                    .app_store()
-                    .select_graph_neighbors(
-                        namespace,
-                        node_id,
-                        &cutoff_iso,
-                        GraphDirection::Incoming,
+            for record in ctx
+                .app_store()
+                .select_graph_neighbors(node_id, &cutoff_iso, GraphDirection::Incoming)
+                .await?
+            {
+                if let Value::Object(map) = record
+                    && let (Some(in_id), Some(out_id)) = (
+                        map.get("in").and_then(string_from_value),
+                        map.get("out").and_then(string_from_value),
                     )
-                    .await?
+                    && visited.insert(in_id.clone())
                 {
-                    if let Value::Object(map) = record
-                        && let (Some(in_id), Some(out_id)) = (
-                            map.get("in").and_then(string_from_value),
-                            map.get("out").and_then(string_from_value),
-                        )
-                        && visited.insert(in_id.clone())
-                    {
-                        next_hop.insert(in_id.clone(), out_id);
-                        discovered_nodes.insert(in_id.clone());
-                        nodes_with_predecessors.insert(node_id.clone());
-                        next_frontier.push(in_id);
-                    }
+                    next_hop.insert(in_id.clone(), out_id);
+                    discovered_nodes.insert(in_id.clone());
+                    nodes_with_predecessors.insert(node_id.clone());
+                    next_frontier.push(in_id);
                 }
             }
         }
@@ -687,22 +666,19 @@ pub(crate) async fn find_intro_chain(
     Ok(best_path)
 }
 
-/// Resolves an entity name to its `entity_id`. Tries the indexed lookup via
-/// `select_entity_lookup` in the default namespace first, then falls back to
-/// scanning entities across all namespaces. Returns `None` when the name is
-/// unknown in every namespace.
+/// Resolves an entity name to its `entity_id` within the store's bound
+/// Active Namespace. The indexed lookup is preferred, with a table scan as a
+/// compatibility fallback when the lookup record is unavailable.
 async fn find_entity_id_by_name(
     ctx: &impl GraphContext,
-    default_namespace: &str,
-    namespaces: &[String],
     target_name: &str,
 ) -> Result<Option<String>, MemoryError> {
     let normalized_name = crate::service::normalize_text(target_name);
 
-    // Prefer the indexed lookup in the default namespace.
+    // Prefer the indexed lookup in the store's bound Active Namespace.
     if let Some(record) = ctx
         .app_store()
-        .select_entity_lookup(default_namespace, &normalized_name)
+        .select_entity_lookup(&normalized_name)
         .await?
         .and_then(|value| value.as_object().cloned())
     {
@@ -712,26 +688,24 @@ async fn find_entity_id_by_name(
             .or_else(|| record.get("id").and_then(string_from_value)));
     }
 
-    for namespace in namespaces {
-        for record in ctx.app_store().select_entities(namespace).await? {
-            let Some(map) = record.as_object() else {
-                continue;
-            };
-            let entity_name = map
-                .get("canonical_name")
-                .and_then(string_from_value)
-                .or_else(|| map.get("name").and_then(string_from_value));
-            let Some(name) = entity_name else {
-                continue;
-            };
-            if crate::service::normalize_text(&name) != normalized_name {
-                continue;
-            }
-            return Ok(map
-                .get("entity_id")
-                .and_then(string_from_value)
-                .or_else(|| map.get("id").and_then(string_from_value)));
+    for record in ctx.app_store().select_entities().await? {
+        let Some(map) = record.as_object() else {
+            continue;
+        };
+        let entity_name = map
+            .get("canonical_name")
+            .and_then(string_from_value)
+            .or_else(|| map.get("name").and_then(string_from_value));
+        let Some(name) = entity_name else {
+            continue;
+        };
+        if crate::service::normalize_text(&name) != normalized_name {
+            continue;
         }
+        return Ok(map
+            .get("entity_id")
+            .and_then(string_from_value)
+            .or_else(|| map.get("id").and_then(string_from_value)));
     }
 
     Ok(None)
@@ -771,10 +745,9 @@ pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String
 /// Returns a JSON snapshot of an entity (entity_id + canonical_name).
 pub async fn entity_snapshot(
     store: &AppStoreClient,
-    namespace: &str,
     entity_id: &str,
 ) -> Result<Value, MemoryError> {
-    let record = store.select_entity(entity_id, namespace).await?;
+    let record = store.select_entity(entity_id).await?;
     let canonical_name = record
         .as_ref()
         .and_then(Value::as_object)
@@ -792,7 +765,6 @@ pub async fn entity_snapshot(
 /// BFS path finding between two entities in the knowledge graph.
 pub async fn graph_path_snapshot(
     store: &AppStoreClient,
-    namespace: &str,
     from_entity_id: &str,
     to_entity_id: &str,
     cutoff: DateTime<Utc>,
@@ -801,7 +773,7 @@ pub async fn graph_path_snapshot(
     if from_entity_id == to_entity_id {
         return Ok(GraphPathSnapshot {
             found: true,
-            nodes: vec![entity_snapshot(store, namespace, from_entity_id).await?],
+            nodes: vec![entity_snapshot(store, from_entity_id).await?],
             edges: Vec::new(),
         });
     }
@@ -821,7 +793,7 @@ pub async fn graph_path_snapshot(
 
         for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
             let records = store
-                .select_graph_neighbors(namespace, &current, &cutoff_iso, direction)
+                .select_graph_neighbors(&current, &cutoff_iso, direction)
                 .await?;
             for record in records {
                 let Some(neighbor) = edge_neighbor(&record, direction) else {
@@ -837,7 +809,7 @@ pub async fn graph_path_snapshot(
                 if neighbor == to_entity_id {
                     let mut snapshots = Vec::with_capacity(next_nodes.len());
                     for node_id in next_nodes {
-                        snapshots.push(entity_snapshot(store, namespace, &node_id).await?);
+                        snapshots.push(entity_snapshot(store, &node_id).await?);
                     }
                     return Ok(GraphPathSnapshot {
                         found: true,
@@ -856,8 +828,8 @@ pub async fn graph_path_snapshot(
     Ok(GraphPathSnapshot {
         found: false,
         nodes: vec![
-            entity_snapshot(store, namespace, from_entity_id).await?,
-            entity_snapshot(store, namespace, to_entity_id).await?,
+            entity_snapshot(store, from_entity_id).await?,
+            entity_snapshot(store, to_entity_id).await?,
         ],
         edges: Vec::new(),
     })
@@ -866,7 +838,6 @@ pub async fn graph_path_snapshot(
 /// BFS neighbor expansion from a target entity.
 pub async fn graph_neighbor_expansion(
     store: &AppStoreClient,
-    namespace: &str,
     target_id: &str,
     direction: &str,
     depth: i32,
@@ -894,7 +865,7 @@ pub async fn graph_neighbor_expansion(
         for node_id in &frontier {
             for graph_direction in &directions {
                 for record in store
-                    .select_graph_neighbors(namespace, node_id, &cutoff_iso, *graph_direction)
+                    .select_graph_neighbors(node_id, &cutoff_iso, *graph_direction)
                     .await?
                 {
                     if let Some(neighbor) = edge_neighbor(&record, *graph_direction) {
@@ -902,7 +873,7 @@ pub async fn graph_neighbor_expansion(
                             &record,
                         ));
                         if visited.insert(neighbor.clone()) {
-                            nodes.push(entity_snapshot(store, namespace, &neighbor).await?);
+                            nodes.push(entity_snapshot(store, &neighbor).await?);
                             next_frontier.push(neighbor);
                         }
                     }
@@ -928,32 +899,20 @@ pub async fn graph_neighbor_expansion(
 /// Builds the full graph payload: path + neighbor expansion for both endpoints.
 pub async fn graph_payload(
     store: &AppStoreClient,
-    namespace: &str,
     from_entity_id: &str,
     to_entity_id: &str,
     cutoff: DateTime<Utc>,
     max_depth: i32,
 ) -> Result<Value, MemoryError> {
-    let path = graph_path_snapshot(
-        store,
-        namespace,
-        from_entity_id,
-        to_entity_id,
-        cutoff,
-        max_depth,
-    )
-    .await?;
-    let from_neighbors =
-        graph_neighbor_expansion(store, namespace, from_entity_id, "both", 1, cutoff).await?;
-    let to_neighbors =
-        graph_neighbor_expansion(store, namespace, to_entity_id, "both", 1, cutoff).await?;
+    let path = graph_path_snapshot(store, from_entity_id, to_entity_id, cutoff, max_depth).await?;
+    let from_neighbors = graph_neighbor_expansion(store, from_entity_id, "both", 1, cutoff).await?;
+    let to_neighbors = graph_neighbor_expansion(store, to_entity_id, "both", 1, cutoff).await?;
 
     Ok(json!({
         "target": {
             "from_entity_id": from_entity_id,
             "to_entity_id": to_entity_id,
             "max_depth": max_depth.max(1),
-            "namespace": namespace,
         },
         "graph": {
             "path_found": path.found,
@@ -1176,22 +1135,17 @@ mod tests {
         let db = Arc::new(BudgetedGraphDbClient::default());
         let service = crate::service::MemoryService::new(
             db.clone(),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
         )
         .expect("service");
 
-        let connections = find_surprising_connections(
-            &service,
-            "org",
-            "entity:0",
-            32,
-            GraphTraversalBudget::FULL,
-        )
-        .await
-        .expect("connections");
+        let connections =
+            find_surprising_connections(&service, "entity:0", 32, GraphTraversalBudget::FULL)
+                .await
+                .expect("connections");
 
         assert!(
             db.neighbor_queries.load(Ordering::Relaxed)
@@ -1219,14 +1173,9 @@ mod tests {
                 json!([{"entity_id": "entity:openai"}]),
             );
 
-        let service = MemoryService::new(
-            Arc::new(db),
-            vec!["org".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .unwrap();
+        let service =
+            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
+                .unwrap();
 
         let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
 
@@ -1261,14 +1210,9 @@ mod tests {
                 json!([{"entity_id": "entity:openai"}]),
             );
 
-        let service = MemoryService::new(
-            Arc::new(db),
-            vec!["org".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .unwrap();
+        let service =
+            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
+                .unwrap();
 
         let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
 
@@ -1308,14 +1252,9 @@ mod tests {
                 json!([{"entity_id": "entity:openai"}]),
             );
 
-        let service = MemoryService::new(
-            Arc::new(db),
-            vec!["org".to_string()],
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .unwrap();
+        let service =
+            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
+                .unwrap();
 
         let chain = service.find_intro_chain("OpenAI", 4, None).await.unwrap();
 
@@ -1348,7 +1287,7 @@ mod tests {
                 .await
                 .expect("apply migrations");
         }
-        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
             .expect("create test service");
 
         // Resolve the same entity via different typed methods
@@ -1383,7 +1322,7 @@ mod tests {
                 .await
                 .expect("apply migrations");
         }
-        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
             .expect("create test service");
 
         let from_id = service

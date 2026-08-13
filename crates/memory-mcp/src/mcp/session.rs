@@ -15,7 +15,6 @@ use super::response::OpenAppResult;
 #[derive(Debug, Clone)]
 pub(crate) struct AppSessionState {
     pub(crate) app: String,
-    pub(crate) scope: String,
     pub(crate) expires_at: Option<DateTime<Utc>>,
     pub(crate) payload: Value,
 }
@@ -97,12 +96,11 @@ impl SessionManager {
     pub async fn create(
         &self,
         app: &str,
-        scope: &str,
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
         let session_id = self.next_session_id();
-        let payload = enrich_session_payload(app, &session_id, scope, ttl_seconds, payload);
+        let payload = enrich_session_payload(app, &session_id, ttl_seconds, payload);
         let expires_at = payload
             .get("meta")
             .and_then(|meta| meta.get("expires_at"))
@@ -113,7 +111,6 @@ impl SessionManager {
             session_id.clone(),
             AppSessionState {
                 app: app.to_string(),
-                scope: scope.to_string(),
                 expires_at,
                 payload: payload.clone(),
             },
@@ -195,7 +192,6 @@ pub(crate) fn app_command_result_from_details(
 pub(crate) fn enrich_session_payload(
     app: &str,
     session_id: &str,
-    scope: &str,
     ttl_seconds: Option<i64>,
     payload: Value,
 ) -> Value {
@@ -212,7 +208,6 @@ pub(crate) fn enrich_session_payload(
         .unwrap_or_else(serde_json::Map::new);
     object.insert("app".to_string(), serde_json::json!(app));
     object.insert("session_id".to_string(), serde_json::json!(session_id));
-    object.insert("scope".to_string(), serde_json::json!(scope));
     object.insert(
         "meta".to_string(),
         serde_json::json!({
@@ -233,10 +228,10 @@ mod tests {
     #[test]
     fn enrich_session_payload_adds_meta_with_expiry() {
         let payload = json!({"data": "value"});
-        let enriched = enrich_session_payload("inspector", "ses:1", "org", Some(3600), payload);
+        let enriched = enrich_session_payload("inspector", "ses:1", Some(3600), payload);
         assert_eq!(enriched["app"], "inspector");
         assert_eq!(enriched["session_id"], "ses:1");
-        assert_eq!(enriched["scope"], "org");
+
         assert!(enriched["meta"]["expires_at"].is_string());
         assert_eq!(enriched["meta"]["ttl_seconds"], 3600);
         assert_eq!(enriched["data"], "value");
@@ -245,7 +240,7 @@ mod tests {
     #[test]
     fn enrich_session_payload_handles_no_ttl() {
         let payload = json!({});
-        let enriched = enrich_session_payload("diff", "ses:2", "personal", None, payload);
+        let enriched = enrich_session_payload("diff", "ses:2", None, payload);
         assert_eq!(enriched["app"], "diff");
         assert_eq!(enriched["meta"]["ttl_seconds"], serde_json::Value::Null);
         assert!(enriched["meta"]["expires_at"].is_null());
@@ -259,7 +254,6 @@ mod tests {
                 "ses:9999".to_string(),
                 AppSessionState {
                     app: "diff".to_string(),
-                    scope: "org".to_string(),
                     expires_at: Some(Utc::now() - Duration::seconds(1)),
                     payload: json!({"app": "diff"}),
                 },
@@ -285,7 +279,6 @@ mod tests {
                 "ses:expired".to_string(),
                 AppSessionState {
                     app: "diff".to_string(),
-                    scope: "org".to_string(),
                     expires_at: Some(Utc::now() - Duration::seconds(1)),
                     payload: json!({}),
                 },
@@ -296,7 +289,6 @@ mod tests {
                 "ses:live".to_string(),
                 AppSessionState {
                     app: "diff".to_string(),
-                    scope: "org".to_string(),
                     expires_at: Some(Utc::now() + Duration::seconds(30)),
                     payload: json!({}),
                 },

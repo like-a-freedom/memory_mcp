@@ -258,7 +258,10 @@ impl<S: ModelProgressSink> ThrottledProgressSink<S> {
 
 impl<S: ModelProgressSink> ModelProgressSink for ThrottledProgressSink<S> {
     fn emit(&self, event: &ModelProgressEvent) {
-        let mut state = self.last.lock().expect("throttle state lock");
+        let mut state = match self.last.lock() {
+            Ok(state) => state,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let now = Instant::now();
         let bucket = event
             .progress_percent
@@ -296,17 +299,26 @@ pub struct CapturingSink {
 
 impl CapturingSink {
     pub fn events(&self) -> Vec<ModelProgressEvent> {
-        self.events.lock().expect("events lock").clone()
+        match self.events.lock() {
+            Ok(events) => events.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
 
     pub fn event_count(&self) -> usize {
-        self.events.lock().expect("events lock").len()
+        match self.events.lock() {
+            Ok(events) => events.len(),
+            Err(poisoned) => poisoned.into_inner().len(),
+        }
     }
 }
 
 impl ModelProgressSink for CapturingSink {
     fn emit(&self, event: &ModelProgressEvent) {
-        self.events.lock().expect("events lock").push(event.clone());
+        match self.events.lock() {
+            Ok(mut events) => events.push(event.clone()),
+            Err(poisoned) => poisoned.into_inner().push(event.clone()),
+        }
     }
 }
 

@@ -8,7 +8,7 @@
 
 **Tech stack:** Rust 2024, Tokio, `rmcp` 2.2, SurrealDB 3.2, Serde/Schemars, Chrono, SHA-256, the existing local extraction and embedding stack, the existing metrics facade and optional Prometheus exporter. No new mandatory database, remote service, LLM, vector store, graph store, agent framework, or runtime Python dependency.
 
-**Canonical status:** This is the single active implementation plan for agent-memory lifecycle integration. It supersedes the implementation sections of `docs/AGENT_MEMORY_DISCIPLINE_PLAN.md` and the three external proposals reviewed on 2026-07-23. Older documents remain research and decision history.
+**Canonical status:** This is the historical implementation plan for agent-memory lifecycle integration. Its implementation record is preserved, but ADR-0038 and its 2026-08-12 follow-on plan supersede its legacy scope/project transport fields and project daily budget. The lifecycle security, trust, policy-tag, quarantine, and bounded-capture semantics remain in force. It supersedes the implementation sections of `docs/AGENT_MEMORY_DISCIPLINE_PLAN.md` and the three external proposals reviewed on 2026-07-23. Older documents remain research and decision history.
 
 **Verified repository baseline:** local `master` at `86d2bb9634c0b92f8ea9c2364d053d2383e9e6e4` on 2026-07-23. The branch was 41 commits ahead of `origin/master`. Re-run the preflight before implementation; do not infer current behavior from public GitHub alone.
 

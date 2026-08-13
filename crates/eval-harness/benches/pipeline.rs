@@ -70,10 +70,8 @@ fn bench_retrieval(c: &mut Criterion) {
                     &service.build_context(),
                     memory_mcp::models::AssembleContextRequest {
                         query: "project status".into(),
-                        scope: "org".into(),
                         as_of: Some(chrono::Utc::now()),
                         budget: 5,
-                        project: None,
                         fact_types: vec![],
                         view_mode: None,
                         window_start: None,

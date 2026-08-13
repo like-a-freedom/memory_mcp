@@ -81,16 +81,8 @@ impl ExternalRetrievalSuite {
                     };
                 }
             };
-            test_support::seed_fact_with_links_and_project(
-                &service,
-                &case.scope,
-                &fact.content,
-                t_valid,
-                vec![],
-                None,
-                None,
-            )
-            .await;
+            test_support::seed_fact_with_links(&service, &fact.content, t_valid, vec![], None)
+                .await;
         }
 
         let start_query = std::time::Instant::now();
@@ -98,10 +90,8 @@ impl ExternalRetrievalSuite {
             &service.build_context(),
             memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),
-                scope: case.scope.clone(),
                 as_of: Some(chrono::Utc::now()),
                 budget: case.budget,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,
@@ -272,7 +262,6 @@ mod tests {
                 dataset: "test".into(),
                 description: "test".into(),
                 query: "query".into(),
-                scope: "org".into(),
                 budget: 5,
                 facts: vec![crate::corpus::adapters::SeedFact {
                     content: "fact".into(),
@@ -290,7 +279,6 @@ mod tests {
                 dataset: "test".into(),
                 description: "test".into(),
                 query: "query".into(),
-                scope: "org".into(),
                 budget: 5,
                 facts: vec![crate::corpus::adapters::SeedFact {
                     content: "fact".into(),
@@ -318,7 +306,6 @@ mod tests {
             dataset: "test".into(),
             description: "test".into(),
             query: "test query".into(),
-            scope: "org".into(),
             budget: 5,
             facts: vec![crate::corpus::adapters::SeedFact {
                 content: "test fact".into(),

@@ -6,10 +6,8 @@ use crate::service::{normalize_text, query::bucket_to_five_minutes};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CacheKey {
     pub(crate) query: String,
-    pub(crate) scope: String,
     pub(crate) cutoff: String,
     pub(crate) budget: i32,
-    pub(crate) project: Option<String>,
     pub(crate) fact_types: Vec<String>,
     pub(crate) view: CacheView,
     pub(crate) tags: Option<Vec<String>>,
@@ -43,10 +41,8 @@ impl CacheKey {
     #[must_use]
     pub fn new(
         query: &str,
-        scope: &str,
         cutoff: DateTime<Utc>,
         budget: i32,
-        project: Option<&str>,
         fact_types: &[String],
         view: CacheView,
         tags: Option<Vec<String>>,
@@ -60,19 +56,11 @@ impl CacheKey {
         fact_types.dedup();
         Self {
             query: normalize_text(query),
-            scope: scope.to_string(),
             cutoff: bucket_to_five_minutes(cutoff),
             budget,
-            project: project.map(ToString::to_string),
             fact_types,
             view,
             tags,
         }
-    }
-
-    /// Check if this cache key matches the given scope.
-    #[must_use]
-    pub fn matches_scope(&self, scope: &str) -> bool {
-        self.scope == scope
     }
 }

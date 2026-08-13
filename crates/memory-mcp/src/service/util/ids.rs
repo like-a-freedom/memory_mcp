@@ -13,7 +13,7 @@ pub fn hash_prefix(payload: &str) -> String {
     hex::encode(digest)[..24].to_string()
 }
 
-/// Generate a deterministic episode ID.
+/// Generate the legacy v1 episode ID, whose identity included scope metadata.
 #[must_use]
 pub fn deterministic_episode_id(
     source_type: &str,
@@ -27,6 +27,22 @@ pub fn deterministic_episode_id(
         normalize_text(source_id),
         normalize_dt(t_ref),
         normalize_text(scope),
+    );
+    format!("episode:{}", hash_prefix(&payload))
+}
+
+/// Generate the scope-free v2 episode ID for new writes.
+#[must_use]
+pub fn deterministic_episode_id_v2(
+    source_type: &str,
+    source_id: &str,
+    t_ref: chrono::DateTime<chrono::Utc>,
+) -> String {
+    let payload = format!(
+        "{}|{}|{}",
+        normalize_text(source_type),
+        normalize_text(source_id),
+        normalize_dt(t_ref),
     );
     format!("episode:{}", hash_prefix(&payload))
 }

@@ -58,7 +58,6 @@ pub(crate) async fn run_backfill_page(
     limit: usize,
 ) -> Result<Option<FactId>, MemoryError> {
     let query = BackfillFactQuery {
-        namespace,
         after_fact_id: cursor,
         limit,
     };

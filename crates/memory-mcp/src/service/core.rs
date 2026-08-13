@@ -18,18 +18,24 @@ pub(crate) use helpers::*;
 
 impl MemoryService {
     pub(crate) fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone())
+        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
     /// Read-side store for the batch reembed worker (ADR-0027: reembed SQL
     /// lives in its owning store, not on `DbClient`).
     pub(crate) fn reembed_store(&self) -> crate::storage::ReembedStoreClient {
-        crate::storage::ReembedStoreClient::new(self.db_client.clone())
+        crate::storage::ReembedStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
     /// Episode-domain store (ADR-0027: episode queries live in the store).
     pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
-        crate::storage::EpisodeStoreClient::new(self.db_client.clone())
+        crate::storage::EpisodeStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
     /// Builds a `ServiceContext` from this service's fields.
@@ -39,8 +45,7 @@ impl MemoryService {
     pub fn build_context(&self) -> super::service_context::ServiceContext {
         super::service_context::ServiceContext {
             db_client: self.db_client.clone(),
-            namespaces: self.namespaces.clone(),
-            default_namespace: self.default_namespace.clone(),
+            active_namespace: self.active_namespace.clone(),
             logger: self.logger.clone(),
             rate_limiter: self.rate_limiter.clone(),
             ingestion_service: self.ingestion_service.clone(),
@@ -50,6 +55,7 @@ impl MemoryService {
             entity_extractor: self.entity_extractor.clone(),
             embedding_service: super::embedding_service::EmbeddingService::new(
                 self.db_client.clone(),
+                self.active_namespace.clone(),
                 self.logger.clone(),
                 self.embedding_provider.clone(),
                 self.embedding_similarity_threshold,
@@ -117,19 +123,20 @@ impl MemoryService {
 
     /// Returns the total count of episodes.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
-        let mut total = 0;
-        let sql = "SELECT count() FROM episode GROUP ALL";
-        for namespace in &self.namespaces {
-            let result = self.db_client.query(sql, None, namespace).await?;
-            let count = result
-                .as_array()
-                .and_then(|arr| arr.first())
-                .and_then(|obj| obj.get("count"))
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) as i32;
-            total += count;
-        }
-        Ok(total)
+        let result = self
+            .db_client
+            .query(
+                "SELECT count() FROM episode GROUP ALL",
+                None,
+                &self.active_namespace,
+            )
+            .await?;
+        Ok(result
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|obj| obj.get("count"))
+            .and_then(|value| value.as_i64())
+            .unwrap_or(0) as i32)
     }
 
     /// Adds a new fact.
@@ -144,7 +151,6 @@ impl MemoryService {
         quote: &str,
         source_episode: &str,
         t_valid: DateTime<Utc>,
-        scope: &str,
         confidence: f64,
         entity_links: Vec<String>,
         policy_tags: Vec<String>,
@@ -159,7 +165,6 @@ impl MemoryService {
                 quote,
                 source_episode,
                 t_valid,
-                scope,
                 confidence,
                 entity_links,
                 policy_tags,
@@ -212,6 +217,7 @@ impl MemoryService {
         }
         let store = std::sync::Arc::new(crate::storage::AgentMemoryStore::new(
             self.db_client.clone(),
+            self.active_namespace.clone(),
         ));
         let ingestion = std::sync::Arc::new(self.ingestion_service.clone());
         let backend = std::sync::Arc::new(
@@ -236,14 +242,7 @@ impl MemoryService {
         };
         let budget = super::agent_memory::capture::default_capture_budget();
         let result = capture
-            .execute(
-                event,
-                context,
-                &budget,
-                16 * 1024,
-                16,
-                &self.default_namespace,
-            )
+            .execute(event, context, &budget, 16 * 1024, 16)
             .await?;
         Ok(Some(result))
     }
@@ -297,24 +296,16 @@ impl MemoryService {
             .await
     }
 
-    /// Retrieves SurrealDB config.
+    /// Retrieves the bound SurrealDB storage context.
     pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
         Ok(json!({
-            "namespaces": self.namespaces.clone(),
+            "namespace": self.active_namespace,
         }))
     }
 
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
-        let _ = self
-            .db_client
-            .select_table("event_log", &self.default_namespace)
-            .await?;
+        let _ = self.app_store().select_records("event_log").await?;
         Ok(())
-    }
-
-    /// Returns the namespace for a given scope.
-    pub fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
-        crate::service::MemoryScope::parse(scope)?.namespace(&self.namespaces)
     }
 
     pub(crate) async fn find_episode_record(
@@ -331,22 +322,17 @@ impl MemoryService {
         self.find_record_by_id(fact_id).await
     }
 
-    /// Scans all namespaces for a record by its ID, returning the payload and owning namespace.
+    /// Looks up a record in the process-bound Active Namespace.
     async fn find_record_by_id(
         &self,
         record_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        // Validate the record-id shape up-front so callers can't mask bugs as
-        // silent 'not found' by passing bare hex (the query builder used to
-        // turn such inputs into a no-op SELECT).
         crate::storage::validate_record_id(record_id)?;
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(record_id, namespace).await?;
-            if let Some(Value::Object(map)) = record {
-                return Ok((Some(map), Some(namespace.clone())));
-            }
-        }
-        Ok((None, None))
+        let record = self.app_store().select_record(record_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.active_namespace.clone()),
+        ))
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
@@ -395,7 +381,7 @@ impl<'a> super::agent_memory::recall::RecallPipeline for ProductionRecallPipelin
 mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
-    use crate::models::{AccessPayload, AccessScopeAllow, Provenance};
+    use crate::models::{AccessPayload, Provenance};
     use crate::service::EmbeddingProvider;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
@@ -428,12 +414,10 @@ mod tests {
     fn log_event_includes_access_when_provided() {
         let access = AccessPayload {
             caller_id: Some("test-caller".to_string()),
-            allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: None,
             session_vars: None,
             transport: None,
             content_type: None,
-            cross_scope_allow: None,
         };
         let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
         let access_event = event.get("access").unwrap();
@@ -444,27 +428,22 @@ mod tests {
     }
 
     #[test]
-    fn serialize_access_includes_all_fields() {
+    fn serialize_access_preserves_supported_fields_and_omits_scope_fields() {
         let access = AccessPayload {
             caller_id: Some("caller".to_string()),
-            allowed_scopes: Some(vec!["org".to_string()]),
             allowed_tags: Some(vec!["tag1".to_string()]),
             session_vars: Some(json!({"key": "value"})),
             transport: Some("http".to_string()),
             content_type: Some("application/json".to_string()),
-            cross_scope_allow: Some(vec![AccessScopeAllow {
-                from: "*".to_string(),
-                to: "org".to_string(),
-            }]),
         };
         let serialized = serialize_access(&access);
         assert!(serialized.get("caller_id").is_some());
-        assert!(serialized.get("allowed_scopes").is_some());
         assert!(serialized.get("allowed_tags").is_some());
         assert!(serialized.get("session_vars").is_some());
         assert!(serialized.get("transport").is_some());
         assert!(serialized.get("content_type").is_some());
-        assert!(serialized.get("cross_scope_allow").is_some());
+        assert!(serialized.get("allowed_scopes").is_none());
+        assert!(serialized.get("cross_scope_allow").is_none());
     }
 
     /// Verifies that truncation is inside `generate_embedding` by checking
@@ -486,40 +465,12 @@ mod tests {
         assert_eq!(truncated.chars().count(), 8_000);
     }
 
-    #[test]
-    fn namespace_for_scope_returns_exact_match() {
-        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
-        assert_eq!(service.namespace_for_scope("org").unwrap(), "org");
-        assert_eq!(service.namespace_for_scope("personal").unwrap(), "personal");
-        assert_eq!(service.namespace_for_scope("team").unwrap(), "team");
-        assert_eq!(
-            service.namespace_for_scope("private-domain").unwrap(),
-            "private-domain"
-        );
-    }
-
-    #[test]
-    fn namespace_for_scope_returns_error_for_unknown() {
-        let service = create_test_service(vec!["org", "personal"]);
-        assert!(matches!(
-            service.namespace_for_scope("unknown"),
-            Err(MemoryError::Validation(_))
-        ));
-    }
-
-    #[test]
-    fn namespace_for_scope_accepts_case_insensitive_inputs() {
-        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
-        assert_eq!(service.namespace_for_scope("ORG").unwrap(), "org");
-        assert_eq!(service.namespace_for_scope("TEAM").unwrap(), "team");
-    }
-
-    fn create_test_service(namespaces: Vec<&str>) -> MemoryService {
+    fn create_test_service(active_namespace: &str) -> MemoryService {
         use std::sync::Arc;
 
         MemoryService::new(
             Arc::new(crate::service::mock_db::MockDbClient::new()),
-            namespaces.iter().map(|s| s.to_string()).collect(),
+            active_namespace.to_string(),
             "warn".to_string(),
             50,
             100,
@@ -532,7 +483,7 @@ mod tests {
 
         MemoryService::new(
             Arc::new(crate::service::mock_db::MockDbClient::new()),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             rps,
             burst,
@@ -542,14 +493,14 @@ mod tests {
 
     #[test]
     fn enforce_rate_limit_allows_without_caller_id() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let access = AccessPayload::default();
         assert!(service.enforce_rate_limit(Some(&access)).is_ok());
     }
 
     #[test]
     fn enforce_rate_limit_allows_within_limit() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let access = AccessPayload {
             caller_id: Some("user-1".to_string()),
             ..Default::default()
@@ -559,7 +510,7 @@ mod tests {
 
     #[test]
     fn enforce_rate_limit_accepts_none() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         assert!(service.enforce_rate_limit(None).is_ok());
     }
 
@@ -663,7 +614,7 @@ mod tests {
 
         let service = MemoryService::new_with_embedding_provider(
             db_client.clone(),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -680,7 +631,6 @@ mod tests {
                 "Compensation increase approved",
                 "episode:test",
                 Utc::now(),
-                "org",
                 0.9,
                 vec![],
                 vec![],
@@ -718,7 +668,7 @@ mod tests {
 
         let mut service = MemoryService::new_with_embedding_provider(
             db_client.clone(),
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -738,7 +688,6 @@ mod tests {
                 "Provider outage should not block fact creation",
                 "episode:test",
                 Utc::now(),
-                "org",
                 0.9,
                 vec![],
                 vec![],
@@ -788,7 +737,7 @@ mod tests {
 
         let mut service = MemoryService::new_with_embedding_provider(
             db_client,
-            vec!["org".to_string()],
+            "org".to_string(),
             "warn".to_string(),
             50,
             100,
@@ -840,15 +789,10 @@ mod tests {
     fn log_event_with_full_access_context() {
         let access = AccessPayload {
             caller_id: Some("test-user".to_string()),
-            allowed_scopes: Some(vec!["personal".to_string(), "org".to_string()]),
             allowed_tags: Some(vec!["tag1".to_string()]),
             session_vars: Some(json!({"session": "value"})),
             transport: Some("grpc".to_string()),
             content_type: Some("application/grpc".to_string()),
-            cross_scope_allow: Some(vec![AccessScopeAllow {
-                from: "personal".to_string(),
-                to: "org".to_string(),
-            }]),
         };
         let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
         let access_val = event.get("access").unwrap();
@@ -858,13 +802,22 @@ mod tests {
         );
         assert_eq!(
             access_val
-                .get("allowed_scopes")
+                .get("allowed_tags")
                 .unwrap()
                 .as_array()
                 .unwrap()
                 .len(),
-            2
+            1
         );
+        assert_eq!(
+            access_val
+                .get("session_vars")
+                .and_then(|value| value.get("session"))
+                .and_then(Value::as_str),
+            Some("value")
+        );
+        assert!(access_val.get("allowed_scopes").is_none());
+        assert!(access_val.get("cross_scope_allow").is_none());
         assert_eq!(access_val.get("transport").unwrap().as_str(), Some("grpc"));
         assert_eq!(
             access_val.get("content_type").unwrap().as_str(),
@@ -901,40 +854,22 @@ mod tests {
     }
 
     #[test]
-    fn serialize_access_with_all_none_fields() {
+    fn serialize_access_with_all_none_fields_omits_scope_fields() {
         let access = AccessPayload {
             caller_id: None,
-            allowed_scopes: None,
             allowed_tags: None,
             session_vars: None,
             transport: None,
             content_type: None,
-            cross_scope_allow: None,
         };
         let serialized = serialize_access(&access);
         assert!(serialized.get("caller_id").is_some());
-        assert!(serialized.get("allowed_scopes").is_some());
         assert!(serialized.get("allowed_tags").is_some());
         assert!(serialized.get("session_vars").is_some());
         assert!(serialized.get("transport").is_some());
         assert!(serialized.get("content_type").is_some());
-        assert!(serialized.get("cross_scope_allow").is_some());
-    }
-
-    #[test]
-    fn namespace_for_scope_handles_various_inputs() {
-        let service = create_test_service(vec!["org", "personal", "team", "private-domain"]);
-
-        assert_eq!(service.namespace_for_scope("org").unwrap(), "org");
-        assert_eq!(service.namespace_for_scope("personal").unwrap(), "personal");
-        assert_eq!(service.namespace_for_scope("team").unwrap(), "team");
-        assert_eq!(
-            service.namespace_for_scope("private-domain").unwrap(),
-            "private-domain"
-        );
-        assert!(service.namespace_for_scope("unknown").is_err());
-        assert!(service.namespace_for_scope("").is_err());
-        assert_eq!(service.namespace_for_scope("ORG").unwrap(), "org");
+        assert!(serialized.get("allowed_scopes").is_none());
+        assert!(serialized.get("cross_scope_allow").is_none());
     }
 
     #[test]
@@ -970,20 +905,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_surrealdb_config_returns_namespaces() {
-        let namespaces = vec!["org".to_string(), "personal".to_string()];
+    async fn get_surrealdb_config_returns_active_namespace() {
+        let namespaces = vec!["org".to_string()];
         let db_client = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces("config_test", &namespaces, "warn")
                 .await
                 .expect("connect in-memory test db"),
         );
-        let service =
-            MemoryService::new(db_client, namespaces.clone(), "warn".to_string(), 50, 100)
-                .expect("create test service");
+        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
+            .expect("create test service");
 
         let config = service.get_surrealdb_config().await.expect("get config");
-        let config_namespaces = config["namespaces"].as_array().expect("namespaces array");
-        assert_eq!(config_namespaces.len(), 2);
+        assert_eq!(config["namespace"], "org");
     }
 
     #[tokio::test]
@@ -1004,7 +937,7 @@ mod tests {
                 .await
                 .expect("apply migrations");
         }
-        let service = MemoryService::new(db_client, namespaces, "warn".to_string(), 50, 100)
+        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
             .expect("create test service");
 
         let count = service.episode_count().await.expect("count episodes");
@@ -1019,7 +952,7 @@ mod tests {
 
     #[tokio::test]
     async fn find_episode_record_rejects_bare_hex() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let result = service
             .find_episode_record("474b2d8b81b3feabf832ef08")
             .await;
@@ -1034,7 +967,7 @@ mod tests {
 
     #[tokio::test]
     async fn find_episode_record_rejects_empty_id_part() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let result = service.find_episode_record("episode:").await;
         assert!(matches!(
             result,
@@ -1044,7 +977,7 @@ mod tests {
 
     #[tokio::test]
     async fn find_fact_record_rejects_bare_hex() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let result = service.find_fact_record("072d682d0d467aa94aad684d").await;
         assert!(matches!(
             result,
@@ -1054,7 +987,7 @@ mod tests {
 
     #[tokio::test]
     async fn find_fact_record_rejects_empty_id_part() {
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let result = service.find_fact_record("fact:").await;
         assert!(matches!(
             result,
@@ -1065,7 +998,7 @@ mod tests {
     #[tokio::test]
     async fn find_episode_record_accepts_wellformed_episode_id() {
         // Sanity: well-formed ids pass validation and reach the DB (mock returns None).
-        let service = create_test_service(vec!["org"]);
+        let service = create_test_service("org");
         let result = service.find_episode_record("episode:doesnotexist").await;
         assert!(
             result.is_ok(),

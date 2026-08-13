@@ -18,7 +18,7 @@ async fn seed_edge(
     to_id: &str,
     t_valid: chrono::DateTime<Utc>,
 ) {
-    memory_mcp::storage::EpisodeStoreClient::new(db_client.clone())
+    memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), namespace)
         .relate_edge(
             edge_id,
             from_id,
@@ -35,7 +35,6 @@ async fn seed_edge(
                 "t_valid": normalize_dt(t_valid),
                 "t_ingested": normalize_dt(t_valid),
             }),
-            namespace,
         )
         .await
         .expect("seed edge should succeed");
@@ -157,7 +156,7 @@ async fn community_rebuild_pass_prunes_stale_communities_without_active_edges() 
 }
 
 #[tokio::test]
-async fn community_rebuild_pass_processes_all_configured_namespaces() {
+async fn community_rebuild_pass_processes_only_active_namespace() {
     let (service, db_client) = common::make_service_with_client().await;
     let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 13, 0, 0).unwrap();
 
@@ -165,20 +164,12 @@ async fn community_rebuild_pass_processes_all_configured_namespaces() {
         ("entity:ivy_lane", "Ivy Lane"),
         ("entity:jade_park", "Jade Park"),
     ] {
-        common::seed_entity(
-            &db_client,
-            "personal",
-            entity_id,
-            "person",
-            canonical_name,
-            &[],
-        )
-        .await;
+        common::seed_entity(&db_client, "org", entity_id, "person", canonical_name, &[]).await;
     }
 
     seed_edge(
         &db_client,
-        "personal",
+        "org",
         "edge:ivy-jade",
         "entity:ivy_lane",
         "knows",
@@ -193,13 +184,10 @@ async fn community_rebuild_pass_processes_all_configured_namespaces() {
 
     assert_eq!(
         rebuilt, 1,
-        "expected one rebuilt community across namespaces"
+        "expected one rebuilt community in the active namespace"
     );
 
-    let communities = db_client
-        .select_table("community", "personal")
-        .await
-        .unwrap();
+    let communities = db_client.select_table("community", "org").await.unwrap();
     assert!(
         communities.iter().any(|community| {
             let Some(members) = community
@@ -212,6 +200,6 @@ async fn community_rebuild_pass_processes_all_configured_namespaces() {
             let members: Vec<_> = members.iter().filter_map(|value| value.as_str()).collect();
             members.contains(&"entity:ivy_lane") && members.contains(&"entity:jade_park")
         }),
-        "community rebuild should include non-default namespaces"
+        "community rebuild should operate on the active namespace"
     );
 }

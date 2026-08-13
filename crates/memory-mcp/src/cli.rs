@@ -68,15 +68,15 @@ pub enum Command {
     /// Output: ToolResponse with source snippets and provenance data.
     Explain(args::ExplainArgs),
     /// Assemble ranked, relevant context for a query.
-    /// Searches stored facts matching `--query`, scoped by `--scope` (org/team/personal).
+    /// Searches stored facts matching `--query` in the process Active Namespace.
     /// Output: ToolResponse with ranked context_items. Next step: pipe items to `explain`.
     AssembleContext(args::AssembleContextArgs),
-    /// Internal: capture a lifecycle event (hidden from --help).
-    /// Consumed by hook scripts, not a public tool. See ADR-0016 AD-4.
+    /// Internal: capture a scope-free lifecycle event (hidden from --help).
+    /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
     LifecycleCapture(args::LifecycleCaptureArgs),
-    /// Internal: recall lifecycle context (hidden from --help).
-    /// Consumed by hook scripts, not a public tool. See ADR-0016 AD-5.
+    /// Internal: recall scope-free lifecycle context (hidden from --help).
+    /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
     LifecycleRecall(args::LifecycleRecallArgs),
 }

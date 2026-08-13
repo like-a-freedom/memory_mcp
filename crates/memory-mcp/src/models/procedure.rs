@@ -37,7 +37,13 @@ impl ProcedureStatus {
 pub struct ProcedureCandidateRecord {
     pub candidate_id: String,
     pub namespace: String,
-    pub scope: String,
+    /// Identity schema version used when this candidate was created.
+    #[serde(default = "default_identity_version")]
+    pub identity_version: u8,
+    /// Legacy policy metadata retained for compatibility reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// Legacy policy metadata retained for compatibility reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     pub task_fingerprint: String,
@@ -71,8 +77,17 @@ pub fn beta_posterior_mean(success_count: i64, failure_count: i64) -> f64 {
     alpha / (alpha + beta)
 }
 
-/// Compute a deterministic candidate ID from namespace, scope, project, and
-/// task fingerprint.
+const LEGACY_IDENTITY_VERSION: u8 = 1;
+const V2_IDENTITY_VERSION: u8 = 2;
+
+fn default_identity_version() -> u8 {
+    LEGACY_IDENTITY_VERSION
+}
+
+/// Compute the legacy deterministic candidate ID from namespace, scope,
+/// project, and task fingerprint.
+///
+/// Keep this function unchanged for compatibility with existing candidate IDs.
 #[must_use]
 pub fn deterministic_candidate_id(
     namespace: &str,
@@ -91,6 +106,23 @@ pub fn deterministic_candidate_id(
     hasher.update(task_fingerprint.as_bytes());
     let hash = hex::encode(&hasher.finalize()[..]);
     format!("procedure_candidate:{hash}")
+}
+
+/// Compute the v2 candidate ID from the active namespace and task fingerprint.
+///
+/// Legacy `scope` and `project` metadata are deliberately not accepted here.
+#[must_use]
+pub fn deterministic_candidate_id_v2(namespace: &str, task_fingerprint: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    for value in [namespace.as_bytes(), task_fingerprint.as_bytes()] {
+        let length = u64::try_from(value.len()).unwrap_or(u64::MAX);
+        hasher.update(length.to_be_bytes());
+        hasher.update(value);
+    }
+    let hash = hex::encode(hasher.finalize());
+    format!("procedure_candidate:v{V2_IDENTITY_VERSION}:{hash}")
 }
 
 #[cfg(test)]
@@ -135,6 +167,46 @@ mod tests {
         let id1 = deterministic_candidate_id("test", "org", Some("p"), "task:1");
         let id2 = deterministic_candidate_id("test", "org", Some("p"), "task:2");
         assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_candidate_id_v2_ignores_legacy_partition_metadata() {
+        let legacy_org = deterministic_candidate_id("test", "org", Some("p1"), "task:1");
+        let legacy_private = deterministic_candidate_id("test", "private", Some("p2"), "task:1");
+        assert_ne!(legacy_org, legacy_private);
+
+        let id1 = deterministic_candidate_id_v2("test", "task:1");
+        let id2 = deterministic_candidate_id_v2("test", "task:1");
+        assert_eq!(id1, id2);
+        assert!(id1.starts_with("procedure_candidate:v2:"));
+
+        let other_namespace = deterministic_candidate_id_v2("other", "task:1");
+        let other_task = deterministic_candidate_id_v2("test", "task:2");
+        assert_ne!(id1, other_namespace);
+        assert_ne!(id1, other_task);
+    }
+
+    #[test]
+    fn legacy_candidate_record_defaults_to_v1_identity() {
+        let legacy = serde_json::json!({
+            "candidate_id": "procedure_candidate:legacy",
+            "namespace": "test",
+            "scope": "org",
+            "project": "legacy-project",
+            "task_fingerprint": "task:1",
+            "normalized_task": "do work",
+            "status": "shadow",
+            "trust_floor": "lifecycle_evidence",
+            "origin_kind": "lifecycle_adapter",
+            "created_at": "2026-07-01T00:00:00Z",
+            "updated_at": "2026-07-01T00:00:00Z"
+        });
+
+        let record: ProcedureCandidateRecord = serde_json::from_value(legacy)
+            .expect("legacy procedure candidate must remain readable");
+        assert_eq!(record.identity_version, 1);
+        assert_eq!(record.scope.as_deref(), Some("org"));
+        assert_eq!(record.project.as_deref(), Some("legacy-project"));
     }
 
     #[test]

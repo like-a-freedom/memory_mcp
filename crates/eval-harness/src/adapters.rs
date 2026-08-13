@@ -6,8 +6,6 @@ pub struct CanonicalFact {
     pub fact_id: String,
     pub episode_id: String,
     pub content: String,
-    pub scope: String,
-    pub project: Option<String>,
     pub t_valid: String,
     pub embedding: Option<Vec<f32>>,
     pub embedding_model: Option<String>,
@@ -78,7 +76,6 @@ pub async fn import_canonical_facts(
                 &fact.content,
                 &fact.episode_id,
                 t_valid,
-                &fact.scope,
                 0.9,
                 vec![],
                 vec![],
@@ -111,8 +108,6 @@ pub fn facts_for_case(case: &ExternalCase) -> Vec<CanonicalFact> {
                 fact_id,
                 episode_id,
                 content: fact.content.clone(),
-                scope: case.scope.clone(),
-                project: None,
                 t_valid: fact.t_valid.clone(),
                 embedding: None,
                 embedding_model: None,
@@ -135,7 +130,6 @@ mod tests {
             dataset: "test".into(),
             description: "test case".into(),
             query: "test query".into(),
-            scope: "org".into(),
             budget: 5,
             facts: vec![
                 SeedFact {
@@ -167,11 +161,11 @@ mod tests {
     }
 
     #[test]
-    fn facts_preserve_content_and_scope() {
+    fn facts_preserve_content_without_partition_metadata() {
         let case = test_case();
         let facts = facts_for_case(&case);
         assert_eq!(facts[0].content, "Fact one content");
-        assert_eq!(facts[0].scope, "org");
+
         assert_eq!(facts[0].t_valid, "2026-01-01T00:00:00Z");
     }
 
@@ -188,8 +182,6 @@ mod tests {
             fact_id: "f1".into(),
             episode_id: "episode:e1".into(),
             content: "  ".into(),
-            scope: "org".into(),
-            project: None,
             t_valid: "2026-01-01T00:00:00Z".into(),
             embedding: None,
             embedding_model: None,
@@ -205,8 +197,6 @@ mod tests {
             fact_id: "f1".into(),
             episode_id: "episode:e1".into(),
             content: "valid content".into(),
-            scope: "org".into(),
-            project: None,
             t_valid: "2026-01-01T00:00:00Z".into(),
             embedding: Some(vec![0.1, 0.2, 0.3]),
             embedding_model: None,
@@ -223,8 +213,6 @@ mod tests {
             fact_id: "f1".into(),
             episode_id: "episode:e1".into(),
             content: "valid content".into(),
-            scope: "org".into(),
-            project: None,
             t_valid: "2026-01-01T00:00:00Z".into(),
             embedding: Some(vec![0.1, 0.2]),
             embedding_model: Some("test-model".into()),
@@ -243,8 +231,6 @@ mod tests {
             fact_id: "f1".into(),
             episode_id: "episode:e1".into(),
             content: "Alice works at Orbital Labs".into(),
-            scope: "org".into(),
-            project: None,
             t_valid: "2026-01-01T00:00:00Z".into(),
             embedding: None,
             embedding_model: None,
@@ -257,10 +243,8 @@ mod tests {
             &service.build_context(),
             memory_mcp::models::AssembleContextRequest {
                 query: "Alice Orbital".into(),
-                scope: "org".into(),
                 as_of: Some(chrono::Utc::now()),
                 budget: 5,
-                project: None,
                 fact_types: vec![],
                 view_mode: None,
                 window_start: None,

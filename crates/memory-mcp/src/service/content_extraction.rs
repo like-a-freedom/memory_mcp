@@ -362,15 +362,19 @@ fn looks_like_remote_url(content: &str) -> bool {
 fn strip_html_to_text(raw: &str) -> String {
     use std::sync::LazyLock;
 
-    static SCRIPT_STYLE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
-        regex::Regex::new(r"(?is)<(script|style)[^>]*>.*?</(script|style)>")
-            .expect("script/style regex should compile")
-    });
-    static TAG_RE: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r"(?is)<[^>]+>").expect("tag regex should compile"));
+    static SCRIPT_STYLE_RE: LazyLock<Result<regex::Regex, regex::Error>> =
+        LazyLock::new(|| regex::Regex::new(r"(?is)<(script|style)[^>]*>.*?</(script|style)>"));
+    static TAG_RE: LazyLock<Result<regex::Regex, regex::Error>> =
+        LazyLock::new(|| regex::Regex::new(r"(?is)<[^>]+>"));
 
-    let without_scripts = SCRIPT_STYLE_RE.replace_all(raw, " ");
-    let without_tags = TAG_RE.replace_all(&without_scripts, " ");
+    let without_scripts = match SCRIPT_STYLE_RE.as_ref() {
+        Ok(regex) => regex.replace_all(raw, " ").into_owned(),
+        Err(_) => raw.to_string(),
+    };
+    let without_tags = match TAG_RE.as_ref() {
+        Ok(regex) => regex.replace_all(&without_scripts, " ").into_owned(),
+        Err(_) => without_scripts,
+    };
 
     without_tags
         .replace("&nbsp;", " ")
@@ -486,10 +490,7 @@ mod tests {
             source_id: "caller-provided".to_string(),
             content: file_path.to_string_lossy().into_owned(),
             t_ref: Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         })
         .await
@@ -514,10 +515,7 @@ mod tests {
             source_id: "caller-provided".to_string(),
             content: file_path.to_string_lossy().into_owned(),
             t_ref: Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         })
         .await
@@ -581,10 +579,7 @@ mod tests {
             source_id: "original".to_string(),
             content: "old".to_string(),
             t_ref: Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         };
 
@@ -616,10 +611,7 @@ mod tests {
             source_id: "id".to_string(),
             content: "old".to_string(),
             t_ref: Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         };
 

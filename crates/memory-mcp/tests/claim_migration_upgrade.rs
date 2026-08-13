@@ -66,3 +66,40 @@ fn migration_030_defines_fields_on_claim_relation() {
     assert!(sql.contains("left_fact_id ON claim_relation"));
     assert!(sql.contains("right_fact_id ON claim_relation"));
 }
+
+#[test]
+fn migration_037_makes_legacy_triple_namespace_optional() {
+    let sql = migration_sql!("037_triple_legacy_namespace_optional.surql");
+    assert!(sql.contains("DEFINE FIELD OVERWRITE namespace ON triple TYPE option<string>"));
+    assert!(!sql.contains("REMOVE FIELD"));
+    assert!(!sql.contains("UPDATE triple"));
+}
+
+#[test]
+fn migration_032_expands_legacy_partition_fields_without_removing_them() {
+    let sql = migration_sql!("032_scope_free_active_namespace_expand.surql");
+
+    for declaration in [
+        "DEFINE FIELD OVERWRITE scope ON episode TYPE option<string>",
+        "DEFINE FIELD OVERWRITE visibility_scope ON episode TYPE option<string>",
+        "DEFINE FIELD OVERWRITE scope ON fact TYPE option<string>",
+        "DEFINE FIELD OVERWRITE scope ON claim TYPE option<string>",
+        "DEFINE FIELD OVERWRITE project ON claim TYPE option<string>",
+        "DEFINE FIELD OVERWRITE scope ON claim_relation TYPE option<string>",
+        "DEFINE FIELD OVERWRITE project ON claim_relation TYPE option<string>",
+    ] {
+        assert!(
+            sql.contains(declaration),
+            "missing declaration: {declaration}"
+        );
+    }
+
+    assert!(
+        !sql.contains("REMOVE FIELD"),
+        "expand migration must preserve legacy fields"
+    );
+    assert!(
+        !sql.contains("UPDATE episode") && !sql.contains("UPDATE fact"),
+        "expand migration must not rewrite source evidence"
+    );
+}

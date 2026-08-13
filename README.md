@@ -33,7 +33,7 @@ Memory MCP implements a memory system for AI agents with core goals:
 - extract entities, facts, and links in a deterministic way
 - track knowledge over both valid time and transaction time
 - assemble compact, relevant context for downstream reasoning
-- support scope-aware retrieval and access filtering
+- support policy-tag-aware retrieval and access filtering within one Active Namespace
 
 In practice, an agent can ingest emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
 
@@ -43,7 +43,7 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 - **Episode ingestion** for storing raw source material
 - **Entity resolution** with alias handling and deterministic IDs
 - **Fact extraction** for metrics, promises, and other structured knowledge
-- **Context assembly** for ranked retrieval by query, scope, and time cutoff
+- **Context assembly** for ranked retrieval by query, policy tags, and time cutoff
 - **Graph relationships** between episodes, entities, and facts
 - **Optional semantic retrieval providers** including in-process `local-candle`
 - **Pluggable NER backends** for entity extraction: `anno`, `regex`, explicit Anno NuNER ONNX, and two native Candle zero-shot GLiNER backends (selectable via `NER_EXTRACTOR`)
@@ -157,7 +157,7 @@ SurrealDB explicitly, use one of the supported remote schemes (`ws`, `wss`,
 SURREALDB_URL=ws://127.0.0.1:8000/rpc \
 SURREALDB_EMBEDDED=false \
 SURREALDB_DB_NAME=memory \
-SURREALDB_NAMESPACES=org,personal \
+SURREALDB_NAMESPACE=org \
 SURREALDB_USERNAME=<your-remote-username> \
 SURREALDB_PASSWORD=<your-remote-password> \
 RUST_LOG=info \
@@ -208,8 +208,6 @@ RUST_LOG=info cargo run --quiet --bin memory_mcp -- serve
 # Terminal 2 — start the watcher on a project inbox
 cargo run --features cli-watch --quiet -- \
   watch ~/projects/atlas/inbox \
-  --project atlas \
-  --scope org \
   --interval 5
 ```
 
@@ -237,7 +235,7 @@ No manual `ingest` tool call needed.
 
 ### Optional MCP apps surface
 
-The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is intentionally feature-gated so the six canonical memory tools stay available without exposing extra session/resource endpoints by default.
+The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is intentionally feature-gated so the eight canonical memory tools stay available without exposing extra session/resource endpoints by default.
 
 Build or run with apps enabled:
 
@@ -258,10 +256,10 @@ cargo clippy --all-targets --features mcp-apps
 <summary><strong>Architecture flow</strong></summary>
 
 ```
-CLI: memory_mcp watch <dir> [--project X] [--scope Y] [--interval Z]
+CLI: memory_mcp watch <dir> [--interval Z]
   │
   ▼
-FsWatcher::run_with_interval(dir, project, scope, interval, service)
+FsWatcher::run_with_interval(dir, interval, service)
   │
   ├─ Validate: directory must exist and be readable
   ├─ Initialize: notify::RecommendedWatcher (polling mode)
@@ -280,8 +278,7 @@ FsWatcher::run_with_interval(dir, project, scope, interval, service)
        ├─ Determine metadata:
        │   • source_id = "watch:<file_path>"
        │   • source_type = "email" (.eml) or "document" (all others)
-       │   • project = CLI flag value
-       │   • scope = CLI flag value
+       │   • namespace = the server's startup-selected Active Namespace
        │
        ├─ Dispatch: service.ingest(IngestRequest { content: <file_path> })
        │   └─ Internally: read file → detect format → extract text → chunk
@@ -326,8 +323,6 @@ Required:
   <dir>              Directory to watch (must exist and be readable)
 
 Optional:
-  --project <name>   Attach ingested episodes to a project (default: none)
-  --scope <scope>    Scope for namespace resolution (default: "org")
   --interval <secs>  Poll interval + dedup window in seconds (default: 2, min: 1)
 ```
 
@@ -346,7 +341,7 @@ The watcher **does not diff content** — every qualifying event triggers a full
 | Level | Watch events you'll see |
 |-------|------------------------|
 | `info` | `watcher.ready` (startup), `watcher.ingest_complete` (with `episode_id`) |
-| `debug` | `watcher.ingest_dispatch` (file path, source_type, project, scope) |
+| `debug` | `watcher.ingest_dispatch` (file path and source_type; storage uses the process Active Namespace) |
 | `trace` | `watcher.event_skipped` (dedup reason, elapsed vs interval) |
 | `warn` | — (none specific to watch) |
 | `error` | `watcher.ingest_error` (fatal — watcher terminates) |
@@ -380,7 +375,7 @@ Configuration is loaded from environment variables.
 | Variable | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
 | `SURREALDB_DB_NAME` | string | `memory` | No | Database name |
-| `SURREALDB_NAMESPACES` | comma-separated list | `org` | No | Namespace list |
+| `SURREALDB_NAMESPACE` | string | `main` | No | One namespace; changing it takes effect after restart and never moves data |
 | `SURREALDB_USERNAME` | string | `root` (embedded); explicit value required (remote) | Remote only | Database username |
 | `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Remote only | Database password |
 | `SURREALDB_URL` | URL | unset (embedded) | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
@@ -448,37 +443,36 @@ The binary supports a few opt-in Cargo features:
 
 The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `NER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 
-### Scopes and namespaces
+### One active namespace
 
-Every tool call that reads or writes data uses a **scope** to determine which SurrealDB **namespace** to operate in. The mapping is fixed:
+Each server process selects exactly one SurrealDB **namespace** at startup. The
+default is `main`; `SURREALDB_NAMESPACE` may select one other namespace. All
+ordinary MCP, CLI, lifecycle, app, and worker operations use that namespace
+implicitly — tool calls do not carry `scope`, `project`, or a request-level
+namespace.
 
-| Scope | Required namespace(s) | Notes |
-|-------|----------------------|-------|
-| `personal` | `personal` | |
-| `team` | `team` or `org` | Falls back to `org` if `team` is not configured |
-| `org` | `org` | Default scope for `ingest` and `extract` (inline content) |
-| `private-domain` | `private-domain` or `private` | |
+**`SURREALDB_NAMESPACE`** accepts exactly one name. The removed plural variable
+`SURREALDB_NAMESPACES` is a hard configuration error; if your environment still
+sets it, choose one name and replace it:
 
-**`SURREALDB_NAMESPACES`** is the comma-separated list of SurrealDB namespace names available to the server. Every scope you use in tool calls must resolve to at least one namespace in this list.
+```dotenv
+# old and unsupported
+SURREALDB_NAMESPACES=kaspersky,org,personal,private-domain
 
-**Common mistake:** If `SURREALDB_NAMESPACES=mycompany` and you call `extract` with `scope: "org"`, the lookup fails because namespace `org` is not in the list. Either:
+# choose exactly one
+SURREALDB_NAMESPACE=kaspersky
+```
 
-1. Add the required namespace to your config:
-   ```
-   SURREALDB_NAMESPACES=mycompany,org
-   ```
-2. Or use a scope that matches a configured namespace (but scopes are fixed — you cannot define custom scopes).
-
-**How `extract` resolves scope:**
-
-- **With `episode_id`**: The server searches **all** configured namespaces to find the episode. The `scope` parameter is ignored — namespace resolution is not needed because the episode already exists in some namespace.
-- **With inline `content`**: The `scope` parameter is used (defaults to `"org"`). The content is first ingested into the namespace resolved from that scope, then extracted.
+Switching and restarting accesses another namespace without moving data. One
+Active Namespace does **not** isolate personal/corporate/family/project memories
+internally; operators who need separate authorization domains must run separate
+process configurations. Namespace transfer/export/import is not automatic.
 
 ### Example
 
 ```bash
 SURREALDB_DB_NAME=memory
-SURREALDB_NAMESPACES=org,personal
+SURREALDB_NAMESPACE=org
 SURREALDB_USERNAME=root
 SURREALDB_PASSWORD=root
 SURREALDB_URL=ws://127.0.0.1:8000/rpc
@@ -519,10 +513,10 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 
 At startup the server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
-In normal `serve` / `watch` startup, every configured namespace is checked before semantic retrieval is enabled.
-If a namespace is already marked `ready` for the same signature, semantic retrieval starts normally.
-If a namespace is missing state but is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
-If any namespace is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
+In normal `serve` / `watch` startup, the Active Namespace is checked before semantic retrieval is enabled.
+If it is already marked `ready` for the same signature, semantic retrieval starts normally.
+If its state is missing but it is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
+If it is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
 
 That is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
 
@@ -569,12 +563,12 @@ What the command does:
 
 1. Resolves the configured target signature and dimension.
 2. Loads or creates a persisted control-plane job record at `embedding_job:fact_reembed`.
-3. Marks each namespace as `rebuilding` in `embedding_state`.
-4. Rewrites **all** fact embeddings, including invalidated / historical facts.
+3. Marks the Active Namespace as `rebuilding` in `embedding_state`.
+4. Rewrites **all** fact embeddings in the Active Namespace, including invalidated / historical facts.
 5. Stores fresh metadata on each fact (`embedding_provider`, `embedding_model`, `embedding_dimension`, `embedding_signature`, `embedding_updated_at`).
-6. Marks namespaces `ready` on success, or `failed` if the failure quota is exceeded.
+6. Marks the Active Namespace `ready` on success, or `failed` if the failure quota is exceeded.
 
-The job is **restart-safe** for the same target signature: if the process stops mid-run, invoking `memory_mcp reembed` again resumes from the persisted per-namespace cursor instead of starting from scratch.
+The job is **restart-safe** for the same target signature: if the process stops mid-run, invoking `memory_mcp reembed` again resumes from the persisted Active-Namespace cursor instead of starting from scratch. Legacy aggregate job records are read only for the currently selected namespace; other entries are left untouched.
 
 **Ctrl+C handling:** Pressing Ctrl+C interrupts the run gracefully. The current fact finishes, job state is persisted with status `interrupted`, and the exit code is 130. Resume with `memory_mcp reembed`.
 
@@ -674,9 +668,7 @@ Persisted query analytics are **optional** and **disabled by default**.
 
 When `QUERY_LOGGING_ENABLED=true`, successful `assemble_context` calls write a row to the `query_log` table with:
 
-- `scope`
 - `query`
-- `project`
 - `view_mode`
 - `resolved_view_mode`
 - `query_flags`
@@ -696,8 +688,8 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 `memory_mcp` emits structured logs across the plan-added functionality using the standard levels below:
 
 - `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, watcher startup, watcher ingest completion, and community rebuild passes
-- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), project/view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
-- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, watcher dedup skips, retrieval-tier summaries, appended `experience` facts, and per-namespace community rebuild details
+- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, watcher dedup skips, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
 - `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, and degraded worker passes
 - `error` — terminal failures such as watcher ingest errors or process-level startup/serve failures
 
@@ -960,8 +952,7 @@ memory_mcp ingest \
   --source-type email \
   --source-id msg-001 \
   --content "I will finish the API by Friday." \
-  --t-ref 2026-06-30T10:00:00Z \
-  --scope team
+  --t-ref 2026-06-30T10:00:00Z
 
 # Extract entities and facts
 memory_mcp extract --episode-id episode:abc123
@@ -970,8 +961,7 @@ memory_mcp extract --episode-id episode:abc123
 memory_mcp extract \
   --content "Alice works at Acme Corp." \
   --source-type ad-hoc \
-  --t-ref 2026-06-30T10:00:00Z \
-  --scope team
+  --t-ref 2026-06-30T10:00:00Z
 
 # Resolve an entity
 memory_mcp resolve \
@@ -982,7 +972,6 @@ memory_mcp resolve \
 # Query assembled context
 memory_mcp assemble-context \
   --query "What did Alice promise?" \
-  --scope org \
   --budget 10
 
 # Invalidate a fact

@@ -7,14 +7,13 @@ use crate::models::{AccessPayload, IngestRequest};
 
 use super::content_extraction::prepare_ingest_request;
 use super::error::MemoryError;
-use super::util::{RateLimiter, deterministic_episode_id, validate_ingest_request};
+use super::util::{RateLimiter, deterministic_episode_id_v2, validate_ingest_request};
 use super::{log_event, normalize_dt, now};
 
 /// Handles episode ingestion: file parsing, deduplication, and persistence.
 #[derive(Clone)]
 pub struct IngestionService {
-    db_client: Arc<dyn crate::storage::DbClient>,
-    namespaces: Vec<String>,
+    episode_store: crate::storage::EpisodeStoreClient,
     logger: StdoutLogger,
     rate_limiter: Arc<RateLimiter>,
 }
@@ -22,13 +21,12 @@ pub struct IngestionService {
 impl IngestionService {
     pub(crate) fn new(
         db_client: Arc<dyn crate::storage::DbClient>,
-        namespaces: Vec<String>,
+        active_namespace: String,
         logger: StdoutLogger,
         rate_limiter: Arc<RateLimiter>,
     ) -> Self {
         Self {
-            db_client,
-            namespaces,
+            episode_store: crate::storage::EpisodeStoreClient::new(db_client, active_namespace),
             logger,
             rate_limiter,
         }
@@ -43,10 +41,6 @@ impl IngestionService {
             return Err(MemoryError::Validation("rate limit exceeded".into()));
         }
         Ok(())
-    }
-
-    pub fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
-        super::MemoryScope::parse(scope)?.namespace(&self.namespaces)
     }
 
     pub async fn ingest(
@@ -65,8 +59,6 @@ impl IngestionService {
                 json!({
                     "source_type": request.source_type,
                     "source_id": request.source_id,
-                    "scope": request.scope,
-                    "project": request.project,
                     "transport": ingest_transport,
                 }),
                 json!({}),
@@ -81,8 +73,6 @@ impl IngestionService {
             log_event(
                 "ingest.prepared",
                 json!({
-                    "scope": request.scope,
-                    "project": request.project,
                     "transport": ingest_transport,
                     "source_id_rewritten": request.source_id != original_source_id,
                 }),
@@ -100,40 +90,62 @@ impl IngestionService {
 
         validate_ingest_request(&request)?;
 
-        let episode_id = deterministic_episode_id(
-            &request.source_type,
-            &request.source_id,
-            request.t_ref,
-            &request.scope,
-        );
-        let namespace = self.namespace_for_scope(&request.scope)?;
-        let existing = self.db_client.select_one(&episode_id, &namespace).await?;
+        let v2_episode_id =
+            deterministic_episode_id_v2(&request.source_type, &request.source_id, request.t_ref);
+        let existing = self.episode_store.select_one(&v2_episode_id).await?;
+        let episode_id = if existing.is_some() {
+            v2_episode_id.clone()
+        } else {
+            let legacy_matches = self
+                .episode_store
+                .select_by_source_identity(
+                    &request.source_type,
+                    &request.source_id,
+                    &normalize_dt(request.t_ref),
+                    2,
+                )
+                .await?;
+            match legacy_matches.as_slice() {
+                [] => v2_episode_id.clone(),
+                [record] => crate::service::value_helpers::string_from_value(
+                    record
+                        .get("episode_id")
+                        .or_else(|| record.get("id"))
+                        .ok_or_else(|| {
+                            MemoryError::Conflict(
+                                "legacy episode match has no stable episode_id".to_string(),
+                            )
+                        })?,
+                )
+                .ok_or_else(|| {
+                    MemoryError::Conflict(
+                        "legacy episode match has an unreadable episode_id".to_string(),
+                    )
+                })?,
+                _ => {
+                    return Err(MemoryError::Conflict(format!(
+                        "ambiguous legacy episode identity for source_type={} source_id={} t_ref={}; refusing to create a duplicate",
+                        request.source_type,
+                        request.source_id,
+                        normalize_dt(request.t_ref),
+                    )));
+                }
+            }
+        };
 
-        if existing.is_none() {
+        if existing.is_none() && episode_id == v2_episode_id {
             let t_ingested = request.t_ingested.unwrap_or_else(now);
-            let mut payload = serde_json::Map::from_iter([
+            let payload = serde_json::Map::from_iter([
                 ("episode_id".to_string(), json!(episode_id)),
                 ("source_type".to_string(), json!(request.source_type)),
                 ("source_id".to_string(), json!(request.source_id)),
                 ("content".to_string(), json!(request.content)),
                 ("t_ref".to_string(), json!(normalize_dt(request.t_ref))),
                 ("t_ingested".to_string(), json!(normalize_dt(t_ingested))),
-                ("scope".to_string(), json!(request.scope.clone())),
-                (
-                    "visibility_scope".to_string(),
-                    json!(
-                        request
-                            .visibility_scope
-                            .unwrap_or_else(|| request.scope.clone())
-                    ),
-                ),
                 ("policy_tags".to_string(), json!(request.policy_tags)),
             ]);
-            if let Some(project) = request.project.clone() {
-                payload.insert("project".to_string(), json!(project));
-            }
-            self.db_client
-                .create(&episode_id, Value::Object(payload), &namespace)
+            self.episode_store
+                .create(&episode_id, Value::Object(payload))
                 .await?;
         } else {
             self.logger.log(
@@ -142,7 +154,6 @@ impl IngestionService {
                     json!({
                         "episode_id": episode_id,
                         "source_id": request.source_id,
-                        "scope": request.scope,
                     }),
                     json!({"status": "existing_episode_reused"}),
                     access.as_ref(),
@@ -160,7 +171,6 @@ impl IngestionService {
                     "source_type": request.source_type,
                     "source_id": request.source_id,
                     "t_ref": normalize_dt(request.t_ref),
-                    "scope": request.scope,
                 }),
                 json!({"episode_id": episode_id}),
                 access.as_ref(),
@@ -188,7 +198,7 @@ mod tests {
     async fn ingest_creates_new_episode() {
         let t_ref = Utc::now();
         let expected_id =
-            super::super::util::deterministic_episode_id("inline", "test-content", t_ref, "org");
+            super::super::util::deterministic_episode_id_v2("inline", "test-content", t_ref);
 
         let db = MockDbClient::new()
             .expect_select_one(&expected_id, None)
@@ -196,7 +206,7 @@ mod tests {
 
         let svc = IngestionService::new(
             Arc::new(db),
-            vec!["org".into()],
+            "org".to_string(),
             StdoutLogger::new("warn"),
             Arc::new(RateLimiter::new(1000, 100)),
         );
@@ -208,10 +218,7 @@ mod tests {
                     source_id: "test-content".into(),
                     content: "hello world".into(),
                     t_ref,
-                    scope: "org".into(),
-                    project: None,
                     t_ingested: None,
-                    visibility_scope: None,
                     policy_tags: vec![],
                 },
                 None,
@@ -222,10 +229,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ingest_returns_existing_episode_id_on_duplicate() {
+    async fn ingest_returns_existing_episode_id_on_v2_duplicate() {
         let t_ref = Utc::now();
         let expected_id =
-            super::super::util::deterministic_episode_id("inline", "dup-content", t_ref, "org");
+            super::super::util::deterministic_episode_id_v2("inline", "dup-content", t_ref);
 
         let db = MockDbClient::new().expect_select_one(
             &expected_id,
@@ -234,7 +241,7 @@ mod tests {
 
         let svc = IngestionService::new(
             Arc::new(db),
-            vec!["org".into()],
+            "org".to_string(),
             StdoutLogger::new("warn"),
             Arc::new(RateLimiter::new(1000, 100)),
         );
@@ -246,10 +253,7 @@ mod tests {
                     source_id: "dup-content".into(),
                     content: "hello world".into(),
                     t_ref,
-                    scope: "org".into(),
-                    project: None,
                     t_ingested: None,
-                    visibility_scope: None,
                     policy_tags: vec![],
                 },
                 None,
@@ -257,5 +261,80 @@ mod tests {
             .await;
 
         assert_eq!(result.unwrap(), expected_id);
+    }
+
+    #[tokio::test]
+    async fn ingest_reuses_one_legacy_episode_by_source_identity() {
+        let t_ref = Utc::now();
+        let legacy_id =
+            super::super::util::deterministic_episode_id("inline", "legacy-source", t_ref, "org");
+        let db = MockDbClient::new().expect_query(
+            "SELECT * FROM episode WHERE source_type",
+            serde_json::json!([{
+                "episode_id": legacy_id,
+                "source_type": "inline",
+                "source_id": "legacy-source",
+                "t_ref": super::super::normalize_dt(t_ref),
+            }]),
+        );
+        let svc = IngestionService::new(
+            Arc::new(db),
+            "org".to_string(),
+            StdoutLogger::new("warn"),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
+
+        let result = svc
+            .ingest(
+                IngestRequest {
+                    source_type: "inline".into(),
+                    source_id: "legacy-source".into(),
+                    content: "legacy content".into(),
+                    t_ref,
+                    t_ingested: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await;
+
+        assert_eq!(result.expect("legacy identity should be reused"), legacy_id);
+    }
+
+    #[tokio::test]
+    async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing() {
+        let t_ref = Utc::now();
+        let db = MockDbClient::new().expect_query(
+            "SELECT * FROM episode WHERE source_type",
+            serde_json::json!([
+                {"episode_id": "episode:legacy-a"},
+                {"episode_id": "episode:legacy-b"}
+            ]),
+        );
+        let svc = IngestionService::new(
+            Arc::new(db),
+            "org".to_string(),
+            StdoutLogger::new("warn"),
+            Arc::new(RateLimiter::new(1000, 100)),
+        );
+
+        let result = svc
+            .ingest(
+                IngestRequest {
+                    source_type: "inline".into(),
+                    source_id: "ambiguous-source".into(),
+                    content: "ambiguous content".into(),
+                    t_ref,
+                    t_ingested: None,
+                    policy_tags: vec![],
+                },
+                None,
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(MemoryError::Conflict(message)) if message.contains("ambiguous legacy episode identity")
+        ));
     }
 }

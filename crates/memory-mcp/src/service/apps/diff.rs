@@ -8,8 +8,7 @@ use crate::service::{
 
 impl crate::service::MemoryService {
     pub async fn build_diff(&self, request: DiffRequest) -> Result<DiffView, MemoryError> {
-        let namespace = self.namespace_for_scope(&request.scope)?;
-        let facts = self.app_store().select_facts(&namespace).await?;
+        let facts = self.app_store().select_facts().await?;
 
         let left = facts_at(
             &facts,
@@ -121,7 +120,7 @@ fn facts_at(
 
 fn matches_target(fact: &crate::models::Fact, target_type: &str, target_id: Option<&str>) -> bool {
     match target_type {
-        "scope" => true,
+        "all" => true,
         "entity" => target_id.is_some_and(|target_id| {
             fact.entity_links
                 .iter()

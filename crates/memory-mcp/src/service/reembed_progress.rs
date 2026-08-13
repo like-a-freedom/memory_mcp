@@ -77,7 +77,7 @@ impl IndicatifProgressReporter {
             indicatif::ProgressStyle::with_template(
                 "Reembedding [{prefix}] {bar:40.cyan/blue} {pos}/{len} ({percent}%) eta {eta_precise} | {per_sec} {msg}",
             )
-            .expect("valid indicatif template")
+            .unwrap_or_else(|_| indicatif::ProgressStyle::default_bar())
             .progress_chars("█░"),
         );
         bar.set_draw_target(indicatif::ProgressDrawTarget::stderr_with_hz(10));
@@ -85,7 +85,7 @@ impl IndicatifProgressReporter {
         let spinner = indicatif::ProgressBar::new_spinner();
         spinner.set_style(
             indicatif::ProgressStyle::with_template("{spinner} {msg}")
-                .expect("valid spinner template"),
+                .unwrap_or_else(|_| indicatif::ProgressStyle::default_spinner()),
         );
         spinner.set_draw_target(indicatif::ProgressDrawTarget::stderr_with_hz(10));
 

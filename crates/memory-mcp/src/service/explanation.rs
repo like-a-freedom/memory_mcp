@@ -17,7 +17,7 @@ use crate::models::{
 use crate::service::apps::graph::GraphContext;
 use crate::service::error::MemoryError;
 use crate::service::{log_event, normalize_dt, now, query};
-use crate::storage::DbClient;
+use crate::storage::{AppStoreClient, BoundDbClient, DbClient};
 
 use crate::service::value_helpers::{json_i64, string_from_value};
 
@@ -25,40 +25,26 @@ use crate::service::value_helpers::{json_i64, string_from_value};
 /// collection, graph insights, and explain item construction.
 #[derive(Clone)]
 pub struct ExplanationService {
-    db_client: Arc<dyn DbClient>,
+    db: BoundDbClient,
     logger: StdoutLogger,
-    namespaces: Vec<String>,
-    default_namespace: String,
 }
 
 impl ExplanationService {
     pub fn new(
         db_client: Arc<dyn DbClient>,
         logger: StdoutLogger,
-        namespaces: Vec<String>,
+        active_namespace: String,
     ) -> Self {
-        let default_namespace = namespaces.first().cloned().unwrap_or_else(|| "org".into());
         Self {
-            db_client,
+            db: BoundDbClient::new(db_client, active_namespace),
             logger,
-            namespaces,
-            default_namespace,
         }
-    }
-
-    pub fn namespace_for_scope(&self, scope: &str) -> Result<String, MemoryError> {
-        for namespace in &self.namespaces {
-            if namespace == scope {
-                return Ok(namespace.clone());
-            }
-        }
-        Ok(self.default_namespace.clone())
     }
 }
 
 impl GraphContext for ExplanationService {
     fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone())
+        AppStoreClient::from_bound(self.db.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
@@ -76,7 +62,6 @@ impl ExplanationService {
             item: ExplainItem,
             episode: Option<crate::models::Episode>,
             entity_links: Vec<String>,
-            fact_namespace: Option<String>,
         }
 
         let mut resolved = Vec::with_capacity(request.context_pack.len());
@@ -93,8 +78,8 @@ impl ExplanationService {
                 .as_ref()
                 .and_then(crate::service::episode::episode_from_record);
 
-            let (entity_links, fact_namespace) = if let Some(ref fact_id) = item.fact_id {
-                let (fact_record, namespace) = self.find_fact_record(fact_id).await?;
+            let entity_links = if let Some(ref fact_id) = item.fact_id {
+                let (fact_record, _) = self.find_fact_record(fact_id).await?;
                 let links = fact_record
                     .and_then(|r| {
                         r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
@@ -107,34 +92,21 @@ impl ExplanationService {
                 for link in &links {
                     all_entity_links.insert(link.clone());
                 }
-                (links, namespace)
+                links
             } else {
-                (Vec::new(), None)
+                Vec::new()
             };
 
             resolved.push(ResolvedItem {
                 item,
                 episode,
                 entity_links,
-                fact_namespace,
             });
         }
 
         // --- Phase 2: shared graph insights (computed once for the batch) ---
         let entity_links_vec: Vec<String> = all_entity_links.into_iter().collect();
-        let first_namespace = resolved
-            .iter()
-            .find_map(|r| {
-                r.fact_namespace.clone().or_else(|| {
-                    r.episode
-                        .as_ref()
-                        .and_then(|ep| self.namespace_for_scope(&ep.scope).ok())
-                })
-            })
-            .unwrap_or_else(|| self.default_namespace.clone());
-        let shared_insights = self
-            .build_graph_insights_batched(&entity_links_vec, &first_namespace)
-            .await?;
+        let shared_insights = self.build_graph_insights_batched(&entity_links_vec).await?;
 
         // --- Phase 3: build explain items with cached provenance ---
         let mut episode_via_entity_cache: HashMap<String, Vec<crate::models::Episode>> =
@@ -164,16 +136,10 @@ impl ExplanationService {
                 continue;
             };
 
-            let namespace = resolved_item.fact_namespace.unwrap_or_else(|| {
-                self.namespace_for_scope(&episode.scope)
-                    .unwrap_or_else(|_| self.default_namespace.clone())
-            });
-
             let all_sources = self
                 .collect_provenance_sources_cached(
                     &episode,
                     &resolved_item.entity_links,
-                    &namespace,
                     &mut episode_via_entity_cache,
                 )
                 .await?;
@@ -245,7 +211,6 @@ impl ExplanationService {
                 },
                 quote: resolved_item.item.quote,
                 source_episode: resolved_item.item.source_episode,
-                scope: Some(episode.scope.clone()),
                 t_ref: Some(episode.t_ref),
                 t_ingested: Some(episode.t_ingested),
                 provenance: explain_provenance,
@@ -294,13 +259,11 @@ impl ExplanationService {
         // body and does NOT delegate to `find_record_by_id`, so it validates
         // independently.
         crate::storage::validate_record_id(fact_id)?;
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(fact_id, namespace).await?;
-            if let Some(map) = record.and_then(|v| v.as_object().cloned()) {
-                return Ok((Some(map), Some(namespace.clone())));
-            }
-        }
-        Ok((None, None))
+        let record = self.db.select_one(fact_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.db.namespace().to_string()),
+        ))
     }
 
     async fn find_record_by_id(
@@ -309,13 +272,11 @@ impl ExplanationService {
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
         // Validate the record-id shape up-front (see comment in `find_fact_record`).
         crate::storage::validate_record_id(record_id)?;
-        for namespace in &self.namespaces {
-            let record = self.db_client.select_one(record_id, namespace).await?;
-            if let Some(map) = record.and_then(|v| v.as_object().cloned()) {
-                return Ok((Some(map), Some(namespace.clone())));
-            }
-        }
-        Ok((None, None))
+        let record = self.db.select_one(record_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.db.namespace().to_string()),
+        ))
     }
 
     pub(crate) async fn record_fact_access(
@@ -323,10 +284,7 @@ impl ExplanationService {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), MemoryError> {
-        let (record, namespace) = self.find_fact_record(fact_id).await?;
-        let Some(namespace) = namespace else {
-            return Ok(());
-        };
+        let (record, _namespace) = self.find_fact_record(fact_id).await?;
         let Some(mut record) = record else {
             return Ok(());
         };
@@ -342,9 +300,7 @@ impl ExplanationService {
             json!(normalize_dt(query::now())),
         );
 
-        self.db_client
-            .update(fact_id, Value::Object(record), &namespace)
-            .await?;
+        self.db.update(fact_id, Value::Object(record)).await?;
 
         Ok(())
     }
@@ -352,12 +308,11 @@ impl ExplanationService {
     async fn find_episodes_via_entity(
         &self,
         entity_id: &str,
-        namespace: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
         let sql = "SELECT * FROM episode WHERE episode_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE type::string(out) FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
         let result = self
-            .db_client
-            .query(sql, Some(json!({"entity_id": entity_id})), namespace)
+            .db
+            .query(sql, Some(json!({"entity_id": entity_id})))
             .await?;
 
         let episodes: Vec<crate::models::Episode> = result
@@ -379,7 +334,6 @@ impl ExplanationService {
     async fn build_graph_insights_batched(
         &self,
         entity_links: &[String],
-        namespace: &str,
     ) -> Result<Option<GraphInsights>, MemoryError> {
         const MAX_GRAPH_INSIGHT_LINKED_ENTITIES: usize = 8;
         const MAX_GRAPH_INSIGHT_HUBS: i32 = 5;
@@ -397,7 +351,7 @@ impl ExplanationService {
             self.logger.log(
                 log_event(
                     "explain.graph_insights.skipped",
-                    json!({"namespace": namespace}),
+                    json!({}),
                     json!({"reason": "no_linked_entities"}),
                     None,
                     None,
@@ -412,7 +366,6 @@ impl ExplanationService {
             log_event(
                 "explain.graph_insights.start",
                 json!({
-                    "namespace": namespace,
                     "linked_entity_count": linked_entities.len(),
                 }),
                 json!({}),
@@ -427,7 +380,6 @@ impl ExplanationService {
         let cutoff = now();
         let hub_entities = crate::service::apps::graph::find_hub_entities(
             self,
-            namespace,
             cutoff,
             MAX_GRAPH_INSIGHT_HUBS,
             budget,
@@ -446,7 +398,7 @@ impl ExplanationService {
 
         for entity_id in linked_entities {
             for connection in crate::service::apps::graph::find_surprising_connections(
-                self, namespace, &entity_id, 3, budget,
+                self, &entity_id, 3, budget,
             )
             .await?
             {
@@ -477,7 +429,7 @@ impl ExplanationService {
         self.logger.log(
             log_event(
                 "explain.graph_insights.done",
-                json!({"namespace": namespace}),
+                json!({}),
                 json!({
                     "hub_entities": hub_entities.len(),
                     "surprising_connections": surprising_connections.len(),
@@ -501,7 +453,6 @@ impl ExplanationService {
         &self,
         primary_episode: &crate::models::Episode,
         entity_links: &[String],
-        namespace: &str,
         cache: &mut HashMap<String, Vec<crate::models::Episode>>,
     ) -> Result<Vec<ProvenanceSource>, MemoryError> {
         let mut sources = Vec::new();
@@ -520,7 +471,7 @@ impl ExplanationService {
             let linked_episodes = if let Some(cached) = cache.get(entity_id) {
                 cached.clone()
             } else {
-                let episodes = self.find_episodes_via_entity(entity_id, namespace).await?;
+                let episodes = self.find_episodes_via_entity(entity_id).await?;
                 cache.insert(entity_id.clone(), episodes.clone());
                 episodes
             };
@@ -573,7 +524,7 @@ mod tests {
         ExplanationService::new(
             Arc::new(MockDbClient::new()),
             StdoutLogger::new("warn"),
-            vec!["org".to_string()],
+            "org".to_string(),
         )
     }
 

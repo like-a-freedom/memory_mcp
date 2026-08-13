@@ -12,6 +12,7 @@
 
 use memory_mcp::models::{
     ProcedureCandidateRecord, ProcedureStatus, beta_posterior_mean, deterministic_candidate_id,
+    deterministic_candidate_id_v2,
 };
 use memory_mcp::service::procedures::{ReviewAction, rank_candidates, review_candidate};
 
@@ -26,7 +27,8 @@ fn make_candidate(
     ProcedureCandidateRecord {
         candidate_id: id.to_string(),
         namespace: "test".to_string(),
-        scope: "org".to_string(),
+        identity_version: 2,
+        scope: Some("org".to_string()),
         project: Some("p".to_string()),
         task_fingerprint: task.to_string(),
         normalized_task: task.to_string(),
@@ -80,6 +82,37 @@ fn deterministic_ids_and_evidence() {
 
     let id3 = deterministic_candidate_id("test", "org", Some("p"), "task:2");
     assert_ne!(id1, id3);
+
+    let v2_id = deterministic_candidate_id_v2("test", "task:1");
+    assert_eq!(
+        v2_id,
+        deterministic_candidate_id_v2("test", "task:1"),
+        "v2 identity is independent of legacy scope/project metadata"
+    );
+    assert!(v2_id.starts_with("procedure_candidate:v2:"));
+}
+
+#[test]
+fn legacy_candidate_json_defaults_to_v1_and_preserves_metadata() {
+    let legacy = serde_json::json!({
+        "candidate_id": "procedure_candidate:legacy",
+        "namespace": "test",
+        "scope": "org",
+        "project": "legacy-project",
+        "task_fingerprint": "task:1",
+        "normalized_task": "do work",
+        "status": "shadow",
+        "trust_floor": "lifecycle_evidence",
+        "origin_kind": "lifecycle_adapter",
+        "created_at": "2026-07-01T00:00:00Z",
+        "updated_at": "2026-07-01T00:00:00Z"
+    });
+
+    let record: ProcedureCandidateRecord =
+        serde_json::from_value(legacy).expect("legacy candidate remains readable");
+    assert_eq!(record.identity_version, 1);
+    assert_eq!(record.scope.as_deref(), Some("org"));
+    assert_eq!(record.project.as_deref(), Some("legacy-project"));
 }
 
 #[test]

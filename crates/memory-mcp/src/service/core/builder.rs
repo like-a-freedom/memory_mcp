@@ -15,7 +15,7 @@ use crate::service::entity_extraction::create_entity_extractor_with_progress;
 use crate::service::error::MemoryError;
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
-    build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_states,
+    build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_state,
 };
 use crate::service::util::RateLimiter;
 use crate::storage::{DbClient, SurrealDbClient};
@@ -25,8 +25,7 @@ use crate::storage::{DbClient, SurrealDbClient};
 pub struct MemoryService {
     /// Database client for storage operations.
     pub(crate) db_client: Arc<dyn DbClient>,
-    pub(crate) namespaces: Vec<String>,
-    pub(crate) default_namespace: String,
+    pub(crate) active_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
     pub(crate) ingestion_service: super::super::ingestion::IngestionService,
@@ -129,9 +128,7 @@ impl MemoryService {
         ner_progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
     ) -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
-        let default_namespace = config
-            .default_namespace()
-            .ok_or_else(|| MemoryError::ConfigInvalid("namespaces cannot be empty".to_string()))?;
+        let active_namespace = config.active_namespace().as_str().to_string();
 
         let effective_data_dir = config.data_dir_or_default();
         let startup_logger = crate::logging::StdoutLogger::new(&config.log_level);
@@ -149,8 +146,8 @@ impl MemoryService {
             }),
         );
         startup_event.insert(
-            "namespaces".to_string(),
-            serde_json::json!(config.namespaces.clone()),
+            "namespace".to_string(),
+            serde_json::json!(config.active_namespace().as_str()),
         );
         startup_event.insert(
             "query_logging_enabled".to_string(),
@@ -170,8 +167,8 @@ impl MemoryService {
         }
         startup_logger.log(startup_event, crate::logging::LogLevel::Info);
 
-        let db_client = SurrealDbClient::connect(&config, default_namespace).await?;
-        let server_version = match db_client.server_version(default_namespace).await {
+        let db_client = SurrealDbClient::connect(&config).await?;
+        let server_version = match db_client.server_version(&active_namespace).await {
             Ok(version) => version,
             Err(err) => {
                 let mut event = std::collections::HashMap::new();
@@ -191,12 +188,12 @@ impl MemoryService {
         startup_logger.log(versions_event, crate::logging::LogLevel::Info);
 
         let db_client = Arc::new(db_client) as Arc<dyn DbClient>;
-        apply_startup_migrations(&db_client, &config.namespaces).await?;
+        apply_startup_migrations(&db_client, &active_namespace).await?;
 
         let (decision, target) = resolve_embedding_startup(
             &config.embedding,
             &db_client,
-            &config.namespaces,
+            &active_namespace,
             &effective_data_dir,
             &startup_logger,
         )
@@ -217,7 +214,7 @@ impl MemoryService {
                 .await?
             }
             (_, EmbeddingStartupDecision::UseConfiguredProvider)
-            | (_, EmbeddingStartupDecision::BootstrapReadyNamespaces { .. }) => {
+            | (_, EmbeddingStartupDecision::BootstrapReadyNamespace { .. }) => {
                 create_embedding_provider_with_dimension(
                     &config.embedding,
                     &effective_data_dir,
@@ -259,7 +256,7 @@ impl MemoryService {
 
         let mut service = Self::new_with_embedding_provider(
             db_client.clone(),
-            config.namespaces,
+            config.active_namespace().as_str().to_string(),
             config.log_level,
             50,
             100,
@@ -280,16 +277,16 @@ impl MemoryService {
         }
 
         if let (
-            EmbeddingStartupDecision::BootstrapReadyNamespaces {
-                namespaces,
-                active_signature,
-            },
+            EmbeddingStartupDecision::BootstrapReadyNamespace { active_signature },
             Some(target),
         ) = (&decision, target.as_ref())
         {
-            write_bootstrap_ready_states(
-                &service.db_client,
-                namespaces,
+            let bound_db = crate::storage::BoundDbClient::new(
+                service.db_client.clone(),
+                service.active_namespace.clone(),
+            );
+            write_bootstrap_ready_state(
+                &bound_db,
                 active_signature,
                 config.embedding.provider_label(),
                 config.embedding.model.as_deref(),
@@ -303,8 +300,8 @@ impl MemoryService {
                 serde_json::json!("embedding.bootstrap_ready_written"),
             );
             event.insert(
-                "namespaces".to_string(),
-                serde_json::json!(namespaces.clone()),
+                "namespace".to_string(),
+                serde_json::json!(service.active_namespace.clone()),
             );
             event.insert(
                 "target_signature".to_string(),
@@ -315,27 +312,14 @@ impl MemoryService {
 
         service.check_surrealdb_connection().await?;
 
-        // Schedule one backfill job per namespace
-        for ns in &service.namespaces {
-            if let Err(e) = crate::service::claims::backfill::schedule_namespace_backfill(
-                &service.claim_service,
-                ns,
-            )
-            .await
-            {
-                startup_logger.log(
-                    std::collections::HashMap::from([
-                        (
-                            "op".to_string(),
-                            serde_json::json!("claim.backfill_schedule_failed"),
-                        ),
-                        ("namespace".to_string(), serde_json::json!(ns)),
-                        ("error".to_string(), serde_json::json!(e.to_string())),
-                    ]),
-                    crate::logging::LogLevel::Warn,
-                );
-            }
-        }
+        // The initial durable backfill schedule is part of readiness. A worker
+        // must never start with a best-effort, in-memory-only promise to process
+        // legacy facts later.
+        crate::service::claims::backfill::schedule_namespace_backfill(
+            &service.claim_service,
+            &service.active_namespace,
+        )
+        .await?;
 
         // Spawn lifecycle workers if enabled
         let lifecycle_background_workers =
@@ -348,14 +332,14 @@ impl MemoryService {
     /// Creates a new service instance.
     pub fn new(
         db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
+        active_namespace: String,
         log_level: String,
         rate_limit_rps: i32,
         rate_limit_burst: i32,
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
-            namespaces,
+            active_namespace,
             log_level,
             ServiceBuildConfig {
                 rate_limit_rps,
@@ -374,7 +358,7 @@ impl MemoryService {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_with_embedding_provider(
         db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
+        active_namespace: String,
         log_level: String,
         rate_limit_rps: i32,
         rate_limit_burst: i32,
@@ -384,7 +368,7 @@ impl MemoryService {
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
-            namespaces,
+            active_namespace,
             log_level,
             ServiceBuildConfig {
                 rate_limit_rps,
@@ -401,7 +385,7 @@ impl MemoryService {
     #[allow(dead_code)]
     pub(crate) fn new_with_cache_size(
         db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
+        active_namespace: String,
         log_level: String,
         rate_limit_rps: i32,
         rate_limit_burst: i32,
@@ -409,7 +393,7 @@ impl MemoryService {
     ) -> Result<Self, MemoryError> {
         Self::build(
             db_client,
-            namespaces,
+            active_namespace,
             log_level,
             ServiceBuildConfig {
                 rate_limit_rps,
@@ -427,17 +411,18 @@ impl MemoryService {
 
     fn build(
         db_client: Arc<dyn DbClient>,
-        namespaces: Vec<String>,
+        active_namespace: String,
         log_level: String,
         build_config: ServiceBuildConfig,
         embedding_provider: Arc<dyn EmbeddingProvider>,
         entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
-        if namespaces.is_empty() {
+        if active_namespace.trim().is_empty() {
             return Err(MemoryError::ConfigInvalid(
-                "namespaces cannot be empty".to_string(),
+                "one active namespace is required".to_string(),
             ));
         }
+        let active_namespace = active_namespace.trim().to_string();
         let cache_size = std::num::NonZeroUsize::new(build_config.cache_size).ok_or_else(|| {
             MemoryError::ConfigInvalid("context cache size must be > 0".to_string())
         })?;
@@ -453,21 +438,23 @@ impl MemoryService {
         ));
         let ingestion_service = super::super::ingestion::IngestionService::new(
             db_client.clone(),
-            namespaces.clone(),
+            active_namespace.clone(),
             logger.clone(),
             rate_limiter.clone(),
         );
-        let entity_service = super::super::entity::EntityService::new(db_client.clone());
+        let entity_service =
+            super::super::entity::EntityService::new(db_client.clone(), active_namespace.clone());
         let fact_service = super::super::fact::FactService::new(
-            crate::storage::FactStoreClient::new(db_client.clone()),
+            crate::storage::FactStoreClient::new(db_client.clone(), active_namespace.clone()),
         );
         let explanation_service = super::super::explanation::ExplanationService::new(
             db_client.clone(),
             logger.clone(),
-            namespaces.clone(),
+            active_namespace.clone(),
         );
         let claim_store = Arc::new(crate::storage::claims::SurrealClaimStore::new(
             db_client.clone(),
+            active_namespace.clone(),
         ));
         let fuzzy_threshold = std::env::var("ENTITY_FUZZY_THRESHOLD")
             .ok()
@@ -475,8 +462,7 @@ impl MemoryService {
             .unwrap_or(super::super::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
         Ok(Self {
             db_client,
-            namespaces: namespaces.clone(),
-            default_namespace: namespaces[0].clone(),
+            active_namespace,
             logger,
             rate_limiter,
             ingestion_service,
@@ -569,7 +555,7 @@ mod tests {
         let mut config = config();
         config.defaulted_variables = vec![
             "SURREALDB_DB_NAME",
-            "SURREALDB_NAMESPACES",
+            "SURREALDB_NAMESPACE",
             "SURREALDB_EMBEDDED",
             "SURREALDB_USERNAME",
             "SURREALDB_PASSWORD",

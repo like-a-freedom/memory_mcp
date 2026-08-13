@@ -7,13 +7,15 @@
 
 use std::sync::Arc;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::models::{
     CaptureDisposition, CaptureReasonCode, InvocationOrigin, SourceKind, TrustClass,
 };
 use crate::service::MemoryError;
-use crate::storage::DbClient;
+use crate::storage::{BoundDbClient, DbClient};
 
 /// A persisted lifecycle event record.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -33,9 +35,6 @@ pub struct MemoryEventRecord {
     pub task_fingerprint: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub normalized_task: Option<String>,
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     #[serde(default)]
     pub policy_tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -75,9 +74,6 @@ pub struct EventProjectionJobRecord {
     pub event_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub episode_id: Option<String>,
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     pub status: String,
     #[serde(default)]
     pub attempts: i64,
@@ -109,41 +105,80 @@ pub struct MemoryCaptureAuditRecord {
     pub disposition: String,
     #[serde(default)]
     pub reason_codes: Vec<String>,
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     pub created_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<String>,
+}
+
+/// Parse a scope-free lifecycle record while accepting only the two known
+/// legacy partition fields for read-old compatibility.
+fn parse_scope_free_record<T: DeserializeOwned>(
+    mut value: Value,
+    record_type: &str,
+) -> Result<T, MemoryError> {
+    let object = value.as_object_mut().ok_or_else(|| {
+        MemoryError::Storage(format!(
+            "failed to parse {record_type}: durable row is not an object"
+        ))
+    })?;
+
+    for field in ["scope", "project"] {
+        if let Some(legacy_value) = object.remove(field)
+            && !legacy_value.is_string()
+            && !legacy_value.is_null()
+        {
+            return Err(MemoryError::Storage(format!(
+                "failed to parse {record_type}: legacy {field} must be a string"
+            )));
+        }
+    }
+
+    serde_json::from_value(value)
+        .map_err(|error| MemoryError::Storage(format!("failed to parse {record_type}: {error}")))
+}
+
+pub(crate) fn parse_memory_event(value: Value) -> Result<MemoryEventRecord, MemoryError> {
+    parse_scope_free_record(value, "memory_event")
+}
+
+pub(crate) fn parse_event_projection_job(
+    value: Value,
+) -> Result<EventProjectionJobRecord, MemoryError> {
+    parse_scope_free_record(value, "event_projection_job")
+}
+
+pub(crate) fn parse_memory_capture_audit(
+    value: Value,
+) -> Result<MemoryCaptureAuditRecord, MemoryError> {
+    parse_scope_free_record(value, "memory_capture_audit")
 }
 
 /// Narrow store for agent-memory lifecycle records.
 ///
 /// Wraps `Arc<dyn DbClient>` without modifying the trait.
 pub struct AgentMemoryStore {
-    client: Arc<dyn DbClient>,
+    client: BoundDbClient,
 }
 
 impl AgentMemoryStore {
-    /// Create a new narrow store over an existing client.
+    /// Create a new narrow store bound to the process Active Namespace.
     #[must_use]
-    pub fn new(client: Arc<dyn DbClient>) -> Self {
-        Self { client }
+    pub fn new(client: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            client: BoundDbClient::new(client, namespace),
+        }
     }
 
     /// Load a memory event by its stable event ID.
     pub async fn load_event(
         &self,
         event_id: &str,
-        namespace: &str,
     ) -> Result<Option<MemoryEventRecord>, MemoryError> {
         let record_id = format!("memory_event:{event_id}");
-        let existing = self.client.select_one(&record_id, namespace).await?;
+        let existing = self.client.select_one(&record_id).await?;
         match existing {
             Some(value) => {
-                let record: MemoryEventRecord = serde_json::from_value(value).map_err(|e| {
-                    MemoryError::Storage(format!("failed to parse memory_event: {e}"))
-                })?;
+                let record = parse_memory_event(value)?;
                 Ok(Some(record))
             }
             None => Ok(None),
@@ -151,34 +186,48 @@ impl AgentMemoryStore {
     }
 
     /// Persist a memory event.
-    pub async fn create_event(
-        &self,
-        record: &MemoryEventRecord,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
+    pub async fn create_event(&self, record: &MemoryEventRecord) -> Result<(), MemoryError> {
         let record_id = format!("memory_event:{}", record.event_id);
         let value = serde_json::to_value(record)
             .map_err(|e| MemoryError::Storage(format!("failed to serialize memory_event: {e}")))?;
-        self.client
-            .create(&record_id, value, namespace)
-            .await
-            .map(|_| ())
+        self.client.create(&record_id, value).await.map(|_| ())
+    }
+
+    /// Load pending jobs or jobs whose lease has expired.
+    pub async fn load_pending_jobs(
+        &self,
+        now: &str,
+        limit: i32,
+    ) -> Result<Vec<EventProjectionJobRecord>, MemoryError> {
+        let sql = "SELECT * FROM event_projection_job WHERE status = 'pending' OR (status = 'leased' AND lease_expires_at <= type::datetime($now)) LIMIT $limit";
+        let rows = self
+            .client
+            .query(sql, Some(serde_json::json!({"now": now, "limit": limit})))
+            .await?;
+        rows.as_array()
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .cloned()
+            .map(parse_event_projection_job)
+            .collect()
+    }
+
+    /// Update a projection job through the process-bound namespace.
+    pub async fn update_job(&self, job_id: &str, payload: Value) -> Result<(), MemoryError> {
+        let record_id = format!("event_projection_job:{job_id}");
+        self.client.update(&record_id, payload).await.map(|_| ())
     }
 
     /// Load a projection job by its job ID.
     pub async fn load_job(
         &self,
         job_id: &str,
-        namespace: &str,
     ) -> Result<Option<EventProjectionJobRecord>, MemoryError> {
         let record_id = format!("event_projection_job:{job_id}");
-        let existing = self.client.select_one(&record_id, namespace).await?;
+        let existing = self.client.select_one(&record_id).await?;
         match existing {
             Some(value) => {
-                let record: EventProjectionJobRecord =
-                    serde_json::from_value(value).map_err(|e| {
-                        MemoryError::Storage(format!("failed to parse event_projection_job: {e}"))
-                    })?;
+                let record = parse_event_projection_job(value)?;
                 Ok(Some(record))
             }
             None => Ok(None),
@@ -186,54 +235,36 @@ impl AgentMemoryStore {
     }
 
     /// Persist a projection job.
-    pub async fn create_job(
-        &self,
-        record: &EventProjectionJobRecord,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
+    pub async fn create_job(&self, record: &EventProjectionJobRecord) -> Result<(), MemoryError> {
         let record_id = format!("event_projection_job:{}", record.job_id);
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize event_projection_job: {e}"))
         })?;
-        self.client
-            .create(&record_id, value, namespace)
-            .await
-            .map(|_| ())
+        self.client.create(&record_id, value).await.map(|_| ())
     }
 
     /// Persist a rejection audit.
-    pub async fn create_audit(
-        &self,
-        record: &MemoryCaptureAuditRecord,
-        namespace: &str,
-    ) -> Result<(), MemoryError> {
+    pub async fn create_audit(&self, record: &MemoryCaptureAuditRecord) -> Result<(), MemoryError> {
         let record_id = format!("memory_capture_audit:{}", record.audit_id);
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize memory_capture_audit: {e}"))
         })?;
-        self.client
-            .create(&record_id, value, namespace)
-            .await
-            .map(|_| ())
+        self.client.create(&record_id, value).await.map(|_| ())
     }
 
     /// Load a rejection audit by event ID.
     pub async fn load_audit_by_event(
         &self,
         event_id: &str,
-        namespace: &str,
     ) -> Result<Option<MemoryCaptureAuditRecord>, MemoryError> {
         let sql = "SELECT * FROM memory_capture_audit WHERE event_id = $event_id LIMIT 1";
         let vars = serde_json::json!({"event_id": event_id});
-        let rows = self.client.query(sql, Some(vars), namespace).await?;
+        let rows = self.client.query(sql, Some(vars)).await?;
         // query returns a Value; for a SELECT it is typically an array.
         let row = rows.as_array().and_then(|arr| arr.first()).cloned();
         match row {
             Some(value) => {
-                let record: MemoryCaptureAuditRecord =
-                    serde_json::from_value(value).map_err(|e| {
-                        MemoryError::Storage(format!("failed to parse memory_capture_audit: {e}"))
-                    })?;
+                let record = parse_memory_capture_audit(value)?;
                 Ok(Some(record))
             }
             None => Ok(None),
@@ -320,6 +351,98 @@ pub fn origin_kind_str(origin: &InvocationOrigin) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_partition_fields_are_read_compatibility_only() {
+        let event = parse_memory_event(serde_json::json!({
+            "event_id": "evt:legacy",
+            "event_kind": "post_tool_result",
+            "task_fingerprint": "task:legacy",
+            "scope": "org",
+            "project": "legacy-project",
+            "disposition": "accepted",
+            "trust_class": "lifecycle_evidence",
+            "origin_kind": "lifecycle_adapter",
+            "created_at": "2026-08-13T00:00:00Z"
+        }))
+        .expect("legacy event row remains readable");
+        let encoded = serde_json::to_value(event).expect("encode scope-free event");
+        assert!(
+            !encoded
+                .as_object()
+                .expect("event object")
+                .contains_key("scope")
+        );
+        assert!(
+            !encoded
+                .as_object()
+                .expect("event object")
+                .contains_key("project")
+        );
+
+        let job = parse_event_projection_job(serde_json::json!({
+            "job_id": "job:legacy",
+            "event_id": "evt:legacy",
+            "scope": "org",
+            "project": "legacy-project",
+            "status": "pending",
+            "origin_kind": "lifecycle_adapter",
+            "created_at": "2026-08-13T00:00:00Z"
+        }))
+        .expect("legacy job row remains readable");
+        let encoded = serde_json::to_value(job).expect("encode scope-free job");
+        assert!(
+            !encoded
+                .as_object()
+                .expect("job object")
+                .contains_key("scope")
+        );
+        assert!(
+            !encoded
+                .as_object()
+                .expect("job object")
+                .contains_key("project")
+        );
+
+        let audit = parse_memory_capture_audit(serde_json::json!({
+            "audit_id": "audit:legacy",
+            "event_id": "evt:legacy",
+            "content_hash": "sha256:legacy",
+            "content_byte_len": 0,
+            "disposition": "rejected",
+            "scope": "org",
+            "project": "legacy-project",
+            "created_at": "2026-08-13T00:00:00Z"
+        }))
+        .expect("legacy audit row remains readable");
+        let encoded = serde_json::to_value(audit).expect("encode scope-free audit");
+        assert!(
+            !encoded
+                .as_object()
+                .expect("audit object")
+                .contains_key("scope")
+        );
+        assert!(
+            !encoded
+                .as_object()
+                .expect("audit object")
+                .contains_key("project")
+        );
+    }
+
+    #[test]
+    fn malformed_legacy_partition_field_is_observable() {
+        let error = parse_event_projection_job(serde_json::json!({
+            "job_id": "job:malformed",
+            "event_id": "evt:malformed",
+            "scope": {"unexpected": true},
+            "status": "pending",
+            "origin_kind": "lifecycle_adapter",
+            "created_at": "2026-08-13T00:00:00Z"
+        }))
+        .expect_err("malformed legacy field must not be silently accepted");
+        assert!(error.to_string().contains("legacy scope"));
+    }
 
     #[test]
     fn disposition_str_is_stable() {

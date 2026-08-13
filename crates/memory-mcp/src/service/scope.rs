@@ -1,54 +1,4 @@
 use crate::config::LifecycleConfig;
-use crate::service::MemoryError;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MemoryScope {
-    Personal,
-    Team,
-    Org,
-    PrivateDomain,
-}
-
-impl MemoryScope {
-    pub(crate) fn parse(raw: &str) -> Result<Self, MemoryError> {
-        match raw.trim().to_ascii_lowercase().as_str() {
-            "personal" => Ok(Self::Personal),
-            "team" => Ok(Self::Team),
-            "org" => Ok(Self::Org),
-            "private-domain" | "private_domain" | "private" => Ok(Self::PrivateDomain),
-            other => Err(MemoryError::Validation(format!("unknown scope: {other}"))),
-        }
-    }
-
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Personal => "personal",
-            Self::Team => "team",
-            Self::Org => "org",
-            Self::PrivateDomain => "private-domain",
-        }
-    }
-
-    pub(crate) fn namespace(self, namespaces: &[String]) -> Result<String, MemoryError> {
-        let candidates = match self {
-            Self::Personal => &["personal"][..],
-            Self::Team => &["team", "org"][..],
-            Self::Org => &["org"][..],
-            Self::PrivateDomain => &["private-domain", "private"][..],
-        };
-
-        candidates
-            .iter()
-            .find_map(|candidate| namespaces.iter().find(|ns| ns.as_str() == *candidate))
-            .cloned()
-            .ok_or_else(|| {
-                MemoryError::Validation(format!(
-                    "no namespace configured for scope {}",
-                    self.as_str()
-                ))
-            })
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct LifecyclePolicy {
@@ -80,29 +30,6 @@ impl From<&LifecycleConfig> for LifecyclePolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_scope_accepts_team_and_private_domain() {
-        assert_eq!(MemoryScope::parse("team").unwrap().as_str(), "team");
-        assert_eq!(
-            MemoryScope::parse("private-domain").unwrap().as_str(),
-            "private-domain"
-        );
-        assert_eq!(
-            MemoryScope::parse("private").unwrap().as_str(),
-            "private-domain"
-        );
-        assert_eq!(
-            MemoryScope::parse("private_domain").unwrap().as_str(),
-            "private-domain"
-        );
-    }
-
-    #[test]
-    fn parse_scope_rejects_unknown_scope() {
-        let err = MemoryScope::parse("org-typo").unwrap_err();
-        assert!(matches!(err, MemoryError::Validation(_)));
-    }
 
     #[test]
     fn lifecycle_policy_matches_config_defaults() {

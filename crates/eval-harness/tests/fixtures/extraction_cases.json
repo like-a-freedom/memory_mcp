@@ -4,7 +4,6 @@
         "description": "metric and promise extraction from update email",
         "source_type": "email",
         "source_id": "ext-001",
-        "scope": "org",
         "content": "ARR grew to $3M. I will send the update by Friday.",
         "expected": {
             "fact_types": [
@@ -19,7 +18,6 @@
         "description": "person entities and promise extraction from meeting note",
         "source_type": "meeting",
         "source_id": "ext-002",
-        "scope": "org",
         "content": "Alice Smith will send Bob Jones the prototype by Friday.",
         "expected": {
             "fact_types": [
@@ -36,7 +34,6 @@
         "description": "metric contradiction warning for updated ARR",
         "source_type": "chat",
         "source_id": "ext-003",
-        "scope": "personal",
         "content": "Alice Smith reports ARR is $7M.",
         "setup_episodes": [
             {
@@ -66,7 +63,6 @@
         "description": "metric contradiction warning for revised MRR",
         "source_type": "chat",
         "source_id": "ext-004",
-        "scope": "org",
         "content": "Bob Jones reports MRR is $140K.",
         "setup_episodes": [
             {
@@ -96,7 +92,6 @@
         "description": "metric contradiction warning for revised budget",
         "source_type": "chat",
         "source_id": "ext-005",
-        "scope": "org",
         "content": "Carla Gomez says the marketing budget is $3M.",
         "setup_episodes": [
             {
@@ -126,7 +121,6 @@
         "description": "promise contradiction warning for shifted delivery date",
         "source_type": "meeting",
         "source_id": "ext-006",
-        "scope": "org",
         "content": "Alice Smith will send Bob Jones the prototype by Monday.",
         "setup_episodes": [
             {
@@ -157,7 +151,6 @@
         "description": "promise contradiction warning for updated checklist handoff",
         "source_type": "meeting",
         "source_id": "ext-007",
-        "scope": "personal",
         "content": "Mina Patel will send Omar Khan the rollout checklist next week.",
         "setup_episodes": [
             {
@@ -188,7 +181,6 @@
         "description": "experience fact extraction from user preference statement",
         "source_type": "chat",
         "source_id": "ext-008",
-        "scope": "org",
         "content": "Alice Smith prefers weekly launch updates over ad-hoc pings.",
         "expected": {
             "fact_types": [
@@ -204,7 +196,6 @@
         "description": "document-style action items from email extract as promise facts",
         "source_type": "email",
         "source_id": "ext-009",
-        "scope": "org",
         "content": "Subject: Atlas follow-up\n\nAction items:\n- Alice Smith: send revised deck by Friday\n- Bob Jones: review launch checklist by Monday",
         "expected": {
             "fact_types": [

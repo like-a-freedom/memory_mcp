@@ -42,8 +42,6 @@ fn log_and_return_error(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WatchCommand {
     pub dir: PathBuf,
-    pub project: Option<String>,
-    pub scope: String,
     pub interval_secs: u64,
 }
 
@@ -139,9 +137,7 @@ pub async fn run_watch_mode(
         event!(
             "op" => json!("main.watch_starting"),
             "dir" => json!(watch.dir.display().to_string()),
-            "scope" => json!(watch.scope),
             "interval_secs" => json!(watch.interval_secs),
-            "project" => json!(watch.project),
         ),
         LogLevel::Info,
     );
@@ -156,8 +152,6 @@ pub async fn run_watch_mode(
     {
         let result = crate::service::FsWatcher::run_with_interval(
             watch.dir,
-            watch.project,
-            watch.scope,
             watch.interval_secs,
             memory_service,
         )
@@ -330,24 +324,12 @@ mod tests {
 
     #[test]
     fn cli_watch_with_optional_flags() {
-        let cli = Cli::parse_from([
-            "memory_mcp",
-            "watch",
-            "/tmp/inbox",
-            "--project",
-            "atlas",
-            "--scope",
-            "team",
-            "--interval-secs",
-            "7",
-        ]);
+        let cli = Cli::parse_from(["memory_mcp", "watch", "/tmp/inbox", "--interval-secs", "7"]);
         let watch: WatchArgs = match cli.command {
             Some(Command::Watch(w)) => w,
             _ => panic!("expected Watch command"),
         };
         assert_eq!(watch.dir.to_str().unwrap(), "/tmp/inbox");
-        assert_eq!(watch.project.as_deref(), Some("atlas"));
-        assert_eq!(watch.scope, "team");
         assert_eq!(watch.interval_secs, 7);
     }
 
@@ -358,8 +340,17 @@ mod tests {
             Some(Command::Watch(w)) => w,
             _ => panic!("expected Watch command"),
         };
-        assert_eq!(watch.scope, "team");
         assert_eq!(watch.interval_secs, 2);
+    }
+
+    #[test]
+    fn cli_watch_rejects_legacy_partition_flags() {
+        let result =
+            Cli::try_parse_from(["memory_mcp", "watch", "/tmp/inbox", "--project", "atlas"]);
+        assert!(result.is_err());
+
+        let result = Cli::try_parse_from(["memory_mcp", "watch", "/tmp/inbox", "--scope", "team"]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -468,7 +459,7 @@ mod tests {
             "memory_mcp",
             "lifecycle-capture",
             "--event",
-            "{\"event_kind\":\"post_tool_result\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\",\"scope\":\"org\"}",
+            "{\"event_kind\":\"post_tool_result\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\"}",
             "--context",
             "{\"origin\":{\"kind\":\"lifecycle_adapter\",\"adapter_id\":\"claude_code\",\"adapter_version\":\"1\",\"host_event\":\"post_tool_result\"}}",
         ]);
@@ -481,7 +472,7 @@ mod tests {
             "memory_mcp",
             "lifecycle-recall",
             "--event",
-            "{\"event_kind\":\"session_start\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\",\"scope\":\"org\"}",
+            "{\"event_kind\":\"session_start\",\"task_fingerprint\":\"task:1\",\"normalized_task\":\"do work\"}",
             "--context",
             "{\"origin\":{\"kind\":\"lifecycle_adapter\",\"adapter_id\":\"claude_code\",\"adapter_version\":\"1\",\"host_event\":\"session_start\"}}",
         ]);

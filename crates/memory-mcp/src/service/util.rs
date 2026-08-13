@@ -10,7 +10,7 @@ mod validation;
 
 pub use ids::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_fact_id, hash_prefix,
+    deterministic_episode_id, deterministic_episode_id_v2, deterministic_fact_id, hash_prefix,
 };
 pub use validation::{validate_entity_candidate, validate_fact_input, validate_ingest_request};
 

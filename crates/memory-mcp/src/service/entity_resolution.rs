@@ -36,23 +36,16 @@ impl EntityResolver {
         &self,
         entity_service: &EntityService,
         candidate: EntityCandidate,
-        namespace: &str,
     ) -> Result<(String, bool), MemoryError> {
         let normalized = normalize_entity_name(&candidate.canonical_name);
 
         // Fast path: exact match by normalized name (via DB index).
-        if let Some(entity_id) = entity_service
-            .find_entity_id_by_name(&normalized, namespace)
-            .await?
-        {
+        if let Some(entity_id) = entity_service.find_entity_id_by_name(&normalized).await? {
             return Ok((entity_id, false));
         }
 
         // Alias check: look up by alias for an exact match.
-        if let Some(entity_id) = entity_service
-            .find_entity_id_by_alias(&normalized, namespace)
-            .await?
-        {
+        if let Some(entity_id) = entity_service.find_entity_id_by_alias(&normalized).await? {
             return Ok((entity_id, false));
         }
 
@@ -66,12 +59,10 @@ impl EntityResolver {
             .unwrap_or("");
         if prefix.is_empty() {
             // Entity too short for prefix search (less than 1 char). Create directly.
-            let entity_id = entity_service.create_entity(candidate, namespace).await?;
+            let entity_id = entity_service.create_entity(candidate).await?;
             return Ok((entity_id, true));
         }
-        let candidates = entity_service
-            .find_entities_by_prefix(namespace, prefix)
-            .await?;
+        let candidates = entity_service.find_entities_by_prefix(prefix).await?;
 
         let best_match = candidates
             .iter()
@@ -91,14 +82,14 @@ impl EntityResolver {
             // wasn't already exact, so we don't store a redundant self-alias).
             if score < 1.0 {
                 entity_service
-                    .add_alias_to_entity(&entity_id, &candidate.canonical_name, namespace)
+                    .add_alias_to_entity(&entity_id, &candidate.canonical_name)
                     .await?;
             }
             return Ok((entity_id, false));
         }
 
         // No match found — create a new entity.
-        let entity_id = entity_service.create_entity(candidate, namespace).await?;
+        let entity_id = entity_service.create_entity(candidate).await?;
         Ok((entity_id, true))
     }
 }
@@ -182,7 +173,7 @@ mod tests {
 
     fn make_service(db: MockDbClient) -> (EntityService, EntityResolver) {
         let db = Arc::new(db);
-        let svc = EntityService::new(db);
+        let svc = EntityService::new(db, "org");
         let resolver = EntityResolver::new(DEFAULT_FUZZY_THRESHOLD);
         (svc, resolver)
     }
@@ -200,7 +191,7 @@ mod tests {
             aliases: vec![],
         };
         let (entity_id, was_created) = resolver
-            .resolve_or_create(&svc, candidate, "org")
+            .resolve_or_create(&svc, candidate)
             .await
             .expect("resolve");
         assert_eq!(entity_id, "entity:person:alice");
@@ -228,7 +219,7 @@ mod tests {
             aliases: vec![],
         };
         let (entity_id, was_created) = resolver
-            .resolve_or_create(&svc, candidate, "org")
+            .resolve_or_create(&svc, candidate)
             .await
             .expect("resolve");
         assert!(was_created, "should create new entity");
@@ -263,7 +254,7 @@ mod tests {
             aliases: vec![],
         };
         let (entity_id, was_created) = resolver
-            .resolve_or_create(&svc, candidate, "org")
+            .resolve_or_create(&svc, candidate)
             .await
             .expect("resolve");
         assert!(!was_created, "fuzzy match should not create");
@@ -299,7 +290,7 @@ mod tests {
             aliases: vec![],
         };
         let (_entity_id, was_created) = resolver
-            .resolve_or_create(&svc, candidate, "org")
+            .resolve_or_create(&svc, candidate)
             .await
             .expect("resolve");
         assert!(

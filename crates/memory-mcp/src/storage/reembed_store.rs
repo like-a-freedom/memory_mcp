@@ -11,31 +11,52 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::DbClient;
 use crate::storage::helpers::is_missing_table_error;
+use crate::storage::{BoundDbClient, DbClient};
 
 /// Read-side store for the batch reembed worker.
 #[derive(Clone)]
 pub struct ReembedStoreClient {
-    db: Arc<dyn DbClient>,
+    db: BoundDbClient,
 }
 
 impl ReembedStoreClient {
-    pub fn new(db: Arc<dyn DbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            db: BoundDbClient::new(db, namespace),
+        }
+    }
+
+    /// Execute schema/index DDL in the process-bound namespace.
+    pub async fn execute_ddl(&self, sql: &str) -> Result<Value, MemoryError> {
+        self.db.query(sql, None).await
+    }
+
+    /// Load a reembed-owned record by ID.
+    pub async fn load_record(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(record_id).await
+    }
+
+    /// Create or update a reembed-owned record without exposing routing.
+    pub async fn upsert_record(&self, record_id: &str, payload: Value) -> Result<(), MemoryError> {
+        if self.db.select_one(record_id).await?.is_some() {
+            self.db.update(record_id, payload).await?;
+        } else {
+            self.db.create(record_id, payload).await?;
+        }
+        Ok(())
     }
 
     /// Counts facts whose embedding metadata does not match the target signature.
     pub async fn count_facts_needing_reembed(
         &self,
-        namespace: &str,
         target_signature: &str,
     ) -> Result<usize, MemoryError> {
         let sql = "SELECT count() AS count FROM fact WHERE embedding_signature IS NONE \
                    OR embedding_signature IS NULL OR embedding_signature != $target_signature \
                    GROUP ALL";
         let vars = json!({"target_signature": target_signature});
-        let result = match self.db.query(sql, Some(vars), namespace).await {
+        let result = match self.db.query(sql, Some(vars)).await {
             Ok(value) => value,
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
                 return Ok(0);
@@ -57,7 +78,6 @@ impl ReembedStoreClient {
     /// Selects facts needing rewrite in stable `fact_id` order, optionally after a cursor.
     pub async fn select_facts_needing_reembed(
         &self,
-        namespace: &str,
         target_signature: &str,
         last_completed_fact_id: Option<&str>,
         limit: i32,
@@ -82,7 +102,7 @@ impl ReembedStoreClient {
             "limit": limit,
         });
 
-        match self.db.query(&sql, Some(vars), namespace).await {
+        match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
@@ -180,16 +200,16 @@ mod tests {
             .await
             .expect("connect in memory db"),
         );
-        let store = ReembedStoreClient::new(db_client.clone());
+        let store = ReembedStoreClient::new(db_client.clone(), "org");
 
         let count = store
-            .count_facts_needing_reembed("org", "embsig:target")
+            .count_facts_needing_reembed("embsig:target")
             .await
             .expect("count must not error on missing table");
         assert_eq!(count, 0);
 
         let batch = store
-            .select_facts_needing_reembed("org", "embsig:target", None, 10)
+            .select_facts_needing_reembed("embsig:target", None, 10)
             .await
             .expect("select must not error on missing table");
         assert!(batch.is_empty());
@@ -202,17 +222,17 @@ mod tests {
         seed_fact(&db_client, "fact:b", None).await;
         seed_fact(&db_client, "fact:c", Some("embsig:old")).await;
         seed_fact(&db_client, "fact:d", Some("embsig:target")).await;
-        let store = ReembedStoreClient::new(db_client.clone());
+        let store = ReembedStoreClient::new(db_client.clone(), "org");
 
         let count = store
-            .count_facts_needing_reembed("org", "embsig:target")
+            .count_facts_needing_reembed("embsig:target")
             .await
             .expect("count");
         // b (missing signature) and c (stale signature) need reembedding.
         assert_eq!(count, 2);
 
         let batch = store
-            .select_facts_needing_reembed("org", "embsig:target", None, 10)
+            .select_facts_needing_reembed("embsig:target", None, 10)
             .await
             .expect("select");
         let ids: Vec<&str> = batch
@@ -228,10 +248,10 @@ mod tests {
         seed_fact(&db_client, "fact:1", Some("embsig:old")).await;
         seed_fact(&db_client, "fact:2", Some("embsig:old")).await;
         seed_fact(&db_client, "fact:3", Some("embsig:old")).await;
-        let store = ReembedStoreClient::new(db_client.clone());
+        let store = ReembedStoreClient::new(db_client.clone(), "org");
 
         let page = store
-            .select_facts_needing_reembed("org", "embsig:target", None, 2)
+            .select_facts_needing_reembed("embsig:target", None, 2)
             .await
             .expect("first page");
         let ids: Vec<&str> = page
@@ -241,7 +261,7 @@ mod tests {
         assert_eq!(ids, vec!["fact:1", "fact:2"]);
 
         let next = store
-            .select_facts_needing_reembed("org", "embsig:target", Some("fact:2"), 2)
+            .select_facts_needing_reembed("embsig:target", Some("fact:2"), 2)
             .await
             .expect("next page");
         let ids: Vec<&str> = next

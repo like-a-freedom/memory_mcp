@@ -89,7 +89,9 @@ where
         }
     }
 
-    unreachable!("remote embedding retry loop should always return")
+    Err(MemoryError::Transient(
+        "remote embedding retry loop exhausted without a response".to_string(),
+    ))
 }
 
 fn map_send_error(err: reqwest::Error) -> RemoteRequestFailure {

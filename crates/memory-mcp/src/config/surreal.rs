@@ -5,12 +5,63 @@ use std::env;
 use super::constants::*;
 use super::embedding::EmbeddingConfig;
 use super::helpers::{
-    default_embedded_data_dir, is_remote_url, normalize_url_scheme, parse_bool_env,
-    parse_comma_list, parse_env, resolve_embedded_data_dir,
+    default_embedded_data_dir, is_remote_url, normalize_url_scheme, parse_bool_env, parse_env,
+    resolve_embedded_data_dir,
 };
 use super::lifecycle::LifecycleConfig;
 use super::ner::NerConfig;
 use crate::service::MemoryError;
+
+/// The single SurrealDB namespace selected for the lifetime of a server process.
+///
+/// Namespace selection is configuration, not request data. Once a value has been
+/// parsed at the process boundary, ordinary operations cannot change it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ActiveNamespace(String);
+
+impl ActiveNamespace {
+    /// The zero-config namespace.
+    pub const DEFAULT: &'static str = "main";
+
+    /// Parses an environment or builder value.
+    ///
+    /// Empty values and comma-separated lists are rejected here. Other name
+    /// validation remains the responsibility of SurrealDB, which keeps this
+    /// adapter from inventing a database-specific grammar.
+    pub fn new(value: impl AsRef<str>) -> Result<Self, MemoryError> {
+        let value = value.as_ref().trim();
+        if value.is_empty() {
+            return Err(MemoryError::ConfigInvalid(
+                "SURREALDB_NAMESPACE must not be empty; choose one namespace name".to_string(),
+            ));
+        }
+        if value.contains(',') {
+            return Err(MemoryError::ConfigInvalid(
+                "SURREALDB_NAMESPACE accepts exactly one namespace; remove commas and choose one name"
+                    .to_string(),
+            ));
+        }
+        Ok(Self(value.to_string()))
+    }
+
+    /// Returns the namespace name for the bound storage session.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for ActiveNamespace {
+    fn default() -> Self {
+        Self(Self::DEFAULT.to_string())
+    }
+}
+
+impl std::fmt::Display for ActiveNamespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StorageBackend {
@@ -47,8 +98,8 @@ pub struct SurrealConfig {
     pub db_name: String,
     /// Connection URL (optional for embedded mode).
     pub url: Option<String>,
-    /// List of namespaces to use.
-    pub namespaces: Vec<String>,
+    /// The one namespace used by this server process.
+    pub namespace: ActiveNamespace,
     /// Database username.
     pub username: String,
     /// Database password.
@@ -86,7 +137,7 @@ impl SurrealConfig {
     /// | `SURREALDB_URL` | Yes (remote) | WebSocket URL |
     /// | `SURREALDB_EMBEDDED` | No | Set to `true` or `false`; inferred from URL when unset |
     /// | `SURREALDB_DATA_DIR` | No | Path to RocksDB data directory (user data directory by default) |
-    /// | `SURREALDB_NAMESPACES` | No | Comma-separated namespaces (default: `org`) |
+    /// | `SURREALDB_NAMESPACE` | No | One namespace (default: `main`) |
     /// | `SURREALDB_USERNAME` | Yes (remote) | Database username (`root` in embedded mode by default) |
     /// | `SURREALDB_PASSWORD` | Yes (remote) | Database password (`root` in embedded mode by default) |
     /// | `RUST_LOG` | No | Logging level (default: "info") |
@@ -99,8 +150,8 @@ impl SurrealConfig {
     /// # Errors
     ///
     /// Returns `MemoryError::ConfigMissing` when remote mode lacks a URL or
-    /// explicit credentials. Returns `MemoryError::ConfigInvalid` if namespaces
-    /// is explicitly empty.
+    /// explicit credentials. Returns `MemoryError::ConfigInvalid` if the namespace
+    /// is explicitly empty or contains a comma.
     pub fn from_env() -> Result<Self, MemoryError> {
         let raw_url = env::var("SURREALDB_URL").ok();
         let url = raw_url
@@ -112,19 +163,21 @@ impl SurrealConfig {
             .unwrap_or_else(|| !is_remote_url(raw_url.as_deref()));
         let db_name_was_explicit = env::var("SURREALDB_DB_NAME").is_ok();
         let db_name = env::var("SURREALDB_DB_NAME").unwrap_or_else(|_| "memory".into());
-        let namespaces_were_explicit = env::var("SURREALDB_NAMESPACES").is_ok();
-        let namespaces =
-            parse_comma_list("SURREALDB_NAMESPACES").unwrap_or_else(|_| vec!["org".into()]);
+        if env::var_os("SURREALDB_NAMESPACES").is_some() {
+            return Err(MemoryError::ConfigInvalid(
+                "SURREALDB_NAMESPACES was removed; use SURREALDB_NAMESPACE with exactly one name"
+                    .to_string(),
+            ));
+        }
+        let namespace_was_explicit = env::var("SURREALDB_NAMESPACE").is_ok();
+        let namespace = env::var("SURREALDB_NAMESPACE")
+            .map(ActiveNamespace::new)
+            .unwrap_or_else(|_| Ok(ActiveNamespace::default()))?;
         let username_was_explicit = env::var("SURREALDB_USERNAME").is_ok();
         let password_was_explicit = env::var("SURREALDB_PASSWORD").is_ok();
         let username = env::var("SURREALDB_USERNAME").unwrap_or_else(|_| "root".into());
         let password = env::var("SURREALDB_PASSWORD").unwrap_or_else(|_| "root".into());
 
-        if namespaces.is_empty() {
-            return Err(MemoryError::ConfigInvalid(
-                "SURREALDB_NAMESPACES is empty".to_string(),
-            ));
-        }
         if !embedded && !is_remote_url(url.as_deref()) {
             return Err(MemoryError::ConfigMissing("SURREALDB_URL".to_string()));
         }
@@ -146,8 +199,8 @@ impl SurrealConfig {
         if !db_name_was_explicit {
             defaulted_variables.push("SURREALDB_DB_NAME");
         }
-        if !namespaces_were_explicit {
-            defaulted_variables.push("SURREALDB_NAMESPACES");
+        if !namespace_was_explicit {
+            defaulted_variables.push("SURREALDB_NAMESPACE");
         }
         if !embedded_was_explicit {
             defaulted_variables.push("SURREALDB_EMBEDDED");
@@ -181,7 +234,7 @@ impl SurrealConfig {
         Ok(Self {
             db_name,
             url,
-            namespaces,
+            namespace,
             username,
             password,
             log_level,
@@ -197,10 +250,10 @@ impl SurrealConfig {
         })
     }
 
-    /// Returns the first namespace as the default.
+    /// Returns the active namespace selected for this process.
     #[must_use]
-    pub fn default_namespace(&self) -> Option<&str> {
-        self.namespaces.first().map(|s| s.as_str())
+    pub fn active_namespace(&self) -> &ActiveNamespace {
+        &self.namespace
     }
 
     /// Returns the data directory path, using default if not specified.
@@ -228,8 +281,7 @@ impl SurrealConfig {
 /// let config = SurrealConfigBuilder::new()
 ///     .db_name("memory")
 ///     .url("ws://localhost:8000")
-///     .namespace("personal")
-///     .namespace("org")
+///     .namespace("main")
 ///     .credentials("user", "pass")
 ///     .embedded(true)
 ///     .build();
@@ -238,7 +290,7 @@ impl SurrealConfig {
 pub struct SurrealConfigBuilder {
     db_name: Option<String>,
     url: Option<String>,
-    namespaces: Vec<String>,
+    namespace: Option<String>,
     username: Option<String>,
     password: Option<String>,
     log_level: String,
@@ -258,7 +310,7 @@ impl Default for SurrealConfigBuilder {
         Self {
             db_name: None,
             url: None,
-            namespaces: Vec::new(),
+            namespace: None,
             username: None,
             password: None,
             log_level: String::new(),
@@ -294,9 +346,9 @@ impl SurrealConfigBuilder {
         self
     }
 
-    /// Adds a namespace to the configuration.
-    pub fn namespace(mut self, ns: impl Into<String>) -> Self {
-        self.namespaces.push(ns.into());
+    /// Sets the one namespace used by the configuration.
+    pub fn namespace(mut self, namespace: impl Into<String>) -> Self {
+        self.namespace = Some(namespace.into());
         self
     }
 
@@ -360,7 +412,7 @@ impl SurrealConfigBuilder {
     /// # Errors
     ///
     /// Returns `MemoryError::ConfigMissing` if required fields are not set.
-    /// Returns `MemoryError::ConfigInvalid` if namespaces is empty.
+    /// Returns `MemoryError::ConfigInvalid` if the namespace is empty or invalid.
     pub fn build(self) -> Result<SurrealConfig, MemoryError> {
         let db_name = self
             .db_name
@@ -372,16 +424,15 @@ impl SurrealConfigBuilder {
             .password
             .ok_or_else(|| MemoryError::ConfigMissing("password".to_string()))?;
 
-        if self.namespaces.is_empty() {
-            return Err(MemoryError::ConfigInvalid(
-                "namespaces cannot be empty".to_string(),
-            ));
-        }
+        let namespace = self
+            .namespace
+            .map(ActiveNamespace::new)
+            .unwrap_or_else(|| Ok(ActiveNamespace::default()))?;
 
         Ok(SurrealConfig {
             db_name,
             url: self.url,
-            namespaces: self.namespaces,
+            namespace,
             username,
             password,
             log_level: self.log_level,
@@ -411,6 +462,7 @@ mod tests {
         "SURREALDB_URL",
         "SURREALDB_EMBEDDED",
         "SURREALDB_DB_NAME",
+        "SURREALDB_NAMESPACE",
         "SURREALDB_NAMESPACES",
         "SURREALDB_USERNAME",
         "SURREALDB_PASSWORD",
@@ -486,6 +538,36 @@ mod tests {
     }
 
     #[test]
+    fn active_namespace_trims_surrounding_whitespace() {
+        let namespace = ActiveNamespace::new("  main  ").expect("trimmed namespace is valid");
+
+        assert_eq!(namespace.as_str(), "main");
+    }
+
+    #[test]
+    fn active_namespace_rejects_empty_value() {
+        let error = ActiveNamespace::new("").expect_err("empty namespace must be rejected");
+
+        assert!(matches!(error, MemoryError::ConfigInvalid(message) if message.contains("empty")));
+    }
+
+    #[test]
+    fn active_namespace_rejects_whitespace_only_value() {
+        let error =
+            ActiveNamespace::new(" \t\n ").expect_err("whitespace-only namespace must be rejected");
+
+        assert!(matches!(error, MemoryError::ConfigInvalid(message) if message.contains("empty")));
+    }
+
+    #[test]
+    fn active_namespace_rejects_comma_separated_values() {
+        let error = ActiveNamespace::new("main,personal")
+            .expect_err("comma-separated namespaces must be rejected");
+
+        assert!(matches!(error, MemoryError::ConfigInvalid(message) if message.contains("comma")));
+    }
+
+    #[test]
     fn storage_backend_selection_follows_embedded_flag() {
         assert_eq!(
             StorageBackend::from_embedded(true),
@@ -499,8 +581,7 @@ mod tests {
         let config = SurrealConfigBuilder::new()
             .db_name("test_db")
             .url("ws://localhost:8000")
-            .namespace("personal")
-            .namespace("org")
+            .namespace("main")
             .credentials("user", "pass")
             .log_level("debug")
             .embedded(true)
@@ -512,7 +593,7 @@ mod tests {
 
         assert_eq!(config.db_name, "test_db");
         assert_eq!(config.url, Some("ws://localhost:8000".to_string()));
-        assert_eq!(config.namespaces, vec!["personal", "org"]);
+        assert_eq!(config.active_namespace().as_str(), "main");
         assert_eq!(config.username, "user");
         assert_eq!(config.password, "pass");
         assert_eq!(config.log_level, "debug");
@@ -532,24 +613,25 @@ mod tests {
     }
 
     #[test]
-    fn builder_requires_namespaces() {
-        let result = SurrealConfigBuilder::new()
+    fn builder_defaults_namespace_to_main() {
+        let config = SurrealConfigBuilder::new()
             .db_name("test")
             .credentials("u", "p")
-            .build();
-        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+            .build()
+            .expect("namespace should have a zero-config default");
+
+        assert_eq!(config.active_namespace().as_str(), "main");
     }
 
     #[test]
-    fn builder_default_namespace() {
+    fn builder_sets_namespace() {
         let config = SurrealConfigBuilder::new()
             .db_name("test")
-            .namespace("first")
-            .namespace("second")
+            .namespace("main")
             .credentials("u", "p")
             .build()
             .expect("valid config");
-        assert_eq!(config.default_namespace(), Some("first"));
+        assert_eq!(config.active_namespace().as_str(), "main");
     }
 
     #[test]
@@ -603,7 +685,7 @@ mod tests {
     fn query_logging_is_disabled_by_default() {
         let config = SurrealConfigBuilder::new()
             .db_name("test")
-            .namespace("org")
+            .namespace("main")
             .credentials("u", "p")
             .build()
             .expect("valid config");
@@ -622,7 +704,7 @@ mod tests {
         clear_surreal_environment();
         unsafe {
             env::set_var("SURREALDB_DB_NAME", "memory");
-            env::set_var("SURREALDB_NAMESPACES", "org,personal");
+            env::set_var("SURREALDB_NAMESPACE", "main");
             env::set_var("SURREALDB_USERNAME", "root");
             env::set_var("SURREALDB_PASSWORD", "root");
             env::set_var("SURREALDB_EMBEDDED", "true");
@@ -646,7 +728,7 @@ mod tests {
         let config = SurrealConfig::from_env().expect("empty environment should be valid");
 
         assert_eq!(config.db_name, "memory");
-        assert_eq!(config.namespaces, vec!["org"]);
+        assert_eq!(config.active_namespace().as_str(), "main");
         assert_eq!(config.username, "root");
         assert_eq!(config.password, "root");
         assert!(config.embedded);
@@ -659,7 +741,7 @@ mod tests {
             config.defaulted_variables,
             vec![
                 "SURREALDB_DB_NAME",
-                "SURREALDB_NAMESPACES",
+                "SURREALDB_NAMESPACE",
                 "SURREALDB_EMBEDDED",
                 "SURREALDB_USERNAME",
                 "SURREALDB_PASSWORD",
@@ -678,7 +760,7 @@ mod tests {
 
         assert!(config.embedded);
         assert_eq!(config.db_name, "memory");
-        assert_eq!(config.namespaces, vec!["org"]);
+        assert_eq!(config.active_namespace().as_str(), "main");
         assert_eq!(config.username, "root");
         assert_eq!(config.password, "root");
         assert!(matches!(
@@ -731,7 +813,7 @@ mod tests {
             config.defaulted_variables,
             vec![
                 "SURREALDB_DB_NAME",
-                "SURREALDB_NAMESPACES",
+                "SURREALDB_NAMESPACE",
                 "SURREALDB_EMBEDDED",
                 "SURREALDB_USERNAME",
                 "SURREALDB_PASSWORD",
@@ -744,7 +826,7 @@ mod tests {
     fn builder_created_config_has_no_default_provenance() {
         let config = SurrealConfigBuilder::new()
             .db_name("test")
-            .namespace("org")
+            .namespace("main")
             .credentials("u", "p")
             .build()
             .expect("valid config");
@@ -807,11 +889,57 @@ mod tests {
             config.defaulted_variables,
             vec![
                 "SURREALDB_DB_NAME",
-                "SURREALDB_NAMESPACES",
+                "SURREALDB_NAMESPACE",
                 "SURREALDB_EMBEDDED",
             ]
         );
         assert!(config.data_dir.is_none());
+    }
+
+    #[test]
+    fn from_env_rejects_legacy_plural_namespace_env_when_non_empty() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREALDB_NAMESPACES", "org,personal") };
+
+        let error = SurrealConfig::from_env().expect_err("legacy plural env must be rejected");
+
+        assert!(
+            matches!(error, MemoryError::ConfigInvalid(message) if message.contains("SURREALDB_NAMESPACES"))
+        );
+    }
+
+    #[test]
+    fn from_env_rejects_legacy_plural_namespace_env_when_empty() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe { env::set_var("SURREALDB_NAMESPACES", "") };
+
+        let error =
+            SurrealConfig::from_env().expect_err("empty legacy plural env must be rejected");
+
+        assert!(
+            matches!(error, MemoryError::ConfigInvalid(message) if message.contains("SURREALDB_NAMESPACES"))
+        );
+    }
+
+    #[test]
+    fn from_env_rejects_legacy_plural_and_singular_namespace_env_together() {
+        let _lock = env_lock().lock().expect("environment lock");
+        let _snapshot = EnvSnapshot::capture(SURREAL_CONFIG_ENV_KEYS);
+        clear_surreal_environment();
+        unsafe {
+            env::set_var("SURREALDB_NAMESPACES", "org");
+            env::set_var("SURREALDB_NAMESPACE", "main");
+        }
+
+        let error = SurrealConfig::from_env().expect_err("both namespace envs must be rejected");
+
+        assert!(
+            matches!(error, MemoryError::ConfigInvalid(message) if message.contains("SURREALDB_NAMESPACES"))
+        );
     }
 
     #[test]

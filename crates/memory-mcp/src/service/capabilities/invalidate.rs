@@ -1,11 +1,10 @@
 use serde_json::{Value, json};
 
 use crate::models::{AccessPayload, InvalidateRequest};
-use crate::service::cache::invalidate_cache_by_scope;
+use crate::service::cache::invalidate_cache;
 use crate::service::error::MemoryError;
 use crate::service::query::{normalize_dt, now};
 use crate::service::service_context::ServiceContext;
-use crate::service::value_helpers::string_from_value;
 
 /// Capability for invalidating facts (marking them as outdated).
 pub struct InvalidateCapability;
@@ -22,35 +21,27 @@ impl InvalidateCapability {
     ) -> Result<(), MemoryError> {
         ctx.enforce_rate_limit(access.as_ref())?;
 
-        let (record, namespace) = ctx.find_record_by_id(&request.fact_id).await?;
-        let namespace =
-            namespace.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+        let (record, _namespace) = ctx.find_record_by_id(&request.fact_id).await?;
         let mut updated =
             record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
-
-        let scope = updated
-            .get("scope")
-            .and_then(string_from_value)
-            .unwrap_or_else(|| namespace.clone());
 
         updated.insert(
             "t_invalid".to_string(),
             json!(normalize_dt(request.t_invalid)),
         );
         updated.insert("t_invalid_ingested".to_string(), json!(normalize_dt(now())));
-        ctx.db_client
-            .update(&request.fact_id, Value::Object(updated), &namespace)
+        ctx.fact_store()
+            .update(&request.fact_id, Value::Object(updated))
             .await?;
         if let Some(ref claim_store) = ctx.claim_store {
             claim_store
                 .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
-                    namespace: &namespace,
                     fact_id: &crate::models::FactId::from(request.fact_id.as_str()),
                     retract_reason: "manual_invalidation",
                 })
                 .await?;
         }
-        invalidate_cache_by_scope(&ctx.context_cache, &scope).await;
+        invalidate_cache(&ctx.context_cache).await;
         Ok(())
     }
 }
@@ -117,10 +108,8 @@ mod tests {
 
         let cache_key = CacheKey::new(
             "query",
-            "team",
             chrono::Utc::now(),
             5,
-            None,
             &[],
             CacheView::default(),
             None,

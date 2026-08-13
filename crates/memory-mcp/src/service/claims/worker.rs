@@ -73,7 +73,6 @@ pub(crate) async fn run_next_leased_job(
     worker_id: &str,
 ) -> Result<bool, MemoryError> {
     let lease_request = LeaseJobRequest {
-        namespace: "org",
         lease_owner: worker_id,
         lease_duration: std::time::Duration::from_secs(30),
     };
@@ -121,7 +120,6 @@ pub(crate) async fn reconcile_claim_inline(
     let claims = claim_service
         .store
         .select_claims_for_facts(crate::storage::claims::ClaimsForFactsQuery {
-            namespace,
             fact_ids: std::slice::from_ref(source_fact_id),
         })
         .await?;
@@ -161,7 +159,6 @@ pub(crate) async fn reconcile_claim_inline(
 }
 
 async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<(), MemoryError> {
-    let namespace = &job.namespace;
     let claim_id = match &job.claim_id {
         Some(id) => id.clone(),
         None => return Ok(()),
@@ -177,7 +174,6 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
     let owning_claims = claim_service
         .store
         .select_claims_for_facts(crate::storage::claims::ClaimsForFactsQuery {
-            namespace,
             fact_ids: std::slice::from_ref(&source_fact_id),
         })
         .await?;
@@ -195,14 +191,13 @@ async fn reconcile_page_with_owning(
     owning: crate::models::claim::Claim,
 ) -> Result<(), MemoryError> {
     let page_start = std::time::Instant::now();
-    let namespace = &job.namespace;
     let slot_fp = owning.slot_fingerprint.clone();
 
     let candidates = claim_service
         .store
         .select_candidates_page(ClaimCandidateQuery {
-            namespace,
             slot_fingerprint: &slot_fp,
+            identity_version: owning.identity_version,
             after_claim_id: None,
             limit: claim_service.config.candidate_page_size,
         })
@@ -210,7 +205,6 @@ async fn reconcile_page_with_owning(
 
     if candidates.is_empty() {
         let request = CommitReconciliationPageRequest {
-            namespace,
             job_id: &job.job_id,
             expected_lease_owner: "",
             relations: &[],
@@ -323,7 +317,6 @@ async fn reconcile_page_with_owning(
 
     let last_id = candidates.last().map(|c| c.claim_id.clone());
     let request = CommitReconciliationPageRequest {
-        namespace,
         job_id: &job.job_id,
         expected_lease_owner: "",
         relations: &relations,
@@ -371,10 +364,7 @@ async fn reconcile_page_with_owning(
     // Refresh the active-relations gauge now that the page's relations are
     // durable. Failures here surface as errors so they are visible rather
     // than silently skipped.
-    let counts = claim_service
-        .store
-        .count_active_relations(namespace)
-        .await?;
+    let counts = claim_service.store.count_active_relations().await?;
     for c in counts {
         let family = match c.schema_family.as_deref() {
             Some("attribute") => Some(crate::models::claim::ClaimSchemaFamily::Attribute),

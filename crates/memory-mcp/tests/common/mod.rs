@@ -11,14 +11,11 @@ use serde_json::json;
 
 static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
-fn namespace_for_scope(scope: &str) -> &str {
-    match scope {
-        "personal" => "personal",
-        "team" => "team",
-        "private" | "private-domain" | "private_domain" => "private-domain",
-        _ => "org",
-    }
-}
+/// The single namespace used by ordinary in-memory test fixtures.
+///
+/// A few tests still pass legacy scope labels to seed records so they can prove
+/// that old metadata is readable. Those labels must never select storage.
+const TEST_ACTIVE_NAMESPACE: &str = "org";
 
 fn next_test_db_name() -> String {
     let seq = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -32,12 +29,7 @@ pub struct TestMemory {
 
 impl TestMemory {
     pub async fn new(query_logging_enabled: bool) -> Self {
-        let namespaces = vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "team".to_string(),
-            "private-domain".to_string(),
-        ];
+        let namespaces = vec!["org".to_string()];
         let db_name = next_test_db_name();
         let db_client = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces(&db_name, &namespaces, "warn")
@@ -51,10 +43,15 @@ impl TestMemory {
                 .expect("apply in-memory migrations");
         }
 
-        let service =
-            MemoryService::new(db_client.clone(), namespaces, "warn".to_string(), 50, 100)
-                .expect("service init")
-                .with_query_logging_enabled(query_logging_enabled);
+        let service = MemoryService::new(
+            db_client.clone(),
+            TEST_ACTIVE_NAMESPACE.to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service init")
+        .with_query_logging_enabled(query_logging_enabled);
 
         Self { service, db_client }
     }
@@ -94,10 +91,7 @@ pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &
         t_ref: "2026-03-01T10:00:00Z"
             .parse::<DateTime<Utc>>()
             .expect("static timestamp should parse"),
-        scope: "personal".to_string(),
-        project: None,
         t_ingested: None,
-        visibility_scope: None,
         policy_tags: vec![],
     };
     let episode_id = IngestCapability::ingest(&service.build_context(), request, None)
@@ -122,7 +116,7 @@ pub async fn seed_fact_at(
 #[allow(dead_code)]
 pub async fn seed_fact_with_links(
     service: &MemoryService,
-    scope: &str,
+    _legacy_scope: &str,
     content: &str,
     t_valid: DateTime<Utc>,
     entity_links: Vec<String>,
@@ -134,7 +128,6 @@ pub async fn seed_fact_with_links(
             content,
             "episode:seed",
             t_valid,
-            scope,
             0.9,
             entity_links,
             vec![],
@@ -147,7 +140,7 @@ pub async fn seed_fact_with_links(
 #[allow(dead_code)]
 pub async fn seed_episode_backed_fact_with_source_id(
     service: &MemoryService,
-    scope: &str,
+    _legacy_scope: &str,
     content: &str,
     t_valid: DateTime<Utc>,
     source_id: &str,
@@ -159,10 +152,7 @@ pub async fn seed_episode_backed_fact_with_source_id(
             source_id: source_id.to_string(),
             content: content.to_string(),
             t_ref: t_valid,
-            scope: scope.to_string(),
-            project: None,
             t_ingested: Some(t_valid),
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -186,7 +176,6 @@ pub async fn seed_episode_backed_fact_with_source_id(
             content,
             &episode_id,
             t_valid,
-            scope,
             0.9,
             entity_links,
             vec![],
@@ -229,10 +218,7 @@ pub async fn seed_fact_with_links_and_project(
             source_id,
             content: format!("seed source for {content}"),
             t_ref: t_valid,
-            scope: scope.to_string(),
-            project: normalized_project.map(str::to_string),
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         },
         None,
@@ -247,7 +233,6 @@ pub async fn seed_fact_with_links_and_project(
             content,
             &episode_id,
             t_valid,
-            scope,
             0.9,
             entity_links,
             vec![],
@@ -260,7 +245,7 @@ pub async fn seed_fact_with_links_and_project(
 #[allow(dead_code)]
 pub async fn seed_entity(
     db_client: &Arc<SurrealDbClient>,
-    scope: &str,
+    _legacy_scope: &str,
     entity_id: &str,
     entity_type: &str,
     canonical_name: &str,
@@ -276,7 +261,7 @@ pub async fn seed_entity(
                 "canonical_name_normalized": normalize_text(canonical_name),
                 "aliases": aliases,
             }),
-            namespace_for_scope(scope),
+            TEST_ACTIVE_NAMESPACE,
         )
         .await
         .expect("seed entity should succeed");
@@ -285,7 +270,7 @@ pub async fn seed_entity(
 #[allow(dead_code)]
 pub async fn seed_community(
     db_client: &Arc<SurrealDbClient>,
-    scope: &str,
+    _legacy_scope: &str,
     community_id: &str,
     member_entities: &[String],
     summary: &str,
@@ -300,7 +285,7 @@ pub async fn seed_community(
                 "summary": summary,
                 "updated_at": normalize_dt(updated_at),
             }),
-            namespace_for_scope(scope),
+            TEST_ACTIVE_NAMESPACE,
         )
         .await
         .expect("seed community should succeed");

@@ -83,73 +83,71 @@ pub async fn run_decay_pass(
     let now = Utc::now();
     let mut invalidated = 0;
 
-    for namespace in &service.namespaces {
-        let facts = service
-            .app_store()
-            .select_active_facts(namespace, DECAY_BATCH_LIMIT)
-            .await?;
+    let namespace = &service.active_namespace;
+    let facts = service
+        .app_store()
+        .select_active_facts(DECAY_BATCH_LIMIT)
+        .await?;
 
-        for record in facts {
-            if record
-                .get("t_invalid")
-                .is_some_and(|value| !value.is_null())
-            {
-                continue;
-            }
+    for record in facts {
+        if record
+            .get("t_invalid")
+            .is_some_and(|value| !value.is_null())
+        {
+            continue;
+        }
 
-            let t_valid = record
-                .get("t_valid")
+        let t_valid = record
+            .get("t_valid")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or(now);
+
+        let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
+        let access_count = record.get("access_count").and_then(json_i64).unwrap_or(0);
+        let last_accessed = record
+            .get("last_accessed")
+            .and_then(|value| value.as_str())
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        let delta = now - t_valid;
+        let days_since_valid = delta.num_days() as f64;
+        let decay_rate = (2.0_f64).ln() / half_life_days;
+        let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
+        let is_hot = access_count > 0
+            && last_accessed.is_some_and(|last_accessed| {
+                let delta_access = now - last_accessed;
+                delta_access.num_days() as f64 <= half_life_days
+            });
+
+        if decayed < threshold && !is_hot {
+            let fact_id = record
+                .get("fact_id")
                 .and_then(|v| v.as_str())
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or(now);
+                .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))?;
 
-            let base_confidence = record.get("confidence").and_then(json_f64).unwrap_or(0.5);
-            let access_count = record.get("access_count").and_then(json_i64).unwrap_or(0);
-            let last_accessed = record
-                .get("last_accessed")
-                .and_then(|value| value.as_str())
-                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
-                .map(|dt| dt.with_timezone(&Utc));
+            let payload = json!({
+                "t_invalid": crate::service::normalize_dt(now),
+                "t_invalid_ingested": crate::service::normalize_dt(now),
+            });
 
-            let delta = now - t_valid;
-            let days_since_valid = delta.num_days() as f64;
-            let decay_rate = (2.0_f64).ln() / half_life_days;
-            let decayed = base_confidence * (-decay_rate * days_since_valid).exp();
-            let is_hot = access_count > 0
-                && last_accessed.is_some_and(|last_accessed| {
-                    let delta_access = now - last_accessed;
-                    delta_access.num_days() as f64 <= half_life_days
-                });
+            service
+                .db_client
+                .update(fact_id, payload, namespace)
+                .await?;
 
-            if decayed < threshold && !is_hot {
-                let fact_id = record
-                    .get("fact_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))?;
+            service
+                .claim_service
+                .store
+                .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
+                    fact_id: &crate::models::FactId::from(fact_id),
+                    retract_reason: "confidence_decay",
+                })
+                .await?;
 
-                let payload = json!({
-                    "t_invalid": crate::service::normalize_dt(now),
-                    "t_invalid_ingested": crate::service::normalize_dt(now),
-                });
-
-                service
-                    .db_client
-                    .update(fact_id, payload, namespace)
-                    .await?;
-
-                service
-                    .claim_service
-                    .store
-                    .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
-                        namespace,
-                        fact_id: &crate::models::FactId::from(fact_id),
-                        retract_reason: "confidence_decay",
-                    })
-                    .await?;
-
-                invalidated += 1;
-            }
+            invalidated += 1;
         }
     }
 

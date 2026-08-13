@@ -159,7 +159,6 @@ pub(crate) struct BuildRankedContextFactsRequest<'a> {
     pub(crate) semantic_facts: Vec<(Fact, String)>,
     pub(crate) query_opt: Option<&'a str>,
     pub(crate) semantic_available: bool,
-    pub(crate) scope: &'a str,
     pub(crate) cutoff: DateTime<Utc>,
 }
 
@@ -174,7 +173,6 @@ pub(crate) fn build_ranked_context_facts(
         semantic_facts,
         query_opt,
         semantic_available,
-        scope,
         cutoff,
     } = request;
 
@@ -210,7 +208,7 @@ pub(crate) fn build_ranked_context_facts(
                         candidate.query_alignment_factor,
                         candidate.grounding_score,
                         semantic_available,
-                        default_direct_rationale(query_opt, scope, cutoff),
+                        default_direct_rationale(query_opt, cutoff),
                     );
                 }
             })
@@ -222,7 +220,7 @@ pub(crate) fn build_ranked_context_facts(
                     query_alignment_factor,
                     grounding_score,
                     semantic_available,
-                    default_direct_rationale(query_opt, scope, cutoff),
+                    default_direct_rationale(query_opt, cutoff),
                 ),
                 fact,
                 retrieval_tier,
@@ -411,21 +409,12 @@ fn graph_rank_weight(rank: usize, hop_count: usize, origin_factor: f64) -> f64 {
     reciprocal_rank(rank) * hop_weight * origin_factor.clamp(0.0, 1.0)
 }
 
-pub(crate) fn default_direct_rationale(
-    query_opt: Option<&str>,
-    scope: &str,
-    cutoff: DateTime<Utc>,
-) -> String {
+pub(crate) fn default_direct_rationale(query_opt: Option<&str>, cutoff: DateTime<Utc>) -> String {
     query_opt.map_or_else(
-        || {
-            format!(
-                "matched scope={scope} and active at {}",
-                cutoff.date_naive()
-            )
-        },
+        || format!("matched active memory at {}", cutoff.date_naive()),
         |query| {
             format!(
-                "matched lexical query=\"{query}\" in scope={scope} and active at {}",
+                "matched lexical query=\"{query}\" and active at {}",
                 cutoff.date_naive()
             )
         },
@@ -434,19 +423,18 @@ pub(crate) fn default_direct_rationale(
 
 pub(crate) fn default_episode_fallback_rationale(
     query_opt: Option<&str>,
-    scope: &str,
     cutoff: DateTime<Utc>,
 ) -> String {
     query_opt.map_or_else(
         || {
             format!(
-                "matched episode content in scope={scope} and active at {}",
+                "matched episode content and active at {}",
                 cutoff.date_naive()
             )
         },
         |query| {
             format!(
-                "matched episode content query=\"{query}\" in scope={scope} and active at {}",
+                "matched episode content query=\"{query}\" and active at {}",
                 cutoff.date_naive()
             )
         },
@@ -1365,7 +1353,6 @@ mod tests {
                 semantic_facts: Vec::new(),
                 query_opt: Some("march 2026 launch review"),
                 semantic_available: false,
-                scope: "org",
                 cutoff,
             },
             crate::service::decayed_confidence,
@@ -1404,7 +1391,6 @@ mod tests {
                 semantic_facts: Vec::new(),
                 query_opt: Some("launch workstream"),
                 semantic_available: false,
-                scope: "org",
                 cutoff,
             },
             crate::service::decayed_confidence,
@@ -1496,7 +1482,6 @@ mod tests {
                     "I recently attended an event where there was a unique blend of modern beats with Pacific sounds.",
                 ),
                 semantic_available: false,
-                scope: "org",
                 cutoff,
             },
             crate::service::decayed_confidence,

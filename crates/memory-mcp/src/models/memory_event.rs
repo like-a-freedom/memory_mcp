@@ -228,14 +228,12 @@ pub struct ContentMetadata {
 
 /// A normalized host event ready for capture policy evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct NormalizedHostEvent {
     pub event_kind: LifecycleEventKind,
     pub task_fingerprint: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub normalized_task: String,
-    pub scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -253,8 +251,8 @@ pub struct CaptureBudget {
     pub remaining_session_captures: u32,
     /// Remaining accepted bytes for the session.
     pub remaining_session_bytes: u32,
-    /// Remaining daily accepted bytes for the project.
-    pub remaining_project_daily_bytes: u64,
+    /// Remaining daily accepted bytes for this process/Active Namespace.
+    pub remaining_process_daily_bytes: u64,
     /// Whether the budget is exhausted.
     pub exhausted: bool,
 }
@@ -591,8 +589,6 @@ mod tests {
             event_kind: LifecycleEventKind::PostToolResult,
             task_fingerprint: "task:1".to_string(),
             normalized_task: "do work".to_string(),
-            scope: "org".to_string(),
-            project: Some("p".to_string()),
             policy_tags: vec![],
             content: Some("ran cargo check".to_string()),
             artifact_uris: vec![],
@@ -614,7 +610,7 @@ mod tests {
         let budget = CaptureBudget {
             remaining_session_captures: 0,
             remaining_session_bytes: 0,
-            remaining_project_daily_bytes: 0,
+            remaining_process_daily_bytes: 0,
             exhausted: true,
         };
         assert!(budget.exhausted);
@@ -622,6 +618,46 @@ mod tests {
         let rejected = CaptureDisposition::Rejected;
         assert!(rejected.is_zero_growth());
         assert!(!rejected.is_accepted());
+    }
+
+    #[test]
+    fn legacy_scope_and_project_event_fields_are_rejected() {
+        let base = serde_json::json!({
+            "event_kind": "user_prompt",
+            "task_fingerprint": "task:1",
+            "normalized_task": "do work"
+        });
+
+        for legacy_field in ["scope", "project"] {
+            let mut payload = base.clone();
+            payload[legacy_field] = if legacy_field == "scope" {
+                serde_json::json!("org")
+            } else {
+                serde_json::json!("legacy-project")
+            };
+            let error = serde_json::from_value::<NormalizedHostEvent>(payload)
+                .expect_err("legacy lifecycle partition field must be rejected");
+            assert!(error.to_string().contains(legacy_field));
+        }
+    }
+
+    #[test]
+    fn scope_free_event_round_trips_without_partition_fields() {
+        let event = NormalizedHostEvent {
+            event_kind: LifecycleEventKind::UserPrompt,
+            task_fingerprint: "task:1".to_string(),
+            normalized_task: "do work".to_string(),
+            policy_tags: vec!["team:core".to_string()],
+            content: Some("content".to_string()),
+            artifact_uris: vec![],
+            capture_signal: Some("preference".to_string()),
+        };
+        let value = serde_json::to_value(&event).expect("serialize event");
+        assert!(!value.as_object().expect("object").contains_key("scope"));
+        assert!(!value.as_object().expect("object").contains_key("project"));
+        let decoded: NormalizedHostEvent =
+            serde_json::from_value(value).expect("scope-free event must deserialize");
+        assert_eq!(decoded, event);
     }
 
     #[test]
@@ -653,8 +689,6 @@ mod tests {
             event_kind: LifecycleEventKind::PostToolResult,
             task_fingerprint: "t".to_string(),
             normalized_task: String::new(),
-            scope: "org".to_string(),
-            project: None,
             policy_tags: vec![],
             content: None,
             artifact_uris: (0..20)

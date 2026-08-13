@@ -334,8 +334,7 @@ PY
   validate_response facts "$EXTRACT_JSON"
 
   run_timed_to_file "$CONTEXT_JSON" "$BIN" assemble-context \
-    --query "Who owns the memory MCP project?" \
-    --scope org
+    --query "Who owns the memory MCP project?"
   fact_recall_seconds="$LAST_ELAPSED"
   validate_response context "$CONTEXT_JSON"
   total_finished=$(monotonic_ns)

@@ -46,35 +46,22 @@ pub(crate) fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<
 }
 
 /// Persist a new edge after confirming it does not already exist.
-pub(crate) async fn store_edge(
-    service: &ServiceContext,
-    edge: &Edge,
-    namespace: &str,
-) -> Result<(), MemoryError> {
+pub(crate) async fn store_edge(service: &ServiceContext, edge: &Edge) -> Result<(), MemoryError> {
     let edge_id =
         ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
 
-    let existing = service
-        .episode_store()
-        .select_one(&edge_id, namespace)
-        .await?;
+    let existing = service.episode_store().select_one(&edge_id).await?;
     if existing.is_some() {
         return Ok(());
     }
 
-    invalidate_conflicting_edges(service, edge, namespace).await?;
+    invalidate_conflicting_edges(service, edge).await?;
 
     let payload = build_edge_payload(edge, &edge_id);
 
     service
         .episode_store()
-        .relate_edge(
-            &edge_id,
-            &edge.in_id,
-            &edge.out_id,
-            Value::Object(payload),
-            namespace,
-        )
+        .relate_edge(&edge_id, &edge.in_id, &edge.out_id, Value::Object(payload))
         .await?;
 
     Ok(())
@@ -96,16 +83,10 @@ pub(crate) struct StoredEdgeVersion {
 async fn invalidate_conflicting_edges(
     service: &ServiceContext,
     new_edge: &Edge,
-    namespace: &str,
 ) -> Result<(), MemoryError> {
     let existing_edges = service
         .episode_store()
-        .select_edges_for_triple(
-            namespace,
-            &new_edge.in_id,
-            &new_edge.relation,
-            &new_edge.out_id,
-        )
+        .select_edges_for_triple(&new_edge.in_id, &new_edge.relation, &new_edge.out_id)
         .await?;
 
     for existing in existing_edges
@@ -121,7 +102,6 @@ async fn invalidate_conflicting_edges(
                     "t_invalid": normalize_dt(new_edge.t_valid),
                     "t_invalid_ingested": normalize_dt(new_edge.t_ingested),
                 }),
-                namespace,
             )
             .await?;
     }

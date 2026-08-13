@@ -7,8 +7,9 @@ use crate::models::ClaimJobId;
 use crate::models::EpisodeId;
 use crate::models::FactId;
 use crate::models::claim::{
-    ClaimBuildInput, ClaimDraft, ClaimJob, ClaimJobKind, ClaimJobState, ClaimSlot,
-    ComparisonKeyHash, ExtractorFingerprint, PolicyFingerprint, QualifierHash, build_claim,
+    ClaimBuildInput, ClaimDraft, ClaimIdentityVersion, ClaimJob, ClaimJobKind, ClaimJobState,
+    ClaimSlot, ComparisonKeyHash, ExtractorFingerprint, PolicyFingerprint, QualifierHash,
+    build_claim,
 };
 use crate::service::MemoryError;
 use crate::storage::claims::{ClaimStore, PersistProjectionRequest};
@@ -39,8 +40,6 @@ pub(crate) struct FactPersistedParams<'a> {
     pub source_episode_id: &'a EpisodeId,
     pub fact_type: &'a str,
     pub content: &'a str,
-    pub scope: &'a str,
-    pub project: Option<&'a str>,
     pub policy_tags: &'a [String],
     pub entity_links: &'a [String],
     pub t_valid: chrono::DateTime<chrono::Utc>,
@@ -122,14 +121,13 @@ impl ClaimService {
         for draft in &result.drafts {
             let comparison_key_hash = ComparisonKeyHash::compute(&draft.comparison_key);
             let qualifier_hash = QualifierHash::compute(&draft.qualifiers);
-            let access_policy_fingerprint =
-                PolicyFingerprint::compute(params.scope, params.project, params.policy_tags);
-            let project_identity = params.project.unwrap_or("__none__").to_string();
+            let access_policy_fingerprint = PolicyFingerprint::compute_v2(params.policy_tags);
 
             let subject_slot = ClaimSlot {
+                identity_version: ClaimIdentityVersion::V2,
                 namespace: params.namespace.to_string(),
-                scope: params.scope.to_string(),
-                project_identity,
+                scope: None,
+                project_identity: None,
                 access_policy_fingerprint: access_policy_fingerprint.clone(),
                 schema_ref: draft.schema_ref,
                 subject_key: draft.subject.clone(),
@@ -155,8 +153,6 @@ impl ClaimService {
                 namespace: params.namespace,
                 source_fact_id: params.fact_id,
                 source_episode_id: params.source_episode_id,
-                scope: params.scope,
-                project: params.project,
                 policy_tags: params.policy_tags,
                 draft: claim_draft,
                 extractor_fingerprint: fingerprint,
@@ -201,7 +197,6 @@ impl ClaimService {
 
         // Persist via store
         let persist_request = PersistProjectionRequest {
-            namespace: params.namespace,
             claims,
             jobs: vec![projection_job],
         };
@@ -305,7 +300,7 @@ mod tests {
         }
         async fn persist_projection(
             &self,
-            _req: PersistProjectionRequest<'_>,
+            _req: PersistProjectionRequest,
         ) -> Result<(), MemoryError> {
             Ok(())
         }
@@ -329,7 +324,6 @@ mod tests {
         }
         async fn count_active_relations(
             &self,
-            _ns: &str,
         ) -> Result<Vec<crate::storage::claims::ActiveRelationCount>, MemoryError> {
             Ok(vec![])
         }
@@ -368,8 +362,6 @@ mod tests {
             source_episode_id: Box::leak(Box::new(EpisodeId::from("ep:test"))),
             fact_type: "experience",
             content,
-            scope: "personal",
-            project: None,
             policy_tags: &[],
             entity_links: &[],
             t_valid: chrono::Utc::now(),

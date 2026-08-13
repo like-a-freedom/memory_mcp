@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde_json::json;
 
 use crate::models::EntityCandidate;
@@ -19,12 +17,17 @@ fn is_missing_table_error(message: &str) -> bool {
 /// Resolves and persists entities.
 #[derive(Clone)]
 pub struct EntityService {
-    db_client: Arc<dyn crate::storage::DbClient>,
+    db: crate::storage::BoundDbClient,
 }
 
 impl EntityService {
-    pub fn new(db_client: Arc<dyn crate::storage::DbClient>) -> Self {
-        Self { db_client }
+    pub(crate) fn new(
+        db_client: std::sync::Arc<dyn crate::storage::DbClient>,
+        namespace: impl Into<String>,
+    ) -> Self {
+        Self {
+            db: crate::storage::BoundDbClient::new(db_client, namespace),
+        }
     }
 
     // -- Fuzzy resolution support methods --
@@ -34,17 +37,12 @@ impl EntityService {
     pub async fn find_entity_id_by_name(
         &self,
         normalized_name: &str,
-        namespace: &str,
     ) -> Result<Option<String>, MemoryError> {
         // Canonical-name index lookup first (fast path), then alias lookup.
         let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
         let canonical_result = match self
-            .db_client
-            .query(
-                canonical_sql,
-                Some(json!({ "name": normalized_name })),
-                namespace,
-            )
+            .db
+            .query(canonical_sql, Some(json!({ "name": normalized_name })))
             .await
         {
             Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
@@ -60,12 +58,8 @@ impl EntityService {
 
         let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
         let result = match self
-            .db_client
-            .query(
-                alias_sql,
-                Some(json!({ "name": normalized_name })),
-                namespace,
-            )
+            .db
+            .query(alias_sql, Some(json!({ "name": normalized_name })))
             .await
         {
             Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
@@ -82,15 +76,14 @@ impl EntityService {
     pub async fn find_entity_id_by_alias(
         &self,
         normalized_alias: &str,
-        namespace: &str,
     ) -> Result<Option<String>, MemoryError> {
         // NOTE: `entity_aliases` is a plain (non-FULLTEXT) index on the `aliases`
         // array, so the FTS operator `@1@` would silently match nothing.
         // `CONTAINS` is SurrealDB's array-membership operator and is index-aware.
         let sql = "SELECT entity_id FROM entity WHERE aliases CONTAINS $alias LIMIT 1";
         let result = self
-            .db_client
-            .query(sql, Some(json!({"alias": normalized_alias})), namespace)
+            .db
+            .query(sql, Some(json!({"alias": normalized_alias})))
             .await?;
         Ok(result
             .as_array()
@@ -103,14 +96,10 @@ impl EntityService {
     /// Returns a list of `(entity_id, canonical_name)` pairs.
     pub async fn find_entities_by_prefix(
         &self,
-        namespace: &str,
         prefix: &str,
     ) -> Result<Vec<(String, String)>, MemoryError> {
         let sql = "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with(canonical_name_normalized, $prefix) LIMIT 50";
-        let result = self
-            .db_client
-            .query(sql, Some(json!({"prefix": prefix})), namespace)
-            .await?;
+        let result = self.db.query(sql, Some(json!({"prefix": prefix}))).await?;
         Ok(result
             .as_array()
             .map(|arr| {
@@ -131,26 +120,20 @@ impl EntityService {
         &self,
         entity_id: &str,
         alias: &str,
-        namespace: &str,
     ) -> Result<(), MemoryError> {
         let normalized_alias = normalize_text(alias);
         let sql = "UPDATE type::record($id) SET aliases += [$alias]";
-        self.db_client
+        self.db
             .query(
                 sql,
                 Some(json!({"id": entity_id, "alias": normalized_alias})),
-                namespace,
             )
             .await?;
         Ok(())
     }
 
     /// Create a new entity from a candidate and return its ID.
-    pub async fn create_entity(
-        &self,
-        candidate: EntityCandidate,
-        namespace: &str,
-    ) -> Result<String, MemoryError> {
+    pub async fn create_entity(&self, candidate: EntityCandidate) -> Result<String, MemoryError> {
         validate_entity_candidate(&candidate)?;
         let entity_id = deterministic_entity_id(&candidate.entity_type, &candidate.canonical_name);
         let normalized = normalize_text(&candidate.canonical_name);
@@ -169,11 +152,11 @@ impl EntityService {
             "aliases": aliases,
         });
 
-        match self.db_client.create(&entity_id, payload, namespace).await {
+        match self.db.create(&entity_id, payload).await {
             Ok(_) => Ok(entity_id),
             Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {
                 // Race condition — return the existing entity.
-                let existing = self.find_entity_id_by_name(&normalized, namespace).await?;
+                let existing = self.find_entity_id_by_name(&normalized).await?;
                 Ok(existing.unwrap_or(entity_id))
             }
             Err(err) => Err(err),
@@ -185,21 +168,18 @@ impl EntityService {
     pub async fn query_triples(
         &self,
         sql: &str,
-        namespace: &str,
         subject: &str,
         predicate: &str,
         object: &str,
     ) -> Result<serde_json::Value, MemoryError> {
-        self.db_client
+        self.db
             .query(
                 sql,
                 Some(json!({
-                    "ns": namespace,
                     "subject": subject,
                     "predicate": predicate,
                     "object": object,
                 })),
-                namespace,
             )
             .await
     }
@@ -209,12 +189,9 @@ impl EntityService {
     pub async fn invalidate_triple_by_id(
         &self,
         sql: &str,
-        namespace: &str,
         triple_id: &str,
     ) -> Result<(), MemoryError> {
-        self.db_client
-            .query(sql, Some(json!({"id": triple_id})), namespace)
-            .await?;
+        self.db.query(sql, Some(json!({"id": triple_id}))).await?;
         Ok(())
     }
 
@@ -224,8 +201,7 @@ impl EntityService {
         &self,
         sql: &str,
         vars: serde_json::Value,
-        namespace: &str,
     ) -> Result<serde_json::Value, MemoryError> {
-        self.db_client.query(sql, Some(vars), namespace).await
+        self.db.query(sql, Some(vars)).await
     }
 }

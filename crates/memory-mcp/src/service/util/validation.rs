@@ -2,7 +2,7 @@
 
 use crate::models::EntityCandidate;
 use crate::models::IngestRequest;
-use crate::service::error::{MemoryError, error_messages};
+use crate::service::error::MemoryError;
 
 /// Validate an ingest request.
 pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryError> {
@@ -15,11 +15,7 @@ pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryErro
     if request.content.trim().is_empty() {
         return Err(MemoryError::Validation("content is required".into()));
     }
-    if request.scope.trim().is_empty() {
-        return Err(MemoryError::Validation(
-            error_messages::SCOPE_REQUIRED.into(),
-        ));
-    }
+
     Ok(())
 }
 
@@ -35,12 +31,16 @@ pub fn validate_entity_candidate(candidate: &EntityCandidate) -> Result<(), Memo
 }
 
 /// Validate fact input parameters.
+///
+/// The final argument is retained for source compatibility with older direct
+/// callers. It is legacy metadata and is deliberately not validated or used
+/// for routing; storage is selected by the process-bound Active Namespace.
 pub fn validate_fact_input(
     fact_type: &str,
     content: &str,
     quote: &str,
     source_episode: &str,
-    scope: &str,
+    _legacy_scope: &str,
 ) -> Result<(), MemoryError> {
     if fact_type.trim().is_empty() {
         return Err(MemoryError::Validation("fact_type is required".into()));
@@ -53,11 +53,6 @@ pub fn validate_fact_input(
     }
     if source_episode.trim().is_empty() {
         return Err(MemoryError::Validation("source_episode is required".into()));
-    }
-    if scope.trim().is_empty() {
-        return Err(MemoryError::Validation(
-            error_messages::SCOPE_REQUIRED.into(),
-        ));
     }
     Ok(())
 }
@@ -73,10 +68,7 @@ mod tests {
             source_id: "msg-123".to_string(),
             content: "Test content".to_string(),
             t_ref: Utc::now(),
-            scope: "org".to_string(),
-            project: None,
             t_ingested: None,
-            visibility_scope: None,
             policy_tags: vec![],
         }
     }
@@ -117,14 +109,6 @@ mod tests {
         request.content = "".to_string();
         let result = validate_ingest_request(&request);
         assert!(matches!(result, Err(MemoryError::Validation(msg)) if msg.contains("content")));
-    }
-
-    #[test]
-    fn validate_ingest_request_rejects_empty_scope() {
-        let mut request = create_valid_ingest_request();
-        request.scope = "".to_string();
-        let result = validate_ingest_request(&request);
-        assert!(matches!(result, Err(MemoryError::Validation(msg)) if msg.contains("scope")));
     }
 
     fn create_valid_entity_candidate() -> EntityCandidate {
@@ -199,9 +183,12 @@ mod tests {
     }
 
     #[test]
-    fn validate_fact_input_rejects_empty_scope() {
+    fn validate_fact_input_accepts_empty_legacy_scope() {
         let result = validate_fact_input("note", "content", "quote", "episode:123", "");
-        assert!(matches!(result, Err(MemoryError::Validation(msg)) if msg.contains("scope")));
+        assert!(
+            result.is_ok(),
+            "legacy scope must not affect validation: {result:?}"
+        );
     }
 
     #[test]

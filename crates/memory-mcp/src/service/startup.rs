@@ -1,6 +1,6 @@
 use crate::service::embedding::embedding_from_value;
 use crate::service::error::MemoryError;
-use crate::storage::DbClient;
+use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
 pub(crate) const EMBEDDING_STATE_RECORD_ID: &str = "embedding_state:fact";
@@ -15,13 +15,8 @@ pub enum EmbeddingActivationMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EmbeddingStartupDecision {
     UseConfiguredProvider,
-    BootstrapReadyNamespaces {
-        namespaces: Vec<String>,
-        active_signature: String,
-    },
-    DisableSemantic {
-        reason: String,
-    },
+    BootstrapReadyNamespace { active_signature: String },
+    DisableSemantic { reason: String },
 }
 
 /// Build a startup versions event payload used for diagnostic logging.
@@ -44,196 +39,120 @@ pub(crate) fn build_startup_versions_event(
     m
 }
 
-/// Apply startup migrations to all configured namespaces.
+/// Apply startup migrations only to the process-bound Active Namespace.
 pub(crate) async fn apply_startup_migrations(
     db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
+    active_namespace: &str,
 ) -> Result<(), MemoryError> {
-    for namespace in namespaces {
-        db_client.apply_migrations(namespace).await?;
-    }
-    Ok(())
+    BoundDbClient::new(db_client.clone(), active_namespace)
+        .apply_migrations()
+        .await
 }
 
-pub(crate) async fn load_embedding_states(
-    db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
-) -> Result<std::collections::HashMap<String, Option<serde_json::Value>>, MemoryError> {
-    let mut states = std::collections::HashMap::new();
-
-    for namespace in namespaces {
-        states.insert(
-            namespace.clone(),
-            db_client
-                .select_one(EMBEDDING_STATE_RECORD_ID, namespace)
-                .await?,
-        );
-    }
-
-    Ok(states)
+async fn load_embedding_state(
+    db: &BoundDbClient,
+) -> Result<Option<serde_json::Value>, MemoryError> {
+    db.select_one(EMBEDDING_STATE_RECORD_ID).await
 }
 
-pub(crate) async fn count_facts_per_namespace(
-    db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
-) -> Result<std::collections::HashMap<String, usize>, MemoryError> {
-    let mut counts = std::collections::HashMap::new();
-
-    for namespace in namespaces {
-        counts.insert(
-            namespace.clone(),
-            db_client.select_table("fact", namespace).await?.len(),
-        );
-    }
-
-    Ok(counts)
+async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
+    Ok(db.select_table("fact").await?.len())
 }
 
-pub(crate) async fn sample_stored_embedding_dimensions(
-    db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
+async fn sample_stored_embedding_dimensions(
+    db: &BoundDbClient,
     sample_size: usize,
-) -> Result<std::collections::HashMap<String, Vec<usize>>, MemoryError> {
-    let mut sampled = std::collections::HashMap::new();
-
-    for namespace in namespaces {
-        let dimensions = db_client
-            .select_table("fact", namespace)
-            .await?
-            .into_iter()
-            .filter_map(|record| record.get("embedding").and_then(embedding_from_value))
-            .map(|embedding| embedding.len())
-            .take(sample_size)
-            .collect::<Vec<_>>();
-        sampled.insert(namespace.clone(), dimensions);
-    }
-
-    Ok(sampled)
+) -> Result<Vec<usize>, MemoryError> {
+    Ok(db
+        .select_table("fact")
+        .await?
+        .into_iter()
+        .filter_map(|record| record.get("embedding").and_then(embedding_from_value))
+        .map(|embedding| embedding.len())
+        .take(sample_size)
+        .collect())
 }
 
-pub(crate) async fn write_bootstrap_ready_states(
-    db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
+pub(crate) async fn write_bootstrap_ready_state(
+    db: &BoundDbClient,
     active_signature: &str,
     provider: &str,
     model: Option<&str>,
     dimension: usize,
 ) -> Result<(), MemoryError> {
-    let updated_at = chrono::Utc::now().to_rfc3339();
-
-    for namespace in namespaces {
-        let payload = serde_json::json!({
-            "status": "ready",
-            "active_signature": active_signature,
-            "provider": provider,
-            "model": model,
-            "dimension": dimension,
-            "updated_at": updated_at,
-        });
-
-        if db_client
-            .select_one(EMBEDDING_STATE_RECORD_ID, namespace)
-            .await?
-            .is_some()
-        {
-            db_client
-                .update(EMBEDDING_STATE_RECORD_ID, payload, namespace)
-                .await?;
-        } else {
-            db_client
-                .create(EMBEDDING_STATE_RECORD_ID, payload, namespace)
-                .await?;
-        }
+    let payload = serde_json::json!({
+        "status": "ready",
+        "active_signature": active_signature,
+        "provider": provider,
+        "model": model,
+        "dimension": dimension,
+        "updated_at": chrono::Utc::now().to_rfc3339(),
+    });
+    if db.select_one(EMBEDDING_STATE_RECORD_ID).await?.is_some() {
+        db.update(EMBEDDING_STATE_RECORD_ID, payload).await?;
+    } else {
+        db.create(EMBEDDING_STATE_RECORD_ID, payload).await?;
     }
-
     Ok(())
 }
 
 pub(crate) fn decide_embedding_startup(
-    configured_namespaces: &[String],
-    namespace_states: &std::collections::HashMap<String, Option<serde_json::Value>>,
+    active_namespace: &str,
+    namespace_state: Option<&serde_json::Value>,
+    sample_dimensions: &[usize],
+    fact_count: usize,
     target_signature: &str,
-    sample_dimensions: &std::collections::HashMap<String, Vec<usize>>,
-    fact_counts: &std::collections::HashMap<String, usize>,
     target_dimension: usize,
 ) -> EmbeddingStartupDecision {
-    let mut namespaces_to_bootstrap = Vec::new();
-
-    for namespace in configured_namespaces {
-        match namespace_states
-            .get(namespace)
-            .and_then(|value| value.as_ref())
+    match namespace_state {
+        Some(state)
+            if matches!(
+                state.get("status").and_then(serde_json::Value::as_str),
+                Some("rebuilding") | Some("failed")
+            ) =>
         {
-            Some(state)
-                if state.get("status").and_then(serde_json::Value::as_str)
-                    == Some("rebuilding")
-                    || state.get("status").and_then(serde_json::Value::as_str)
-                        == Some("failed") =>
-            {
-                return EmbeddingStartupDecision::DisableSemantic {
-                    reason: format!(
-                        "embedding maintenance is incomplete in namespace `{namespace}`"
-                    ),
-                };
-            }
-            Some(state)
-                if state.get("status").and_then(serde_json::Value::as_str) == Some("ready")
-                    && state
-                        .get("active_signature")
-                        .and_then(serde_json::Value::as_str)
-                        == Some(target_signature) => {}
-            Some(state)
-                if state.get("status").and_then(serde_json::Value::as_str) == Some("ready") =>
-            {
-                return EmbeddingStartupDecision::DisableSemantic {
-                    reason: format!(
-                        "configured embedding signature differs from persisted state in namespace `{namespace}`"
-                    ),
-                };
-            }
-            None => {
-                let fact_count = *fact_counts.get(namespace).unwrap_or(&0);
-                if fact_count == 0 {
-                    namespaces_to_bootstrap.push(namespace.clone());
-                    continue;
-                }
-
-                let sampled = sample_dimensions
-                    .get(namespace)
-                    .cloned()
-                    .unwrap_or_default();
-                if !sampled.is_empty()
-                    && sampled
-                        .iter()
-                        .all(|dimension| *dimension == target_dimension)
-                {
-                    namespaces_to_bootstrap.push(namespace.clone());
-                    continue;
-                }
-
-                return EmbeddingStartupDecision::DisableSemantic {
-                    reason: format!(
-                        "legacy embeddings in namespace `{namespace}` require reembed before semantic search can resume"
-                    ),
-                };
-            }
-            Some(_) => {
-                return EmbeddingStartupDecision::DisableSemantic {
-                    reason: format!(
-                        "embedding state in namespace `{namespace}` is invalid or incomplete"
-                    ),
-                };
+            EmbeddingStartupDecision::DisableSemantic {
+                reason: format!(
+                    "embedding maintenance is incomplete in namespace `{active_namespace}`"
+                ),
             }
         }
-    }
-
-    if namespaces_to_bootstrap.is_empty() {
-        EmbeddingStartupDecision::UseConfiguredProvider
-    } else {
-        EmbeddingStartupDecision::BootstrapReadyNamespaces {
-            namespaces: namespaces_to_bootstrap,
-            active_signature: target_signature.to_string(),
+        Some(state)
+            if state.get("status").and_then(serde_json::Value::as_str) == Some("ready")
+                && state
+                    .get("active_signature")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(target_signature) =>
+        {
+            EmbeddingStartupDecision::UseConfiguredProvider
         }
+        Some(state) if state.get("status").and_then(serde_json::Value::as_str) == Some("ready") => {
+            EmbeddingStartupDecision::DisableSemantic {
+                reason: format!(
+                    "configured embedding signature differs from persisted state in namespace `{active_namespace}`"
+                ),
+            }
+        }
+        None if fact_count == 0
+            || (!sample_dimensions.is_empty()
+                && sample_dimensions
+                    .iter()
+                    .all(|dimension| *dimension == target_dimension)) =>
+        {
+            EmbeddingStartupDecision::BootstrapReadyNamespace {
+                active_signature: target_signature.to_string(),
+            }
+        }
+        None => EmbeddingStartupDecision::DisableSemantic {
+            reason: format!(
+                "legacy embeddings in namespace `{active_namespace}` require reembed before semantic search can resume"
+            ),
+        },
+        Some(_) => EmbeddingStartupDecision::DisableSemantic {
+            reason: format!(
+                "embedding state in namespace `{active_namespace}` is invalid or incomplete"
+            ),
+        },
     }
 }
 
@@ -246,7 +165,7 @@ pub(crate) fn decide_embedding_startup(
 pub(crate) async fn resolve_embedding_startup(
     config: &crate::config::EmbeddingConfig,
     db_client: &Arc<dyn DbClient>,
-    namespaces: &[String],
+    active_namespace: &str,
     data_dir: &str,
     startup_logger: &crate::logging::StdoutLogger,
 ) -> Result<
@@ -281,34 +200,31 @@ pub(crate) async fn resolve_embedding_startup(
     };
 
     let decision = if let Some(target) = target.as_ref() {
-        let namespace_states = load_embedding_states(db_client, namespaces).await?;
-        let fact_counts = count_facts_per_namespace(db_client, namespaces).await?;
+        let db = BoundDbClient::new(db_client.clone(), active_namespace);
+        let namespace_state = load_embedding_state(&db).await?;
+        let fact_count = count_facts(&db).await?;
         let sample_dimensions =
-            sample_stored_embedding_dimensions(db_client, namespaces, STORED_EMBEDDING_SAMPLE_SIZE)
-                .await?;
+            sample_stored_embedding_dimensions(&db, STORED_EMBEDDING_SAMPLE_SIZE).await?;
 
         let mut event = std::collections::HashMap::new();
         event.insert(
             "op".to_string(),
             serde_json::json!("embedding.startup_state_loaded"),
         );
-        event.insert("namespaces".to_string(), serde_json::json!(namespaces));
+        event.insert("namespace".to_string(), serde_json::json!(active_namespace));
         event.insert(
-            "state_count".to_string(),
-            serde_json::json!(namespace_states.len()),
+            "state_present".to_string(),
+            serde_json::json!(namespace_state.is_some()),
         );
-        event.insert(
-            "fact_counts".to_string(),
-            serde_json::json!(fact_counts.clone()),
-        );
+        event.insert("fact_count".to_string(), serde_json::json!(fact_count));
         startup_logger.log(event, crate::logging::LogLevel::Debug);
 
         decide_embedding_startup(
-            namespaces,
-            &namespace_states,
-            &target.signature,
+            active_namespace,
+            namespace_state.as_ref(),
             &sample_dimensions,
-            &fact_counts,
+            fact_count,
+            &target.signature,
             target.dimension,
         )
     } else if config.is_enabled() {
@@ -328,7 +244,7 @@ pub(crate) async fn resolve_embedding_startup(
         "decision".to_string(),
         serde_json::json!(format!("{:?}", decision)),
     );
-    decision_event.insert("namespaces".to_string(), serde_json::json!(namespaces));
+    decision_event.insert("namespace".to_string(), serde_json::json!(active_namespace));
     decision_event.insert(
         "target_signature".to_string(),
         serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
@@ -364,7 +280,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn apply_startup_migrations_runs_for_every_namespace() {
+    async fn apply_startup_migrations_uses_only_the_active_namespace() {
         use std::sync::Mutex;
         use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -382,7 +298,6 @@ mod tests {
             ) -> Result<Option<Value>, MemoryError> {
                 Ok(None)
             }
-
             async fn select_table(
                 &self,
                 _table: &str,
@@ -390,7 +305,6 @@ mod tests {
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
             }
-
             #[allow(clippy::too_many_arguments)]
             async fn create(
                 &self,
@@ -400,7 +314,6 @@ mod tests {
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
-
             async fn update(
                 &self,
                 _record_id: &str,
@@ -409,7 +322,6 @@ mod tests {
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
-
             async fn query(
                 &self,
                 _sql: &str,
@@ -418,7 +330,6 @@ mod tests {
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
-
             async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
                 self.apply_count.fetch_add(1, Ordering::SeqCst);
                 self.calls.safe_lock().push(namespace.to_string());
@@ -431,25 +342,13 @@ mod tests {
             apply_count: AtomicUsize::new(0),
         });
         let db_client_dyn: Arc<dyn DbClient> = db_client.clone();
-        let namespaces = vec![
-            "org".to_string(),
-            "personal".to_string(),
-            "private".to_string(),
-        ];
 
-        apply_startup_migrations(&db_client_dyn, &namespaces)
+        apply_startup_migrations(&db_client_dyn, "main")
             .await
             .expect("startup migrations");
 
-        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 3);
-        assert_eq!(
-            db_client.calls.safe_lock().clone(),
-            vec![
-                "org".to_string(),
-                "personal".to_string(),
-                "private".to_string(),
-            ]
-        );
+        assert_eq!(db_client.apply_count.load(Ordering::SeqCst), 1);
+        assert_eq!(db_client.calls.safe_lock().as_slice(), ["main"]);
     }
 
     #[tokio::test]
@@ -460,7 +359,7 @@ mod tests {
                 .await
                 .expect("in-memory database should connect"),
         ) as Arc<dyn DbClient>;
-        apply_startup_migrations(&db_client, std::slice::from_ref(&namespace))
+        apply_startup_migrations(&db_client, &namespace)
             .await
             .expect("startup migrations should apply");
 
@@ -473,15 +372,10 @@ mod tests {
         };
         let logger = crate::logging::StdoutLogger::new("warn");
 
-        let (decision, target) = resolve_embedding_startup(
-            &config,
-            &db_client,
-            std::slice::from_ref(&namespace),
-            "/tmp",
-            &logger,
-        )
-        .await
-        .expect("provider probe failure should degrade semantic startup");
+        let (decision, target) =
+            resolve_embedding_startup(&config, &db_client, &namespace, "/tmp", &logger)
+                .await
+                .expect("provider probe failure should degrade semantic startup");
 
         assert!(
             target.is_none(),
@@ -494,27 +388,9 @@ mod tests {
     }
 
     #[test]
-    fn decide_embedding_startup_disables_semantic_when_any_namespace_is_rebuilding() {
-        let states = std::collections::HashMap::from([
-            (
-                "org".to_string(),
-                Some(serde_json::json!({"status": "ready", "active_signature": "embsig:ok"})),
-            ),
-            (
-                "personal".to_string(),
-                Some(serde_json::json!({"status": "rebuilding", "active_signature": "embsig:ok"})),
-            ),
-        ]);
-
-        let decision = decide_embedding_startup(
-            &["org".to_string(), "personal".to_string()],
-            &states,
-            "embsig:ok",
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            384,
-        );
-
+    fn decide_embedding_startup_disables_semantic_when_active_namespace_is_rebuilding() {
+        let state = serde_json::json!({"status": "rebuilding", "active_signature": "embsig:ok"});
+        let decision = decide_embedding_startup("main", Some(&state), &[], 10, "embsig:ok", 384);
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::DisableSemantic { .. }
@@ -522,50 +398,20 @@ mod tests {
     }
 
     #[test]
-    fn decide_embedding_startup_bootstraps_legacy_ready_when_dimensions_match() {
-        let states = std::collections::HashMap::from([("org".to_string(), None)]);
-        let decision = decide_embedding_startup(
-            &["org".to_string()],
-            &states,
-            "embsig:new",
-            &std::collections::HashMap::from([("org".to_string(), vec![384usize])]),
-            &std::collections::HashMap::from([("org".to_string(), 12usize)]),
-            384,
-        );
-
+    fn decide_embedding_startup_bootstraps_active_namespace_when_dimensions_match() {
+        let decision = decide_embedding_startup("main", None, &[384usize], 12, "embsig:new", 384);
         assert!(matches!(
             decision,
-            EmbeddingStartupDecision::BootstrapReadyNamespaces { .. }
+            EmbeddingStartupDecision::BootstrapReadyNamespace { .. }
         ));
     }
 
     #[test]
-    fn decide_embedding_startup_bootstraps_missing_namespace_without_ignoring_existing_ready_state()
-    {
-        let states = std::collections::HashMap::from([
-            (
-                "org".to_string(),
-                Some(serde_json::json!({"status": "ready", "active_signature": "embsig:new"})),
-            ),
-            ("personal".to_string(), None),
-        ]);
-
-        let decision = decide_embedding_startup(
-            &["org".to_string(), "personal".to_string()],
-            &states,
-            "embsig:new",
-            &std::collections::HashMap::from([("personal".to_string(), vec![384usize])]),
-            &std::collections::HashMap::from([
-                ("org".to_string(), 10usize),
-                ("personal".to_string(), 2usize),
-            ]),
-            384,
-        );
-
+    fn decide_embedding_startup_does_not_bootstrap_when_legacy_dimensions_are_unknown() {
+        let decision = decide_embedding_startup("main", None, &[], 12, "embsig:new", 384);
         assert!(matches!(
             decision,
-            EmbeddingStartupDecision::BootstrapReadyNamespaces { ref namespaces, .. }
-                if namespaces == &vec!["personal".to_string()]
+            EmbeddingStartupDecision::DisableSemantic { .. }
         ));
     }
 }
