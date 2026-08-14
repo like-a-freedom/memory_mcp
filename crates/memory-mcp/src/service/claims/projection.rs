@@ -174,7 +174,7 @@ impl ClaimService {
 
         // Create projection job
         let job_id = ClaimJobId::from_raw(format!(
-            "claim_job:project:{}:{}",
+            "claim_job:extract:{}:{}",
             params.fact_id,
             fingerprint.as_str()
         ));

@@ -15,7 +15,7 @@ use crate::storage::claims::{
     ClaimCandidateQuery, CommitReconciliationPageRequest, JobCounters, LeaseJobRequest,
 };
 
-use super::project::ClaimService;
+use super::projection::ClaimService;
 
 /// Bounded worker runtime for claim reconciliation.
 #[derive(Clone)]

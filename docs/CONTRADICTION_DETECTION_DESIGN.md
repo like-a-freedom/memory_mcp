@@ -304,7 +304,7 @@ src/service/claims/schema.rs     built-in ClaimSchema registry
 src/service/claims/extract.rs    deterministic pure projection
 src/service/claims/normalize.rs  canonical serialization and typed values
 src/service/claims/reconcile.rs  pure decision engine
-src/service/claims/project.rs    application orchestration
+src/service/claims/projection.rs  application orchestration
 src/service/claims/backfill.rs   durable batch-job orchestration
 src/storage/claims.rs            SurrealDB ClaimStore adapter and indexed queries
 ```

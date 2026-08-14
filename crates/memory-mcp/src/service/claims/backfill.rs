@@ -10,7 +10,7 @@ use crate::models::{ClaimJobId, FactId};
 use crate::service::MemoryError;
 use crate::storage::claims::BackfillFactQuery;
 
-use super::project::ClaimService;
+use super::projection::ClaimService;
 
 /// Ensure one deterministic backfill job exists per namespace.
 pub(crate) async fn schedule_namespace_backfill(
@@ -81,7 +81,7 @@ pub(crate) async fn run_backfill_page(
             .store
             .ensure_projection_job(&ClaimJob {
                 job_id: ClaimJobId::from_raw(format!(
-                    "claim_job:project:{}:{}",
+                    "claim_job:extract:{}:{}",
                     fact_id,
                     claim_service.registry.extractor_fingerprint().as_str(),
                 )),

@@ -48,7 +48,7 @@ pub struct ServiceContext {
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
     /// Claim service reference for extract reconciliation.
-    pub(crate) claim_service: crate::service::claims::project::ClaimService,
+    pub(crate) claim_service: crate::service::claims::projection::ClaimService,
     /// Bounded-concurrency semaphore for fire-and-forget triple extraction.
     pub(crate) triple_extraction_semaphore: Arc<tokio::sync::Semaphore>,
 }

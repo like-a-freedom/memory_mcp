@@ -1337,7 +1337,7 @@ fn validate_applied_migration_compatibility(
     validate_applied_migration(existing, expected_file_name, expected_checksum)
 }
 
-fn is_record_already_exists_error(message: &str) -> bool {
+pub(crate) fn is_record_already_exists_error(message: &str) -> bool {
     let lowered = message.to_ascii_lowercase();
     lowered.contains("already exists")
         && (lowered.contains("record") || lowered.contains("script_migration"))

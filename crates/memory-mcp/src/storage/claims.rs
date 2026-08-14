@@ -11,6 +11,17 @@ use crate::models::FactId;
 use crate::models::claim::{Claim, ClaimIdentityVersion, ClaimJob, ClaimRelation};
 use crate::service::MemoryError;
 
+/// True when the error reports a duplicate deterministic record ID. For claim
+/// projection this is an idempotent no-op (repeat projection of an identical
+/// claim), not a failure.
+fn is_already_exists_error(err: &MemoryError) -> bool {
+    matches!(
+        err,
+        MemoryError::Storage(message)
+            if super::client::is_record_already_exists_error(message)
+    )
+}
+
 // ─── ClaimStore Trait ─────────────────────────────────────────────────────────
 
 /// Narrow storage capability for the claim reconciliation pipeline.
@@ -236,18 +247,23 @@ impl ClaimStore for SurrealClaimStore {
         for claim in &request.claims {
             let content = serde_json::to_value(claim)
                 .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
-            self.db
-                .create(claim.claim_id.as_ref(), content)
-                .await
-                .map_err(|e| MemoryError::Storage(format!("persist claim: {e}")))?;
+            if let Err(err) = self.db.create(claim.claim_id.as_ref(), content).await {
+                // CREATE never overwrites, so a collision is an idempotent
+                // no-op (repeat projection of a deterministic claim), not a
+                // failure — and an invalidated claim stays invalidated.
+                if !is_already_exists_error(&err) {
+                    return Err(MemoryError::Storage(format!("persist claim: {err}")));
+                }
+            }
         }
         for job in &request.jobs {
             let content = serde_json::to_value(job)
                 .map_err(|e| MemoryError::Storage(format!("serialize job: {e}")))?;
-            self.db
-                .create(job.job_id.as_ref(), content)
-                .await
-                .map_err(|e| MemoryError::Storage(format!("persist job: {e}")))?;
+            if let Err(err) = self.db.create(job.job_id.as_ref(), content).await
+                && !is_already_exists_error(&err)
+            {
+                return Err(MemoryError::Storage(format!("persist job: {err}")));
+            }
         }
         Ok(())
     }
@@ -470,6 +486,21 @@ mod tests {
     use super::*;
     use crate::models::claim::ClaimIdentityVersion;
     use async_trait::async_trait;
+
+    #[test]
+    fn already_exists_error_is_treated_as_idempotent() {
+        let err = MemoryError::Storage(
+            "SurrealDB query statement errors:\nstatement 0: Database record `claim:abc` already exists"
+                .to_string(),
+        );
+        assert!(is_already_exists_error(&err));
+    }
+
+    #[test]
+    fn unrelated_storage_error_is_not_tolerated() {
+        let err = MemoryError::Storage("some other storage failure".to_string());
+        assert!(!is_already_exists_error(&err));
+    }
 
     #[derive(Clone, Default)]
     struct NamespaceRecorder {

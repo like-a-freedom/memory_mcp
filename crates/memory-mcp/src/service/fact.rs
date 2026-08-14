@@ -40,21 +40,29 @@ pub struct FactService {
     db: crate::storage::FactStoreClient,
 }
 
+/// Result of persisting a fact, reporting whether a new record was created
+/// or an identical deterministic record already existed (idempotent repeat).
+pub(crate) struct CreateFactOutcome {
+    fact_id: String,
+    created: bool,
+}
+
 impl FactService {
     pub fn new(db_client: crate::storage::FactStoreClient) -> Self {
         Self { db: db_client }
     }
 
-    /// Creates a new fact record if it does not already exist.
+    /// Creates a fact record with a deterministic ID.
     ///
-    /// Returns the fact ID. If the fact already exists (same deterministic ID),
-    /// returns the existing ID without re-writing.
+    /// Returns the fact ID and whether a new record was created. When a fact
+    /// with the same deterministic ID already exists, it is returned unchanged
+    /// (`created == false`) and nothing is re-written.
     ///
     /// The caller is responsible for embedding generation, triple extraction,
     /// claim projection, and cache invalidation — this method handles only
     /// the core persistence path.
     #[allow(clippy::too_many_arguments)]
-    pub async fn create_fact(
+    pub(crate) async fn create_fact(
         &self,
         fact_type: &str,
         content: &str,
@@ -67,13 +75,16 @@ impl FactService {
         provenance: &Provenance,
         embedding_fields: Option<EmbeddingPayload>,
         index_keys: Vec<String>,
-    ) -> Result<String, MemoryError> {
+    ) -> Result<CreateFactOutcome, MemoryError> {
         validate_fact_input(fact_type, content, quote, source_episode, "")?;
 
         let fact_id = deterministic_fact_id(fact_type, content, source_episode, t_valid);
         let existing = self.db.select_one(&fact_id).await?;
         if existing.is_some() {
-            return Ok(fact_id);
+            return Ok(CreateFactOutcome {
+                fact_id,
+                created: false,
+            });
         }
 
         let t_ingested = now();
@@ -111,7 +122,10 @@ impl FactService {
                 "failed to persist fact record".to_string(),
             ));
         }
-        Ok(fact_id)
+        Ok(CreateFactOutcome {
+            fact_id,
+            created: true,
+        })
     }
 
     /// Builds the search index keys for a fact from entity links, temporal markers,
@@ -280,8 +294,10 @@ impl FactService {
             }
         };
 
-        // Create fact record via FactService.
-        let fact_id = self
+        // Create fact record via FactService. `created == false` means the
+        // deterministic fact already existed (same id + same content): repeat
+        // ingestion is idempotent, so derived work below is skipped for it.
+        let outcome = self
             .create_fact(
                 fact_type,
                 content,
@@ -296,6 +312,7 @@ impl FactService {
                 index_keys,
             )
             .await?;
+        let fact_id = outcome.fact_id;
 
         // Invalidate caches immediately after ingestion to ensure isolation.
         invalidate_cache(&ctx.context_cache).await;
@@ -304,31 +321,39 @@ impl FactService {
         crate::service::episode::triples::spawn_triple_extraction(ctx, &fact_id, content);
 
         // Synchronous claim projection for deterministic extract visibility.
-        let claim_svc = ctx.claim_service.clone();
-        let claim_fact_id = FactId::from(fact_id.clone());
-        let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
-        let claim_content = content.to_string();
-        let claim_entity_links = entity_links.clone();
-        let claim_t_valid = t_valid;
-        let claim_params = crate::service::claims::project::FactPersistedParams {
-            namespace: &namespace,
-            fact_id: &claim_fact_id,
-            source_episode_id: &claim_episode_id,
-            fact_type,
-            content: &claim_content,
-            policy_tags: &policy_tags,
-            entity_links: &claim_entity_links,
-            t_valid: claim_t_valid,
-            source_lineage: episode_source_id.as_deref(),
-        };
-        match claim_svc.after_fact_persisted(&claim_params).await {
-            Ok(summary) => claim_svc.record_post_fact_success(
-                &namespace,
-                &summary.fact_id,
-                summary.claims_projected,
-                summary.claims_skipped,
-            ),
-            Err(error) => claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error),
+        // Runs only for freshly created facts: re-projecting an existing fact
+        // would collide with its deterministic claim IDs (noisy "already
+        // exists" errors) and must never overwrite claims of an invalidated
+        // fact. Same-id/same-content is idempotent by contract.
+        if outcome.created {
+            let claim_svc = ctx.claim_service.clone();
+            let claim_fact_id = FactId::from(fact_id.clone());
+            let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
+            let claim_content = content.to_string();
+            let claim_entity_links = entity_links.clone();
+            let claim_t_valid = t_valid;
+            let claim_params = crate::service::claims::projection::FactPersistedParams {
+                namespace: &namespace,
+                fact_id: &claim_fact_id,
+                source_episode_id: &claim_episode_id,
+                fact_type,
+                content: &claim_content,
+                policy_tags: &policy_tags,
+                entity_links: &claim_entity_links,
+                t_valid: claim_t_valid,
+                source_lineage: episode_source_id.as_deref(),
+            };
+            match claim_svc.after_fact_persisted(&claim_params).await {
+                Ok(summary) => claim_svc.record_post_fact_success(
+                    &namespace,
+                    &summary.fact_id,
+                    summary.claims_projected,
+                    summary.claims_skipped,
+                ),
+                Err(error) => {
+                    claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
+                }
+            }
         }
 
         // Enqueue background embedding after claim projection to ensure test invariants.
@@ -424,7 +449,7 @@ mod tests {
         let svc = FactService::new(FactStoreClient::new(Arc::new(db), "org"));
         let provenance = Provenance::agent_observation("episode:test");
 
-        let fact_id = svc
+        let outcome = svc
             .create_fact(
                 "note",
                 "hello world",
@@ -441,7 +466,8 @@ mod tests {
             .await
             .expect("create fact");
 
-        assert!(fact_id.starts_with("fact:"));
+        assert!(outcome.created, "expected a fresh fact record");
+        assert!(outcome.fact_id.starts_with("fact:"));
     }
 
     #[tokio::test]
@@ -453,7 +479,7 @@ mod tests {
         let svc = FactService::new(FactStoreClient::new(Arc::new(db), "org"));
         let provenance = Provenance::agent_observation("episode:test");
 
-        let result = svc
+        let outcome = svc
             .create_fact(
                 "note",
                 "dup",
@@ -470,7 +496,8 @@ mod tests {
             .await
             .expect("create fact dup");
 
-        assert_eq!(result, fact_id);
+        assert_eq!(outcome.fact_id, fact_id);
+        assert!(!outcome.created, "duplicate must not re-write the fact");
     }
 
     #[test]

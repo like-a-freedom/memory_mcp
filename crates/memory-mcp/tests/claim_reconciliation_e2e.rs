@@ -315,3 +315,61 @@ async fn relation_outcomes_use_the_accepted_persisted_vocabulary() {
         );
     }
 }
+
+// ─── Idempotency: repeated extraction never duplicates derived records ────────
+
+#[tokio::test]
+async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
+    let (service, db_client) = make_service().await;
+
+    let ep = ingest_source(
+        &service,
+        "chat",
+        "src:idem",
+        "Alice Smith reports ARR is $5M.",
+        "personal",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+
+    let fact_count = || async {
+        db_client
+            .query(
+                "SELECT count() AS cnt FROM fact WHERE source_episode = $ep",
+                Some(serde_json::json!({ "ep": ep.clone() })),
+                "org",
+            )
+            .await
+            .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
+            .map(|rows| {
+                rows.first()
+                    .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0)
+    };
+
+    let facts_before = fact_count().await;
+    let claims_before = claim_count_for_episode(&db_client, &ep).await;
+    assert!(facts_before > 0, "no facts for episode {ep}");
+    assert!(claims_before > 0, "expected at least one claim");
+
+    // Same-id/same-content is idempotent by contract: re-extracting the same
+    // episode must neither duplicate facts/claims/jobs nor surface an error.
+    ExtractCapability::extract(&service.build_context(), &ep, None, None)
+        .await
+        .expect("repeat extract should succeed");
+
+    assert_eq!(fact_count().await, facts_before, "facts must not duplicate");
+    assert_eq!(
+        claim_count_for_episode(&db_client, &ep).await,
+        claims_before,
+        "claims must not duplicate"
+    );
+    let jobs_before = job_count_with_source_fact(&db_client).await;
+    assert_eq!(
+        job_count_with_source_fact(&db_client).await,
+        jobs_before,
+        "projection jobs must not duplicate"
+    );
+}

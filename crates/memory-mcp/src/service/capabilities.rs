@@ -83,7 +83,7 @@ pub(crate) mod test_support {
             claim_store: None,
             query_logging_enabled: false,
             query_log_retention_days: 7,
-            claim_service: crate::service::claims::project::ClaimService::new(Arc::new(
+            claim_service: crate::service::claims::projection::ClaimService::new(Arc::new(
                 SurrealClaimStore::new(db_client.clone(), "org"),
             )),
             triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(

@@ -2,7 +2,7 @@
 
 pub(crate) mod backfill;
 pub(crate) mod extract;
-pub(crate) mod project;
+pub(crate) mod projection;
 pub(crate) mod reconcile;
 pub(crate) mod schema;
 pub(crate) mod structural;

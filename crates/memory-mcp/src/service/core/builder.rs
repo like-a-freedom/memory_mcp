@@ -49,7 +49,7 @@ pub struct MemoryService {
     pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
     pub(crate) lifecycle_config: crate::config::LifecycleConfig,
     #[allow(dead_code)]
-    pub(crate) claim_service: super::super::claims::project::ClaimService,
+    pub(crate) claim_service: super::super::claims::projection::ClaimService,
     /// Shared per-session exposure-trace registry for selective recall.
     ///
     /// Holds at most 32 traces per session for 30 minutes. Persists only when a
@@ -489,7 +489,7 @@ impl MemoryService {
                 super::super::triple_extractor::RuleBasedTripleExtractor::new(),
             ),
             lifecycle_config: crate::config::LifecycleConfig::default(),
-            claim_service: super::super::claims::project::ClaimService::new(claim_store),
+            claim_service: super::super::claims::projection::ClaimService::new(claim_store),
             trace_registry: Arc::new(
                 super::super::agent_memory::recall::SessionTraceRegistry::new(),
             ),
