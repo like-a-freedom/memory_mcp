@@ -9,7 +9,7 @@ memory_mcp/
 ├── Cargo.toml                  # Workspace root (members: "crates/*", default: memory-mcp)
 ├── crates/
 │   ├── memory-mcp/             # Production binary + library crate
-│   │   ├── Cargo.toml          # version 1.7.0, edition 2024
+│   │   ├── Cargo.toml          # version 1.8.0, edition 2024
 │   │   ├── src/
 │   │   │   ├── main.rs         # Thin binary entry. Delegates to lib.
 │   │   │   ├── lib.rs          # Public API root. Exports MemoryMcp, MemoryService, MemoryError, etc.
