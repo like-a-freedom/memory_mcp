@@ -181,6 +181,50 @@ pub fn build_update_query(
     }
 }
 
+/// Build SQL query for upserting (insert-or-update) a record.
+///
+/// SurrealDB's `UPDATE` does not create a record that does not exist;
+/// `UPSERT` with a record ID inserts the record or replaces its fields,
+/// which is the idempotent write used by deterministic job records.
+pub fn build_upsert_query(
+    record_id: &str,
+    content: Value,
+) -> Result<(String, Value), crate::service::MemoryError> {
+    use crate::service::MemoryError;
+
+    let (table, id) = if let Some(idx) = record_id.find(':') {
+        (&record_id[..idx], &record_id[idx + 1..])
+    } else {
+        return Err(MemoryError::Storage(format!(
+            "Invalid record_id format: expected 'table:id', got '{record_id}'"
+        )));
+    };
+
+    let content_for_upsert = if let Value::Object(mut map) = content {
+        map.remove("id");
+        Value::Object(map)
+    } else {
+        content
+    };
+
+    let normalized = normalize_surreal_json(&content_for_upsert);
+    if let Value::Object(map) = normalized {
+        let (assignments, vars) = build_set_assignments(table, map);
+        let sql = if assignments.is_empty() {
+            format!("UPSERT {table}:⟨{id}⟩ RETURN *")
+        } else {
+            format!(
+                "UPSERT {table}:⟨{id}⟩ SET {} RETURN *",
+                assignments.join(", ")
+            )
+        };
+        Ok((sql, Value::Object(vars)))
+    } else {
+        let sql = format!("UPSERT {table}:⟨{id}⟩ MERGE $content RETURN *");
+        Ok((sql, json!({"content": normalized})))
+    }
+}
+
 pub fn build_select_facts_filtered_query(
     cutoff: &str,
     query_contains: Option<&str>,

@@ -158,22 +158,6 @@ impl SurrealClaimStore {
         }
     }
 
-    fn upsert_one_sql(table: &str, record_id: &str) -> Result<String, MemoryError> {
-        if !table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            return Err(MemoryError::Validation(format!(
-                "invalid table name: {table}"
-            )));
-        }
-        // `record_id` may arrive either as a bare id (`abc...`) or as the full
-        // SurrealDB record id including the table prefix (`claim:abc...`).
-        // Strip the prefix so we don't produce `claim:⟨claim:abc⟩`.
-        let body = record_id
-            .strip_prefix(&format!("{table}:"))
-            .unwrap_or(record_id);
-        let sql = format!("UPDATE {table}:⟨{body}⟩ CONTENT $content");
-        Ok(sql)
-    }
-
     fn serialize<T: serde::Serialize>(value: &T) -> Result<serde_json::Value, MemoryError> {
         serde_json::to_value(value)
             .map_err(|e| MemoryError::Storage(format!("serialization failed: {e}")))
@@ -206,8 +190,12 @@ impl SurrealClaimStore {
 impl ClaimStore for SurrealClaimStore {
     async fn ensure_projection_job(&self, job: &ClaimJob) -> Result<(), MemoryError> {
         let content = Self::serialize(job)?;
-        let sql = Self::upsert_one_sql("claim_job", job.job_id.as_ref())?;
-        let vars = serde_json::json!({"content": content});
+        // `UPSERT` with a record ID inserts the job or replaces its fields;
+        // SurrealDB's `UPDATE` silently no-ops on a missing record and
+        // `CONTENT`-style writes reject JSON nulls on SCHEMAFULL `option<>`
+        // fields, so the SET-assignment builder is used instead.
+        let (sql, vars) =
+            crate::storage::queries::build_upsert_query(job.job_id.as_ref(), content)?;
         self.db.query(&sql, Some(vars)).await?;
         Ok(())
     }
@@ -217,15 +205,18 @@ impl ClaimStore for SurrealClaimStore {
         request: LeaseJobRequest<'_>,
     ) -> Result<Option<ClaimJob>, MemoryError> {
         let expires = chrono::Utc::now() + request.lease_duration;
-        // Atomically find the next pending/expired job and lease it.
-        // SurrealDB doesn't support ORDER BY in UPDATE, so we use a subquery
-        // to find the next job ID and then update it.
+        // Atomically find one pending/expired job and lease it. SurrealDB 3.2
+        // rejects ORDER BY inside a subquery used as an UPDATE target, and
+        // UPDATE itself has no ORDER BY clause, so no ordering is applied;
+        // claim-job processing order is not semantically significant (each
+        // job reconciles an independent slot). The SCHEMAFULL `option<datetime>`
+        // fields require explicit `type::datetime` coercion of bound vars.
         let sql = "UPDATE (SELECT id FROM claim_job \
                    WHERE status = 'pending' \
                    AND (lease_expires_at IS NONE OR lease_expires_at < time::now()) \
-                   ORDER BY job_id LIMIT 1) \
+                   LIMIT 1) \
                    SET status = 'leased', lease_owner = $owner, \
-                   lease_expires_at = $expires, started_at = $now RETURN BEFORE";
+                   lease_expires_at = type::datetime($expires), started_at = type::datetime($now) RETURN BEFORE";
         let vars = serde_json::json!({
             "owner": request.lease_owner,
             "expires": crate::service::normalize_dt(expires),
@@ -500,6 +491,140 @@ mod tests {
     fn unrelated_storage_error_is_not_tolerated() {
         let err = MemoryError::Storage("some other storage failure".to_string());
         assert!(!is_already_exists_error(&err));
+    }
+
+    fn pending_job(job_id: &str) -> ClaimJob {
+        let now = chrono::Utc::now();
+        ClaimJob {
+            job_id: crate::models::ClaimJobId::from_raw(job_id.to_string()),
+            kind: crate::models::claim::ClaimJobKind::Extract,
+            namespace: "org".to_string(),
+            source_fact_id: None,
+            claim_id: None,
+            extractor_fingerprint: crate::models::claim::ExtractorFingerprint::compute(1, "test"),
+            evaluator_fingerprint: None,
+            status: crate::models::claim::ClaimJobState::Pending,
+            cursor: None,
+            lease_owner: None,
+            lease_expires_at: None,
+            processed: 0,
+            succeeded: 0,
+            skipped: 0,
+            failed: 0,
+            retry_count: 0,
+            last_error: None,
+            created_at: now,
+            started_at: None,
+            updated_at: now,
+            completed_at: None,
+        }
+    }
+
+    async fn embedded_claim_store() -> SurrealClaimStore {
+        let db = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory_with_namespaces(
+                "claim_lease_test",
+                &["org".to_string()],
+                "error",
+            )
+            .await
+            .expect("embedded db"),
+        );
+        db.apply_migrations("org").await.expect("migrations");
+        SurrealClaimStore::new(db, "org")
+    }
+
+    #[tokio::test]
+    async fn ensure_projection_job_upserts_idempotently() {
+        let store = embedded_claim_store().await;
+        store
+            .ensure_projection_job(&pending_job("claim_job:job-a"))
+            .await
+            .expect("first upsert");
+        store
+            .ensure_projection_job(&pending_job("claim_job:job-a"))
+            .await
+            .expect("second upsert is idempotent");
+
+        let rows = store
+            .db
+            .query("SELECT count() AS cnt FROM claim_job", None)
+            .await
+            .expect("count jobs");
+        let count = serde_json::from_value::<Vec<serde_json::Value>>(rows)
+            .unwrap_or_default()
+            .first()
+            .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+            .unwrap_or(0);
+        assert_eq!(count, 1, "upsert must not duplicate the job");
+    }
+
+    #[tokio::test]
+    async fn lease_next_job_leases_exactly_one_pending_job() {
+        let store = embedded_claim_store().await;
+
+        store
+            .ensure_projection_job(&pending_job("claim_job:lease-1"))
+            .await
+            .expect("seed job 1");
+        store
+            .ensure_projection_job(&pending_job("claim_job:lease-2"))
+            .await
+            .expect("seed job 2");
+
+        let first = store
+            .lease_next_job(LeaseJobRequest {
+                lease_owner: "worker-1",
+                lease_duration: std::time::Duration::from_secs(30),
+            })
+            .await
+            .expect("lease first job")
+            .expect("expected one leased job");
+        // RETURN BEFORE yields the pre-lease state.
+        assert_eq!(first.status, crate::models::claim::ClaimJobState::Pending);
+        assert_eq!(first.lease_owner, None);
+
+        // The persisted record is now leased by worker-1.
+        let leased_count = store
+            .db
+            .query(
+                "SELECT count() AS cnt FROM claim_job WHERE status = 'leased' AND lease_owner = 'worker-1'",
+                None,
+            )
+            .await
+            .expect("count leased");
+        let leased =
+            serde_json::from_value::<Vec<serde_json::Value>>(leased_count).unwrap_or_default();
+        assert_eq!(
+            leased
+                .first()
+                .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+                .unwrap_or(0),
+            1,
+            "exactly one job must be leased"
+        );
+
+        // The other job remains pending and can be leased by a second worker.
+        let second = store
+            .lease_next_job(LeaseJobRequest {
+                lease_owner: "worker-2",
+                lease_duration: std::time::Duration::from_secs(30),
+            })
+            .await
+            .expect("lease second job")
+            .expect("expected the second job");
+        assert_eq!(second.status, crate::models::claim::ClaimJobState::Pending);
+        assert_ne!(second.job_id, first.job_id, "must lease the other job");
+
+        // No jobs left pending: a third lease finds nothing.
+        let none = store
+            .lease_next_job(LeaseJobRequest {
+                lease_owner: "worker-3",
+                lease_duration: std::time::Duration::from_secs(30),
+            })
+            .await
+            .expect("third lease");
+        assert!(none.is_none());
     }
 
     #[derive(Clone, Default)]
