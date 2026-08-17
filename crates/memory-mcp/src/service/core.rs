@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
-use crate::models::AccessPayload;
 
 use super::error::MemoryError;
 
@@ -334,20 +333,6 @@ impl MemoryService {
             Some(self.active_namespace.clone()),
         ))
     }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn enforce_rate_limit(
-        &self,
-        access: Option<&AccessPayload>,
-    ) -> Result<(), MemoryError> {
-        if let Some(access) = access
-            && let Some(caller) = &access.caller_id
-            && !self.rate_limiter.allow(caller)
-        {
-            return Err(MemoryError::Validation("rate limit exceeded".into()));
-        }
-        Ok(())
-    }
 }
 
 /// Production implementation of [`recall::RecallPipeline`] that delegates to
@@ -476,42 +461,6 @@ mod tests {
             100,
         )
         .unwrap()
-    }
-
-    fn create_test_service_with_rate_limit(rps: i32, burst: i32) -> MemoryService {
-        use std::sync::Arc;
-
-        MemoryService::new(
-            Arc::new(crate::service::mock_db::MockDbClient::new()),
-            "org".to_string(),
-            "warn".to_string(),
-            rps,
-            burst,
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn enforce_rate_limit_allows_without_caller_id() {
-        let service = create_test_service("org");
-        let access = AccessPayload::default();
-        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
-    }
-
-    #[test]
-    fn enforce_rate_limit_allows_within_limit() {
-        let service = create_test_service("org");
-        let access = AccessPayload {
-            caller_id: Some("user-1".to_string()),
-            ..Default::default()
-        };
-        assert!(service.enforce_rate_limit(Some(&access)).is_ok());
-    }
-
-    #[test]
-    fn enforce_rate_limit_accepts_none() {
-        let service = create_test_service("org");
-        assert!(service.enforce_rate_limit(None).is_ok());
     }
 
     struct StaticTestEmbeddingProvider {
@@ -870,38 +819,6 @@ mod tests {
         assert!(serialized.get("content_type").is_some());
         assert!(serialized.get("allowed_scopes").is_none());
         assert!(serialized.get("cross_scope_allow").is_none());
-    }
-
-    #[test]
-    fn enforce_rate_limit_with_burst_capacity() {
-        let service = create_test_service_with_rate_limit(10, 5);
-        let access = AccessPayload {
-            caller_id: Some("burst-test".to_string()),
-            ..Default::default()
-        };
-
-        for _ in 0..5 {
-            assert!(service.enforce_rate_limit(Some(&access)).is_ok());
-        }
-    }
-
-    #[test]
-    fn enforce_rate_limit_multiple_users_isolated() {
-        let service = create_test_service_with_rate_limit(10, 1);
-
-        let user1 = AccessPayload {
-            caller_id: Some("user-1".to_string()),
-            ..Default::default()
-        };
-        let user2 = AccessPayload {
-            caller_id: Some("user-2".to_string()),
-            ..Default::default()
-        };
-
-        assert!(service.enforce_rate_limit(Some(&user1)).is_ok());
-        assert!(service.enforce_rate_limit(Some(&user1)).is_err());
-
-        assert!(service.enforce_rate_limit(Some(&user2)).is_ok());
     }
 
     #[tokio::test]

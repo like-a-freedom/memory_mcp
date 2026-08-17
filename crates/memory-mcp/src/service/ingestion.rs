@@ -32,23 +32,12 @@ impl IngestionService {
         }
     }
 
-    /// Rate limit check matching MemoryService::enforce_rate_limit pattern.
-    fn rate_limiter_check(&self, access: Option<&AccessPayload>) -> Result<(), MemoryError> {
-        if let Some(access) = access
-            && let Some(caller) = &access.caller_id
-            && !self.rate_limiter.allow(caller)
-        {
-            return Err(MemoryError::Validation("rate limit exceeded".into()));
-        }
-        Ok(())
-    }
-
     pub async fn ingest(
         &self,
         request: IngestRequest,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        self.rate_limiter_check(access.as_ref())?;
+        self.rate_limiter.check_access(access.as_ref())?;
 
         let ingest_transport = super::content_extraction::detect_ingest_transport(&request.content);
         let original_source_id = request.source_id.clone();

@@ -74,17 +74,14 @@ impl ServiceContext {
     }
 
     /// Enforces rate limit based on the caller ID in the access payload.
+    ///
+    /// Delegates to [`RateLimiter::check_access`], the single enforcement
+    /// point for the token-bucket policy.
     pub(crate) fn enforce_rate_limit(
         &self,
         access: Option<&crate::models::AccessPayload>,
     ) -> Result<(), MemoryError> {
-        if let Some(access) = access
-            && let Some(caller) = &access.caller_id
-            && !self.rate_limiter.allow(caller)
-        {
-            return Err(MemoryError::Validation("rate limit exceeded".into()));
-        }
-        Ok(())
+        self.rate_limiter.check_access(access)
     }
 
     /// Returns the episode record for the given episode ID.

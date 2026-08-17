@@ -55,11 +55,35 @@ impl RateLimiter {
         *entry -= 1.0;
         true
     }
+
+    /// Enforces the per-caller rate limit for an access payload.
+    ///
+    /// This is the single enforcement point for the token-bucket policy: it
+    /// returns `Ok(())` when no caller is identified (no `access` or no
+    /// `caller_id`) or the caller still has budget, and
+    /// `Err(MemoryError::Validation)` once the caller's bucket is exhausted.
+    /// `ServiceContext::enforce_rate_limit` and `IngestionService` both
+    /// delegate here so the policy lives in exactly one place.
+    pub(crate) fn check_access(
+        &self,
+        access: Option<&crate::models::AccessPayload>,
+    ) -> Result<(), crate::service::error::MemoryError> {
+        if let Some(access) = access
+            && let Some(caller) = &access.caller_id
+            && !self.allow(caller)
+        {
+            return Err(crate::service::error::MemoryError::Validation(
+                "rate limit exceeded".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::AccessPayload;
 
     #[test]
     fn rate_limiter_new_initializes_correctly() {
@@ -104,5 +128,73 @@ mod tests {
         assert!(limiter.allow("user-a"));
         assert!(!limiter.allow("user-a"));
         assert!(limiter.allow("user-b"));
+    }
+
+    // --- check_access: the shared access-payload enforcement point ---
+
+    #[test]
+    fn check_access_allows_without_caller_id() {
+        let limiter = RateLimiter::new(50, 100);
+        let access = AccessPayload::default();
+        assert!(limiter.check_access(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn check_access_allows_within_limit() {
+        let limiter = RateLimiter::new(50, 100);
+        let access = AccessPayload {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        assert!(limiter.check_access(Some(&access)).is_ok());
+    }
+
+    #[test]
+    fn check_access_accepts_none() {
+        let limiter = RateLimiter::new(50, 100);
+        assert!(limiter.check_access(None).is_ok());
+    }
+
+    #[test]
+    fn check_access_with_burst_capacity() {
+        let limiter = RateLimiter::new(10, 5);
+        let access = AccessPayload {
+            caller_id: Some("burst-test".to_string()),
+            ..Default::default()
+        };
+        for _ in 0..5 {
+            assert!(limiter.check_access(Some(&access)).is_ok());
+        }
+    }
+
+    #[test]
+    fn check_access_multiple_users_isolated() {
+        let limiter = RateLimiter::new(10, 1);
+        let user1 = AccessPayload {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        let user2 = AccessPayload {
+            caller_id: Some("user-2".to_string()),
+            ..Default::default()
+        };
+        assert!(limiter.check_access(Some(&user1)).is_ok());
+        assert!(limiter.check_access(Some(&user1)).is_err());
+        assert!(limiter.check_access(Some(&user2)).is_ok());
+    }
+
+    #[test]
+    fn check_access_rejects_when_bucket_exhausted() {
+        let limiter = RateLimiter::new(1, 1);
+        let access = AccessPayload {
+            caller_id: Some("user-1".to_string()),
+            ..Default::default()
+        };
+        assert!(limiter.check_access(Some(&access)).is_ok());
+        let err = limiter.check_access(Some(&access)).unwrap_err();
+        assert!(matches!(
+            err,
+            crate::service::error::MemoryError::Validation(ref msg) if msg == "rate limit exceeded"
+        ));
     }
 }
