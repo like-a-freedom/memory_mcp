@@ -1,6 +1,6 @@
 # Lifecycle Integration Completion Plan — Wiring and Evidence Gate
 
-> Status: Proposed (2026-07-23)
+> Status: ✅ Executed (verified 2026-08-17 audit) — lifecycle capture/recall wired; `MAX_SESSIONS`/`evict_expired` enforced
 > Parent plan: `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`
 > Parent ADR: `docs/adr/0016-agent-memory-lifecycle-integration.md`
 

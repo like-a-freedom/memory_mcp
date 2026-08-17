@@ -1,6 +1,6 @@
 # Memory Management and Architecture Regression Fixes
 
-> Status: Proposed (2026-07-23)
+> Status: ✅ Executed (verified 2026-08-17 audit) — trace-registry bounded; `ServiceContext` slimmed; detached spawns joined
 > Parent: Architecture Review #2
 
 ## Context

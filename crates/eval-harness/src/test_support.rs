@@ -20,7 +20,6 @@ fn next_test_db_name() -> String {
 
 pub struct TestMemory {
     pub service: MemoryService,
-    #[allow(dead_code)]
     pub db_client: Arc<SurrealDbClient>,
 }
 

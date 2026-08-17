@@ -15,7 +15,7 @@ TOKEN_START, TOKEN_END, TOKEN_ENT, TOKEN_SEP = 1, 2, 128002, 128003
 THRESHOLD = 0.5
 
 tok = Tokenizer.from_file(f"{ROOT}/tokenizer.json")
-cfg = json.load(open("/tmp/nuner_gliner_config.json"))
+cfg = json.load(open(f"{ROOT}/gliner_config.json"))
 MAX_WIDTH = cfg["max_width"]
 assert MAX_WIDTH == 1, f"parity assumes max_width=1, got {MAX_WIDTH}"
 

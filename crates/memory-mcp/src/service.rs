@@ -58,7 +58,6 @@ mod query;
 mod reembed;
 pub mod reembed_options;
 pub mod reembed_progress;
-mod scope;
 mod startup;
 mod triple_extractor;
 mod util;
@@ -73,7 +72,7 @@ pub(crate) mod value_helpers;
 #[cfg(test)]
 pub mod mock_db;
 
-pub(crate) use scope::LifecyclePolicy;
+pub(crate) use lifecycle::LifecyclePolicy;
 
 #[cfg(test)]
 pub(crate) use apps::edge_neighbor;

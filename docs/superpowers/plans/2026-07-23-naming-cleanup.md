@@ -1,6 +1,6 @@
 # Naming and Dead-Code Suppression Cleanup
 
-> Status: Proposed (2026-07-23)
+> Status: ✅ Executed (verified 2026-08-17 audit) — `STORED_EMBEDDING_SAMPLE_SIZE` renamed; false `#[allow(dead_code)]` removed from policy.rs
 > Audit candidate: 4 (retire misleading legacy markers)
 
 ## Context
