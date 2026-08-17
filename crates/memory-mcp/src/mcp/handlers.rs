@@ -65,7 +65,6 @@ pub struct MemoryMcp {
     service: Arc<MemoryService>,
     session_manager: SessionManager,
     tasks: TaskManager,
-    #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
 

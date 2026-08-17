@@ -16,7 +16,9 @@ pub struct StorageUsage {
 
 async fn measure_storage(db_client: &Arc<memory_mcp::storage::SurrealDbClient>) -> StorageUsage {
     use memory_mcp::storage::DbClient;
-    let result = db_client.query("SELECT * FROM fact", None, "org").await;
+    let result = db_client
+        .query("SELECT * FROM fact", None, test_support::ACTIVE_NAMESPACE)
+        .await;
     let rows = match result {
         Ok(val) => {
             if let Some(arr) = val.as_array() {

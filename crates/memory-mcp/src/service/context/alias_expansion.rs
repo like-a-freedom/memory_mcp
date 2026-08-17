@@ -107,17 +107,9 @@ pub(crate) async fn expand_query_with_aliases(
     expanded.into_iter().collect()
 }
 
-#[allow(dead_code)]
-pub(crate) async fn expand_query_with_aliases_for_test(
-    service: &crate::service::service_context::ServiceContext,
-    query: &str,
-) -> Vec<String> {
-    expand_query_with_aliases(service, query).await
-}
-
 #[cfg(test)]
 mod tests {
-    use super::expand_query_with_aliases_for_test;
+    use super::expand_query_with_aliases;
     use crate::storage::DbClient;
     use serde_json::json;
     use std::sync::Arc;
@@ -171,7 +163,7 @@ mod tests {
         .expect("service");
 
         let expanded =
-            expand_query_with_aliases_for_test(&service.build_context(), "alice smith atlas").await;
+            expand_query_with_aliases(&service.build_context(), "alice smith atlas").await;
 
         assert!(
             expanded.iter().any(|query| query == "alice s. atlas"),

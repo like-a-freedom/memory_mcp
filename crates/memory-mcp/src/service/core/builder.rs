@@ -48,7 +48,6 @@ pub struct MemoryService {
     pub(crate) entity_resolver: super::super::entity_resolution::EntityResolver,
     pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
     pub(crate) lifecycle_config: crate::config::LifecycleConfig,
-    #[allow(dead_code)]
     pub(crate) claim_service: super::super::claims::projection::ClaimService,
     /// Shared per-session exposure-trace registry for selective recall.
     ///
@@ -378,34 +377,6 @@ impl MemoryService {
             },
             embedding_provider,
             entity_extractor,
-        )
-    }
-
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(crate) fn new_with_cache_size(
-        db_client: Arc<dyn DbClient>,
-        active_namespace: String,
-        log_level: String,
-        rate_limit_rps: i32,
-        rate_limit_burst: i32,
-        cache_size: usize,
-    ) -> Result<Self, MemoryError> {
-        Self::build(
-            db_client,
-            active_namespace,
-            log_level,
-            ServiceBuildConfig {
-                rate_limit_rps,
-                rate_limit_burst,
-                cache_size,
-                embedding_similarity_threshold:
-                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
-            },
-            Arc::new(DisabledEmbeddingProvider::new(
-                crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            )),
-            Arc::new(AnnoEntityExtractor::new()?),
         )
     }
 
