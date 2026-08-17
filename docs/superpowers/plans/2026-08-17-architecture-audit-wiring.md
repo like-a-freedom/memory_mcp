@@ -1,6 +1,6 @@
 # Architecture Audit — Wiring & Suppression Sweep — 2026-08-17
 
-> Status: In progress
+> Status: Complete
 > Parent: `/improve-codebase-architecture` audit + `/grill-with-docs` planning round
 > Branch: `housekeeping-baby` (from `53435300`)
 
