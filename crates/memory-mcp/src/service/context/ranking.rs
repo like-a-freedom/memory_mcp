@@ -682,7 +682,13 @@ fn compare_ranked_context_facts_with_focus(
         .then_with(|| a.fact.fact_id.cmp(&b.fact.fact_id))
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+/// No-focus comparator for deterministic ranking assertions in tests.
+///
+/// Production ordering always goes through
+/// [`compare_ranked_context_facts_with_focus`] (with a temporal focus window).
+/// This variant exists so tests can assert a stable, focus-free ordering
+/// without constructing a `TemporalWindow`.
+#[cfg(test)]
 pub(crate) fn compare_ranked_context_facts(
     a: &RankedContextFact,
     b: &RankedContextFact,
@@ -1210,7 +1216,12 @@ fn selected_results_meet_grounding_floor(
     matched_terms.len() >= min_terms && coverage >= MIN_QUERY_GROUNDING_RATIO
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+/// Sorts ranked facts using the no-focus comparator for test assertions.
+///
+/// Production sorting uses [`sort_ranked_context_facts_for_timeline`] or the
+/// focus-aware selection path. This helper gives tests a deterministic,
+/// focus-free sort without constructing a `TemporalWindow`.
+#[cfg(test)]
 pub(crate) fn sort_ranked_context_facts(facts: &mut [RankedContextFact]) {
     facts.sort_by(compare_ranked_context_facts);
 }
