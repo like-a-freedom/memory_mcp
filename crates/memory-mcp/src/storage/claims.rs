@@ -779,7 +779,21 @@ mod tests {
     fn latest_registered_migration_is_expected() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "037_triple_legacy_namespace_optional.surql");
+        assert_eq!(last.file_name, "038_claim_source_span.surql");
+    }
+
+    #[test]
+    fn migration_038_defines_claim_source_span() {
+        let migrations = crate::storage::migrations::versioned_migrations();
+        let migration = migrations
+            .iter()
+            .find(|entry| entry.file_name == "038_claim_source_span.surql");
+        assert!(migration.is_some());
+        assert!(migration.is_some_and(|entry| {
+            entry
+                .sql
+                .contains("DEFINE FIELD source_span ON claim TYPE option<array>")
+        }));
     }
 
     #[test]

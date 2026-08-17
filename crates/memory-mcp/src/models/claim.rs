@@ -561,6 +561,10 @@ pub struct ClaimDraft {
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
     pub validity_source: ClaimValiditySource,
     pub source_lineage: Option<String>,
+    /// Byte offset range `(start, end)` in the original source content.
+    /// Provenance metadata only — excluded from claim identity (ADR-0013).
+    #[serde(default)]
+    pub source_span: Option<(usize, usize)>,
 }
 
 // ─── Claim Derivation ─────────────────────────────────────────────────────────
@@ -622,6 +626,11 @@ pub struct Claim {
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
     pub validity_source: ClaimValiditySource,
     pub source_lineage: Option<String>,
+    /// Byte offset range `(start, end)` in the original source content from
+    /// which the claim was extracted. Provenance metadata only — excluded
+    /// from claim identity (ADR-0013) and from the canonical payload hash.
+    #[serde(default)]
+    pub source_span: Option<(usize, usize)>,
     pub derivation: ClaimDerivation,
     pub extractor_fingerprint: ExtractorFingerprint,
     pub t_ingested: chrono::DateTime<chrono::Utc>,
@@ -854,6 +863,7 @@ pub fn build_claim(input: ClaimBuildInput<'_>) -> Result<Claim, MemoryError> {
         valid_to: draft.valid_to,
         validity_source: draft.validity_source,
         source_lineage: draft.source_lineage.clone(),
+        source_span: draft.source_span,
         derivation: ClaimDerivation {
             source_fact_id: input.source_fact_id.clone(),
             source_episode_id: input.source_episode_id.clone(),
@@ -1109,6 +1119,7 @@ mod tests {
                 valid_to: None,
                 validity_source: ClaimValiditySource::Explicit,
                 source_lineage: None,
+                source_span: None,
             },
             extractor_fingerprint: &ExtractorFingerprint::compute(1, "test"),
             t_ingested: chrono::Utc::now(),
@@ -1309,6 +1320,7 @@ mod tests {
             valid_to: None,
             validity_source: ClaimValiditySource::Explicit,
             source_lineage: None,
+            source_span: None,
         };
 
         let fact_id = FactId::from("fact:test1");
@@ -1347,11 +1359,131 @@ mod tests {
                 valid_to: c1.valid_to,
                 validity_source: c1.validity_source,
                 source_lineage: c1.source_lineage.clone(),
+                source_span: c1.source_span,
             },
             extractor_fingerprint: &ext_fp2,
             t_ingested: c1.t_ingested,
         };
         let c2 = build_claim(input2).unwrap();
         assert_eq!(c1.claim_id, c2.claim_id);
+    }
+
+    #[test]
+    fn build_claim_carries_source_span_from_draft() {
+        let schema = ClaimSchemaRef {
+            family: ClaimSchemaFamily::Attribute,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        };
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "height".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let hash = ComparisonKeyHash::compute(&key);
+
+        let subject = ClaimSlot {
+            identity_version: ClaimIdentityVersion::Legacy,
+            namespace: "ns".to_string(),
+            scope: None,
+            project_identity: None,
+            access_policy_fingerprint: PolicyFingerprint::compute_v2(&[]),
+            schema_ref: schema,
+            subject_key: "entity:abc".to_string(),
+            comparison_key_hash: hash,
+            qualifier_hash: QualifierHash::compute(&BTreeMap::new()),
+        };
+
+        let draft = ClaimDraft {
+            schema_ref: schema,
+            subject,
+            comparison_key: key,
+            qualifiers: BTreeMap::new(),
+            value: ClaimValue::Boolean(true),
+            cardinality: ClaimCardinality::SingleValued,
+            observed_at: chrono::Utc::now(),
+            valid_from: None,
+            valid_to: None,
+            validity_source: ClaimValiditySource::Explicit,
+            source_lineage: None,
+            source_span: Some((0, 33)),
+        };
+
+        let fact_id = FactId::from("fact:span1");
+        let episode_id = EpisodeId::from("ep:span1");
+        let ext_fp = ExtractorFingerprint::compute(1, "test");
+
+        let claim = build_claim(ClaimBuildInput {
+            namespace: "ns",
+            source_fact_id: &fact_id,
+            source_episode_id: &episode_id,
+            policy_tags: &[],
+            draft,
+            extractor_fingerprint: &ext_fp,
+            t_ingested: chrono::Utc::now(),
+        })
+        .unwrap();
+
+        assert_eq!(claim.source_span, Some((0, 33)));
+    }
+
+    #[test]
+    fn build_claim_source_span_does_not_affect_claim_id() {
+        let schema = ClaimSchemaRef {
+            family: ClaimSchemaFamily::Attribute,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        };
+        let mut components = BTreeMap::new();
+        components.insert("dim".to_string(), "height".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let hash = ComparisonKeyHash::compute(&key);
+
+        let make_subject = || ClaimSlot {
+            identity_version: ClaimIdentityVersion::Legacy,
+            namespace: "ns".to_string(),
+            scope: None,
+            project_identity: None,
+            access_policy_fingerprint: PolicyFingerprint::compute_v2(&[]),
+            schema_ref: schema,
+            subject_key: "entity:abc".to_string(),
+            comparison_key_hash: hash.clone(),
+            qualifier_hash: QualifierHash::compute(&BTreeMap::new()),
+        };
+
+        let observed_at = chrono::Utc::now();
+        let t_ingested = chrono::Utc::now();
+        let fact_id = FactId::from("fact:span-id");
+        let episode_id = EpisodeId::from("ep:span-id");
+        let ext_fp = ExtractorFingerprint::compute(1, "test");
+
+        let make_input = |span: Option<(usize, usize)>| ClaimBuildInput {
+            namespace: "ns",
+            source_fact_id: &fact_id,
+            source_episode_id: &episode_id,
+            policy_tags: &[],
+            draft: ClaimDraft {
+                schema_ref: schema,
+                subject: make_subject(),
+                comparison_key: key.clone(),
+                qualifiers: BTreeMap::new(),
+                value: ClaimValue::Boolean(true),
+                cardinality: ClaimCardinality::SingleValued,
+                observed_at,
+                valid_from: None,
+                valid_to: None,
+                validity_source: ClaimValiditySource::Explicit,
+                source_lineage: None,
+                source_span: span,
+            },
+            extractor_fingerprint: &ext_fp,
+            t_ingested,
+        };
+
+        let with_span = build_claim(make_input(Some((0, 33)))).unwrap();
+        let without_span = build_claim(make_input(None)).unwrap();
+        let different_span = build_claim(make_input(Some((5, 20)))).unwrap();
+
+        // ADR-0013: claim identity is schema_ref + extractor fingerprint +
+        // fact_id + CanonicalPayloadHash(value + qualifiers). source_span is
+        // provenance metadata and must not enter the ID computation.
+        assert_eq!(with_span.claim_id, without_span.claim_id);
+        assert_eq!(with_span.claim_id, different_span.claim_id);
     }
 }

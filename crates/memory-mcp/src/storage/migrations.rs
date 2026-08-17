@@ -123,6 +123,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "037_triple_legacy_namespace_optional.surql",
             sql: include_str!("../../migrations/037_triple_legacy_namespace_optional.surql"),
         },
+        MigrationScript {
+            file_name: "038_claim_source_span.surql",
+            sql: include_str!("../../migrations/038_claim_source_span.surql"),
+        },
     ]
 }
 

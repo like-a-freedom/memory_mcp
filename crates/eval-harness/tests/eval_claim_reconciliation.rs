@@ -71,7 +71,6 @@ struct ExpectedClaim {
     #[serde(default)]
     #[allow(dead_code)]
     valid_to: Option<String>,
-    #[allow(dead_code)]
     source_span: String,
 }
 
@@ -236,4 +235,37 @@ fn claim_fixture_covers_every_schema_outcome_and_isolation_boundary() {
         missing_coverage,
         all_coverage
     );
+}
+
+#[test]
+fn claim_fixture_source_spans_are_well_formed() {
+    // Every expected claim carries a byte-offset span "start-end" with
+    // start <= end. The full claim-assertion gate (comparing spans against
+    // extracted claims) is deferred — see the 2026-08-17 wiring plan, q1.
+    let cases = load_cases();
+    let mut spans_checked = 0usize;
+    for case in &cases {
+        for claim in &case.expected.claims {
+            let (start, end) = claim.source_span.split_once('-').unwrap_or_else(|| {
+                panic!(
+                    "case {}: malformed source_span {:?}",
+                    case.id, claim.source_span
+                )
+            });
+            let start: usize = start.parse().unwrap_or_else(|_| {
+                panic!("case {}: bad span start {:?}", case.id, claim.source_span)
+            });
+            let end: usize = end.parse().unwrap_or_else(|_| {
+                panic!("case {}: bad span end {:?}", case.id, claim.source_span)
+            });
+            assert!(
+                start <= end,
+                "case {}: span start > end: {:?}",
+                case.id,
+                claim.source_span
+            );
+            spans_checked += 1;
+        }
+    }
+    assert!(spans_checked > 0, "fixture carries no expected claims");
 }

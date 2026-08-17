@@ -500,6 +500,7 @@ mod tests {
             valid_to,
             validity_source: ClaimValiditySource::Explicit,
             source_lineage: None,
+            source_span: None,
             derivation: crate::models::claim::ClaimDerivation {
                 source_fact_id: FactId::from("fact:test"),
                 source_episode_id: EpisodeId::from("ep:test"),

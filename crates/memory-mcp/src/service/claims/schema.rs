@@ -48,9 +48,8 @@ pub(crate) struct ClaimDraftCandidate {
     pub valid_from: Option<chrono::DateTime<chrono::Utc>>,
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
     pub validity_source: ClaimValiditySource,
-    // Byte offset range in the original source content. Asserted by extract tests;
-    // persisted through `Claim.source_span` in a later step.
-    #[allow(dead_code)]
+    /// Byte offset range in the original source content. Asserted by extract
+    /// tests and persisted through `Claim.source_span`.
     pub source_span: Option<(usize, usize)>,
 }
 
