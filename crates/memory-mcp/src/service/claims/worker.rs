@@ -3,8 +3,6 @@
 //! Cancellation-aware worker that leases pending jobs, processes
 //! exact-slot candidate pages, and commits relations atomically.
 
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;

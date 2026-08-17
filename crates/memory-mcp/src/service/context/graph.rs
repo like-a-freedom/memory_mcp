@@ -22,7 +22,6 @@ pub(crate) struct GraphCandidate {
     pub(crate) fact: Fact,
     pub(crate) rationale: String,
     pub(crate) origin_factor: f64,
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) trace: GraphTrace,
 }
 

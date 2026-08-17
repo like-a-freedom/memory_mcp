@@ -3,8 +3,6 @@
 //! Discovers facts that lack the current extractor fingerprint
 //! and schedules projection jobs for them.
 
-#![allow(dead_code)]
-
 use crate::models::claim::{ClaimJob, ClaimJobKind, ClaimJobState};
 use crate::models::{ClaimJobId, FactId};
 use crate::service::MemoryError;

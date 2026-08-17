@@ -3,14 +3,10 @@
 //! Parses raw fact content into generic structural assertions once.
 //! Schemas consume assertions and never re-parse raw content independently.
 
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 use std::ops::Range;
 
-use crate::models::claim::{
-    CanonicalPayloadHash, ClaimSchemaRef, ComparisonKeyHash, NormalizedText, QualifierHash,
-};
+use crate::models::claim::NormalizedText;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +27,6 @@ pub(crate) struct StructuralAssertion {
 pub(crate) enum StructuralValue {
     Text(NormalizedText),
     Number { raw: String, unit: Option<String> },
-    EntityRef(NormalizedText),
     Boolean(bool),
 }
 
@@ -47,16 +42,6 @@ pub(crate) enum CardinalityEvidence {
 pub(crate) struct SubjectCandidate {
     pub entity_id: String,
     pub names: Vec<NormalizedText>,
-}
-
-/// A projection identity for deduplication.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct ProjectionIdentity {
-    pub schema: ClaimSchemaRef,
-    pub subject: String,
-    pub comparison_key_hash: ComparisonKeyHash,
-    pub qualifier_hash: QualifierHash,
-    pub value_hash: CanonicalPayloadHash,
 }
 
 /// Resolve a subject from hint and candidates.
@@ -258,7 +243,6 @@ fn split_number_unit(val: &str) -> Option<(String, Option<String>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::claim::ClaimSchemaFamily;
 
     #[test]
     fn parse_kv_measure_line() {
@@ -363,47 +347,5 @@ mod tests {
     fn two_kv_lines_produce_two_assertions() {
         let assertions = parse_assertions("height: 180 cm\nweight: 75 kg");
         assert_eq!(assertions.len(), 2);
-    }
-
-    proptest::proptest! {
-        #[test]
-        fn projection_identity_changes_when_schema_or_key_changes(
-            key_a in "[a-z]{1,16}",
-            key_b in "[a-z]{1,16}",
-        ) {
-            proptest::prop_assume!(key_a != key_b);
-            let schema = ClaimSchemaRef {
-                family: ClaimSchemaFamily::Attribute,
-                version: std::num::NonZeroU16::new(1).unwrap(),
-            };
-            let ck_a = ComparisonKeyHash::compute(&crate::models::claim::ComparisonKey::new(
-                schema,
-                std::collections::BTreeMap::from([("dim".to_string(), key_a)]),
-            ).unwrap());
-            let ck_b = ComparisonKeyHash::compute(&crate::models::claim::ComparisonKey::new(
-                schema,
-                std::collections::BTreeMap::from([("dim".to_string(), key_b)]),
-            ).unwrap());
-            let vh = CanonicalPayloadHash::compute(
-                &crate::models::claim::ClaimValue::Text(NormalizedText::new("same")),
-                &BTreeMap::new(),
-            );
-            let qh = QualifierHash::compute(&BTreeMap::new());
-            let a = ProjectionIdentity {
-                schema,
-                subject: "entity:s".to_string(),
-                comparison_key_hash: ck_a,
-                qualifier_hash: qh.clone(),
-                value_hash: vh.clone(),
-            };
-            let b = ProjectionIdentity {
-                schema,
-                subject: "entity:s".to_string(),
-                comparison_key_hash: ck_b,
-                qualifier_hash: qh,
-                value_hash: vh,
-            };
-            proptest::prop_assert_ne!(a, b);
-        }
     }
 }

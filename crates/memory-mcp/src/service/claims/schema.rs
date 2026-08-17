@@ -197,7 +197,6 @@ impl ClaimSchema for AttributeV1 {
                     super::structural::StructuralValue::Text(t) => t.to_string(),
                     super::structural::StructuralValue::Boolean(b) => b.to_string(),
                     super::structural::StructuralValue::Number { raw, .. } => raw.clone(),
-                    super::structural::StructuralValue::EntityRef(t) => t.to_string(),
                 };
                 output.push(ClaimDraftCandidate {
                     schema_ref: self.schema_ref(),

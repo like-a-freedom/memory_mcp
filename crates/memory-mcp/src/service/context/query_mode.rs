@@ -34,7 +34,6 @@ pub(super) struct QueryFlags {
 }
 
 impl QueryFlags {
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn max_graph_hops(&self) -> usize {
         if self.wants_graph_path { 2 } else { 1 }
     }
