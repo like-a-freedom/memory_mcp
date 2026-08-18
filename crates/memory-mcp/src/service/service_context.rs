@@ -304,4 +304,26 @@ mod tests {
             "well-formed id must pass validation: {result:?}"
         );
     }
+
+    #[test]
+    fn enforce_rate_limit_delegates_to_rate_limiter() {
+        use std::sync::Arc;
+
+        use crate::models::AccessPayload;
+        use crate::service::util::RateLimiter;
+
+        let db = MockDbClient::new();
+        let mut ctx = make_context_base(db);
+        ctx.rate_limiter = Arc::new(RateLimiter::new(1, 1));
+
+        let access = AccessPayload {
+            caller_id: Some("ctx-user".into()),
+            ..Default::default()
+        };
+        assert!(ctx.enforce_rate_limit(Some(&access)).is_ok());
+        let err = ctx.enforce_rate_limit(Some(&access)).unwrap_err();
+        assert!(matches!(err, MemoryError::Validation(ref msg) if msg == "rate limit exceeded"));
+        // No caller → always allowed.
+        assert!(ctx.enforce_rate_limit(None).is_ok());
+    }
 }

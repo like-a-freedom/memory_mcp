@@ -11,6 +11,8 @@ import onnxruntime as ort
 from tokenizers import Tokenizer
 
 ROOT = "crates/memory-mcp/tests/models/ner/deepanwa--NuNerZero_onnx"
+# gliner_config.json ships with the deepanwa/NuNerZero_onnx checkpoint;
+# download it alongside model.onnx and tokenizer.json before running.
 TOKEN_START, TOKEN_END, TOKEN_ENT, TOKEN_SEP = 1, 2, 128002, 128003
 THRESHOLD = 0.5
 

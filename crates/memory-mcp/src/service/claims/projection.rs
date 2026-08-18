@@ -296,7 +296,26 @@ mod tests {
     use crate::storage::claims::PersistProjectionRequest;
     use async_trait::async_trait;
 
-    struct NoopClaimStore;
+    struct NoopClaimStore {
+        captured_projections:
+            Option<std::sync::Arc<std::sync::Mutex<Vec<crate::models::claim::Claim>>>>,
+    }
+
+    impl NoopClaimStore {
+        fn new() -> Self {
+            Self {
+                captured_projections: None,
+            }
+        }
+
+        fn capturing(
+            sink: std::sync::Arc<std::sync::Mutex<Vec<crate::models::claim::Claim>>>,
+        ) -> Self {
+            Self {
+                captured_projections: Some(sink),
+            }
+        }
+    }
 
     #[async_trait]
     impl ClaimStore for NoopClaimStore {
@@ -311,8 +330,11 @@ mod tests {
         }
         async fn persist_projection(
             &self,
-            _req: PersistProjectionRequest,
+            req: PersistProjectionRequest,
         ) -> Result<(), MemoryError> {
+            if let Some(sink) = &self.captured_projections {
+                sink.lock().unwrap().extend(req.claims);
+            }
             Ok(())
         }
         async fn select_candidates_page(
@@ -359,7 +381,7 @@ mod tests {
     }
 
     fn noop_store() -> Arc<dyn ClaimStore> {
-        Arc::new(NoopClaimStore)
+        Arc::new(NoopClaimStore::new())
     }
 
     fn claim_svc() -> ClaimService {
@@ -454,77 +476,10 @@ mod tests {
         assert_eq!(summary.claims_projected, 0);
     }
 
-    struct CapturingClaimStore {
-        claims: std::sync::Arc<std::sync::Mutex<Vec<crate::models::claim::Claim>>>,
-    }
-
-    #[async_trait]
-    impl ClaimStore for CapturingClaimStore {
-        async fn ensure_projection_job(&self, _job: &ClaimJob) -> Result<(), MemoryError> {
-            Ok(())
-        }
-        async fn lease_next_job(
-            &self,
-            _req: crate::storage::claims::LeaseJobRequest<'_>,
-        ) -> Result<Option<ClaimJob>, MemoryError> {
-            Ok(None)
-        }
-        async fn persist_projection(
-            &self,
-            req: PersistProjectionRequest,
-        ) -> Result<(), MemoryError> {
-            self.claims.lock().unwrap().extend(req.claims);
-            Ok(())
-        }
-        async fn select_candidates_page(
-            &self,
-            _q: crate::storage::claims::ClaimCandidateQuery<'_>,
-        ) -> Result<Vec<crate::models::claim::Claim>, MemoryError> {
-            Ok(vec![])
-        }
-        async fn select_claims_for_facts(
-            &self,
-            _q: crate::storage::claims::ClaimsForFactsQuery<'_>,
-        ) -> Result<Vec<crate::models::claim::Claim>, MemoryError> {
-            Ok(vec![])
-        }
-        async fn select_relations_for_facts(
-            &self,
-            _q: crate::storage::claims::RelationsForFactsQuery<'_>,
-        ) -> Result<Vec<crate::models::claim::ClaimRelation>, MemoryError> {
-            Ok(vec![])
-        }
-        async fn count_active_relations(
-            &self,
-        ) -> Result<Vec<crate::storage::claims::ActiveRelationCount>, MemoryError> {
-            Ok(vec![])
-        }
-        async fn select_facts_for_backfill(
-            &self,
-            _q: crate::storage::claims::BackfillFactQuery<'_>,
-        ) -> Result<Vec<serde_json::Value>, MemoryError> {
-            Ok(vec![])
-        }
-        async fn retract_fact_and_claims(
-            &self,
-            _req: crate::storage::claims::RetractFactAndClaimsRequest<'_>,
-        ) -> Result<(), MemoryError> {
-            Ok(())
-        }
-        async fn commit_reconciliation_page(
-            &self,
-            _req: crate::storage::claims::CommitReconciliationPageRequest<'_>,
-        ) -> Result<(), MemoryError> {
-            Ok(())
-        }
-    }
-
     #[tokio::test]
     async fn after_fact_persisted_preserves_source_span() {
         let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let svc = ClaimService::new(Arc::new(CapturingClaimStore {
-            claims: captured.clone(),
-        }));
+        let svc = ClaimService::new(Arc::new(NoopClaimStore::capturing(captured.clone())));
         let fact_id = FactId::from("fact:span");
         // Key-value line: the structural parser reports span 0..line.len().
         let params = test_params(&fact_id, "height: 180");
