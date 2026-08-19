@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::logging::{LogLevel, StdoutLogger};
@@ -733,6 +734,61 @@ pub struct GraphPathSnapshot {
     pub edges: Vec<Value>,
 }
 
+/// Typed state persisted for a graph app session.
+///
+/// The nested values intentionally remain JSON values because graph records
+/// are storage-shaped and may gain fields independently of the session
+/// protocol. The session envelope and its mutation points are typed here,
+/// preserving the exact payload shape consumed by the app HTML resource.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionState {
+    pub(crate) target: GraphSessionTarget,
+    pub(crate) graph: GraphSessionGraph,
+    pub(crate) neighbors: GraphSessionNeighbors,
+    pub(crate) selected_edge: Value,
+    pub(crate) context_preview: Value,
+    pub(crate) expansions: Vec<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionTarget {
+    pub(crate) from_entity_id: String,
+    pub(crate) to_entity_id: String,
+    pub(crate) max_depth: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) as_of: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionGraph {
+    pub(crate) path_found: bool,
+    pub(crate) nodes: Vec<Value>,
+    pub(crate) edges: Vec<Value>,
+    pub(crate) hop_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionNeighbors {
+    pub(crate) from: Value,
+    pub(crate) to: Value,
+}
+
+impl GraphSessionState {
+    pub(crate) fn from_payload(payload: &Value) -> Result<Self, MemoryError> {
+        serde_json::from_value(payload.clone()).map_err(|error| {
+            MemoryError::Validation(format!("invalid graph session payload: {error}"))
+        })
+    }
+
+    pub(crate) fn to_payload(&self) -> Result<Value, MemoryError> {
+        serde_json::to_value(self).map_err(|error| {
+            MemoryError::Storage(format!(
+                "failed to serialize graph session payload: {error}"
+            ))
+        })
+    }
+}
+
 /// Extracts the neighbor entity ID from an edge record based on traversal direction.
 pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String> {
     let map = record.as_object()?;
@@ -907,32 +963,76 @@ pub async fn graph_payload(
     let path = graph_path_snapshot(store, from_entity_id, to_entity_id, cutoff, max_depth).await?;
     let from_neighbors = graph_neighbor_expansion(store, from_entity_id, "both", 1, cutoff).await?;
     let to_neighbors = graph_neighbor_expansion(store, to_entity_id, "both", 1, cutoff).await?;
+    let hop_count = path.edges.len();
 
-    Ok(json!({
-        "target": {
-            "from_entity_id": from_entity_id,
-            "to_entity_id": to_entity_id,
-            "max_depth": max_depth.max(1),
+    GraphSessionState {
+        target: GraphSessionTarget {
+            from_entity_id: from_entity_id.to_string(),
+            to_entity_id: to_entity_id.to_string(),
+            max_depth: max_depth.max(1),
+            as_of: None,
         },
-        "graph": {
-            "path_found": path.found,
-            "nodes": path.nodes,
-            "edges": path.edges,
-            "hop_count": path.edges.len(),
+        graph: GraphSessionGraph {
+            path_found: path.found,
+            nodes: path.nodes,
+            edges: path.edges,
+            hop_count,
         },
-        "neighbors": {
-            "from": from_neighbors,
-            "to": to_neighbors,
+        neighbors: GraphSessionNeighbors {
+            from: from_neighbors,
+            to: to_neighbors,
         },
-        "selected_edge": Value::Null,
-        "context_preview": Value::Null,
-        "expansions": [],
-    }))
+        selected_edge: Value::Null,
+        context_preview: Value::Null,
+        expansions: Vec::new(),
+    }
+    .to_payload()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graph_session_state_round_trips_the_app_payload_shape() {
+        let payload = json!({
+            "target": {
+                "from_entity_id": "entity:alice",
+                "to_entity_id": "entity:acme",
+                "max_depth": 4
+            },
+            "graph": {
+                "path_found": true,
+                "nodes": [{"entity_id": "entity:alice", "canonical_name": "Alice"}],
+                "edges": [],
+                "hop_count": 0
+            },
+            "neighbors": {
+                "from": {
+                    "target_id": "entity:alice",
+                    "direction": "both",
+                    "depth": 1,
+                    "nodes": [],
+                    "edges": []
+                },
+                "to": {
+                    "target_id": "entity:acme",
+                    "direction": "both",
+                    "depth": 1,
+                    "nodes": [],
+                    "edges": []
+                }
+            },
+            "selected_edge": null,
+            "context_preview": null,
+            "expansions": []
+        });
+
+        let state = GraphSessionState::from_payload(&payload).expect("valid graph payload");
+        let encoded = state.to_payload().expect("graph payload should serialize");
+
+        assert_eq!(encoded, payload);
+    }
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
