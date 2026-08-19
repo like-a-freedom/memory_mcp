@@ -19,6 +19,7 @@ mod agent_memory;
 pub(crate) mod app_store;
 pub(crate) mod claims;
 mod client;
+pub(crate) mod close;
 pub(crate) mod context_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
@@ -27,6 +28,7 @@ mod migrations;
 mod procedures;
 mod queries;
 pub(crate) mod reembed_store;
+mod triple_store;
 mod types;
 
 // Re-export the public API
@@ -38,6 +40,7 @@ pub use agent_memory::{
 pub use app_store::AppStoreClient;
 pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
+pub(crate) use close::{CloseStoreClient, CloseTimestamps};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
@@ -48,4 +51,5 @@ pub use queries::{
     fact_embedding_dimension_placeholder, validate_record_id,
 };
 pub use reembed_store::ReembedStoreClient;
+pub(crate) use triple_store::TripleStoreClient;
 pub use types::GraphDirection;

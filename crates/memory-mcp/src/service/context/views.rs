@@ -202,7 +202,7 @@ fn apply_episode_time_window(
 }
 
 pub(crate) async fn build_facets_view(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     _namespace: &str,
     cutoff: DateTime<Utc>,
     budget: i32,
@@ -300,7 +300,7 @@ pub(crate) struct FactFilterParams<'a> {
 }
 
 pub(crate) async fn build_wake_up_view(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     params: FactFilterParams<'_>,
     budget: i32,
     decayed_fn: impl Fn(&crate::models::Fact, DateTime<Utc>) -> f64,
@@ -378,7 +378,7 @@ pub(crate) async fn build_wake_up_view(
 }
 
 pub(crate) async fn build_map_view(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff: DateTime<Utc>,
     budget: i32,
     normalize_dt_fn: impl Fn(DateTime<Utc>) -> String,

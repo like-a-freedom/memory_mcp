@@ -421,6 +421,10 @@ impl EntityExtractor for VagoLfm2EntityExtractor {
         "sauerkraut-lfm2.5-gliner"
     }
 
+    fn scheduling(&self) -> super::NerScheduling {
+        scheduling()
+    }
+
     fn fingerprint(&self) -> ExtractorFingerprint {
         ExtractorFingerprint {
             selector: SELECTOR_SAUKRAUT_LFM25.to_string(),
@@ -483,6 +487,10 @@ impl VagoLfm2EntityExtractor {
 /// shared artifact store, then constructs the extractor. A newly staged
 /// revision is probe-loaded and installed before activation so the first real
 /// extraction reuses it.
+pub(crate) fn scheduling() -> super::NerScheduling {
+    super::NerScheduling::BlockingPool
+}
+
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
     context: NerBuildContext,

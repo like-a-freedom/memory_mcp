@@ -1466,6 +1466,10 @@ impl EntityExtractor for GlinerEntityExtractor {
         "gliner"
     }
 
+    fn scheduling(&self) -> super::NerScheduling {
+        scheduling()
+    }
+
     fn fingerprint(&self) -> ExtractorFingerprint {
         ExtractorFingerprint {
             selector: crate::config::SELECTOR_CLASSIC_GLINER.to_string(),
@@ -1537,6 +1541,10 @@ pub(crate) const CLASSIC_GLINER_SPEC: crate::service::model_artifacts::NerArtifa
 /// `urchade/gliner_multi-v2.1` checkpoint through the shared artifact store,
 /// then constructs the extractor. A newly staged revision is probe-loaded and
 /// installed before activation so the first real extraction reuses it.
+pub(crate) fn scheduling() -> super::NerScheduling {
+    super::NerScheduling::BlockingPool
+}
+
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
     context: super::NerBuildContext,

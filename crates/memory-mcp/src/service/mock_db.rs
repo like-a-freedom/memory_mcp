@@ -19,7 +19,7 @@ use crate::storage::DbClient;
 
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;
 type SelectTableFn = dyn Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync;
-type QueryFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
+
 type CreateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 
@@ -30,14 +30,14 @@ type UpdateFn = dyn Fn() -> Result<Value, MemoryError> + Send + Sync;
 pub struct MockDbClient {
     select_one_responses: Mutex<HashMap<String, Result<Option<Value>, MemoryError>>>,
     select_table_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
-    edge_neighbors_responses: Mutex<HashMap<String, Result<Vec<Value>, MemoryError>>>,
+
     create_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
     update_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
-    query_responses: Mutex<HashMap<String, Result<Value, MemoryError>>>,
+
     migration_result: Mutex<Result<(), MemoryError>>,
     fallback_select_one: Mutex<Option<Box<SelectOneFn>>>,
     fallback_select_table: Mutex<Option<Box<SelectTableFn>>>,
-    fallback_query: Mutex<Option<Box<QueryFn>>>,
+
     fallback_create: Mutex<Option<Box<CreateFn>>>,
     fallback_update: Mutex<Option<Box<UpdateFn>>>,
 }
@@ -47,14 +47,14 @@ impl MockDbClient {
         Self {
             select_one_responses: Mutex::new(HashMap::new()),
             select_table_responses: Mutex::new(HashMap::new()),
-            edge_neighbors_responses: Mutex::new(HashMap::new()),
+
             create_responses: Mutex::new(HashMap::new()),
             update_responses: Mutex::new(HashMap::new()),
-            query_responses: Mutex::new(HashMap::new()),
+
             migration_result: Mutex::new(Ok(())),
             fallback_select_one: Mutex::new(None),
             fallback_select_table: Mutex::new(None),
-            fallback_query: Mutex::new(None),
+
             fallback_create: Mutex::new(None),
             fallback_update: Mutex::new(None),
         }
@@ -121,31 +121,6 @@ impl MockDbClient {
         self.expect_select_table_with(move |table| {
             panic!("select_table should not be called for {table_name}, got {table}");
         })
-    }
-
-    pub fn expect_edge_neighbors(self, node_id: &str, neighbors: Vec<Value>) -> Self {
-        self.edge_neighbors_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(node_id.to_string(), Ok(neighbors));
-        self
-    }
-
-    pub fn expect_migration_handler(
-        mut self,
-        f: impl Fn(&str) -> Result<(), MemoryError> + Send + Sync + 'static,
-    ) -> Self {
-        self.migration_result = Mutex::new(Ok(()));
-        let _ = f;
-        self
-    }
-
-    pub fn expect_query(self, sql_prefix: &str, result: Value) -> Self {
-        self.query_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(sql_prefix.to_string(), Ok(result));
-        self
     }
 
     pub fn expect_migration_result(mut self, result: Result<(), MemoryError>) -> Self {
@@ -259,48 +234,10 @@ impl DbClient for MockDbClient {
 
     async fn query(
         &self,
-        sql: &str,
-        vars: Option<Value>,
+        _sql: &str,
+        _vars: Option<Value>,
         _namespace: &str,
     ) -> Result<Value, MemoryError> {
-        // The graph stores now run edge-neighbor lookups through the core `query`
-        // op; serve the per-node canned responses keyed by `node_id`. A full edge
-        // scan must never be used by live traversal, so panic on it.
-        if sql.contains("FROM edge") {
-            if !(sql.contains("WHERE in =") || sql.contains("WHERE out =")) {
-                panic!("select_edges_filtered should not be called");
-            }
-            let node_id = vars
-                .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
-                .unwrap_or_default();
-            if let Some(resp) = self
-                .edge_neighbors_responses
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .get(&node_id)
-                .cloned()
-            {
-                return resp.map(Value::Array);
-            }
-            return Ok(Value::Array(Vec::new()));
-        }
-        for (prefix, result) in self
-            .query_responses
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .iter()
-        {
-            if sql.starts_with(prefix.as_str()) {
-                return result.clone();
-            }
-        }
-        if let Some(ref f) = *self
-            .fallback_query
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-        {
-            return f();
-        }
         Ok(Value::Null)
     }
 

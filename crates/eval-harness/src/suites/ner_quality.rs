@@ -309,6 +309,9 @@ mod tests {
         fn provider_name(&self) -> &'static str {
             "fake"
         }
+        fn scheduling(&self) -> memory_mcp::service::NerScheduling {
+            memory_mcp::service::NerScheduling::Inline
+        }
         async fn extract_candidates(
             &self,
             _content: &str,

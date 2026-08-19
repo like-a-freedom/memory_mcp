@@ -8,7 +8,6 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::helpers::is_missing_table_error;
 use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
 /// Concrete store for app-facing graph + entity + record reads and mutations.
@@ -36,6 +35,19 @@ impl AppStoreClient {
         self.db.select_one(record_id).await
     }
 
+    /// Looks up a validated record in the process-bound Active Namespace.
+    pub(crate) async fn find_record_by_id(
+        &self,
+        record_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        crate::storage::validate_record_id(record_id)?;
+        let record = self.select_record(record_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.db.namespace().to_string()),
+        ))
+    }
+
     pub async fn select_records(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
         self.db.select_table(table).await
     }
@@ -56,11 +68,9 @@ impl AppStoreClient {
             return Ok(Vec::new());
         }
         let sql = "SELECT entity_id, canonical_name, aliases FROM entity WHERE entity_id IN $ids";
-        match self.db.query(sql, Some(json!({"ids": entity_ids}))).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db
+            .query_rows(sql, Some(json!({"ids": entity_ids})))
+            .await
     }
 
     pub async fn select_communities(&self) -> Result<Vec<Value>, MemoryError> {
@@ -109,11 +119,7 @@ impl AppStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// One page of active edges in stable order.
@@ -125,11 +131,7 @@ impl AppStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edges_filtered_page_query(cutoff, limit, start);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     pub async fn select_entity_lookup(
@@ -138,30 +140,19 @@ impl AppStoreClient {
     ) -> Result<Option<Value>, MemoryError> {
         // Canonical-name index lookup first (fast path), then alias lookup.
         let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
-        let canonical_result = match self
+        let canonical_result = self
             .db
-            .query(canonical_sql, Some(json!({ "name": normalized_name })))
-            .await
-        {
-            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => None,
-            Err(err) => return Err(err),
-        };
+            .query_first(canonical_sql, Some(json!({ "name": normalized_name })))
+            .await?;
 
         if canonical_result.is_some() {
             return Ok(canonical_result);
         }
 
         let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
-        match self
-            .db
-            .query(alias_sql, Some(json!({ "name": normalized_name })))
+        self.db
+            .query_first(alias_sql, Some(json!({ "name": normalized_name })))
             .await
-        {
-            Ok(value) => Ok(value.as_array().and_then(|arr| arr.first()).cloned()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(None),
-            Err(err) => Err(err),
-        }
     }
 
     pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
@@ -169,11 +160,7 @@ impl AppStoreClient {
             &crate::service::normalize_dt(crate::service::now()),
             limit,
         );
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     pub async fn select_episodes_for_archival(
@@ -184,11 +171,30 @@ impl AppStoreClient {
         let sql = "SELECT * FROM episode WHERE status != 'archived' \
                    AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit";
         let vars = json!({ "cutoff": cutoff, "limit": limit });
-        match self.db.query(sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(sql, Some(vars)).await
+    }
+
+    /// Increments fact access metadata without exposing record mutation details
+    /// to retrieval or explanation orchestration.
+    pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
+        let (record, _namespace) = self.find_record_by_id(fact_id).await?;
+        let Some(mut record) = record else {
+            return Ok(());
+        };
+
+        let access_count = record
+            .get("access_count")
+            .and_then(crate::service::value_helpers::json_i64)
+            .unwrap_or(0)
+            .saturating_add(boost);
+        record.insert("access_count".to_string(), json!(access_count));
+        record.insert(
+            "last_accessed".to_string(),
+            json!(crate::service::normalize_dt(crate::service::now())),
+        );
+
+        self.db.update(fact_id, Value::Object(record)).await?;
+        Ok(())
     }
 
     pub async fn update_record(
@@ -201,5 +207,45 @@ impl AppStoreClient {
 
     pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
         self.db.query(sql, vars).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::json;
+
+    use super::AppStoreClient;
+    use crate::service::MemoryError;
+    use crate::service::mock_db::MockDbClient;
+
+    #[tokio::test]
+    async fn find_record_by_id_rejects_invalid_record_ids() {
+        let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
+
+        let result = store.find_record_by_id("bare-hex-id").await;
+
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_record_by_id_returns_record_and_active_namespace() {
+        let db = MockDbClient::new().expect_select_one(
+            "fact:known",
+            Some(json!({"fact_id": "fact:known", "content": "remembered"})),
+        );
+        let store = AppStoreClient::new(Arc::new(db), "org");
+
+        let (record, namespace) = store
+            .find_record_by_id("fact:known")
+            .await
+            .expect("record lookup should succeed");
+
+        assert_eq!(
+            record.and_then(|map| map.get("fact_id").cloned()),
+            Some(json!("fact:known"))
+        );
+        assert_eq!(namespace.as_deref(), Some("org"));
     }
 }

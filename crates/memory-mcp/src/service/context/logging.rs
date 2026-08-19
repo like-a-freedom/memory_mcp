@@ -48,7 +48,7 @@ pub(crate) fn supplemental_experience_count(results: &[AssembledContextItem]) ->
 }
 
 pub(crate) async fn record_query_log(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: &AssembleContextRequest,
     results: &[AssembledContextItem],
     cache_hit: bool,
@@ -128,7 +128,7 @@ pub(crate) async fn record_query_log(
 }
 
 pub(crate) async fn maybe_record_query_log(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: &AssembleContextRequest,
     results: &[AssembledContextItem],
     cache_hit: bool,
@@ -245,7 +245,7 @@ pub(crate) async fn maybe_record_query_log(
 }
 
 async fn prune_expired_query_logs(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
 ) -> Result<usize, MemoryError> {
     let cutoff = crate::service::query::now()
         - chrono::Duration::days(i64::from(service.query_log_retention_days()));

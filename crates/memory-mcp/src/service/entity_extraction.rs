@@ -25,6 +25,16 @@ pub use gliner::GlinerEntityExtractor;
 pub use lfm2_gliner::VagoLfm2EntityExtractor;
 pub use regex::RegexEntityExtractor;
 
+/// How an entity extractor must be scheduled by the episode pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NerScheduling {
+    /// The extractor is async-safe and may run on the current runtime task.
+    Inline,
+    /// The extractor performs synchronous CPU/accelerator work and must run on
+    /// Tokio's blocking pool.
+    BlockingPool,
+}
+
 /// Extracts entity candidates from text.
 #[async_trait]
 pub trait EntityExtractor: Send + Sync {
@@ -32,6 +42,9 @@ pub trait EntityExtractor: Send + Sync {
     fn provider_name(&self) -> &'static str {
         "unknown"
     }
+
+    /// Declares where extraction must execute.
+    fn scheduling(&self) -> NerScheduling;
 
     /// Returns the extractor's durable identity fingerprint.
     ///
@@ -122,6 +135,10 @@ impl EntityExtractor for LlmEntityExtractor {
         "llm"
     }
 
+    fn scheduling(&self) -> NerScheduling {
+        NerScheduling::Inline
+    }
+
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         (self.extract_fn)(content.to_string()).await
     }
@@ -190,6 +207,7 @@ pub(crate) type BackendBuildFn =
 struct BackendSpec {
     kind: crate::config::NerExtractorKind,
     name: &'static str,
+    scheduling: fn() -> NerScheduling,
     build: BackendBuildFn,
 }
 
@@ -205,26 +223,31 @@ fn backend_registry() -> &'static [BackendSpec] {
         BackendSpec {
             kind: Kind::Anno,
             name: "anno",
+            scheduling: anno::scheduling,
             build: anno::build,
         },
         BackendSpec {
             kind: Kind::Regex,
             name: "regex",
+            scheduling: regex::scheduling,
             build: regex::build,
         },
         BackendSpec {
             kind: Kind::AnnoOnnx,
             name: "anno-onnx",
+            scheduling: anno_onnx::scheduling,
             build: anno_onnx::build,
         },
         BackendSpec {
             kind: Kind::ClassicGliner,
             name: "gliner",
+            scheduling: gliner::scheduling,
             build: gliner::build,
         },
         BackendSpec {
             kind: Kind::SauerkrautLfm25,
             name: "sauerkraut-lfm2.5-gliner",
+            scheduling: lfm2_gliner::scheduling,
             build: lfm2_gliner::build,
         },
     ]
@@ -295,7 +318,17 @@ pub(crate) async fn create_entity_extractor_with_progress(
         logger: logger.clone(),
         progress,
     };
-    (spec.build)(config.extractor.clone(), context).await
+    let extractor = (spec.build)(config.extractor.clone(), context).await?;
+    let declared = (spec.scheduling)();
+    if extractor.scheduling() != declared {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "NER backend `{}` scheduling declaration disagrees with its registry entry: backend={:?}, registry={:?}",
+            spec.name,
+            extractor.scheduling(),
+            declared,
+        )));
+    }
+    Ok(extractor)
 }
 
 #[cfg(test)]
@@ -538,7 +571,25 @@ mod tests {
                 "regex",
                 "anno-onnx",
                 "gliner",
-                "sauerkraut-lfm2.5-gliner"
+                "sauerkraut-lfm2.5-gliner",
+            ]
+        );
+    }
+
+    #[test]
+    fn registry_declares_scheduling_for_every_backend() {
+        let scheduling: Vec<NerScheduling> = backend_registry()
+            .iter()
+            .map(|spec| (spec.scheduling)())
+            .collect();
+        assert_eq!(
+            scheduling,
+            vec![
+                NerScheduling::Inline,
+                NerScheduling::Inline,
+                NerScheduling::BlockingPool,
+                NerScheduling::BlockingPool,
+                NerScheduling::BlockingPool,
             ]
         );
     }

@@ -4,23 +4,18 @@ use std::collections::{BTreeSet, HashSet, VecDeque};
 
 use serde_json::{Value, json};
 
+use crate::service::community::{
+    CommunityMembership, CommunityRecord, is_entity_id, parse_community_record,
+};
 use crate::service::error::MemoryError;
-use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::now;
 use crate::service::parse_iso;
 use crate::service::service_context::ServiceContext;
-use crate::service::value_helpers::{string_from_value, unwrap_array_value};
+use crate::service::value_helpers::string_from_value;
 use crate::storage::GraphDirection;
 
 use super::edges::StoredEdgeVersion;
-
-/// Represents a persisted community with member entities.
-#[derive(Debug, Clone)]
-pub(crate) struct StoredCommunity {
-    pub(crate) community_id: String,
-    pub(crate) member_entities: Vec<String>,
-}
 
 fn unwrap_string(value: &Value) -> Option<String> {
     string_from_value(value)
@@ -71,48 +66,31 @@ pub(crate) async fn update_communities(
     }
 
     let member_entities = collect_connected_entity_component(service, entity_ids).await?;
-    if member_entities.len() < 2 {
+    let Some(membership) = CommunityMembership::from_entities(member_entities) else {
         return Ok(());
-    }
+    };
 
-    let summary = build_community_summary(service, &member_entities).await?;
-    let overlapping = find_overlapping_communities(service, &member_entities).await?;
-    let community_id = overlapping
-        .iter()
-        .map(|c| c.community_id.clone())
-        .min()
-        .unwrap_or_else(|| ids::deterministic_community_id(&member_entities));
-
+    let summary = build_community_summary(service, &membership.member_entities).await?;
+    let overlapping = find_overlapping_communities(service, &membership.member_entities).await?;
     let payload = json!({
-        "community_id": community_id,
-        "member_entities": member_entities,
+        "community_id": membership.community_id,
+        "member_entities": membership.member_entities,
         "summary": summary,
         "updated_at": normalize_dt(now()),
     });
 
-    let existing = service.episode_store().select_one(&community_id).await?;
-    if existing.is_some() {
-        service
-            .episode_store()
-            .update(&community_id, payload)
-            .await?;
-    } else {
-        service
-            .episode_store()
-            .create(&community_id, payload)
-            .await?;
-    }
+    service
+        .app_store()
+        .upsert_community(&membership.community_id, payload)
+        .await?;
 
     for stale in overlapping
         .into_iter()
-        .filter(|c| c.community_id != community_id)
+        .filter(|community| community.community_id != membership.community_id)
     {
         service
-            .episode_store()
-            .query(
-                "DELETE type::record($community_id);",
-                Some(json!({"community_id": stale.community_id})),
-            )
+            .app_store()
+            .delete_record(&stale.community_id)
             .await?;
     }
 
@@ -167,10 +145,6 @@ pub(crate) async fn collect_connected_entity_component(
     }
 
     Ok(visited.into_iter().collect())
-}
-
-fn is_entity_id(record_id: &str) -> bool {
-    record_id.starts_with("entity:")
 }
 
 fn is_traversable_context_node(record_id: &str) -> bool {
@@ -231,7 +205,7 @@ fn condense_community_labels(labels: &[String]) -> String {
 pub(crate) async fn find_overlapping_communities(
     service: &ServiceContext,
     member_entities: &[String],
-) -> Result<Vec<StoredCommunity>, MemoryError> {
+) -> Result<Vec<CommunityRecord>, MemoryError> {
     let member_set: HashSet<_> = member_entities.iter().cloned().collect();
 
     let communities = service
@@ -241,32 +215,14 @@ pub(crate) async fn find_overlapping_communities(
 
     Ok(communities
         .iter()
-        .filter_map(stored_community_from_record)
+        .filter_map(parse_community_record)
         .filter(|community| {
             community
                 .member_entities
                 .iter()
-                .any(|m| member_set.contains(m))
+                .any(|member| member_set.contains(member))
         })
         .collect())
-}
-
-fn stored_community_from_record(record: &Value) -> Option<StoredCommunity> {
-    let map = record.as_object()?;
-    let community_id = map
-        .get("community_id")
-        .and_then(unwrap_string)
-        .or_else(|| map.get("id").and_then(unwrap_string))?;
-    let member_entities = map
-        .get("member_entities")
-        .and_then(unwrap_array_value)
-        .map(|values| values.iter().filter_map(unwrap_string).collect::<Vec<_>>())
-        .unwrap_or_default();
-
-    Some(StoredCommunity {
-        community_id,
-        member_entities,
-    })
 }
 
 #[cfg(test)]

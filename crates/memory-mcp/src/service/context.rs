@@ -12,6 +12,7 @@ use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 
 use super::error::MemoryError;
+use super::service_context::{RetrievalContext, ServiceContext};
 use super::{log_event, normalize_dt};
 
 mod alias_expansion;
@@ -42,7 +43,7 @@ use views::{build_facets_view, build_map_view, build_wake_up_view};
 
 /// Records fact access for each item, logging errors without failing the operation.
 async fn track_fact_accesses(
-    ctx: &crate::service::service_context::ServiceContext,
+    ctx: &RetrievalContext,
     items: &[AssembledContextItem],
     access: &AccessPayload,
 ) {
@@ -63,21 +64,31 @@ async fn track_fact_accesses(
     }
 }
 
-/// Assembles context for a query.
+/// Enters the narrow retrieval seam for one context assembly.
+pub async fn assemble_context(
+    ctx: &ServiceContext,
+    request: AssembleContextRequest,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let access = AccessPayload::from_payload(request.access.clone());
+    ctx.enforce_rate_limit(access.as_ref())?;
+    let retrieval = ctx.retrieval_context();
+    assemble_context_inner(&retrieval, request).await
+}
+
+/// Assembles context after the outer service adapter has entered the narrow
+/// retrieval seam.
 ///
 /// Orchestrates: parameter preparation → cache check → view-mode dispatch
 /// (facets / wake_up / map / default multi-tier) → experience append →
 /// cache store → query log. All logic is delegated to `pipeline` and `views`.
-pub async fn assemble_context(
-    ctx: &crate::service::service_context::ServiceContext,
+async fn assemble_context_inner(
+    ctx: &RetrievalContext,
     request: AssembleContextRequest,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let started_at = Instant::now();
     let access = AccessPayload::from_payload(request.access.clone());
 
     pipeline::log_context_start(ctx, &request, access.as_ref());
-    ctx.enforce_rate_limit(access.as_ref())?;
-
     let params = pipeline::prepare_context_params(ctx, &request, access).await?;
 
     let query_log_diagnostics = logging::QueryLogDiagnostics {

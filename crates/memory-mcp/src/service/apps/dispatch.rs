@@ -14,6 +14,7 @@ use serde_json::json;
 
 use super::workflow::AppCommand;
 use super::{LifecycleCommand, LifecycleCommandOutcome};
+use crate::service::apps::graph::GraphSessionState;
 use crate::service::apps::ingestion_review::{
     apply_ingestion_review_edit, apply_ingestion_review_status,
 };
@@ -198,6 +199,17 @@ fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
         object.insert(key.to_string(), value);
     }
+}
+
+fn decode_graph_session(ctx: &AppContext<'_>) -> Result<GraphSessionState, ErrorData> {
+    GraphSessionState::from_payload(&ctx.payload)
+        .map_err(|error| internal(format!("invalid graph session state: {error}")))
+}
+
+fn encode_graph_session(state: &GraphSessionState) -> Result<Value, ErrorData> {
+    state
+        .to_payload()
+        .map_err(|error| internal(format!("failed to encode graph session state: {error}")))
 }
 
 /// Shared tail for ingestion-review payload edits: decode items, run the
@@ -627,11 +639,11 @@ fn execute_expand_neighbors<'a>(
         else {
             return Err(internal("validated app command did not match action"));
         };
-        let cutoff = ctx
-            .payload
-            .get("target")
-            .and_then(|target| target.get("as_of"))
-            .and_then(Value::as_str)
+        let mut state = decode_graph_session(ctx)?;
+        let cutoff = state
+            .target
+            .as_of
+            .as_deref()
             .and_then(parse_datetime)
             .unwrap_or_else(chrono::Utc::now);
         let expansion = crate::service::graph_neighbor_expansion(
@@ -643,12 +655,8 @@ fn execute_expand_neighbors<'a>(
         )
         .await
         .map_err(mcp_error)?;
-        let mut payload = ctx.payload.clone();
-        if let Some(expansions) = payload.get_mut("expansions").and_then(Value::as_array_mut) {
-            expansions.push(expansion.clone());
-        } else {
-            upsert_json_field(&mut payload, "expansions", json!([expansion.clone()]));
-        }
+        state.expansions.push(expansion.clone());
+        let payload = encode_graph_session(&state)?;
         Ok(AppCommandOutcome::persist(
             "expand_neighbors",
             payload,
@@ -678,8 +686,9 @@ fn execute_open_edge_details<'a>(
             .await
             .map_err(mcp_error)?
             .ok_or_else(|| invalid_params(format!("Unknown graph edge: {edge_id}")))?;
-        let mut payload = ctx.payload.clone();
-        upsert_json_field(&mut payload, "selected_edge", edge.clone());
+        let mut state = decode_graph_session(ctx)?;
+        state.selected_edge = edge.clone();
+        let payload = encode_graph_session(&state)?;
         Ok(AppCommandOutcome::persist(
             "open_edge_details",
             payload,
@@ -702,23 +711,18 @@ fn execute_use_path_as_context<'a>(
         let AppCommand::UsePathAsContext { path_id } = cmd else {
             return Err(internal("validated app command did not match action"));
         };
-        let node_names = ctx
-            .payload
-            .get("graph")
-            .and_then(|graph| graph.get("nodes"))
-            .and_then(Value::as_array)
-            .map(|nodes| {
-                nodes
-                    .iter()
-                    .filter_map(|node| {
-                        node.get("canonical_name")
-                            .or_else(|| node.get("entity_id"))
-                            .and_then(Value::as_str)
-                            .map(ToString::to_string)
-                    })
-                    .collect::<Vec<_>>()
+        let mut state = decode_graph_session(ctx)?;
+        let node_names = state
+            .graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                node.get("canonical_name")
+                    .or_else(|| node.get("entity_id"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
             })
-            .unwrap_or_default();
+            .collect::<Vec<_>>();
         let preview = json!({
             "path_id": path_id,
             "summary": if node_names.is_empty() {
@@ -728,8 +732,8 @@ fn execute_use_path_as_context<'a>(
             },
             "node_names": node_names,
         });
-        let mut payload = ctx.payload.clone();
-        upsert_json_field(&mut payload, "context_preview", preview.clone());
+        state.context_preview = preview.clone();
+        let payload = encode_graph_session(&state)?;
         Ok(AppCommandOutcome::persist(
             "use_path_as_context",
             payload,

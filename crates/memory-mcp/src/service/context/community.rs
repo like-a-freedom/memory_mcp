@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use serde_json::Value;
 
 use crate::models::Fact;
+use crate::service::community::parse_community_record;
 use crate::service::error::MemoryError;
 use crate::service::value_helpers::{json_f64, json_string};
 use crate::storage::GraphDirection;
@@ -35,18 +36,8 @@ pub(crate) struct StoredCommunitySummary {
     pub(crate) ft_score: f64,
 }
 
-fn unwrap_context_array(value: &Value) -> Option<&Vec<Value>> {
-    if let Some(array) = value.as_array() {
-        Some(array)
-    } else if let Some(object) = value.as_object() {
-        object.get("Array").and_then(Value::as_array)
-    } else {
-        None
-    }
-}
-
 pub(crate) async fn collect_community_facts(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: CollectCommunityFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String, f64)>, MemoryError> {
     let matched_communities = find_matching_communities(service, request.query).await?;
@@ -148,7 +139,7 @@ fn best_community_match<'a>(
 }
 
 async fn community_origin_factor_for_fact(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     fact: &Fact,
     matches_by_entity: &HashMap<String, CommunityMatch>,
@@ -171,7 +162,7 @@ async fn community_origin_factor_for_fact(
 }
 
 async fn entity_origin_factor(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     entity_id: &str,
     cache: &mut HashMap<String, f64>,
@@ -217,7 +208,7 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 }
 
 pub(crate) async fn find_matching_communities(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
     let communities = service
@@ -241,37 +232,17 @@ pub(crate) async fn find_matching_communities(
 
 pub(crate) fn stored_community_summary_from_value(value: &Value) -> Option<StoredCommunitySummary> {
     let map = value.as_object()?;
-    let community_id = map
-        .get("community_id")
-        .and_then(json_string)
-        .or_else(|| map.get("id").and_then(json_string))?
-        .to_string();
-    let summary = map
-        .get("summary")
-        .and_then(json_string)
-        .unwrap_or_default()
-        .to_string();
-    let member_entities = map
-        .get("member_entities")
-        .and_then(unwrap_context_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(json_string)
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let community = parse_community_record(value)?;
     let ft_score = map.get("ft_score").and_then(json_f64).unwrap_or(0.0);
 
-    if summary.is_empty() || member_entities.is_empty() {
+    if community.summary.is_empty() || community.member_entities.is_empty() {
         return None;
     }
 
     Some(StoredCommunitySummary {
-        community_id,
-        summary,
-        member_entities,
+        community_id: community.community_id,
+        summary: community.summary,
+        member_entities: community.member_entities,
         ft_score,
     })
 }
@@ -374,26 +345,6 @@ mod tests {
             "summary": "test",
         });
         assert!(stored_community_summary_from_value(&value).is_none());
-    }
-
-    // -- unwrap_context_array ----------------------------------------------
-
-    #[test]
-    fn unwrap_passes_through_plain_array() {
-        let value = serde_json::json!(["a", "b"]);
-        assert_eq!(unwrap_context_array(&value).map(|v| v.len()), Some(2));
-    }
-
-    #[test]
-    fn unwrap_extracts_surrealdb_wrapped_array() {
-        let value = serde_json::json!({"Array": ["x", "y"]});
-        assert_eq!(unwrap_context_array(&value).map(|v| v.len()), Some(2));
-    }
-
-    #[test]
-    fn unwrap_returns_none_for_other() {
-        assert!(unwrap_context_array(&serde_json::json!("string")).is_none());
-        assert!(unwrap_context_array(&serde_json::json!(42)).is_none());
     }
 
     // -- edge_origin_factor ------------------------------------------------

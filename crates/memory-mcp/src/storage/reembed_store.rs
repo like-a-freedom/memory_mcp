@@ -11,7 +11,6 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::helpers::is_missing_table_error;
 use crate::storage::{BoundDbClient, DbClient};
 
 /// Read-side store for the batch reembed worker.
@@ -56,17 +55,10 @@ impl ReembedStoreClient {
                    OR embedding_signature IS NULL OR embedding_signature != $target_signature \
                    GROUP ALL";
         let vars = json!({"target_signature": target_signature});
-        let result = match self.db.query(sql, Some(vars)).await {
-            Ok(value) => value,
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => {
-                return Ok(0);
-            }
-            Err(err) => return Err(err),
-        };
+        let rows = self.db.query_rows(sql, Some(vars)).await?;
 
-        let count = result
-            .as_array()
-            .and_then(|records| records.first())
+        let count = rows
+            .first()
             .and_then(|record| record.get("count").cloned())
             .and_then(|value| value.as_u64())
             .and_then(|value| usize::try_from(value).ok())
@@ -102,11 +94,7 @@ impl ReembedStoreClient {
             "limit": limit,
         });
 
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 }
 

@@ -7,13 +7,6 @@ use super::query::normalize_text;
 use super::util::{deterministic_entity_id, validate_entity_candidate};
 use super::value_helpers::string_from_value;
 
-/// Mirrors the storage-layer check for a missing table so service code can
-/// degrade gracefully without reaching into the private `storage::helpers`.
-fn is_missing_table_error(message: &str) -> bool {
-    let lowered = message.to_lowercase();
-    lowered.contains("does not exist") && lowered.contains("table")
-}
-
 /// Resolves and persists entities.
 #[derive(Clone)]
 pub struct EntityService {
@@ -40,15 +33,10 @@ impl EntityService {
     ) -> Result<Option<String>, MemoryError> {
         // Canonical-name index lookup first (fast path), then alias lookup.
         let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
-        let canonical_result = match self
+        let canonical_result = self
             .db
-            .query(canonical_sql, Some(json!({ "name": normalized_name })))
-            .await
-        {
-            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
-            Err(MemoryError::Storage(msg)) if is_missing_table_error(&msg) => None,
-            Err(err) => return Err(err),
-        };
+            .query_first(canonical_sql, Some(json!({ "name": normalized_name })))
+            .await?;
 
         if let Some(record) = canonical_result {
             return Ok(record
@@ -57,15 +45,10 @@ impl EntityService {
         }
 
         let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
-        let result = match self
+        let result = self
             .db
-            .query(alias_sql, Some(json!({ "name": normalized_name })))
-            .await
-        {
-            Ok(value) => value.as_array().and_then(|arr| arr.first()).cloned(),
-            Err(MemoryError::Storage(msg)) if is_missing_table_error(&msg) => None,
-            Err(err) => return Err(err),
-        };
+            .query_first(alias_sql, Some(json!({ "name": normalized_name })))
+            .await?;
         Ok(result
             .and_then(|record| record.as_object().cloned())
             .and_then(|map| map.get("entity_id").and_then(string_from_value)))
@@ -161,47 +144,5 @@ impl EntityService {
             }
             Err(err) => Err(err),
         }
-    }
-
-    /// Execute a query against the triple table.
-    /// Helper for conflict resolution.
-    pub async fn query_triples(
-        &self,
-        sql: &str,
-        subject: &str,
-        predicate: &str,
-        object: &str,
-    ) -> Result<serde_json::Value, MemoryError> {
-        self.db
-            .query(
-                sql,
-                Some(json!({
-                    "subject": subject,
-                    "predicate": predicate,
-                    "object": object,
-                })),
-            )
-            .await
-    }
-
-    /// Invalidate a triple by ID.
-    /// Helper for conflict resolution.
-    pub async fn invalidate_triple_by_id(
-        &self,
-        sql: &str,
-        triple_id: &str,
-    ) -> Result<(), MemoryError> {
-        self.db.query(sql, Some(json!({"id": triple_id}))).await?;
-        Ok(())
-    }
-
-    /// Execute a raw SQL query with bind variables.
-    /// Helper for triple persistence and other operations.
-    pub async fn execute_query(
-        &self,
-        sql: &str,
-        vars: serde_json::Value,
-    ) -> Result<serde_json::Value, MemoryError> {
-        self.db.query(sql, Some(vars)).await
     }
 }

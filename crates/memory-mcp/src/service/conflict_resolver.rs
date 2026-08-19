@@ -3,92 +3,147 @@
 //! When a new triple is created with a singleton predicate (e.g., "works_at"),
 //! any existing active triple with the same (subject, predicate) but a different
 //! object is automatically invalidated via bi-temporal close.
+//!
+//! This module owns the *policy* (which predicates are singletons, what
+//! supersession means); all reads and writes on the `triple` table go through
+//! [`TripleStoreClient`], the single owner of that table.
 
-use crate::service::entity::EntityService;
 use crate::service::error::MemoryError;
 use crate::service::triple_extractor::SemanticTriple;
+use crate::storage::TripleStoreClient;
 
 /// Resolve conflicts for a newly created triple.
 ///
 /// If the triple's predicate is a singleton, find any existing active triples
-/// with the same (subject, predicate) but a different object and invalidate them.
-pub async fn resolve_conflicts_for_triple(
-    entity_service: &EntityService,
+/// with the same (subject, predicate) but a different object and invalidate
+/// them. Returns the ids of the invalidated triples.
+pub(crate) async fn resolve_conflicts_for_triple(
+    triple_store: &TripleStoreClient,
     new_triple: &SemanticTriple,
 ) -> Result<Vec<String>, MemoryError> {
     if !crate::service::triple_extractor::is_singleton_predicate(&new_triple.predicate) {
         return Ok(vec![]);
     }
 
-    // Find conflicting triples: same (subject, predicate), different object.
-    let conflicting = find_conflicting_triples(
-        entity_service,
-        &new_triple.subject,
-        &new_triple.predicate,
-        &new_triple.object,
-    )
-    .await?;
+    let conflicting = triple_store
+        .find_conflicting_triple_ids(
+            &new_triple.subject,
+            &new_triple.predicate,
+            &new_triple.object,
+        )
+        .await?;
 
-    if conflicting.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // Invalidate conflicting triples via bi-temporal close.
     let mut invalidated = Vec::with_capacity(conflicting.len());
     for triple_id in &conflicting {
-        invalidate_triple(entity_service, triple_id).await?;
+        triple_store.close_triple(triple_id).await?;
         invalidated.push(triple_id.clone());
     }
 
     Ok(invalidated)
 }
 
-/// Find active triples with the same (subject, predicate) but a different object.
-async fn find_conflicting_triples(
-    entity_service: &EntityService,
-    subject: &str,
-    predicate: &str,
-    exclude_object: &str,
-) -> Result<Vec<String>, MemoryError> {
-    let sql = r#"
-        SELECT id FROM triple
-        WHERE subject = $subject
-          AND predicate = $predicate
-          AND object != $object
-          AND t_invalid IS NONE
-        LIMIT 10
-    "#;
-    let result = entity_service
-        .query_triples(sql, subject, predicate, exclude_object)
-        .await?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::DbClient;
+    use std::sync::Arc;
 
-    Ok(result
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| {
-                    v.as_object()?
-                        .get("id")
-                        .and_then(|id| id.as_str())
-                        .map(String::from)
-                })
-                .collect()
-        })
-        .unwrap_or_default())
-}
+    fn triple(subject: &str, predicate: &str, object: &str) -> SemanticTriple {
+        SemanticTriple {
+            subject: subject.to_string(),
+            predicate: predicate.to_string(),
+            object: object.to_string(),
+            confidence: 0.9,
+            source_fact_id: "fact:new".to_string(),
+        }
+    }
 
-/// Invalidate a triple via bi-temporal close: set both the valid-time end
-/// (`t_invalid`) and the transaction-time end (`t_invalid_ingested`).
-///
-/// `t_invalid_ingested` MUST be set whenever `t_invalid` is closed, so the
-/// audit trail records *when the system learned* the triple was superseded —
-/// not just when it logically stopped being true. This mirrors the existing
-/// fact/edge invalidation path in `lifecycle/decay.rs`.
-async fn invalidate_triple(
-    entity_service: &EntityService,
-    triple_id: &str,
-) -> Result<(), MemoryError> {
-    let sql =
-        "UPDATE type::record($id) SET t_invalid = time::now(), t_invalid_ingested = time::now()";
-    entity_service.invalidate_triple_by_id(sql, triple_id).await
+    async fn embedded_triple_store() -> TripleStoreClient {
+        let db_name = format!(
+            "conflict_resolver_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time")
+                .as_nanos()
+        );
+        let db_client = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory_with_namespaces(
+                &db_name,
+                &["org".to_string()],
+                "error",
+            )
+            .await
+            .expect("connect in memory db"),
+        );
+        db_client
+            .apply_migrations("org")
+            .await
+            .expect("apply migrations");
+        TripleStoreClient::new(db_client, "org")
+    }
+
+    #[tokio::test]
+    async fn resolve_conflicts_closes_superseded_triples() {
+        let store = embedded_triple_store().await;
+        let superseded = store
+            .create_triple("alice", "works_at", "acme", 0.9, "fact:old")
+            .await
+            .expect("seed triple");
+
+        let invalidated =
+            resolve_conflicts_for_triple(&store, &triple("alice", "works_at", "globex"))
+                .await
+                .expect("resolve conflicts");
+
+        assert_eq!(invalidated, vec![superseded]);
+
+        let still_conflicting = store
+            .find_conflicting_triple_ids("alice", "works_at", "globex")
+            .await
+            .expect("find conflicting");
+        assert!(
+            still_conflicting.is_empty(),
+            "superseded triples must no longer appear as conflicts: {still_conflicting:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_conflicts_skips_non_singleton_predicates() {
+        let store = embedded_triple_store().await;
+        store
+            .create_triple("alice", "knows", "bob", 0.9, "fact:old")
+            .await
+            .expect("seed triple");
+
+        let invalidated = resolve_conflicts_for_triple(&store, &triple("alice", "knows", "carol"))
+            .await
+            .expect("resolve conflicts");
+
+        assert!(
+            invalidated.is_empty(),
+            "non-singleton predicates must never supersede"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_conflicts_keeps_triples_with_same_object() {
+        let store = embedded_triple_store().await;
+        let same_object = store
+            .create_triple("alice", "works_at", "acme", 0.9, "fact:old")
+            .await
+            .expect("seed triple");
+
+        let invalidated =
+            resolve_conflicts_for_triple(&store, &triple("alice", "works_at", "acme"))
+                .await
+                .expect("resolve conflicts");
+
+        assert!(invalidated.is_empty(), "same object is not a conflict");
+
+        let active = store
+            .find_conflicting_triple_ids("alice", "works_at", "globex")
+            .await
+            .expect("find conflicting");
+        assert_eq!(active, vec![same_object]);
+    }
 }

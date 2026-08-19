@@ -13,7 +13,7 @@
 use crate::models::Fact;
 use crate::service::episode::fact_from_value_or_wrapper;
 use crate::service::error::MemoryError;
-use crate::service::service_context::ServiceContext;
+use crate::service::service_context::RetrievalContext;
 
 /// Collect facts linked via triples matching the given query text.
 ///
@@ -25,7 +25,7 @@ use crate::service::service_context::ServiceContext;
 /// This is a best-effort retrieval step called after lexical, temporal,
 /// alias-expansion, and experience tiers.
 pub(super) async fn collect_triple_facts(
-    service: &ServiceContext,
+    service: &RetrievalContext,
     cutoff_iso: &str,
     query: &str,
     limit: i32,

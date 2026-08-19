@@ -1962,9 +1962,11 @@ async fn test_service_assemble_context_map_view_includes_communities() {
     assert_eq!(community.quote, "3 members");
     assert_eq!(community.source_episode, "community:atlas-team");
     assert_eq!(community.provenance.get("member_count"), Some(&json!(3)));
+    let mut expected_member_entities = vec![alice_id, bob_id, carol_id];
+    expected_member_entities.sort();
     assert_eq!(
         community.provenance.get("member_entities"),
-        Some(&json!([alice_id, bob_id, carol_id]))
+        Some(&json!(expected_member_entities))
     );
     assert!(community.rationale.contains("view_mode=map"));
 }

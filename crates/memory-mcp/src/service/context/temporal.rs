@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Datelike, NaiveDate, Utc, Weekday};
 
+use crate::service::query::is_four_digit_year;
 use crate::storage::ContextFactQuery;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,10 +157,6 @@ fn month_number(token: &str) -> Option<u32> {
         "december" => Some(12),
         _ => None,
     }
-}
-
-fn is_four_digit_year(token: &str) -> bool {
-    token.len() == 4 && token.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn is_weekday_name(token: &str) -> bool {
@@ -478,7 +475,7 @@ pub(crate) struct CollectTemporalFactsRequest<'a> {
 }
 
 pub(crate) async fn collect_temporal_facts(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: CollectTemporalFactsRequest<'_>,
 ) -> Result<Vec<crate::models::Fact>, crate::service::error::MemoryError> {
     use crate::service::query::search_query_terms;

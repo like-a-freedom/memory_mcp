@@ -94,14 +94,15 @@ async fn invalidate_conflicting_edges(
         .filter_map(stored_edge_version_from_record)
         .filter(|existing| edge_versions_conflict(existing, new_edge))
     {
+        // ADR-0039: supersession closes the old edge with the new edge's
+        // t_valid/t_ingested so the audit trail records the superseding
+        // version's times — caller-supplied timestamps through the close owner.
         service
-            .episode_store()
-            .update(
+            .close_store()
+            .close_record(
                 &existing.edge_id,
-                json!({
-                    "t_invalid": normalize_dt(new_edge.t_valid),
-                    "t_invalid_ingested": normalize_dt(new_edge.t_ingested),
-                }),
+                &crate::storage::CloseTimestamps::at_pair(new_edge.t_valid, new_edge.t_ingested),
+                None,
             )
             .await?;
     }

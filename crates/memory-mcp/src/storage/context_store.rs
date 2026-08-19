@@ -11,7 +11,6 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::helpers::is_missing_table_error;
 use crate::storage::queries::BI_TEMPORAL_WHERE;
 use crate::storage::{BoundDbClient, ContextFactQuery, DbClient, GraphDirection};
 
@@ -46,11 +45,7 @@ impl ContextStoreClient {
             limit,
             fact_types,
         );
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Facts linked to a set of normalized entity ids.
@@ -65,11 +60,7 @@ impl ContextStoreClient {
             entity_links,
             limit,
         );
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Facts matching a subject-predicate-object triple pattern.
@@ -96,11 +87,7 @@ impl ContextStoreClient {
             "cutoff": cutoff,
             "limit": limit,
         });
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Approximate nearest-neighbour facts for an embedding query.
@@ -112,11 +99,7 @@ impl ContextStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_facts_ann_query(cutoff, query_vec, limit);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Neighboring edge records around a node, direction-bounded and
@@ -129,11 +112,7 @@ impl ContextStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Entities matching a batch of normalized names (alias-resolution hot path).
@@ -147,11 +126,7 @@ impl ContextStoreClient {
         let sql = "SELECT * FROM entity WHERE canonical_name_normalized IN $names \
                    OR aliases CONTAINSANY $names";
         let vars = json!({ "names": normalized_names });
-        match self.db.query(sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(sql, Some(vars)).await
     }
 
     /// Communities whose summary matches a free-text hint.
@@ -165,11 +140,7 @@ impl ContextStoreClient {
              ORDER BY ft_score DESC, summary ASC LIMIT 25"
         );
         let vars = json!({ "query": query });
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Full table scan (used by graph views and the occasional admin operation).
@@ -186,11 +157,7 @@ impl ContextStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_episodes_by_content_query(cutoff, query, limit);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.
@@ -199,11 +166,7 @@ impl ContextStoreClient {
             &crate::service::normalize_dt(crate::service::now()),
             limit,
         );
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 }
 

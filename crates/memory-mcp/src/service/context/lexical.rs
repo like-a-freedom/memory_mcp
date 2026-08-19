@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use crate::models::Fact;
 use crate::service::error::MemoryError;
 use crate::service::query::{
-    query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
-    search_query_terms, unique_query_terms,
+    is_four_digit_year, query_hard_anchor_terms, query_term_rarity_weight,
+    query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
 use crate::service::value_helpers::{json_f64, json_string};
 use crate::storage::ContextFactQuery;
@@ -30,7 +30,7 @@ pub(crate) struct FactQueryParams<'a> {
 }
 
 pub(crate) async fn select_fact_records_for_query(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     params: FactQueryParams<'_>,
 ) -> Result<LexicalQueryResult, MemoryError> {
     let query_terms = params.query_opt.map(search_query_terms).unwrap_or_default();
@@ -248,12 +248,8 @@ fn is_calendar_month(term: &str) -> bool {
     )
 }
 
-fn is_four_digit_year(term: &str) -> bool {
-    term.len() == 4 && term.chars().all(|character| character.is_ascii_digit())
-}
-
 async fn scan_fact_records_by_query_terms(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     params: &FactQueryParams<'_>,
     query_terms: &[String],
 ) -> Result<Vec<Value>, MemoryError> {
@@ -781,7 +777,7 @@ fn lexical_fact_id(record: &Value) -> String {
 }
 
 pub(crate) async fn select_episode_records_for_query(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     query_opt: Option<&str>,
     limit: i32,
@@ -1238,8 +1234,9 @@ mod tests {
         )
         .expect("service");
 
+        let retrieval = service.build_context().retrieval_context();
         let lexical_result = select_fact_records_for_query(
-            &service.build_context(),
+            &retrieval,
             FactQueryParams {
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("atlas launch checklist"),
@@ -1382,8 +1379,9 @@ mod tests {
         )
         .expect("service");
 
+        let retrieval = service.build_context().retrieval_context();
         let lexical_result = select_fact_records_for_query(
-            &service.build_context(),
+            &retrieval,
             FactQueryParams {
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("lgbtq support group"),
@@ -1522,8 +1520,9 @@ mod tests {
         )
         .expect("service");
 
+        let retrieval = service.build_context().retrieval_context();
         let lexical_result = select_fact_records_for_query(
-            &service.build_context(),
+            &retrieval,
             FactQueryParams {
                 cutoff_iso: "2026-01-15T10:30:00Z",
                 query_opt: Some("What degree did I graduate with?"),

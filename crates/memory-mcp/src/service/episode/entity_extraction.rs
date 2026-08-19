@@ -5,20 +5,11 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 use crate::models::{EntityCandidate, ExtractedEntity};
+use crate::service::entity_extraction::NerScheduling;
 use crate::service::error::MemoryError;
 use crate::service::normalize_text;
 use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
-
-fn ner_provider_uses_blocking_pool(provider: &str) -> bool {
-    // CPU/Metal-heavy local inference backends must not block the async
-    // runtime, so their extraction runs on the blocking pool. `anno` is
-    // retained for legacy rule-based extraction symmetry.
-    matches!(
-        provider,
-        "anno" | "gliner" | "anno-onnx" | "sauerkraut-lfm2.5-gliner"
-    )
-}
 
 /// Extract entities from content.
 ///
@@ -40,28 +31,31 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let extraction_result = if ner_provider_uses_blocking_pool(provider) {
-        let extractor = service.entity_extractor.clone();
-        let content_owned = content.to_string();
-        let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
-        let handle = tokio::runtime::Handle::current();
+    let extraction_result = match service.entity_extractor.scheduling() {
+        NerScheduling::BlockingPool => {
+            let extractor = service.entity_extractor.clone();
+            let content_owned = content.to_string();
+            let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
+            let handle = tokio::runtime::Handle::current();
 
-        tokio::task::spawn_blocking(move || {
-            handle.block_on(async move {
-                match zero_shot_labels {
-                    Some(labels) => {
-                        extractor
-                            .extract_candidates_with_labels(&content_owned, &labels)
-                            .await
+            tokio::task::spawn_blocking(move || {
+                handle.block_on(async move {
+                    match zero_shot_labels {
+                        Some(labels) => {
+                            extractor
+                                .extract_candidates_with_labels(&content_owned, &labels)
+                                .await
+                        }
+                        None => extractor.extract_candidates(&content_owned).await,
                     }
-                    None => extractor.extract_candidates(&content_owned).await,
-                }
+                })
             })
-        })
-        .await
-        .map_err(|err| MemoryError::Storage(format!("entity extraction task panicked: {err}")))?
-    } else {
-        match zero_shot_labels {
+            .await
+            .map_err(|err| {
+                MemoryError::Storage(format!("entity extraction task panicked: {err}"))
+            })?
+        }
+        NerScheduling::Inline => match zero_shot_labels {
             Some(labels) => {
                 service
                     .entity_extractor
@@ -69,7 +63,7 @@ pub async fn extract_entities(
                     .await
             }
             None => service.entity_extractor.extract_candidates(content).await,
-        }
+        },
     };
 
     let candidates = match extraction_result {

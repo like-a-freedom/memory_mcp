@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use serde_json::json;
 
 use crate::models::{AssembledContextItem, Fact};
+use crate::service::query::matched_query_terms_for_fact;
 
 use super::ranking;
 
@@ -65,25 +66,6 @@ pub(super) fn ranked_fact_to_item(
         retrieval_tier: Some(retrieval_tier.as_str().to_string()),
         reconciliation: None,
     }
-}
-
-fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let mut fact_terms = crate::service::query::search_query_terms(&fact.content)
-        .into_iter()
-        .collect::<HashSet<_>>();
-    for index_key in &fact.index_keys {
-        fact_terms.extend(crate::service::query::search_query_terms(index_key));
-    }
-
-    query_terms
-        .iter()
-        .filter(|term| fact_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
 }
 
 pub(super) fn selected_fact_matched_terms(

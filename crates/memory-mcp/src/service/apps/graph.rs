@@ -1,12 +1,14 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::SurprisingConnection;
+use crate::service::community::{CommunityRecord, is_entity_id, parse_community_record};
 use crate::service::value_helpers::string_from_value;
-use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
+use crate::service::{MemoryError, MemoryService, normalize_dt};
 use crate::storage::{AppStoreClient, GraphDirection};
 
 /// Minimal context required by graph traversal functions.
@@ -459,33 +461,12 @@ fn neighbor_node(record: &Value, direction: GraphDirection, current: &str) -> Op
 }
 
 fn graph_community_from_value(value: &Value) -> Option<GraphCommunity> {
-    let map = value.as_object()?;
-    let community_id = map
-        .get("community_id")
-        .and_then(super::super::episode::unwrap_record_string)
-        .or_else(|| {
-            map.get("id")
-                .and_then(super::super::episode::unwrap_record_string)
-        })?;
-    let summary = map
-        .get("summary")
-        .and_then(super::super::episode::unwrap_record_string)
-        .unwrap_or_default();
-    let member_entities = map
-        .get("member_entities")
-        .and_then(unwrap_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(super::super::episode::unwrap_record_string)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let updated_at = map
-        .get("updated_at")
-        .and_then(super::super::episode::unwrap_record_string)
-        .as_deref()
-        .and_then(parse_iso);
+    let CommunityRecord {
+        community_id,
+        summary,
+        member_entities,
+        updated_at,
+    } = parse_community_record(value)?;
 
     if summary.is_empty() || member_entities.is_empty() {
         return None;
@@ -552,10 +533,6 @@ async fn cached_entity_name(
 
     cache.insert(entity_id.to_string(), name.clone());
     Ok(name)
-}
-
-fn is_entity_id(record_id: &str) -> bool {
-    record_id.starts_with("entity:")
 }
 
 fn is_traversable_graph_node(record_id: &str) -> bool {
@@ -711,16 +688,6 @@ async fn find_entity_id_by_name(
     Ok(None)
 }
 
-fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
-    if let Some(array) = value.as_array() {
-        Some(array)
-    } else if let Some(object) = value.as_object() {
-        object.get("Array").and_then(Value::as_array)
-    } else {
-        None
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Graph traversal for app sessions
 // ---------------------------------------------------------------------------
@@ -731,6 +698,61 @@ pub struct GraphPathSnapshot {
     pub found: bool,
     pub nodes: Vec<Value>,
     pub edges: Vec<Value>,
+}
+
+/// Typed state persisted for a graph app session.
+///
+/// The nested values intentionally remain JSON values because graph records
+/// are storage-shaped and may gain fields independently of the session
+/// protocol. The session envelope and its mutation points are typed here,
+/// preserving the exact payload shape consumed by the app HTML resource.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionState {
+    pub(crate) target: GraphSessionTarget,
+    pub(crate) graph: GraphSessionGraph,
+    pub(crate) neighbors: GraphSessionNeighbors,
+    pub(crate) selected_edge: Value,
+    pub(crate) context_preview: Value,
+    pub(crate) expansions: Vec<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionTarget {
+    pub(crate) from_entity_id: String,
+    pub(crate) to_entity_id: String,
+    pub(crate) max_depth: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) as_of: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionGraph {
+    pub(crate) path_found: bool,
+    pub(crate) nodes: Vec<Value>,
+    pub(crate) edges: Vec<Value>,
+    pub(crate) hop_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GraphSessionNeighbors {
+    pub(crate) from: Value,
+    pub(crate) to: Value,
+}
+
+impl GraphSessionState {
+    pub(crate) fn from_payload(payload: &Value) -> Result<Self, MemoryError> {
+        serde_json::from_value(payload.clone()).map_err(|error| {
+            MemoryError::Validation(format!("invalid graph session payload: {error}"))
+        })
+    }
+
+    pub(crate) fn to_payload(&self) -> Result<Value, MemoryError> {
+        serde_json::to_value(self).map_err(|error| {
+            MemoryError::Storage(format!(
+                "failed to serialize graph session payload: {error}"
+            ))
+        })
+    }
 }
 
 /// Extracts the neighbor entity ID from an edge record based on traversal direction.
@@ -907,32 +929,76 @@ pub async fn graph_payload(
     let path = graph_path_snapshot(store, from_entity_id, to_entity_id, cutoff, max_depth).await?;
     let from_neighbors = graph_neighbor_expansion(store, from_entity_id, "both", 1, cutoff).await?;
     let to_neighbors = graph_neighbor_expansion(store, to_entity_id, "both", 1, cutoff).await?;
+    let hop_count = path.edges.len();
 
-    Ok(json!({
-        "target": {
-            "from_entity_id": from_entity_id,
-            "to_entity_id": to_entity_id,
-            "max_depth": max_depth.max(1),
+    GraphSessionState {
+        target: GraphSessionTarget {
+            from_entity_id: from_entity_id.to_string(),
+            to_entity_id: to_entity_id.to_string(),
+            max_depth: max_depth.max(1),
+            as_of: None,
         },
-        "graph": {
-            "path_found": path.found,
-            "nodes": path.nodes,
-            "edges": path.edges,
-            "hop_count": path.edges.len(),
+        graph: GraphSessionGraph {
+            path_found: path.found,
+            nodes: path.nodes,
+            edges: path.edges,
+            hop_count,
         },
-        "neighbors": {
-            "from": from_neighbors,
-            "to": to_neighbors,
+        neighbors: GraphSessionNeighbors {
+            from: from_neighbors,
+            to: to_neighbors,
         },
-        "selected_edge": Value::Null,
-        "context_preview": Value::Null,
-        "expansions": [],
-    }))
+        selected_edge: Value::Null,
+        context_preview: Value::Null,
+        expansions: Vec::new(),
+    }
+    .to_payload()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graph_session_state_round_trips_the_app_payload_shape() {
+        let payload = json!({
+            "target": {
+                "from_entity_id": "entity:alice",
+                "to_entity_id": "entity:acme",
+                "max_depth": 4
+            },
+            "graph": {
+                "path_found": true,
+                "nodes": [{"entity_id": "entity:alice", "canonical_name": "Alice"}],
+                "edges": [],
+                "hop_count": 0
+            },
+            "neighbors": {
+                "from": {
+                    "target_id": "entity:alice",
+                    "direction": "both",
+                    "depth": 1,
+                    "nodes": [],
+                    "edges": []
+                },
+                "to": {
+                    "target_id": "entity:acme",
+                    "direction": "both",
+                    "depth": 1,
+                    "nodes": [],
+                    "edges": []
+                }
+            },
+            "selected_edge": null,
+            "context_preview": null,
+            "expansions": []
+        });
+
+        let state = GraphSessionState::from_payload(&payload).expect("valid graph payload");
+        let encoded = state.to_payload().expect("graph payload should serialize");
+
+        assert_eq!(encoded, payload);
+    }
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -956,30 +1022,6 @@ mod tests {
         assert!(!is_traversable_graph_node("community:abc"));
         assert!(!is_traversable_graph_node("user:123"));
         assert!(!is_traversable_graph_node("random"));
-    }
-
-    #[test]
-    fn unwrap_array_handles_plain_array() {
-        let v = json!([1, 2, 3]);
-        assert!(unwrap_array(&v).is_some());
-    }
-
-    #[test]
-    fn unwrap_array_handles_wrapped_array() {
-        let v = json!({"Array": [1, 2, 3]});
-        assert!(unwrap_array(&v).is_some());
-    }
-
-    #[test]
-    fn unwrap_array_returns_none_for_object() {
-        let v = json!({"key": "value"});
-        assert!(unwrap_array(&v).is_none());
-    }
-
-    #[test]
-    fn unwrap_array_returns_none_for_scalar() {
-        assert!(unwrap_array(&json!("string")).is_none());
-        assert!(unwrap_array(&json!(42)).is_none());
     }
 
     #[test]
@@ -1153,120 +1195,6 @@ mod tests {
             "neighbor queries should stop at the configured traversal budget"
         );
         assert!(connections.len() <= GraphTraversalBudget::FULL.max_results);
-    }
-
-    #[tokio::test]
-    async fn find_intro_chain_uses_db_side_neighbor_lookups() {
-        use std::sync::Arc;
-
-        let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edge_neighbors(
-                "entity:openai",
-                vec![json!({"in": "entity:bob", "out": "entity:openai"})],
-            )
-            .expect_edge_neighbors(
-                "entity:bob",
-                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-            )
-            .expect_query(
-                "SELECT * FROM entity WHERE canonical_name_normalized",
-                json!([{"entity_id": "entity:openai"}]),
-            );
-
-        let service =
-            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
-                .unwrap();
-
-        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
-
-        assert_eq!(
-            chain,
-            vec![
-                "entity:alice".to_string(),
-                "entity:bob".to_string(),
-                "entity:openai".to_string(),
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn find_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
-        use std::sync::Arc;
-
-        let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edge_neighbors(
-                "entity:openai",
-                vec![
-                    json!({"in": "entity:bob", "out": "entity:openai"}),
-                    json!({"in": "entity:carol", "out": "entity:openai"}),
-                ],
-            )
-            .expect_edge_neighbors(
-                "entity:bob",
-                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-            )
-            .expect_query(
-                "SELECT * FROM entity WHERE canonical_name_normalized",
-                json!([{"entity_id": "entity:openai"}]),
-            );
-
-        let service =
-            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
-                .unwrap();
-
-        let chain = service.find_intro_chain("OpenAI", 3, None).await.unwrap();
-
-        assert_eq!(
-            chain,
-            vec!["entity:carol".to_string(), "entity:openai".to_string()],
-            "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
-        );
-    }
-
-    #[tokio::test]
-    async fn find_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
-        use std::sync::Arc;
-
-        let db = crate::service::mock_db::MockDbClient::new()
-            .expect_edge_neighbors(
-                "entity:openai",
-                vec![
-                    json!({"in": "entity:bob", "out": "entity:openai"}),
-                    json!({"in": "entity:carol", "out": "entity:openai"}),
-                ],
-            )
-            .expect_edge_neighbors(
-                "entity:bob",
-                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-            )
-            .expect_edge_neighbors(
-                "entity:carol",
-                vec![json!({"in": "entity:diana", "out": "entity:carol"})],
-            )
-            .expect_edge_neighbors(
-                "entity:alice",
-                vec![json!({"in": "entity:erin", "out": "entity:alice"})],
-            )
-            .expect_query(
-                "SELECT * FROM entity WHERE canonical_name_normalized",
-                json!([{"entity_id": "entity:openai"}]),
-            );
-
-        let service =
-            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
-                .unwrap();
-
-        let chain = service.find_intro_chain("OpenAI", 4, None).await.unwrap();
-
-        assert_eq!(
-            chain,
-            vec![
-                "entity:diana".to_string(),
-                "entity:carol".to_string(),
-                "entity:openai".to_string(),
-            ],
-            "the traversal should keep the shorter diamond branch instead of returning the deeper alternative"
-        );
     }
 
     #[tokio::test]

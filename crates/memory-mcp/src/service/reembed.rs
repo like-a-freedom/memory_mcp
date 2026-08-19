@@ -851,10 +851,12 @@ impl MemoryService {
             .and_then(json_string)
             .ok_or_else(|| MemoryError::Validation("missing quote".to_string()))?;
 
-        let embedding = self
-            .generate_embedding(&MemoryService::build_fact_embedding_input(
-                fact_type, content, quote,
-            ))
+        let embedding_input =
+            super::fact::FactService::build_fact_embedding_input(fact_type, content, quote);
+        let context = self.build_context();
+        let embedding = context
+            .embedding_service
+            .generate_embedding(&embedding_input)
             .await?
             .ok_or_else(|| {
                 MemoryError::Validation(

@@ -33,7 +33,9 @@ mod tests {
     use crate::service::MemoryService;
     use crate::service::capabilities::test_support::make_context_base;
     use crate::service::mock_db::MockDbClient;
-    use serde_json::json;
+    use crate::storage::{DbClient, SurrealDbClient};
+    use serde_json::{Value, json};
+    use std::sync::{Arc, Mutex};
 
     #[tokio::test]
     async fn resolve_delegates_to_entity_resolver() {
@@ -72,35 +74,133 @@ mod tests {
         assert!(result.is_err(), "rate-limited resolve must fail");
     }
 
+    #[derive(Clone)]
+    struct RecordingDbClient {
+        inner: Arc<SurrealDbClient>,
+        select_table_calls: Arc<Mutex<Vec<String>>>,
+        create_calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl RecordingDbClient {
+        fn new(inner: Arc<SurrealDbClient>) -> Self {
+            Self {
+                inner,
+                select_table_calls: Arc::new(Mutex::new(Vec::new())),
+                create_calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn select_table_calls(&self) -> Vec<String> {
+            self.select_table_calls
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone()
+        }
+
+        fn create_calls(&self) -> Vec<String> {
+            self.create_calls
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl DbClient for RecordingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            namespace: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            self.inner.select_one(record_id, namespace).await
+        }
+
+        async fn select_table(
+            &self,
+            table: &str,
+            namespace: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            self.select_table_calls
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(table.to_string());
+            self.inner.select_table(table, namespace).await
+        }
+
+        async fn create(
+            &self,
+            record_id: &str,
+            content: Value,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.create_calls
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(record_id.to_string());
+            self.inner.create(record_id, content, namespace).await
+        }
+
+        async fn update(
+            &self,
+            record_id: &str,
+            content: Value,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.inner.update(record_id, content, namespace).await
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            vars: Option<Value>,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.inner.query(sql, vars, namespace).await
+        }
+
+        async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+            self.inner.apply_migrations(namespace).await
+        }
+    }
+
     #[tokio::test]
     async fn resolve_uses_indexed_entity_lookup_instead_of_table_scan() {
-        use std::sync::Arc;
-
-        let db = crate::service::mock_db::MockDbClient::new()
-            .expect_select_table_panic("entity")
-            .expect_create_with(|| {
-                panic!("resolve should not create when indexed lookup finds a record")
-            })
-            .expect_edge_neighbors(
-                "entity:openai",
-                vec![json!({"in": "entity:bob", "out": "entity:openai"})],
+        let db = Arc::new(
+            SurrealDbClient::connect_in_memory_with_namespaces(
+                "resolve_indexed_lookup",
+                &["org".to_string()],
+                "warn",
             )
-            .expect_edge_neighbors(
-                "entity:bob",
-                vec![json!({"in": "entity:alice", "out": "entity:bob"})],
-            )
-            .expect_query(
-                "SELECT * FROM entity WHERE canonical_name_normalized",
-                json!([{"entity_id": "entity:existing"}]),
-            );
+            .await
+            .unwrap(),
+        );
+        db.apply_migrations("org").await.unwrap();
+        db.create(
+            "entity:existing",
+            json!({
+                "entity_id": "entity:existing",
+                "entity_type": "person",
+                "canonical_name": "Dima Ivanov",
+                "canonical_name_normalized": "dima ivanov",
+                "aliases": [],
+            }),
+            "org",
+        )
+        .await
+        .unwrap();
 
-        let service =
-            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
-                .unwrap();
+        let recorder = RecordingDbClient::new(db);
+        let service = MemoryService::new(
+            Arc::new(recorder.clone()),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
 
-        let ctx = service.build_context();
-        let resolved = crate::service::capabilities::resolve::ResolveCapability::resolve(
-            &ctx,
+        let resolved = ResolveCapability::resolve(
+            &service.build_context(),
             EntityCandidate {
                 entity_type: "person".to_string(),
                 canonical_name: "Dima Ivanov".to_string(),
@@ -112,5 +212,13 @@ mod tests {
         .unwrap();
 
         assert_eq!(resolved, "entity:existing");
+        assert!(
+            recorder.select_table_calls().is_empty(),
+            "indexed resolve must not scan the entity table"
+        );
+        assert!(
+            recorder.create_calls().is_empty(),
+            "indexed resolve must not create an entity"
+        );
     }
 }

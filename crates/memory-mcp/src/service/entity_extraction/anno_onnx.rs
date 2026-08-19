@@ -34,10 +34,10 @@
 //! the shared [`LoadedModel`] lifecycle used by heavy Candle backends.
 //! `NER_IDLE_UNLOAD_SECS` (0 = retain) is honored by dropping the session
 //! after that many idle seconds and lazily rebuilding it from disk.
-//! `NER_MAX_CONCURRENCY` is accepted by configuration but not applied here
-//! (KISS): ONNX intra-op threads bound CPU parallelism and the session mutex
-//! serializes concurrent runs. Inputs are not chunked; sequences beyond the
-//! export's maximum length surface as an ONNX error.
+//! `NER_MAX_CONCURRENCY` bounds extraction through the shared
+//! [`InferenceGate`]. The session mutex still protects the mutable ONNX
+//! session. Inputs are not chunked; sequences beyond the export's maximum
+//! length surface as an ONNX error.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -51,6 +51,7 @@ use tokenizers::Tokenizer;
 use crate::models::EntityCandidate;
 use crate::service::model_artifacts::{ArtifactRequirement, NerArtifactSpec};
 
+use super::super::model_runtime::InferenceGate;
 use super::{
     BackendBoxFuture, EntityExtractor, ExtractorFingerprint, MemoryError, NerBuildContext,
 };
@@ -316,6 +317,7 @@ pub struct AnnoOnnxEntityExtractor {
     labels: Vec<String>,
     threshold: f64,
     idle_unload_secs: u64,
+    inference_gate: InferenceGate,
 }
 
 impl AnnoOnnxEntityExtractor {
@@ -326,6 +328,7 @@ impl AnnoOnnxEntityExtractor {
         labels: Vec<String>,
         threshold: f64,
         idle_unload_secs: u64,
+        max_concurrency: usize,
         logger: crate::logging::StdoutLogger,
     ) -> Result<Self, MemoryError> {
         let labels = normalize_labels(&labels);
@@ -366,6 +369,7 @@ impl AnnoOnnxEntityExtractor {
             labels,
             threshold: threshold.clamp(0.0, 1.0),
             idle_unload_secs,
+            inference_gate: InferenceGate::new(max_concurrency),
         })
     }
 
@@ -526,11 +530,18 @@ impl EntityExtractor for AnnoOnnxEntityExtractor {
         provider_name()
     }
 
+    fn scheduling(&self) -> super::NerScheduling {
+        scheduling()
+    }
+
     fn fingerprint(&self) -> ExtractorFingerprint {
         fingerprint_for(&self.labels, self.threshold)
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        let _permit = self.inference_gate.acquire().await.map_err(|error| {
+            MemoryError::Storage(format!("anno-onnx inference gate closed: {error}"))
+        })?;
         self.extract_inner(content, &self.labels)
     }
 
@@ -543,6 +554,9 @@ impl EntityExtractor for AnnoOnnxEntityExtractor {
         if labels.is_empty() {
             return Ok(Vec::new());
         }
+        let _permit = self.inference_gate.acquire().await.map_err(|error| {
+            MemoryError::Storage(format!("anno-onnx inference gate closed: {error}"))
+        })?;
         self.extract_inner(content, &labels)
     }
 }
@@ -553,6 +567,10 @@ impl EntityExtractor for AnnoOnnxEntityExtractor {
 /// (test fixtures land here, KISS). Without one, the shared artifact store
 /// prepares `deepanwa/NuNerZero_onnx` under `<data_dir>/models/ner` and the
 /// extractor consumes the prepared checkpoint root.
+pub(crate) fn scheduling() -> super::NerScheduling {
+    super::NerScheduling::BlockingPool
+}
+
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
     context: NerBuildContext,
@@ -583,6 +601,7 @@ pub(crate) fn build(
             model.labels,
             threshold,
             model.idle_unload_secs,
+            model.max_concurrency,
             context.logger,
         )?;
 
@@ -769,7 +788,7 @@ mod tests {
         let missing =
             std::env::temp_dir().join(format!("anno-onnx-missing-{}", std::process::id()));
         let result =
-            AnnoOnnxEntityExtractor::new(missing, vec!["person".to_string()], 0.5, 0, logger);
+            AnnoOnnxEntityExtractor::new(missing, vec!["person".to_string()], 0.5, 0, 1, logger);
         assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
     }
 }

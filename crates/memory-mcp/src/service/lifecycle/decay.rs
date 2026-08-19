@@ -83,7 +83,6 @@ pub async fn run_decay_pass(
     let now = Utc::now();
     let mut invalidated = 0;
 
-    let namespace = &service.active_namespace;
     let facts = service
         .app_store()
         .select_active_facts(DECAY_BATCH_LIMIT)
@@ -128,16 +127,10 @@ pub async fn run_decay_pass(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| MemoryError::Validation("missing fact_id".into()))?;
 
-            let payload = json!({
-                "t_invalid": crate::service::normalize_dt(now),
-                "t_invalid_ingested": crate::service::normalize_dt(now),
-            });
-
-            service
-                .db_client
-                .update(fact_id, payload, namespace)
-                .await?;
-
+            // ADR-0039: retraction delegates the whole bi-temporal close
+            // (fact + derived claims) to the close owner. Both `t_invalid`
+            // and `t_invalid_ingested` are closed together and the reason is
+            // persisted — no raw `DbClient` update here.
             service
                 .claim_service
                 .store

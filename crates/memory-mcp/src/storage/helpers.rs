@@ -53,6 +53,19 @@ pub fn surreal_to_json(value: SurrealValue) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
 
+/// Reconstructs a `table:key` record-id string from a serialized SurrealDB
+/// record id.
+///
+/// `surreal_to_json` renders record ids as `{"RecordId": {"table": ..., "key":
+/// ...}}`; this is the inverse used when a query returns `id` columns.
+pub fn record_id_from_json_value(value: &Value) -> Option<String> {
+    let map = value.as_object()?;
+    let record_id = map.get("RecordId").and_then(|v| v.as_object())?;
+    let table = record_id.get("table").and_then(|v| v.as_str())?;
+    let key = record_id.get("key").and_then(|v| v.as_str())?;
+    Some(format!("{table}:{key}"))
+}
+
 pub fn extract_first_record(value: Value) -> Option<Value> {
     extract_records(value).into_iter().next()
 }
@@ -223,6 +236,27 @@ mod tests {
         ));
         assert!(!is_table_already_exists_error("already exists"));
         assert!(!is_table_already_exists_error("table created"));
+    }
+
+    #[test]
+    fn record_id_from_json_value_reconstructs_table_key() {
+        let value = serde_json::json!({"RecordId": {"table": "triple", "key": "abc123"}});
+        assert_eq!(
+            record_id_from_json_value(&value).as_deref(),
+            Some("triple:abc123")
+        );
+    }
+
+    #[test]
+    fn record_id_from_json_value_rejects_non_record_values() {
+        assert_eq!(
+            record_id_from_json_value(&serde_json::json!("triple:x")),
+            None
+        );
+        assert_eq!(
+            record_id_from_json_value(&serde_json::json!({"RecordId": {"table": "triple"}})),
+            None
+        );
     }
 
     #[test]

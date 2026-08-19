@@ -374,25 +374,13 @@ impl ClaimStore for SurrealClaimStore {
         &self,
         request: RetractFactAndClaimsRequest<'_>,
     ) -> Result<(), MemoryError> {
-        // Use `time::now()` in SQL so SurrealDB stores a native datetime,
-        // not a string that fails `option<datetime>` coercion.
-        let sql1 = "UPDATE fact:⟨$id⟩ SET t_invalid = time::now(), invalidation_reason = $reason";
-        let vars1 = serde_json::json!({
-            "id": request.fact_id.as_ref(),
-            "reason": request.retract_reason,
-        });
-        self.db.query(sql1, Some(vars1)).await?;
-        let sql2 = "UPDATE claim SET t_invalid_ingested = time::now() WHERE source_fact_id = $fact_id AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
-        let vars2 = serde_json::json!({
-            "fact_id": request.fact_id.as_ref(),
-        });
-        self.db.query(sql2, Some(vars2)).await?;
-        let sql3 = "UPDATE claim_relation SET t_invalid_ingested = time::now() WHERE (left_fact_id = $fact_id OR right_fact_id = $fact_id) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
-        let vars3 = serde_json::json!({
-            "fact_id": request.fact_id.as_ref(),
-        });
-        self.db.query(sql3, Some(vars3)).await?;
-        Ok(())
+        // ADR-0039: the bi-temporal close owner is the single place that
+        // composes close SQL. Retraction delegates the whole close (fact +
+        // derived claims) to it, so both bi-temporal fields are always closed
+        // together and the reason is persisted.
+        crate::storage::CloseStoreClient::from_bound(self.db.clone())
+            .retract_fact_and_claims(request.fact_id.as_ref(), request.retract_reason)
+            .await
     }
 
     async fn commit_reconciliation_page(
