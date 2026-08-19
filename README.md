@@ -15,6 +15,10 @@ It is designed for workflows where agents need more than short-lived chat contex
 - [Overview](#overview)
 - [What it provides](#what-it-provides)
 - [Architecture](#architecture)
+  - [Runtime layers](#runtime-layers)
+  - [Write path: ingest and extraction](#write-path-ingest-and-extraction)
+  - [Read path: context assembly](#read-path-context-assembly)
+  - [Bi-temporal data model](#bi-temporal-data-model)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [MCP tools](#mcp-tools)
@@ -54,20 +58,177 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 
 ## Architecture
 
-At a high level, the project follows a layered Rust design:
+Memory MCP is a layered system with a narrow service seam between protocol
+adapters and domain logic. The MCP and CLI interfaces share the same
+protocol-agnostic capabilities, so behavior does not diverge between an agent
+calling a tool and an operator running a command locally.
 
-```text
-Agent / MCP client
-    │
-    ▼
-Memory MCP server (`src/mcp/`)
-    │
-    ▼
-Memory service layer (`src/service/`)
-    │
-    ▼
-Storage layer (`src/storage.rs` + SurrealDB)
+### Runtime layers
+
+```mermaid
+flowchart TD
+    Agent["AI agent / MCP client"]
+    Hooks["Agent host hooks\nstop / precompact"]
+    Operator["Operator / CI"]
+
+    Agent -->|"stdio JSON-RPC"| MCP["MCP protocol layer\nhandlers, params, parsers, sessions"]
+    Hooks -->|"hidden lifecycle CLI\nsubcommands"| CLI["CLI layer\nserve, watch, reembed, init"]
+    Operator --> CLI
+
+    MCP --> Tools["Protocol-agnostic tools\ningest, extract, resolve, retrieve, explain, invalidate"]
+    CLI --> Tools
+    Tools --> Capabilities["Capabilities\nsmall use-case adapters"]
+    Capabilities --> Context["ServiceContext\nnarrow dependency seam\nrate limiting + stores + providers"]
+
+    Context --> Domain["Domain services\ningestion, facts, entities, claims,\nembeddings, lifecycle, procedures"]
+    Context --> Retrieval["Context pipeline\nlexical, semantic, graph, community,\ntemporal filtering and ranking"]
+    Domain --> Storage["Storage abstraction\nnarrow stores + append-only migrations"]
+    Retrieval --> Storage
+    Storage --> DB[("SurrealDB\nActive Namespace")]
 ```
+
+**Important boundaries**
+
+- `main.rs` is intentionally thin: argument parsing and dispatch only.
+- `mcp/` is a protocol adapter; business logic stays in `service/`.
+- `tools/` and `service/capabilities/` are reusable from both MCP and CLI.
+- Storage is selected once at startup. Requests do not choose a namespace.
+- Facts and claims are never deleted. They are invalidated while preserving
+  historical traceability.
+
+### Write path: ingest and extraction
+
+The write path turns source material into durable, structured memory. Ingestion
+is deterministic and idempotent: sending the same source again returns the
+existing episode instead of creating a duplicate.
+
+```mermaid
+flowchart TD
+    Source["Raw source\nemail, note, document, file"] --> Ingest["ingest"]
+    Ingest --> Limit["RateLimiter.check_access\nper-caller token bucket"]
+    Limit --> Parse["Prepare content\nPDF / HTML / plaintext"]
+    Parse --> EpisodeID["Deterministic episode ID v2"]
+    EpisodeID --> Existing{"Episode already exists?"}
+    Existing -->|"yes"| Episode["Return episode:<id>\nidempotent dedupe"]
+    Existing -->|"no"| PersistEpisode["Persist episode\nt_ref + t_ingested"]
+    PersistEpisode --> Episode
+
+    Episode --> Extract["extract(episode_id)"]
+    Extract --> NER["Entity extraction\nanno, regex, anno-onnx,\nclassic GLiNER, LFM2 GLiNER"]
+    NER --> Resolve["Entity resolution\naliases -> canonical IDs"]
+    Extract --> Facts["Fact extraction\nstructured facts + provenance"]
+    Facts --> Triples["Triple extraction\nsubject / predicate / object"]
+    Facts --> Embeddings["Embedding generation\ncached + background retry"]
+    Facts --> Claims["Claim projection\nvalue, qualifiers, validity, source_span"]
+    Claims --> Reconcile["Claim reconciliation\nmatch, upsert, retract, backfill"]
+    Reconcile --> Store[("Durable memory\nSurrealDB")]
+    Resolve --> Store
+    Triples --> Store
+    Embeddings --> Store
+    Facts --> Store
+```
+
+The claim pipeline preserves provenance: `source_span` points back to the
+source range that produced a claim, while remaining outside deterministic
+claim identity. This lets metadata improve traceability without changing
+whether two claims are considered the same claim.
+
+### Read path: context assembly
+
+The read path fuses several retrieval strategies, then applies policy,
+temporal, provenance, and budget constraints before returning a compact
+context pack.
+
+```mermaid
+flowchart TD
+    Query["assemble_context\nquery + budget + flags"] --> Limit["RateLimiter.check_access"]
+    Limit --> Cache{"Context cache hit?"}
+    Cache -->|"yes"| Cached["Return cached context"]
+    Cache -->|"no"| Prepare["Normalize parameters\nexpand aliases, resolve mode"]
+
+    Prepare --> Lexical["Lexical retrieval\nterm and field matches"]
+    Prepare --> Semantic["Semantic retrieval\nquery embeddings + similarity"]
+    Prepare --> Graph["Graph retrieval\nentity links, triples, bounded hops"]
+    Prepare --> Community["Community retrieval\nentity/community summaries"]
+    Prepare --> Experience["Experience retrieval\nrepeated topics and preferences"]
+
+    Lexical --> Fuse["Fuse candidates"]
+    Semantic --> Fuse
+    Graph --> Fuse
+    Community --> Fuse
+    Experience --> Fuse
+
+    Fuse --> Filter["Filter\nvalid time, policy tags, access"]
+    Filter --> Rank["Rank\nrelevance, decay, source priority,\nsemantic score, temporal focus"]
+    Rank --> Select["Select\nbudget, per-source caps, grounding"]
+    Select --> Shape["Shape response\nranked or timeline view"]
+    Shape --> Track["Record fact access\nrecency feedback"]
+    Track --> Result["Context items\ncontent + rationale + provenance"]
+    Result --> Explain["explain\ncitation-ready source snippets"]
+```
+
+A query can therefore succeed even when one retrieval signal is weak: lexical
+matches, semantic similarity, graph expansion, community summaries, and
+experience candidates are fused before ranking. Each result includes enough
+rationale and provenance for an agent to decide whether to use it.
+
+### Bi-temporal data model
+
+Memory distinguishes **when something was true** from **when the system learned
+it**. This is essential for correcting stale knowledge without erasing the
+historical record.
+
+```mermaid
+erDiagram
+    EPISODE ||--o{ FACT : yields
+    FACT }o--o{ ENTITY : links
+    FACT ||--o{ CLAIM : projects
+    FACT ||--o{ TRIPLE : produces
+    ENTITY }o--o{ COMMUNITY : belongs_to
+
+    EPISODE {
+        string episode_id PK
+        string source_type
+        datetime t_ref
+        datetime t_ingested
+    }
+    FACT {
+        string fact_id PK
+        string content
+        array entity_links
+        array embedding
+        datetime t_valid
+        datetime t_invalid
+    }
+    CLAIM {
+        string claim_id PK
+        string schema_ref
+        string value
+        array source_span
+        datetime t_valid
+        datetime t_invalid
+    }
+    ENTITY {
+        string entity_id PK
+        string canonical_name
+        array aliases
+    }
+    TRIPLE {
+        string triple_id PK
+        string subject
+        string predicate
+        string object
+    }
+    COMMUNITY {
+        string community_id PK
+        string summary
+    }
+```
+
+- `t_ref` / `t_valid`: when the source says the information is true.
+- `t_ingested`: when Memory MCP recorded the source.
+- `t_invalid`: when a fact or claim was superseded; the row remains available
+  for audit and historical queries.
 
 ### Main modules
 
@@ -1041,6 +1202,24 @@ output-only onboarding exception: `memory_mcp init`.
   Accepted content is stored once. Quotas prevent unbounded ingestion.
 - **Procedural memory:** Separately gated and projected through the existing
   `FactType::Experience` seam. Currently shadow-only.
+
+```mermaid
+flowchart LR
+    Session["Agent session"] --> Recall["RECALL\nassemble_context"]
+    Recall --> Work["Agent work\nreason, edit, call APIs"]
+    Work --> Outcome{"Significant outcome?"}
+    Outcome -->|"no"| Work
+    Outcome -->|"yes"| Capture["CAPTURE\ningest + extract"]
+    Capture --> Store[("Bi-temporal memory")]
+    Store --> Recall
+
+    Stop["memory_stop_hook.sh"] --> Capture
+    Precompact["memory_precompact_hook.sh"] --> Capture
+```
+
+The lifecycle integration deliberately reuses the normal retrieval and
+extraction paths. Hooks do not create a second memory implementation, and
+external content is treated as data rather than privileged instruction.
 
 See:
 - [ADR 0016](docs/adr/0016-agent-memory-lifecycle-integration.md)
