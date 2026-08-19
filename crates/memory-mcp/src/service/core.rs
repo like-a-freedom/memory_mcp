@@ -108,34 +108,13 @@ impl MemoryService {
         );
     }
 
-    pub(crate) fn build_fact_embedding_input(
-        fact_type: &str,
-        content: &str,
-        quote: &str,
-    ) -> String {
-        super::fact::FactService::build_fact_embedding_input(fact_type, content, quote)
-    }
-
     pub(crate) fn lifecycle_policy(&self) -> super::LifecyclePolicy {
         super::LifecyclePolicy::from(&self.lifecycle_config)
     }
 
-    /// Returns the total count of episodes.
+    /// Returns the total count of episodes through the owning episode store.
     pub async fn episode_count(&self) -> Result<i32, MemoryError> {
-        let result = self
-            .db_client
-            .query(
-                "SELECT count() FROM episode GROUP ALL",
-                None,
-                &self.active_namespace,
-            )
-            .await?;
-        Ok(result
-            .as_array()
-            .and_then(|arr| arr.first())
-            .and_then(|obj| obj.get("count"))
-            .and_then(|value| value.as_i64())
-            .unwrap_or(0) as i32)
+        self.episode_store().count_episodes().await
     }
 
     /// Adds a new fact.
@@ -282,19 +261,6 @@ impl MemoryService {
         Ok(Some(result))
     }
 
-    /// Generates an embedding vector for the supplied input.
-    ///
-    /// Thin delegator to `EmbeddingService::generate_embedding`.
-    pub(crate) async fn generate_embedding(
-        &self,
-        input: &str,
-    ) -> Result<Option<Vec<f64>>, MemoryError> {
-        self.build_context()
-            .embedding_service
-            .generate_embedding(input)
-            .await
-    }
-
     /// Retrieves the bound SurrealDB storage context.
     pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
         Ok(json!({
@@ -311,27 +277,14 @@ impl MemoryService {
         &self,
         episode_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.find_record_by_id(episode_id).await
+        self.build_context().find_episode_record(episode_id).await
     }
 
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.find_record_by_id(fact_id).await
-    }
-
-    /// Looks up a record in the process-bound Active Namespace.
-    async fn find_record_by_id(
-        &self,
-        record_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        crate::storage::validate_record_id(record_id)?;
-        let record = self.app_store().select_record(record_id).await?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.active_namespace.clone()),
-        ))
+        self.build_context().find_fact_record(fact_id).await
     }
 }
 
@@ -431,9 +384,8 @@ mod tests {
         assert!(serialized.get("cross_scope_allow").is_none());
     }
 
-    /// Verifies that truncation is inside `generate_embedding` by checking
-    /// that build_fact_embedding_input + generate_embedding together won't
-    /// pass a 60k+ input to the provider. The truncation limit is 8,000 chars.
+    /// Verifies that the fact-owned input builder produces a long input for
+    /// the embedding service's 8,000-character truncation limit.
     /// This test is deliberately lightweight — the full reembed pipeline
     /// with long content is exercised in `reembed_long_fact_content_does_not_fail`.
     #[test]
@@ -441,8 +393,11 @@ mod tests {
         // Simulate what build_fact_embedding_input produces for a very long
         // fact, then verify the truncation would apply.
         let long_content = "x".repeat(60_000);
-        let full_input =
-            MemoryService::build_fact_embedding_input("note", &long_content, &long_content);
+        let full_input = crate::service::fact::FactService::build_fact_embedding_input(
+            "note",
+            &long_content,
+            &long_content,
+        );
         // The input + overhead is > 8,000, so generate_embedding will truncate
         assert!(full_input.len() > 8_000);
         // Truncation should produce at most 8,000 chars
@@ -836,35 +791,9 @@ mod tests {
         assert_eq!(config["namespace"], "org");
     }
 
-    #[tokio::test]
-    async fn episode_count_returns_zero_for_empty_db() {
-        let namespaces = vec!["org".to_string()];
-        let db_client = Arc::new(
-            SurrealDbClient::connect_in_memory_with_namespaces(
-                "episode_count_test",
-                &namespaces,
-                "warn",
-            )
-            .await
-            .expect("connect in-memory test db"),
-        );
-        for ns in &namespaces {
-            db_client
-                .apply_migrations(ns)
-                .await
-                .expect("apply migrations");
-        }
-        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
-            .expect("create test service");
-
-        let count = service.episode_count().await.expect("count episodes");
-        assert_eq!(count, 0);
-    }
-
     // -----------------------------------------------------------------------
-    // validate_record_id wired into MemoryService::find_record_by_id
-    // (tests — exercised via the public find_episode_record /
-    // find_fact_record entry points, which delegate to find_record_by_id).
+    // validate_record_id wired into AppStoreClient::find_record_by_id
+    // (tests — exercised via the MemoryService entry points).
     // -----------------------------------------------------------------------
 
     #[tokio::test]

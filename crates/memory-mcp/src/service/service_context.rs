@@ -65,12 +65,7 @@ impl ServiceContext {
         ),
         MemoryError,
     > {
-        crate::storage::validate_record_id(record_id)?;
-        let record = self.app_store().select_record(record_id).await?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.active_namespace.clone()),
-        ))
+        self.app_store().find_record_by_id(record_id).await
     }
 
     /// Enforces rate limit based on the caller ID in the access payload.

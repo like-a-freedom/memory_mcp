@@ -246,37 +246,14 @@ impl ExplanationService {
         &self,
         episode_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.find_record_by_id(episode_id).await
+        self.app_store().find_record_by_id(episode_id).await
     }
 
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
     ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        // Validate the record-id shape up-front so callers can't mask bugs as
-        // silent 'not found' by passing bare hex (the query builder used to
-        // turn such inputs into a no-op SELECT). This entry point has its own
-        // body and does NOT delegate to `find_record_by_id`, so it validates
-        // independently.
-        crate::storage::validate_record_id(fact_id)?;
-        let record = self.db.select_one(fact_id).await?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.db.namespace().to_string()),
-        ))
-    }
-
-    async fn find_record_by_id(
-        &self,
-        record_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        // Validate the record-id shape up-front (see comment in `find_fact_record`).
-        crate::storage::validate_record_id(record_id)?;
-        let record = self.db.select_one(record_id).await?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.db.namespace().to_string()),
-        ))
+        self.app_store().find_record_by_id(fact_id).await
     }
 
     pub(crate) async fn record_fact_access(

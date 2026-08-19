@@ -35,6 +35,19 @@ impl AppStoreClient {
         self.db.select_one(record_id).await
     }
 
+    /// Looks up a validated record in the process-bound Active Namespace.
+    pub(crate) async fn find_record_by_id(
+        &self,
+        record_id: &str,
+    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+        crate::storage::validate_record_id(record_id)?;
+        let record = self.select_record(record_id).await?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.db.namespace().to_string()),
+        ))
+    }
+
     pub async fn select_records(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
         self.db.select_table(table).await
     }
@@ -171,5 +184,45 @@ impl AppStoreClient {
 
     pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
         self.db.query(sql, vars).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::json;
+
+    use super::AppStoreClient;
+    use crate::service::MemoryError;
+    use crate::service::mock_db::MockDbClient;
+
+    #[tokio::test]
+    async fn find_record_by_id_rejects_invalid_record_ids() {
+        let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
+
+        let result = store.find_record_by_id("bare-hex-id").await;
+
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn find_record_by_id_returns_record_and_active_namespace() {
+        let db = MockDbClient::new().expect_select_one(
+            "fact:known",
+            Some(json!({"fact_id": "fact:known", "content": "remembered"})),
+        );
+        let store = AppStoreClient::new(Arc::new(db), "org");
+
+        let (record, namespace) = store
+            .find_record_by_id("fact:known")
+            .await
+            .expect("record lookup should succeed");
+
+        assert_eq!(
+            record.and_then(|map| map.get("fact_id").cloned()),
+            Some(json!("fact:known"))
+        );
+        assert_eq!(namespace.as_deref(), Some("org"));
     }
 }

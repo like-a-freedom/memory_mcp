@@ -29,6 +29,20 @@ impl EpisodeStoreClient {
         self.db.select_one(record_id).await
     }
 
+    /// Returns the total number of episodes in the bound Active Namespace.
+    pub async fn count_episodes(&self) -> Result<i32, MemoryError> {
+        let result = self
+            .db
+            .query("SELECT count() FROM episode GROUP ALL", None)
+            .await?;
+        Ok(result
+            .as_array()
+            .and_then(|rows| rows.first())
+            .and_then(|row| row.get("count"))
+            .and_then(Value::as_i64)
+            .unwrap_or(0) as i32)
+    }
+
     pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
         self.db.create(record_id, content).await
     }
@@ -217,6 +231,16 @@ mod tests {
             )
             .await
             .expect("seed fact should succeed");
+    }
+
+    #[tokio::test]
+    async fn count_episodes_returns_zero_for_empty_store() {
+        let db_client = make_db().await;
+        let store = EpisodeStoreClient::new(db_client, "org");
+
+        let count = store.count_episodes().await.expect("count episodes");
+
+        assert_eq!(count, 0);
     }
 
     #[tokio::test]
