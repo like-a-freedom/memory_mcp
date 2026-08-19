@@ -259,10 +259,6 @@ impl RetrievalContext {
         &self.context_access_log
     }
 
-    pub(crate) fn app_store(&self) -> AppStoreClient {
-        self.app_store.clone()
-    }
-
     pub(crate) async fn record_fact_access(
         &self,
         fact_id: &str,
@@ -291,7 +287,7 @@ impl crate::service::apps::graph::GraphContext for ServiceContext {
 
 impl crate::service::apps::graph::GraphContext for RetrievalContext {
     fn app_store(&self) -> crate::storage::AppStoreClient {
-        self.app_store()
+        self.app_store.clone()
     }
 
     fn logger(&self) -> &StdoutLogger {

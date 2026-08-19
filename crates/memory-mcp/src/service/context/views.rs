@@ -203,7 +203,6 @@ fn apply_episode_time_window(
 
 pub(crate) async fn build_facets_view(
     service: &crate::service::service_context::RetrievalContext,
-    _namespace: &str,
     cutoff: DateTime<Utc>,
     budget: i32,
     access: &AccessPayload,

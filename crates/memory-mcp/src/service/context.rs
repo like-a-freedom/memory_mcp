@@ -162,14 +162,7 @@ async fn assemble_context_inner(
     // --- View-mode dispatch ---
     let mut results: Vec<AssembledContextItem> = match params.resolved_view_mode_opt.as_deref() {
         Some("facets") => {
-            build_facets_view(
-                ctx,
-                &params.namespace,
-                params.cutoff,
-                request.budget,
-                &params.access,
-            )
-            .await?
+            build_facets_view(ctx, params.cutoff, request.budget, &params.access).await?
         }
         Some("wake_up") => {
             build_wake_up_view(
