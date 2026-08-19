@@ -16,10 +16,10 @@ use crate::models::{
 };
 use crate::service::apps::graph::GraphContext;
 use crate::service::error::MemoryError;
-use crate::service::{log_event, normalize_dt, now, query};
+use crate::service::{log_event, normalize_dt, now};
 use crate::storage::{AppStoreClient, BoundDbClient, DbClient};
 
-use crate::service::value_helpers::{json_i64, string_from_value};
+use crate::service::value_helpers::string_from_value;
 
 /// Handles `explain` orchestration: episode/fact resolution, provenance
 /// collection, graph insights, and explain item construction.
@@ -261,25 +261,7 @@ impl ExplanationService {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), MemoryError> {
-        let (record, _namespace) = self.find_fact_record(fact_id).await?;
-        let Some(mut record) = record else {
-            return Ok(());
-        };
-
-        let access_count = record
-            .get("access_count")
-            .and_then(json_i64)
-            .unwrap_or(0)
-            .saturating_add(boost);
-        record.insert("access_count".to_string(), json!(access_count));
-        record.insert(
-            "last_accessed".to_string(),
-            json!(normalize_dt(query::now())),
-        );
-
-        self.db.update(fact_id, Value::Object(record)).await?;
-
-        Ok(())
+        self.app_store().record_fact_access(fact_id, boost).await
     }
 
     async fn find_episodes_via_entity(

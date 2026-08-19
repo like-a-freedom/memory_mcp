@@ -97,6 +97,60 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn embedded_invalidate_persists_bitemporal_close_and_reason()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, db_client) = setup_embedded_service_with_client().await?;
+    let now = Utc::now();
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "ARR is $2M",
+            "ARR is $2M",
+            "episode:close-test",
+            now - Duration::days(1),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::agent_observation("episode:close-test"),
+        )
+        .await?;
+
+    InvalidateCapability::invalidate(
+        &service.build_context(),
+        InvalidateRequest {
+            fact_id: fact_id.clone(),
+            reason: "Superseded by a newer ARR report".to_string(),
+            t_invalid: now - Duration::seconds(1),
+        },
+        None,
+    )
+    .await?;
+
+    let stored = db_client
+        .select_one(&fact_id, "org")
+        .await?
+        .expect("invalidated fact should remain stored");
+    assert!(
+        stored
+            .get("t_invalid")
+            .is_some_and(|value| !value.is_null())
+    );
+    assert!(
+        stored
+            .get("t_invalid_ingested")
+            .is_some_and(|value| !value.is_null())
+    );
+    assert_eq!(
+        stored
+            .get("invalidation_reason")
+            .and_then(|value| value.as_str()),
+        Some("Superseded by a newer ARR report")
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn embedded_relate_invalidates_previous_active_edge_version()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, db_client) = setup_embedded_service_with_client().await?;

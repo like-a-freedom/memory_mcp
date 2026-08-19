@@ -66,7 +66,6 @@ pub(crate) struct RetrievalContext {
     pub(crate) app_store: AppStoreClient,
     pub(crate) embedding_service: EmbeddingService,
     pub(crate) context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    pub(crate) explanation_service: ExplanationService,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
 }
@@ -88,7 +87,6 @@ impl ServiceContext {
             app_store: AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone()),
             embedding_service: self.embedding_service.clone(),
             context_cache: self.context_cache.clone(),
-            explanation_service: self.explanation_service.clone(),
             query_logging_enabled: self.query_logging_enabled,
             query_log_retention_days: self.query_log_retention_days,
         }
@@ -270,9 +268,7 @@ impl RetrievalContext {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), MemoryError> {
-        self.explanation_service
-            .record_fact_access(fact_id, boost)
-            .await
+        self.app_store.record_fact_access(fact_id, boost).await
     }
 
     pub(crate) fn is_query_logging_enabled(&self) -> bool {

@@ -174,6 +174,29 @@ impl AppStoreClient {
         self.db.query_rows(sql, Some(vars)).await
     }
 
+    /// Increments fact access metadata without exposing record mutation details
+    /// to retrieval or explanation orchestration.
+    pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
+        let (record, _namespace) = self.find_record_by_id(fact_id).await?;
+        let Some(mut record) = record else {
+            return Ok(());
+        };
+
+        let access_count = record
+            .get("access_count")
+            .and_then(crate::service::value_helpers::json_i64)
+            .unwrap_or(0)
+            .saturating_add(boost);
+        record.insert("access_count".to_string(), json!(access_count));
+        record.insert(
+            "last_accessed".to_string(),
+            json!(crate::service::normalize_dt(crate::service::now())),
+        );
+
+        self.db.update(fact_id, Value::Object(record)).await?;
+        Ok(())
+    }
+
     pub async fn update_record(
         &self,
         record_id: &str,

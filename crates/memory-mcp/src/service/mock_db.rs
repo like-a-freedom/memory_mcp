@@ -123,15 +123,6 @@ impl MockDbClient {
         })
     }
 
-    pub fn expect_migration_handler(
-        mut self,
-        f: impl Fn(&str) -> Result<(), MemoryError> + Send + Sync + 'static,
-    ) -> Self {
-        self.migration_result = Mutex::new(Ok(()));
-        let _ = f;
-        self
-    }
-
     pub fn expect_migration_result(mut self, result: Result<(), MemoryError>) -> Self {
         self.migration_result = Mutex::new(result);
         self
