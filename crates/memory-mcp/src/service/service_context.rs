@@ -186,9 +186,11 @@ impl ServiceContext {
         crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
-    /// Returns the fact store handle bound to the Active Namespace.
-    pub(crate) fn fact_store(&self) -> crate::storage::FactStoreClient {
-        crate::storage::FactStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    /// Returns the episode store handle (the db client).
+    /// Returns the bi-temporal close owner bound to the Active Namespace
+    /// (ADR-0039: the only place that composes close operations).
+    pub(crate) fn close_store(&self) -> crate::storage::CloseStoreClient {
+        crate::storage::CloseStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
     /// Returns the episode store handle (the db client).

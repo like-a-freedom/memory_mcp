@@ -19,6 +19,7 @@ mod agent_memory;
 pub(crate) mod app_store;
 pub(crate) mod claims;
 mod client;
+pub(crate) mod close;
 pub(crate) mod context_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
@@ -38,10 +39,12 @@ pub use agent_memory::{
 pub use app_store::AppStoreClient;
 pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
+pub(crate) use close::{CloseStoreClient, CloseTimestamps};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
 pub use helpers::is_missing_index_error;
+pub(crate) use helpers::record_id_from_json_value;
 pub use procedures::ProcedureStore;
 pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,

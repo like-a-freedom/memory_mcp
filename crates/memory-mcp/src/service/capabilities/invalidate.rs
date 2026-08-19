@@ -1,19 +1,20 @@
-use serde_json::{Value, json};
-
 use crate::models::{AccessPayload, InvalidateRequest};
 use crate::service::cache::invalidate_cache;
 use crate::service::error::MemoryError;
-use crate::service::query::{normalize_dt, now};
 use crate::service::service_context::ServiceContext;
+use crate::storage::CloseTimestamps;
 
 /// Capability for invalidating facts (marking them as outdated).
 pub struct InvalidateCapability;
 
 impl InvalidateCapability {
-    /// Invalidates a fact by setting `t_invalid` and `t_invalid_ingested`.
+    /// Invalidates a fact by closing both bi-temporal fields (ADR-0039).
     ///
-    /// The fact is looked up across all namespaces. Its scope is used to
-    /// invalidate the context cache for that scope.
+    /// The fact is looked up to verify existence, then closed through the
+    /// storage close owner: `t_invalid` takes the caller-supplied valid time,
+    /// `t_invalid_ingested` defaults to server-side now, and `request.reason`
+    /// is persisted to `invalidation_reason`. Derived claims are closed when
+    /// the claim pipeline is wired.
     pub async fn invalidate(
         ctx: &ServiceContext,
         request: InvalidateRequest,
@@ -22,24 +23,21 @@ impl InvalidateCapability {
         ctx.enforce_rate_limit(access.as_ref())?;
 
         let (record, _namespace) = ctx.find_record_by_id(&request.fact_id).await?;
-        let mut updated =
-            record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+        record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
 
-        updated.insert(
-            "t_invalid".to_string(),
-            json!(normalize_dt(request.t_invalid)),
-        );
-        updated.insert("t_invalid_ingested".to_string(), json!(normalize_dt(now())));
-        ctx.fact_store()
-            .update(&request.fact_id, Value::Object(updated))
+        let close_store = ctx.close_store();
+        close_store
+            .close_record(
+                &request.fact_id,
+                &CloseTimestamps {
+                    t_invalid: Some(request.t_invalid),
+                    t_invalid_ingested: None,
+                },
+                Some(&request.reason),
+            )
             .await?;
-        if let Some(ref claim_store) = ctx.claim_store {
-            claim_store
-                .retract_fact_and_claims(crate::storage::claims::RetractFactAndClaimsRequest {
-                    fact_id: &crate::models::FactId::from(request.fact_id.as_str()),
-                    retract_reason: "manual_invalidation",
-                })
-                .await?;
+        if ctx.claim_store.is_some() {
+            close_store.close_claims_for_fact(&request.fact_id).await?;
         }
         invalidate_cache(&ctx.context_cache).await;
         Ok(())

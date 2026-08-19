@@ -167,15 +167,14 @@ impl EntityService {
             .await
     }
 
-    /// Invalidate a triple by ID.
+    /// Close a triple via the bi-temporal close owner (ADR-0039).
+    ///
+    /// Triples carry no `invalidation_reason` field, so no reason is persisted.
     /// Helper for conflict resolution.
-    pub async fn invalidate_triple_by_id(
-        &self,
-        sql: &str,
-        triple_id: &str,
-    ) -> Result<(), MemoryError> {
-        self.db.query(sql, Some(json!({"id": triple_id}))).await?;
-        Ok(())
+    pub async fn close_triple(&self, triple_id: &str) -> Result<(), MemoryError> {
+        crate::storage::CloseStoreClient::from_bound(self.db.clone())
+            .close_record(triple_id, &crate::storage::CloseTimestamps::now(), None)
+            .await
     }
 
     /// Execute a raw SQL query with bind variables.

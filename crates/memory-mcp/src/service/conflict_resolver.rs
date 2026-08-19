@@ -67,28 +67,24 @@ async fn find_conflicting_triples(
         .map(|arr| {
             arr.iter()
                 .filter_map(|v| {
-                    v.as_object()?
-                        .get("id")
-                        .and_then(|id| id.as_str())
-                        .map(String::from)
+                    let id = v.as_object()?.get("id")?;
+                    crate::storage::record_id_from_json_value(id)
                 })
                 .collect()
         })
         .unwrap_or_default())
 }
 
-/// Invalidate a triple via bi-temporal close: set both the valid-time end
-/// (`t_invalid`) and the transaction-time end (`t_invalid_ingested`).
+/// Close a triple via the bi-temporal close owner (ADR-0039): both the
+/// valid-time end (`t_invalid`) and the transaction-time end
+/// (`t_invalid_ingested`) are set together.
 ///
 /// `t_invalid_ingested` MUST be set whenever `t_invalid` is closed, so the
 /// audit trail records *when the system learned* the triple was superseded —
-/// not just when it logically stopped being true. This mirrors the existing
-/// fact/edge invalidation path in `lifecycle/decay.rs`.
+/// not just when it logically stopped being true.
 async fn invalidate_triple(
     entity_service: &EntityService,
     triple_id: &str,
 ) -> Result<(), MemoryError> {
-    let sql =
-        "UPDATE type::record($id) SET t_invalid = time::now(), t_invalid_ingested = time::now()";
-    entity_service.invalidate_triple_by_id(sql, triple_id).await
+    entity_service.close_triple(triple_id).await
 }
