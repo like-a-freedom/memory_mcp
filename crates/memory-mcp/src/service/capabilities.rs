@@ -30,17 +30,26 @@ pub(crate) mod test_support {
     /// Builds a `ServiceContext` wired to a `MockDbClient` and no-op
     /// providers, suitable for capability unit tests.
     pub(crate) fn make_context_base(db: MockDbClient) -> ServiceContext {
+        make_context_with_rate_limiter(db, Arc::new(RateLimiter::new(100, 100)))
+    }
+
+    /// Builds a capability test context with one limiter shared by the
+    /// context and the service that owns ingest enforcement.
+    pub(crate) fn make_context_with_rate_limiter(
+        db: MockDbClient,
+        rate_limiter: Arc<RateLimiter>,
+    ) -> ServiceContext {
         let db_client: Arc<dyn crate::storage::DbClient> = Arc::new(db);
         ServiceContext {
             db_client: db_client.clone(),
             active_namespace: "org".to_string(),
             logger: StdoutLogger::new("warn"),
-            rate_limiter: Arc::new(RateLimiter::new(100, 100)),
+            rate_limiter: rate_limiter.clone(),
             ingestion_service: IngestionService::new(
                 db_client.clone(),
                 "org".to_string(),
                 StdoutLogger::new("warn"),
-                Arc::new(RateLimiter::new(100, 100)),
+                rate_limiter,
             ),
             explanation_service: ExplanationService::new(
                 db_client.clone(),

@@ -14,7 +14,8 @@ impl IngestCapability {
         request: IngestRequest,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        ctx.enforce_rate_limit(access.as_ref())?;
+        // IngestionService owns rate-limit enforcement for this path. Keeping
+        // the check there avoids debiting the shared bucket twice.
         ctx.ingestion_service.ingest(request, access).await
     }
 }
@@ -25,7 +26,9 @@ mod tests {
 
     use crate::models::IngestRequest;
     use crate::service::capabilities::ingest::IngestCapability;
-    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::capabilities::test_support::{
+        make_context_base, make_context_with_rate_limiter,
+    };
     use crate::service::mock_db::MockDbClient;
     use crate::service::util::RateLimiter;
 
@@ -58,28 +61,81 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_respects_rate_limit() {
-        let db = MockDbClient::new();
-        let mut ctx = make_context_base(db);
-        ctx.rate_limiter = Arc::new(RateLimiter::new(1, 1));
+        let ctx =
+            make_context_with_rate_limiter(MockDbClient::new(), Arc::new(RateLimiter::new(1, 1)));
 
         let access = crate::models::AccessPayload {
             caller_id: Some("user-a".into()),
             ..Default::default()
         };
         let t_ref = chrono::Utc::now();
-        let request = || IngestRequest {
+        let request = |source_id: &str| IngestRequest {
             source_type: "inline".into(),
-            source_id: "x".into(),
+            source_id: source_id.into(),
             content: "c".into(),
             t_ref,
             t_ingested: None,
             policy_tags: vec![],
         };
 
-        let _ = IngestCapability::ingest(&ctx, request(), Some(access.clone())).await;
-        let result = IngestCapability::ingest(&ctx, request(), Some(access)).await;
+        let first = IngestCapability::ingest(&ctx, request("first"), Some(access.clone())).await;
+        assert!(
+            first.is_ok(),
+            "the first ingest should consume one token: {first:?}"
+        );
+
+        let second = IngestCapability::ingest(&ctx, request("second"), Some(access)).await;
         assert!(matches!(
-            result,
+            second,
+            Err(crate::service::MemoryError::Validation(ref msg)) if msg == "rate limit exceeded"
+        ));
+    }
+
+    #[tokio::test]
+    async fn ingest_debits_one_token_per_successful_request() {
+        let ctx =
+            make_context_with_rate_limiter(MockDbClient::new(), Arc::new(RateLimiter::new(1, 3)));
+        let access = crate::models::AccessPayload {
+            caller_id: Some("one-token-user".into()),
+            ..Default::default()
+        };
+        let t_ref = chrono::Utc::now();
+
+        for index in 0..3 {
+            let result = IngestCapability::ingest(
+                &ctx,
+                IngestRequest {
+                    source_type: "inline".into(),
+                    source_id: format!("one-token-{index}"),
+                    content: "c".into(),
+                    t_ref,
+                    t_ingested: None,
+                    policy_tags: vec![],
+                },
+                Some(access.clone()),
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "request {index} should consume exactly one token: {result:?}"
+            );
+        }
+
+        let exhausted = IngestCapability::ingest(
+            &ctx,
+            IngestRequest {
+                source_type: "inline".into(),
+                source_id: "one-token-exhausted".into(),
+                content: "c".into(),
+                t_ref,
+                t_ingested: None,
+                policy_tags: vec![],
+            },
+            Some(access),
+        )
+        .await;
+        assert!(matches!(
+            exhausted,
             Err(crate::service::MemoryError::Validation(ref msg)) if msg == "rate limit exceeded"
         ));
     }
