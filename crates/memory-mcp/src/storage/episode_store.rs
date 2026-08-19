@@ -10,7 +10,6 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::helpers::is_missing_table_error;
 use crate::storage::queries::build_fact_visibility_clause;
 use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
@@ -58,11 +57,7 @@ impl EpisodeStoreClient {
             "t_ref": t_ref,
             "limit": limit,
         });
-        match self.db.query(sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(sql, Some(vars)).await
     }
 
     /// Neighbors around a graph node in the Active Namespace.
@@ -74,11 +69,7 @@ impl EpisodeStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
             crate::storage::queries::build_select_edge_neighbors_query(node_id, cutoff, direction);
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Entities matching a set of canonical id strings.
@@ -91,11 +82,7 @@ impl EpisodeStoreClient {
         }
         let sql = "SELECT * FROM entity WHERE entity_id IN $entity_ids";
         let vars = json!({ "entity_ids": entity_ids });
-        match self.db.query(sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(sql, Some(vars)).await
     }
 
     /// Active (not-yet-invalidated) facts linked to an episode.
@@ -110,11 +97,7 @@ impl EpisodeStoreClient {
             "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
         );
         let vars = json!({ "episode_id": episode_id, "cutoff": cutoff, "limit": limit });
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Communities containing any of the listed member entities.
@@ -126,11 +109,7 @@ impl EpisodeStoreClient {
             crate::storage::queries::build_select_communities_by_member_entities_query(
                 member_entities,
             );
-        match self.db.query(&sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Edges whose `in`/`out`/`relation` matches this triple query.
@@ -145,11 +124,7 @@ impl EpisodeStoreClient {
         let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
                    AND out = <record> $out_id";
         let vars = json!({ "in_id": in_id, "relation": relation, "out_id": out_id });
-        match self.db.query(sql, Some(vars)).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
-            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
-            Err(err) => Err(err),
-        }
+        self.db.query_rows(sql, Some(vars)).await
     }
 
     /// Link two records through an edge in the Active Namespace.

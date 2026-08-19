@@ -116,6 +116,35 @@ impl BoundDbClient {
         self.db.query(sql, vars, &self.namespace).await
     }
 
+    /// Runs a query and returns its result rows.
+    ///
+    /// Concentrates the store-wide recipe: a missing table degrades to an
+    /// empty result set (stores are created lazily by migrations), while any
+    /// other storage error propagates.
+    pub(crate) async fn query_rows(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        match self.db.query(sql, vars, &self.namespace).await {
+            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Runs a query and returns its first result row, if any.
+    ///
+    /// Same missing-table degradation as [`Self::query_rows`].
+    pub(crate) async fn query_first(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+    ) -> Result<Option<Value>, MemoryError> {
+        let rows = self.query_rows(sql, vars).await?;
+        Ok(rows.into_iter().next())
+    }
+
     pub(crate) async fn select_table(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
         self.db.select_table(table, &self.namespace).await
     }
@@ -1840,6 +1869,163 @@ mod tests {
             recorder.recorded_namespaces(),
             vec!["main", "main", "main", "main", "main"]
         );
+    }
+
+    /// Scripted `DbClient` fake for exercising `BoundDbClient` query recipes.
+    #[derive(Clone)]
+    enum QueryBehavior {
+        Rows(Value),
+        MissingTable,
+        OtherError,
+    }
+
+    struct ScriptedQueryClient {
+        behavior: QueryBehavior,
+    }
+
+    #[async_trait]
+    impl DbClient for ScriptedQueryClient {
+        async fn select_one(
+            &self,
+            _record_id: &str,
+            _namespace: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn select_table(
+            &self,
+            _table: &str,
+            _namespace: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(Vec::new())
+        }
+
+        async fn create(
+            &self,
+            _record_id: &str,
+            _content: Value,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _record_id: &str,
+            _content: Value,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            _sql: &str,
+            _vars: Option<Value>,
+            _namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            match &self.behavior {
+                QueryBehavior::Rows(value) => Ok(value.clone()),
+                QueryBehavior::MissingTable => Err(MemoryError::Storage(
+                    "The table 'fact' does not exist".to_string(),
+                )),
+                QueryBehavior::OtherError => {
+                    Err(MemoryError::Storage("connection lost".to_string()))
+                }
+            }
+        }
+
+        async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    fn scripted_bound_client(behavior: QueryBehavior) -> BoundDbClient {
+        BoundDbClient::new(Arc::new(ScriptedQueryClient { behavior }), "main")
+    }
+
+    #[tokio::test]
+    async fn query_rows_returns_rows_when_query_succeeds() {
+        let rows = serde_json::json!([{"id": "fact:1"}, {"id": "fact:2"}]);
+        let bound = scripted_bound_client(QueryBehavior::Rows(rows.clone()));
+
+        let result = bound
+            .query_rows("SELECT * FROM fact", None)
+            .await
+            .expect("query_rows should succeed");
+
+        assert_eq!(result, rows.as_array().cloned().unwrap_or_default());
+    }
+
+    #[tokio::test]
+    async fn query_rows_returns_empty_when_table_missing() {
+        let bound = scripted_bound_client(QueryBehavior::MissingTable);
+
+        let result = bound
+            .query_rows("SELECT * FROM fact", None)
+            .await
+            .expect("missing table must degrade to empty rows");
+
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn query_rows_propagates_other_errors() {
+        let bound = scripted_bound_client(QueryBehavior::OtherError);
+
+        let error = bound
+            .query_rows("SELECT * FROM fact", None)
+            .await
+            .expect_err("non-missing-table errors must propagate");
+
+        assert!(matches!(error, MemoryError::Storage(message) if message == "connection lost"));
+    }
+
+    #[tokio::test]
+    async fn query_first_returns_first_row_when_query_succeeds() {
+        let rows = serde_json::json!([{"id": "fact:1"}, {"id": "fact:2"}]);
+        let bound = scripted_bound_client(QueryBehavior::Rows(rows));
+
+        let result = bound
+            .query_first("SELECT * FROM fact LIMIT 1", None)
+            .await
+            .expect("query_first should succeed");
+
+        assert_eq!(result, Some(serde_json::json!({"id": "fact:1"})));
+    }
+
+    #[tokio::test]
+    async fn query_first_returns_none_for_empty_or_missing_table() {
+        let bound = scripted_bound_client(QueryBehavior::Rows(serde_json::json!([])));
+        assert_eq!(
+            bound
+                .query_first("SELECT * FROM fact LIMIT 1", None)
+                .await
+                .expect("empty rows should succeed"),
+            None
+        );
+
+        let bound = scripted_bound_client(QueryBehavior::MissingTable);
+        assert_eq!(
+            bound
+                .query_first("SELECT * FROM fact LIMIT 1", None)
+                .await
+                .expect("missing table must degrade to None"),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn query_first_propagates_other_errors() {
+        let bound = scripted_bound_client(QueryBehavior::OtherError);
+
+        let error = bound
+            .query_first("SELECT * FROM fact LIMIT 1", None)
+            .await
+            .expect_err("non-missing-table errors must propagate");
+
+        assert!(matches!(error, MemoryError::Storage(message) if message == "connection lost"));
     }
 
     #[tokio::test]
