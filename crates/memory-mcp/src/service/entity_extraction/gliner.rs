@@ -9,7 +9,7 @@ use candle_core::{Device, IndexOp, Module, Tensor};
 use candle_nn::rnn::Direction;
 use candle_nn::{LSTM, LSTMConfig, RNN, VarBuilder};
 use candle_transformers::models::debertav2::{Config, DTYPE, DebertaV2Model};
-use tokenizers::{Encoding, Tokenizer};
+use tokenizers::{AddedToken, Encoding, Tokenizer};
 
 use crate::models::EntityCandidate;
 
@@ -19,6 +19,14 @@ mod batching;
 mod scoring;
 
 const ENT_TOKEN_CANDIDATES: &[&str] = &["<<ENT>>", "[ENT]", "<<SEP>>", "@"];
+// These ids are part of the classic `urchade/gliner_multi-v2.1` checkpoint
+// contract. The companion tokenizer omits the added tokens, so they must be
+// restored in this exact order before model inference starts.
+const CLASSIC_GLINER_MARKER_TOKENS: &[(&str, u32)] = &[
+    ("[FLERT]", 250_102),
+    ("<<ENT>>", 250_103),
+    ("<<SEP>>", 250_104),
+];
 const SEP_TOKEN: &str = "<<SEP>>";
 const DEFAULT_MAX_SPAN_WIDTH: usize = 12;
 const DEFAULT_MAX_SEQ_LEN: usize = 384;
@@ -41,6 +49,62 @@ fn split_text_words(text: &str) -> Vec<(String, (usize, usize))> {
         .find_iter(text)
         .map(|mat| (mat.as_str().to_string(), (mat.start(), mat.end())))
         .collect()
+}
+
+fn validate_smoke_probe(
+    result: Result<Vec<EntityCandidate>, MemoryError>,
+) -> Result<(), MemoryError> {
+    result.map(|_| ())
+}
+
+fn prepare_classic_gliner_tokenizer(tokenizer: Tokenizer) -> Result<Tokenizer, MemoryError> {
+    prepare_tokenizer_with_marker_tokens(tokenizer, CLASSIC_GLINER_MARKER_TOKENS)
+}
+
+fn prepare_tokenizer_with_marker_tokens(
+    mut tokenizer: Tokenizer,
+    marker_tokens: &[(&str, u32)],
+) -> Result<Tokenizer, MemoryError> {
+    let missing_tokens = marker_tokens
+        .iter()
+        .filter(|(token, _)| tokenizer.token_to_id(token).is_none())
+        .map(|(token, _)| AddedToken::from(*token, false).normalized(true))
+        .collect::<Vec<_>>();
+
+    if !missing_tokens.is_empty() {
+        tokenizer.add_tokens(missing_tokens).map_err(|err| {
+            MemoryError::Storage(format!("failed to add GLiNER marker tokens: {err}"))
+        })?;
+    }
+
+    for &(token, expected_id) in marker_tokens {
+        let token_id = tokenizer.token_to_id(token).ok_or_else(|| {
+            MemoryError::Storage(format!(
+                "GLiNER tokenizer missing required marker token `{token}`"
+            ))
+        })?;
+        if token_id != expected_id {
+            return Err(MemoryError::Storage(format!(
+                "GLiNER marker token `{token}` has id {token_id}, expected {expected_id}"
+            )));
+        }
+
+        let encoding = tokenizer
+            .encode(vec![token.to_string()], false)
+            .map_err(|err| {
+                MemoryError::Storage(format!(
+                    "GLiNER marker token `{token}` cannot be encoded: {err}"
+                ))
+            })?;
+        if encoding.get_ids() != [token_id] {
+            return Err(MemoryError::Storage(format!(
+                "GLiNER marker token `{token}` does not round-trip to id {token_id}: {:?}",
+                encoding.get_ids()
+            )));
+        }
+    }
+
+    Ok(tokenizer)
 }
 
 #[derive(Debug, Clone)]
@@ -674,7 +738,9 @@ impl GlinerEntityExtractor {
             .await?;
         // Fixed smoke probe over a short English/Russian mixed sentence; any
         // entity output is sufficient — the goal is architecture validation.
-        let _ = loaded.extract_inner("Alice Smith from Acme Corp");
+        // Inference errors must prevent activation so the artifact store can
+        // record the revision as incompatible and select a known-good fallback.
+        validate_smoke_probe(loaded.extract_inner("Alice Smith from Acme Corp"))?;
         self.model.install_loaded(loaded).await;
         Ok(())
     }
@@ -803,6 +869,7 @@ impl GlinerLoader {
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|err| MemoryError::Storage(format!("failed to load tokenizer: {err}")))?;
+        let tokenizer = prepare_classic_gliner_tokenizer(tokenizer)?;
 
         let config_str = std::fs::read_to_string(&config_path)
             .map_err(|err| MemoryError::Storage(format!("failed to read config: {err}")))?;
@@ -1349,6 +1416,10 @@ impl LoadedGliner {
         text: &str,
         labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        if labels.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let text_words = split_text_words(text);
         if text_words.is_empty() {
             return Ok(Vec::new());
@@ -1501,6 +1572,10 @@ impl EntityExtractor for GlinerEntityExtractor {
         content: &str,
         zero_shot_labels: &[String],
     ) -> Result<Vec<EntityCandidate>, MemoryError> {
+        if zero_shot_labels.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let _permit = self.acquire_inference_permit().await?;
         let loaded = self.ensure_loaded().await?;
         let result = loaded.extract_inner_with_labels(content, zero_shot_labels);
@@ -1642,4 +1717,145 @@ pub(crate) fn build_batching_log_event(
         None,
         None,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use tokenizers::models::wordpiece::WordPiece;
+
+    fn bare_tokenizer() -> Tokenizer {
+        let model = WordPiece::builder()
+            .vocab([
+                ("[UNK]".to_string(), 0),
+                ("person".to_string(), 1),
+                ("company".to_string(), 2),
+            ])
+            .unk_token("[UNK]".to_string())
+            .build()
+            .expect("build test tokenizer");
+        Tokenizer::new(model)
+    }
+
+    #[test]
+    fn smoke_probe_accepts_successful_inference() {
+        assert!(validate_smoke_probe(Ok(Vec::new())).is_ok());
+    }
+
+    #[test]
+    fn smoke_probe_propagates_inference_errors() {
+        let result = validate_smoke_probe(Err(MemoryError::Storage(
+            "prompt extraction mismatch".to_string(),
+        )));
+
+        assert!(matches!(
+            result,
+            Err(MemoryError::Storage(message)) if message == "prompt extraction mismatch"
+        ));
+    }
+
+    #[test]
+    fn classic_gliner_tokenizer_adds_trained_marker_tokens_in_model_order() {
+        let test_marker_tokens = [("[FLERT]", 3), ("<<ENT>>", 4), ("<<SEP>>", 5)];
+        let tokenizer = prepare_tokenizer_with_marker_tokens(bare_tokenizer(), &test_marker_tokens)
+            .expect("marker tokens should be installed");
+
+        assert_eq!(tokenizer.token_to_id("[FLERT]"), Some(3));
+        assert_eq!(tokenizer.token_to_id("<<ENT>>"), Some(4));
+        assert_eq!(tokenizer.token_to_id("<<SEP>>"), Some(5));
+
+        let labels = [
+            "person",
+            "company",
+            "location",
+            "product",
+            "event",
+            "technology",
+        ];
+        let mut prompt_words = Vec::with_capacity(labels.len() * 2 + 1);
+        for label in labels {
+            prompt_words.push("<<ENT>>".to_string());
+            prompt_words.push(label.to_string());
+        }
+        prompt_words.push("<<SEP>>".to_string());
+
+        let encoding = tokenizer
+            .encode(prompt_words.clone(), true)
+            .expect("encode pre-tokenized GLiNER prompt");
+        let ent_id = tokenizer.token_to_id("<<ENT>>").expect("ENT marker id");
+        let sep_id = tokenizer.token_to_id("<<SEP>>").expect("SEP marker id");
+        assert_eq!(encoding.get_ids().last(), Some(&sep_id));
+        let ent_positions = encoding
+            .get_ids()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, token_id)| (*token_id == ent_id).then_some(index))
+            .collect::<Vec<_>>();
+
+        assert_eq!(ent_positions.len(), labels.len());
+        assert!(ent_positions.iter().all(|&index| {
+            encoding
+                .get_word_ids()
+                .get(index)
+                .and_then(|word_id| *word_id)
+                .is_some_and(|word_id| word_id < prompt_words.len() as u32)
+        }));
+    }
+
+    #[test]
+    fn classic_gliner_tokenizer_marker_patch_is_idempotent() {
+        let test_marker_tokens = [("[FLERT]", 3), ("<<ENT>>", 4), ("<<SEP>>", 5)];
+        let tokenizer = bare_tokenizer();
+        let tokenizer = prepare_tokenizer_with_marker_tokens(tokenizer, &test_marker_tokens)
+            .expect("first marker patch should succeed");
+        let tokenizer = prepare_tokenizer_with_marker_tokens(tokenizer, &test_marker_tokens)
+            .expect("second marker patch should succeed");
+
+        assert_eq!(tokenizer.token_to_id("[FLERT]"), Some(3));
+        assert_eq!(tokenizer.token_to_id("<<ENT>>"), Some(4));
+        assert_eq!(tokenizer.token_to_id("<<SEP>>"), Some(5));
+    }
+
+    #[test]
+    fn marker_patch_rejects_preexisting_marker_at_wrong_model_id() {
+        let model = WordPiece::builder()
+            .vocab([
+                ("[UNK]".to_string(), 0),
+                ("<<ENT>>".to_string(), 1),
+                ("person".to_string(), 2),
+            ])
+            .unk_token("[UNK]".to_string())
+            .build()
+            .expect("build test tokenizer");
+        let marker_tokens = [("[FLERT]", 3), ("<<ENT>>", 4), ("<<SEP>>", 5)];
+
+        let error = prepare_tokenizer_with_marker_tokens(Tokenizer::new(model), &marker_tokens)
+            .expect_err("wrong preexisting marker id must be rejected");
+        assert!(error.to_string().contains("<<ENT>>"));
+        assert!(error.to_string().contains("expected 4"));
+    }
+
+    #[tokio::test]
+    async fn empty_custom_labels_short_circuit_before_model_load() {
+        let extractor = GlinerEntityExtractor::new_with_runtime(
+            Path::new("/path/to/a/nonexistent/gliner/model"),
+            vec!["person".to_string()],
+            0.5,
+            1,
+            128,
+            1,
+            crate::config::GlinerDeviceKind::Cpu,
+            0,
+            crate::logging::StdoutLogger::new("error"),
+        )
+        .expect("runtime configuration should not load model files");
+
+        let candidates = extractor
+            .extract_candidates_with_labels("Alice works at Acme", &[])
+            .await
+            .expect("empty labels should be a no-op");
+        assert!(candidates.is_empty());
+    }
 }

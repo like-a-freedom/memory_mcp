@@ -10,11 +10,14 @@ use memory_mcp::config::{
     GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
 };
 use memory_mcp::logging::StdoutLogger;
+use memory_mcp::mcp::MemoryMcp;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
 use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
 use memory_mcp::service::capabilities::extract::ExtractCapability;
 use memory_mcp::service::capabilities::ingest::IngestCapability;
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor, create_entity_extractor};
+use memory_mcp::tools::params::{ExtractParams, IngestParams};
+use rmcp::handler::server::wrapper::Parameters;
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
@@ -70,6 +73,57 @@ fn local_gliner_model_dir() -> PathBuf {
         .join("models")
         .join("ner")
         .join("urchade--gliner_multi-v2.1")
+}
+
+/// Builds a local GLiNER fixture that matches the companion tokenizer shape:
+/// the base tokenizer is present, but the three trained GLiNER marker tokens
+/// are absent and must be restored by the runtime loader.
+fn companion_style_gliner_model_dir(temp_dir: &TempDir) -> PathBuf {
+    let source_dir = local_gliner_model_dir();
+    assert_required_files(&source_dir, GLINER_REQUIRED_FILES);
+
+    let model_dir = temp_dir.path().join("gliner-companion-tokenizer");
+    std::fs::create_dir_all(&model_dir).expect("create companion tokenizer fixture");
+    std::fs::copy(
+        source_dir.join("gliner_config.json"),
+        model_dir.join("gliner_config.json"),
+    )
+    .expect("copy GLiNER config");
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(
+        source_dir.join("model.safetensors"),
+        model_dir.join("model.safetensors"),
+    )
+    .expect("link GLiNER weights");
+    #[cfg(not(unix))]
+    std::fs::copy(
+        source_dir.join("model.safetensors"),
+        model_dir.join("model.safetensors"),
+    )
+    .expect("copy GLiNER weights");
+
+    let tokenizer_path = source_dir.join("tokenizer.json");
+    let mut tokenizer: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(tokenizer_path).expect("read GLiNER tokenizer"),
+    )
+    .expect("parse GLiNER tokenizer");
+    tokenizer["added_tokens"]
+        .as_array_mut()
+        .expect("tokenizer added_tokens array")
+        .retain(|token| {
+            !matches!(
+                token.get("content").and_then(serde_json::Value::as_str),
+                Some("[FLERT]" | "<<ENT>>" | "<<SEP>>")
+            )
+        });
+    std::fs::write(
+        model_dir.join("tokenizer.json"),
+        serde_json::to_vec(&tokenizer).expect("serialize companion tokenizer"),
+    )
+    .expect("write companion tokenizer");
+
+    model_dir
 }
 
 /// Current upstream HEAD of `urchade/gliner_multi-v2.1`, used as the seeded
@@ -428,6 +482,57 @@ async fn local_gliner_extractor_supports_per_call_custom_labels() {
     }
 }
 
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn local_gliner_repairs_companion_tokenizer_marker_tokens() {
+    let temp_dir = TempDir::new().expect("create companion tokenizer test directory");
+    let model_dir = companion_style_gliner_model_dir(&temp_dir);
+    let extractor = GlinerEntityExtractor::new(&model_dir, supported_gliner_labels(), 0.2)
+        .expect("GLiNER extractor should construct with companion tokenizer");
+
+    let entities = extractor
+        .extract_candidates("Alice Smith from OpenAI presented Rust in Seattle")
+        .await
+        .expect("GLiNER should repair and use companion tokenizer");
+
+    assert_candidate_entity("companion tokenizer", &entities, "person", &["Alice Smith"]);
+    assert_candidate_entity("companion tokenizer", &entities, "company", &["OpenAI"]);
+    assert_candidate_entity("companion tokenizer", &entities, "location", &["Seattle"]);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn local_gliner_empty_per_call_labels_do_not_require_model_artifacts() {
+    let extractor = GlinerEntityExtractor::new(
+        Path::new("/path/to/a/nonexistent/gliner/model"),
+        supported_gliner_labels(),
+        0.2,
+    )
+    .expect("runtime configuration should not load model files");
+
+    let entities = extractor
+        .extract_candidates_with_labels("Alice Smith from OpenAI", &[])
+        .await
+        .expect("empty per-call labels should not invoke inference");
+
+    assert!(entities.is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn local_gliner_empty_per_call_labels_are_a_noop() {
+    let model_dir = local_gliner_model_dir();
+    assert_required_files(&model_dir, GLINER_REQUIRED_FILES);
+    let extractor = GlinerEntityExtractor::new(&model_dir, supported_gliner_labels(), 0.2)
+        .expect("GLiNER extractor should construct");
+
+    let entities = extractor
+        .extract_candidates_with_labels("Alice Smith from OpenAI", &[])
+        .await
+        .expect("empty per-call labels should not invoke inference");
+
+    assert!(entities.is_empty());
+}
+
 async fn local_gliner_candidate_signatures_for_batch_size(
     batch_size: usize,
 ) -> (Vec<(String, String)>, Vec<(String, String)>) {
@@ -529,6 +634,57 @@ async fn memory_service_uses_local_gliner_zero_shot_labels() {
         );
         assert_extracted_case_entities(case_name, &extracted.entities, &expected_entities);
     }
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "requires local GLiNER model files under tests/models/ner/urchade--gliner_multi-v2.1"]
+async fn mcp_gliner_ingest_then_extract_completes_end_to_end() {
+    let _env_lock = ENV_LOCK.lock().await;
+    let temp_dir = TempDir::new().expect("temp dir should be created");
+    let _env = local_gliner_env(&temp_dir, None, 0.2);
+    let service = MemoryService::new_from_env()
+        .await
+        .expect("service should bootstrap with local GLiNER");
+    let mcp = MemoryMcp::new(service);
+
+    let ingest = mcp
+        .ingest(Parameters(IngestParams {
+            source_type: "test".to_string(),
+            source_id: "gliner-mcp-e2e".to_string(),
+            content: "Alice Smith from OpenAI presented Rust in Seattle at Build 2026.".to_string(),
+            t_ref: Utc::now().to_rfc3339(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        }))
+        .await
+        .expect("MCP ingest should succeed")
+        .0;
+    assert_eq!(ingest.status, "success");
+
+    let extraction = mcp
+        .extract(Parameters(ExtractParams {
+            episode_id: Some(ingest.result),
+            content: None,
+            text: None,
+            source_type: None,
+            source_id: None,
+            t_ref: None,
+            zero_shot_labels: None,
+        }))
+        .await
+        .expect("MCP extract should succeed")
+        .0;
+    assert_eq!(extraction.status, "success");
+    assert_extracted_case_entities(
+        "MCP GLiNER E2E",
+        &extraction.result.entities,
+        &vec![
+            ("person", vec!["Alice Smith"]),
+            ("company", vec!["OpenAI"]),
+            ("location", vec!["Seattle"]),
+            ("event", vec!["Build 2026"]),
+        ],
+    );
 }
 
 fn content_source_id(content: &str) -> String {
