@@ -67,7 +67,7 @@ fn insert_shortest_hop(
 }
 
 async fn resolve_query_anchor_entities(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     raw_query: &str,
     lexical_facts: &[Fact],
 ) -> Result<BTreeMap<String, String>, MemoryError> {
@@ -97,7 +97,7 @@ async fn resolve_query_anchor_entities(
 }
 
 async fn walk_anchor_entities(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     anchors: &BTreeMap<String, String>,
     max_hops: usize,
@@ -168,7 +168,7 @@ async fn walk_anchor_entities(
 }
 
 pub(crate) async fn collect_graph_facts(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: CollectGraphFactsRequest<'_>,
 ) -> Result<Vec<GraphCandidate>, MemoryError> {
     if request.raw_query.trim().is_empty() || request.max_hops == 0 {
@@ -374,7 +374,8 @@ mod tests {
         };
         let cutoff_iso = crate::service::normalize_dt(cutoff);
 
-        let anchors = resolve_query_anchor_entities(&service.build_context(), "Alice Stone", &[])
+        let retrieval = service.build_context().retrieval_context();
+        let anchors = resolve_query_anchor_entities(&retrieval, "Alice Stone", &[])
             .await
             .expect("resolve anchors");
         assert_eq!(
@@ -383,8 +384,7 @@ mod tests {
             "expected Alice to be resolved as a graph anchor: {anchors:?}"
         );
 
-        let ctx = service.build_context();
-        let outgoing_neighbors = ctx
+        let outgoing_neighbors = retrieval
             .context_store()
             .select_edge_neighbors("entity:alice", &cutoff_iso, GraphDirection::Outgoing)
             .await
@@ -395,7 +395,7 @@ mod tests {
             "expected Alice to have one outgoing neighbor edge: {outgoing_neighbors:?}"
         );
 
-        let traces = walk_anchor_entities(&service.build_context(), &cutoff_iso, &anchors, 1)
+        let traces = walk_anchor_entities(&retrieval, &cutoff_iso, &anchors, 1)
             .await
             .expect("walk anchors");
         assert_eq!(
@@ -404,7 +404,7 @@ mod tests {
             "expected Bob to be discovered one hop away: {traces:?}"
         );
 
-        let raw_records = ctx
+        let raw_records = retrieval
             .context_store()
             .select_facts_by_entity_links(
                 &cutoff_iso,
@@ -420,7 +420,7 @@ mod tests {
         );
 
         let candidates = collect_graph_facts(
-            &service.build_context(),
+            &retrieval,
             CollectGraphFactsRequest {
                 cutoff_iso: &cutoff_iso,
                 raw_query: "Alice Stone",

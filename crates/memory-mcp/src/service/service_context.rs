@@ -18,7 +18,7 @@ use crate::service::fact::FactService;
 use crate::service::ingestion::IngestionService;
 use crate::service::triple_extractor::TripleExtractor;
 use crate::service::util::RateLimiter;
-use crate::storage::DbClient;
+use crate::storage::{AppStoreClient, ContextAccessLogClient, ContextStoreClient, DbClient};
 
 /// Shared context passed to capability modules.
 ///
@@ -53,7 +53,47 @@ pub struct ServiceContext {
     pub(crate) triple_extraction_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
+/// Narrow infrastructure seam for the context retrieval pipeline.
+///
+/// This owns the stores and services retrieval uses so helper modules do not
+/// depend on ingestion, extraction, resolution, claims, or lifecycle fields.
+#[derive(Clone)]
+pub(crate) struct RetrievalContext {
+    pub(crate) active_namespace: String,
+    pub(crate) logger: StdoutLogger,
+    pub(crate) context_store: ContextStoreClient,
+    pub(crate) context_access_log: ContextAccessLogClient,
+    pub(crate) app_store: AppStoreClient,
+    pub(crate) embedding_service: EmbeddingService,
+    pub(crate) context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    pub(crate) explanation_service: ExplanationService,
+    pub(crate) query_logging_enabled: bool,
+    pub(crate) query_log_retention_days: u32,
+}
+
 impl ServiceContext {
+    /// Builds the narrow retrieval seam once for one context assembly.
+    pub(crate) fn retrieval_context(&self) -> RetrievalContext {
+        RetrievalContext {
+            active_namespace: self.active_namespace.clone(),
+            logger: self.logger.clone(),
+            context_store: ContextStoreClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            ),
+            context_access_log: ContextAccessLogClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            ),
+            app_store: AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone()),
+            embedding_service: self.embedding_service.clone(),
+            context_cache: self.context_cache.clone(),
+            explanation_service: self.explanation_service.clone(),
+            query_logging_enabled: self.query_logging_enabled,
+            query_log_retention_days: self.query_log_retention_days,
+        }
+    }
+
     /// Looks up a record in the process-bound Active Namespace.
     pub(crate) async fn find_record_by_id(
         &self,
@@ -107,27 +147,6 @@ impl ServiceContext {
         self.find_record_by_id(fact_id).await
     }
 
-    /// Records fact access (access_count, last_accessed) for recency scoring.
-    pub(crate) async fn record_fact_access(
-        &self,
-        fact_id: &str,
-        boost: i64,
-    ) -> Result<(), MemoryError> {
-        self.explanation_service
-            .record_fact_access(fact_id, boost)
-            .await
-    }
-
-    /// Whether query logging is enabled for this service.
-    pub(crate) fn is_query_logging_enabled(&self) -> bool {
-        self.query_logging_enabled
-    }
-
-    /// Number of days to retain query logs before pruning.
-    pub(crate) fn query_log_retention_days(&self) -> u32 {
-        self.query_log_retention_days
-    }
-
     /// Public helper for tool-level logging.
     pub(crate) fn log_tool_event(
         &self,
@@ -158,22 +177,6 @@ impl ServiceContext {
             crate::service::log_event(op, args, result, None, request_id, Some(duration_ms)),
             level,
         );
-    }
-
-    /// Returns the context store handle (the db client).
-    pub(crate) fn context_store(&self) -> crate::storage::ContextStoreClient {
-        crate::storage::ContextStoreClient::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
-    }
-
-    /// Returns the context access log handle bound to the Active Namespace.
-    pub(crate) fn context_access_log(&self) -> crate::storage::ContextAccessLogClient {
-        crate::storage::ContextAccessLogClient::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
     }
 
     /// Returns the app store handle bound to the Active Namespace.
@@ -249,10 +252,52 @@ impl ServiceContext {
     }
 }
 
+impl RetrievalContext {
+    pub(crate) fn context_store(&self) -> &ContextStoreClient {
+        &self.context_store
+    }
+
+    pub(crate) fn context_access_log(&self) -> &ContextAccessLogClient {
+        &self.context_access_log
+    }
+
+    pub(crate) fn app_store(&self) -> AppStoreClient {
+        self.app_store.clone()
+    }
+
+    pub(crate) async fn record_fact_access(
+        &self,
+        fact_id: &str,
+        boost: i64,
+    ) -> Result<(), MemoryError> {
+        self.explanation_service
+            .record_fact_access(fact_id, boost)
+            .await
+    }
+
+    pub(crate) fn is_query_logging_enabled(&self) -> bool {
+        self.query_logging_enabled
+    }
+
+    pub(crate) fn query_log_retention_days(&self) -> u32 {
+        self.query_log_retention_days
+    }
+}
+
 impl crate::service::apps::graph::GraphContext for ServiceContext {
     fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+        AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
+    fn logger(&self) -> &StdoutLogger {
+        &self.logger
+    }
+}
+
+impl crate::service::apps::graph::GraphContext for RetrievalContext {
+    fn app_store(&self) -> crate::storage::AppStoreClient {
+        self.app_store()
+    }
+
     fn logger(&self) -> &StdoutLogger {
         &self.logger
     }
@@ -308,6 +353,20 @@ mod tests {
             result.is_ok(),
             "well-formed id must pass validation: {result:?}"
         );
+    }
+
+    #[test]
+    fn retrieval_context_is_bound_to_the_active_namespace_and_query_policy() {
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let retrieval = ctx.retrieval_context();
+
+        assert_eq!(retrieval.active_namespace, ctx.active_namespace);
+        assert_eq!(
+            retrieval.query_log_retention_days,
+            ctx.query_log_retention_days
+        );
+        assert_eq!(retrieval.query_logging_enabled, ctx.query_logging_enabled);
     }
 
     #[test]

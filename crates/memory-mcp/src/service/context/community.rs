@@ -37,7 +37,7 @@ pub(crate) struct StoredCommunitySummary {
 }
 
 pub(crate) async fn collect_community_facts(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     request: CollectCommunityFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String, f64)>, MemoryError> {
     let matched_communities = find_matching_communities(service, request.query).await?;
@@ -139,7 +139,7 @@ fn best_community_match<'a>(
 }
 
 async fn community_origin_factor_for_fact(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     fact: &Fact,
     matches_by_entity: &HashMap<String, CommunityMatch>,
@@ -162,7 +162,7 @@ async fn community_origin_factor_for_fact(
 }
 
 async fn entity_origin_factor(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     cutoff_iso: &str,
     entity_id: &str,
     cache: &mut HashMap<String, f64>,
@@ -208,7 +208,7 @@ fn edge_origin_factor(edge: &Value) -> f64 {
 }
 
 pub(crate) async fn find_matching_communities(
-    service: &crate::service::service_context::ServiceContext,
+    service: &crate::service::service_context::RetrievalContext,
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
     let communities = service

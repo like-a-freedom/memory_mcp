@@ -8,7 +8,7 @@ use super::scoring::selected_fact_query_term_coverage;
 use super::types::{RankedContextFact, RetrievalTier};
 use crate::service::error::MemoryError;
 use crate::service::query::matched_query_terms_for_text;
-use crate::service::service_context::ServiceContext;
+use crate::service::service_context::RetrievalContext;
 
 pub(super) fn should_prefer_episode_content(
     selected_facts: &[RankedContextFact],
@@ -55,7 +55,7 @@ pub(super) fn should_prefer_episode_content(
 }
 
 pub(super) async fn collect_episode_fallback_items(
-    service: &ServiceContext,
+    service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
     query: &str,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
