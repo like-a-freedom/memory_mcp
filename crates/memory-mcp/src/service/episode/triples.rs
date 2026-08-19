@@ -41,7 +41,7 @@ pub(crate) fn spawn_triple_extraction(service: &ServiceContext, fact_id: &str, c
     let extractor = service.triple_extractor.clone();
     let fact_id = fact_id.to_string();
     let content = content.to_string();
-    let entity_service = service.entity_service.clone();
+    let triple_store = service.triple_store();
 
     tokio::spawn(async move {
         // Hold the permit for the duration of the task.
@@ -49,26 +49,19 @@ pub(crate) fn spawn_triple_extraction(service: &ServiceContext, fact_id: &str, c
 
         if let Ok(triples) = extractor.extract(&content, &fact_id).await {
             for triple in &triples {
-                let sql = r#"
-                    CREATE TYPE::thing("triple", rand::guid()) SET
-                        subject = $subject,
-                        predicate = $predicate,
-                        object = $object,
-                        confidence = $confidence,
-                        source_fact_id = $source_fact_id
-                "#;
-                let vars = json!({
-                    "subject": triple.subject,
-                    "predicate": triple.predicate,
-                    "object": triple.object,
-                    "confidence": triple.confidence,
-                    "source_fact_id": triple.source_fact_id,
-                });
-                let _ = entity_service.execute_query(sql, vars).await;
+                let _ = triple_store
+                    .create_triple(
+                        &triple.subject,
+                        &triple.predicate,
+                        &triple.object,
+                        triple.confidence,
+                        &triple.source_fact_id,
+                    )
+                    .await;
 
                 if crate::service::triple_extractor::is_singleton_predicate(&triple.predicate) {
                     let _ = crate::service::conflict_resolver::resolve_conflicts_for_triple(
-                        &entity_service,
+                        &triple_store,
                         triple,
                     )
                     .await;

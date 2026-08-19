@@ -186,11 +186,19 @@ impl ServiceContext {
         crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
-    /// Returns the episode store handle (the db client).
     /// Returns the bi-temporal close owner bound to the Active Namespace
     /// (ADR-0039: the only place that composes close operations).
     pub(crate) fn close_store(&self) -> crate::storage::CloseStoreClient {
         crate::storage::CloseStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    }
+
+    /// Returns the triple store handle bound to the Active Namespace — the
+    /// single owner of every read/write on the `triple` table.
+    pub(crate) fn triple_store(&self) -> crate::storage::TripleStoreClient {
+        crate::storage::TripleStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
     /// Returns the episode store handle (the db client).

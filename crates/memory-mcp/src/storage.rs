@@ -28,6 +28,7 @@ mod migrations;
 mod procedures;
 mod queries;
 pub(crate) mod reembed_store;
+mod triple_store;
 mod types;
 
 // Re-export the public API
@@ -44,11 +45,11 @@ pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
 pub use helpers::is_missing_index_error;
-pub(crate) use helpers::record_id_from_json_value;
 pub use procedures::ProcedureStore;
 pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
     fact_embedding_dimension_placeholder, validate_record_id,
 };
 pub use reembed_store::ReembedStoreClient;
+pub(crate) use triple_store::TripleStoreClient;
 pub use types::GraphDirection;

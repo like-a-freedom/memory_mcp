@@ -145,45 +145,4 @@ impl EntityService {
             Err(err) => Err(err),
         }
     }
-
-    /// Execute a query against the triple table.
-    /// Helper for conflict resolution.
-    pub async fn query_triples(
-        &self,
-        sql: &str,
-        subject: &str,
-        predicate: &str,
-        object: &str,
-    ) -> Result<serde_json::Value, MemoryError> {
-        self.db
-            .query(
-                sql,
-                Some(json!({
-                    "subject": subject,
-                    "predicate": predicate,
-                    "object": object,
-                })),
-            )
-            .await
-    }
-
-    /// Close a triple via the bi-temporal close owner (ADR-0039).
-    ///
-    /// Triples carry no `invalidation_reason` field, so no reason is persisted.
-    /// Helper for conflict resolution.
-    pub async fn close_triple(&self, triple_id: &str) -> Result<(), MemoryError> {
-        crate::storage::CloseStoreClient::from_bound(self.db.clone())
-            .close_record(triple_id, &crate::storage::CloseTimestamps::now(), None)
-            .await
-    }
-
-    /// Execute a raw SQL query with bind variables.
-    /// Helper for triple persistence and other operations.
-    pub async fn execute_query(
-        &self,
-        sql: &str,
-        vars: serde_json::Value,
-    ) -> Result<serde_json::Value, MemoryError> {
-        self.db.query(sql, Some(vars)).await
-    }
 }
