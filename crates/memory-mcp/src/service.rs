@@ -11,7 +11,7 @@ pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
 #[doc(hidden)]
 pub use entity_extraction::VagoLfm2EntityExtractor;
 pub use entity_extraction::{
-    AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor,
+    AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor, NerScheduling,
     RegexEntityExtractor, create_entity_extractor,
 };
 pub use error::MemoryError;

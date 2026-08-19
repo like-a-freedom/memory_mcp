@@ -542,7 +542,11 @@ mod tests {
         #[async_trait::async_trait]
         impl EntityExtractor for BlockingGlinerExtractor {
             fn provider_name(&self) -> &'static str {
-                "gliner"
+                "renamed-heavy-backend"
+            }
+
+            fn scheduling(&self) -> crate::service::entity_extraction::NerScheduling {
+                crate::service::entity_extraction::NerScheduling::BlockingPool
             }
 
             async fn extract_candidates(

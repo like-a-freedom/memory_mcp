@@ -10,7 +10,11 @@ use crate::models::EntityCandidate;
 use super::classifier::classify_entity_type;
 use super::{BackendBoxFuture, EntityExtractor, MemoryError};
 
-/// Builds the regex backend — no async work needed.
+pub(crate) fn scheduling() -> super::NerScheduling {
+    super::NerScheduling::Inline
+}
+
+// Builds the regex backend — no async work needed.
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
     _context: super::NerBuildContext,
@@ -55,6 +59,10 @@ impl RegexEntityExtractor {
 impl EntityExtractor for RegexEntityExtractor {
     fn provider_name(&self) -> &'static str {
         "regex"
+    }
+
+    fn scheduling(&self) -> super::NerScheduling {
+        scheduling()
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {

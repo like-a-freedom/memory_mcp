@@ -9,6 +9,10 @@ use crate::models::EntityCandidate;
 
 use super::{BackendBoxFuture, EntityExtractor, MemoryError};
 
+pub(crate) fn scheduling() -> super::NerScheduling {
+    super::NerScheduling::Inline
+}
+
 /// Builds the anno backend — no async work needed.
 pub(crate) fn build(
     config: crate::config::NerExtractorConfig,
@@ -57,6 +61,10 @@ impl std::fmt::Debug for AnnoEntityExtractor {
 impl EntityExtractor for AnnoEntityExtractor {
     fn provider_name(&self) -> &'static str {
         "anno"
+    }
+
+    fn scheduling(&self) -> super::NerScheduling {
+        scheduling()
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
