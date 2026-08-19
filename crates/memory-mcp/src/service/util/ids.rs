@@ -81,6 +81,7 @@ pub fn deterministic_fact_id(
 pub fn deterministic_community_id(member_entities: &[String]) -> String {
     let mut members = member_entities.to_vec();
     members.sort();
+    members.dedup();
     format!("community:{}", hash_prefix(&members.join("|")))
 }
 
@@ -178,6 +179,21 @@ mod tests {
         let members2 = vec!["b".to_string(), "c".to_string(), "a".to_string()];
         let id2 = deterministic_community_id(&members2);
         assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn deterministic_community_id_deduplicates_members() {
+        let unique = vec!["entity:a".to_string(), "entity:b".to_string()];
+        let duplicated = vec![
+            "entity:b".to_string(),
+            "entity:a".to_string(),
+            "entity:b".to_string(),
+        ];
+
+        assert_eq!(
+            deterministic_community_id(&unique),
+            deterministic_community_id(&duplicated)
+        );
     }
 
     #[test]

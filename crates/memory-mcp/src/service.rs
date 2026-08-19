@@ -34,6 +34,7 @@ mod cache;
 pub mod claims;
 #[cfg(not(any(test, feature = "prometheus")))]
 pub(crate) mod claims;
+mod community;
 mod conflict_resolver;
 mod content_extraction;
 mod context;

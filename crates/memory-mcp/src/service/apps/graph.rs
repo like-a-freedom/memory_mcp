@@ -6,8 +6,9 @@ use serde_json::{Value, json};
 
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::SurprisingConnection;
+use crate::service::community::{CommunityRecord, is_entity_id, parse_community_record};
 use crate::service::value_helpers::string_from_value;
-use crate::service::{MemoryError, MemoryService, normalize_dt, parse_iso};
+use crate::service::{MemoryError, MemoryService, normalize_dt};
 use crate::storage::{AppStoreClient, GraphDirection};
 
 /// Minimal context required by graph traversal functions.
@@ -460,33 +461,12 @@ fn neighbor_node(record: &Value, direction: GraphDirection, current: &str) -> Op
 }
 
 fn graph_community_from_value(value: &Value) -> Option<GraphCommunity> {
-    let map = value.as_object()?;
-    let community_id = map
-        .get("community_id")
-        .and_then(super::super::episode::unwrap_record_string)
-        .or_else(|| {
-            map.get("id")
-                .and_then(super::super::episode::unwrap_record_string)
-        })?;
-    let summary = map
-        .get("summary")
-        .and_then(super::super::episode::unwrap_record_string)
-        .unwrap_or_default();
-    let member_entities = map
-        .get("member_entities")
-        .and_then(unwrap_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(super::super::episode::unwrap_record_string)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let updated_at = map
-        .get("updated_at")
-        .and_then(super::super::episode::unwrap_record_string)
-        .as_deref()
-        .and_then(parse_iso);
+    let CommunityRecord {
+        community_id,
+        summary,
+        member_entities,
+        updated_at,
+    } = parse_community_record(value)?;
 
     if summary.is_empty() || member_entities.is_empty() {
         return None;
@@ -553,10 +533,6 @@ async fn cached_entity_name(
 
     cache.insert(entity_id.to_string(), name.clone());
     Ok(name)
-}
-
-fn is_entity_id(record_id: &str) -> bool {
-    record_id.starts_with("entity:")
 }
 
 fn is_traversable_graph_node(record_id: &str) -> bool {
@@ -710,16 +686,6 @@ async fn find_entity_id_by_name(
     }
 
     Ok(None)
-}
-
-fn unwrap_array(value: &Value) -> Option<&Vec<Value>> {
-    if let Some(array) = value.as_array() {
-        Some(array)
-    } else if let Some(object) = value.as_object() {
-        object.get("Array").and_then(Value::as_array)
-    } else {
-        None
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1056,30 +1022,6 @@ mod tests {
         assert!(!is_traversable_graph_node("community:abc"));
         assert!(!is_traversable_graph_node("user:123"));
         assert!(!is_traversable_graph_node("random"));
-    }
-
-    #[test]
-    fn unwrap_array_handles_plain_array() {
-        let v = json!([1, 2, 3]);
-        assert!(unwrap_array(&v).is_some());
-    }
-
-    #[test]
-    fn unwrap_array_handles_wrapped_array() {
-        let v = json!({"Array": [1, 2, 3]});
-        assert!(unwrap_array(&v).is_some());
-    }
-
-    #[test]
-    fn unwrap_array_returns_none_for_object() {
-        let v = json!({"key": "value"});
-        assert!(unwrap_array(&v).is_none());
-    }
-
-    #[test]
-    fn unwrap_array_returns_none_for_scalar() {
-        assert!(unwrap_array(&json!("string")).is_none());
-        assert!(unwrap_array(&json!(42)).is_none());
     }
 
     #[test]

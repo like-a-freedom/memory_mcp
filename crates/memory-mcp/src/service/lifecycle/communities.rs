@@ -3,7 +3,7 @@
 //! Rebuilds the `community` table from the currently active edge graph using a
 //! union-find pass over active edges gathered in paginated batches.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 use chrono::Utc;
 use serde_json::Value;
@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::service::MemoryError;
 use crate::service::MemoryService;
+use crate::service::community::converge_communities_from_active_edges;
 use crate::service::service_context::ServiceContext;
 
 /// Spawns the community recomputation background task.
@@ -227,17 +228,17 @@ async fn build_communities_from_active_edges(
     service: &ServiceContext,
     edge_records: &[serde_json::Value],
 ) -> Result<Vec<RebuiltCommunity>, MemoryError> {
-    let grouped_entities = group_entity_components_from_active_edges(edge_records);
+    let memberships = converge_communities_from_active_edges(edge_records);
 
     let mut rebuilt = Vec::new();
-    for member_entities in grouped_entities {
+    for membership in memberships {
         let summary =
-            super::super::episode::build_community_summary(service, &member_entities).await?;
-        let community_id = crate::service::deterministic_community_id(&member_entities);
+            super::super::episode::build_community_summary(service, &membership.member_entities)
+                .await?;
 
         rebuilt.push(RebuiltCommunity {
-            community_id,
-            member_entities,
+            community_id: membership.community_id,
+            member_entities: membership.member_entities,
             summary,
         });
     }
@@ -246,60 +247,11 @@ async fn build_communities_from_active_edges(
     Ok(rebuilt)
 }
 
-fn group_entity_components_from_active_edges(
-    edge_records: &[serde_json::Value],
-) -> Vec<Vec<String>> {
-    let mut union_find = UnionFind::default();
-    let mut entity_nodes = BTreeSet::<String>::new();
-
-    for record in edge_records {
-        let Some((left, right)) = edge_endpoints_from_record(record) else {
-            continue;
-        };
-
-        union_find.union(&left, &right);
-        if is_entity_id(&left) {
-            entity_nodes.insert(left);
-        }
-        if is_entity_id(&right) {
-            entity_nodes.insert(right);
-        }
-    }
-
-    let mut grouped_entities = BTreeMap::<String, BTreeSet<String>>::new();
-    for entity_id in entity_nodes {
-        let root = union_find.find(entity_id.as_str());
-        grouped_entities.entry(root).or_default().insert(entity_id);
-    }
-
-    grouped_entities
-        .into_values()
-        .filter(|members| members.len() >= 2)
-        .map(|members| members.into_iter().collect::<Vec<_>>())
-        .collect()
-}
-
-fn edge_endpoints_from_record(record: &serde_json::Value) -> Option<(String, String)> {
-    let map = record.as_object()?;
-    let left = map
-        .get("in")
-        .and_then(super::super::episode::unwrap_record_string)?;
-    let right = map
-        .get("out")
-        .and_then(super::super::episode::unwrap_record_string)?;
-    Some((left, right))
-}
-
-fn is_entity_id(record_id: &str) -> bool {
-    record_id.starts_with("entity:")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use crate::service::episode;
     use crate::storage::{DbClient, SurrealDbClient};
     use serde_json::json;
 
@@ -346,145 +298,6 @@ mod tests {
             )
             .await
             .expect("seed edge");
-    }
-
-    fn edge(from_id: &str, to_id: &str) -> Value {
-        json!({"in": from_id, "out": to_id})
-    }
-
-    // -----------------------------------------------------------------------
-    // UnionFind tests (pure data structure, no DB needed)
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn union_find_singleton_node_returns_itself() {
-        let mut uf = UnionFind::default();
-        let root = uf.find("entity:alice");
-        assert_eq!(root, "entity:alice");
-    }
-
-    #[test]
-    fn union_find_two_nodes_share_root_after_union() {
-        let mut uf = UnionFind::default();
-        uf.union("entity:alice", "entity:bob");
-        let root_alice = uf.find("entity:alice");
-        let root_bob = uf.find("entity:bob");
-        assert_eq!(root_alice, root_bob);
-    }
-
-    #[test]
-    fn union_find_transitive_connectivity() {
-        let mut uf = UnionFind::default();
-        uf.union("entity:alice", "entity:bob");
-        uf.union("entity:bob", "entity:charlie");
-        let root_alice = uf.find("entity:alice");
-        let root_charlie = uf.find("entity:charlie");
-        assert_eq!(root_alice, root_charlie);
-    }
-
-    #[test]
-    fn union_find_disjoint_sets_remain_separate() {
-        let mut uf = UnionFind::default();
-        uf.union("entity:alice", "entity:bob");
-        uf.union("entity:charlie", "entity:dave");
-        let root_ab = uf.find("entity:alice");
-        let root_cd = uf.find("entity:charlie");
-        assert_ne!(root_ab, root_cd);
-    }
-
-    #[test]
-    fn union_find_idempotent_union() {
-        let mut uf = UnionFind::default();
-        uf.union("entity:alice", "entity:bob");
-        uf.union("entity:alice", "entity:bob"); // duplicate union
-        let root_alice = uf.find("entity:alice");
-        let root_bob = uf.find("entity:bob");
-        assert_eq!(root_alice, root_bob);
-    }
-
-    #[test]
-    fn union_find_merges_two_existing_communities() {
-        let mut uf = UnionFind::default();
-        uf.union("entity:alice", "entity:bob");
-        uf.union("entity:charlie", "entity:dave");
-        // Now merge the two communities
-        uf.union("entity:bob", "entity:charlie");
-        let root = uf.find("entity:alice");
-        assert_eq!(root, uf.find("entity:bob"));
-        assert_eq!(root, uf.find("entity:charlie"));
-        assert_eq!(root, uf.find("entity:dave"));
-    }
-
-    // -----------------------------------------------------------------------
-    // edge_endpoints_from_record tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn edge_endpoints_extracts_in_and_out() {
-        let record = json!({
-            "in": "entity:alice",
-            "out": "entity:bob",
-            "relation": "knows",
-        });
-        let result = edge_endpoints_from_record(&record);
-        assert_eq!(
-            result,
-            Some(("entity:alice".to_string(), "entity:bob".to_string()))
-        );
-    }
-
-    #[test]
-    fn edge_endpoints_returns_none_for_non_object() {
-        let record = json!("not an object");
-        assert!(edge_endpoints_from_record(&record).is_none());
-    }
-
-    #[test]
-    fn edge_endpoints_returns_none_when_in_missing() {
-        let record = json!({
-            "out": "entity:bob",
-        });
-        assert!(edge_endpoints_from_record(&record).is_none());
-    }
-
-    #[test]
-    fn edge_endpoints_returns_none_when_out_missing() {
-        let record = json!({
-            "in": "entity:alice",
-        });
-        assert!(edge_endpoints_from_record(&record).is_none());
-    }
-
-    #[test]
-    fn edge_endpoints_handles_wrapped_record_strings() {
-        let record = json!({
-            "in": {"String": "entity:alice"},
-            "out": {"String": "entity:bob"},
-        });
-        // unwrap_record_string handles {"String": ...} wrappers
-        let left = record.get("in").and_then(episode::unwrap_record_string);
-        let right = record.get("out").and_then(episode::unwrap_record_string);
-        assert_eq!(left, Some("entity:alice".to_string()));
-        assert_eq!(right, Some("entity:bob".to_string()));
-    }
-
-    // -----------------------------------------------------------------------
-    // is_entity_id tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn is_entity_id_true_for_entity_prefix() {
-        assert!(is_entity_id("entity:alice"));
-        assert!(is_entity_id("entity:project-123"));
-    }
-
-    #[test]
-    fn is_entity_id_false_for_non_entity() {
-        assert!(!is_entity_id("episode:abc"));
-        assert!(!is_entity_id("fact:123"));
-        assert!(!is_entity_id("community:xyz"));
-        assert!(!is_entity_id(""));
-        assert!(!is_entity_id("entity")); // no colon
     }
 
     #[tokio::test]
@@ -545,27 +358,18 @@ mod tests {
         let (edges, batches) = collect_active_edge_records(&app_store, "2026-05-13T00:00:00Z", 2)
             .await
             .expect("paged edge scan should succeed");
-        let grouped = group_entity_components_from_active_edges(&edges);
+        let grouped = converge_communities_from_active_edges(&edges);
 
         assert_eq!(batches, 2);
+        assert_eq!(grouped.len(), 1);
         assert_eq!(
-            grouped,
-            vec![vec![
+            grouped[0].member_entities,
+            vec![
                 "entity:alice".to_string(),
                 "entity:bob".to_string(),
                 "entity:carol".to_string(),
-            ]]
+            ]
         );
-    }
-
-    #[test]
-    fn group_entity_components_from_active_edges_ignores_single_entity_components() {
-        let grouped = group_entity_components_from_active_edges(&[
-            edge("entity:solo", "episode:orphan"),
-            edge("fact:orphan", "episode:orphan"),
-        ]);
-
-        assert!(grouped.is_empty());
     }
 }
 
@@ -574,50 +378,4 @@ struct RebuiltCommunity {
     community_id: String,
     member_entities: Vec<String>,
     summary: String,
-}
-
-#[derive(Debug, Default)]
-struct UnionFind {
-    parent: HashMap<String, String>,
-    rank: HashMap<String, usize>,
-}
-
-impl UnionFind {
-    fn find(&mut self, node: &str) -> String {
-        let parent = self
-            .parent
-            .entry(node.to_string())
-            .or_insert_with(|| node.to_string())
-            .clone();
-        self.rank.entry(node.to_string()).or_insert(0);
-
-        if parent == node {
-            return parent;
-        }
-
-        let root = self.find(&parent);
-        self.parent.insert(node.to_string(), root.clone());
-        root
-    }
-
-    fn union(&mut self, left: &str, right: &str) {
-        let left_root = self.find(left);
-        let right_root = self.find(right);
-
-        if left_root == right_root {
-            return;
-        }
-
-        let left_rank = *self.rank.get(&left_root).unwrap_or(&0);
-        let right_rank = *self.rank.get(&right_root).unwrap_or(&0);
-
-        if left_rank < right_rank {
-            self.parent.insert(left_root, right_root);
-        } else if left_rank > right_rank {
-            self.parent.insert(right_root, left_root);
-        } else {
-            self.parent.insert(right_root.clone(), left_root.clone());
-            self.rank.insert(left_root, left_rank + 1);
-        }
-    }
 }
