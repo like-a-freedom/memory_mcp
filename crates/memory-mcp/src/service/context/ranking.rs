@@ -11,8 +11,8 @@ use super::temporal::TemporalWindow;
 use crate::models::{Fact, FactType};
 use crate::service::normalize_text;
 use crate::service::query::{
-    query_hard_anchor_terms, query_term_should_be_soft_anchor, search_query_terms,
-    unique_query_terms,
+    fact_term_set, is_four_digit_year, matched_query_terms_for_fact, query_hard_anchor_terms,
+    query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn protected_direct_recall_fact_ids(
         if !is_protected_lexical_recall_tier(fact.retrieval_tier) {
             continue;
         }
-        if matched_query_terms_for_fact(fact, query_terms).len() < 4 {
+        if matched_query_terms_for_fact(&fact.fact, query_terms).len() < 4 {
             continue;
         }
         if focused_ranked_relevance_score(fact, temporal_focus) + 1e-9 < min_relevance {
@@ -645,7 +645,7 @@ fn is_temporal_query_term(term: &str) -> bool {
             | "q2"
             | "q3"
             | "q4"
-    ) || (term.len() == 4 && term.chars().all(|character| character.is_ascii_digit()))
+    ) || is_four_digit_year(term)
 }
 
 fn fact_matches_all_query_terms(fact: &RankedContextFact, required_terms: &[String]) -> bool {
@@ -653,7 +653,7 @@ fn fact_matches_all_query_terms(fact: &RankedContextFact, required_terms: &[Stri
         return false;
     }
 
-    let matched_terms = matched_query_terms_for_fact(fact, required_terms);
+    let matched_terms = matched_query_terms_for_fact(&fact.fact, required_terms);
     required_terms
         .iter()
         .all(|term| matched_terms.contains(term.as_str()))
@@ -730,33 +730,6 @@ fn index_key_jaccard_similarity(left: &[String], right: &[String]) -> f64 {
     }
 }
 
-fn matched_query_terms_for_fact(
-    fact: &RankedContextFact,
-    query_terms: &[String],
-) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let fact_terms = fact_term_set(&fact.fact);
-
-    query_terms
-        .iter()
-        .filter(|term| fact_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
-}
-
-fn fact_term_set(fact: &Fact) -> HashSet<String> {
-    let mut fact_terms = search_query_terms(&fact.content)
-        .into_iter()
-        .collect::<HashSet<_>>();
-    for index_key in &fact.index_keys {
-        fact_terms.extend(search_query_terms(index_key));
-    }
-    fact_terms
-}
-
 fn derive_query_anchor_terms(
     facts: &[RankedContextFact],
     query_terms: &[String],
@@ -771,7 +744,7 @@ fn derive_query_anchor_terms(
     let total_docs = facts.len().max(1);
 
     for fact in facts {
-        let matched_terms = matched_query_terms_for_fact(fact, &unique_terms);
+        let matched_terms = matched_query_terms_for_fact(&fact.fact, &unique_terms);
         for term in matched_terms {
             *doc_freq.entry(term).or_default() += 1;
         }
@@ -852,7 +825,7 @@ pub(crate) fn prune_redundant_selected_facts(
     loop {
         let matched_terms = selected
             .iter()
-            .map(|fact| matched_query_terms_for_fact(fact, query_terms))
+            .map(|fact| matched_query_terms_for_fact(&fact.fact, query_terms))
             .collect::<Vec<_>>();
         let mut term_frequency = HashMap::<String, usize>::new();
         for terms in &matched_terms {
@@ -1200,7 +1173,7 @@ fn selected_results_meet_grounding_floor(
 
     let mut matched_terms = HashSet::new();
     for fact in selected {
-        matched_terms.extend(matched_query_terms_for_fact(fact, query_terms));
+        matched_terms.extend(matched_query_terms_for_fact(&fact.fact, query_terms));
     }
 
     let coverage = matched_terms.len() as f64 / query_terms.len() as f64;

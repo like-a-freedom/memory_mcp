@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use crate::models::Fact;
 use crate::service::error::MemoryError;
 use crate::service::query::{
-    query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
-    search_query_terms, unique_query_terms,
+    is_four_digit_year, query_hard_anchor_terms, query_term_rarity_weight,
+    query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
 use crate::service::value_helpers::{json_f64, json_string};
 use crate::storage::ContextFactQuery;
@@ -246,10 +246,6 @@ fn is_calendar_month(term: &str) -> bool {
             | "november"
             | "december"
     )
-}
-
-fn is_four_digit_year(term: &str) -> bool {
-    term.len() == 4 && term.chars().all(|character| character.is_ascii_digit())
 }
 
 async fn scan_fact_records_by_query_terms(

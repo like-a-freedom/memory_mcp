@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 
 use crate::models::AssembledContextItem;
 use crate::service::decayed_confidence;
+use crate::service::query::matched_query_terms_for_text;
 
 use super::lexical;
 use super::ranking;
@@ -129,22 +130,6 @@ fn first_person_fact_grounding_bonus(content: &str) -> isize {
     } else {
         0
     }
-}
-
-fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashSet<String> {
-    if query_terms.is_empty() {
-        return HashSet::new();
-    }
-
-    let content_terms = crate::service::query::search_query_terms(text)
-        .into_iter()
-        .collect::<HashSet<_>>();
-
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
 }
 
 pub(super) fn maybe_append_first_person_ranked_fact_item(

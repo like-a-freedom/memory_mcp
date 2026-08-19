@@ -7,23 +7,8 @@ use super::ranking::default_episode_fallback_rationale;
 use super::scoring::selected_fact_query_term_coverage;
 use super::types::{RankedContextFact, RetrievalTier};
 use crate::service::error::MemoryError;
+use crate::service::query::matched_query_terms_for_text;
 use crate::service::service_context::ServiceContext;
-
-fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> Vec<String> {
-    if query_terms.is_empty() {
-        return Vec::new();
-    }
-
-    let content_terms = crate::service::query::search_query_terms(text)
-        .into_iter()
-        .collect::<std::collections::HashSet<_>>();
-
-    query_terms
-        .iter()
-        .filter(|term| content_terms.contains(term.as_str()))
-        .cloned()
-        .collect()
-}
 
 pub(super) fn should_prefer_episode_content(
     selected_facts: &[RankedContextFact],
@@ -260,8 +245,8 @@ mod tests {
             ],
         );
         assert_eq!(terms.len(), 2);
-        assert!(terms.contains(&"coffee".to_string()));
-        assert!(terms.contains(&"brewing".to_string()));
+        assert!(terms.contains("coffee"));
+        assert!(terms.contains("brewing"));
     }
 
     #[test]

@@ -2,10 +2,14 @@
 
 use chrono::{DateTime, Utc};
 
+mod lexical;
 mod search;
 mod time;
 
 use crate::models::Fact;
+pub use lexical::{
+    fact_term_set, is_four_digit_year, matched_query_terms_for_fact, matched_query_terms_for_text,
+};
 pub use search::{
     normalize_text, preprocess_search_query, query_hard_anchor_terms, query_term_rarity_weight,
     query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
