@@ -740,6 +740,7 @@ pub(crate) struct GraphSessionNeighbors {
 }
 
 impl GraphSessionState {
+    #[cfg(any(test, feature = "mcp-apps"))]
     pub(crate) fn from_payload(payload: &Value) -> Result<Self, MemoryError> {
         serde_json::from_value(payload.clone()).map_err(|error| {
             MemoryError::Validation(format!("invalid graph session payload: {error}"))
