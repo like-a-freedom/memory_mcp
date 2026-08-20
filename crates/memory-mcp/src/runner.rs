@@ -4,9 +4,11 @@
 //! Returns `Result<(), ExitCode>`. The only `std::process::exit` call lives in
 //! `main.rs`. See Risk R7.
 
+use std::collections::HashMap;
 use std::process::ExitCode;
 
 use clap::Parser;
+use serde_json::json;
 
 use crate::cli::args::WatchArgs;
 use crate::cli::commands;
@@ -15,13 +17,24 @@ use crate::cli::{
     Cli, Command, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
     run_stdio_server, run_watch_mode,
 };
-use crate::logging::StdoutLogger;
+use crate::logging::{LogLevel, StdoutLogger, install_log_file};
 // `EmbeddingActivationMode` is `pub(crate)` re-exported from `service` (the
 // underlying `startup` module is private). The `error` submodule is also
 // private — reach `MemoryError` via the `pub use error::MemoryError;` at
 // `src/service.rs:15`, not via `service::error::`. See Risk R12.
 use crate::service::EmbeddingActivationMode;
 use crate::service::MemoryError;
+
+/// Reads `MEMORY_LOG_FILE` from the environment. Returns `Some(trimmed_path)`
+/// if the variable is set and non-empty after trimming; `None` otherwise.
+fn resolve_log_file_path(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
 
 /// Application entry point. Called from `main.rs`.
 ///
@@ -31,6 +44,22 @@ use crate::service::MemoryError;
 pub async fn run() -> Result<(), ExitCode> {
     let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into());
     let logger = StdoutLogger::new(&log_level);
+
+    // Install file log sink if configured. Must happen before log_startup
+    // so the very first event goes to the file.
+    if let Ok(raw_path) = std::env::var("MEMORY_LOG_FILE") {
+        if let Some(path) = resolve_log_file_path(&raw_path) {
+            if let Err(err) = install_log_file(&path) {
+                // Fallback: warn to stderr (sink not installed, so stderr works).
+                let mut event = HashMap::new();
+                event.insert("op".to_string(), json!("main.log_file_open_failed"));
+                event.insert("path".to_string(), json!(&path));
+                event.insert("error".to_string(), json!(err.to_string()));
+                logger.log(event, LogLevel::Warn);
+            }
+        }
+    }
+
     let cli = Cli::parse();
 
     let startup_ts = chrono::Utc::now();
@@ -201,5 +230,19 @@ mod tests {
         let value = cli_error_json(&MemoryError::Validation("bad input".into()));
 
         assert!(value.get("hint").is_none());
+    }
+
+    #[test]
+    fn resolve_log_file_path_trims_and_rejects_empty() {
+        assert_eq!(
+            super::resolve_log_file_path("  /tmp/test.log  "),
+            Some("/tmp/test.log".to_string())
+        );
+        assert_eq!(super::resolve_log_file_path(""), None);
+        assert_eq!(super::resolve_log_file_path("   "), None);
+        assert_eq!(
+            super::resolve_log_file_path("/var/log/memory.log"),
+            Some("/var/log/memory.log".to_string())
+        );
     }
 }
