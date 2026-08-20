@@ -556,6 +556,7 @@ The following settings are optional for power users. They are read by the same e
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `RUST_LOG` | string | `info` | Logging level; canonical values are `trace`, `debug`, `info`, `warn`, and `error`; `warning` aliases `warn`, and unknown values fall back to `info` |
+| `MEMORY_LOG_FILE` | path | unset | Write structured log events to this file instead of stderr; the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; on open failure the process falls back to stderr with a warning |
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `prometheus` feature is compiled and this variable is set |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
@@ -862,6 +863,8 @@ Recommended presets:
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
 
+When `MEMORY_LOG_FILE` is set to a non-empty path, all structured log events are written to that file instead of stderr. This is useful for MCP hosts that do not expose the server's stderr. The file is opened in append mode (no rotation); the parent directory must already exist. If the file cannot be opened, a warning is emitted to stderr and logging continues there.
+
 ## MCP tools
 
 The public MCP surface is centered on a small set of high-value operations rather than endpoint-by-endpoint plumbing.
@@ -1161,7 +1164,8 @@ Memory-operation CLI subcommands print the `ToolResponse<T>` as pretty JSON to *
 }
 ```
 
-Structured log events go to **stderr** (controlled by `RUST_LOG`). Successful
+Structured log events go to **stderr** (controlled by `RUST_LOG`), or to the
+file named by `MEMORY_LOG_FILE` when that variable is set. Successful
 CLI results, including `memory_mcp init`, go to **stdout** as JSON. Configuration
 failures and other error responses go to **stderr** as JSON:
 
