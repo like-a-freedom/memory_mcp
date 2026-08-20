@@ -47,17 +47,16 @@ pub async fn run() -> Result<(), ExitCode> {
 
     // Install file log sink if configured. Must happen before log_startup
     // so the very first event goes to the file.
-    if let Ok(raw_path) = std::env::var("MEMORY_LOG_FILE") {
-        if let Some(path) = resolve_log_file_path(&raw_path) {
-            if let Err(err) = install_log_file(&path) {
-                // Fallback: warn to stderr (sink not installed, so stderr works).
-                let mut event = HashMap::new();
-                event.insert("op".to_string(), json!("main.log_file_open_failed"));
-                event.insert("path".to_string(), json!(&path));
-                event.insert("error".to_string(), json!(err.to_string()));
-                logger.log(event, LogLevel::Warn);
-            }
-        }
+    if let Ok(raw_path) = std::env::var("MEMORY_LOG_FILE")
+        && let Some(path) = resolve_log_file_path(&raw_path)
+        && let Err(err) = install_log_file(&path)
+    {
+        // Fallback: warn to stderr (sink not installed, so stderr works).
+        let mut event = HashMap::new();
+        event.insert("op".to_string(), json!("main.log_file_open_failed"));
+        event.insert("path".to_string(), json!(&path));
+        event.insert("error".to_string(), json!(err.to_string()));
+        logger.log(event, LogLevel::Warn);
     }
 
     let cli = Cli::parse();
