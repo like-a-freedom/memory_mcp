@@ -674,6 +674,12 @@ The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER
 #### How it works at startup
 
 At startup the server resolves a **target embedding identity** from the configured provider, model, base URL, and effective dimension.
+For remote providers (`openai-compatible`, `ollama`) the effective dimension is normally detected with a single short **dimension probe** request to the provider.
+Two startup behaviors keep this from blocking `serve`:
+
+- If `SURREALDB_EMBEDDING_DIMENSION` is set, the probe is **skipped entirely** — the override is authoritative at startup, so the server resolves its embedding identity without any network access. A wrong override then surfaces as a dimension-validation error on embed; use `reembed` as the recovery path.
+- If no override is set and the provider is unreachable, the probe fails fast (single attempt, bounded by a short probe timeout) and the server degrades to lexical/graph-only retrieval instead of stalling startup.
+
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
 In normal `serve` / `watch` startup, the Active Namespace is checked before semantic retrieval is enabled.
 If it is already marked `ready` for the same signature, semantic retrieval starts normally.

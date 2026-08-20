@@ -17,7 +17,8 @@ pub(crate) mod task_runner;
 
 use local::LocalCandleEmbeddingProvider;
 use remote::{
-    OllamaEmbeddingProvider, OpenAiCompatibleEmbeddingProvider, detect_ollama_embedding_dimension,
+    OllamaEmbeddingProvider, OpenAiCompatibleEmbeddingProvider,
+    REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS, detect_ollama_embedding_dimension,
     detect_openai_embedding_dimension,
 };
 
@@ -91,6 +92,19 @@ fn build_embedding_http_client(timeout_secs: u64) -> Result<reqwest::Client, Mem
         .map_err(|err| MemoryError::ConfigInvalid(format!("invalid embedding HTTP client: {err}")))
 }
 
+/// HTTP client for the startup dimension probe. The connect timeout is
+/// bounded by the probe budget so an unreachable provider cannot stall
+/// startup beyond it even when the operator configured a large
+/// `EMBEDDINGS_TIMEOUT_SECS`.
+fn build_probe_http_client(timeout_secs: u64) -> Result<reqwest::Client, MemoryError> {
+    let probe_timeout = Duration::from_secs(timeout_secs.min(REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS));
+    reqwest::Client::builder()
+        .timeout(probe_timeout)
+        .connect_timeout(probe_timeout)
+        .build()
+        .map_err(|err| MemoryError::ConfigInvalid(format!("invalid embedding HTTP client: {err}")))
+}
+
 fn validate_dimension_override(
     dimension_override: Option<usize>,
     actual_dimension: usize,
@@ -128,7 +142,16 @@ async fn resolve_embedding_dimension(
             validate_dimension_override(config.dimension_override, actual_dimension)
         }
         EmbeddingProviderKind::OpenAiCompatible => {
-            let client = build_embedding_http_client(config.timeout_secs)?;
+            // An explicit SURREALDB_EMBEDDING_DIMENSION makes the probe
+            // unnecessary: the override is authoritative at startup, so the
+            // server can resolve its embedding identity without any network
+            // access (offline startup). A wrong override surfaces later via
+            // dimension validation on embed; `reembed` remains the recovery
+            // path for dimension changes.
+            if let Some(dimension) = config.dimension_override {
+                return Ok(dimension);
+            }
+            let client = build_probe_http_client(config.timeout_secs)?;
             let actual_dimension =
                 detect_openai_embedding_dimension(
                     &client,
@@ -144,7 +167,12 @@ async fn resolve_embedding_dimension(
             validate_dimension_override(config.dimension_override, actual_dimension)
         }
         EmbeddingProviderKind::Ollama => {
-            let client = build_embedding_http_client(config.timeout_secs)?;
+            // See the OpenAiCompatible arm: an explicit dimension override
+            // skips the network probe entirely.
+            if let Some(dimension) = config.dimension_override {
+                return Ok(dimension);
+            }
+            let client = build_probe_http_client(config.timeout_secs)?;
             let actual_dimension =
                 detect_ollama_embedding_dimension(
                     &client,
@@ -729,6 +757,92 @@ mod tests {
             .await
             .expect("resolved target for disabled provider with override");
         assert_eq!(resolved.dimension, 42);
+    }
+
+    // --- Offline startup: remote provider with explicit dimension override ---
+    //
+    // An explicit SURREALDB_EMBEDDING_DIMENSION must make the server resolve
+    // its embedding identity without any network access, so `serve` can start
+    // in an environment without internet even when a remote provider is
+    // configured. The base URL below is unreachable by design (TEST-NET-1);
+    // the tests fail if a probe is attempted.
+
+    const UNREACHABLE_BASE_URL: &str = "http://192.0.2.1:9999/v1";
+
+    #[tokio::test]
+    async fn openai_compatible_dimension_override_skips_probe_and_resolves_offline() {
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::OpenAiCompatible,
+            base_url: Some(UNREACHABLE_BASE_URL.to_string()),
+            model: Some("test-model".to_string()),
+            dimension_override: Some(1536),
+            timeout_secs: 15,
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            resolve_embedding_target_identity(&config, "."),
+        )
+        .await
+        .expect("override must resolve without network access")
+        .expect("resolved target");
+
+        assert_eq!(resolved.dimension, 1536);
+        assert_eq!(resolved.provider_label, "openai-compatible");
+    }
+
+    #[tokio::test]
+    async fn ollama_dimension_override_skips_probe_and_resolves_offline() {
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::Ollama,
+            base_url: Some(UNREACHABLE_BASE_URL.to_string()),
+            model: Some("test-model".to_string()),
+            dimension_override: Some(2048),
+            timeout_secs: 15,
+            ..EmbeddingConfig::default()
+        };
+
+        let resolved = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            resolve_embedding_target_identity(&config, "."),
+        )
+        .await
+        .expect("override must resolve without network access")
+        .expect("resolved target");
+
+        assert_eq!(resolved.dimension, 2048);
+        assert_eq!(resolved.provider_label, "ollama");
+    }
+
+    #[tokio::test]
+    async fn remote_probe_without_override_fails_fast_when_provider_unreachable() {
+        // Without an override the probe must still run, but it must fail fast
+        // (single attempt under the probe timeout) instead of exhausting the
+        // runtime retry budget (~100s with default settings).
+        let config = EmbeddingConfig {
+            provider: EmbeddingProviderKind::OpenAiCompatible,
+            base_url: Some(UNREACHABLE_BASE_URL.to_string()),
+            model: Some("test-model".to_string()),
+            dimension_override: None,
+            timeout_secs: 15,
+            ..EmbeddingConfig::default()
+        };
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(12),
+            resolve_embedding_target_identity(&config, "."),
+        )
+        .await
+        .expect("probe must fail fast instead of exhausting runtime retries");
+
+        assert!(result.is_err(), "unreachable provider must fail the probe");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(12),
+            "probe took {:?}, expected to fail within the probe budget",
+            started.elapsed()
+        );
     }
 
     /// Verifies that the fallback target construction (used by the builder

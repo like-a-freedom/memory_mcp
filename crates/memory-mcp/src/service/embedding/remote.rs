@@ -14,6 +14,13 @@ const MAX_REMOTE_EMBEDDING_ATTEMPTS: u32 = 5;
 const BASE_REMOTE_EMBEDDING_DELAY_MS: u64 = 2000;
 const MAX_REMOTE_EMBEDDING_DELAY_MS: u64 = 15_000;
 
+/// Wall-clock budget for the startup dimension probe against a remote
+/// provider. The probe runs on the critical startup path, so it must fail
+/// fast (single attempt, no backoff loop) and let the server degrade to
+/// lexical/graph-only retrieval instead of stalling for the full runtime
+/// retry budget when the provider is unreachable.
+pub(crate) const REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS: u64 = 10;
+
 #[derive(Debug, Clone)]
 struct RetryableRemoteRequestFailure {
     message: String,
@@ -47,15 +54,18 @@ fn remote_retry_delay(attempt: u32, retry_after: Option<Duration>) -> Duration {
     })
 }
 
-fn log_remote_retry(provider: &str, attempt: u32, delay: Duration, message: &str) {
+fn log_remote_retry(
+    provider: &str,
+    attempt: u32,
+    max_attempts: u32,
+    delay: Duration,
+    message: &str,
+) {
     let mut event = HashMap::new();
     event.insert("op".to_string(), json!("embedding.request.retry"));
     event.insert("provider".to_string(), json!(provider));
     event.insert("attempt".to_string(), json!(attempt));
-    event.insert(
-        "max_attempts".to_string(),
-        json!(MAX_REMOTE_EMBEDDING_ATTEMPTS),
-    );
+    event.insert("max_attempts".to_string(), json!(max_attempts));
     event.insert("delay_ms".to_string(), json!(delay.as_millis() as u64));
     event.insert("reason".to_string(), json!(message));
     super::embedding_logger().log(event, LogLevel::Warn);
@@ -63,26 +73,25 @@ fn log_remote_retry(provider: &str, attempt: u32, delay: Duration, message: &str
 
 async fn with_remote_embedding_retry<T, F, Fut>(
     provider: &'static str,
+    max_attempts: u32,
     mut operation: F,
 ) -> Result<T, MemoryError>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, RemoteRequestFailure>>,
 {
-    for attempt in 1..=MAX_REMOTE_EMBEDDING_ATTEMPTS {
+    for attempt in 1..=max_attempts {
         match operation().await {
             Ok(value) => return Ok(value),
-            Err(RemoteRequestFailure::Retryable(failure))
-                if attempt < MAX_REMOTE_EMBEDDING_ATTEMPTS =>
-            {
+            Err(RemoteRequestFailure::Retryable(failure)) if attempt < max_attempts => {
                 let delay = remote_retry_delay(attempt, failure.retry_after);
-                log_remote_retry(provider, attempt, delay, &failure.message);
+                log_remote_retry(provider, attempt, max_attempts, delay, &failure.message);
                 tokio::time::sleep(delay).await;
             }
             Err(RemoteRequestFailure::Retryable(failure)) => {
                 return Err(MemoryError::Transient(format!(
                     "{} after {} attempts",
-                    failure.message, MAX_REMOTE_EMBEDDING_ATTEMPTS
+                    failure.message, max_attempts
                 )));
             }
             Err(RemoteRequestFailure::Fatal(err)) => return Err(err),
@@ -152,30 +161,34 @@ async fn request_openai_embedding_and_parse(
         headers.insert(AUTHORIZATION, value);
     }
 
-    with_remote_embedding_retry("openai-compatible", || async {
-        let body = {
-            let response = client
-                .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
-                .headers(headers.clone())
-                .json(&json!({"model": model, "input": input}))
-                .send()
-                .await
-                .map_err(map_send_error)?;
-            response_json(response).await?
-        };
+    with_remote_embedding_retry(
+        "openai-compatible",
+        MAX_REMOTE_EMBEDDING_ATTEMPTS,
+        || async {
+            let body = {
+                let response = client
+                    .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+                    .headers(headers.clone())
+                    .json(&json!({"model": model, "input": input}))
+                    .send()
+                    .await
+                    .map_err(map_send_error)?;
+                response_json(response).await?
+            };
 
-        // Parsing failure (missing data) is retryable — providers may
-        // return empty payloads under load.
-        match parse_openai_embedding(&body) {
-            Ok(embedding) => Ok(embedding),
-            Err(_) => Err(RemoteRequestFailure::Retryable(
-                RetryableRemoteRequestFailure {
-                    message: "embedding response missing data[0].embedding".to_string(),
-                    retry_after: None,
-                },
-            )),
-        }
-    })
+            // Parsing failure (missing data) is retryable — providers may
+            // return empty payloads under load.
+            match parse_openai_embedding(&body) {
+                Ok(embedding) => Ok(embedding),
+                Err(_) => Err(RemoteRequestFailure::Retryable(
+                    RetryableRemoteRequestFailure {
+                        message: "embedding response missing data[0].embedding".to_string(),
+                        retry_after: None,
+                    },
+                )),
+            }
+        },
+    )
     .await
 }
 
@@ -185,7 +198,7 @@ async fn request_ollama_body(
     model: &str,
     input: &str,
 ) -> Result<Value, MemoryError> {
-    with_remote_embedding_retry("ollama", || async {
+    with_remote_embedding_retry("ollama", MAX_REMOTE_EMBEDDING_ATTEMPTS, || async {
         let response = client
             .post(format!("{}/api/embeddings", base_url.trim_end_matches('/')))
             .json(&json!({"model": model, "prompt": input}))
@@ -246,15 +259,86 @@ impl OllamaEmbeddingProvider {
     }
 }
 
+/// One-shot OpenAI-compatible embedding request without the runtime retry
+/// loop. Used by the startup dimension probe, which must fail fast when the
+/// provider is unreachable instead of blocking server startup.
+async fn request_openai_embedding_once(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+    api_key: Option<&str>,
+    input: &str,
+) -> Result<Vec<f64>, MemoryError> {
+    let mut headers =
+        HeaderMap::from_iter([(CONTENT_TYPE, HeaderValue::from_static("application/json"))]);
+    if let Some(api_key) = api_key {
+        let value = HeaderValue::from_str(&format!("Bearer {api_key}")).map_err(|err| {
+            MemoryError::ConfigInvalid(format!("invalid EMBEDDINGS_API_KEY header: {err}"))
+        })?;
+        headers.insert(AUTHORIZATION, value);
+    }
+
+    let response = client
+        .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+        .headers(headers)
+        .json(&json!({"model": model, "input": input}))
+        .send()
+        .await
+        .map_err(|err| {
+            MemoryError::Transient(format!("embedding probe transport failure: {err}"))
+        })?;
+    let body = response_json(response)
+        .await
+        .map_err(|failure| match failure {
+            RemoteRequestFailure::Retryable(retryable) => MemoryError::Transient(retryable.message),
+            RemoteRequestFailure::Fatal(err) => err,
+        })?;
+
+    parse_openai_embedding(&body)
+}
+
+/// One-shot Ollama embedding request without the runtime retry loop. Used
+/// by the startup dimension probe, which must fail fast when the provider is
+/// unreachable instead of blocking server startup.
+async fn request_ollama_body_once(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+    input: &str,
+) -> Result<Value, MemoryError> {
+    let response = client
+        .post(format!("{}/api/embeddings", base_url.trim_end_matches('/')))
+        .json(&json!({"model": model, "prompt": input}))
+        .send()
+        .await
+        .map_err(|err| {
+            MemoryError::Transient(format!("embedding probe transport failure: {err}"))
+        })?;
+
+    response_json(response)
+        .await
+        .map_err(|failure| match failure {
+            RemoteRequestFailure::Retryable(retryable) => MemoryError::Transient(retryable.message),
+            RemoteRequestFailure::Fatal(err) => err,
+        })
+}
+
 pub(super) async fn detect_openai_embedding_dimension(
     client: &reqwest::Client,
     base_url: &str,
     model: &str,
     api_key: Option<&str>,
 ) -> Result<usize, MemoryError> {
-    let embedding =
-        request_openai_embedding_and_parse(client, base_url, model, api_key, "dimension probe")
-            .await?;
+    let embedding = tokio::time::timeout(
+        Duration::from_secs(REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS),
+        request_openai_embedding_once(client, base_url, model, api_key, "dimension probe"),
+    )
+    .await
+    .map_err(|_| {
+        MemoryError::Transient(format!(
+            "embedding dimension probe timed out after {REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS}s"
+        ))
+    })??;
 
     Ok(embedding.len())
 }
@@ -264,7 +348,16 @@ pub(super) async fn detect_ollama_embedding_dimension(
     base_url: &str,
     model: &str,
 ) -> Result<usize, MemoryError> {
-    let body = request_ollama_body(client, base_url, model, "dimension probe").await?;
+    let body = tokio::time::timeout(
+        Duration::from_secs(REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS),
+        request_ollama_body_once(client, base_url, model, "dimension probe"),
+    )
+    .await
+    .map_err(|_| {
+        MemoryError::Transient(format!(
+            "embedding dimension probe timed out after {REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS}s"
+        ))
+    })??;
 
     Ok(parse_ollama_embedding(&body)?.len())
 }

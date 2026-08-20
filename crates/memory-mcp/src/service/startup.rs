@@ -387,6 +387,97 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn resolve_embedding_startup_degrades_fast_when_remote_provider_unreachable() {
+        // Offline startup regression: a remote provider without an explicit
+        // dimension override must fail its probe within the bounded probe
+        // budget and degrade to lexical/graph-only retrieval, instead of
+        // stalling startup for the full runtime retry budget (~100s).
+        let namespace = "org".to_string();
+        let db_client = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory("memory", &namespace, "warn")
+                .await
+                .expect("in-memory database should connect"),
+        ) as Arc<dyn DbClient>;
+        apply_startup_migrations(&db_client, &namespace)
+            .await
+            .expect("startup migrations should apply");
+
+        let config = crate::config::EmbeddingConfig {
+            provider: crate::config::EmbeddingProviderKind::OpenAiCompatible,
+            // TEST-NET-1: unreachable by design, and connect attempts hang
+            // until timeout (unlike connection-refused loopback ports).
+            base_url: Some("http://192.0.2.1:9999/v1".to_string()),
+            model: Some("test-model".to_string()),
+            api_key: None,
+            timeout_secs: 15,
+            ..crate::config::EmbeddingConfig::default()
+        };
+        let logger = crate::logging::StdoutLogger::new("warn");
+
+        let started = std::time::Instant::now();
+        let (decision, target) = tokio::time::timeout(
+            std::time::Duration::from_secs(12),
+            resolve_embedding_startup(&config, &db_client, &namespace, "/tmp", &logger),
+        )
+        .await
+        .expect("startup must degrade within the probe budget, not the retry budget")
+        .expect("probe failure should degrade semantic startup");
+
+        assert!(target.is_none());
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::DisableSemantic { .. }
+        ));
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(12),
+            "startup took {:?}, expected to degrade within the probe budget",
+            started.elapsed()
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_embedding_startup_resolves_offline_with_explicit_dimension_override() {
+        // Offline startup with an explicit dimension override must not touch
+        // the network at all: the target resolves from configuration and the
+        // empty namespace bootstraps to `ready` for that signature.
+        let namespace = "org".to_string();
+        let db_client = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory("memory", &namespace, "warn")
+                .await
+                .expect("in-memory database should connect"),
+        ) as Arc<dyn DbClient>;
+        apply_startup_migrations(&db_client, &namespace)
+            .await
+            .expect("startup migrations should apply");
+
+        let config = crate::config::EmbeddingConfig {
+            provider: crate::config::EmbeddingProviderKind::OpenAiCompatible,
+            base_url: Some("http://192.0.2.1:9999/v1".to_string()),
+            model: Some("test-model".to_string()),
+            api_key: None,
+            dimension_override: Some(1536),
+            timeout_secs: 15,
+            ..crate::config::EmbeddingConfig::default()
+        };
+        let logger = crate::logging::StdoutLogger::new("warn");
+
+        let (decision, target) = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            resolve_embedding_startup(&config, &db_client, &namespace, "/tmp", &logger),
+        )
+        .await
+        .expect("override must resolve the target without network access")
+        .expect("startup should resolve an embedding target from the override");
+
+        let target = target.expect("target resolved from explicit dimension override");
+        assert_eq!(target.dimension, 1536);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::BootstrapReadyNamespace { .. }
+        ));
+    }
+
     #[test]
     fn decide_embedding_startup_disables_semantic_when_active_namespace_is_rebuilding() {
         let state = serde_json::json!({"status": "rebuilding", "active_signature": "embsig:ok"});
