@@ -35,6 +35,11 @@ the live schema for optional fields and enums rather than inventing them. No
 canonical tool accepts a `scope`, `project`, or `namespace` argument: the Active
 Namespace is server startup configuration and is never selected per request.
 
+Record IDs are canonical `<table>:<id>` strings — `episode:474b2d8b…`,
+`fact:52f9d92d…`, `entity:…`. Round-trip every ID exactly as a tool returned
+it; never strip or re-add the table prefix. A bare hex ID without its prefix
+is rejected with a validation error, not treated as "not found".
+
 Successful tool responses use an envelope with `status`, `result`, and
 `guidance`. List results also expose pagination metadata. MCP errors are
 failures, not empty results; preserve known handles and report `pending`.

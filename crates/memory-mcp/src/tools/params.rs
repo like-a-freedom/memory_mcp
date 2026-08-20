@@ -44,7 +44,9 @@ pub struct ExplainParams {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ExtractParams {
-    /// Episode ID to extract from (optional if content provided)
+    /// Episode ID to extract from (optional if content provided).
+    /// Use the canonical `episode:<id>` form exactly as returned by `ingest`;
+    /// a bare hex ID without the `episode:` prefix is rejected.
     pub episode_id: Option<String>,
     /// Content to analyze (optional if episode_id provided)
     pub content: Option<String>,
@@ -78,7 +80,9 @@ pub struct ResolveParams {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct InvalidateParams {
-    /// ID of the fact to invalidate
+    /// ID of the fact to invalidate.
+    /// Use the canonical `fact:<id>` form exactly as returned by `extract`;
+    /// a bare hex ID without the `fact:` prefix is rejected.
     pub fact_id: String,
     /// Reason for invalidation
     pub reason: String,
@@ -283,6 +287,27 @@ mod tests {
         assert!(
             payload_err.to_string().contains("payload"),
             "unexpected error: {payload_err}"
+        );
+    }
+
+    #[test]
+    fn record_id_fields_document_canonical_table_prefix_form() {
+        let extract = schema_json::<ExtractParams>();
+        let episode_description = extract["properties"]["episode_id"]["description"]
+            .as_str()
+            .expect("episode_id description");
+        assert!(
+            episode_description.contains("episode:<id>"),
+            "episode_id description must name the canonical form: {episode_description}"
+        );
+
+        let invalidate = schema_json::<InvalidateParams>();
+        let fact_description = invalidate["properties"]["fact_id"]["description"]
+            .as_str()
+            .expect("fact_id description");
+        assert!(
+            fact_description.contains("fact:<id>"),
+            "fact_id description must name the canonical form: {fact_description}"
         );
     }
 
