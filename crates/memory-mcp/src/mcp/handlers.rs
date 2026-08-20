@@ -523,15 +523,18 @@ mod tests {
     #[cfg(feature = "mcp-apps")]
     use crate::service::capabilities::resolve::ResolveCapability;
     use crate::service::edge_neighbor;
+    use crate::service::{DisabledEmbeddingProvider, EntityExtractor, GlinerEntityExtractor};
     use crate::storage::{DbClient, SurrealDbClient};
+    use crate::tools::params::{ExtractParams, IngestParams};
     use chrono::Datelike;
     #[cfg(feature = "mcp-apps")]
     use chrono::{TimeZone, Utc};
     #[cfg(feature = "mcp-apps")]
     use rmcp::model::{ReadResourceRequestParams, ResourceContents};
     use serde_json::{Value, json};
+    use std::path::Path;
 
-    async fn create_test_mcp() -> MemoryMcp {
+    async fn test_db_client() -> Arc<SurrealDbClient> {
         let namespaces = vec!["org".to_string()];
         let db_client = Arc::new(
             SurrealDbClient::connect_in_memory_with_namespaces(
@@ -550,8 +553,37 @@ mod tests {
                 .expect("apply test migrations");
         }
 
-        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
-            .expect("create test service");
+        db_client
+    }
+
+    async fn create_test_mcp() -> MemoryMcp {
+        let service = MemoryService::new(
+            test_db_client().await,
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("create test service");
+        MemoryMcp::new(service)
+    }
+
+    async fn create_test_mcp_with_extractor(
+        entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> MemoryMcp {
+        let service = MemoryService::new_with_embedding_provider(
+            test_db_client().await,
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(DisabledEmbeddingProvider::new(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            entity_extractor,
+        )
+        .expect("create test service with custom extractor");
         MemoryMcp::new(service)
     }
 
@@ -600,6 +632,49 @@ mod tests {
         let mcp = create_test_mcp().await;
         assert!(mcp.get_tool("extract").is_some());
         assert!(mcp.get_tool("ingest").is_some());
+    }
+
+    #[tokio::test]
+    async fn mcp_extract_with_empty_gliner_labels_skips_model_loading() {
+        let extractor = Arc::new(
+            GlinerEntityExtractor::new(
+                Path::new("/path/to/a/nonexistent/gliner/model"),
+                vec!["person".to_string()],
+                0.2,
+            )
+            .expect("GLiNER runtime configuration should not load model files"),
+        ) as Arc<dyn EntityExtractor>;
+        let mcp = create_test_mcp_with_extractor(extractor).await;
+
+        let ingest = mcp
+            .ingest(Parameters(IngestParams {
+                source_type: "test".to_string(),
+                source_id: "empty-gliner-labels".to_string(),
+                content: "Alice works at Acme".to_string(),
+                t_ref: "2026-01-01T00:00:00Z".to_string(),
+                t_ingested: None,
+                policy_tags: Vec::new(),
+            }))
+            .await
+            .expect("MCP ingest should succeed")
+            .0;
+
+        let extraction = mcp
+            .extract(Parameters(ExtractParams {
+                episode_id: Some(ingest.result),
+                content: None,
+                text: None,
+                source_type: None,
+                source_id: None,
+                t_ref: None,
+                zero_shot_labels: Some(Vec::new()),
+            }))
+            .await
+            .expect("MCP extract with empty GLiNER labels should succeed")
+            .0;
+
+        assert_eq!(extraction.status, "success");
+        assert!(extraction.result.entities.is_empty());
     }
 
     #[test]
