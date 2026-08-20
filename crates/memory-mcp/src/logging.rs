@@ -4,8 +4,9 @@
 //! and configurable log levels.
 
 use std::collections::HashMap;
+use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use chrono::Utc;
 use serde_json::Value;
@@ -60,7 +61,31 @@ struct WarnTracker {
     counts: Mutex<HashMap<String, u64>>,
 }
 
-/// Logger that writes structured events to stderr.
+/// Process-global file sink. When installed, all `StdoutLogger` instances
+/// write to this file instead of stderr. Set once at startup via
+/// [`install_log_file`]; never unset for the process lifetime.
+static LOG_FILE_SINK: OnceLock<Mutex<File>> = OnceLock::new();
+
+/// Installs a file-based log sink for the entire process.
+///
+/// Opens the file in append mode, creating it if it does not exist.
+/// Parent directories are NOT created. Returns `Err` if the file cannot
+/// be opened (missing directory, permission denied, etc.).
+///
+/// Calling this a second time returns `Err` with `ErrorKind::AlreadyExists`
+/// (the first installation wins).
+pub fn install_log_file(path: &str) -> Result<(), io::Error> {
+    let file = OpenOptions::new().create(true).append(true).open(path)?;
+    LOG_FILE_SINK.set(Mutex::new(file)).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "log file sink already installed",
+        )
+    })
+}
+
+/// Logger that writes structured events to stderr (or to the file sink
+/// installed via [`install_log_file`]).
 #[derive(Clone)]
 pub struct StdoutLogger {
     level: LogLevel,
@@ -123,6 +148,15 @@ impl StdoutLogger {
         }
 
         let line = Self::format_event_line(&event, level);
+
+        // Write to file sink if installed; otherwise fall through to stderr.
+        if let Some(sink) = LOG_FILE_SINK.get() {
+            let mut file = sink.lock().unwrap_or_else(|poison| poison.into_inner());
+            let _ = file.write_all(line.as_bytes());
+            let _ = file.write_all(b"\n");
+            let _ = file.flush();
+            return;
+        }
 
         let mut stderr = io::stderr();
         let _ = stderr.write_all(line.as_bytes());
