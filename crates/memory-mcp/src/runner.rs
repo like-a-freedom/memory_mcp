@@ -25,8 +25,8 @@ use crate::logging::{LogLevel, StdoutLogger, install_log_file};
 use crate::service::EmbeddingActivationMode;
 use crate::service::MemoryError;
 
-/// Reads `MEMORY_LOG_FILE` from the environment. Returns `Some(trimmed_path)`
-/// if the variable is set and non-empty after trimming; `None` otherwise.
+/// Normalizes a raw `MEMORY_LOG_FILE` value. Returns `Some(trimmed_path)`
+/// if the value is non-empty after trimming; `None` otherwise.
 fn resolve_log_file_path(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -51,12 +51,17 @@ pub async fn run() -> Result<(), ExitCode> {
         && let Some(path) = resolve_log_file_path(&raw_path)
         && let Err(err) = install_log_file(&path)
     {
-        // Fallback: warn to stderr (sink not installed, so stderr works).
+        // Fallback: warn to stderr unconditionally. The sink is not installed,
+        // so stderr works; going through `logger.log` would let `RUST_LOG=error`
+        // silently swallow the one diagnostic that must not be lost.
         let mut event = HashMap::new();
         event.insert("op".to_string(), json!("main.log_file_open_failed"));
         event.insert("path".to_string(), json!(&path));
         event.insert("error".to_string(), json!(err.to_string()));
-        logger.log(event, LogLevel::Warn);
+        eprintln!(
+            "{}",
+            StdoutLogger::format_event_line(&event, LogLevel::Warn)
+        );
     }
 
     let cli = Cli::parse();

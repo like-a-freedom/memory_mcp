@@ -55,6 +55,14 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
+/// Writes one line to a sink, best-effort. Logging must never panic or
+/// propagate I/O failures (a broken sink should not take down callers).
+fn write_line<W: Write>(writer: &mut W, line: &str) {
+    let _ = writer.write_all(line.as_bytes());
+    let _ = writer.write_all(b"\n");
+    let _ = writer.flush();
+}
+
 /// Tracks repeated warning occurrences for deduplication.
 #[derive(Default)]
 struct WarnTracker {
@@ -73,8 +81,15 @@ static LOG_FILE_SINK: OnceLock<Mutex<File>> = OnceLock::new();
 /// be opened (missing directory, permission denied, etc.).
 ///
 /// Calling this a second time returns `Err` with `ErrorKind::AlreadyExists`
-/// (the first installation wins).
+/// (the first installation wins) without touching the filesystem.
 pub fn install_log_file(path: &str) -> Result<(), io::Error> {
+    // Check before opening so a second call never creates a stray file.
+    if LOG_FILE_SINK.get().is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "log file sink already installed",
+        ));
+    }
     let file = OpenOptions::new().create(true).append(true).open(path)?;
     LOG_FILE_SINK.set(Mutex::new(file)).map_err(|_| {
         io::Error::new(
@@ -152,16 +167,12 @@ impl StdoutLogger {
         // Write to file sink if installed; otherwise fall through to stderr.
         if let Some(sink) = LOG_FILE_SINK.get() {
             let mut file = sink.lock().unwrap_or_else(|poison| poison.into_inner());
-            let _ = file.write_all(line.as_bytes());
-            let _ = file.write_all(b"\n");
-            let _ = file.flush();
+            write_line(&mut *file, &line);
             return;
         }
 
         let mut stderr = io::stderr();
-        let _ = stderr.write_all(line.as_bytes());
-        let _ = stderr.write_all(b"\n");
-        let _ = stderr.flush();
+        write_line(&mut stderr, &line);
     }
 
     /// Formats an event into a single human-readable line.
