@@ -471,10 +471,7 @@ impl MemoryService {
             db_client.clone(),
             active_namespace.clone(),
         ));
-        let fuzzy_threshold = std::env::var("ENTITY_FUZZY_THRESHOLD")
-            .ok()
-            .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(super::super::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
+        let fuzzy_threshold = crate::config::ner::entity_fuzzy_threshold()?;
         Ok(Self {
             db_client,
             active_namespace,

@@ -1,6 +1,7 @@
 # File Log Sink (`MEMORY_LOG_FILE`) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Status: Complete (MEMORY_LOG_FILE shipped in runner.rs)
 
 **Goal:** Add an optional file-based log output controlled by `MEMORY_LOG_FILE` env var, so MCP hosts that don't expose stderr can still capture diagnostic logs.
 

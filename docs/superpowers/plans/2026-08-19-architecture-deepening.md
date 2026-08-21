@@ -1,6 +1,6 @@
 # Architecture Deepening — Round 2 — 2026-08-19
 
-> Status: In progress
+> Status: Complete
 > Parent: `/improve-codebase-architecture` round-2 report (11 candidates) +
 > `/grill-with-docs` planning round
 > Branch: `deepening-round-2` (from `73a60aad`)

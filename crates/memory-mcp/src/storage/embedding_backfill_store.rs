@@ -21,6 +21,10 @@ impl EmbeddingBackfillStoreClient {
         }
     }
 
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+        Self { db }
+    }
+
     pub(crate) async fn count_facts_missing_embeddings(&self) -> Result<usize, MemoryError> {
         let rows = self
             .db

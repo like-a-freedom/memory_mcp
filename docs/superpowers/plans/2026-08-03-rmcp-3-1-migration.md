@@ -1,6 +1,7 @@
 # rmcp 3.1 Migration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Status: Complete (rmcp 3.1.x in workspace)
 
 **Goal:** Migrate `memory_mcp` from `rmcp` 2.2.0 to `rmcp` 3.1.0 while preserving synchronous tool behavior, making only `extract` task-capable through the official `io.modelcontextprotocol/tasks` extension, and keeping stdio protocol tests aligned with the new wire contract.
 

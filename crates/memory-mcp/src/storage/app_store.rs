@@ -94,11 +94,22 @@ impl AppStoreClient {
         Ok(())
     }
 
-    pub async fn delete_record(&self, record_id: &str) -> Result<Value, MemoryError> {
+    /// Hard-deletes a stale community record.
+    ///
+    /// This is the only sanctioned hard delete in the codebase: community
+    /// records are derived artifacts rebuilt from active edges, so removing
+    /// them does not break the bi-temporal audit trail (ADR-0044 spirit).
+    /// The id must be a `community:` record; anything else is rejected.
+    pub async fn delete_community(&self, community_id: &str) -> Result<Value, MemoryError> {
+        if !community_id.starts_with("community:") {
+            return Err(MemoryError::Validation(format!(
+                "delete_community expects a 'community:' record id, got '{community_id}'"
+            )));
+        }
         self.db
             .query(
                 "DELETE type::record($record_id);",
-                Some(json!({"record_id": record_id})),
+                Some(json!({"record_id": community_id})),
             )
             .await
     }
@@ -264,5 +275,18 @@ mod tests {
             Some(json!("fact:known"))
         );
         assert_eq!(namespace.as_deref(), Some("org"));
+    }
+
+    #[tokio::test]
+    async fn delete_community_rejects_non_community_record_ids() {
+        let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
+
+        for bad_id in ["fact:abc", "episode:xyz", "community", ""] {
+            let result = store.delete_community(bad_id).await;
+            assert!(
+                matches!(result, Err(MemoryError::Validation(_))),
+                "expected validation error for '{bad_id}'"
+            );
+        }
     }
 }

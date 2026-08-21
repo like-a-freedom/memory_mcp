@@ -90,7 +90,7 @@ pub(crate) async fn update_communities(
     {
         service
             .app_store()
-            .delete_record(&stale.community_id)
+            .delete_community(&stale.community_id)
             .await?;
     }
 

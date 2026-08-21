@@ -29,7 +29,6 @@ tokio.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-serde_json.workspace = true
 tempfile.workspace = true
 
 [lints]
@@ -46,7 +45,6 @@ harness = false
 [[bench]]
 name = "ner_metal"
 harness = false
-required-features = []
 
 [[bench]]
 name = "contention"

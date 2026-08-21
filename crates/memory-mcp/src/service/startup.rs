@@ -63,18 +63,9 @@ async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
 }
 
 async fn count_facts_missing_embeddings(db: &BoundDbClient) -> Result<usize, MemoryError> {
-    let rows = db
-        .query_rows(
-            "SELECT count() AS count FROM fact WHERE embedding IS NONE GROUP ALL",
-            None,
-        )
-        .await?;
-    Ok(rows
-        .first()
-        .and_then(|row| row.get("count"))
-        .and_then(serde_json::Value::as_u64)
-        .and_then(|value| usize::try_from(value).ok())
-        .unwrap_or(0))
+    crate::storage::embedding_backfill_store::EmbeddingBackfillStoreClient::from_bound(db.clone())
+        .count_facts_missing_embeddings()
+        .await
 }
 
 async fn sample_stored_embedding_dimensions(

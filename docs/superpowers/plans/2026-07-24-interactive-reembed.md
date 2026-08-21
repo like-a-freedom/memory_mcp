@@ -1,6 +1,7 @@
 # Interactive Reembed with Progress, Cancellation, and Continue-on-Error
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Status: Complete (indicatif progress, ReembedOptions, cancellation, continue-on-error shipped)
 
 Transform `memory_mcp reembed` from a silent background operation into an interactive, observable, and resilient maintenance workflow with live progress, graceful Ctrl+C handling, and continue-on-error semantics.
 

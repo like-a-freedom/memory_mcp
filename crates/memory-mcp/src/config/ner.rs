@@ -171,6 +171,21 @@ fn parse_nonzero_usize(var_name: &str, default: usize) -> Result<usize, MemoryEr
     Ok(value)
 }
 
+/// Fuzzy-match threshold for entity alias resolution (0.0..=1.0).
+///
+/// Reads `ENTITY_FUZZY_THRESHOLD`; invalid values are rejected with
+/// [`MemoryError::ConfigInvalid`] instead of silently falling back.
+pub fn entity_fuzzy_threshold() -> Result<f64, MemoryError> {
+    let value = parse_env::<f64>("ENTITY_FUZZY_THRESHOLD")?
+        .unwrap_or(crate::service::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err(MemoryError::ConfigInvalid(
+            "ENTITY_FUZZY_THRESHOLD must be a finite number in 0.0..=1.0".to_string(),
+        ));
+    }
+    Ok(value)
+}
+
 fn parse_threshold(var_name: &str) -> Result<Option<f64>, MemoryError> {
     let Some(value) = parse_env::<f64>(var_name)? else {
         return Ok(None);

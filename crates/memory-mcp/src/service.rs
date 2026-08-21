@@ -46,7 +46,7 @@ mod embedding_runtime;
 mod embedding_service;
 mod entity;
 mod entity_extraction;
-mod entity_resolution;
+pub(crate) mod entity_resolution;
 mod episode;
 mod error;
 pub(crate) mod explanation;

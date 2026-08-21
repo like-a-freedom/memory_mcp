@@ -1,6 +1,7 @@
 # Evaluation V2 Closure Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Status: Task 1 complete; Task 2 in progress
 
 **Goal:** Turn the 2026-07-29 diagnostic v2 run into a truthful, fully gated evaluation whose claim, end-to-end, lifecycle, external-retrieval, and performance results measure the intended production behavior within the PR 10-minute and release 20-minute budgets.
 
@@ -124,7 +125,7 @@ Task 6 completes ADR-0017's wired lifecycle evidence gate.
 - Changes: `RunRequest` to carry suite-load issues into the artifact.
 - Consumes: the exact suite list loaded from `ProfileManifest`; no implicit registry-wide suites.
 
-- [ ] **Step 1: Write failing verdict truth-table tests**
+- [x] **Step 1: Write failing verdict truth-table tests**
 
 ```rust
 use eval_harness::{
@@ -178,7 +179,7 @@ fn empty_selected_suite_is_invalid() {
 }
 ```
 
-- [ ] **Step 2: Run the focused verdict tests and verify all three fail**
+- [x] **Step 2: Run the focused verdict tests and verify all three fail**
 
 Run:
 
@@ -189,7 +190,7 @@ cargo test -p eval-harness --test run_verdict -- --nocapture
 Expected: compilation fails because `RunVerdict`, `RunIssue`, and
 `derive_run_verdict` do not exist.
 
-- [ ] **Step 3: Add the minimal verdict and issue domain types**
+- [x] **Step 3: Add the minimal verdict and issue domain types**
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,7 +242,7 @@ Regression comparison follows the same direction: `AtLeast` fails when
 `baseline - observed > budget`, while `AtMost` fails when
 `observed - baseline > budget`.
 
-- [ ] **Step 4: Replace global expected IDs with namespaced case keys**
+- [x] **Step 4: Replace global expected IDs with namespaced case keys**
 
 Change the artifact field to:
 
@@ -264,7 +265,7 @@ expected_cases.extend(
 Do not sort/deduplicate before validation. Validation must reject duplicate
 `CaseKey` values, missing outcomes, and unexpected outcomes.
 
-- [ ] **Step 5: Write failing selected-suite accounting tests**
+- [x] **Step 5: Write failing selected-suite accounting tests**
 
 ```rust
 #[tokio::test]
@@ -283,7 +284,7 @@ async fn selected_suite_returning_zero_outcomes_is_invalid() {
 }
 ```
 
-- [ ] **Step 6: Make suite construction return evidence instead of warnings**
+- [x] **Step 6: Make suite construction return evidence instead of warnings**
 
 Add a private registry result in `main.rs`:
 
@@ -317,7 +318,7 @@ artifact/profile paths, an empty baseline, and an empty issue list.
 the test exercises missing execution evidence rather than an empty
 declaration.
 
-- [ ] **Step 7: Store verdict in artifact v2 and validate it**
+- [x] **Step 7: Store verdict in artifact v2 and validate it**
 
 Set:
 
@@ -330,7 +331,7 @@ whose stored verdict differs. Update `eval-artifact-v2.json` with
 `additionalProperties: false`, namespaced `expected_cases`, `verdict`, and
 `issues`.
 
-- [ ] **Step 8: Map the CLI exit code exclusively from the stored verdict**
+- [x] **Step 8: Map the CLI exit code exclusively from the stored verdict**
 
 ```rust
 match artifact.verdict {
@@ -343,7 +344,7 @@ match artifact.verdict {
 Write the artifact and print the generated report before returning any of
 these codes.
 
-- [ ] **Step 9: Render an unambiguous report result**
+- [x] **Step 9: Render an unambiguous report result**
 
 The generated Markdown header must contain exactly one of:
 
@@ -357,7 +358,7 @@ Include separate tables for quality failures, invalid cases, failed gates,
 invalid gates, budget, and run issues. A missing gate list must render
 `Metric gates: none declared`; it must not imply a passing quality result.
 
-- [ ] **Step 10: Run focused and workspace verification**
+- [x] **Step 10: Run focused and workspace verification**
 
 Run:
 
@@ -370,7 +371,7 @@ cargo fmt --all --check
 
 Expected: all commands pass with zero warnings and zero formatting drift.
 
-- [ ] **Step 11: Commit the truthful run contract**
+- [x] **Step 11: Commit the truthful run contract**
 
 ```bash
 git add crates/eval-harness/src crates/eval-harness/tests/run_verdict.rs evals/schema/eval-artifact-v2.json

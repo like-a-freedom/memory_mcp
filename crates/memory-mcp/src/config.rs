@@ -5,7 +5,7 @@ mod constants;
 mod embedding;
 mod helpers;
 mod lifecycle;
-mod ner;
+pub(crate) mod ner;
 mod surreal;
 
 pub use constants::*;

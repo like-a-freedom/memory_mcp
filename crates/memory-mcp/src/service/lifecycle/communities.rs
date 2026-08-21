@@ -167,7 +167,7 @@ async fn rebuild_namespace_communities_with_batch_size(
         };
 
         if !active_ids.contains(&community_id) {
-            service.app_store().delete_record(&community_id).await?;
+            service.app_store().delete_community(&community_id).await?;
             stale_deleted += 1;
         }
     }
