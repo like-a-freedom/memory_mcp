@@ -41,6 +41,7 @@ mod context;
 mod core;
 pub(crate) mod durable_work;
 mod embedding;
+mod embedding_recovery;
 mod embedding_runtime;
 mod embedding_service;
 mod entity;

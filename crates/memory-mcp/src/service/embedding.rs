@@ -28,6 +28,10 @@ fn embedding_logger() -> &'static StdoutLogger {
     EMBEDDING_LOGGER.get_or_init(|| StdoutLogger::new("warn"))
 }
 
+pub(crate) fn embedding_endpoint_for_log(endpoint: &str) -> String {
+    remote::redact_endpoint_for_log(endpoint)
+}
+
 /// Abstraction over optional embedding providers.
 #[async_trait]
 pub trait EmbeddingProvider: Send + Sync {
@@ -103,6 +107,46 @@ fn build_probe_http_client(timeout_secs: u64) -> Result<reqwest::Client, MemoryE
         .connect_timeout(probe_timeout)
         .build()
         .map_err(|err| MemoryError::ConfigInvalid(format!("invalid embedding HTTP client: {err}")))
+}
+
+pub(crate) async fn probe_remote_embedding_dimension(
+    config: &EmbeddingConfig,
+) -> Result<usize, MemoryError> {
+    let client = build_probe_http_client(config.timeout_secs)?;
+    match config.provider {
+        EmbeddingProviderKind::OpenAiCompatible => {
+            detect_openai_embedding_dimension(
+                &client,
+                config
+                    .base_url
+                    .as_deref()
+                    .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_BASE_URL".to_string()))?,
+                config
+                    .model
+                    .as_deref()
+                    .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
+                config.api_key.as_deref(),
+            )
+            .await
+        }
+        EmbeddingProviderKind::Ollama => {
+            detect_ollama_embedding_dimension(
+                &client,
+                config
+                    .base_url
+                    .as_deref()
+                    .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_BASE_URL".to_string()))?,
+                config
+                    .model
+                    .as_deref()
+                    .ok_or_else(|| MemoryError::ConfigMissing("EMBEDDINGS_MODEL".to_string()))?,
+            )
+            .await
+        }
+        _ => Err(MemoryError::Validation(
+            "embedding recovery probe requires a remote provider".to_string(),
+        )),
+    }
 }
 
 fn validate_dimension_override(

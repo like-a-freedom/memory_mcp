@@ -15,6 +15,8 @@ pub enum EmbeddingActivationMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EmbeddingStartupDecision {
     UseConfiguredProvider,
+    ResumePendingBackfill { active_signature: String },
+    RecoverMissingEmbeddings { target_signature: String },
     BootstrapReadyNamespace { active_signature: String },
     DisableSemantic { reason: String },
 }
@@ -49,7 +51,7 @@ pub(crate) async fn apply_startup_migrations(
         .await
 }
 
-async fn load_embedding_state(
+pub(crate) async fn load_embedding_state(
     db: &BoundDbClient,
 ) -> Result<Option<serde_json::Value>, MemoryError> {
     db.select_one(EMBEDDING_STATE_RECORD_ID).await
@@ -57,6 +59,21 @@ async fn load_embedding_state(
 
 async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
     Ok(db.select_table("fact").await?.len())
+}
+
+async fn count_facts_missing_embeddings(db: &BoundDbClient) -> Result<usize, MemoryError> {
+    let rows = db
+        .query_rows(
+            "SELECT count() AS count FROM fact WHERE embedding IS NONE GROUP ALL",
+            None,
+        )
+        .await?;
+    Ok(rows
+        .first()
+        .and_then(|row| row.get("count"))
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(0))
 }
 
 async fn sample_stored_embedding_dimensions(
@@ -79,9 +96,14 @@ pub(crate) async fn write_bootstrap_ready_state(
     provider: &str,
     model: Option<&str>,
     dimension: usize,
+    backfill_pending: bool,
 ) -> Result<(), MemoryError> {
     let payload = serde_json::json!({
-        "status": "ready",
+        "status": if backfill_pending {
+            "backfill_pending"
+        } else {
+            "ready"
+        },
         "active_signature": active_signature,
         "provider": provider,
         "model": model,
@@ -101,6 +123,7 @@ pub(crate) fn decide_embedding_startup(
     namespace_state: Option<&serde_json::Value>,
     sample_dimensions: &[usize],
     fact_count: usize,
+    missing_embedding_count: usize,
     target_signature: &str,
     target_dimension: usize,
 ) -> EmbeddingStartupDecision {
@@ -118,19 +141,35 @@ pub(crate) fn decide_embedding_startup(
             }
         }
         Some(state)
-            if state.get("status").and_then(serde_json::Value::as_str) == Some("ready")
-                && state
-                    .get("active_signature")
-                    .and_then(serde_json::Value::as_str)
-                    == Some(target_signature) =>
+            if matches!(
+                state.get("status").and_then(serde_json::Value::as_str),
+                Some("ready") | Some("backfill_pending")
+            ) && state
+                .get("active_signature")
+                .and_then(serde_json::Value::as_str)
+                == Some(target_signature) =>
         {
-            EmbeddingStartupDecision::UseConfiguredProvider
+            if state.get("status").and_then(serde_json::Value::as_str) == Some("backfill_pending")
+                || missing_embedding_count > 0
+            {
+                EmbeddingStartupDecision::ResumePendingBackfill {
+                    active_signature: target_signature.to_string(),
+                }
+            } else {
+                EmbeddingStartupDecision::UseConfiguredProvider
+            }
         }
         Some(state) if state.get("status").and_then(serde_json::Value::as_str) == Some("ready") => {
-            EmbeddingStartupDecision::DisableSemantic {
-                reason: format!(
-                    "configured embedding signature differs from persisted state in namespace `{active_namespace}`"
-                ),
+            if missing_embedding_count > 0 {
+                EmbeddingStartupDecision::RecoverMissingEmbeddings {
+                    target_signature: target_signature.to_string(),
+                }
+            } else {
+                EmbeddingStartupDecision::DisableSemantic {
+                    reason: format!(
+                        "configured embedding signature differs from persisted state in namespace `{active_namespace}`"
+                    ),
+                }
             }
         }
         None if fact_count == 0
@@ -191,6 +230,16 @@ pub(crate) async fn resolve_embedding_startup(
                     "provider".to_string(),
                     serde_json::json!(config.provider_label()),
                 );
+                event.insert(
+                    "endpoint".to_string(),
+                    serde_json::json!(
+                        config
+                            .base_url
+                            .as_deref()
+                            .map(crate::service::embedding::embedding_endpoint_for_log)
+                    ),
+                );
+                event.insert("model".to_string(), serde_json::json!(config.model.clone()));
                 startup_logger.log(event, crate::logging::LogLevel::Warn);
                 None
             }
@@ -205,6 +254,7 @@ pub(crate) async fn resolve_embedding_startup(
         let fact_count = count_facts(&db).await?;
         let sample_dimensions =
             sample_stored_embedding_dimensions(&db, STORED_EMBEDDING_SAMPLE_SIZE).await?;
+        let missing_embedding_count = count_facts_missing_embeddings(&db).await?;
 
         let mut event = std::collections::HashMap::new();
         event.insert(
@@ -217,6 +267,10 @@ pub(crate) async fn resolve_embedding_startup(
             serde_json::json!(namespace_state.is_some()),
         );
         event.insert("fact_count".to_string(), serde_json::json!(fact_count));
+        event.insert(
+            "missing_embedding_count".to_string(),
+            serde_json::json!(missing_embedding_count),
+        );
         startup_logger.log(event, crate::logging::LogLevel::Debug);
 
         decide_embedding_startup(
@@ -224,6 +278,7 @@ pub(crate) async fn resolve_embedding_startup(
             namespace_state.as_ref(),
             &sample_dimensions,
             fact_count,
+            missing_embedding_count,
             &target.signature,
             target.dimension,
         )
@@ -481,7 +536,7 @@ mod tests {
     #[test]
     fn decide_embedding_startup_disables_semantic_when_active_namespace_is_rebuilding() {
         let state = serde_json::json!({"status": "rebuilding", "active_signature": "embsig:ok"});
-        let decision = decide_embedding_startup("main", Some(&state), &[], 10, "embsig:ok", 384);
+        let decision = decide_embedding_startup("main", Some(&state), &[], 10, 0, "embsig:ok", 384);
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::DisableSemantic { .. }
@@ -489,8 +544,49 @@ mod tests {
     }
 
     #[test]
+    fn decide_embedding_startup_resumes_pending_backfill_for_matching_ready_state() {
+        let state = serde_json::json!({
+            "status": "backfill_pending",
+            "active_signature": "embsig:ok",
+        });
+        let decision = decide_embedding_startup("main", Some(&state), &[], 12, 0, "embsig:ok", 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::ResumePendingBackfill { .. }
+        ));
+    }
+
+    #[test]
+    fn decide_embedding_startup_recovers_missing_embeddings_before_reembed_on_signature_change() {
+        let state = serde_json::json!({
+            "status": "ready",
+            "active_signature": "embsig:old",
+        });
+        let decision =
+            decide_embedding_startup("main", Some(&state), &[], 12, 3, "embsig:new", 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::RecoverMissingEmbeddings { .. }
+        ));
+    }
+
+    #[test]
+    fn decide_embedding_startup_resumes_legacy_ready_state_with_missing_embeddings() {
+        let state = serde_json::json!({
+            "status": "ready",
+            "active_signature": "embsig:ok",
+        });
+        let decision = decide_embedding_startup("main", Some(&state), &[], 12, 3, "embsig:ok", 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::ResumePendingBackfill { .. }
+        ));
+    }
+
+    #[test]
     fn decide_embedding_startup_bootstraps_active_namespace_when_dimensions_match() {
-        let decision = decide_embedding_startup("main", None, &[384usize], 12, "embsig:new", 384);
+        let decision =
+            decide_embedding_startup("main", None, &[384usize], 12, 0, "embsig:new", 384);
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::BootstrapReadyNamespace { .. }
@@ -499,7 +595,7 @@ mod tests {
 
     #[test]
     fn decide_embedding_startup_does_not_bootstrap_when_legacy_dimensions_are_unknown() {
-        let decision = decide_embedding_startup("main", None, &[], 12, "embsig:new", 384);
+        let decision = decide_embedding_startup("main", None, &[], 12, 12, "embsig:new", 384);
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::DisableSemantic { .. }

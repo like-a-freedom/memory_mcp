@@ -573,6 +573,8 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_BASE_URL` | URL | unset for `local-candle`; `https://api.openai.com/v1` for `openai-compatible`; `http://127.0.0.1:11434` for `ollama` | Base URL for remote embedding providers |
 | `EMBEDDINGS_MAX_TOKENS` | unsigned integer | `384` | Max token budget before `local-candle` chunks long inputs |
 | `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
+| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff |
+| `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
 | `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
@@ -682,9 +684,9 @@ Two startup behaviors keep this from blocking `serve`:
 
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
 In normal `serve` / `watch` startup, the Active Namespace is checked before semantic retrieval is enabled.
-If it is already marked `ready` for the same signature, semantic retrieval starts normally.
+If it is already marked `ready` for the same signature and has no missing vectors, semantic retrieval starts normally. If it is marked `backfill_pending`, startup resumes the recovery worker; a matching `ready` state with `embedding IS NONE` facts is also treated as resumable for compatibility with states written before the durable marker existed.
 If its state is missing but it is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
-If it is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors.
+If it is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors. When a signature differs but missing vectors exist, the service starts degraded and schedules safe backfill of only those missing vectors; the old persisted signature remains until `reembed` completes.
 
 That is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
 
@@ -698,6 +700,18 @@ The runtime now separates two modes:
 **Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
 
 This keeps the public MCP tool surface unchanged while giving operators a deterministic recovery path after provider changes.
+
+#### Air-gapped startup and recovery
+
+A remote embedding provider is an external dependency, so the server separates startup availability from later semantic recovery:
+
+1. Startup performs one bounded dimension preflight. If the remote endpoint is unavailable, the server logs `embedding.preflight_failed` and `embedding.startup_decision`, installs the disabled provider, and continues with lexical/graph-only retrieval. MCP operations do not wait for the provider's runtime retry loop. Remote HTTP errors include the sanitized endpoint, model, and bounded `response_payload`; JSON fields such as `api_key`, `authorization`, `token`, `input`, and `prompt` are redacted.
+2. When `EMBEDDINGS_AUTO_RECOVERY` is enabled, a background worker waits `EMBEDDINGS_RECOVERY_INTERVAL_SECS` (default `60`) and probes again. Probe failures use `15s → 30s → 60s` exponential backoff capped at `300s`; transport failures and HTTP errors, including `404`, remain retryable. After three consecutive failures the repetitive probe event is logged at debug level.
+3. If the probe dimension matches the active index and the persisted signature is equal or absent, the worker first persists `embedding_state:fact.status = "backfill_pending"`, then swaps in the provider, invalidates the context cache, and backfills facts created while degraded. Only after backfill completes does it persist `status = "ready"`. Backfill selects only `embedding IS NONE`, uses `fact_id` order and batches of `100`, and never drops the HNSW index.
+4. If the dimension matches but the signature differs, the worker enables the provider for new writes, logs `embedding.reembed_required`, and backfills only facts without vectors. It preserves the old persisted signature and never rewrites existing vectors, so a restart remains degraded until `reembed`. If the dimension differs, semantic mode stays disabled and `embedding.reembed_required` points to `reembed`.
+5. After compatible recovery and an empty applicable backfill set, the worker exits. Server shutdown cancels and joins it through the existing lifecycle shutdown path. A crash during backfill is restart-safe: `backfill_pending` or the missing-vector count causes the next startup to resume.
+
+The observed startup `404` is not proof of an air gap: it usually means that the configured URL, route, model, or provider API shape is wrong. The recovery worker keeps probing so a transient endpoint failure does not require a restart, but a persistent `404` still requires correcting the endpoint configuration.
 
 #### The `reembed` maintenance command
 

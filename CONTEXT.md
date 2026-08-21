@@ -106,6 +106,20 @@ procedure version
 
 "Do not use 'discipline' as a domain noun or public feature name."
 
+## Embedding lifecycle vocabulary
+
+**Embedding Recovery**:
+The in-process re-enablement of a configured remote embedding provider after startup degraded because the provider was unreachable. Recovery re-resolves the embedding target identity and, on success, restores semantic retrieval without a process restart. A compatible recovery uses the durable `backfill_pending` state until deferred work completes; a signature-mismatch recovery keeps semantic retrieval degraded after restart while it fills only missing vectors.
+_Avoid_: Failover, auto-restart, hot reload
+
+**Embedding Backfill**:
+The deferred background generation of embeddings for facts persisted without one during a degraded period, performed at an unchanged dimension and without vector-index rebuild. Backfill completes what degradation skipped; it is not a rewrite of existing embeddings. The selection predicate is always `embedding IS NONE`; stale existing vectors remain the `reembed` responsibility.
+_Avoid_: Reembed, rebuild, reindex
+
+**Reembed**:
+The deliberate maintenance operation that rewrites fact embeddings for a new embedding target identity, possibly changing dimension and rebuilding the vector index. Reembed is operator-driven and is the recovery path for dimension or signature changes that Embedding Recovery cannot handle.
+_Avoid_: Backfill, migration
+
 ## Trust model
 
 Trust is derived from the invocation channel and configured server policy.

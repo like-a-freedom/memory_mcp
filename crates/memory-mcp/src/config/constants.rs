@@ -12,7 +12,16 @@ pub const DEFAULT_EMBEDDING_MAX_TOKENS: usize = 384;
 /// Default timeout for embedding provider HTTP requests.
 pub const DEFAULT_EMBEDDING_TIMEOUT_SECS: u64 = 15;
 
-/// Default cosine similarity threshold for semantic retrieval.
+/// Default initial delay before probing a degraded remote embedding provider.
+pub const DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS: u64 = 60;
+
+/// Initial retry backoff for embedding recovery probes.
+pub const DEFAULT_EMBEDDING_RECOVERY_BACKOFF_SECS: u64 = 15;
+
+/// Maximum retry backoff for embedding recovery probes.
+pub const DEFAULT_EMBEDDING_RECOVERY_MAX_BACKOFF_SECS: u64 = 300;
+
+/// Default cosine similarity threshold for semantic matches.
 pub const DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD: f64 = 0.7;
 
 /// Default retention window for persisted query analytics rows.

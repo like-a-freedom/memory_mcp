@@ -20,6 +20,129 @@ const MAX_REMOTE_EMBEDDING_DELAY_MS: u64 = 15_000;
 /// lexical/graph-only retrieval instead of stalling for the full runtime
 /// retry budget when the provider is unreachable.
 pub(crate) const REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS: u64 = 10;
+const MAX_REMOTE_ERROR_BODY_BYTES: usize = 4096;
+const REDACTED_REMOTE_ERROR_VALUE: &str = "[REDACTED]";
+
+fn is_sensitive_remote_error_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    [
+        "api_key",
+        "apikey",
+        "authorization",
+        "input",
+        "password",
+        "prompt",
+        "secret",
+        "token",
+    ]
+    .iter()
+    .any(|sensitive| key.contains(sensitive))
+}
+
+fn redact_remote_error_json(value: &mut Value) {
+    match value {
+        Value::Object(fields) => {
+            for (key, value) in fields {
+                if is_sensitive_remote_error_key(key) {
+                    *value = json!(REDACTED_REMOTE_ERROR_VALUE);
+                } else {
+                    redact_remote_error_json(value);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                redact_remote_error_json(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn sanitize_remote_error_payload(payload: &[u8]) -> String {
+    let raw = String::from_utf8_lossy(payload).trim().to_string();
+    if raw.is_empty() {
+        return "<empty>".to_string();
+    }
+
+    match serde_json::from_str::<Value>(&raw) {
+        Ok(mut value) => {
+            redact_remote_error_json(&mut value);
+            match serde_json::to_string(&value) {
+                Ok(serialized) => serialized,
+                Err(_) => "<invalid-json-response>".to_string(),
+            }
+        }
+        Err(_) => raw.replace('\n', "\\n").replace('\r', "\\r"),
+    }
+}
+
+async fn read_remote_error_payload(response: &mut reqwest::Response) -> String {
+    let mut payload = Vec::new();
+    let mut truncated = false;
+
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                let remaining = MAX_REMOTE_ERROR_BODY_BYTES.saturating_sub(payload.len());
+                if remaining == 0 {
+                    truncated = true;
+                    break;
+                }
+                if chunk.len() > remaining {
+                    payload.extend_from_slice(&chunk[..remaining]);
+                    truncated = true;
+                    break;
+                }
+                payload.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(error) => {
+                return format!("<response body read failed: {error}>");
+            }
+        }
+    }
+
+    let mut sanitized = sanitize_remote_error_payload(&payload);
+    if truncated {
+        sanitized.push_str("…<truncated>");
+    }
+    sanitized
+}
+
+pub(super) fn redact_endpoint_for_log(endpoint: &str) -> String {
+    let endpoint = endpoint
+        .split_once('#')
+        .map_or(endpoint, |(without_fragment, _)| without_fragment);
+    let endpoint = endpoint
+        .split_once('?')
+        .map_or(endpoint, |(without_query, _)| without_query);
+
+    let Some(scheme_end) = endpoint.find("://") else {
+        return endpoint.to_string();
+    };
+    let authority_start = scheme_end + 3;
+    let path_start = endpoint[authority_start..]
+        .find('/')
+        .map_or(endpoint.len(), |offset| authority_start + offset);
+    let authority = &endpoint[authority_start..path_start];
+    let Some(credentials_end) = authority.rfind('@') else {
+        return endpoint.to_string();
+    };
+
+    format!(
+        "{}***@{}",
+        &endpoint[..authority_start],
+        &endpoint[authority_start + credentials_end + 1..]
+    )
+}
+
+fn remote_error_context(endpoint: &str, model: &str, response_payload: &str) -> String {
+    format!(
+        "endpoint={}; model={model}; response_payload={response_payload}",
+        redact_endpoint_for_log(endpoint)
+    )
+}
 
 #[derive(Debug, Clone)]
 struct RetryableRemoteRequestFailure {
@@ -116,28 +239,37 @@ fn map_send_error(err: reqwest::Error) -> RemoteRequestFailure {
     )))
 }
 
-async fn response_json(response: reqwest::Response) -> Result<Value, RemoteRequestFailure> {
+async fn response_json(
+    mut response: reqwest::Response,
+    endpoint: &str,
+    model: &str,
+) -> Result<Value, RemoteRequestFailure> {
     let status = response.status();
     if !status.is_success() {
         let retry_after = retry_after_duration(response.headers());
         let status_code = status.as_u16();
+        let response_payload = read_remote_error_payload(&mut response).await;
+        let context = remote_error_context(endpoint, model, &response_payload);
         if is_retryable_status(status) {
             return Err(RemoteRequestFailure::Retryable(
                 RetryableRemoteRequestFailure {
-                    message: format!("embedding request returned retryable status {status_code}"),
+                    message: format!(
+                        "embedding request returned retryable status {status_code}; {context}"
+                    ),
                     retry_after,
                 },
             ));
         }
 
         return Err(RemoteRequestFailure::Fatal(MemoryError::Storage(format!(
-            "embedding request returned error status {status_code}"
+            "embedding request returned error status {status_code}; {context}"
         ))));
     }
 
     response.json::<Value>().await.map_err(|err| {
         RemoteRequestFailure::Fatal(MemoryError::Storage(format!(
-            "embedding response decode failed: {err}"
+            "embedding response decode failed; endpoint={}; model={model}; error={err}",
+            redact_endpoint_for_log(endpoint)
         )))
     })
 }
@@ -161,19 +293,20 @@ async fn request_openai_embedding_and_parse(
         headers.insert(AUTHORIZATION, value);
     }
 
+    let endpoint = format!("{}/embeddings", base_url.trim_end_matches('/'));
     with_remote_embedding_retry(
         "openai-compatible",
         MAX_REMOTE_EMBEDDING_ATTEMPTS,
         || async {
             let body = {
                 let response = client
-                    .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+                    .post(&endpoint)
                     .headers(headers.clone())
                     .json(&json!({"model": model, "input": input}))
                     .send()
                     .await
                     .map_err(map_send_error)?;
-                response_json(response).await?
+                response_json(response, &endpoint, model).await?
             };
 
             // Parsing failure (missing data) is retryable — providers may
@@ -182,7 +315,14 @@ async fn request_openai_embedding_and_parse(
                 Ok(embedding) => Ok(embedding),
                 Err(_) => Err(RemoteRequestFailure::Retryable(
                     RetryableRemoteRequestFailure {
-                        message: "embedding response missing data[0].embedding".to_string(),
+                        message: format!(
+                            "embedding response missing data[0].embedding; {}",
+                            remote_error_context(
+                                &endpoint,
+                                model,
+                                "<successful response with unexpected schema>"
+                            )
+                        ),
                         retry_after: None,
                     },
                 )),
@@ -198,14 +338,15 @@ async fn request_ollama_body(
     model: &str,
     input: &str,
 ) -> Result<Value, MemoryError> {
+    let endpoint = format!("{}/api/embeddings", base_url.trim_end_matches('/'));
     with_remote_embedding_retry("ollama", MAX_REMOTE_EMBEDDING_ATTEMPTS, || async {
         let response = client
-            .post(format!("{}/api/embeddings", base_url.trim_end_matches('/')))
+            .post(&endpoint)
             .json(&json!({"model": model, "prompt": input}))
             .send()
             .await
             .map_err(map_send_error)?;
-        response_json(response).await
+        response_json(response, &endpoint, model).await
     })
     .await
 }
@@ -278,8 +419,9 @@ async fn request_openai_embedding_once(
         headers.insert(AUTHORIZATION, value);
     }
 
+    let endpoint = format!("{}/embeddings", base_url.trim_end_matches('/'));
     let response = client
-        .post(format!("{}/embeddings", base_url.trim_end_matches('/')))
+        .post(&endpoint)
         .headers(headers)
         .json(&json!({"model": model, "input": input}))
         .send()
@@ -287,12 +429,15 @@ async fn request_openai_embedding_once(
         .map_err(|err| {
             MemoryError::Transient(format!("embedding probe transport failure: {err}"))
         })?;
-    let body = response_json(response)
-        .await
-        .map_err(|failure| match failure {
-            RemoteRequestFailure::Retryable(retryable) => MemoryError::Transient(retryable.message),
-            RemoteRequestFailure::Fatal(err) => err,
-        })?;
+    let body =
+        response_json(response, &endpoint, model)
+            .await
+            .map_err(|failure| match failure {
+                RemoteRequestFailure::Retryable(retryable) => {
+                    MemoryError::Transient(retryable.message)
+                }
+                RemoteRequestFailure::Fatal(err) => err,
+            })?;
 
     parse_openai_embedding(&body)
 }
@@ -306,8 +451,9 @@ async fn request_ollama_body_once(
     model: &str,
     input: &str,
 ) -> Result<Value, MemoryError> {
+    let endpoint = format!("{}/api/embeddings", base_url.trim_end_matches('/'));
     let response = client
-        .post(format!("{}/api/embeddings", base_url.trim_end_matches('/')))
+        .post(&endpoint)
         .json(&json!({"model": model, "prompt": input}))
         .send()
         .await
@@ -315,7 +461,7 @@ async fn request_ollama_body_once(
             MemoryError::Transient(format!("embedding probe transport failure: {err}"))
         })?;
 
-    response_json(response)
+    response_json(response, &endpoint, model)
         .await
         .map_err(|failure| match failure {
             RemoteRequestFailure::Retryable(retryable) => MemoryError::Transient(retryable.message),
@@ -537,5 +683,67 @@ mod tests {
     fn parse_openai_embedding_returns_none_for_wrong_shape() {
         // Plain array, not {"data": [...]}
         assert!(parse_openai_embedding(&json!([0.1, 0.2, 0.3])).is_err());
+    }
+
+    #[test]
+    fn remote_endpoint_redacts_credentials_and_query_parameters() {
+        assert_eq!(
+            redact_endpoint_for_log("https://user:secret@example.test/v1?api_key=hidden#fragment"),
+            "https://***@example.test/v1"
+        );
+    }
+
+    #[test]
+    fn remote_error_payload_redacts_sensitive_json_fields() {
+        let payload = sanitize_remote_error_payload(
+            br#"{"error":{"message":"route not found"},"api_key":"secret","input":"private memory"}"#,
+        );
+
+        assert!(payload.contains("route not found"));
+        assert!(payload.contains("[REDACTED]"));
+        assert!(!payload.contains("secret"));
+        assert!(!payload.contains("private memory"));
+    }
+
+    #[tokio::test]
+    async fn remote_probe_error_includes_endpoint_model_and_response_payload() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind listener");
+        let address = listener.local_addr().expect("listener address");
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+            let mut request = [0u8; 4096];
+            let _ = socket.read(&mut request).await.expect("read request");
+            let body = br#"{"error":{"message":"route not found"}}"#;
+            let response = format!(
+                "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write headers");
+            socket.write_all(body).await.expect("write body");
+        });
+
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .expect("http client");
+        let base_url = format!("http://{address}/v1");
+        let error = detect_openai_embedding_dimension(&client, &base_url, "test-model", None)
+            .await
+            .expect_err("404 probe should fail");
+        let message = error.to_string();
+
+        assert!(message.contains("status 404"));
+        assert!(message.contains("/v1/embeddings"));
+        assert!(message.contains("model=test-model"));
+        assert!(message.contains("route not found"));
+        server.await.expect("server task");
     }
 }

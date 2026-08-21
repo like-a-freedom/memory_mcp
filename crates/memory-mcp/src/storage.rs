@@ -21,6 +21,7 @@ pub(crate) mod claims;
 mod client;
 pub(crate) mod close;
 pub(crate) mod context_store;
+pub(crate) mod embedding_backfill_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
 mod helpers;

@@ -191,6 +191,7 @@ impl MemoryService {
         }
 
         let mut pass = pass;
+        let embedding_state = self.embedding_runtime_snapshot();
 
         self.logger.log(
             std::collections::HashMap::from([
@@ -202,12 +203,9 @@ impl MemoryService {
                 ("target_dimension".to_string(), json!(pass.target_dimension)),
                 (
                     "provider".to_string(),
-                    json!(self.embedding_provider.provider_name()),
+                    json!(embedding_state.provider.provider_name()),
                 ),
-                (
-                    "model".to_string(),
-                    json!(self.current_embedding_model.clone()),
-                ),
+                ("model".to_string(), json!(embedding_state.model.clone())),
                 ("resumed".to_string(), json!(pass.resumed)),
                 ("total_facts".to_string(), json!(pass.summary.total_facts)),
             ]),
@@ -258,16 +256,17 @@ impl MemoryService {
         &self,
         options: &ReembedOptions,
     ) -> Result<ReembedPass, MemoryError> {
-        if !self.embedding_provider.is_enabled() {
+        let embedding_state = self.embedding_runtime_snapshot();
+        if !embedding_state.provider.is_enabled() {
             return Err(MemoryError::Validation(
                 "reembed requires an enabled embedding provider".to_string(),
             ));
         }
 
-        let target_signature = self.current_embedding_signature.clone().ok_or_else(|| {
+        let target_signature = embedding_state.signature.clone().ok_or_else(|| {
             MemoryError::Validation("reembed requires an enabled embedding signature".to_string())
         })?;
-        let target_dimension = self.current_embedding_dimension.ok_or_else(|| {
+        let target_dimension = embedding_state.dimension.ok_or_else(|| {
             MemoryError::Validation("reembed requires a resolved target dimension".to_string())
         })?;
 
@@ -475,6 +474,7 @@ impl MemoryService {
         pass: &mut ReembedPass,
         ns_state: &mut NamespaceBatchState,
     ) -> Result<BatchOutcome, MemoryError> {
+        let embedding_state = self.embedding_runtime_snapshot();
         // In --retry-failed mode, filter batch to only failed fact IDs.
         let batch: Vec<Value> = if options.retry_failed {
             batch
@@ -656,12 +656,9 @@ impl MemoryService {
                                 ),
                                 (
                                     "provider".to_string(),
-                                    json!(self.embedding_provider.provider_name()),
+                                    json!(embedding_state.provider.provider_name()),
                                 ),
-                                (
-                                    "model".to_string(),
-                                    json!(self.current_embedding_model.clone()),
-                                ),
+                                ("model".to_string(), json!(embedding_state.model.clone())),
                                 ("target_dimension".to_string(), json!(pass.target_dimension)),
                                 (
                                     "target_signature".to_string(),
@@ -791,11 +788,11 @@ impl MemoryService {
                 ),
                 (
                     "provider".to_string(),
-                    json!(self.embedding_provider.provider_name()),
+                    json!(self.embedding_runtime_snapshot().provider.provider_name()),
                 ),
                 (
                     "model".to_string(),
-                    json!(self.current_embedding_model.clone()),
+                    json!(self.embedding_runtime_snapshot().model.clone()),
                 ),
                 ("target_dimension".to_string(), json!(pass.target_dimension)),
                 (
@@ -829,6 +826,7 @@ impl MemoryService {
         target_signature: &str,
         target_dimension: usize,
     ) -> Result<String, MemoryError> {
+        let embedding_state = self.embedding_runtime_snapshot();
         let mut updated = fact
             .as_object()
             .cloned()
@@ -874,9 +872,9 @@ impl MemoryService {
         updated.insert("embedding".to_string(), json!(embedding));
         updated.insert(
             "embedding_provider".to_string(),
-            json!(self.embedding_provider.provider_name()),
+            json!(embedding_state.provider.provider_name()),
         );
-        if let Some(model) = &self.current_embedding_model {
+        if let Some(model) = &embedding_state.model {
             updated.insert("embedding_model".to_string(), json!(model));
         }
         updated.insert("embedding_dimension".to_string(), json!(target_dimension));
@@ -899,20 +897,15 @@ impl MemoryService {
         active_signature: Option<&str>,
         last_job_id: Option<&str>,
     ) -> Result<(), MemoryError> {
+        let embedding_state = self.embedding_runtime_snapshot();
         let mut payload = serde_json::Map::from_iter([
             ("status".to_string(), json!(status)),
             (
                 "provider".to_string(),
-                json!(self.embedding_provider.provider_name()),
+                json!(embedding_state.provider.provider_name()),
             ),
-            (
-                "model".to_string(),
-                json!(self.current_embedding_model.clone()),
-            ),
-            (
-                "dimension".to_string(),
-                json!(self.current_embedding_dimension),
-            ),
+            ("model".to_string(), json!(embedding_state.model.clone())),
+            ("dimension".to_string(), json!(embedding_state.dimension)),
             (
                 "updated_at".to_string(),
                 json!(chrono::Utc::now().to_rfc3339()),
@@ -944,12 +937,13 @@ impl MemoryService {
         last_error: Option<&str>,
         elapsed: std::time::Duration,
     ) -> Result<(), MemoryError> {
+        let embedding_state = self.embedding_runtime_snapshot();
         let payload = json!({
             "job_id": REEMBED_JOB_ID,
             "status": status,
             "target_signature": target_signature,
-            "provider": self.embedding_provider.provider_name(),
-            "model": self.current_embedding_model.clone(),
+            "provider": embedding_state.provider.provider_name(),
+            "model": embedding_state.model.clone(),
             "dimension": target_dimension,
             "namespaces": vec![self.active_namespace.clone()],
             "requested_at": started_at,
@@ -1255,7 +1249,7 @@ mod tests {
         dimension: usize,
     ) -> MemoryService {
         assert_eq!(active_namespace, TEST_NAMESPACE);
-        let mut service = MemoryService::new_with_embedding_provider(
+        let service = MemoryService::new_with_embedding_provider(
             db_client,
             active_namespace.to_string(),
             "warn".to_string(),
@@ -1266,9 +1260,15 @@ mod tests {
             Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service should build");
-        service.current_embedding_signature = Some("embsig:new".to_string());
-        service.current_embedding_model = Some("test-model".to_string());
-        service.current_embedding_dimension = Some(dimension);
+        let provider = service.embedding_runtime_snapshot().provider;
+        service.replace_embedding_runtime_state(
+            crate::service::embedding_runtime::EmbeddingRuntimeState::new(
+                provider,
+                Some("embsig:new".to_string()),
+                Some("test-model".to_string()),
+                Some(dimension),
+            ),
+        );
         service
     }
 

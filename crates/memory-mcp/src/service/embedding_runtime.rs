@@ -1,6 +1,33 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::service::MemoryError;
+
+use super::EmbeddingProvider;
+
+#[derive(Clone)]
+pub(crate) struct EmbeddingRuntimeState {
+    pub(crate) provider: Arc<dyn EmbeddingProvider>,
+    pub(crate) signature: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) dimension: Option<usize>,
+}
+
+impl EmbeddingRuntimeState {
+    pub(crate) fn new(
+        provider: Arc<dyn EmbeddingProvider>,
+        signature: Option<String>,
+        model: Option<String>,
+        dimension: Option<usize>,
+    ) -> Self {
+        Self {
+            provider,
+            signature,
+            model,
+            dimension,
+        }
+    }
+}
 
 pub(crate) const DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS: u32 = 3;
 pub(crate) const DEFAULT_BACKGROUND_EMBEDDING_INITIAL_DELAY_MS: u64 = 750;

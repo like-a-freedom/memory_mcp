@@ -43,6 +43,10 @@ pub struct EmbeddingConfig {
     pub similarity_threshold: f64,
     /// Optional override for model directory path (used by local providers).
     pub model_dir: Option<String>,
+    /// Initial delay before the in-process remote recovery worker probes.
+    pub recovery_interval_secs: u64,
+    /// Whether remote embedding recovery is enabled after a failed startup probe.
+    pub auto_recovery: bool,
 }
 
 impl Default for EmbeddingConfig {
@@ -57,6 +61,8 @@ impl Default for EmbeddingConfig {
             max_tokens: DEFAULT_EMBEDDING_MAX_TOKENS,
             similarity_threshold: DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             model_dir: None,
+            recovery_interval_secs: DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS,
+            auto_recovery: true,
         }
     }
 }
@@ -104,6 +110,14 @@ impl EmbeddingConfig {
         let similarity_threshold = parse_env::<f64>("EMBEDDINGS_SIMILARITY_THRESHOLD")?
             .unwrap_or(DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD);
         let model_dir = env::var("EMBEDDINGS_MODEL_DIR").ok();
+        let recovery_interval_secs = parse_env::<u64>("EMBEDDINGS_RECOVERY_INTERVAL_SECS")?
+            .unwrap_or(DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS);
+        if recovery_interval_secs == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "EMBEDDINGS_RECOVERY_INTERVAL_SECS must be greater than zero".to_string(),
+            ));
+        }
+        let auto_recovery = parse_bool_env("EMBEDDINGS_AUTO_RECOVERY").unwrap_or(true);
 
         if !enabled {
             return Ok(Self {
@@ -112,6 +126,8 @@ impl EmbeddingConfig {
                 max_tokens,
                 similarity_threshold,
                 model_dir,
+                recovery_interval_secs,
+                auto_recovery,
                 ..Self::default()
             });
         }
@@ -168,6 +184,8 @@ impl EmbeddingConfig {
             max_tokens,
             similarity_threshold,
             model_dir,
+            recovery_interval_secs,
+            auto_recovery,
         })
     }
 
@@ -319,6 +337,62 @@ mod tests {
             || {
                 let config = EmbeddingConfig::from_env().expect("config from env");
                 assert_eq!(config.dimension_override, None);
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_defaults_to_enabled_recovery() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("openai-compatible")),
+                ("EMBEDDINGS_MODEL", Some("test-model")),
+                ("EMBEDDINGS_RECOVERY_INTERVAL_SECS", None),
+                ("EMBEDDINGS_AUTO_RECOVERY", None),
+            ],
+            || {
+                let config = EmbeddingConfig::from_env().expect("config from env");
+                assert_eq!(config.recovery_interval_secs, 60);
+                assert!(config.auto_recovery);
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_parses_recovery_interval_and_opt_out() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("openai-compatible")),
+                ("EMBEDDINGS_MODEL", Some("test-model")),
+                ("EMBEDDINGS_RECOVERY_INTERVAL_SECS", Some("17")),
+                ("EMBEDDINGS_AUTO_RECOVERY", Some("false")),
+            ],
+            || {
+                let config = EmbeddingConfig::from_env().expect("config from env");
+                assert_eq!(config.recovery_interval_secs, 17);
+                assert!(!config.auto_recovery);
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_rejects_zero_recovery_interval() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("openai-compatible")),
+                ("EMBEDDINGS_MODEL", Some("test-model")),
+                ("EMBEDDINGS_RECOVERY_INTERVAL_SECS", Some("0")),
+            ],
+            || {
+                let result = EmbeddingConfig::from_env();
+                assert!(matches!(
+                    result,
+                    Err(MemoryError::ConfigInvalid(message))
+                        if message.contains("EMBEDDINGS_RECOVERY_INTERVAL_SECS")
+                ));
             },
         );
     }

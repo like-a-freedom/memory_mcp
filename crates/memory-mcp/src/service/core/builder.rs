@@ -11,6 +11,10 @@ use crate::service::cache::CacheKey;
 use crate::service::embedding::{
     DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider_with_dimension,
 };
+use crate::service::embedding_recovery::{
+    EmbeddingRecoveryRuntime, should_spawn_embedding_recovery,
+};
+use crate::service::embedding_runtime::EmbeddingRuntimeState;
 use crate::service::entity_extraction::create_entity_extractor_with_progress;
 use crate::service::error::MemoryError;
 use crate::service::startup::{
@@ -35,11 +39,8 @@ pub struct MemoryService {
     pub(crate) context_cache:
         Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
-    pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
+    pub(crate) embedding_runtime_state: Arc<std::sync::RwLock<EmbeddingRuntimeState>>,
     pub(crate) embedding_similarity_threshold: f64,
-    pub(crate) current_embedding_signature: Option<String>,
-    pub(crate) current_embedding_model: Option<String>,
-    pub(crate) current_embedding_dimension: Option<usize>,
     pub(crate) task_runner: Arc<super::super::embedding::task_runner::BackgroundTaskRunner>,
     pub(crate) query_embedding_cache:
         Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
@@ -59,6 +60,8 @@ pub struct MemoryService {
     /// spawn lifecycle workers; populated by `new_from_env_with_mode`.
     pub(crate) lifecycle_background_workers:
         Option<super::super::lifecycle::LifecycleBackgroundWorkerRuntime>,
+    /// Owned runtime for remote embedding recovery after a degraded startup.
+    pub(crate) embedding_recovery_runtime: Option<EmbeddingRecoveryRuntime>,
     /// Bounded-concurrency semaphore for fire-and-forget triple extraction
     /// tasks. Limits in-flight extraction tasks to prevent unbounded task
     /// spawning under load.
@@ -213,6 +216,7 @@ impl MemoryService {
                 .await?
             }
             (_, EmbeddingStartupDecision::UseConfiguredProvider)
+            | (_, EmbeddingStartupDecision::ResumePendingBackfill { .. })
             | (_, EmbeddingStartupDecision::BootstrapReadyNamespace { .. }) => {
                 create_embedding_provider_with_dimension(
                     &config.embedding,
@@ -223,6 +227,30 @@ impl MemoryService {
                         .unwrap_or_else(|| config.embedding.fallback_dimension()),
                 )
                 .await?
+            }
+            (_, EmbeddingStartupDecision::RecoverMissingEmbeddings { target_signature }) => {
+                let mut event = std::collections::HashMap::new();
+                event.insert(
+                    "op".to_string(),
+                    serde_json::json!("embedding.rebuild_required"),
+                );
+                event.insert(
+                    "reason".to_string(),
+                    serde_json::json!(
+                        "configured embedding signature differs; missing embeddings will be recovered without rewriting existing vectors"
+                    ),
+                );
+                event.insert(
+                    "target_signature".to_string(),
+                    serde_json::json!(target_signature),
+                );
+                startup_logger.log(event, crate::logging::LogLevel::Warn);
+                Arc::new(DisabledEmbeddingProvider::new(
+                    target
+                        .as_ref()
+                        .map(|value| value.dimension)
+                        .unwrap_or_else(|| config.embedding.fallback_dimension()),
+                ))
             }
             (_, EmbeddingStartupDecision::DisableSemantic { reason }) => {
                 let mut event = std::collections::HashMap::new();
@@ -253,6 +281,7 @@ impl MemoryService {
         )
         .await?;
 
+        let runtime_provider = embedding_provider.clone();
         let mut service = Self::new_with_embedding_provider(
             db_client.clone(),
             config.active_namespace().as_str().to_string(),
@@ -266,9 +295,12 @@ impl MemoryService {
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
         service.lifecycle_config = config.lifecycle.clone();
-        service.current_embedding_signature = target.as_ref().map(|value| value.signature.clone());
-        service.current_embedding_model = target.as_ref().and_then(|value| value.model.clone());
-        service.current_embedding_dimension = target.as_ref().map(|value| value.dimension);
+        service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
+            runtime_provider,
+            target.as_ref().map(|value| value.signature.clone()),
+            target.as_ref().and_then(|value| value.model.clone()),
+            target.as_ref().map(|value| value.dimension),
+        ));
 
         // Wire environment-driven claim configuration
         if let Ok(claim_config) = crate::config::claims::ClaimConfig::from_env() {
@@ -290,6 +322,7 @@ impl MemoryService {
                 config.embedding.provider_label(),
                 config.embedding.model.as_deref(),
                 target.dimension,
+                false,
             )
             .await?;
 
@@ -324,6 +357,17 @@ impl MemoryService {
         let lifecycle_background_workers =
             super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
         service.lifecycle_background_workers = Some(lifecycle_background_workers);
+
+        if should_spawn_embedding_recovery(mode, &decision, &config.embedding) {
+            service.embedding_recovery_runtime = Some(
+                service
+                    .start_embedding_recovery_worker(
+                        config.embedding.clone(),
+                        effective_data_dir.clone(),
+                    )
+                    .await,
+            );
+        }
 
         Ok(service)
     }
@@ -442,11 +486,13 @@ impl MemoryService {
             explanation_service,
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
             entity_extractor,
-            embedding_provider,
+            embedding_runtime_state: Arc::new(std::sync::RwLock::new(EmbeddingRuntimeState::new(
+                embedding_provider,
+                None,
+                None,
+                None,
+            ))),
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
-            current_embedding_signature: None,
-            current_embedding_model: None,
-            current_embedding_dimension: None,
             task_runner: Arc::new(
                 super::super::embedding::task_runner::BackgroundTaskRunner::new(),
             ),
@@ -465,6 +511,7 @@ impl MemoryService {
                 super::super::agent_memory::recall::SessionTraceRegistry::new(),
             ),
             lifecycle_background_workers: None,
+            embedding_recovery_runtime: None,
             triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
                 crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
             )),

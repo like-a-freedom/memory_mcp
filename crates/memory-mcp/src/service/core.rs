@@ -29,6 +29,25 @@ impl MemoryService {
         )
     }
 
+    pub(crate) fn embedding_runtime_snapshot(
+        &self,
+    ) -> crate::service::embedding_runtime::EmbeddingRuntimeState {
+        self.embedding_runtime_state
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    pub(crate) fn replace_embedding_runtime_state(
+        &self,
+        state: crate::service::embedding_runtime::EmbeddingRuntimeState,
+    ) {
+        *self
+            .embedding_runtime_state
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
+    }
+
     /// Episode-domain store (ADR-0027: episode queries live in the store).
     pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
         crate::storage::EpisodeStoreClient::new(
@@ -42,6 +61,7 @@ impl MemoryService {
     /// Used by capability modules and tools that need a narrow reference
     /// instead of `&self`.
     pub fn build_context(&self) -> super::service_context::ServiceContext {
+        let embedding_state = self.embedding_runtime_snapshot();
         super::service_context::ServiceContext {
             db_client: self.db_client.clone(),
             active_namespace: self.active_namespace.clone(),
@@ -56,11 +76,11 @@ impl MemoryService {
                 self.db_client.clone(),
                 self.active_namespace.clone(),
                 self.logger.clone(),
-                self.embedding_provider.clone(),
+                embedding_state.provider,
                 self.embedding_similarity_threshold,
-                self.current_embedding_signature.clone(),
-                self.current_embedding_model.clone(),
-                self.current_embedding_dimension,
+                embedding_state.signature,
+                embedding_state.model,
+                embedding_state.dimension,
                 self.context_cache.clone(),
                 self.query_embedding_cache.clone(),
                 self.task_runner.clone(),
@@ -175,6 +195,31 @@ impl MemoryService {
         runtime
     }
 
+    pub(crate) async fn start_embedding_recovery_worker(
+        &self,
+        config: crate::config::EmbeddingConfig,
+        data_dir: String,
+    ) -> super::embedding_recovery::EmbeddingRecoveryRuntime {
+        let runtime = super::embedding_recovery::EmbeddingRecoveryRuntime::new();
+        let backend = std::sync::Arc::new(
+            super::embedding_recovery::ConfiguredEmbeddingRecoveryBackend::new(
+                config.clone(),
+                data_dir,
+            ),
+        );
+        runtime
+            .spawn(
+                self.clone(),
+                config.clone(),
+                backend,
+                super::embedding_recovery::RecoveryWorkerSettings::production(
+                    config.recovery_interval_secs,
+                ),
+            )
+            .await;
+        runtime
+    }
+
     /// Shut down the lifecycle background workers (decay, archival, community).
     ///
     /// Cancels all worker tasks and joins them. Safe to call when no workers
@@ -183,6 +228,9 @@ impl MemoryService {
     /// already drained).
     pub async fn shutdown_lifecycle_background_workers(&self) {
         if let Some(runtime) = &self.lifecycle_background_workers {
+            runtime.shutdown().await;
+        }
+        if let Some(runtime) = &self.embedding_recovery_runtime {
             runtime.shutdown().await;
         }
     }
@@ -321,6 +369,7 @@ mod tests {
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
     use crate::models::{AccessPayload, Provenance};
     use crate::service::EmbeddingProvider;
+    use crate::service::embedding_runtime::EmbeddingRuntimeState;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;
@@ -416,6 +465,35 @@ mod tests {
             100,
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn build_context_uses_the_latest_embedding_runtime_state() {
+        let service = create_test_service("org");
+        let replacement = Arc::new(StaticTestEmbeddingProvider::new());
+        service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
+            replacement,
+            Some("embsig:test".to_string()),
+            Some("test-model".to_string()),
+            Some(DEFAULT_EMBEDDING_DIMENSION),
+        ));
+
+        let context = service.build_context();
+        assert_eq!(
+            context
+                .embedding_service
+                .embedding_provider()
+                .provider_name(),
+            "test"
+        );
+        assert_eq!(
+            context.embedding_service.current_embedding_signature(),
+            Some("embsig:test")
+        );
+        assert_eq!(
+            context.embedding_service.current_embedding_dimension(),
+            Some(DEFAULT_EMBEDDING_DIMENSION)
+        );
     }
 
     struct StaticTestEmbeddingProvider {
@@ -570,7 +648,7 @@ mod tests {
         );
         db_client.apply_migrations("org").await.expect("migrations");
 
-        let mut service = MemoryService::new_with_embedding_provider(
+        let service = MemoryService::new_with_embedding_provider(
             db_client.clone(),
             "org".to_string(),
             "warn".to_string(),
@@ -581,9 +659,13 @@ mod tests {
             Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
-        service.current_embedding_signature = Some("embsig:background-test".to_string());
-        service.current_embedding_model = Some("test-model".to_string());
-        service.current_embedding_dimension = Some(DEFAULT_EMBEDDING_DIMENSION);
+        let provider = service.embedding_runtime_snapshot().provider;
+        service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
+            provider,
+            Some("embsig:background-test".to_string()),
+            Some("test-model".to_string()),
+            Some(DEFAULT_EMBEDDING_DIMENSION),
+        ));
 
         let fact_id = service
             .add_fact(
@@ -639,7 +721,7 @@ mod tests {
         );
         db_client.apply_migrations("org").await.expect("migrations");
 
-        let mut service = MemoryService::new_with_embedding_provider(
+        let service = MemoryService::new_with_embedding_provider(
             db_client,
             "org".to_string(),
             "warn".to_string(),
@@ -650,9 +732,13 @@ mod tests {
             Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
         )
         .expect("service");
-        service.current_embedding_signature = Some("embsig:background-query-test".to_string());
-        service.current_embedding_model = Some("test-model".to_string());
-        service.current_embedding_dimension = Some(DEFAULT_EMBEDDING_DIMENSION);
+        let provider = service.embedding_runtime_snapshot().provider;
+        service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
+            provider,
+            Some("embsig:background-query-test".to_string()),
+            Some("test-model".to_string()),
+            Some(DEFAULT_EMBEDDING_DIMENSION),
+        ));
 
         let ctx = service.build_context();
         let first = ctx
