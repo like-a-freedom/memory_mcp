@@ -88,6 +88,31 @@ pub fn build_embedding_signature(
     format!("embsig:{}", hex::encode(hasher.finalize()))
 }
 
+/// Known endpoint path suffixes users may append to `EMBEDDINGS_BASE_URL`.
+const ENDPOINT_SUFFIXES: [&str; 2] = ["/api/embeddings", "/embeddings"];
+
+/// Normalizes a user-provided `EMBEDDINGS_BASE_URL` to a bare base (no endpoint
+/// path): trims whitespace and trailing slashes and strips any known endpoint
+/// suffix, so both `.../v1` and `.../v1/embeddings` forms resolve identically.
+fn normalize_base_url(raw: String) -> String {
+    let mut url = raw.trim().to_string();
+    loop {
+        let trimmed = url.trim_end_matches('/').to_string();
+        let lower = trimmed.to_ascii_lowercase();
+        let stripped = ENDPOINT_SUFFIXES.iter().find_map(|suffix| {
+            if lower.len() > suffix.len() && lower.ends_with(suffix) {
+                Some(trimmed[..trimmed.len() - suffix.len()].to_string())
+            } else {
+                None
+            }
+        });
+        match stripped {
+            Some(next) => url = next,
+            None => return trimmed,
+        }
+    }
+}
+
 impl EmbeddingConfig {
     /// Loads optional embedding provider configuration from environment variables.
     ///
@@ -163,14 +188,14 @@ impl EmbeddingConfig {
 
         let base_url = match provider {
             EmbeddingProviderKind::LocalCandle => None,
-            EmbeddingProviderKind::OpenAiCompatible => Some(
+            EmbeddingProviderKind::OpenAiCompatible => Some(normalize_base_url(
                 env::var("EMBEDDINGS_BASE_URL")
                     .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-            ),
-            EmbeddingProviderKind::Ollama => Some(
+            )),
+            EmbeddingProviderKind::Ollama => Some(normalize_base_url(
                 env::var("EMBEDDINGS_BASE_URL")
                     .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()),
-            ),
+            )),
             EmbeddingProviderKind::Disabled => None,
         };
 
@@ -240,6 +265,72 @@ impl EmbeddingConfig {
 mod tests {
     use super::*;
     use std::panic::{self, AssertUnwindSafe};
+
+    #[test]
+    fn normalize_base_url_strips_openai_embeddings_suffix() {
+        assert_eq!(
+            normalize_base_url("https://integrate.api.nvidia.com/v1/embeddings".to_string()),
+            "https://integrate.api.nvidia.com/v1"
+        );
+        assert_eq!(
+            normalize_base_url("https://integrate.api.nvidia.com/v1/".to_string()),
+            "https://integrate.api.nvidia.com/v1"
+        );
+        assert_eq!(
+            normalize_base_url("https://integrate.api.nvidia.com/v1".to_string()),
+            "https://integrate.api.nvidia.com/v1"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_strips_ollama_suffix() {
+        assert_eq!(
+            normalize_base_url("http://127.0.0.1:11434/api/embeddings".to_string()),
+            "http://127.0.0.1:11434"
+        );
+        assert_eq!(
+            normalize_base_url("http://127.0.0.1:11434".to_string()),
+            "http://127.0.0.1:11434"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_is_idempotent() {
+        let once = normalize_base_url("https://api.example.com/v1/embeddings".to_string());
+        assert_eq!(normalize_base_url(once.clone()), once);
+    }
+
+    #[test]
+    fn normalize_base_url_trims_whitespace_and_case_insensitive_suffix() {
+        assert_eq!(
+            normalize_base_url("  https://api.example.com/v1/Embeddings/  ".to_string()),
+            "https://api.example.com/v1"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_strips_doubled_suffix() {
+        assert_eq!(
+            normalize_base_url("https://api.example.com/v1/embeddings/embeddings".to_string()),
+            "https://api.example.com/v1"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_handles_non_ascii_input_without_panicking() {
+        assert_eq!(
+            normalize_base_url("https://h/İ/v1/embeddings".to_string()),
+            "https://h/İ/v1"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_keeps_unrelated_paths() {
+        assert_eq!(
+            normalize_base_url("https://gateway.example.com/custom/route".to_string()),
+            "https://gateway.example.com/custom/route"
+        );
+    }
 
     use super::super::env_lock;
 
