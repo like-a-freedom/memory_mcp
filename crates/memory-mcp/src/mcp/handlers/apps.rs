@@ -16,7 +16,7 @@ use super::super::resources::{
     parse_app_root_uri, parse_app_session_uri,
 };
 use super::super::resources::{app_catalog_resources, app_resource_templates};
-use super::super::response::{AppCommandResult, OpenAppResult};
+use super::super::response::OpenAppResult;
 use super::super::session;
 use super::MemoryMcp;
 
@@ -96,23 +96,6 @@ impl MemoryMcp {
         self.session_manager.get_valid(session_id).await
     }
 
-    pub(super) async fn replace_session_payload(
-        &self,
-        session_id: &str,
-        payload: Value,
-    ) -> Result<session::AppSessionState, ErrorData> {
-        self.session_manager
-            .replace_payload(session_id, payload)
-            .await
-    }
-
-    pub(super) async fn remove_session(
-        &self,
-        session_id: &str,
-    ) -> Result<session::AppSessionState, ErrorData> {
-        self.session_manager.remove(session_id).await
-    }
-
     pub(super) async fn create_session(
         &self,
         app: &str,
@@ -120,16 +103,6 @@ impl MemoryMcp {
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
         self.session_manager.create(app, ttl_seconds, payload).await
-    }
-
-    pub(super) fn app_command_result_from_details(
-        app: &str,
-        session_id: &str,
-        action: &str,
-        resource_uri: Option<String>,
-        details: Value,
-    ) -> AppCommandResult {
-        session::app_command_result_from_details(app, session_id, action, resource_uri, details)
     }
 
     #[cfg(feature = "mcp-apps")]

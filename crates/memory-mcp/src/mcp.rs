@@ -21,7 +21,7 @@ mod error;
 mod handlers;
 mod params;
 mod parsers;
-mod resources;
+pub(crate) mod resources;
 pub(crate) mod response;
 pub(crate) mod session;
 

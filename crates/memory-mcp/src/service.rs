@@ -19,7 +19,7 @@ pub use error::is_transient_db_error;
 
 pub(crate) mod apps;
 #[cfg(feature = "mcp-apps")]
-pub(crate) use apps::{AppCommand, AppCommandInput};
+pub(crate) use apps::AppCommandInput;
 pub use apps::{
     ArchiveCandidatesOutcome, CommitIngestionReviewOutcome, CommitIngestionReviewRequest,
     DiffChange, DiffRequest, DiffSummary, DiffTarget, DiffView, DiffViewRange,

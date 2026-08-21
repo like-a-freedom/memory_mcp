@@ -4,6 +4,8 @@ pub(crate) mod dispatch;
 pub(crate) mod graph;
 mod ingestion_review;
 mod lifecycle;
+#[cfg(feature = "mcp-apps")]
+pub(crate) mod session_lifecycle;
 mod types;
 #[cfg(feature = "mcp-apps")]
 mod workflow;
@@ -23,4 +25,4 @@ pub use types::{
     RestoreArchivedOutcome,
 };
 #[cfg(feature = "mcp-apps")]
-pub(crate) use workflow::{AppCommand, AppCommandInput};
+pub(crate) use workflow::AppCommandInput;

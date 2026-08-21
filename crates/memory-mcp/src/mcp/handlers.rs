@@ -21,18 +21,14 @@ use crate::logging::LogLevel;
 use crate::models::ExtractResult;
 #[cfg(test)]
 use crate::models::{AssembledContextItem, ExplainItem};
+#[cfg(feature = "mcp-apps")]
+use crate::service::AppCommandInput;
 use crate::service::MemoryService;
-#[cfg(feature = "mcp-apps")]
-use crate::service::apps::dispatch::{AppContext, find_descriptor};
-#[cfg(feature = "mcp-apps")]
-use crate::service::{AppCommand, AppCommandInput};
 #[cfg(feature = "mcp-apps")]
 use std::time::Instant;
 
 use super::error::mcp_error;
 use super::params::*;
-#[cfg(feature = "mcp-apps")]
-use super::resources::app_session_uri;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session::{self, SessionManager};
 
@@ -412,53 +408,26 @@ impl MemoryMcp {
                 Some(&request_id),
             );
 
-            let outcome: Result<AppCommandResult, ErrorData> = async {
-                let session = self.session(&p.session_id).await?;
-                let command = AppCommand::parse(
-                    &session.app,
-                    AppCommandInput {
-                        action: p.action.clone(),
-                        item_ids: p.item_ids.clone(),
-                        target_ids: p.target_ids.clone(),
-                        target_id: p.target_id.clone(),
-                        item_id: p.item_id.clone(),
-                        patch_json: p.patch_json.clone(),
-                        reason: p.reason.clone(),
-                        dry_run: p.dry_run.unwrap_or(false),
-                        confirmed: p.confirmed.unwrap_or(false),
-                        format: p.format.clone(),
-                        direction: p.direction.clone(),
-                        depth: p.depth,
-                    },
-                )
-                .map_err(|error| Self::invalid_params(error.to_string()))?;
-                let descriptor = find_descriptor(&command)?;
-                let ctx = AppContext {
-                    service: &self.service,
-                    session_id: &p.session_id,
-                    app: &session.app,
-                    payload: session.payload.clone(),
-                };
-                let outcome = (descriptor.execute)(&ctx, &command).await?;
-                if let Some(payload) = outcome.new_payload {
-                    self.replace_session_payload(&p.session_id, payload).await?;
-                }
-                if outcome.close_session {
-                    self.remove_session(&p.session_id).await?;
-                }
-                let resource_uri = if outcome.close_session {
-                    None
-                } else {
-                    Some(app_session_uri(&session.app, &p.session_id))
-                };
-                Ok(Self::app_command_result_from_details(
-                    &session.app,
-                    &p.session_id,
-                    outcome.action,
-                    resource_uri,
-                    outcome.details,
-                ))
-            }
+            let input = AppCommandInput {
+                action: p.action.clone(),
+                item_ids: p.item_ids.clone(),
+                target_ids: p.target_ids.clone(),
+                target_id: p.target_id.clone(),
+                item_id: p.item_id.clone(),
+                patch_json: p.patch_json.clone(),
+                reason: p.reason.clone(),
+                dry_run: p.dry_run.unwrap_or(false),
+                confirmed: p.confirmed.unwrap_or(false),
+                format: p.format.clone(),
+                direction: p.direction.clone(),
+                depth: p.depth,
+            };
+            let outcome = crate::service::apps::session_lifecycle::execute_app_command(
+                &self.service,
+                &self.session_manager,
+                &p.session_id,
+                input,
+            )
             .await;
 
             match outcome {
