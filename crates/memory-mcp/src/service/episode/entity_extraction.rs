@@ -175,15 +175,8 @@ pub(super) async fn persist_extraction_projection(
     let record_body = format!("{episode_key}:{projection_suffix}");
 
     // Written through the episode store so no raw SurrealDB queries leak into
-    // tools. `type::datetime(...)` mirrors the query builder's temporal-field
-    // handling for `episode`/`fact`/`edge`: SurrealDB does not coerce RFC3339
-    // strings into `datetime`-typed schema fields.
-    let sql = format!(
-        "CREATE entity_extraction_projection:⟨{record_body}⟩ SET \
-         episode_id = $episode_id, \
-         t_ingested = type::datetime($t_ingested), t_created = type::datetime($t_created), \
-         fingerprint = $fingerprint, entity_ids = $entity_ids RETURN *"
-    );
+    // tools (ADR-0044): the store owns the CREATE statement and the
+    // `type::datetime(...)` coercion for temporal schema fields.
     let vars = serde_json::json!({
         "episode_id": episode_id,
         "t_ingested": crate::service::normalize_dt(ingested_at),
@@ -192,7 +185,10 @@ pub(super) async fn persist_extraction_projection(
         "entity_ids": entity_ids,
     });
 
-    service.episode_store().query(&sql, Some(vars)).await?;
+    service
+        .episode_store()
+        .create_extraction_projection(&record_body, vars)
+        .await?;
 
     Ok(())
 }

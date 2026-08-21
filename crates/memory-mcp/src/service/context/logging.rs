@@ -249,15 +249,10 @@ async fn prune_expired_query_logs(
 ) -> Result<usize, MemoryError> {
     let cutoff = crate::service::query::now()
         - chrono::Duration::days(i64::from(service.query_log_retention_days()));
-    let deleted = service
+    service
         .context_access_log()
-        .query(
-            "DELETE query_log WHERE logged_at IS NOT NONE AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
-            Some(json!({"cutoff": crate::service::normalize_dt(cutoff)})),
-        )
-        .await?;
-
-    Ok(deleted.as_array().map_or(0, std::vec::Vec::len))
+        .prune_expired_logs(&crate::service::normalize_dt(cutoff))
+        .await
 }
 
 #[cfg(test)]

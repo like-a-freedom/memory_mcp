@@ -268,23 +268,17 @@ impl ExplanationService {
         &self,
         entity_id: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
-        let sql = "SELECT * FROM episode WHERE episode_id IN (SELECT VALUE source_episode FROM fact WHERE fact_id IN (SELECT VALUE type::string(out) FROM edge WHERE in = <record> $entity_id AND relation = 'involved_in')) ORDER BY t_ref DESC LIMIT 10";
-        let result = self
-            .db
-            .query(sql, Some(json!({"entity_id": entity_id})))
+        let rows = crate::storage::ContextStoreClient::from_bound(self.db.clone())
+            .select_episodes_via_entity(entity_id)
             .await?;
 
-        let episodes: Vec<crate::models::Episode> = result
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| {
-                        let obj = v.as_object()?;
-                        crate::service::episode::episode_from_record(obj)
-                    })
-                    .collect()
+        let episodes: Vec<crate::models::Episode> = rows
+            .iter()
+            .filter_map(|value| {
+                let obj = value.as_object()?;
+                crate::service::episode::episode_from_record(obj)
             })
-            .unwrap_or_default();
+            .collect();
 
         Ok(episodes)
     }

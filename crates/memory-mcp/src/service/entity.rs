@@ -5,11 +5,14 @@ use crate::models::EntityCandidate;
 use super::error::MemoryError;
 use super::query::normalize_text;
 use super::util::{deterministic_entity_id, validate_entity_candidate};
-use super::value_helpers::string_from_value;
 
 /// Resolves and persists entities.
+///
+/// Entity-table SQL lives in [`crate::storage::EntityStoreClient`]
+/// (ADR-0044); this service expresses intent, not queries.
 #[derive(Clone)]
 pub struct EntityService {
+    entity_store: crate::storage::EntityStoreClient,
     db: crate::storage::BoundDbClient,
 }
 
@@ -18,7 +21,12 @@ impl EntityService {
         db_client: std::sync::Arc<dyn crate::storage::DbClient>,
         namespace: impl Into<String>,
     ) -> Self {
+        let namespace = namespace.into();
         Self {
+            entity_store: crate::storage::EntityStoreClient::new(
+                db_client.clone(),
+                namespace.clone(),
+            ),
             db: crate::storage::BoundDbClient::new(db_client, namespace),
         }
     }
@@ -31,27 +39,9 @@ impl EntityService {
         &self,
         normalized_name: &str,
     ) -> Result<Option<String>, MemoryError> {
-        // Canonical-name index lookup first (fast path), then alias lookup.
-        let canonical_sql = "SELECT * FROM entity WHERE canonical_name_normalized = $name LIMIT 1";
-        let canonical_result = self
-            .db
-            .query_first(canonical_sql, Some(json!({ "name": normalized_name })))
-            .await?;
-
-        if let Some(record) = canonical_result {
-            return Ok(record
-                .as_object()
-                .and_then(|map| map.get("entity_id").and_then(string_from_value)));
-        }
-
-        let alias_sql = "SELECT * FROM entity WHERE aliases CONTAINS $name LIMIT 1";
-        let result = self
-            .db
-            .query_first(alias_sql, Some(json!({ "name": normalized_name })))
-            .await?;
-        Ok(result
-            .and_then(|record| record.as_object().cloned())
-            .and_then(|map| map.get("entity_id").and_then(string_from_value)))
+        self.entity_store
+            .find_entity_id_by_name(normalized_name)
+            .await
     }
 
     /// Find an entity ID by searching aliases.
@@ -60,19 +50,9 @@ impl EntityService {
         &self,
         normalized_alias: &str,
     ) -> Result<Option<String>, MemoryError> {
-        // NOTE: `entity_aliases` is a plain (non-FULLTEXT) index on the `aliases`
-        // array, so the FTS operator `@1@` would silently match nothing.
-        // `CONTAINS` is SurrealDB's array-membership operator and is index-aware.
-        let sql = "SELECT entity_id FROM entity WHERE aliases CONTAINS $alias LIMIT 1";
-        let result = self
-            .db
-            .query(sql, Some(json!({"alias": normalized_alias})))
-            .await?;
-        Ok(result
-            .as_array()
-            .and_then(|arr| arr.first())
-            .and_then(|v| v.as_object())
-            .and_then(|map| map.get("entity_id").and_then(string_from_value)))
+        self.entity_store
+            .find_entity_id_by_alias(normalized_alias)
+            .await
     }
 
     /// Find entities whose normalized name starts with the given prefix.
@@ -81,21 +61,7 @@ impl EntityService {
         &self,
         prefix: &str,
     ) -> Result<Vec<(String, String)>, MemoryError> {
-        let sql = "SELECT entity_id, canonical_name FROM entity WHERE string::starts_with(canonical_name_normalized, $prefix) LIMIT 50";
-        let result = self.db.query(sql, Some(json!({"prefix": prefix}))).await?;
-        Ok(result
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| {
-                        let map = v.as_object()?;
-                        let id = map.get("entity_id").and_then(string_from_value)?;
-                        let name = map.get("canonical_name").and_then(string_from_value)?;
-                        Some((id, name))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
+        self.entity_store.find_entities_by_prefix(prefix).await
     }
 
     /// Add an alias to an existing entity.
@@ -105,14 +71,9 @@ impl EntityService {
         alias: &str,
     ) -> Result<(), MemoryError> {
         let normalized_alias = normalize_text(alias);
-        let sql = "UPDATE type::record($id) SET aliases += [$alias]";
-        self.db
-            .query(
-                sql,
-                Some(json!({"id": entity_id, "alias": normalized_alias})),
-            )
-            .await?;
-        Ok(())
+        self.entity_store
+            .add_alias(entity_id, &normalized_alias)
+            .await
     }
 
     /// Create a new entity from a candidate and return its ID.

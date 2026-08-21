@@ -28,6 +28,10 @@ impl ContextStoreClient {
         }
     }
 
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+        Self { db }
+    }
+
     /// Facts matching a query at query-time with bi-temporal and fact-type filters.
     pub async fn select_facts_filtered(
         &self,
@@ -168,6 +172,23 @@ impl ContextStoreClient {
         );
         self.db.query_rows(&sql, Some(vars)).await
     }
+
+    /// Episodes linked to an entity through the fact→edge graph
+    /// (`entity ←edge← fact →episode`), newest first (ADR-0044: graph-shaped
+    /// read-model queries belong to this store).
+    pub async fn select_episodes_via_entity(
+        &self,
+        entity_id: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let sql = "SELECT * FROM episode WHERE episode_id IN (\
+                   SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
+                   SELECT VALUE type::string(out) FROM edge \
+                   WHERE in = <record> $entity_id AND relation = 'involved_in')) \
+                   ORDER BY t_ref DESC LIMIT 10";
+        self.db
+            .query_rows(sql, Some(json!({ "entity_id": entity_id })))
+            .await
+    }
 }
 
 /// Write-side context store — only the access-log path. Keeps narrow
@@ -189,7 +210,17 @@ impl ContextAccessLogClient {
         self.db.create(record_id, content).await
     }
 
-    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
-        self.db.query(sql, vars).await
+    /// Deletes query-log rows older than `cutoff` and returns how many were
+    /// removed (ADR-0044: the retention DELETE lives in the owning store).
+    pub async fn prune_expired_logs(&self, cutoff: &str) -> Result<usize, MemoryError> {
+        let deleted = self
+            .db
+            .query(
+                "DELETE query_log WHERE logged_at IS NOT NONE \
+                 AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
+                Some(json!({ "cutoff": cutoff })),
+            )
+            .await?;
+        Ok(deleted.as_array().map_or(0, Vec::len))
     }
 }

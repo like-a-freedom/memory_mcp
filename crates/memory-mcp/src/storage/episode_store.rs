@@ -51,10 +51,29 @@ impl EpisodeStoreClient {
         self.db.update(record_id, content).await
     }
 
-    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
-        self.db.query(sql, vars).await
+    /// Persists an entity extraction projection row (ADR-0044: the CREATE
+    /// statement lives in the owning store, not in the service layer).
+    ///
+    /// `record_body` is the two-part `episode-key:projection-suffix` body;
+    /// `⟨...⟩` keeps it a single id string. `type::datetime(...)` mirrors the
+    /// query builder's temporal-field handling: SurrealDB does not coerce
+    /// RFC3339 strings into `datetime`-typed schema fields.
+    pub async fn create_extraction_projection(
+        &self,
+        record_body: &str,
+        vars: Value,
+    ) -> Result<(), MemoryError> {
+        let sql = format!(
+            "CREATE entity_extraction_projection:⟨{record_body}⟩ SET \
+             episode_id = $episode_id, \
+             t_ingested = type::datetime($t_ingested), t_created = type::datetime($t_created), \
+             fingerprint = $fingerprint, entity_ids = $entity_ids RETURN *"
+        );
+        self.db.query(&sql, Some(vars)).await?;
+        Ok(())
     }
 
+    /// Persists an entity extraction projection row (ADR-0044: the CREATE
     /// Finds episodes by the stable source identity used by both legacy and
     /// scope-free episode IDs. The caller decides how many matches are safe.
     pub async fn select_by_source_identity(

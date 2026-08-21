@@ -205,8 +205,25 @@ impl AppStoreClient {
         self.db.update(record_id, content).await
     }
 
-    pub async fn query(&self, sql: &str, vars: Option<Value>) -> Result<Value, MemoryError> {
-        self.db.query(sql, vars).await
+    /// Whether any fact linked to `episode_id` was accessed at or after
+    /// `hot_cutoff` (ADR-0044: the archival hotness check lives in the
+    /// owning store).
+    pub async fn has_recent_fact_access(
+        &self,
+        episode_id: &str,
+        hot_cutoff: &str,
+    ) -> Result<bool, MemoryError> {
+        let rows = self
+            .db
+            .query_rows(
+                "SELECT fact_id FROM fact \
+                 WHERE source_episode = $episode_id \
+                 AND last_accessed IS NOT NONE \
+                 AND last_accessed >= type::datetime($hot_cutoff) LIMIT 1",
+                Some(json!({ "episode_id": episode_id, "hot_cutoff": hot_cutoff })),
+            )
+            .await?;
+        Ok(!rows.is_empty())
     }
 }
 
