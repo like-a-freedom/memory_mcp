@@ -3,7 +3,6 @@ use crate::service::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
-pub(crate) use crate::storage::EMBEDDING_STATE_RECORD_ID;
 pub(crate) const STORED_EMBEDDING_SAMPLE_SIZE: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +53,9 @@ pub(crate) async fn apply_startup_migrations(
 pub(crate) async fn load_embedding_state(
     db: &BoundDbClient,
 ) -> Result<Option<serde_json::Value>, MemoryError> {
-    db.select_one(EMBEDDING_STATE_RECORD_ID).await
+    crate::storage::EmbeddingStateStoreClient::from_bound(db.clone())
+        .load_state()
+        .await
 }
 
 async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {

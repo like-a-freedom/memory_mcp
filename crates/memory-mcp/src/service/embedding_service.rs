@@ -27,6 +27,11 @@ const MAX_EMBEDDING_INPUT_CHARS: usize = 8_000;
 ///
 /// Held as a field on `ServiceContext` and accessed by the `assemble_context`
 /// pipeline, `FactService::add_fact`, `reembed`, and capability modules.
+///
+/// Background tasks receive a `self.clone()`: every field is `Clone` (plain
+/// values, `Arc`, or `BoundDbClient`), so the clone freezes the same
+/// at-spawn-time state the previous `EmbeddingBackgroundSnapshot` captured,
+/// without duplicating the embedding policy methods (C4).
 #[derive(Clone)]
 pub(crate) struct EmbeddingService {
     db: BoundDbClient,
@@ -279,14 +284,15 @@ impl EmbeddingService {
             LogLevel::Info,
         );
 
-        let snapshot = self.embedding_background_snapshot();
         // Self-terminating task: `run_background_fact_embedding_task` runs a
         // bounded retry loop (DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS) and exits
         // on success, `Ok(None)`, or a non-retryable error. It is not an
         // infinite loop, so no CancellationToken is needed. The `task_runner`
-        // reservation is released when the task completes.
+        // reservation is released when the task completes. The clone freezes
+        // the embedding policy state at spawn time.
+        let service = self.clone();
         tokio::spawn(async move {
-            snapshot
+            service
                 .run_background_fact_embedding_task(task_key, namespace, fact_id, input)
                 .await;
         });
@@ -365,49 +371,24 @@ impl EmbeddingService {
             LogLevel::Info,
         );
 
-        let snapshot = self.embedding_background_snapshot();
         // Self-terminating task: `run_background_query_embedding_task` runs a
         // bounded retry loop (DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS) and exits
         // on success, `Ok(None)`, or a non-retryable error. It is not an
         // infinite loop, so no CancellationToken is needed. The `task_runner`
-        // reservation is released when the task completes.
+        // reservation is released when the task completes. The clone freezes
+        // the embedding policy state at spawn time.
+        let service = self.clone();
         tokio::spawn(async move {
-            snapshot
+            service
                 .run_background_query_embedding_task(task_key, input)
                 .await;
         });
     }
 
-    /// Captures the `Arc`-based fields needed by background embedding tasks.
-    fn embedding_background_snapshot(&self) -> EmbeddingBackgroundSnapshot {
-        EmbeddingBackgroundSnapshot {
-            db: self.db.clone(),
-            logger: self.logger.clone(),
-            embedding_provider: self.embedding_provider.clone(),
-            current_embedding_signature: self.current_embedding_signature.clone(),
-            context_cache: self.context_cache.clone(),
-            query_embedding_cache: self.query_embedding_cache.clone(),
-            task_runner: self.task_runner.clone(),
-        }
-    }
-}
+    // ─── Background task execution ──────────────────────────────────────
+    //
+    // These methods run inside spawned tasks on a cloned service instance.
 
-/// Owned snapshot of the fields required by background embedding tasks.
-///
-/// Background tasks cannot borrow `&EmbeddingService` across `.await` points
-/// in a spawned task, so they receive an owned snapshot of the `Arc` fields
-/// they need.
-struct EmbeddingBackgroundSnapshot {
-    db: BoundDbClient,
-    logger: StdoutLogger,
-    embedding_provider: Arc<dyn EmbeddingProvider>,
-    current_embedding_signature: Option<String>,
-    context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    query_embedding_cache: Arc<Mutex<LruCache<String, CachedQueryEmbedding>>>,
-    task_runner: Arc<BackgroundTaskRunner>,
-}
-
-impl EmbeddingBackgroundSnapshot {
     async fn run_background_fact_embedding_task(
         self,
         task_key: String,
@@ -543,119 +524,6 @@ impl EmbeddingBackgroundSnapshot {
         }
 
         Ok(())
-    }
-
-    async fn generate_embedding(&self, input: &str) -> Result<Option<Vec<f64>>, MemoryError> {
-        let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
-            let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
-            self.logger.log(
-                crate::service::log_event(
-                    "embedding.input_truncated",
-                    json!({
-                        "original_chars": input.chars().count(),
-                        "truncated_chars": truncated.chars().count(),
-                        "limit": MAX_EMBEDDING_INPUT_CHARS,
-                    }),
-                    json!({}),
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Warn,
-            );
-            truncated
-        } else {
-            input.to_string()
-        };
-
-        let timer = Instant::now();
-        let provider = self.embedding_provider.provider_name();
-        let args = json!({
-            "provider": provider,
-            "input_chars": effective_input.chars().count(),
-        });
-
-        if !self.embedding_provider.is_enabled() {
-            let mut result = crate::service::core::build_embedding_log_result(0, None);
-            if let Some(map) = result.as_object_mut() {
-                map.insert("status".to_string(), json!("disabled"));
-            }
-            self.logger.log(
-                crate::service::log_event(
-                    "embedding.generate.skipped",
-                    crate::service::log_args_with_duration(args, timer.elapsed()),
-                    result,
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Debug,
-            );
-            return Ok(None);
-        }
-
-        match self.embedding_provider.embed(&effective_input).await {
-            Ok(embedding) => {
-                self.logger.log(
-                    crate::service::log_event(
-                        "embedding.generate.done",
-                        crate::service::log_args_with_duration(args, timer.elapsed()),
-                        crate::service::core::build_embedding_log_result(1, Some(embedding.len())),
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Info,
-                );
-                Ok(Some(embedding))
-            }
-            Err(err) => {
-                let mut result = crate::service::core::build_embedding_log_result(0, None);
-                if let Some(map) = result.as_object_mut() {
-                    map.insert("error".to_string(), json!(err.to_string()));
-                }
-                self.logger.log(
-                    crate::service::log_event(
-                        "embedding.generate.error",
-                        crate::service::log_args_with_duration(args, timer.elapsed()),
-                        result,
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Warn,
-                );
-                Err(err)
-            }
-        }
-    }
-
-    fn should_defer_embedding_retry(&self, err: &MemoryError) -> bool {
-        crate::service::is_transient_embedding_error(err)
-            && crate::service::is_remote_embedding_provider(self.embedding_provider.provider_name())
-    }
-
-    fn query_embedding_cache_key(&self, input: &str) -> String {
-        let signature = self
-            .current_embedding_signature
-            .as_deref()
-            .unwrap_or(self.embedding_provider.provider_name());
-        crate::service::hash_prefix(&format!(
-            "{signature}|{}",
-            crate::service::normalize_text(input)
-        ))
-    }
-
-    async fn store_query_embedding(&self, input: &str, embedding: Vec<f64>) {
-        let cache_key = self.query_embedding_cache_key(input);
-        let mut cache = self.query_embedding_cache.lock().await;
-        cache.put(
-            cache_key,
-            crate::service::CachedQueryEmbedding {
-                embedding,
-                expires_at: std::time::Instant::now() + crate::service::query_embedding_cache_ttl(),
-            },
-        );
     }
 
     fn insert_current_embedding_fields(

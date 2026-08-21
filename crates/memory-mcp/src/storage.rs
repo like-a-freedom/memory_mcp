@@ -45,9 +45,7 @@ pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub(crate) use close::{CloseStoreClient, CloseTimestamps};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
-pub(crate) use embedding_state_store::{
-    EMBEDDING_STATE_RECORD_ID, EmbeddingStateStatus, EmbeddingStateStoreClient,
-};
+pub(crate) use embedding_state_store::{EmbeddingStateStatus, EmbeddingStateStoreClient};
 pub(crate) use entity_store::EntityStoreClient;
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;

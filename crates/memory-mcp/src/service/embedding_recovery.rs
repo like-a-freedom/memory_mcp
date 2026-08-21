@@ -904,7 +904,7 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
         db.create(
-            crate::service::startup::EMBEDDING_STATE_RECORD_ID,
+            crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
             json!({
                 "status": "backfill_pending",
                 "active_signature": signature,
@@ -934,7 +934,7 @@ mod tests {
         .await;
 
         let state = db
-            .select_one(crate::service::startup::EMBEDDING_STATE_RECORD_ID, "org")
+            .select_one(crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID, "org")
             .await
             .expect("read state")
             .expect("state exists");
@@ -949,7 +949,7 @@ mod tests {
         seed_fact_with_embedding(&db, "fact:stale").await;
         let config = remote_config();
         db.create(
-            crate::service::startup::EMBEDDING_STATE_RECORD_ID,
+            crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
             json!({
                 "status": "ready",
                 "active_signature": "embsig:old",
@@ -1002,7 +1002,7 @@ mod tests {
             Some("embsig:old")
         );
         let state = db
-            .select_one(crate::service::startup::EMBEDDING_STATE_RECORD_ID, "org")
+            .select_one(crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID, "org")
             .await
             .expect("read embedding state")
             .expect("embedding state");

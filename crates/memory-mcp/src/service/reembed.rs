@@ -2271,7 +2271,7 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_nothing_to_do_restores_semantic_readiness() {
-        use crate::service::startup::EMBEDDING_STATE_RECORD_ID;
+        use crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID;
 
         let db = make_in_memory_db(&["org"]).await;
         seed_fact_with_embedding(

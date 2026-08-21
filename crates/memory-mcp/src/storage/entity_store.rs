@@ -23,10 +23,6 @@ impl EntityStoreClient {
         }
     }
 
-    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
-        Self { db }
-    }
-
     /// Find an entity ID by its normalized canonical name, falling back to
     /// alias membership. Returns `None` if no entity matches.
     pub(crate) async fn find_entity_id_by_name(
