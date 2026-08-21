@@ -3,7 +3,7 @@ use crate::service::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
-pub(crate) const EMBEDDING_STATE_RECORD_ID: &str = "embedding_state:fact";
+pub(crate) use crate::storage::EMBEDDING_STATE_RECORD_ID;
 pub(crate) const STORED_EMBEDDING_SAMPLE_SIZE: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,24 +98,16 @@ pub(crate) async fn write_bootstrap_ready_state(
     dimension: usize,
     backfill_pending: bool,
 ) -> Result<(), MemoryError> {
-    let payload = serde_json::json!({
-        "status": if backfill_pending {
-            "backfill_pending"
-        } else {
-            "ready"
-        },
-        "active_signature": active_signature,
-        "provider": provider,
-        "model": model,
-        "dimension": dimension,
-        "updated_at": chrono::Utc::now().to_rfc3339(),
-    });
-    if db.select_one(EMBEDDING_STATE_RECORD_ID).await?.is_some() {
-        db.update(EMBEDDING_STATE_RECORD_ID, payload).await?;
+    use crate::storage::{EmbeddingStateStatus, EmbeddingStateStoreClient};
+
+    let status = if backfill_pending {
+        EmbeddingStateStatus::BackfillPending
     } else {
-        db.create(EMBEDDING_STATE_RECORD_ID, payload).await?;
-    }
-    Ok(())
+        EmbeddingStateStatus::Ready
+    };
+    EmbeddingStateStoreClient::from_bound(db.clone())
+        .upsert_bootstrap_state(status, active_signature, provider, model, dimension)
+        .await
 }
 
 pub(crate) fn decide_embedding_startup(

@@ -22,6 +22,7 @@ mod client;
 pub(crate) mod close;
 pub(crate) mod context_store;
 pub(crate) mod embedding_backfill_store;
+pub(crate) mod embedding_state_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
 mod helpers;
@@ -43,6 +44,9 @@ pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub(crate) use close::{CloseStoreClient, CloseTimestamps};
 pub use context_store::{ContextAccessLogClient, ContextStoreClient};
+pub(crate) use embedding_state_store::{
+    EMBEDDING_STATE_RECORD_ID, EmbeddingStateStatus, EmbeddingStateStoreClient,
+};
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
 pub use helpers::is_missing_index_error;

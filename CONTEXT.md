@@ -120,6 +120,16 @@ _Avoid_: Reembed, rebuild, reindex
 The deliberate maintenance operation that rewrites fact embeddings for a new embedding target identity, possibly changing dimension and rebuilding the vector index. Reembed is operator-driven and is the recovery path for dimension or signature changes that Embedding Recovery cannot handle.
 _Avoid_: Backfill, migration
 
+**Embedding State**:
+The durable per-namespace record of the active embedding target identity and readiness status. It is the crash-resume marker for Embedding Recovery and Reembed, and is written by exactly one owning store.
+_Avoid_: Embedding config, provider state, index state
+
+## App surface vocabulary
+
+**App Session**:
+A process-scoped interactive session opened through `open_app` for one app (inspector, diff, graph, ingestion review, lifecycle), carrying a typed payload, bounded by an optional TTL, and closed explicitly or by expiry.
+_Avoid_: UI session, connection, workspace
+
 ## Trust model
 
 Trust is derived from the invocation channel and configured server policy.

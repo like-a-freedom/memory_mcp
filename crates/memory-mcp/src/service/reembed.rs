@@ -15,7 +15,6 @@ use tokio_util::sync::CancellationToken;
 
 use super::reembed_options::{ReembedOptions, ReembedOutcome};
 use super::reembed_progress::ReembedProgressReporter;
-use super::startup::EMBEDDING_STATE_RECORD_ID;
 use super::{MemoryError, MemoryService, normalize_dt};
 use crate::logging::LogLevel;
 use crate::service::value_helpers::{json_i64, json_string};
@@ -897,30 +896,33 @@ impl MemoryService {
         active_signature: Option<&str>,
         last_job_id: Option<&str>,
     ) -> Result<(), MemoryError> {
-        let embedding_state = self.embedding_runtime_snapshot();
-        let mut payload = serde_json::Map::from_iter([
-            ("status".to_string(), json!(status)),
-            (
-                "provider".to_string(),
-                json!(embedding_state.provider.provider_name()),
-            ),
-            ("model".to_string(), json!(embedding_state.model.clone())),
-            ("dimension".to_string(), json!(embedding_state.dimension)),
-            (
-                "updated_at".to_string(),
-                json!(chrono::Utc::now().to_rfc3339()),
-            ),
-        ]);
-        if let Some(active_signature) = active_signature {
-            payload.insert("active_signature".to_string(), json!(active_signature));
-        }
-        if let Some(last_job_id) = last_job_id {
-            payload.insert("last_job_id".to_string(), json!(last_job_id));
-        }
+        use crate::storage::EmbeddingStateStatus;
 
-        self.reembed_store()
-            .upsert_record(EMBEDDING_STATE_RECORD_ID, Value::Object(payload))
-            .await
+        let status = match status {
+            "ready" => EmbeddingStateStatus::Ready,
+            "rebuilding" => EmbeddingStateStatus::Rebuilding,
+            "failed" => EmbeddingStateStatus::Failed,
+            "backfill_pending" => EmbeddingStateStatus::BackfillPending,
+            other => {
+                return Err(MemoryError::Validation(format!(
+                    "unknown embedding state status `{other}`"
+                )));
+            }
+        };
+        let embedding_state = self.embedding_runtime_snapshot();
+        crate::storage::EmbeddingStateStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
+        .upsert_job_state(
+            status,
+            embedding_state.provider.provider_name(),
+            embedding_state.model.as_deref(),
+            embedding_state.dimension,
+            active_signature,
+            last_job_id,
+        )
+        .await
     }
 
     #[allow(clippy::too_many_arguments)]
