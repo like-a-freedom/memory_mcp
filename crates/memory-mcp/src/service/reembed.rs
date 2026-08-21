@@ -21,7 +21,6 @@ use crate::service::value_helpers::{json_i64, json_string};
 
 const REEMBED_JOB_ID: &str = "embedding_job:fact_reembed";
 const REEMBED_BATCH_SIZE: i32 = 100;
-const EMBEDDING_INDEX_NAME: &str = "fact_embedding_hnsw";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReembedSummary {
@@ -69,12 +68,12 @@ enum BatchOutcome {
 }
 
 impl MemoryService {
-    /// Drops the embedding HNSW index in the given namespace.
+    /// Drops the embedding HNSW index in the active namespace.
     ///
-    /// If the index does not exist (e.g. already removed by a previous failed
-    /// run), the call succeeds silently.
+    /// The DDL and its idempotency rule live in [`ReembedStoreClient`]
+    /// (C2); this method only orchestrates logging around the call.
     async fn remove_embedding_index(&self, namespace: &str) -> Result<(), MemoryError> {
-        let sql = format!("REMOVE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact");
+        use crate::storage::{EMBEDDING_INDEX_NAME, IndexRemoval};
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.index_drop_start")),
@@ -84,8 +83,8 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        match self.reembed_store().execute_ddl(&sql).await {
-            Ok(_) => {
+        match self.reembed_store().remove_embedding_index().await {
+            Ok(IndexRemoval::Removed) => {
                 self.logger.log(
                     std::collections::HashMap::from([
                         ("op".to_string(), json!("reembed.index_dropped")),
@@ -96,9 +95,7 @@ impl MemoryService {
                 );
                 Ok(())
             }
-            Err(MemoryError::Storage(message))
-                if crate::storage::is_missing_index_error(&message) =>
-            {
+            Ok(IndexRemoval::AlreadyAbsent) => {
                 self.logger.log(
                     std::collections::HashMap::from([
                         ("op".to_string(), json!("reembed.index_already_absent")),
@@ -124,16 +121,14 @@ impl MemoryService {
         }
     }
 
-    /// Creates the embedding HNSW index in the given namespace with the target
-    /// dimension.
+    /// Creates the embedding HNSW index in the active namespace with the
+    /// target dimension. The DDL lives in [`ReembedStoreClient`] (C2).
     async fn define_embedding_index(
         &self,
         namespace: &str,
         dimension: usize,
     ) -> Result<(), MemoryError> {
-        let sql = format!(
-            "DEFINE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact FIELDS embedding HNSW DIMENSION {dimension}"
-        );
+        use crate::storage::EMBEDDING_INDEX_NAME;
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.index_create_start")),
@@ -144,7 +139,7 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        self.reembed_store().execute_ddl(&sql).await.map(|_| ())
+        self.reembed_store().define_embedding_index(dimension).await
     }
 
     async fn restore_semantic_readiness(

@@ -55,6 +55,6 @@ pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
     fact_embedding_dimension_placeholder, validate_record_id,
 };
-pub use reembed_store::ReembedStoreClient;
+pub use reembed_store::{EMBEDDING_INDEX_NAME, IndexRemoval, ReembedStoreClient};
 pub(crate) use triple_store::TripleStoreClient;
 pub use types::GraphDirection;

@@ -11,7 +11,19 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::service::MemoryError;
-use crate::storage::{BoundDbClient, DbClient};
+use crate::storage::{BoundDbClient, DbClient, is_missing_index_error};
+
+/// Name of the fact embedding HNSW index owned by the reembed flow.
+pub const EMBEDDING_INDEX_NAME: &str = "fact_embedding_hnsw";
+
+/// Outcome of removing the embedding index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexRemoval {
+    /// The index existed and was dropped.
+    Removed,
+    /// The index did not exist; nothing to drop.
+    AlreadyAbsent,
+}
 
 /// Read-side store for the batch reembed worker.
 #[derive(Clone)]
@@ -26,9 +38,29 @@ impl ReembedStoreClient {
         }
     }
 
-    /// Execute schema/index DDL in the process-bound namespace.
-    pub async fn execute_ddl(&self, sql: &str) -> Result<Value, MemoryError> {
-        self.db.query(sql, None).await
+    /// Drops the fact embedding HNSW index in the process-bound namespace.
+    ///
+    /// Idempotent: removing an absent index reports [`IndexRemoval::AlreadyAbsent`]
+    /// instead of erroring (C2 — the DDL and its tolerance rule live here,
+    /// per ADR-0027/0044).
+    pub async fn remove_embedding_index(&self) -> Result<IndexRemoval, MemoryError> {
+        let sql = format!("REMOVE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact");
+        match self.db.query(&sql, None).await {
+            Ok(_) => Ok(IndexRemoval::Removed),
+            Err(MemoryError::Storage(message)) if is_missing_index_error(&message) => {
+                Ok(IndexRemoval::AlreadyAbsent)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Defines the fact embedding HNSW index with the given vector dimension
+    /// in the process-bound namespace (C2).
+    pub async fn define_embedding_index(&self, dimension: usize) -> Result<(), MemoryError> {
+        let sql = format!(
+            "DEFINE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact FIELDS embedding HNSW DIMENSION {dimension}"
+        );
+        self.db.query(&sql, None).await.map(|_| ())
     }
 
     /// Load a reembed-owned record by ID.
@@ -257,5 +289,38 @@ mod tests {
             .filter_map(|record| record.get("fact_id").and_then(|v| v.as_str()))
             .collect();
         assert_eq!(ids, vec!["fact:3"]);
+    }
+
+    #[tokio::test]
+    async fn remove_embedding_index_is_idempotent() {
+        let db_client = make_db().await;
+        let store = ReembedStoreClient::new(db_client.clone(), "org");
+
+        // The migrated schema defines the HNSW index, so the first removal
+        // drops it; the second removal must report AlreadyAbsent, not error.
+        let first = store.remove_embedding_index().await.expect("first removal");
+        assert_eq!(first, super::IndexRemoval::Removed);
+
+        let second = store
+            .remove_embedding_index()
+            .await
+            .expect("second removal must be idempotent");
+        assert_eq!(second, super::IndexRemoval::AlreadyAbsent);
+    }
+
+    #[tokio::test]
+    async fn define_embedding_index_recreates_dropped_index() {
+        let db_client = make_db().await;
+        let store = ReembedStoreClient::new(db_client.clone(), "org");
+
+        store.remove_embedding_index().await.expect("drop index");
+        store
+            .define_embedding_index(1536)
+            .await
+            .expect("recreate index");
+
+        // A fact with a matching-dimension embedding must be writable again,
+        // proving the index is live.
+        seed_fact(&db_client, "fact:post_index", Some("embsig:target")).await;
     }
 }
