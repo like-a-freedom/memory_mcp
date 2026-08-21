@@ -1,6 +1,6 @@
 # Architecture Deepening — Round 3 — 2026-08-21
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Deepen six modules identified in the round-3 architecture review: one owner for embedding state, close raw-SQL escape hatches, unify embedding background policy, unfuse client.rs, split reembed orchestration, and gather app session lifecycle below the adapter line.
 
@@ -78,7 +78,7 @@
 - Consumes: `BoundDbClient` (from `storage/client.rs`), `DbClient` trait, `MemoryError`
 - Produces: `EmbeddingStateStoreClient::new(db, namespace)`, `load_state() -> Result<Option<Value>>`, `upsert_state(payload: Value) -> Result<()>`, `EMBEDDING_STATE_RECORD_ID`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // In crates/memory-mcp/src/storage/embedding_state_store.rs
@@ -149,12 +149,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test -p memory_mcp embedding_state_store -- --nocapture`
 Expected: FAIL — module does not exist yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```rust
 //! Narrow store owning the durable `embedding_state:fact` record (ADR-0043).
@@ -201,7 +201,7 @@ impl EmbeddingStateStoreClient {
 }
 ```
 
-- [ ] **Step 4: Register module in storage.rs**
+- [x] **Step 4: Register module in storage.rs**
 
 Add to `crates/memory-mcp/src/storage.rs`:
 ```rust
@@ -213,12 +213,12 @@ Add re-export:
 pub(crate) use embedding_state_store::{EmbeddingStateStoreClient, EMBEDDING_STATE_RECORD_ID};
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cargo test -p memory_mcp embedding_state_store -- --nocapture`
 Expected: PASS
 
-- [ ] **Step 6: Migrate startup.rs writers**
+- [x] **Step 6: Migrate startup.rs writers**
 
 In `crates/memory-mcp/src/service/startup.rs`:
 - Replace `pub(crate) const EMBEDDING_STATE_RECORD_ID` with a re-export:
@@ -262,7 +262,7 @@ In `crates/memory-mcp/src/service/startup.rs`:
   ```
 - Update call sites in `builder.rs` and `embedding_recovery.rs` to pass `db_client` + `namespace` instead of `&BoundDbClient`.
 
-- [ ] **Step 7: Migrate reembed.rs writer**
+- [x] **Step 7: Migrate reembed.rs writer**
 
 In `crates/memory-mcp/src/service/reembed.rs`:
 - Replace `write_embedding_state` to use the store:
@@ -298,17 +298,17 @@ In `crates/memory-mcp/src/service/reembed.rs`:
   ```
 - Update import: `use crate::storage::EMBEDDING_STATE_RECORD_ID;` (for tests that reference it).
 
-- [ ] **Step 8: Migrate embedding_recovery.rs writers**
+- [x] **Step 8: Migrate embedding_recovery.rs writers**
 
 In `crates/memory-mcp/src/service/embedding_recovery.rs`:
 - Update `install_recovery_provider` and `backfill_and_mark_ready` to call the updated `write_bootstrap_ready_state` signature (passing `db_client` + `namespace`).
 
-- [ ] **Step 9: Run full test suite**
+- [x] **Step 9: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add crates/memory-mcp/src/storage/embedding_state_store.rs crates/memory-mcp/src/storage.rs crates/memory-mcp/src/service/startup.rs crates/memory-mcp/src/service/reembed.rs crates/memory-mcp/src/service/core/builder.rs crates/memory-mcp/src/service/embedding_recovery.rs CONTEXT.md docs/adr/0043-one-owner-for-embedding-state-record.md docs/adr/0044-narrow-stores-expose-named-methods-only.md
@@ -335,7 +335,7 @@ git commit -m "refactor(storage): one owner for embedding state record (ADR-0043
 - Consumes: `BoundDbClient`, `DbClient`, `MemoryError`
 - Produces: `EntityStoreClient` (find_by_alias, find_by_prefix, add_alias), `ContextStoreClient::select_episodes_via_entity`, `EpisodeStoreClient::create_extraction_projection`, `AppStoreClient::has_recent_fact_access`, `ContextAccessLogClient::prune_expired_logs`
 
-- [ ] **Step 1: Write failing tests for EntityStoreClient**
+- [x] **Step 1: Write failing tests for EntityStoreClient**
 
 ```rust
 // In crates/memory-mcp/src/storage/entity_store.rs
@@ -427,12 +427,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test -p memory_mcp entity_store -- --nocapture`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement EntityStoreClient**
+- [x] **Step 3: Implement EntityStoreClient**
 
 ```rust
 //! Narrow entity store: owns entity alias queries (ADR-0044).
@@ -508,7 +508,7 @@ impl EntityStoreClient {
 }
 ```
 
-- [ ] **Step 4: Register in storage.rs and run tests**
+- [x] **Step 4: Register in storage.rs and run tests**
 
 Add to `storage.rs`:
 ```rust
@@ -522,7 +522,7 @@ pub(crate) use entity_store::EntityStoreClient;
 Run: `cargo test -p memory_mcp entity_store -- --nocapture`
 Expected: PASS
 
-- [ ] **Step 5: Add named methods to existing stores**
+- [x] **Step 5: Add named methods to existing stores**
 
 In `crates/memory-mcp/src/storage/context_store.rs`, add to `ContextStoreClient`:
 ```rust
@@ -589,7 +589,7 @@ pub async fn has_recent_fact_access(
 }
 ```
 
-- [ ] **Step 6: Migrate service call sites**
+- [x] **Step 6: Migrate service call sites**
 
 In `crates/memory-mcp/src/service/entity.rs`:
 - Replace `find_entity_id_by_alias` body to use `EntityStoreClient`.
@@ -609,19 +609,19 @@ In `crates/memory-mcp/src/service/lifecycle/archival.rs`:
 In `crates/memory-mcp/src/service/context/logging.rs`:
 - Replace `prune_expired_query_logs` to use `ContextAccessLogClient::prune_expired_logs`.
 
-- [ ] **Step 7: Delete query() escape hatches**
+- [x] **Step 7: Delete query() escape hatches**
 
 Remove `pub async fn query(...)` from:
 - `AppStoreClient` (app_store.rs L207–210)
 - `ContextAccessLogClient` (context_store.rs L191–194)
 - `EpisodeStoreClient` (episode_store.rs L53–56)
 
-- [ ] **Step 8: Run full test suite**
+- [x] **Step 8: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add crates/memory-mcp/src/storage/entity_store.rs crates/memory-mcp/src/storage.rs crates/memory-mcp/src/service/entity.rs crates/memory-mcp/src/service/explanation.rs crates/memory-mcp/src/service/episode/entity_extraction.rs crates/memory-mcp/src/service/lifecycle/archival.rs crates/memory-mcp/src/service/context/logging.rs crates/memory-mcp/src/storage/app_store.rs crates/memory-mcp/src/storage/context_store.rs crates/memory-mcp/src/storage/episode_store.rs
@@ -639,7 +639,7 @@ git commit -m "refactor(storage): close raw-SQL escape hatches (ADR-0044, C3)"
 - Consumes: `EmbeddingService` (Clone), `BackgroundTaskRunner`
 - Produces: Same public API, no snapshot struct
 
-- [ ] **Step 1: Write regression test**
+- [x] **Step 1: Write regression test**
 
 ```rust
 // Add to existing tests in embedding_service.rs or a new test
@@ -652,7 +652,7 @@ async fn background_fact_embedding_uses_service_clone() {
 }
 ```
 
-- [ ] **Step 2: Move snapshot-only methods to EmbeddingService**
+- [x] **Step 2: Move snapshot-only methods to EmbeddingService**
 
 Move these methods from `impl EmbeddingBackgroundSnapshot` to `impl EmbeddingService`:
 - `insert_current_embedding_fields`
@@ -663,7 +663,7 @@ Move these methods from `impl EmbeddingBackgroundSnapshot` to `impl EmbeddingSer
 - `run_background_query_embedding_task` (change `self` to `&self`)
 - `run_background_query_embedding_task_inner` (already `&self`)
 
-- [ ] **Step 3: Update spawn sites to use self.clone()**
+- [x] **Step 3: Update spawn sites to use self.clone()**
 
 In `enqueue_background_fact_embedding`:
 ```rust
@@ -685,7 +685,7 @@ tokio::spawn(async move {
 });
 ```
 
-- [ ] **Step 4: Delete EmbeddingBackgroundSnapshot struct and embedding_background_snapshot()**
+- [x] **Step 4: Delete EmbeddingBackgroundSnapshot struct and embedding_background_snapshot()**
 
 Remove:
 - `struct EmbeddingBackgroundSnapshot` (L400–408)
@@ -697,12 +697,12 @@ Remove:
   - `query_embedding_cache_key` (the private copy at L638–647)
   - `store_query_embedding` (the private copy at L649–659)
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/embedding_service.rs
@@ -721,7 +721,7 @@ git commit -m "refactor(embedding): delete EmbeddingBackgroundSnapshot, use serv
 - Consumes: `SurrealDbClient` private methods (`execute_raw_query`, `query`, `select_one`, `update`)
 - Produces: Migration runtime in `migrations.rs`, `client.rs` reads as pure deep client
 
-- [ ] **Step 1: Make migration-needed primitives pub(crate)**
+- [x] **Step 1: Make migration-needed primitives pub(crate)**
 
 In `client.rs`, change visibility of methods needed by migration code:
 ```rust
@@ -769,7 +769,7 @@ pub(crate) fn logger(&self) -> &StdoutLogger {
 }
 ```
 
-- [ ] **Step 2: Move migration runtime functions to migrations.rs**
+- [x] **Step 2: Move migration runtime functions to migrations.rs**
 
 Move these items from `client.rs` to `migrations.rs`:
 - `apply_migrations_impl` → becomes a free function taking `&SurrealDbClient`
@@ -790,7 +790,7 @@ Move these items from `client.rs` to `migrations.rs`:
 
 Keep `is_record_already_exists_error` in `client.rs` (used by `claims.rs`).
 
-- [ ] **Step 3: Update apply_migrations_impl in client.rs to delegate**
+- [x] **Step 3: Update apply_migrations_impl in client.rs to delegate**
 
 ```rust
 pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryError> {
@@ -799,7 +799,7 @@ pub async fn apply_migrations_impl(&self, namespace: &str) -> Result<(), MemoryE
 }
 ```
 
-- [ ] **Step 4: Move matching tests**
+- [x] **Step 4: Move matching tests**
 
 Move these tests from `client.rs` to `migrations.rs`:
 - `migration_compatibility_allows_recovery_without_executed_at`
@@ -809,12 +809,12 @@ Move these tests from `client.rs` to `migrations.rs`:
 - `initial_schema_rejects_unknown_or_mixed_definition_errors`
 - `schema_postconditions_reject_missing_required_resources`
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/memory-mcp/src/storage/client.rs crates/memory-mcp/src/storage/migrations.rs
@@ -835,7 +835,7 @@ git commit -m "refactor(storage): move migration runtime from client.rs to migra
 - Consumes: `MemoryService`, `SessionManager`, `AppCommand`, `AppContext`, `COMMAND_TABLE`
 - Produces: `open_app_session(...)`, `execute_app_command(...)` — service-level orchestration
 
-- [ ] **Step 1: Write failing test for session lifecycle**
+- [x] **Step 1: Write failing test for session lifecycle**
 
 ```rust
 // In crates/memory-mcp/src/service/apps/session_lifecycle.rs
@@ -853,7 +853,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Create session_lifecycle.rs with orchestration**
+- [x] **Step 2: Create session_lifecycle.rs with orchestration**
 
 ```rust
 //! App session lifecycle orchestration (C6).
@@ -914,14 +914,14 @@ pub(crate) async fn execute_app_command(
 }
 ```
 
-- [ ] **Step 3: Register module**
+- [x] **Step 3: Register module**
 
 Add to `crates/memory-mcp/src/service/apps.rs`:
 ```rust
 pub(crate) mod session_lifecycle;
 ```
 
-- [ ] **Step 4: Update mcp/handlers.rs app_command to delegate**
+- [x] **Step 4: Update mcp/handlers.rs app_command to delegate**
 
 Replace the inline orchestration in `app_command` with:
 ```rust
@@ -948,12 +948,12 @@ let command_result = crate::service::apps::session_lifecycle::execute_app_comman
 .await?;
 ```
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/apps/session_lifecycle.rs crates/memory-mcp/src/service/apps.rs crates/memory-mcp/src/mcp/handlers.rs crates/memory-mcp/src/mcp/handlers/apps.rs
@@ -974,7 +974,7 @@ git commit -m "refactor(apps): gather session lifecycle below adapter line (C6)"
 
 **Depends on:** Task 1 (C1) must be complete first.
 
-- [ ] **Step 1: Move index DDL to ReembedStoreClient**
+- [x] **Step 1: Move index DDL to ReembedStoreClient**
 
 Add to `crates/memory-mcp/src/storage/reembed_store.rs`:
 ```rust
@@ -1005,16 +1005,16 @@ pub async fn define_embedding_index(
 }
 ```
 
-- [ ] **Step 2: Update reembed.rs to use store methods**
+- [x] **Step 2: Update reembed.rs to use store methods**
 
 Replace `remove_embedding_index` and `define_embedding_index` in `reembed.rs` with calls to `self.reembed_store().remove_embedding_index(...)` and `self.reembed_store().define_embedding_index(...)`. Keep the logging in the orchestrator.
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add crates/memory-mcp/src/service/reembed.rs crates/memory-mcp/src/storage/reembed_store.rs
@@ -1025,26 +1025,26 @@ git commit -m "refactor(reembed): move index DDL to ReembedStoreClient (C2)"
 
 ## Task 7: Final verification and cleanup
 
-- [ ] **Step 1: Format check**
+- [x] **Step 1: Format check**
 
 Run: `cargo fmt --all --check`
 Expected: No diff.
 
-- [ ] **Step 2: Clippy**
+- [x] **Step 2: Clippy**
 
 Run: `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings`
 Expected: Zero warnings.
 
-- [ ] **Step 3: Full test suite**
+- [x] **Step 3: Full test suite**
 
 Run: `cargo test -p memory_mcp`
 Expected: All green.
 
-- [ ] **Step 4: Code review pass**
+- [x] **Step 4: Code review pass**
 
 Per `.agents/prompts/code-review.prompt.md`: verify everything is done according to plan, nothing missing, covered by tests, no dangling parts. Fix issues immediately.
 
-- [ ] **Step 5: Final commit if any fixes needed**
+- [x] **Step 5: Final commit if any fixes needed**
 
 ```bash
 git add -A
