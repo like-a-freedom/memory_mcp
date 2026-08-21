@@ -934,7 +934,10 @@ mod tests {
         .await;
 
         let state = db
-            .select_one(crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID, "org")
+            .select_one(
+                crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+                "org",
+            )
             .await
             .expect("read state")
             .expect("state exists");
@@ -1002,7 +1005,10 @@ mod tests {
             Some("embsig:old")
         );
         let state = db
-            .select_one(crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID, "org")
+            .select_one(
+                crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+                "org",
+            )
             .await
             .expect("read embedding state")
             .expect("embedding state");
