@@ -3,10 +3,10 @@ use std::collections::HashSet;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 use crate::service::decayed_confidence;
-use crate::service::error::MemoryError;
 use crate::service::log_event;
 use crate::service::service_context::RetrievalContext;
 

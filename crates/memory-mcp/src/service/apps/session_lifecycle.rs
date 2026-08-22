@@ -4,12 +4,12 @@
 //! close → shape) into the service layer, so the MCP `app_command` handler
 //! is a thin decode–call–encode adapter.
 
-use rmcp::ErrorData;
-
+use crate::error::MemoryError;
 use crate::mcp::response::AppCommandResult;
-use crate::mcp::session::SessionManager;
+use crate::mcp::session::app_command_result_from_details;
 use crate::service::MemoryService;
 use crate::service::apps::dispatch::{AppContext, find_descriptor};
+use crate::service::apps::session::SessionManager;
 use crate::service::apps::workflow::{AppCommand, AppCommandInput};
 
 /// Executes an app command against a session, returning the shaped result.
@@ -23,20 +23,23 @@ pub(crate) async fn execute_app_command(
     session_manager: &SessionManager,
     session_id: &str,
     input: AppCommandInput,
-) -> Result<AppCommandResult, ErrorData> {
+) -> Result<AppCommandResult, MemoryError> {
     session_manager.purge_expired().await;
     let session = session_manager.get_valid(session_id).await?;
 
     let command = AppCommand::parse(&session.app, input)
-        .map_err(|error| crate::mcp::session::invalid_params(error.to_string()))?;
-    let descriptor = find_descriptor(&command)?;
+        .map_err(|error| MemoryError::Validation(error.to_string()))?;
+    let descriptor =
+        find_descriptor(&command).map_err(|error| MemoryError::Validation(error.to_string()))?;
     let ctx = AppContext {
         service,
         session_id,
         app: &session.app,
         payload: session.payload.clone(),
     };
-    let outcome = (descriptor.execute)(&ctx, &command).await?;
+    let outcome = (descriptor.execute)(&ctx, &command)
+        .await
+        .map_err(|error| MemoryError::Validation(error.to_string()))?;
 
     if let Some(payload) = outcome.new_payload {
         session_manager.replace_payload(session_id, payload).await?;
@@ -54,7 +57,7 @@ pub(crate) async fn execute_app_command(
         ))
     };
 
-    Ok(crate::mcp::session::app_command_result_from_details(
+    Ok(app_command_result_from_details(
         &session.app,
         session_id,
         outcome.action,
@@ -66,7 +69,7 @@ pub(crate) async fn execute_app_command(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mcp::session::{AppSessionState, SessionManager};
+    use crate::service::apps::session::{AppSessionState, SessionManager};
     use crate::storage::{DbClient, SurrealDbClient};
     use serde_json::json;
     use std::sync::Arc;

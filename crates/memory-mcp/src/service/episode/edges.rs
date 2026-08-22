@@ -3,8 +3,8 @@
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::models::Edge;
-use crate::service::error::MemoryError;
 use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::parse_iso;

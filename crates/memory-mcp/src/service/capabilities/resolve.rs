@@ -1,7 +1,7 @@
 //! Capability for resolving entity candidates to canonical IDs.
 
+use crate::error::MemoryError;
 use crate::models::{AccessPayload, EntityCandidate};
-use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 
 /// Capability for fuzzy entity resolution and deduplication.

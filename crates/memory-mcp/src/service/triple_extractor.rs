@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::service::error::MemoryError;
+use crate::error::MemoryError;
 
 /// A semantic triple: (subject, predicate, object).
 #[derive(Debug, Clone, Serialize, Deserialize)]

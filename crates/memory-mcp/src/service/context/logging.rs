@@ -2,9 +2,9 @@
 
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AssembleContextRequest, AssembledContextItem};
-use crate::service::error::MemoryError;
 use crate::service::log_event;
 
 pub(crate) struct QueryLogDiagnostics<'a> {

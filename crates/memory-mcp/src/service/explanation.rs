@@ -9,13 +9,13 @@ use std::sync::Arc;
 use chrono::Utc;
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{
     AccessPayload, ExplainItem, ExplainRequest, GraphHubEntity, GraphInsights, Provenance,
     ProvenanceSource,
 };
 use crate::service::apps::graph::GraphContext;
-use crate::service::error::MemoryError;
 use crate::service::{log_event, normalize_dt, now};
 use crate::storage::{AppStoreClient, BoundDbClient, DbClient};
 
@@ -470,7 +470,7 @@ mod tests {
     //! `find_record_by_id`, so its validation must be wired in independently.
 
     use super::*;
-    use crate::service::error::MemoryError;
+    use crate::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
 
     fn make_service() -> ExplanationService {

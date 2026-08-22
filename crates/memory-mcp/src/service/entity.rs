@@ -2,9 +2,9 @@ use serde_json::json;
 
 use crate::models::EntityCandidate;
 
-use super::error::MemoryError;
 use super::query::normalize_text;
 use super::util::{deterministic_entity_id, validate_entity_candidate};
+use crate::error::MemoryError;
 
 /// Resolves and persists entities.
 ///

@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 
 use lru::LruCache;
 
+use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::AssembledContextItem;
 use crate::service::cache::CacheKey;
@@ -12,7 +13,6 @@ use crate::service::embedding_service::EmbeddingService;
 use crate::service::entity::EntityService;
 use crate::service::entity_extraction::EntityExtractor;
 use crate::service::entity_resolution::EntityResolver;
-use crate::service::error::MemoryError;
 use crate::service::explanation::ExplanationService;
 use crate::service::fact::FactService;
 use crate::service::ingestion::IngestionService;
@@ -297,8 +297,8 @@ impl crate::service::apps::graph::GraphContext for RetrievalContext {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::MemoryError;
     use crate::service::capabilities::test_support::make_context_base;
-    use crate::service::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
 
     // These tests drive the wiring of `validate_record_id` into

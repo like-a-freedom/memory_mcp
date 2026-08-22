@@ -33,12 +33,12 @@ mod tests {
         sanitized_content_for_entity_extraction, structured_summary_fact_candidates,
     };
     use super::{episode_from_record, fact_from_record, unwrap_record_string};
+    use crate::error::MemoryError;
     use crate::models::EntityCandidate;
     use crate::models::Episode;
     use crate::models::ExtractedFact;
     use crate::models::FactType;
     use crate::service::EntityExtractor;
-    use crate::service::error::MemoryError;
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Utc;
     use serde_json::{Value, json};

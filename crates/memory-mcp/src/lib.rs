@@ -33,6 +33,7 @@
 
 pub mod cli;
 pub mod config;
+pub mod error;
 pub mod logging;
 pub mod mcp;
 pub mod models;
@@ -46,6 +47,7 @@ pub mod tools;
 #[doc(hidden)]
 pub mod eval_support;
 
+pub use error::{MemoryError, is_transient_db_error};
 pub use mcp::MemoryMcp;
+pub use service::MemoryService;
 pub use service::reembed_options::{ReembedOptions, ReembedOutcome};
-pub use service::{MemoryError, MemoryService};

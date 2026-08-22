@@ -19,6 +19,8 @@ use super::super::resources::{app_catalog_resources, app_resource_templates};
 use super::super::response::OpenAppResult;
 use super::super::session;
 use super::MemoryMcp;
+#[cfg(feature = "mcp-apps")]
+use crate::service::apps::session::AppSessionState;
 
 pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
@@ -88,21 +90,28 @@ impl MemoryMcp {
         }
     }
 
-    pub(super) async fn session(
-        &self,
-        session_id: &str,
-    ) -> Result<session::AppSessionState, ErrorData> {
+    #[cfg(feature = "mcp-apps")]
+    pub(super) async fn session(&self, session_id: &str) -> Result<AppSessionState, ErrorData> {
         self.session_manager.purge_expired().await;
-        self.session_manager.get_valid(session_id).await
+        self.session_manager
+            .get_valid(session_id)
+            .await
+            .map_err(crate::mcp::mcp_error)
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn create_session(
         &self,
         app: &str,
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
-        self.session_manager.create(app, ttl_seconds, payload).await
+        let (session_id, fallback) = self
+            .session_manager
+            .create(app, ttl_seconds, payload)
+            .await
+            .map_err(crate::mcp::mcp_error)?;
+        Ok(session::open_app_result(app, session_id, fallback))
     }
 
     #[cfg(feature = "mcp-apps")]
@@ -209,6 +218,7 @@ impl MemoryMcp {
             .map_err(mcp_error)
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn open_inspector_app(
         &self,
         params: &OpenAppParams,
@@ -228,6 +238,7 @@ impl MemoryMcp {
             .await
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn open_diff_app(
         &self,
         params: &OpenAppParams,
@@ -271,6 +282,7 @@ impl MemoryMcp {
             .await
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn open_ingestion_review_app(
         &self,
         params: &OpenAppParams,
@@ -289,6 +301,7 @@ impl MemoryMcp {
             .await
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn open_lifecycle_app(
         &self,
         params: &OpenAppParams,
@@ -298,6 +311,7 @@ impl MemoryMcp {
             .await
     }
 
+    #[cfg(feature = "mcp-apps")]
     pub(super) async fn open_graph_app(
         &self,
         params: &OpenAppParams,

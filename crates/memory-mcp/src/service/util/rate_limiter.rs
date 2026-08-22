@@ -67,12 +67,12 @@ impl RateLimiter {
     pub(crate) fn check_access(
         &self,
         access: Option<&crate::models::AccessPayload>,
-    ) -> Result<(), crate::service::error::MemoryError> {
+    ) -> Result<(), crate::error::MemoryError> {
         if let Some(access) = access
             && let Some(caller) = &access.caller_id
             && !self.allow(caller)
         {
-            return Err(crate::service::error::MemoryError::Validation(
+            return Err(crate::error::MemoryError::Validation(
                 "rate limit exceeded".into(),
             ));
         }
@@ -194,7 +194,7 @@ mod tests {
         let err = limiter.check_access(Some(&access)).unwrap_err();
         assert!(matches!(
             err,
-            crate::service::error::MemoryError::Validation(ref msg) if msg == "rate limit exceeded"
+            crate::error::MemoryError::Validation(ref msg) if msg == "rate limit exceeded"
         ));
     }
 }

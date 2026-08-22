@@ -5,9 +5,9 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembledContextItem, Episode};
-use crate::service::error::MemoryError;
 use crate::service::log_event;
 use crate::service::value_helpers::json_string;
 

@@ -10,9 +10,9 @@
 //! this module surfaces it unchanged. The step is best-effort: it runs after
 //! lexical, temporal, alias-expansion, and experience tiers.
 
+use crate::error::MemoryError;
 use crate::models::Fact;
 use crate::service::episode::fact_from_value_or_wrapper;
-use crate::service::error::MemoryError;
 use crate::service::service_context::RetrievalContext;
 
 /// Collect facts linked via triples matching the given query text.

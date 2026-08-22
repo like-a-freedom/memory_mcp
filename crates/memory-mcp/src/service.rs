@@ -14,8 +14,9 @@ pub use entity_extraction::{
     AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor, NerScheduling,
     RegexEntityExtractor, create_entity_extractor,
 };
-pub use error::MemoryError;
-pub use error::is_transient_db_error;
+// Re-exported from the neutral `crate::error` home (ADR-0045).
+pub use crate::error::MemoryError;
+pub(crate) use crate::error::is_transient_db_error;
 
 pub(crate) mod apps;
 #[cfg(feature = "mcp-apps")]
@@ -48,7 +49,6 @@ mod entity;
 mod entity_extraction;
 pub(crate) mod entity_resolution;
 mod episode;
-mod error;
 pub(crate) mod explanation;
 pub(crate) mod fact;
 pub(crate) mod ingestion;

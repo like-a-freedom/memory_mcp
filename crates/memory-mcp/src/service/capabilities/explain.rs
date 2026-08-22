@@ -1,7 +1,7 @@
 //! Capability for explaining context items with provenance citations.
 
+use crate::error::MemoryError;
 use crate::models::{AccessPayload, ExplainItem, ExplainRequest};
-use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 
 /// Capability for explaining context items.

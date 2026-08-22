@@ -5,6 +5,8 @@ pub(crate) mod graph;
 mod ingestion_review;
 mod lifecycle;
 #[cfg(feature = "mcp-apps")]
+pub(crate) mod session;
+#[cfg(feature = "mcp-apps")]
 pub(crate) mod session_lifecycle;
 mod types;
 #[cfg(feature = "mcp-apps")]

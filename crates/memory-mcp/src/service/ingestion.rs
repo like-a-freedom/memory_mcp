@@ -6,9 +6,9 @@ use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::{AccessPayload, IngestRequest};
 
 use super::content_extraction::prepare_ingest_request;
-use super::error::MemoryError;
 use super::util::{RateLimiter, deterministic_episode_id_v2, validate_ingest_request};
 use super::{log_event, normalize_dt, now};
+use crate::error::MemoryError;
 
 /// Handles episode ingestion: file parsing, deduplication, and persistence.
 #[derive(Clone)]

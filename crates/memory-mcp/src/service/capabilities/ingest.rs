@@ -1,7 +1,7 @@
 //! Capability for episode ingestion.
 
+use crate::error::MemoryError;
 use crate::models::{AccessPayload, IngestRequest};
-use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 
 /// Capability for ingesting raw source material as an episode.

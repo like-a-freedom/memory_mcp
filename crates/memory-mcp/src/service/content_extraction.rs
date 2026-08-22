@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 
 use crate::models::IngestRequest;
 
-use super::error::MemoryError;
+use crate::error::MemoryError;
 
 mod chunker;
 mod email;

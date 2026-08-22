@@ -8,7 +8,7 @@
 //! supersession means); all reads and writes on the `triple` table go through
 //! [`TripleStoreClient`], the single owner of that table.
 
-use crate::service::error::MemoryError;
+use crate::error::MemoryError;
 use crate::service::triple_extractor::SemanticTriple;
 use crate::storage::TripleStoreClient;
 

@@ -12,10 +12,10 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{FactId, Provenance};
 use crate::service::cache::invalidate_cache;
-use crate::service::error::MemoryError;
 use crate::service::util::{deterministic_fact_id, validate_fact_input};
 #[cfg(test)]
 use crate::storage::FactStoreClient;

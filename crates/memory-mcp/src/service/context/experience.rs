@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
+use crate::error::MemoryError;
 use crate::models::{AccessPayload, AssembledContextItem, Fact, FactType};
-use crate::service::error::MemoryError;
 use crate::service::query::search_query_terms;
 use crate::service::query::{decayed_confidence, normalize_dt};
 

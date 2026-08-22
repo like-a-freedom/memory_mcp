@@ -6,9 +6,9 @@
 use strsim::normalized_levenshtein;
 use unicode_normalization::UnicodeNormalization;
 
+use crate::error::MemoryError;
 use crate::models::EntityCandidate;
 use crate::service::entity::EntityService;
-use crate::service::error::MemoryError;
 
 /// Default similarity threshold for fuzzy entity matching.
 pub const DEFAULT_FUZZY_THRESHOLD: f64 = 0.85;

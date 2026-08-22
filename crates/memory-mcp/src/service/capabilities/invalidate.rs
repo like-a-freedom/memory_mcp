@@ -1,6 +1,6 @@
+use crate::error::MemoryError;
 use crate::models::{AccessPayload, InvalidateRequest};
 use crate::service::cache::invalidate_cache;
-use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 use crate::storage::CloseTimestamps;
 
@@ -50,10 +50,10 @@ mod tests {
 
     use serde_json::json;
 
+    use crate::error::MemoryError;
     use crate::models::{AccessPayload, InvalidateRequest};
     use crate::service::cache::{CacheKey, CacheView};
     use crate::service::capabilities::invalidate::InvalidateCapability;
-    use crate::service::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
     use crate::service::service_context::ServiceContext;
     use crate::service::util::RateLimiter;

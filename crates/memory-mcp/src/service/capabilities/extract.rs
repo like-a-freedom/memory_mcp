@@ -7,11 +7,11 @@ use std::time::Instant;
 
 use serde_json::json;
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, ExtractResult};
 use crate::service::episode::build_extract_log_result;
 use crate::service::episode_from_record;
-use crate::service::error::MemoryError;
 use crate::service::log_args_with_duration;
 use crate::service::log_event;
 use crate::service::service_context::ServiceContext;

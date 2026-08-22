@@ -4,9 +4,9 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde_json::Value;
 
+use crate::error::MemoryError;
 use crate::models::Fact;
 use crate::service::community::parse_community_record;
-use crate::service::error::MemoryError;
 use crate::service::value_helpers::{json_f64, json_string};
 use crate::storage::GraphDirection;
 

@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use serde_json::Value;
 
+use crate::error::MemoryError;
 use crate::models::Fact;
-use crate::service::error::MemoryError;
 use crate::storage::GraphDirection;
 
 use super::filtering::filter_facts_by_constraints;

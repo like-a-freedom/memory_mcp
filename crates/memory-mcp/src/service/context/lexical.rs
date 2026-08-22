@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::models::Fact;
-use crate::service::error::MemoryError;
 use crate::service::query::{
     is_four_digit_year, query_hard_anchor_terms, query_term_rarity_weight,
     query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
@@ -1024,7 +1024,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     use super::{FactQueryParams, lexical_candidate_limit, select_fact_records_for_query};
-    use crate::service::error::MemoryError;
+    use crate::error::MemoryError;
     use crate::storage::DbClient;
     use async_trait::async_trait;
     use std::sync::Arc;

@@ -4,8 +4,8 @@
 //! [`super::super::context`]. After the capability-seam migration, the
 //! pipeline reads from `&ServiceContext` exclusively.
 
+use crate::error::MemoryError;
 use crate::models::{AssembleContextRequest, AssembledContextItem};
-use crate::service::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 
 /// Capability for assembling the most relevant active memory context.

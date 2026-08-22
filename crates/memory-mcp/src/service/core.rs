@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::logging::LogLevel;
 
-use super::error::MemoryError;
+use crate::error::MemoryError;
 
 mod builder;
 mod helpers;
@@ -889,7 +889,7 @@ mod tests {
             .find_episode_record("474b2d8b81b3feabf832ef08")
             .await;
         match result {
-            Err(crate::service::error::MemoryError::Validation(msg)) => {
+            Err(crate::error::MemoryError::Validation(msg)) => {
                 assert!(msg.contains("'<table>:<id>'"), "{msg}");
                 assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
             }
@@ -903,7 +903,7 @@ mod tests {
         let result = service.find_episode_record("episode:").await;
         assert!(matches!(
             result,
-            Err(crate::service::error::MemoryError::Validation(_))
+            Err(crate::error::MemoryError::Validation(_))
         ));
     }
 
@@ -913,7 +913,7 @@ mod tests {
         let result = service.find_fact_record("072d682d0d467aa94aad684d").await;
         assert!(matches!(
             result,
-            Err(crate::service::error::MemoryError::Validation(_))
+            Err(crate::error::MemoryError::Validation(_))
         ));
     }
 
@@ -923,7 +923,7 @@ mod tests {
         let result = service.find_fact_record("fact:").await;
         assert!(matches!(
             result,
-            Err(crate::service::error::MemoryError::Validation(_))
+            Err(crate::error::MemoryError::Validation(_))
         ));
     }
 

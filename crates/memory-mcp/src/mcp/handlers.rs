@@ -30,7 +30,9 @@ use std::time::Instant;
 use super::error::mcp_error;
 use super::params::*;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
-use super::session::{self, SessionManager};
+use super::session;
+#[cfg(feature = "mcp-apps")]
+use crate::service::apps::session::SessionManager;
 
 mod apps;
 
@@ -59,6 +61,7 @@ mod apps;
 #[derive(Clone)]
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
+    #[cfg(feature = "mcp-apps")]
     session_manager: SessionManager,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
@@ -74,6 +77,7 @@ impl MemoryMcp {
     pub fn new(service: MemoryService) -> Self {
         Self {
             service: Arc::new(service),
+            #[cfg(feature = "mcp-apps")]
             session_manager: SessionManager::new(),
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
@@ -458,7 +462,7 @@ impl MemoryMcp {
                         timer.elapsed(),
                         Some(&request_id),
                     );
-                    Err(err)
+                    Err(mcp_error(err))
                 }
             }
         }
@@ -487,6 +491,8 @@ mod tests {
     use crate::models::EntityCandidate;
     #[cfg(feature = "mcp-apps")]
     use crate::models::IngestRequest;
+    #[cfg(feature = "mcp-apps")]
+    use crate::service::apps::session::enrich_session_payload;
     #[cfg(feature = "mcp-apps")]
     use crate::service::capabilities::ingest::IngestCapability;
     #[cfg(feature = "mcp-apps")]
@@ -1354,10 +1360,11 @@ mod tests {
         assert_eq!(MemoryMcp::normalize_public_app_name("unknown_app"), None);
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn enrich_session_payload_adds_meta_with_expiry() {
         let payload = json!({"data": "value"});
-        let enriched = session::enrich_session_payload("inspector", "ses:1", Some(3600), payload);
+        let enriched = enrich_session_payload("inspector", "ses:1", Some(3600), payload);
         assert_eq!(enriched["app"], "inspector");
         assert_eq!(enriched["session_id"], "ses:1");
 
@@ -1366,10 +1373,11 @@ mod tests {
         assert_eq!(enriched["data"], "value");
     }
 
+    #[cfg(feature = "mcp-apps")]
     #[test]
     fn enrich_session_payload_handles_no_ttl() {
         let payload = json!({});
-        let enriched = session::enrich_session_payload("diff", "ses:2", None, payload);
+        let enriched = enrich_session_payload("diff", "ses:2", None, payload);
         assert_eq!(enriched["app"], "diff");
         assert_eq!(enriched["meta"]["ttl_seconds"], serde_json::Value::Null);
         assert!(enriched["meta"]["expires_at"].is_null());

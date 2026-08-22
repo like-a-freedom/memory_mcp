@@ -14,12 +14,12 @@ use serde_json::json;
 
 use super::workflow::AppCommand;
 use super::{LifecycleCommand, LifecycleCommandOutcome};
+use crate::error::MemoryError;
 use crate::service::apps::graph::GraphSessionState;
 use crate::service::apps::ingestion_review::{
     apply_ingestion_review_edit, apply_ingestion_review_status,
 };
 use crate::service::apps::lifecycle::execute_lifecycle_command;
-use crate::service::error::MemoryError;
 use crate::service::{CommitIngestionReviewRequest, IngestionReviewItem, MemoryService};
 use crate::tools::parsers::parse_datetime;
 
@@ -252,7 +252,7 @@ async fn run_lifecycle(
             .map_err(mcp_error)?,
     )
     .map_err(|error| internal(format!("failed to encode lifecycle view: {error}")))?;
-    let enriched = crate::mcp::session::enrich_session_payload(
+    let enriched = crate::service::apps::session::enrich_session_payload(
         ctx.app,
         ctx.session_id,
         ctx.payload

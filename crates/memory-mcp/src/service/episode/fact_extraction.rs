@@ -4,6 +4,7 @@ use super::statement_detection::{
     is_document_action_item, is_experience_statement, is_metric_statement, is_promise_statement,
     is_summary_like_note_candidate,
 };
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::claim::ClaimRelationOutcome;
 use crate::models::{
@@ -18,7 +19,6 @@ use crate::service::episode::summary_parser::{
     entity_links_for_fact_content, sanitized_content_for_entity_extraction,
     structured_summary_fact_candidates,
 };
-use crate::service::error::MemoryError;
 use crate::service::query::now;
 use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};

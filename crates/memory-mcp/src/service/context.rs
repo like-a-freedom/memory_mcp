@@ -11,9 +11,9 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 
-use super::error::MemoryError;
 use super::service_context::{RetrievalContext, ServiceContext};
 use super::{log_event, normalize_dt};
+use crate::error::MemoryError;
 
 mod alias_expansion;
 mod budget;

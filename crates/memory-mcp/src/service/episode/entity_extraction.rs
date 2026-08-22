@@ -3,10 +3,10 @@ use std::time::Instant;
 
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{EntityCandidate, ExtractedEntity};
 use crate::service::entity_extraction::NerScheduling;
-use crate::service::error::MemoryError;
 use crate::service::normalize_text;
 use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};

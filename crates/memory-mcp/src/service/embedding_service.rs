@@ -10,13 +10,13 @@ use lru::LruCache;
 use serde_json::{Value, json};
 use tokio::sync::{Mutex, RwLock};
 
+use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 use crate::models::AssembledContextItem;
 use crate::service::cache::CacheKey;
 use crate::service::embedding::EmbeddingProvider;
 use crate::service::embedding::task_runner::BackgroundTaskRunner;
 use crate::service::embedding_runtime::CachedQueryEmbedding;
-use crate::service::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 
 /// Maximum input length accepted by embedding providers. Inputs longer than

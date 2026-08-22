@@ -3,6 +3,7 @@ use std::sync::Arc;
 use lru::LruCache;
 
 use crate::config::SurrealConfig;
+use crate::error::MemoryError;
 use crate::logging::StdoutLogger;
 use crate::models::AssembledContextItem;
 use crate::service::AnnoEntityExtractor;
@@ -16,7 +17,6 @@ use crate::service::embedding_recovery::{
 };
 use crate::service::embedding_runtime::EmbeddingRuntimeState;
 use crate::service::entity_extraction::create_entity_extractor_with_progress;
-use crate::service::error::MemoryError;
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
     build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_state,

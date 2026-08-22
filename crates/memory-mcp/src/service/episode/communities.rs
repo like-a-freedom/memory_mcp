@@ -4,10 +4,10 @@ use std::collections::{BTreeSet, HashSet, VecDeque};
 
 use serde_json::{Value, json};
 
+use crate::error::MemoryError;
 use crate::service::community::{
     CommunityMembership, CommunityRecord, is_entity_id, parse_community_record,
 };
-use crate::service::error::MemoryError;
 use crate::service::normalize_dt;
 use crate::service::now;
 use crate::service::parse_iso;

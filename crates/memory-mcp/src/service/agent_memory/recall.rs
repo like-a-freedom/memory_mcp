@@ -14,11 +14,11 @@ use std::sync::{Arc, Mutex};
 
 use sha2::{Digest, Sha256};
 
+use crate::error::MemoryError;
 use crate::models::{
     AssembleContextRequest, AssembledContextItem, ExposureTrace, ExposureTraceStore,
     InvocationContext, InvocationOrigin, LifecycleEventKind, NormalizedHostEvent, TRACE_TTL_SECS,
 };
-use crate::service::error::MemoryError;
 
 /// A recall key computed over host, session, task fingerprint, and policy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,5 +1,5 @@
+use crate::error::MemoryError;
 use crate::service::embedding::embedding_from_value;
-use crate::service::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 

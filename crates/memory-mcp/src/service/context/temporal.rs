@@ -477,7 +477,7 @@ pub(crate) struct CollectTemporalFactsRequest<'a> {
 pub(crate) async fn collect_temporal_facts(
     service: &crate::service::service_context::RetrievalContext,
     request: CollectTemporalFactsRequest<'_>,
-) -> Result<Vec<crate::models::Fact>, crate::service::error::MemoryError> {
+) -> Result<Vec<crate::models::Fact>, crate::error::MemoryError> {
     use crate::service::query::search_query_terms;
 
     use super::filtering::{
@@ -500,7 +500,7 @@ pub(crate) async fn collect_temporal_facts(
             .select_table("fact")
             .await
             .map_err(|err| {
-                crate::service::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
+                crate::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
             })?;
 
         let mut facts = filter_facts_by_constraints(records, request.access, request.fact_types)
@@ -522,7 +522,7 @@ pub(crate) async fn collect_temporal_facts(
         return Ok(facts);
     }
 
-    use crate::service::error::MemoryError;
+    use crate::error::MemoryError;
     let search_limit = request.budget.max(1) * 4;
     let mut matched_facts_by_id = std::collections::HashMap::<String, crate::models::Fact>::new();
     let mut eligible_fact_ids: Option<std::collections::HashSet<String>> = None;
