@@ -113,6 +113,7 @@ impl MemoryMcp {
         session::invalid_params(message)
     }
 
+    #[cfg(feature = "mcp-apps")]
     fn missing_app_field(app: &str, field: &str) -> ErrorData {
         session::missing_app_field(app, field)
     }

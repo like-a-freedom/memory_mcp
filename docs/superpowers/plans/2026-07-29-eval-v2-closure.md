@@ -1,7 +1,7 @@
 # Evaluation V2 Closure Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-> Status: Task 1 complete; Task 2 in progress
+> Status: Tasks 1–2 complete; Task 3 onward pending
 
 **Goal:** Turn the 2026-07-29 diagnostic v2 run into a truthful, fully gated evaluation whose claim, end-to-end, lifecycle, external-retrieval, and performance results measure the intended production behavior within the PR 10-minute and release 20-minute budgets.
 
@@ -405,7 +405,7 @@ Keep lineage matcher types `pub(crate)` and their pure tests inside
 `suites/claims.rs`. The integration test invokes the public
 `ClaimReconciliationSuite` and inspects its public outcomes.
 
-- [ ] **Step 1: Write failing lineage matching tests**
+- [x] **Step 1: Write failing lineage matching tests**
 
 ```rust
 #[test]
@@ -435,7 +435,7 @@ fn different_fact_ids_are_not_an_isolation_violation() {
 }
 ```
 
-- [ ] **Step 2: Run the lineage tests and verify they fail**
+- [x] **Step 2: Run the lineage tests and verify they fail**
 
 Run:
 
@@ -446,7 +446,7 @@ cargo test -p eval-harness --test claim_lineage -- --nocapture
 Expected: compilation fails because the lineage and relation evaluator types do
 not exist.
 
-- [ ] **Step 3: Add a narrow feature-gated read-only evidence seam**
+- [x] **Step 3: Add a narrow feature-gated read-only evidence seam**
 
 In the workspace root:
 
@@ -483,7 +483,7 @@ pub struct EvaluatedRelation {
 
 Do not expose SurrealDB queries, mutation methods, or this module through MCP.
 
-- [ ] **Step 4: Record source lineage during setup and source extraction**
+- [x] **Step 4: Record source lineage during setup and source extraction**
 
 Change `ingest_and_extract` to return:
 
@@ -499,7 +499,7 @@ struct ExtractedSource {
 Populate `fact_ids` only from `ExtractResult.facts[].fact_id`. Reject duplicate
 fixture source IDs as invalid evidence.
 
-- [ ] **Step 5: Replace warning matching with persisted relation matching**
+- [x] **Step 5: Replace warning matching with persisted relation matching**
 
 For an expected relation:
 
@@ -522,7 +522,7 @@ If the persisted relation is explicitly unordered, accept the reversed pair in
 the same function. Never use `contains`, source-ID substrings, or warning
 content as identity.
 
-- [ ] **Step 6: Define confusion counts over the persisted relation set**
+- [x] **Step 6: Define confusion counts over the persisted relation set**
 
 For each case calculate:
 
@@ -537,7 +537,7 @@ Emit `MetricEvidence::classification(tp, fp, fn_, tn)`. A case passes only
 when `fn_ == 0`, `fp == 0`, and `isolation_violations == 0`. A missed expected
 contradiction must be `quality_failed`.
 
-- [ ] **Step 7: Classify isolation from boundary metadata**
+- [x] **Step 7: Classify isolation from boundary metadata**
 
 Count a violation only when an actual persisted relation crosses one of:
 
@@ -549,7 +549,7 @@ Count a violation only when an actual persisted relation crosses one of:
 Different fact IDs in a valid same-boundary relation are expected and must not
 be counted. Missing boundary metadata makes the case `invalid`.
 
-- [ ] **Step 8: Add positive, negative, and boundary integration tests**
+- [x] **Step 8: Add positive, negative, and boundary integration tests**
 
 ```rust
 #[tokio::test]
@@ -573,7 +573,7 @@ async fn missed_expected_relation_fails_the_case() {
 }
 ```
 
-- [ ] **Step 9: Run claim evaluation and inspect denominators**
+- [x] **Step 9: Run claim evaluation and inspect denominators**
 
 Run:
 
@@ -588,19 +588,19 @@ cargo run -p eval-harness --bin memory-eval -- run \
 
 Expected:
 
-- 42 namespaced claim outcomes;
+- 41 namespaced claim outcomes (corpus `claim-reconciliation/v1`);
 - no invalid outcomes;
 - non-zero official-test precision and recall denominators;
 - case status agrees with its confusion counts;
 - zero isolation violations.
 
-- [ ] **Step 10: Document the exact claim metric contract**
+- [x] **Step 10: Document the exact claim metric contract**
 
 Record corpus version, split, persisted evidence tables, lineage mapping,
 positive outcomes, negative boundaries, confusion-matrix formula, and the rule
 that warning metrics are diagnostic only.
 
-- [ ] **Step 11: Run quality checks and commit**
+- [x] **Step 11: Run quality checks and commit**
 
 ```bash
 cargo clippy -p memory_mcp -p eval-harness --all-targets --features eval-support -- -D warnings

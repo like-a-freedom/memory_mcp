@@ -15,7 +15,7 @@ name = "memory-eval"
 path = "src/main.rs"
 
 [dependencies]
-memory_mcp = { path = "../memory-mcp" }
+memory_mcp = { path = "../memory-mcp", features = ["eval-support"] }
 async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true

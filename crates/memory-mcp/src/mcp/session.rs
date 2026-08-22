@@ -3,6 +3,8 @@
 //! Session state lives in [`crate::service::apps::session`]; this module
 //! maps service results to `rmcp::ErrorData` and shapes protocol envelopes.
 
+#![cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
+
 use rmcp::ErrorData;
 use serde_json::Value;
 

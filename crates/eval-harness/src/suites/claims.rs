@@ -257,6 +257,36 @@ struct CaseMetrics {
     unresolved_lineage: usize,
 }
 
+fn matches_persisted_relation_by_lineage(
+    expected: &ExpectedRelation,
+    actual: &memory_mcp::eval_support::EvaluatedRelation,
+    lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
+) -> bool {
+    if actual.outcome.to_string() != expected.outcome {
+        return false;
+    }
+    let setup_facts = lineage.get(&expected.setup_source_id);
+    let source_facts = lineage.get(&expected.source_id);
+
+    let forward = setup_facts
+        .map(|f| f.contains(&actual.left_fact_id))
+        .unwrap_or(false)
+        && source_facts
+            .map(|f| f.contains(&actual.right_fact_id))
+            .unwrap_or(false);
+    if forward {
+        return true;
+    }
+
+    // Persisted relations are explicitly unordered; accept the reversed pair.
+    setup_facts
+        .map(|f| f.contains(&actual.right_fact_id))
+        .unwrap_or(false)
+        && source_facts
+            .map(|f| f.contains(&actual.left_fact_id))
+            .unwrap_or(false)
+}
+
 fn matches_expected_relation_by_lineage(
     expected: &ExpectedRelation,
     actual: &memory_mcp::models::ContradictionWarning,
@@ -403,7 +433,7 @@ impl EvalSuite for ClaimReconciliationSuite {
                 ClaimCorpusSplit::Test => CorpusSplit::Test,
             };
 
-            let service = test_support::make_service().await;
+            let (service, db_client) = test_support::make_service_with_client().await;
 
             let mut setup_failed = false;
             let mut setup_error = String::new();
@@ -524,6 +554,60 @@ impl EvalSuite for ClaimReconciliationSuite {
 
             let metrics_result = evaluate_case(case, &extraction, &lineage, &boundaries);
 
+            // Persisted-relation evidence (eval-v2-closure Task 2): score the
+            // case against what the claim worker actually stored, not only the
+            // in-process extraction warnings.
+            let all_fact_ids: Vec<String> = lineage.values().flatten().cloned().collect();
+            let persisted = memory_mcp::eval_support::ClaimEvidenceReader::new(
+                db_client.clone(),
+                test_support::ACTIVE_NAMESPACE,
+            )
+            .for_fact_ids(&all_fact_ids)
+            .await;
+            let persisted_relations = match persisted {
+                Ok(evidence) => evidence.relations,
+                Err(err) => {
+                    outcomes.push(EvalCaseOutcome {
+                        case_key: CaseKey::parse("claim-reconciliation", case_id.as_str()).unwrap(),
+                        mode: EvalMode::EndToEnd,
+                        split: corpus_split,
+                        label_trust: LabelTrust::Official,
+                        status: CaseStatus::Invalid,
+                        metrics: std::collections::BTreeMap::new(),
+                        evidence: std::collections::BTreeMap::new(),
+                        invalid_reason: Some(format!(
+                            "persisted claim evidence unavailable: {err}"
+                        )),
+                        failures: vec![],
+                        duration_ms: start.elapsed().as_millis() as u64,
+                        attempts: 1,
+                    });
+                    continue;
+                }
+            };
+            // Expected relations split by persistability. Production's
+            // source gate (ADR-0008) refuses automatic correction or
+            // supersession within a single source lineage, so relations
+            // whose setup and source share a source_id are never persisted
+            // by design. Those stay scored through the in-process warning
+            // path; only cross-lineage expectations gate persisted quality.
+            let persistable_relations: Vec<&ExpectedRelation> = case
+                .expected
+                .relations
+                .iter()
+                .filter(|r| r.setup_source_id != r.source_id)
+                .collect();
+            let self_lineage_relations =
+                case.expected.relations.len() - persistable_relations.len();
+            let matched_persisted: usize = persistable_relations
+                .iter()
+                .filter(|expected| {
+                    persisted_relations.iter().any(|actual| {
+                        matches_persisted_relation_by_lineage(expected, actual, &lineage)
+                    })
+                })
+                .count();
+
             let mut metric_map = std::collections::BTreeMap::new();
             // Diagnostic-only counts (not gate-consumed): expected/matched/
             // predicted warnings, isolation violations, unresolved lineage.
@@ -536,6 +620,18 @@ impl EvalSuite for ClaimReconciliationSuite {
             metric_map.insert(
                 "matched_warnings".into(),
                 metrics_result.matched_warnings as f64,
+            );
+            metric_map.insert(
+                "persisted_relations".into(),
+                persisted_relations.len() as f64,
+            );
+            metric_map.insert(
+                "matched_persisted_relations".into(),
+                matched_persisted as f64,
+            );
+            metric_map.insert(
+                "self_lineage_relations".into(),
+                self_lineage_relations as f64,
             );
             metric_map.insert(
                 "predicted_warnings".into(),
@@ -553,9 +649,13 @@ impl EvalSuite for ClaimReconciliationSuite {
             let exact_claim_quality = metrics_result.matched_warnings
                 == metrics_result.expected_contradictions
                 && metrics_result.predicted_warnings == metrics_result.expected_contradictions;
+            let persisted_quality = matched_persisted == persistable_relations.len()
+                && persisted_relations.len() == persistable_relations.len();
             let case_invalid = metrics_result.unresolved_lineage > 0;
-            let case_passed =
-                !case_invalid && metrics_result.isolation_violations == 0 && exact_claim_quality;
+            let case_passed = !case_invalid
+                && metrics_result.isolation_violations == 0
+                && exact_claim_quality
+                && persisted_quality;
 
             let tp = metrics_result.matched_warnings as u64;
             let fp = (metrics_result.predicted_warnings as u64).saturating_sub(tp);
@@ -595,11 +695,14 @@ impl EvalSuite for ClaimReconciliationSuite {
                 }),
                 failures: if !case_passed && !case_invalid {
                     vec![format!(
-                        "claim_quality mismatch: expected={}, matched={}, predicted={}, isolation_violations={}",
+                        "claim_quality mismatch: expected={}, matched={}, predicted={}, isolation_violations={}, persisted={}, matched_persisted={}, self_lineage={}",
                         metrics_result.expected_contradictions,
                         metrics_result.matched_warnings,
                         metrics_result.predicted_warnings,
                         metrics_result.isolation_violations,
+                        persisted_relations.len(),
+                        matched_persisted,
+                        self_lineage_relations,
                     )]
                 } else {
                     vec![]

@@ -1,6 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
-use crate::models::claim::ClaimRelationOutcome;
+use crate::error::MemoryError;
+use crate::models::claim::{ClaimRelation, ClaimRelationOutcome};
+use crate::storage::DbClient;
+use crate::storage::claims::ClaimStore;
+use crate::storage::claims::{RelationsForFactsQuery, SurrealClaimStore};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvaluatedRelation {
@@ -87,6 +92,64 @@ pub fn classify_isolation_violation(
         });
     }
     None
+}
+
+/// Read-only, feature-gated evidence seam over persisted claim relations
+/// (eval-v2-closure Task 2). Exposes immutable evaluation views only — no
+/// SurrealDB queries, no mutation, and never reachable through MCP.
+pub struct ClaimEvidenceReader {
+    store: SurrealClaimStore,
+}
+
+/// Persisted evidence for a set of fact IDs.
+#[derive(Debug, Clone, Default)]
+pub struct PersistedClaimEvidence {
+    pub relations: Vec<EvaluatedRelation>,
+}
+
+impl ClaimEvidenceReader {
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        Self {
+            store: SurrealClaimStore::new(db, namespace),
+        }
+    }
+
+    /// Loads active persisted relations touching any of `fact_ids`.
+    pub async fn for_fact_ids(
+        &self,
+        fact_ids: &[String],
+    ) -> Result<PersistedClaimEvidence, MemoryError> {
+        let ids: Vec<crate::models::FactId> = fact_ids
+            .iter()
+            .map(|f| crate::models::FactId::from(f.as_str()))
+            .collect();
+        if ids.is_empty() {
+            return Ok(PersistedClaimEvidence::default());
+        }
+        let relations = self
+            .store
+            .select_relations_for_facts(RelationsForFactsQuery { fact_ids: &ids })
+            .await?;
+        Ok(PersistedClaimEvidence {
+            relations: relations.iter().filter_map(evaluated_relation).collect(),
+        })
+    }
+}
+
+/// Projects a persisted relation onto the evaluation view. Relations without
+/// both source fact IDs (pre-migration rows) are skipped.
+fn evaluated_relation(rel: &ClaimRelation) -> Option<EvaluatedRelation> {
+    let left_fact_id = rel.left_fact_id.as_ref()?.as_ref().to_string();
+    let right_fact_id = rel.right_fact_id.as_ref()?.as_ref().to_string();
+    Some(EvaluatedRelation {
+        relation_id: rel.claim_relation_id.as_ref().to_string(),
+        left_fact_id,
+        right_fact_id,
+        outcome: rel.outcome,
+        reason_code: rel.reason_code.clone(),
+        namespace: String::new(),
+        policy_fingerprint: rel.policy_tags.join(","),
+    })
 }
 
 #[cfg(test)]
