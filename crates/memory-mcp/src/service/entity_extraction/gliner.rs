@@ -1237,7 +1237,13 @@ impl LoadedGliner {
             .forward(&word_hidden)
             .map_err(|err| MemoryError::Storage(format!("rnn forward failed: {err}")))?;
         let spans_data = self.compute_span_scores(&text_hidden, &label_representations)?;
-        all_spans.extend(self.extract_spans(text, &spans_data, &word_offsets, labels));
+        all_spans.extend(extract_spans(
+            self.threshold,
+            text,
+            &spans_data,
+            &word_offsets,
+            labels,
+        ));
         Ok(())
     }
 
@@ -1322,91 +1328,99 @@ impl LoadedGliner {
         );
         Ok(spans)
     }
+}
 
-    fn is_valid_span_text(span_text: &str) -> bool {
-        !span_text.trim().is_empty()
-    }
+/// IOU threshold above which same-label overlapping spans are suppressed by NMS.
+const NMS_IOU_THRESHOLD: f32 = 0.5;
 
-    fn extract_spans(
-        &self,
-        text: &str,
-        spans_data: &[(usize, usize, Vec<f32>)],
-        offsets: &[(usize, usize)],
-        labels: &[String],
-    ) -> Vec<ScoredSpan> {
-        let mut spans = Vec::new();
+/// Span post-processing: map raw span scores to candidate spans, then prune
+/// overlaps.
+///
+/// These are free functions (they only need the extractor threshold and the IOU
+/// constant) so they can be unit-tested without a loaded model.
+fn is_valid_span_text(span_text: &str) -> bool {
+    !span_text.trim().is_empty()
+}
 
-        for &(start, end, ref scores) in spans_data {
-            if start >= offsets.len() || end >= offsets.len() {
-                continue;
-            }
+fn extract_spans(
+    threshold: f64,
+    text: &str,
+    spans_data: &[(usize, usize, Vec<f32>)],
+    offsets: &[(usize, usize)],
+    labels: &[String],
+) -> Vec<ScoredSpan> {
+    let mut spans = Vec::new();
 
-            let start_char = offsets[start].0;
-            let end_char = offsets[end].1;
-            if end_char <= start_char || end_char > text.len() {
-                continue;
-            }
-
-            let span_text = text[start_char..end_char].trim();
-            if !Self::is_valid_span_text(span_text) {
-                continue;
-            }
-
-            for (label_idx, &score) in scores.iter().enumerate() {
-                if label_idx >= labels.len() {
-                    break;
-                }
-                let probability = 1.0_f32 / (1.0_f32 + (-score).exp());
-                if probability >= self.threshold as f32 {
-                    spans.push(ScoredSpan {
-                        start: start_char,
-                        end: end_char,
-                        text: span_text.to_string(),
-                        label: labels[label_idx].clone(),
-                        score: probability,
-                    });
-                }
-            }
+    for &(start, end, ref scores) in spans_data {
+        if start >= offsets.len() || end >= offsets.len() {
+            continue;
         }
 
-        spans
+        let start_char = offsets[start].0;
+        let end_char = offsets[end].1;
+        if end_char <= start_char || end_char > text.len() {
+            continue;
+        }
+
+        let span_text = text[start_char..end_char].trim();
+        if !is_valid_span_text(span_text) {
+            continue;
+        }
+
+        for (label_idx, &score) in scores.iter().enumerate() {
+            if label_idx >= labels.len() {
+                break;
+            }
+            let probability = 1.0_f32 / (1.0_f32 + (-score).exp());
+            if probability >= threshold as f32 {
+                spans.push(ScoredSpan {
+                    start: start_char,
+                    end: end_char,
+                    text: span_text.to_string(),
+                    label: labels[label_idx].clone(),
+                    score: probability,
+                });
+            }
+        }
     }
 
-    fn apply_nms(&self, mut spans: Vec<ScoredSpan>) -> Vec<ScoredSpan> {
-        const IOU_THRESHOLD: f32 = 0.5;
+    spans
+}
 
-        spans.sort_by(|left, right| {
-            right
-                .score
-                .partial_cmp(&left.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
+fn apply_nms(mut spans: Vec<ScoredSpan>) -> Vec<ScoredSpan> {
+    spans.sort_by(|left, right| {
+        right
+            .score
+            .partial_cmp(&left.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut kept = Vec::new();
+    for span in spans {
+        let dominated = kept.iter().any(|kept_span: &ScoredSpan| {
+            if kept_span.label != span.label {
+                return false;
+            }
+            let inter_start = span.start.max(kept_span.start);
+            let inter_end = span.end.min(kept_span.end);
+            if inter_start >= inter_end {
+                return false;
+            }
+            let intersection = (inter_end - inter_start) as f32;
+            let union =
+                (span.end - span.start + kept_span.end - kept_span.start) as f32 - intersection;
+            intersection / union > NMS_IOU_THRESHOLD
         });
 
-        let mut kept = Vec::new();
-        for span in spans {
-            let dominated = kept.iter().any(|kept_span: &ScoredSpan| {
-                if kept_span.label != span.label {
-                    return false;
-                }
-                let inter_start = span.start.max(kept_span.start);
-                let inter_end = span.end.min(kept_span.end);
-                if inter_start >= inter_end {
-                    return false;
-                }
-                let intersection = (inter_end - inter_start) as f32;
-                let union =
-                    (span.end - span.start + kept_span.end - kept_span.start) as f32 - intersection;
-                intersection / union > IOU_THRESHOLD
-            });
-
-            if !dominated {
-                kept.push(span);
-            }
+        if !dominated {
+            kept.push(span);
         }
-
-        kept
     }
 
+    kept
+}
+
+impl LoadedGliner {
     fn extract_inner(&self, text: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
         self.extract_inner_with_labels(text, &self.labels)
     }
@@ -1489,7 +1503,7 @@ impl LoadedGliner {
             }
         }
 
-        let final_spans = self.apply_nms(all_spans);
+        let final_spans = apply_nms(all_spans);
         let mut candidates = final_spans
             .into_iter()
             .map(|span| EntityCandidate {
@@ -1857,5 +1871,235 @@ mod tests {
             .await
             .expect("empty labels should be a no-op");
         assert!(candidates.is_empty());
+    }
+
+    // ── Config inference (pure, no model files) ──────────────────────────────
+
+    fn backbone_metadata(layer_count: usize) -> HashMap<String, SafetensorsTensorMetadata> {
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            format!("{BACKBONE_PREFIX}.embeddings.word_embeddings.weight"),
+            SafetensorsTensorMetadata {
+                shape: vec![1000, 768],
+            },
+        );
+        metadata.insert(
+            format!("{BACKBONE_PREFIX}.encoder.layer.0.intermediate.dense.weight"),
+            SafetensorsTensorMetadata {
+                shape: vec![3072, 768],
+            },
+        );
+        for layer in 0..layer_count {
+            metadata.insert(
+                format!("{BACKBONE_PREFIX}.encoder.layer.{layer}.attention.self.query.weight"),
+                SafetensorsTensorMetadata {
+                    shape: vec![768, 768],
+                },
+            );
+        }
+        metadata
+    }
+
+    #[test]
+    fn infer_backbone_config_from_metadata_recovers_shape_and_depth() {
+        let metadata = backbone_metadata(3);
+        let config =
+            infer_backbone_config_from_metadata(&metadata, 384, 0.1).expect("config inference");
+
+        assert_eq!(config.vocab_size, 1000);
+        assert_eq!(config.hidden_size, 768);
+        assert_eq!(config.num_hidden_layers, 3);
+        assert_eq!(config.num_attention_heads, 12);
+        assert_eq!(config.intermediate_size, 3072);
+        // No position embeddings in the metadata: fall back to the
+        // max-sequence bound instead. The 384 floor is below the 512 fallback,
+        // so the fallback wins.
+        assert!(!config.position_biased_input);
+        assert!(!config.relative_attention);
+        assert_eq!(config.max_position_embeddings, 512);
+    }
+
+    #[test]
+    fn infer_backbone_config_from_metadata_recognizes_position_and_rel_embeddings() {
+        let mut metadata = backbone_metadata(2);
+        metadata.insert(
+            format!("{BACKBONE_PREFIX}.embeddings.position_embeddings.weight"),
+            SafetensorsTensorMetadata {
+                shape: vec![512, 768],
+            },
+        );
+        metadata.insert(
+            format!("{BACKBONE_PREFIX}.encoder.rel_embeddings.weight"),
+            SafetensorsTensorMetadata {
+                shape: vec![256, 64],
+            },
+        );
+
+        let config =
+            infer_backbone_config_from_metadata(&metadata, 128, 0.1).expect("config inference");
+        assert!(config.position_biased_input);
+        assert!(config.relative_attention);
+        assert_eq!(config.max_position_embeddings, 512);
+        // rel_embeddings [buckets*2, head_dim] → buckets = 128.
+        assert_eq!(config.position_buckets, Some(128));
+    }
+
+    #[test]
+    fn infer_backbone_config_from_metadata_rejects_missing_word_embeddings() {
+        let mut metadata = backbone_metadata(1);
+        metadata.remove(&format!(
+            "{BACKBONE_PREFIX}.embeddings.word_embeddings.weight"
+        ));
+        let error = infer_backbone_config_from_metadata(&metadata, 384, 0.1)
+            .expect_err("word embeddings are required");
+        assert!(error.to_string().contains("word_embeddings"));
+    }
+
+    #[test]
+    fn infer_backbone_config_from_metadata_rejects_non_divisible_hidden_size() {
+        let mut metadata = backbone_metadata(1);
+        metadata.insert(
+            format!("{BACKBONE_PREFIX}.embeddings.word_embeddings.weight"),
+            SafetensorsTensorMetadata {
+                shape: vec![1000, 767], // 767 % 64 != 0
+            },
+        );
+        let error = infer_backbone_config_from_metadata(&metadata, 384, 0.1)
+            .expect_err("hidden size 767 cannot divide attention heads");
+        assert!(error.to_string().contains("767"));
+    }
+
+    #[test]
+    fn infer_backbone_config_from_model_name_maps_known_deberta_base() {
+        let config =
+            infer_backbone_config_from_model_name(Some("microsoft/mdeberta-v3-base"), 384, 0.1)
+                .expect("known backbone");
+        assert_eq!(config.hidden_size, 768);
+        assert_eq!(config.num_hidden_layers, 12);
+        assert_eq!(config.vocab_size, 250_105);
+        assert!(config.relative_attention);
+        assert!(!config.position_biased_input);
+        assert_eq!(config.max_position_embeddings, 512);
+    }
+
+    #[test]
+    fn infer_backbone_config_from_model_name_rejects_unknown_backbones() {
+        let error = infer_backbone_config_from_model_name(Some("acme/unknown-backbone"), 384, 0.1)
+            .expect_err("unknown backbone must be rejected");
+        assert!(error.to_string().contains("acme/unknown-backbone"));
+    }
+
+    #[test]
+    fn parse_gliner_runtime_config_uses_defaults_and_bounds_seq_len() {
+        let config = parse_gliner_runtime_config(
+            r#"{"max_len": 128, "dropout": 0.05, "model_name": "deberta-v3-base", "max_width": 8}"#,
+            None,
+        )
+        .expect("runtime config");
+        assert_eq!(config.max_span_width, 8);
+        assert_eq!(config.backbone.hidden_dropout_prob, 0.05);
+        // max_seq_len is bounded below by DEFAULT_MAX_SEQ_LEN (384); the
+        // configured 128 is below the floor, so the floor wins.
+        assert_eq!(config.max_seq_len, 384);
+        assert_eq!(config.head_hidden_size, 512); // default hidden_size
+    }
+
+    #[test]
+    fn parse_gliner_runtime_config_propagates_invalid_json() {
+        assert!(parse_gliner_runtime_config("not json", None).is_err());
+    }
+
+    // ── Span extraction + NMS (pure, no model) ───────────────────────────────
+
+    fn span(start: usize, end: usize, text: &str, label: &str, score: f32) -> ScoredSpan {
+        ScoredSpan {
+            start,
+            end,
+            text: text.to_string(),
+            label: label.to_string(),
+            score,
+        }
+    }
+
+    #[test]
+    fn extract_spans_filters_below_threshold_and_maps_char_offsets() {
+        let text = "Alice works at Acme Corp";
+        // Word offsets use exclusive end chars, so a (start, end) word-index
+        // pair maps to text[offsets[start].0..offsets[end].1].
+        let offsets: Vec<(usize, usize)> = vec![
+            (0, 5),   // "Alice"
+            (6, 11),  // "works"
+            (12, 14), // "at"
+            (15, 19), // "Acme"
+            (20, 24), // "Corp"
+        ];
+        let labels = vec!["person".to_string(), "company".to_string()];
+        // logit → sigmoid: 3.0 ≈ 0.95 (passes 0.5), -3.0 ≈ 0.05 (fails).
+        // `end` is an INCLUSIVE word index, so (0,0) → "Alice", (3,3) → "Acme".
+        let spans_data = vec![
+            (0, 0, vec![3.0, -3.0]), // Alice → person only
+            (3, 3, vec![-1.0, 3.0]), // Acme → company only
+        ];
+
+        let spans = extract_spans(0.5, text, &spans_data, &offsets, &labels);
+        assert_eq!(spans.len(), 2);
+        assert_eq!(spans[0].text, "Alice");
+        assert_eq!(spans[0].label, "person");
+        assert!(spans[0].score > 0.9);
+        assert_eq!(spans[1].text, "Acme");
+        assert_eq!(spans[1].label, "company");
+    }
+
+    #[test]
+    fn extract_spans_skips_invalid_and_out_of_range_spans() {
+        let text = "Alice  works"; // note the double space
+        let offsets: Vec<(usize, usize)> = vec![(0, 5), (7, 12)];
+        let labels = vec!["person".to_string()];
+        let spans_data = vec![
+            (5, 6, vec![3.0]), // start index out of range
+            (1, 0, vec![3.0]), // end_char (5) <= start_char (7) → empty span
+        ];
+        assert!(extract_spans(0.5, text, &spans_data, &offsets, &labels).is_empty());
+    }
+
+    #[test]
+    fn is_valid_span_text_rejects_whitespace_only() {
+        assert!(is_valid_span_text("Alice"));
+        assert!(!is_valid_span_text("   "));
+        assert!(!is_valid_span_text(""));
+    }
+
+    #[test]
+    fn apply_nms_drops_high_iou_same_label_spans() {
+        // "Alice Smith" (0..11) at high score dominates "Alice" (0..5):
+        // intersection 5, union 11 → IoU ≈ 0.45 < 0.5. Use tighter overlap.
+        let kept = apply_nms(vec![
+            span(0, 11, "Alice Smith", "person", 0.9),
+            span(0, 10, "Alice Smithy", "person", 0.8), // IoU 10/11 ≈ 0.91 → dropped
+        ]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].text, "Alice Smith");
+    }
+
+    #[test]
+    fn apply_nms_keeps_disjoint_and_different_label_spans() {
+        let kept = apply_nms(vec![
+            span(0, 5, "Alice", "person", 0.9),
+            span(6, 11, "Acme", "person", 0.8),  // disjoint → kept
+            span(0, 5, "Alice", "company", 0.7), // exact overlap, other label → kept
+        ]);
+        assert_eq!(kept.len(), 3);
+    }
+
+    #[test]
+    fn apply_nms_orders_by_score_before_suppression() {
+        // The lower-score span is evaluated second: overlap 9, union 12 →
+        // IoU 0.75 > 0.5, so it is suppressed by the higher-score span.
+        let kept = apply_nms(vec![
+            span(0, 9, "low", "person", 0.51),
+            span(1, 8, "high", "person", 0.99),
+        ]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].text, "high");
     }
 }

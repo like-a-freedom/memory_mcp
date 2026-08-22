@@ -1,4 +1,4 @@
-mod embedded_support;
+mod common;
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::{AccessPayload, AssembleContextRequest, Provenance};
@@ -6,7 +6,7 @@ use memory_mcp::service::capabilities::assemble_context::AssembleContextCapabili
 
 #[tokio::test]
 async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let now = Utc::now();
 
     service

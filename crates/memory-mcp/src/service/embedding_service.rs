@@ -580,3 +580,415 @@ impl EmbeddingService {
         self.task_runner.release(task_key).await;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use async_trait::async_trait;
+    use lru::LruCache;
+    use serde_json::json;
+    use tokio::sync::{Mutex, RwLock};
+
+    use super::*;
+    use crate::error::MemoryError;
+    use crate::logging::StdoutLogger;
+    use crate::service::embedding::task_runner::BackgroundTaskRunner;
+    use crate::service::embedding_runtime::CachedQueryEmbedding;
+    use crate::service::mock_db::MockDbClient;
+
+    /// Deterministic provider: returns a fixed-dimension vector whose first
+    /// component encodes the input, so tests can distinguish calls.
+    struct ScriptedProvider {
+        dimension: usize,
+        enabled: bool,
+        failures: AtomicUsize,
+        calls: AtomicUsize,
+        fail_with: MemoryError,
+    }
+
+    impl ScriptedProvider {
+        fn new(dimension: usize) -> Self {
+            Self {
+                dimension,
+                enabled: true,
+                failures: AtomicUsize::new(0),
+                calls: AtomicUsize::new(0),
+                fail_with: MemoryError::Transient("synthetic outage".to_string()),
+            }
+        }
+
+        fn disabled(dimension: usize) -> Self {
+            Self {
+                enabled: false,
+                ..Self::new(dimension)
+            }
+        }
+
+        fn fail_permanently(mut self) -> Self {
+            self.failures.store(u32::MAX as usize, Ordering::SeqCst);
+            self.fail_with = MemoryError::Storage("permanent failure".to_string());
+            self
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for ScriptedProvider {
+        fn is_enabled(&self) -> bool {
+            self.enabled
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "scripted"
+        }
+
+        fn dimension(&self) -> usize {
+            self.dimension
+        }
+
+        async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let remaining = self.failures.load(Ordering::SeqCst);
+            if remaining > 0 {
+                self.failures.fetch_sub(1, Ordering::SeqCst);
+                return Err(self.fail_with.clone());
+            }
+            let mut vector = vec![0.0; self.dimension];
+            vector[0] = input.chars().count() as f64;
+            Ok(vector)
+        }
+    }
+
+    /// Remote-named variant of [`ScriptedProvider`] for retry-policy tests.
+    struct ScriptedRemoteProvider(AtomicUsize);
+
+    #[async_trait]
+    impl EmbeddingProvider for ScriptedRemoteProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "openai-compatible"
+        }
+
+        fn dimension(&self) -> usize {
+            4
+        }
+
+        async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+            let remaining = self.0.load(Ordering::SeqCst);
+            if remaining > 0 {
+                self.0.fetch_sub(1, Ordering::SeqCst);
+                return Err(MemoryError::Transient("synthetic outage".to_string()));
+            }
+            let mut vector = vec![0.0; 4];
+            vector[0] = input.chars().count() as f64;
+            Ok(vector)
+        }
+    }
+
+    fn make_service(
+        provider: Arc<dyn EmbeddingProvider>,
+        signature: Option<&str>,
+        runner: Arc<BackgroundTaskRunner>,
+    ) -> EmbeddingService {
+        let context_cache = Arc::new(RwLock::new(LruCache::new(
+            std::num::NonZeroUsize::new(8).unwrap(),
+        )));
+        let query_embedding_cache = Arc::new(Mutex::new(LruCache::new(
+            std::num::NonZeroUsize::new(8).unwrap(),
+        )));
+        EmbeddingService::new(
+            Arc::new(MockDbClient::new()),
+            "org",
+            StdoutLogger::new("warn"),
+            provider,
+            0.8,
+            signature.map(str::to_string),
+            Some("test-model".to_string()),
+            Some(4),
+            context_cache,
+            query_embedding_cache,
+            runner,
+        )
+    }
+
+    #[test]
+    fn task_keys_are_scoped_by_signature_and_kind() {
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let with_sig = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            Some("sig-a"),
+            runner.clone(),
+        );
+        let without_sig = make_service(Arc::new(ScriptedProvider::new(4)), None, runner.clone());
+
+        // Signature present: explicit in the key. Absent: provider name is
+        // the fallback, so the same input maps to different keys.
+        assert_eq!(
+            with_sig.background_fact_task_key("org", "fact:1"),
+            "fact:sig-a:org:fact:1"
+        );
+        assert_eq!(
+            without_sig.background_fact_task_key("org", "fact:1"),
+            "fact:scripted:org:fact:1"
+        );
+
+        let query_key = with_sig.background_query_task_key("some input");
+        assert!(
+            query_key.starts_with("query:sig-a:"),
+            "query key should carry the signature prefix, got {query_key}"
+        );
+        // The query task key embeds the cache key, so it is deterministic.
+        assert_eq!(query_key, with_sig.background_query_task_key("some input"));
+        // Fact and query keys for the same logical work never collide.
+        assert_ne!(
+            with_sig.background_fact_task_key("org", "some input"),
+            with_sig.background_query_task_key("some input")
+        );
+    }
+
+    #[test]
+    fn query_cache_key_normalizes_input_and_scopes_by_signature() {
+        let sig_a = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            Some("sig-a"),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let sig_b = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            Some("sig-b"),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let unnamed = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+
+        // Whitespace and case variants normalize to the same key.
+        assert_eq!(
+            sig_a.query_embedding_cache_key("  The  Quick \n Brown  "),
+            sig_a.query_embedding_cache_key("the quick brown")
+        );
+        // Distinct texts get distinct keys.
+        assert_ne!(
+            sig_a.query_embedding_cache_key("the quick brown"),
+            sig_a.query_embedding_cache_key("jumps over the fox")
+        );
+        // A different embedding signature isolates the caches.
+        assert_ne!(
+            sig_a.query_embedding_cache_key("the quick brown"),
+            sig_b.query_embedding_cache_key("the quick brown")
+        );
+        // No signature: provider name scopes the key instead.
+        assert_ne!(
+            sig_a.query_embedding_cache_key("the quick brown"),
+            unnamed.query_embedding_cache_key("the quick brown")
+        );
+    }
+
+    #[test]
+    fn should_defer_retry_only_for_transient_remote_failures() {
+        let local_transient = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let remote = make_service(
+            Arc::new(ScriptedRemoteProvider(AtomicUsize::new(1))),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+
+        let transient = MemoryError::Transient("outage".to_string());
+        let permanent = MemoryError::Storage("boom".to_string());
+
+        assert!(!local_transient.should_defer_embedding_retry(&transient));
+        assert!(remote.should_defer_embedding_retry(&transient));
+        assert!(!remote.should_defer_embedding_retry(&permanent));
+    }
+
+    #[tokio::test]
+    async fn generate_embedding_returns_none_when_provider_disabled() {
+        let service = make_service(
+            Arc::new(ScriptedProvider::disabled(4)),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let result = service.generate_embedding("hello").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn generate_embedding_propagates_provider_errors() {
+        let provider = Arc::new(ScriptedProvider::new(4).fail_permanently());
+        let service = make_service(
+            provider.clone(),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let result = service.generate_embedding("hello").await;
+        assert!(matches!(result, Err(MemoryError::Storage(_))));
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn query_embedding_uses_cache_and_defers_inflight_tasks() {
+        let provider = Arc::new(ScriptedProvider::new(4));
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(provider.clone(), None, runner.clone());
+
+        // First call: miss, provider invoked, embedding cached.
+        let first = service
+            .generate_query_embedding_with_background("repeat me")
+            .await
+            .unwrap();
+        assert_eq!(first.as_ref().unwrap().len(), 4);
+        assert_eq!(provider.calls(), 1);
+
+        // Second call: cache hit, provider not re-invoked.
+        let second = service
+            .generate_query_embedding_with_background("repeat me")
+            .await
+            .unwrap();
+        assert_eq!(second, first);
+        assert_eq!(provider.calls(), 1);
+
+        // A new input that is already reserved as an inflight background task
+        // is deferred (Ok(None)) instead of racing the provider.
+        let task_key = service.background_query_task_key("deferred input");
+        assert!(runner.try_reserve(&task_key).await);
+        let deferred = service
+            .generate_query_embedding_with_background("deferred input")
+            .await
+            .unwrap();
+        assert!(deferred.is_none());
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn query_embedding_defers_transient_remote_errors() {
+        let provider = Arc::new(ScriptedRemoteProvider(AtomicUsize::new(1)));
+        let service = make_service(
+            provider.clone(),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+
+        // Transient remote failure: deferred to a background retry, the call
+        // itself succeeds with no embedding.
+        let deferred = service
+            .generate_query_embedding_with_background("flaky")
+            .await
+            .unwrap();
+        assert!(deferred.is_none());
+
+        // Same input right after: the background task is inflight, so the
+        // foreground path defers again instead of hammering the provider.
+        let second = service
+            .generate_query_embedding_with_background("flaky")
+            .await
+            .unwrap();
+        assert!(second.is_none());
+    }
+
+    #[tokio::test]
+    async fn cached_query_embedding_evicts_expired_entries() {
+        let service = make_service(
+            Arc::new(ScriptedProvider::new(4)),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let cache_key = service.query_embedding_cache_key("ttl probe");
+        {
+            let mut cache = service.query_embedding_cache.lock().await;
+            // Expired entry must be evicted, not served.
+            cache.put(
+                cache_key.clone(),
+                CachedQueryEmbedding {
+                    embedding: vec![1.0; 4],
+                    expires_at: std::time::Instant::now() - std::time::Duration::from_secs(1),
+                },
+            );
+        }
+        assert!(service.cached_query_embedding("ttl probe").await.is_none());
+        let mut cache = service.query_embedding_cache.lock().await;
+        assert!(
+            cache.get(&cache_key).is_none(),
+            "expired entry must be evicted"
+        );
+    }
+
+    #[tokio::test]
+    async fn store_embedding_on_fact_rejects_dimension_mismatch() {
+        let provider = Arc::new(MismatchedProvider {
+            dimension: 4,
+            returned: 2,
+        });
+        let db = Arc::new(MockDbClient::new().expect_select_one(
+            "fact:1",
+            // A stale signature so the write path is not short-circuited
+            // before dimension validation.
+            Some(json!({"fact_id": "fact:1", "embedding_signature": "sig-previous"})),
+        ));
+        let service = EmbeddingService::new(
+            db,
+            "org",
+            StdoutLogger::new("warn"),
+            provider,
+            0.8,
+            Some("sig-a".to_string()),
+            Some("test-model".to_string()),
+            Some(4),
+            Arc::new(RwLock::new(LruCache::new(
+                std::num::NonZeroUsize::new(8).unwrap(),
+            ))),
+            Arc::new(Mutex::new(LruCache::new(
+                std::num::NonZeroUsize::new(8).unwrap(),
+            ))),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+
+        // `store_embedding_on_fact` reads the record, validates the vector
+        // against the provider dimension, and rejects mismatches before write.
+        let err = service
+            .store_embedding_on_fact("fact:1", vec![1.0, 2.0])
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, MemoryError::Validation(ref msg) if msg.contains("dimension mismatch")),
+            "expected dimension mismatch, got {err:?}"
+        );
+    }
+
+    struct MismatchedProvider {
+        dimension: usize,
+        returned: usize,
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for MismatchedProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "mismatched"
+        }
+
+        fn dimension(&self) -> usize {
+            self.dimension
+        }
+
+        async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+            Ok(vec![0.5; self.returned])
+        }
+    }
+}

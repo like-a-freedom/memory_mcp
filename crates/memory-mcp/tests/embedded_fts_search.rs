@@ -1,4 +1,4 @@
-mod embedded_support;
+mod common;
 
 use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, Provenance};
@@ -9,7 +9,7 @@ use memory_mcp::service::capabilities::resolve::ResolveCapability;
 /// SurrealDB stack (embedded) with the configured full-text analyzer.
 #[tokio::test]
 async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let t = Utc::now() - Duration::days(1);
 
     service
@@ -113,7 +113,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
 
 #[tokio::test]
 async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let t = Utc::now() - Duration::days(1);
 
     service
@@ -157,7 +157,7 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
 
 #[tokio::test]
 async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
     let alice_id = service.resolve_entity("person", "Alice Smith").await?;
 
@@ -222,7 +222,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
 
 #[tokio::test]
 async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let t = Utc.with_ymd_and_hms(2026, 3, 16, 9, 0, 0).unwrap();
 
     let fact_id = service
@@ -409,7 +409,7 @@ fn edge_origin_is_introduced_by_followup_migration() {
 /// entity id, not create a new one.
 #[tokio::test]
 async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     // Create "Alice Smith" and attach the alias "Alicia".
     let alice_id = ResolveCapability::resolve(
@@ -450,7 +450,7 @@ async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::err
 /// snowball stemmer, so Russian queries matched on raw substring only.
 #[tokio::test]
 async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let t = Utc::now() - Duration::days(1);
 
     service

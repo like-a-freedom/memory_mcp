@@ -1,34 +1,14 @@
-mod embedded_support;
+mod common;
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
-use memory_mcp::service::MemoryService;
 use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
 use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
-use memory_mcp::storage::SurrealDbClient;
-
-async fn setup_embedded_service_with_client()
--> Result<(MemoryService, std::sync::Arc<SurrealDbClient>), Box<dyn std::error::Error>> {
-    let db_client = std::sync::Arc::new(
-        SurrealDbClient::connect_in_memory("embedded_test", "org", "warn").await?,
-    );
-    db_client.apply_migrations("org").await?;
-
-    let service = MemoryService::new(
-        db_client.clone(),
-        "org".to_string(),
-        "warn".to_string(),
-        50,
-        100,
-    )?;
-
-    Ok((service, db_client))
-}
 
 #[tokio::test]
 async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
     let now = Utc::now();
 
     let fact_id = service
@@ -99,7 +79,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
 #[tokio::test]
 async fn embedded_invalidate_persists_bitemporal_close_and_reason()
 -> Result<(), Box<dyn std::error::Error>> {
-    let (service, db_client) = setup_embedded_service_with_client().await?;
+    let (service, db_client) = common::make_service_with_client_result().await?;
     let now = Utc::now();
     let fact_id = service
         .add_fact(
@@ -153,7 +133,7 @@ async fn embedded_invalidate_persists_bitemporal_close_and_reason()
 #[tokio::test]
 async fn embedded_relate_invalidates_previous_active_edge_version()
 -> Result<(), Box<dyn std::error::Error>> {
-    let (service, db_client) = setup_embedded_service_with_client().await?;
+    let (service, db_client) = common::make_service_with_client_result().await?;
 
     let alice = service.resolve_entity("person", "Alice").await?;
     let bob = service.resolve_entity("person", "Bob").await?;

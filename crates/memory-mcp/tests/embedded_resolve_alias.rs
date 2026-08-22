@@ -1,4 +1,4 @@
-mod embedded_support;
+mod common;
 
 use memory_mcp::models::EntityCandidate;
 use memory_mcp::service::capabilities::resolve::ResolveCapability;
@@ -6,7 +6,7 @@ use memory_mcp::service::capabilities::resolve::ResolveCapability;
 #[tokio::test]
 async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn std::error::Error>>
 {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     let canonical_id = ResolveCapability::resolve(
         &service.build_context(),
@@ -36,7 +36,7 @@ async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn 
 
 #[tokio::test]
 async fn embedded_resolve_matches_existing_alias() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     let canonical_id = ResolveCapability::resolve(
         &service.build_context(),
@@ -66,7 +66,7 @@ async fn embedded_resolve_matches_existing_alias() -> Result<(), Box<dyn std::er
 
 #[tokio::test]
 async fn embedded_batch_lookup_finds_entity_by_alias() -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     // Create entity with alias
     let entity_id = ResolveCapability::resolve(
@@ -103,7 +103,7 @@ async fn embedded_batch_lookup_finds_entity_by_alias() -> Result<(), Box<dyn std
 #[tokio::test]
 async fn embedded_resolve_creates_new_entity_when_not_found()
 -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     let entity_id = ResolveCapability::resolve(
         &service.build_context(),
@@ -123,7 +123,7 @@ async fn embedded_resolve_creates_new_entity_when_not_found()
 #[tokio::test]
 async fn embedded_resolve_fuzzy_matches_non_identical_cyrillic_name_and_persists_alias()
 -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     let canonical_id = ResolveCapability::resolve(
         &service.build_context(),
@@ -175,7 +175,7 @@ async fn embedded_resolve_fuzzy_matches_non_identical_cyrillic_name_and_persists
 #[tokio::test]
 async fn embedded_resolve_below_threshold_creates_new_entity()
 -> Result<(), Box<dyn std::error::Error>> {
-    let service = embedded_support::setup_embedded_service().await?;
+    let service = common::make_service().await;
 
     let existing_id = ResolveCapability::resolve(
         &service.build_context(),

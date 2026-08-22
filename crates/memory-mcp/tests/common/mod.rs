@@ -82,6 +82,14 @@ pub async fn make_service_with_client_and_query_logging(
     (memory.service, memory.db_client)
 }
 
+/// Same as `make_service_with_client`, but returns `Result` so integration
+/// tests whose signatures already return `Box<dyn Error>` can `?` through it.
+#[allow(dead_code)]
+pub async fn make_service_with_client_result()
+-> Result<(MemoryService, Arc<SurrealDbClient>), Box<dyn std::error::Error>> {
+    Ok(make_service_with_client().await)
+}
+
 #[allow(dead_code)]
 pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &str) -> String {
     let request = IngestRequest {
