@@ -1,7 +1,6 @@
 pub mod action_grounding;
 pub mod capacity;
 pub mod claims;
-pub mod downstream_qa;
 pub mod end_to_end;
 pub mod external_retrieval;
 pub mod extraction;
@@ -16,7 +15,6 @@ pub(crate) mod retrieval_cases;
 pub use action_grounding::ActionGroundingSuite;
 pub use capacity::CapacitySuite;
 pub use claims::ClaimReconciliationSuite;
-pub use downstream_qa::{DownstreamQaSuite, ReaderContract};
 pub use end_to_end::EndToEndSuite;
 pub use external_retrieval::{ExternalRetrievalSuite, WorkerPolicy};
 pub use extraction::ExtractionSuite;
@@ -55,7 +53,6 @@ mod tests {
         "action_grounding.rs",
         "capacity.rs",
         "claims.rs",
-        "downstream_qa.rs",
         "end_to_end.rs",
         "external_retrieval.rs",
         "extraction.rs",

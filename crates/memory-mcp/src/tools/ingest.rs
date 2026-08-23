@@ -23,6 +23,7 @@ pub async fn ingest(
     ctx: &ServiceContext,
     params: IngestParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("ingest");
     let t_ref = parse_datetime(&params.t_ref).ok_or_else(|| {
         MemoryError::Validation(format!(
             "Invalid `t_ref` value: {}. \
@@ -55,6 +56,8 @@ pub async fn ingest(
 
     match IngestCapability::ingest(ctx, request, Some(access)).await {
         Ok(episode_id) => {
+            operation_metrics.record_result("episodes", 1);
+            operation_metrics.success();
             ctx.log_tool_event_with_duration(
                 "ingest.done",
                 json!({"source_id": &source_id}),

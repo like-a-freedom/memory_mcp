@@ -240,6 +240,7 @@ erDiagram
 | `models` | Shared domain models and request/response types |
 | `config` | Environment-driven configuration loading |
 | `logging` | Logging setup and log-level utilities |
+| `observability` | Optional Prometheus installation and bounded runtime metrics |
 
 ## Quick start
 
@@ -594,6 +595,26 @@ The following settings are optional for power users. They are read by the same e
 
 Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
 
+### Runtime metrics
+
+Build with the optional `prometheus` feature and set
+`MEMORY_PROMETHEUS_LISTEN_ADDR` to expose the Prometheus endpoint. The runtime
+exports three generic bounded metric families:
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `memory_operation_calls_total` | `operation`, `outcome` | Logical operation volume; outcome is `success` or `error` |
+| `memory_operation_duration_seconds` | `operation`, `outcome` | Operation latency histogram |
+| `memory_operation_results_total` | `operation`, `result` | Counts of bounded domain outputs such as facts, entities, or retrieved items |
+
+Claim reconciliation exports additional `memory_claim_*` families under the
+cardinality rules in [ADR-0005](docs/adr/0005-separate-claim-traces-from-metric-labels.md).
+The evaluation harness does not publish ephemeral Prometheus series: its
+versioned JSON artifacts are the source of truth for batch latency, capacity,
+retrieval quality, gates, and case outcomes. Individual record identifiers are
+never metric labels; use structured logs for per-request diagnosis. See
+[ADR-0048](docs/adr/0048-bounded-runtime-observability.md).
+
 ### Optional build features
 
 The binary supports a few opt-in Cargo features:
@@ -604,6 +625,7 @@ The binary supports a few opt-in Cargo features:
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
 | `mcp-apps` | Enable the optional interactive MCP app-session surface. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps`. |
+| `prometheus` | Compile the optional Prometheus recorder/listener. Set `MEMORY_PROMETHEUS_LISTEN_ADDR` at runtime to expose `/metrics`. |
 
 The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `NER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 
@@ -1116,6 +1138,7 @@ Every memory tool can be invoked directly from the command line. The CLI shares 
 | `serve` (default) | Run the stdio MCP server |
 | `watch <dir>` | Watch a directory and auto-ingest files (requires `cli-watch` feature) |
 | `reembed` | Rebuild all fact embeddings after a provider switch. Flags: `--max-failures N`, `--retry-failed` |
+| `lifecycle` | Inspect or run lifecycle maintenance: `dashboard`, `archive-candidates`, `restore-archived`, `recompute-decay`, `rebuild-communities` |
 | `ingest` | Store raw source material as an episode |
 | `extract` | Extract entities, facts, and relationships |
 | `resolve` | Resolve entity aliases to a canonical entity id |
@@ -1158,6 +1181,16 @@ memory_mcp assemble-context \
   --query "What did Alice promise?" \
   --budget 10
 
+# Inspect lifecycle state
+memory_mcp lifecycle dashboard
+
+# Run a confirmed dry-run archival selection
+memory_mcp lifecycle archive-candidates episode:old-1 \
+  --dry-run
+
+# Recompute confidence decay (requires --confirmed to mutate)
+memory_mcp lifecycle recompute-decay --confirmed
+
 # Invalidate a fact
 memory_mcp invalidate \
   --fact-id fact:xyz \
@@ -1171,7 +1204,7 @@ memory_mcp explain \
 
 ### Output Format
 
-Memory-operation CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**. The output-only `init` command prints its documented result object to **stdout**:
+Memory-operation CLI subcommands print the `ToolResponse<T>` as pretty JSON to **stdout**. The `lifecycle` command prints an operation/result JSON envelope, and the output-only `init` command prints its documented result object to **stdout**:
 
 ```json
 {

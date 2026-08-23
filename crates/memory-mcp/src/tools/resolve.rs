@@ -18,6 +18,7 @@ pub async fn resolve(
     ctx: &ServiceContext,
     params: ResolveParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("resolve");
     let access = AccessPayload::default();
     let candidate = EntityCandidate {
         entity_type: params.entity_type,
@@ -37,6 +38,8 @@ pub async fn resolve(
 
     match ResolveCapability::resolve(ctx, candidate, Some(access)).await {
         Ok(entity_id) => {
+            operation_metrics.record_result("entities", 1);
+            operation_metrics.success();
             ctx.log_tool_event_with_duration(
                 "resolve.done",
                 json!({}),

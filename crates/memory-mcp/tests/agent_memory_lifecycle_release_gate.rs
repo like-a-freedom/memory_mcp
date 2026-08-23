@@ -61,7 +61,8 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 ///
 /// `init` is the one output-only onboarding exception authorized by ADR-0030.
 /// The `lifecycle-*` entries are internal hidden subcommands consumed by hook
-/// scripts (ADR-0016 AD-4/AD-5), not ordinary public memory tools.
+/// scripts (ADR-0016 AD-4/AD-5); `lifecycle` is the explicit operator-facing
+/// maintenance command authorized by ADR-0047.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
     "watch",
@@ -72,6 +73,7 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "invalidate",
     "explain",
     "assemble-context",
+    "lifecycle",
     "lifecycle-capture",
     "lifecycle-recall",
     "init",

@@ -92,6 +92,8 @@ impl crate::service::MemoryService {
     }
 
     pub async fn lifecycle_dashboard(&self) -> Result<LifecycleDashboard, MemoryError> {
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_dashboard");
         let active_facts = self.app_store().select_active_facts(10_000).await?;
         let policy = self.lifecycle_policy();
         let cutoff = crate::service::normalize_dt(
@@ -103,6 +105,10 @@ impl crate::service::MemoryService {
             .await?;
         let communities = self.app_store().select_communities().await?;
 
+        operation_metrics.record_result("active_facts", active_facts.len());
+        operation_metrics.record_result("archival_candidates", archival_candidates.len());
+        operation_metrics.record_result("communities", communities.len());
+        operation_metrics.success();
         Ok(LifecycleDashboard {
             active_facts: active_facts.len(),
             archival_candidates: archival_candidates.len(),
@@ -124,6 +130,8 @@ impl crate::service::MemoryService {
         target_ids: &[String],
         dry_run: bool,
     ) -> Result<ArchiveCandidatesOutcome, MemoryError> {
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_archive_candidates");
         if !dry_run {
             for episode_id in target_ids {
                 self.app_store()
@@ -138,10 +146,13 @@ impl crate::service::MemoryService {
             }
         }
 
+        let archived_count = if dry_run { 0 } else { target_ids.len() };
+        operation_metrics.record_result("archived", archived_count);
+        operation_metrics.success();
         Ok(ArchiveCandidatesOutcome {
             dry_run,
             target_ids: target_ids.to_vec(),
-            archived_count: if dry_run { 0 } else { target_ids.len() },
+            archived_count,
         })
     }
 
@@ -149,6 +160,8 @@ impl crate::service::MemoryService {
         &self,
         target_ids: &[String],
     ) -> Result<RestoreArchivedOutcome, MemoryError> {
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_restore_archived");
         for episode_id in target_ids {
             self.app_store()
                 .update_record(
@@ -161,6 +174,8 @@ impl crate::service::MemoryService {
                 .await?;
         }
 
+        operation_metrics.record_result("restored", target_ids.len());
+        operation_metrics.success();
         Ok(RestoreArchivedOutcome {
             target_ids: target_ids.to_vec(),
             restored_count: target_ids.len(),
@@ -171,6 +186,8 @@ impl crate::service::MemoryService {
         &self,
         dry_run: bool,
     ) -> Result<RecomputeDecayOutcome, MemoryError> {
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_recompute_decay");
         let invalidated = if dry_run {
             0
         } else {
@@ -183,6 +200,8 @@ impl crate::service::MemoryService {
             .await?
         };
 
+        operation_metrics.record_result("decay_invalidated", invalidated);
+        operation_metrics.success();
         Ok(RecomputeDecayOutcome {
             dry_run,
             invalidated,
@@ -193,12 +212,16 @@ impl crate::service::MemoryService {
         &self,
         dry_run: bool,
     ) -> Result<RebuildCommunitiesOutcome, MemoryError> {
+        let mut operation_metrics =
+            crate::observability::OperationMetrics::new("lifecycle_rebuild_communities");
         let rebuilt = if dry_run {
             0
         } else {
             run_community_rebuild_pass(self).await?
         };
 
+        operation_metrics.record_result("communities", rebuilt);
+        operation_metrics.success();
         Ok(RebuildCommunitiesOutcome { dry_run, rebuilt })
     }
 }

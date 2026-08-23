@@ -24,6 +24,7 @@ pub async fn explain(
     ctx: &ServiceContext,
     params: ExplainParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("explain");
     let access = AccessPayload::default();
     let context_pack =
         parse_context_items(&params.context_items).map_err(MemoryError::Validation)?;
@@ -54,6 +55,7 @@ pub async fn explain(
                 Some(&request_id),
             );
             let count = explanations.len();
+            operation_metrics.record_result("explanations", count);
             // Under compact mode, omit `quote` via the serde adapters reading
             // the thread-local CompactGuard. The guard is held across
             // serialization; `value` contains the compact form.
@@ -62,6 +64,7 @@ pub async fn explain(
                 serde_json::to_value(&explanations)
                     .map_err(|e| MemoryError::Transient(format!("serialize explain items: {e}")))?
             };
+            operation_metrics.success();
             if compact {
                 Ok(ToolResponse::complete_list_compact(
                     value,

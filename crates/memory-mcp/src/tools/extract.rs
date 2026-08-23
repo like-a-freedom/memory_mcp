@@ -25,6 +25,7 @@ pub async fn extract(
     ctx: &ServiceContext,
     params: ExtractParams,
 ) -> Result<ToolResponse<ExtractResult>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("extract");
     let access = AccessPayload::default();
     let episode_id = normalize_optional_string(params.episode_id);
     let content = normalize_optional_string(params.content);
@@ -90,6 +91,8 @@ pub async fn extract(
             .await
         {
             Ok(result) => {
+                record_extract_results(&operation_metrics, &result);
+                operation_metrics.success();
                 let log_result = match ctx.find_episode_record(episode_id).await {
                     Ok((record, _)) => {
                         let episode = record.as_ref().and_then(episode_from_record);
@@ -171,6 +174,8 @@ pub async fn extract(
             .await
             {
                 Ok(result) => {
+                    record_extract_results(&operation_metrics, &result);
+                    operation_metrics.success();
                     let log_result = match ctx.find_episode_record(&episode_id).await {
                         Ok((record, _)) => {
                             let episode = record.as_ref().and_then(episode_from_record);
@@ -229,4 +234,14 @@ pub async fn extract(
             Err(err)
         }
     }
+}
+
+fn record_extract_results(
+    metrics: &crate::observability::OperationMetrics,
+    result: &ExtractResult,
+) {
+    metrics.record_result("entities", result.entities.len());
+    metrics.record_result("facts", result.facts.len());
+    metrics.record_result("links", result.links.len());
+    metrics.record_result("warnings", result.warnings.len());
 }

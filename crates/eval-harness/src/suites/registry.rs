@@ -32,7 +32,6 @@ pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
         "capacity" => Box::new(CountReducer::new("capacity")),
         "poisoning" => Box::new(CountReducer::new("poisoning")),
         "lifecycle" => Box::new(RatioReducer::new("lifecycle", LIFECYCLE_SPECS)),
-        "downstream-qa" => Box::new(CountReducer::new("downstream-qa")),
         "response-size" => Box::new(ResponseSizeReducer::new("response-size")),
         other => ner_quality::reducer_for_suite(other)
             .unwrap_or_else(|| Box::new(CountReducer::new(other))),
@@ -68,9 +67,6 @@ pub fn build_suite(decl: &SuiteDecl) -> Result<Option<Box<dyn EvalSuite>>, EvalE
         ))),
         "lifecycle" => Ok(Some(Box::new(
             crate::suites::lifecycle::LifecycleReleaseSuite::new(),
-        ))),
-        "downstream-qa" => Ok(Some(Box::new(
-            crate::suites::downstream_qa::DownstreamQaSuite::new(),
         ))),
         "response-size" => Ok(Some(Box::new(
             crate::suites::response_size::ResponseSizeSuite::new()?,
@@ -130,7 +126,6 @@ mod tests {
             "capacity",
             "poisoning",
             "lifecycle",
-            "downstream-qa",
             "response-size",
             "ner-quality-anno",
             "ner-quality-regex",
@@ -174,7 +169,6 @@ mod tests {
             "capacity",
             "poisoning",
             "lifecycle",
-            "downstream-qa",
             "response-size",
         ] {
             let suite = build_suite(&decl(id)).unwrap().expect("suite builds");

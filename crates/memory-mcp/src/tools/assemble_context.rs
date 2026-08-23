@@ -24,6 +24,7 @@ pub async fn assemble_context(
     ctx: &ServiceContext,
     params: AssembleContextParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("assemble_context");
     let compact = params.compact;
     let as_of = if params.as_of.trim().is_empty() {
         None
@@ -67,6 +68,7 @@ pub async fn assemble_context(
                 Some(&request_id),
             );
             let count = results.len();
+            operation_metrics.record_result("items", count);
             // Under compact mode, omit `quote` and slim `rationale` via the
             // serde adapters reading the thread-local CompactGuard. The guard
             // is held across serialization; `value` contains the compact form.
@@ -75,6 +77,7 @@ pub async fn assemble_context(
                 serde_json::to_value(&results)
                     .map_err(|e| MemoryError::Transient(format!("serialize context items: {e}")))?
             };
+            operation_metrics.success();
             if compact {
                 Ok(ToolResponse::complete_list_compact(
                     value,

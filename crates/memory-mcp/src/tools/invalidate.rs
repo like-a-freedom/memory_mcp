@@ -19,6 +19,7 @@ pub async fn invalidate(
     ctx: &ServiceContext,
     params: InvalidateParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let mut operation_metrics = crate::observability::OperationMetrics::new("invalidate");
     let access = AccessPayload::default();
     let t_invalid = parse_datetime(&params.t_invalid).ok_or_else(|| {
         MemoryError::Validation(format!(
@@ -49,6 +50,8 @@ pub async fn invalidate(
 
     match InvalidateCapability::invalidate(ctx, request, Some(access)).await {
         Ok(()) => {
+            operation_metrics.record_result("invalidations", 1);
+            operation_metrics.success();
             ctx.log_tool_event_with_duration(
                 "invalidate.done",
                 json!({"fact_id": &fact_id}),

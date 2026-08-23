@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use eval_harness::cli::{self, Command};
 use eval_harness::{
@@ -25,6 +26,28 @@ async fn main() -> std::process::ExitCode {
             artifact,
             shards,
         } => cmd_merge(profile, artifact, shards),
+    }
+}
+
+struct StderrProgressReporter;
+
+impl eval_harness::ProgressReporter for StderrProgressReporter {
+    fn suite_started(&self, position: usize, total: usize, suite_id: &str, expected_cases: usize) {
+        eprintln!("suite {position}/{total}: {suite_id} started ({expected_cases} expected cases)");
+    }
+
+    fn suite_finished(
+        &self,
+        position: usize,
+        total: usize,
+        suite_id: &str,
+        outcome_count: usize,
+        elapsed: Duration,
+    ) {
+        eprintln!(
+            "suite {position}/{total}: {suite_id} finished ({outcome_count} cases, {} ms)",
+            elapsed.as_millis()
+        );
     }
 }
 
@@ -87,7 +110,9 @@ async fn cmd_run(
         suite_filter: suite_filter_set,
         issues,
     };
-    let result = runner.run(&request).await;
+    let result = runner
+        .run_with_progress(&request, &StderrProgressReporter)
+        .await;
 
     match result {
         Ok(art) => {

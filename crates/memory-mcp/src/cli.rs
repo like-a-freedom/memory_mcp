@@ -44,6 +44,8 @@ pub enum Command {
     Watch(args::WatchArgs),
     /// Rebuild all fact embeddings for the current embedding provider/model.
     Reembed(args::ReembedArgs),
+    /// Inspect and run lifecycle maintenance operations.
+    Lifecycle(args::LifecycleArgs),
     /// Print copy-paste configuration for an MCP host without changing files.
     Init(args::InitArgs),
     /// Store raw source material as an episode (source_type, source_id, content).
@@ -104,6 +106,7 @@ impl Command {
             Command::Serve => "serve",
             Command::Watch(_) => "watch",
             Command::Reembed(_) => "reembed",
+            Command::Lifecycle(_) => "cli.lifecycle",
             Command::Init(_) => "cli.init",
             Command::Ingest(_) => "cli.ingest",
             Command::Extract(_) => "cli.extract",
@@ -120,8 +123,8 @@ impl Command {
     ///
     /// Each runner captures its clap `*Args`, so `runner.rs` can build the
     /// service once and dispatch every one-shot subcommand through a single
-    /// code path. The four service modes (serve / watch / reembed / init)
-    /// return `None` and are dispatched before this is reached.
+    /// code path. The service modes (serve / watch / reembed / init) return
+    /// `None` and are dispatched before this is reached.
     pub fn into_one_shot(self) -> Option<OneShotRunner> {
         macro_rules! one_shot {
             ($runner:ident, $args:expr) => {
@@ -133,6 +136,7 @@ impl Command {
 
         match self {
             Command::Serve | Command::Watch(_) | Command::Reembed(_) | Command::Init(_) => None,
+            Command::Lifecycle(args) => one_shot!(run_lifecycle, args),
             Command::Ingest(args) => one_shot!(run_ingest, args),
             Command::Extract(args) => one_shot!(run_extract, args),
             Command::Resolve(args) => one_shot!(run_resolve, args),
@@ -142,5 +146,37 @@ impl Command {
             Command::LifecycleCapture(args) => one_shot!(run_lifecycle_capture, args),
             Command::LifecycleRecall(args) => one_shot!(run_lifecycle_recall, args),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lifecycle_subcommand_parses_typed_operation() {
+        let cli = Cli::try_parse_from(["memory_mcp", "lifecycle", "recompute-decay", "--dry-run"])
+            .expect("lifecycle command should parse");
+
+        let Some(Command::Lifecycle(args)) = cli.command else {
+            panic!("expected lifecycle command");
+        };
+        assert!(matches!(
+            args.operation,
+            args::LifecycleOperation::RecomputeDecay {
+                dry_run: true,
+                confirmed: false
+            }
+        ));
+    }
+
+    #[test]
+    fn lifecycle_command_is_one_shot_and_has_stable_mode_label() {
+        let cli = Cli::try_parse_from(["memory_mcp", "lifecycle", "dashboard"])
+            .expect("lifecycle command should parse");
+        let command = cli.command.expect("command");
+
+        assert_eq!(command.mode_label(), "cli.lifecycle");
+        assert!(command.into_one_shot().is_some());
     }
 }

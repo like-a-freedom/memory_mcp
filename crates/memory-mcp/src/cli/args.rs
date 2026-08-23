@@ -1,4 +1,4 @@
-use clap::Args;
+use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Debug, Args)]
@@ -123,6 +123,57 @@ pub struct ReembedArgs {
     /// Retry only facts that failed in a previous reembed run.
     #[arg(long)]
     pub retry_failed: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct LifecycleArgs {
+    #[command(subcommand)]
+    pub operation: LifecycleOperation,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum LifecycleOperation {
+    /// Show active-fact, archival-candidate, and community counts.
+    Dashboard,
+    /// Archive explicit episode IDs after confirmation.
+    ArchiveCandidates {
+        /// Episode IDs to archive.
+        #[arg(required = true)]
+        target_ids: Vec<String>,
+        /// Validate and report targets without changing storage.
+        #[arg(long)]
+        dry_run: bool,
+        /// Required for a mutating archive operation.
+        #[arg(long)]
+        confirmed: bool,
+    },
+    /// Restore explicit archived episode IDs after confirmation.
+    RestoreArchived {
+        /// Episode IDs to restore.
+        #[arg(required = true)]
+        target_ids: Vec<String>,
+        /// Required because restoration changes storage.
+        #[arg(long)]
+        confirmed: bool,
+    },
+    /// Run confidence-decay maintenance using configured lifecycle policy.
+    RecomputeDecay {
+        /// Report without invalidating facts.
+        #[arg(long)]
+        dry_run: bool,
+        /// Required for a mutating decay pass.
+        #[arg(long)]
+        confirmed: bool,
+    },
+    /// Rebuild derived communities from active graph edges.
+    RebuildCommunities {
+        /// Report without rebuilding communities.
+        #[arg(long)]
+        dry_run: bool,
+        /// Required for a mutating rebuild.
+        #[arg(long)]
+        confirmed: bool,
+    },
 }
 
 #[derive(Debug, Clone, Args)]
