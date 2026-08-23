@@ -131,7 +131,7 @@ pub struct LifecycleArgs {
     pub operation: LifecycleOperation,
 }
 
-#[derive(Debug, Clone, Subcommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
 pub enum LifecycleOperation {
     /// Show active-fact, archival-candidate, and community counts.
     Dashboard,

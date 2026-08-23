@@ -1,6 +1,6 @@
 # Truthful Evaluation System Design
 
-Status: Proposed for review  
+Status: Implemented — see ADR-0019, ADR-0020, and the current eval-harness profiles
 Date: 2026-07-28  
 Scope: evaluation architecture and migration planning; no production API changes
 
@@ -20,8 +20,10 @@ The priorities are:
 4. Results are reproducible, attributable to exact corpora and configuration,
    and useful for regression diagnosis.
 
-This document describes the target system. Implementation is intentionally
-deferred to separately reviewed plans.
+This document describes the implemented evaluation architecture. Delivery was
+completed through separately reviewed plans and the supporting ADRs listed below;
+new evaluation work should update those records rather than treating this spec
+as an unstarted proposal.
 
 ## 2. Evidence from the current system
 

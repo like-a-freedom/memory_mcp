@@ -18,6 +18,7 @@ pub use graph::edge_neighbor;
 #[cfg(feature = "mcp-apps")]
 pub use graph::graph_neighbor_expansion;
 pub use graph::graph_payload;
+pub(crate) use types::LifecycleOperation;
 pub use types::{
     ArchiveCandidatesOutcome, CommitIngestionReviewOutcome, CommitIngestionReviewRequest,
     DiffChange, DiffRequest, DiffSummary, DiffTarget, DiffView, DiffViewRange,

@@ -14,11 +14,13 @@ surface.
 ingest, extract, resolve, assemble_context, explain, invalidate, open_app, app_command
 ```
 
-Lifecycle integration adds no public MCP tool and no ordinary lifecycle CLI
-subcommand. The one output-only onboarding exception, `memory_mcp init`, is
-authorized by ADR-0030; it prints host configuration, does not build a service,
-and does not change the eight-tool MCP surface. Any future public-surface
-proposal requires a separate ADR and the evidence gate described in ADR-0016.
+Lifecycle integration adds no public MCP tool. The one output-only onboarding
+exception, `memory_mcp init`, is authorized by ADR-0030; it prints host
+configuration, does not build a service, and does not change the eight-tool MCP
+surface. Operator-only lifecycle maintenance is exposed through the ordinary
+CLI under ADR-0047 and is not part of the MCP tool surface. Any future
+public-surface proposal requires a separate ADR and the evidence gate described
+in ADR-0016.
 
 ## Module seams
 

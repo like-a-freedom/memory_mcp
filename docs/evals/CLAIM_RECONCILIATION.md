@@ -66,9 +66,11 @@ so denominators and pass rules are reproducible.
 
 Persisted relations are read through the feature-gated, read-only seam
 `memory_mcp::eval_support::ClaimEvidenceReader` (feature `eval-support`,
-disabled by default). It exposes immutable views over the `claim_relations`
-table only — no SurrealDB queries, no mutation, never reachable through MCP.
-Rows missing either source fact ID (pre-migration rows) are skipped.
+disabled by default). It performs a read-only query through the named Claim storage seam and exposes
+immutable views over the `claim_relations` table — no mutation, never reachable
+through MCP. The view carries the process-bound Active Namespace and the
+canonical v2 policy fingerprint derived from persisted policy tags. Rows missing
+either source fact ID (pre-migration rows) are skipped.
 
 ### Lineage mapping
 
@@ -96,10 +98,11 @@ Expected relations split by persistability:
 
 ### Negative boundaries (isolation)
 
-A violation is counted only when a persisted relation crosses the Active
-Namespace or the policy fingerprint. Different fact IDs inside a valid
-same-boundary relation are expected and are not violations. Missing boundary
-metadata makes the case `invalid`.
+A persisted relation matches only when both source fact IDs resolve to the same
+Active Namespace and policy-tag boundary, and the relation's projected metadata
+matches that boundary. Different fact IDs inside a valid same-boundary relation
+are expected and are not violations. Missing or mismatched persisted boundary
+metadata prevents persisted-quality matching.
 
 ### Confusion matrix and gate metrics
 
@@ -113,7 +116,9 @@ per-case pass condition layered on top of the warning gate.
 
 Per-case diagnostic metrics: `persisted_relations`,
 `matched_persisted_relations`, `self_lineage_relations`,
-`isolation_violations`, `unresolved_lineage`.
+`isolation_violations`, `persisted_isolation_violations`,
+`persisted_policy_mismatches`, `persisted_unresolved_lineage`, and
+`unresolved_lineage`.
 
 ## Promotion Gate
 

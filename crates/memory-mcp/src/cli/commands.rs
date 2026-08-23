@@ -1,5 +1,5 @@
-//! CLI command handlers — thin adapters that build `*Params` from clap `*Args`,
-//! delegate to `crate::tools::*`, and print `ToolResponse<T>` as JSON.
+//! CLI command handlers — thin adapters that build service inputs from clap
+//! `*Args`, delegate to the service layer, and print structured JSON responses.
 
 use std::io::Write;
 

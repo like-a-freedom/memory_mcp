@@ -1,6 +1,6 @@
 # Token-Efficient MCP Responses — Design Spec
 
-**Status:** Ready for implementation after user review
+**Status:** Implemented — validation recorded in ADR-0022
 **Date:** 2026-07-30
 **Scope:** Presentation-layer change on `assemble_context` and `explain` responses; no pipeline, ingestion, or storage changes.
 
@@ -20,7 +20,7 @@ Reduce JSON wire size for `assemble_context` and `explain` responses by targetin
 - Median `assemble_context` response ≤ 70% of current (verbose) byte count.
 - Median `explain` response ≤ 80% of current (verbose) byte count.
 
-Actual targets will be set by Phase B measurement data.
+Phase B measured a 39.5% mean byte reduction overall; ADR-0022 records the completed validation and the shipped defaults.
 
 ## 2. Approach
 
@@ -435,23 +435,19 @@ pub use response_size::ResponseSizeSuite;
 
 ### 5.5 Success criteria
 
-The actual byte-reduction percentages are measured, not guessed. The design targets (median `assemble_context` response <= 70% of verbose; median `explain` response <= 80%) will be confirmed or adjusted by Phase B data. If measured reductions are significantly below targets, the field-level decisions in 2.2 will be revisited.
+The byte-reduction percentages were measured rather than guessed. Phase B confirmed the target reductions; the measured results and quality-profile validation are recorded in ADR-0022.
 
-## 6. Phase C — Future ADR (default flip)
+## 6. Phase C — Completed default decision
 
-If Phase B data confirms target reductions, file a standalone ADR (`docs/adr/0022-compact-response-default-for-llm-consumers.md`) that:
-
-1. Records the measured byte reduction.
-2. Confirms `compact=true` as the shipped default.
-3. Documents the `compact=false` escape hatch for debugging.
-4. Sets a policy: `compact` is a presentation-layer concern; future fields that are debug-only or duplicate existing signal should be gated behind `compact=false`.
-
-Phase C is **deferred** — ship the code with `compact=true` as default, measure, then file the ADR with real data.
+Phase B confirmed the target reductions. ADR-0022 records the measured byte
+reduction, confirms `compact=true` as the shipped default, documents the
+`compact=false` debugging escape hatch, and establishes the presentation-layer
+policy for future duplicate or debug-only fields.
 
 ## 7. Constraints and Guardrails
 
-- **v5 bench quality MUST NOT regress.** Run `cargo run -p eval-harness -- run --profile evals/profiles/pr.json --artifact target/evals/v6-pr.json` (and release, nightly) before claiming done. All 17 gates must pass with identical observed values.
-- **Pipeline perf MUST NOT regress.** Run `cargo bench -p memory_mcp --bench pipeline` before and after. The `compact` flag is serialization-only and should have zero impact on pipeline latency — confirm.
+- **v5 bench quality MUST NOT regress.** The completed PR, Release, and Nightly validation is recorded in ADR-0022; rerun those profiles before changing this contract.
+- **Pipeline perf MUST NOT regress.** The completed pipeline benchmark is recorded in ADR-0022; rerun it before changing serialization behavior. The `compact` flag is serialization-only.
 - **No new dependencies.** `serde` skip annotations and a thread-local are standard library.
 - **No new tool.** `compact` is a parameter. 8-tool surface is frozen.
 - **`has_more: false` omission is spec-compliant.** MCP tool responses use JSON; absent boolean fields default to `false` in consumer parsing.
@@ -475,8 +471,8 @@ Phase C is **deferred** — ship the code with `compact=true` as default, measur
 | Artifact | Path | Purpose |
 |----------|------|---------|
 | Design spec | `docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md` | This document |
-| Implementation plan | `docs/superpowers/plans/2026-07-30-token-efficient-responses.md` | Step-by-step implementation |
-| ADR (deferred) | `docs/adr/0022-compact-response-default-for-llm-consumers.md` | Records the default decision with data |
+| Implementation and validation record | `docs/adr/0022-compact-response-default-for-llm-consumers.md` | Accepted decision and measured validation |
+| Response-size profile | `evals/profiles/response_size.json` | Gate-free measurement of compact versus verbose output |
 | New param types | `crates/memory-mcp/src/tools/params.rs` | `compact` field on `AssembleContextParams`, `ExplainParams` |
 | New request fields | `crates/memory-mcp/src/models/request.rs` | `compact` field on `AssembleContextRequest`, `ExplainRequest` |
 | Compact module | `crates/memory-mcp/src/tools/compact.rs` | Thread-local `CompactGuard`, `skip_if_compact`, `serialize_rationale` |
@@ -484,7 +480,7 @@ Phase C is **deferred** — ship the code with `compact=true` as default, measur
 | Updated tool handlers | `crates/memory-mcp/src/tools/{assemble_context,explain}.rs` | Plumb `compact`, wrap serialization, return `Value` |
 | Updated envelope | `crates/memory-mcp/src/tools/response.rs` | `complete_list_compact` constructor |
 | Updated MCP handler | `crates/memory-mcp/src/mcp/handlers.rs` | Accept `Value` from `assemble_context`/`explain` tools |
-| New eval profile | `evals/profiles/response_size.json` | Measurement-only profile |
+
 | New eval suite | `crates/eval-harness/src/suites/response_size.rs` | Byte-size measurement |
 | Updated eval main | `crates/eval-harness/src/main.rs` | Register `response-size` suite |
 | Updated eval suites | `crates/eval-harness/src/suites.rs` | Module declaration |

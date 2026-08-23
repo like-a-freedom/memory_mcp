@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::error::MemoryError;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrepareIngestionReviewRequest {
     pub source_text: Option<String>,
@@ -154,6 +156,45 @@ pub struct RebuildCommunitiesOutcome {
     pub rebuilt: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LifecycleOperation {
+    ArchiveCandidates,
+    RestoreArchived,
+    RecomputeDecay,
+    RebuildCommunities,
+}
+
+impl LifecycleOperation {
+    /// Enforce the confirmation policy shared by every lifecycle adapter.
+    pub(crate) fn validate_confirmation(
+        self,
+        dry_run: bool,
+        confirmed: bool,
+    ) -> Result<(), MemoryError> {
+        let dry_run_allowed = !matches!(self, Self::RestoreArchived);
+        if confirmed || (dry_run_allowed && dry_run) {
+            return Ok(());
+        }
+
+        let operation = self.action_name();
+        let message = if dry_run_allowed {
+            format!("{operation} requires `confirmed=true` unless `dry_run=true`")
+        } else {
+            format!("{operation} requires `confirmed=true`")
+        };
+        Err(MemoryError::Validation(message))
+    }
+
+    const fn action_name(self) -> &'static str {
+        match self {
+            Self::ArchiveCandidates => "archive_candidates",
+            Self::RestoreArchived => "restore_archived",
+            Self::RecomputeDecay => "recompute_decay",
+            Self::RebuildCommunities => "rebuild_communities",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LifecycleCommand {
     ArchiveCandidates {
@@ -208,5 +249,45 @@ impl IngestionReviewSummary {
             edited,
             committable: approved + edited,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn confirmation_policy_allows_only_explicit_mutations_or_supported_dry_runs() {
+        assert!(
+            LifecycleOperation::ArchiveCandidates
+                .validate_confirmation(false, true)
+                .is_ok()
+        );
+        assert!(
+            LifecycleOperation::RecomputeDecay
+                .validate_confirmation(true, false)
+                .is_ok()
+        );
+        assert!(
+            LifecycleOperation::RebuildCommunities
+                .validate_confirmation(true, false)
+                .is_ok()
+        );
+
+        let archive_error = LifecycleOperation::ArchiveCandidates
+            .validate_confirmation(false, false)
+            .expect_err("archive mutation must require confirmation");
+        assert_eq!(
+            archive_error.to_string(),
+            "validation error: archive_candidates requires `confirmed=true` unless `dry_run=true`"
+        );
+
+        let restore_error = LifecycleOperation::RestoreArchived
+            .validate_confirmation(true, false)
+            .expect_err("restore has no dry-run mode");
+        assert_eq!(
+            restore_error.to_string(),
+            "validation error: restore_archived requires `confirmed=true`"
+        );
     }
 }

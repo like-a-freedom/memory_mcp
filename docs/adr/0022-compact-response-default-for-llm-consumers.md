@@ -2,7 +2,7 @@
 
 > **Status:** Accepted (2026-07-30)
 > **Date:** 2026-07-30
-> **Related:** [Design Spec](../superpowers/specs/2026-07-30-token-efficient-responses-design.md); completed by [2026-07-30 Architecture Hardening plan](../superpowers/plans/2026-07-30-architecture-hardening.md)
+> **Related:** [Design Spec](../superpowers/specs/2026-07-30-token-efficient-responses-design.md) and the validated `response-size` profile (`evals/profiles/response_size.json`)
 
 ## Context
 

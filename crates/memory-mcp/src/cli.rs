@@ -20,8 +20,9 @@ pub use runtime::{
 /// `memory_mcp` command-line interface.
 ///
 /// With no subcommand (or with `serve`), runs the stdio MCP server.
-/// Every other subcommand is a one-shot tool invocation that prints
-/// `ToolResponse<T>` as pretty JSON to stdout.
+/// One-shot memory-operation subcommands print `ToolResponse<T>` as pretty JSON
+/// to stdout. The lifecycle command uses its documented operation/result
+/// envelope; operational modes and `init` have their own output contracts.
 #[derive(Debug, Parser)]
 #[command(
     name = "memory_mcp",
@@ -168,6 +169,51 @@ mod tests {
                 confirmed: false
             }
         ));
+    }
+
+    #[test]
+    fn lifecycle_parser_covers_every_typed_operation() {
+        let cases = [
+            (
+                ["archive-candidates", "episode:test", "--dry-run"].as_slice(),
+                args::LifecycleOperation::ArchiveCandidates {
+                    target_ids: vec!["episode:test".to_string()],
+                    dry_run: true,
+                    confirmed: false,
+                },
+            ),
+            (
+                ["restore-archived", "episode:test", "--confirmed"].as_slice(),
+                args::LifecycleOperation::RestoreArchived {
+                    target_ids: vec!["episode:test".to_string()],
+                    confirmed: true,
+                },
+            ),
+            (
+                ["recompute-decay", "--dry-run"].as_slice(),
+                args::LifecycleOperation::RecomputeDecay {
+                    dry_run: true,
+                    confirmed: false,
+                },
+            ),
+            (
+                ["rebuild-communities", "--dry-run"].as_slice(),
+                args::LifecycleOperation::RebuildCommunities {
+                    dry_run: true,
+                    confirmed: false,
+                },
+            ),
+        ];
+
+        for (operation_args, expected) in cases {
+            let mut argv = vec!["memory_mcp", "lifecycle"];
+            argv.extend(operation_args);
+            let cli = Cli::try_parse_from(argv).expect("lifecycle operation should parse");
+            let Some(Command::Lifecycle(parsed)) = cli.command else {
+                panic!("expected lifecycle command");
+            };
+            assert_eq!(parsed.operation, expected);
+        }
     }
 
     #[test]

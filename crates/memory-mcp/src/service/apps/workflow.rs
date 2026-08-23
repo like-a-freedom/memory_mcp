@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use super::types::LifecycleCommand;
+use super::types::{LifecycleCommand, LifecycleOperation};
 use crate::service::MemoryError;
 
 /// Protocol-neutral input used to classify an app command.
@@ -95,15 +95,6 @@ impl AppCommand {
                 Ok(())
             }
         };
-        let require_confirmed = || {
-            if !input.dry_run && !input.confirmed {
-                Err(MemoryError::Validation(format!(
-                    "{action} requires `confirmed=true` unless `dry_run=true`"
-                )))
-            } else {
-                Ok(())
-            }
-        };
 
         match action {
             "approve_items" | "approve_ingestion_items" => {
@@ -156,7 +147,8 @@ impl AppCommand {
                         "`target_ids` is required for archive_candidates".to_string(),
                     ));
                 }
-                require_confirmed()?;
+                LifecycleOperation::ArchiveCandidates
+                    .validate_confirmation(input.dry_run, input.confirmed)?;
                 Ok(Self::Lifecycle(LifecycleCommand::ArchiveCandidates {
                     target_ids: input.target_ids,
                     dry_run: input.dry_run,
@@ -170,11 +162,8 @@ impl AppCommand {
                         "`target_ids` is required for restore_archived".to_string(),
                     ));
                 }
-                if !input.confirmed {
-                    return Err(MemoryError::Validation(
-                        "restore_archived requires `confirmed=true`".to_string(),
-                    ));
-                }
+                LifecycleOperation::RestoreArchived
+                    .validate_confirmation(false, input.confirmed)?;
                 Ok(Self::Lifecycle(LifecycleCommand::RestoreArchived {
                     target_ids: input.target_ids,
                     confirmed: input.confirmed,
@@ -182,7 +171,8 @@ impl AppCommand {
             }
             "recompute_decay" => {
                 require_app("lifecycle")?;
-                require_confirmed()?;
+                LifecycleOperation::RecomputeDecay
+                    .validate_confirmation(input.dry_run, input.confirmed)?;
                 Ok(Self::Lifecycle(LifecycleCommand::RecomputeDecay {
                     dry_run: input.dry_run,
                     confirmed: input.confirmed,
@@ -190,7 +180,8 @@ impl AppCommand {
             }
             "rebuild_communities" => {
                 require_app("lifecycle")?;
-                require_confirmed()?;
+                LifecycleOperation::RebuildCommunities
+                    .validate_confirmation(input.dry_run, input.confirmed)?;
                 Ok(Self::Lifecycle(LifecycleCommand::RebuildCommunities {
                     dry_run: input.dry_run,
                     confirmed: input.confirmed,

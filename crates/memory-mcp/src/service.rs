@@ -74,6 +74,7 @@ pub(crate) mod value_helpers;
 #[cfg(test)]
 pub mod mock_db;
 
+pub(crate) use apps::LifecycleOperation;
 pub(crate) use lifecycle::LifecyclePolicy;
 
 #[cfg(test)]

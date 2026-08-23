@@ -3,6 +3,8 @@ use serde_json::json;
 
 #[cfg(feature = "mcp-apps")]
 use super::types::{LifecycleCommand, LifecycleCommandOutcome};
+#[cfg(feature = "mcp-apps")]
+use crate::service::LifecycleOperation;
 use crate::service::{
     ArchiveCandidatesOutcome, LifecycleDashboard, LifecycleDefaults, LifecycleView, MemoryError,
     RebuildCommunitiesOutcome, RecomputeDecayOutcome, RestoreArchivedOutcome,
@@ -25,11 +27,7 @@ pub(crate) async fn execute_lifecycle_command(
                     "archive_candidates requires at least one target id".to_string(),
                 ));
             }
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "archive_candidates requires confirmed=true unless dry_run=true".to_string(),
-                ));
-            }
+            LifecycleOperation::ArchiveCandidates.validate_confirmation(dry_run, confirmed)?;
             Ok(LifecycleCommandOutcome::ArchiveCandidates(
                 service.archive_candidates(&target_ids, dry_run).await?,
             ))
@@ -43,31 +41,19 @@ pub(crate) async fn execute_lifecycle_command(
                     "restore_archived requires at least one target id".to_string(),
                 ));
             }
-            if !confirmed {
-                return Err(MemoryError::Validation(
-                    "restore_archived requires confirmed=true".to_string(),
-                ));
-            }
+            LifecycleOperation::RestoreArchived.validate_confirmation(false, confirmed)?;
             Ok(LifecycleCommandOutcome::RestoreArchived(
                 service.restore_archived(&target_ids).await?,
             ))
         }
         LifecycleCommand::RecomputeDecay { dry_run, confirmed } => {
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "recompute_decay requires confirmed=true unless dry_run=true".to_string(),
-                ));
-            }
+            LifecycleOperation::RecomputeDecay.validate_confirmation(dry_run, confirmed)?;
             Ok(LifecycleCommandOutcome::RecomputeDecay(
                 service.recompute_decay(dry_run).await?,
             ))
         }
         LifecycleCommand::RebuildCommunities { dry_run, confirmed } => {
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "rebuild_communities requires confirmed=true unless dry_run=true".to_string(),
-                ));
-            }
+            LifecycleOperation::RebuildCommunities.validate_confirmation(dry_run, confirmed)?;
             Ok(LifecycleCommandOutcome::RebuildCommunities(
                 service.rebuild_communities(dry_run).await?,
             ))

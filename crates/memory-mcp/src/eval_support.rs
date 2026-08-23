@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::models::claim::{ClaimRelation, ClaimRelationOutcome};
+use crate::models::claim::{ClaimRelation, ClaimRelationOutcome, PolicyFingerprint};
 use crate::storage::DbClient;
 use crate::storage::claims::ClaimStore;
 use crate::storage::claims::{RelationsForFactsQuery, SurrealClaimStore};
@@ -95,10 +95,12 @@ pub fn classify_isolation_violation(
 }
 
 /// Read-only, feature-gated evidence seam over persisted claim relations
-/// (eval-v2-closure Task 2). Exposes immutable evaluation views only — no
-/// SurrealDB queries, no mutation, and never reachable through MCP.
+/// (eval-v2-closure Task 2). It performs a read-only storage query, then
+/// exposes immutable evaluation views only — no mutation and never reachable
+/// through MCP.
 pub struct ClaimEvidenceReader {
     store: SurrealClaimStore,
+    namespace: String,
 }
 
 /// Persisted evidence for a set of fact IDs.
@@ -109,8 +111,10 @@ pub struct PersistedClaimEvidence {
 
 impl ClaimEvidenceReader {
     pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+        let namespace = namespace.into();
         Self {
-            store: SurrealClaimStore::new(db, namespace),
+            store: SurrealClaimStore::new(db, namespace.clone()),
+            namespace,
         }
     }
 
@@ -131,14 +135,17 @@ impl ClaimEvidenceReader {
             .select_relations_for_facts(RelationsForFactsQuery { fact_ids: &ids })
             .await?;
         Ok(PersistedClaimEvidence {
-            relations: relations.iter().filter_map(evaluated_relation).collect(),
+            relations: relations
+                .iter()
+                .filter_map(|relation| evaluated_relation(relation, &self.namespace))
+                .collect(),
         })
     }
 }
 
 /// Projects a persisted relation onto the evaluation view. Relations without
 /// both source fact IDs (pre-migration rows) are skipped.
-fn evaluated_relation(rel: &ClaimRelation) -> Option<EvaluatedRelation> {
+fn evaluated_relation(rel: &ClaimRelation, namespace: &str) -> Option<EvaluatedRelation> {
     let left_fact_id = rel.left_fact_id.as_ref()?.as_ref().to_string();
     let right_fact_id = rel.right_fact_id.as_ref()?.as_ref().to_string();
     Some(EvaluatedRelation {
@@ -147,8 +154,10 @@ fn evaluated_relation(rel: &ClaimRelation) -> Option<EvaluatedRelation> {
         right_fact_id,
         outcome: rel.outcome,
         reason_code: rel.reason_code.clone(),
-        namespace: String::new(),
-        policy_fingerprint: rel.policy_tags.join(","),
+        namespace: namespace.to_string(),
+        policy_fingerprint: PolicyFingerprint::compute_v2(&rel.policy_tags)
+            .as_str()
+            .to_string(),
     })
 }
 
@@ -210,5 +219,64 @@ mod tests {
         assert_eq!(map.fact_ids("setup-1").len(), 1);
         assert!(map.fact_ids("setup-1").contains("fact:old"));
         assert!(map.fact_ids("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn evaluated_relation_preserves_active_boundary_metadata() {
+        let relation: ClaimRelation = serde_json::from_value(serde_json::json!({
+            "claim_relation_id": "claim_relation:test",
+            "left_claim_id": "claim:left",
+            "right_claim_id": "claim:right",
+            "pair_fingerprint": "pair",
+            "outcome": "contradiction",
+            "predecessor_claim_id": null,
+            "successor_claim_id": null,
+            "reason_code": "contradiction",
+            "evidence": {"reason_code": "contradiction", "description": null},
+            "evaluator_version": "test",
+            "context_fingerprint": "ctx",
+            "evaluated_at": "2026-08-23T00:00:00Z",
+            "supersedes_relation_id": null,
+            "policy_tags": ["private", "source:chat"],
+            "t_ingested": "2026-08-23T00:00:00Z",
+            "t_invalid_ingested": null,
+            "left_fact_id": "fact:left",
+            "right_fact_id": "fact:right"
+        }))
+        .expect("relation fixture should deserialize");
+
+        let evaluated = evaluated_relation(&relation, "main").expect("fact lineage is present");
+        assert_eq!(evaluated.namespace, "main");
+        assert_eq!(
+            evaluated.policy_fingerprint,
+            PolicyFingerprint::compute_v2(&["private".into(), "source:chat".into()]).as_str()
+        );
+    }
+
+    #[test]
+    fn evaluated_relation_skips_incomplete_fact_lineage() {
+        let relation: ClaimRelation = serde_json::from_value(serde_json::json!({
+            "claim_relation_id": "claim_relation:test",
+            "left_claim_id": "claim:left",
+            "right_claim_id": "claim:right",
+            "pair_fingerprint": "pair",
+            "outcome": "contradiction",
+            "predecessor_claim_id": null,
+            "successor_claim_id": null,
+            "reason_code": "contradiction",
+            "evidence": {"reason_code": "contradiction", "description": null},
+            "evaluator_version": "test",
+            "context_fingerprint": "ctx",
+            "evaluated_at": "2026-08-23T00:00:00Z",
+            "supersedes_relation_id": null,
+            "policy_tags": [],
+            "t_ingested": "2026-08-23T00:00:00Z",
+            "t_invalid_ingested": null,
+            "left_fact_id": "fact:left",
+            "right_fact_id": null
+        }))
+        .expect("relation fixture should deserialize");
+
+        assert!(evaluated_relation(&relation, "main").is_none());
     }
 }

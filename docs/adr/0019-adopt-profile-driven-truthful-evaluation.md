@@ -75,7 +75,9 @@ rather than creating a new lifecycle decision.
 - Baseline updates, threshold changes, and frozen test-split changes require
   review and before/after artifacts.
 - Downstream reader QA remains a separate diagnostic until its model, prompt,
-  parameters, provider version, and evaluator are pinned.
+  parameters, provider version, and evaluator are pinned. The former unpinned
+  placeholder suite is not registered; a pinned implementation may be added as
+  a new decision-backed suite later.
 
 ## Alternatives Considered
 

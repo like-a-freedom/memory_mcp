@@ -1184,7 +1184,7 @@ memory_mcp assemble-context \
 # Inspect lifecycle state
 memory_mcp lifecycle dashboard
 
-# Run a confirmed dry-run archival selection
+# Run a dry-run archival selection without changing storage
 memory_mcp lifecycle archive-candidates episode:old-1 \
   --dry-run
 

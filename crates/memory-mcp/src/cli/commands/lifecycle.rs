@@ -8,9 +8,17 @@ use serde_json::json;
 
 use crate::cli::args::{LifecycleArgs, LifecycleOperation};
 use crate::cli::commands::write_response;
-use crate::service::{MemoryError, MemoryService};
+use crate::service::{LifecycleOperation as ServiceLifecycleOperation, MemoryError, MemoryService};
 
 pub async fn run(service: &MemoryService, args: LifecycleArgs) -> Result<(), MemoryError> {
+    let response = build_response(service, args).await?;
+    write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))
+}
+
+async fn build_response(
+    service: &MemoryService,
+    args: LifecycleArgs,
+) -> Result<serde_json::Value, MemoryError> {
     let response = match args.operation {
         LifecycleOperation::Dashboard => json!({
             "operation": "dashboard",
@@ -21,11 +29,8 @@ pub async fn run(service: &MemoryService, args: LifecycleArgs) -> Result<(), Mem
             dry_run,
             confirmed,
         } => {
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "archive-candidates requires --confirmed unless --dry-run is set".into(),
-                ));
-            }
+            ServiceLifecycleOperation::ArchiveCandidates
+                .validate_confirmation(dry_run, confirmed)?;
             json!({
                 "operation": "archive_candidates",
                 "result": service.archive_candidates(&target_ids, dry_run).await?,
@@ -35,33 +40,22 @@ pub async fn run(service: &MemoryService, args: LifecycleArgs) -> Result<(), Mem
             target_ids,
             confirmed,
         } => {
-            if !confirmed {
-                return Err(MemoryError::Validation(
-                    "restore-archived requires --confirmed".into(),
-                ));
-            }
+            ServiceLifecycleOperation::RestoreArchived.validate_confirmation(false, confirmed)?;
             json!({
                 "operation": "restore_archived",
                 "result": service.restore_archived(&target_ids).await?,
             })
         }
         LifecycleOperation::RecomputeDecay { dry_run, confirmed } => {
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "recompute-decay requires --confirmed unless --dry-run is set".into(),
-                ));
-            }
+            ServiceLifecycleOperation::RecomputeDecay.validate_confirmation(dry_run, confirmed)?;
             json!({
                 "operation": "recompute_decay",
                 "result": service.recompute_decay(dry_run).await?,
             })
         }
         LifecycleOperation::RebuildCommunities { dry_run, confirmed } => {
-            if !dry_run && !confirmed {
-                return Err(MemoryError::Validation(
-                    "rebuild-communities requires --confirmed unless --dry-run is set".into(),
-                ));
-            }
+            ServiceLifecycleOperation::RebuildCommunities
+                .validate_confirmation(dry_run, confirmed)?;
             json!({
                 "operation": "rebuild_communities",
                 "result": service.rebuild_communities(dry_run).await?,
@@ -69,7 +63,7 @@ pub async fn run(service: &MemoryService, args: LifecycleArgs) -> Result<(), Mem
         }
     };
 
-    write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -88,23 +82,93 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mutating_operations_require_confirmation() {
+    async fn every_mutating_operation_requires_confirmation() {
         let service = service();
-
-        let result = run(
-            &service,
-            LifecycleArgs {
-                operation: LifecycleOperation::RecomputeDecay {
+        let cases = [
+            (
+                LifecycleOperation::ArchiveCandidates {
+                    target_ids: vec!["episode:test".to_string()],
                     dry_run: false,
                     confirmed: false,
                 },
-            },
-        )
-        .await;
+                "archive_candidates requires `confirmed=true` unless `dry_run=true`",
+            ),
+            (
+                LifecycleOperation::RestoreArchived {
+                    target_ids: vec!["episode:test".to_string()],
+                    confirmed: false,
+                },
+                "restore_archived requires `confirmed=true`",
+            ),
+            (
+                LifecycleOperation::RecomputeDecay {
+                    dry_run: false,
+                    confirmed: false,
+                },
+                "recompute_decay requires `confirmed=true` unless `dry_run=true`",
+            ),
+            (
+                LifecycleOperation::RebuildCommunities {
+                    dry_run: false,
+                    confirmed: false,
+                },
+                "rebuild_communities requires `confirmed=true` unless `dry_run=true`",
+            ),
+        ];
 
-        assert!(
-            matches!(result, Err(MemoryError::Validation(message)) if message.contains("--confirmed"))
-        );
+        for (operation, expected_message) in cases {
+            let result = run(&service, LifecycleArgs { operation }).await;
+            assert!(matches!(
+                result,
+                Err(MemoryError::Validation(message)) if message == expected_message
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn successful_operations_use_operation_result_envelopes() {
+        let service = service();
+        let cases = [
+            (LifecycleOperation::Dashboard, "dashboard"),
+            (
+                LifecycleOperation::ArchiveCandidates {
+                    target_ids: vec!["episode:test".to_string()],
+                    dry_run: true,
+                    confirmed: false,
+                },
+                "archive_candidates",
+            ),
+            (
+                LifecycleOperation::RestoreArchived {
+                    target_ids: vec!["episode:test".to_string()],
+                    confirmed: true,
+                },
+                "restore_archived",
+            ),
+            (
+                LifecycleOperation::RecomputeDecay {
+                    dry_run: true,
+                    confirmed: false,
+                },
+                "recompute_decay",
+            ),
+            (
+                LifecycleOperation::RebuildCommunities {
+                    dry_run: true,
+                    confirmed: false,
+                },
+                "rebuild_communities",
+            ),
+        ];
+
+        for (operation, expected_operation) in cases {
+            let response = build_response(&service, LifecycleArgs { operation })
+                .await
+                .expect("lifecycle operation should succeed");
+            assert_eq!(response["operation"], expected_operation);
+            assert!(response["result"].is_object());
+            assert_eq!(response.as_object().map(|object| object.len()), Some(2));
+        }
     }
 
     #[tokio::test]

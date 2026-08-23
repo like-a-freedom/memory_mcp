@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use memory_mcp::models::claim::PolicyFingerprint;
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
 use memory_mcp::service::capabilities::extract::ExtractCapability;
 use memory_mcp::service::capabilities::ingest::IngestCapability;
@@ -137,6 +138,14 @@ enum WarningLabel {
     UnresolvedLineage,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PersistedBoundaryLabel {
+    Valid,
+    IsolationViolation,
+    PolicyMismatch,
+    UnresolvedLineage,
+}
+
 fn classify_warning(
     expected_relations: &[ExpectedRelation],
     lineage: &std::collections::BTreeMap<String, BTreeSet<String>>,
@@ -255,6 +264,44 @@ struct CaseMetrics {
     predicted_warnings: usize,
     isolation_violations: usize,
     unresolved_lineage: usize,
+}
+
+fn classify_persisted_relation_boundary(
+    actual: &memory_mcp::eval_support::EvaluatedRelation,
+    boundaries: &BTreeMap<String, BoundaryKey>,
+) -> PersistedBoundaryLabel {
+    let Some(left) = boundaries.get(&actual.left_fact_id) else {
+        return PersistedBoundaryLabel::UnresolvedLineage;
+    };
+    let Some(right) = boundaries.get(&actual.right_fact_id) else {
+        return PersistedBoundaryLabel::UnresolvedLineage;
+    };
+
+    // A persisted relation is valid only when both source facts belong to the
+    // same Active Namespace and active policy identity. The relation worker
+    // already enforces this through the v2 slot fingerprint; this check makes
+    // the persisted-evidence contract independently observable.
+    if left.namespace != right.namespace || actual.namespace != left.namespace {
+        return PersistedBoundaryLabel::IsolationViolation;
+    }
+    if left.policy_tags != right.policy_tags
+        || actual.policy_fingerprint != policy_fingerprint(&left.policy_tags)
+    {
+        return PersistedBoundaryLabel::PolicyMismatch;
+    }
+    PersistedBoundaryLabel::Valid
+}
+
+fn persisted_relation_matches_boundary(
+    actual: &memory_mcp::eval_support::EvaluatedRelation,
+    boundaries: &BTreeMap<String, BoundaryKey>,
+) -> bool {
+    classify_persisted_relation_boundary(actual, boundaries) == PersistedBoundaryLabel::Valid
+}
+
+fn policy_fingerprint(tags: &BTreeSet<String>) -> String {
+    let ordered: Vec<String> = tags.iter().cloned().collect();
+    PolicyFingerprint::compute_v2(&ordered).as_str().to_string()
 }
 
 fn matches_persisted_relation_by_lineage(
@@ -604,7 +651,29 @@ impl EvalSuite for ClaimReconciliationSuite {
                 .filter(|expected| {
                     persisted_relations.iter().any(|actual| {
                         matches_persisted_relation_by_lineage(expected, actual, &lineage)
+                            && persisted_relation_matches_boundary(actual, &boundaries)
                     })
+                })
+                .count();
+            let persisted_isolation_violations = persisted_relations
+                .iter()
+                .filter(|actual| {
+                    classify_persisted_relation_boundary(actual, &boundaries)
+                        == PersistedBoundaryLabel::IsolationViolation
+                })
+                .count();
+            let persisted_policy_mismatches = persisted_relations
+                .iter()
+                .filter(|actual| {
+                    classify_persisted_relation_boundary(actual, &boundaries)
+                        == PersistedBoundaryLabel::PolicyMismatch
+                })
+                .count();
+            let persisted_unresolved_lineage = persisted_relations
+                .iter()
+                .filter(|actual| {
+                    classify_persisted_relation_boundary(actual, &boundaries)
+                        == PersistedBoundaryLabel::UnresolvedLineage
                 })
                 .count();
 
@@ -642,6 +711,18 @@ impl EvalSuite for ClaimReconciliationSuite {
                 metrics_result.isolation_violations as f64,
             );
             metric_map.insert(
+                "persisted_isolation_violations".into(),
+                persisted_isolation_violations as f64,
+            );
+            metric_map.insert(
+                "persisted_policy_mismatches".into(),
+                persisted_policy_mismatches as f64,
+            );
+            metric_map.insert(
+                "persisted_unresolved_lineage".into(),
+                persisted_unresolved_lineage as f64,
+            );
+            metric_map.insert(
                 "unresolved_lineage".into(),
                 metrics_result.unresolved_lineage as f64,
             );
@@ -654,6 +735,9 @@ impl EvalSuite for ClaimReconciliationSuite {
             let case_invalid = metrics_result.unresolved_lineage > 0;
             let case_passed = !case_invalid
                 && metrics_result.isolation_violations == 0
+                && persisted_isolation_violations == 0
+                && persisted_policy_mismatches == 0
+                && persisted_unresolved_lineage == 0
                 && exact_claim_quality
                 && persisted_quality;
 
@@ -695,11 +779,14 @@ impl EvalSuite for ClaimReconciliationSuite {
                 }),
                 failures: if !case_passed && !case_invalid {
                     vec![format!(
-                        "claim_quality mismatch: expected={}, matched={}, predicted={}, isolation_violations={}, persisted={}, matched_persisted={}, self_lineage={}",
+                        "claim_quality mismatch: expected={}, matched={}, predicted={}, isolation_violations={}, persisted_isolation_violations={}, persisted_policy_mismatches={}, persisted_unresolved_lineage={}, persisted={}, matched_persisted={}, self_lineage={}",
                         metrics_result.expected_contradictions,
                         metrics_result.matched_warnings,
                         metrics_result.predicted_warnings,
                         metrics_result.isolation_violations,
+                        persisted_isolation_violations,
+                        persisted_policy_mismatches,
+                        persisted_unresolved_lineage,
                         persisted_relations.len(),
                         matched_persisted,
                         self_lineage_relations,
@@ -801,6 +888,38 @@ mod tests {
         assert!(!matches_expected_relation_by_lineage(
             &expected, &actual, &lineage
         ));
+    }
+
+    #[test]
+    fn persisted_relation_requires_exact_boundary_metadata() {
+        let boundaries = same_boundary_boundaries();
+        let mut actual = memory_mcp::eval_support::EvaluatedRelation {
+            relation_id: "relation:test".into(),
+            left_fact_id: "fact:old".into(),
+            right_fact_id: "fact:new".into(),
+            outcome: memory_mcp::models::claim::ClaimRelationOutcome::Contradiction,
+            reason_code: "contradiction".into(),
+            namespace: test_support::ACTIVE_NAMESPACE.into(),
+            policy_fingerprint: policy_fingerprint(&BTreeSet::new()),
+        };
+
+        assert!(persisted_relation_matches_boundary(&actual, &boundaries));
+
+        actual.namespace = "other".into();
+        assert_eq!(
+            classify_persisted_relation_boundary(&actual, &boundaries),
+            PersistedBoundaryLabel::IsolationViolation
+        );
+        assert!(!persisted_relation_matches_boundary(&actual, &boundaries));
+
+        actual.namespace = test_support::ACTIVE_NAMESPACE.into();
+        actual.policy_fingerprint =
+            policy_fingerprint(&["private".to_string()].into_iter().collect());
+        assert_eq!(
+            classify_persisted_relation_boundary(&actual, &boundaries),
+            PersistedBoundaryLabel::PolicyMismatch
+        );
+        assert!(!persisted_relation_matches_boundary(&actual, &boundaries));
     }
 
     #[test]

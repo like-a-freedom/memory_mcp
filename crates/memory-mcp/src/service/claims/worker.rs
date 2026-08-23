@@ -296,7 +296,11 @@ async fn reconcile_page_with_owning(
                     supersedes_relation_id: None,
                     scope: owning.scope.clone(),
                     project: owning.project.clone(),
-                    policy_tags: vec![],
+                    // Relations are evaluated within one slot, whose v2 identity
+                    // already includes the active policy tags. Preserve those
+                    // tags as persisted evidence instead of reconstructing them
+                    // from legacy partition fields during evaluation.
+                    policy_tags: owning.policy_tags.clone(),
                     t_ingested: chrono::Utc::now(),
                     t_invalid_ingested: None,
                     schema_family: Some(owning.schema_family),
@@ -376,4 +380,163 @@ async fn reconcile_page_with_owning(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use async_trait::async_trait;
+
+    use super::super::projection::{ClaimService, FactPersistedParams};
+    use crate::config::claims::{ClaimConfig, ClaimRolloutStage};
+    use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ClaimRelationOutcome};
+    use crate::models::{EpisodeId, FactId};
+    use crate::service::MemoryError;
+    use crate::storage::claims::{
+        ActiveRelationCount, BackfillFactQuery, ClaimCandidateQuery, ClaimStore,
+        ClaimsForFactsQuery, CommitReconciliationPageRequest, LeaseJobRequest,
+        PersistProjectionRequest, RelationsForFactsQuery, RetractFactAndClaimsRequest,
+    };
+
+    #[derive(Default)]
+    struct RecordingClaimStore {
+        claims: Mutex<Vec<Claim>>,
+        relations: Mutex<Vec<ClaimRelation>>,
+    }
+
+    #[async_trait]
+    impl ClaimStore for RecordingClaimStore {
+        async fn ensure_projection_job(&self, _job: &ClaimJob) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn lease_next_job(
+            &self,
+            _request: LeaseJobRequest<'_>,
+        ) -> Result<Option<ClaimJob>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn persist_projection(
+            &self,
+            request: PersistProjectionRequest,
+        ) -> Result<(), MemoryError> {
+            self.claims.lock().unwrap().extend(request.claims);
+            Ok(())
+        }
+
+        async fn select_candidates_page(
+            &self,
+            query: ClaimCandidateQuery<'_>,
+        ) -> Result<Vec<Claim>, MemoryError> {
+            Ok(self
+                .claims
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|claim| {
+                    claim.slot_fingerprint == query.slot_fingerprint
+                        && claim.identity_version == query.identity_version
+                })
+                .take(query.limit)
+                .cloned()
+                .collect())
+        }
+
+        async fn select_claims_for_facts(
+            &self,
+            query: ClaimsForFactsQuery<'_>,
+        ) -> Result<Vec<Claim>, MemoryError> {
+            Ok(self
+                .claims
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|claim| query.fact_ids.contains(&claim.source_fact_id))
+                .cloned()
+                .collect())
+        }
+
+        async fn select_relations_for_facts(
+            &self,
+            _query: RelationsForFactsQuery<'_>,
+        ) -> Result<Vec<ClaimRelation>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn select_facts_for_backfill(
+            &self,
+            _query: BackfillFactQuery<'_>,
+        ) -> Result<Vec<serde_json::Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn retract_fact_and_claims(
+            &self,
+            _request: RetractFactAndClaimsRequest<'_>,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn commit_reconciliation_page(
+            &self,
+            request: CommitReconciliationPageRequest<'_>,
+        ) -> Result<(), MemoryError> {
+            self.relations
+                .lock()
+                .unwrap()
+                .extend(request.relations.iter().cloned());
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn inline_reconciliation_persists_owning_policy_tags() {
+        let store = Arc::new(RecordingClaimStore::default());
+        let service = ClaimService::new(store.clone()).with_config(ClaimConfig {
+            rollout_stage: ClaimRolloutStage::Relations,
+            ..Default::default()
+        });
+        let policy_tags = vec!["private".to_string(), "source:chat".to_string()];
+        let first_fact_id = FactId::from("fact:worker-old");
+        let second_fact_id = FactId::from("fact:worker-new");
+        let first_episode_id = EpisodeId::from("episode:worker-old");
+        let second_episode_id = EpisodeId::from("episode:worker-new");
+
+        for (fact_id, episode_id) in [
+            (&first_fact_id, &first_episode_id),
+            (&second_fact_id, &second_episode_id),
+        ] {
+            service
+                .after_fact_persisted(&FactPersistedParams {
+                    namespace: "main",
+                    fact_id,
+                    source_episode_id: episode_id,
+                    fact_type: "note",
+                    content: "status is active",
+                    policy_tags: &policy_tags,
+                    entity_links: &[],
+                    t_valid: chrono::Utc::now(),
+                    source_lineage: Some(episode_id.as_ref()),
+                })
+                .await
+                .expect("fact projection and inline reconciliation should succeed");
+        }
+
+        let relations = store.relations.lock().unwrap();
+        assert_eq!(relations.len(), 1, "two same-slot claims should reconcile");
+        assert_eq!(relations[0].outcome, ClaimRelationOutcome::Duplicate);
+        assert_eq!(relations[0].policy_tags, policy_tags);
+        let relation_fact_ids = [
+            relations[0].left_fact_id.as_ref(),
+            relations[0].right_fact_id.as_ref(),
+        ];
+        assert!(relation_fact_ids.contains(&Some(&first_fact_id)));
+        assert!(relation_fact_ids.contains(&Some(&second_fact_id)));
+    }
 }
