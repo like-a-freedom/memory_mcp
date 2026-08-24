@@ -96,8 +96,6 @@ mod constants {
 pub use crate::models::Fact;
 
 pub use cache::{CacheKey, invalidate_cache};
-#[cfg(feature = "cli-watch")]
-pub use content_extraction::watcher::FsWatcher;
 pub(crate) use episode::build_extract_log_result;
 pub use episode::{episode_from_record, fact_from_record};
 pub use lifecycle::{

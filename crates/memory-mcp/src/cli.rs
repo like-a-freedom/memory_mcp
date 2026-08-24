@@ -13,8 +13,7 @@ use clap::{Parser, Subcommand};
 use crate::service::{MemoryError, MemoryService};
 
 pub use runtime::{
-    WatchCommand, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
-    run_stdio_server, run_watch_mode,
+    build_memory_service, log_session_duration, log_startup, run_reembed_mode, run_stdio_server,
 };
 
 /// `memory_mcp` command-line interface.
@@ -41,8 +40,6 @@ pub struct Cli {
 pub enum Command {
     /// Run the stdio MCP server (default when no subcommand is given).
     Serve,
-    /// Watch a directory and auto-ingest files as they arrive.
-    Watch(args::WatchArgs),
     /// Rebuild all fact embeddings for the current embedding provider/model.
     Reembed(args::ReembedArgs),
     /// Inspect and run lifecycle maintenance operations.
@@ -105,7 +102,6 @@ impl Command {
     pub fn mode_label(&self) -> &'static str {
         match self {
             Command::Serve => "serve",
-            Command::Watch(_) => "watch",
             Command::Reembed(_) => "reembed",
             Command::Lifecycle(_) => "cli.lifecycle",
             Command::Init(_) => "cli.init",
@@ -136,7 +132,7 @@ impl Command {
         }
 
         match self {
-            Command::Serve | Command::Watch(_) | Command::Reembed(_) | Command::Init(_) => None,
+            Command::Serve | Command::Reembed(_) | Command::Init(_) => None,
             Command::Lifecycle(args) => one_shot!(run_lifecycle, args),
             Command::Ingest(args) => one_shot!(run_ingest, args),
             Command::Extract(args) => one_shot!(run_extract, args),

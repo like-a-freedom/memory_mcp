@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use rmcp::ServiceExt;
 use rmcp::transport::io::stdio;
@@ -37,12 +36,6 @@ fn log_and_return_error(
         LogLevel::Error,
     );
     Box::new(err) as Box<dyn std::error::Error>
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WatchCommand {
-    pub dir: PathBuf,
-    pub interval_secs: u64,
 }
 
 /// Helper: log startup event with pid and mode label.
@@ -127,56 +120,6 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
         .shutdown_lifecycle_background_workers()
         .await;
     result
-}
-
-pub async fn run_watch_mode(
-    logger: &StdoutLogger,
-    watch: WatchCommand,
-) -> Result<(), Box<dyn std::error::Error>> {
-    logger.log(
-        event!(
-            "op" => json!("main.watch_starting"),
-            "dir" => json!(watch.dir.display().to_string()),
-            "interval_secs" => json!(watch.interval_secs),
-        ),
-        LogLevel::Info,
-    );
-
-    let memory_service = build_memory_service(logger, EmbeddingActivationMode::Standard).await?;
-    let claim_worker = memory_service.start_claim_workers().await;
-    let lifecycle_worker = memory_service.start_lifecycle_worker().await;
-    // Keep a handle for background-worker shutdown.
-    let shutdown_service = memory_service.clone();
-
-    #[cfg(feature = "cli-watch")]
-    {
-        let result = crate::service::FsWatcher::run_with_interval(
-            watch.dir,
-            watch.interval_secs,
-            memory_service,
-        )
-        .await
-        .map_err(|err| log_and_return_error(logger, "main.watch_failed", err));
-        claim_worker.shutdown().await;
-        lifecycle_worker.shutdown().await;
-        shutdown_service
-            .shutdown_lifecycle_background_workers()
-            .await;
-        result
-    }
-
-    #[cfg(not(feature = "cli-watch"))]
-    {
-        let _ = (watch, memory_service);
-        claim_worker.shutdown().await;
-        lifecycle_worker.shutdown().await;
-        shutdown_service
-            .shutdown_lifecycle_background_workers()
-            .await;
-        Err(Box::new(std::io::Error::other(
-            "watch subcommand requires the cli-watch feature",
-        )) as Box<dyn std::error::Error>)
-    }
 }
 
 pub async fn run_reembed_mode(
@@ -307,7 +250,7 @@ fn print_reembed_summary(
 #[cfg(test)]
 mod tests {
     use crate::cli::Command;
-    use crate::cli::{Cli, args::WatchArgs};
+    use crate::cli::Cli;
     use clap::{CommandFactory, Parser};
 
     #[test]
@@ -323,39 +266,8 @@ mod tests {
     }
 
     #[test]
-    fn cli_watch_with_optional_flags() {
-        let cli = Cli::parse_from(["memory_mcp", "watch", "/tmp/inbox", "--interval-secs", "7"]);
-        let watch: WatchArgs = match cli.command {
-            Some(Command::Watch(w)) => w,
-            _ => panic!("expected Watch command"),
-        };
-        assert_eq!(watch.dir.to_str().unwrap(), "/tmp/inbox");
-        assert_eq!(watch.interval_secs, 7);
-    }
-
-    #[test]
-    fn cli_watch_defaults() {
-        let cli = Cli::parse_from(["memory_mcp", "watch", "/tmp/inbox"]);
-        let watch: WatchArgs = match cli.command {
-            Some(Command::Watch(w)) => w,
-            _ => panic!("expected Watch command"),
-        };
-        assert_eq!(watch.interval_secs, 2);
-    }
-
-    #[test]
-    fn cli_watch_rejects_legacy_partition_flags() {
-        let result =
-            Cli::try_parse_from(["memory_mcp", "watch", "/tmp/inbox", "--project", "atlas"]);
-        assert!(result.is_err());
-
-        let result = Cli::try_parse_from(["memory_mcp", "watch", "/tmp/inbox", "--scope", "team"]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn cli_watch_rejects_missing_directory() {
-        let result = Cli::try_parse_from(["memory_mcp", "watch"]);
+    fn cli_rejects_removed_watch_subcommand() {
+        let result = Cli::try_parse_from(["memory_mcp", "watch", "/tmp/inbox"]);
         assert!(result.is_err());
     }
 

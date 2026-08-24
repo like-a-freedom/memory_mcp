@@ -3,6 +3,7 @@
 pub(crate) mod claims;
 mod constants;
 mod embedding;
+pub(crate) mod fs_watch;
 mod helpers;
 mod lifecycle;
 pub(crate) mod ner;

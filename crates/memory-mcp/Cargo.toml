@@ -46,7 +46,7 @@ default = []
 # Optional Apple-specific CPU backend. Keep this out of `default`: Cargo package
 # defaults are not target-aware, so portable consumers must opt in explicitly.
 accelerate = ["candle-core/accelerate"]
-cli-watch = ["notify"]
+fs-watch = ["dep:notify"]
 mcp-apps = []
 prometheus = ["dep:metrics-exporter-prometheus"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]

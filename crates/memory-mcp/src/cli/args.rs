@@ -1,5 +1,4 @@
 use clap::{Args, Subcommand};
-use std::path::PathBuf;
 
 #[derive(Debug, Args)]
 pub struct IngestArgs {
@@ -181,16 +180,6 @@ pub struct InitArgs {
     /// Host configuration target: vscode, claude-desktop, codex, zed, or env.
     #[arg(long, value_name = "TARGET", default_value = "vscode")]
     pub target: String,
-}
-
-#[derive(Debug, Args)]
-pub struct WatchArgs {
-    /// Directory to watch for new files
-    pub dir: PathBuf,
-
-    /// Polling interval in seconds (default: 2)
-    #[arg(long, default_value_t = 2)]
-    pub interval_secs: u64,
 }
 
 /// Internal lifecycle-capture args — consumed by hook scripts, not a public tool.

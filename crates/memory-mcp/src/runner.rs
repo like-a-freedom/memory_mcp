@@ -10,12 +10,10 @@ use std::process::ExitCode;
 use clap::Parser;
 use serde_json::json;
 
-use crate::cli::args::WatchArgs;
 use crate::cli::commands;
-use crate::cli::runtime::WatchCommand;
 use crate::cli::{
     Cli, Command, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
-    run_stdio_server, run_watch_mode,
+    run_stdio_server,
 };
 use crate::logging::{LogLevel, StdoutLogger, install_log_file};
 // `EmbeddingActivationMode` is `pub(crate)` re-exported from `service` (the
@@ -88,10 +86,6 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
             .map_err(boxed_to_failure),
 
         Some(Command::Init(args)) => commands::init::run(args).map_err(report_cli_error),
-
-        Some(Command::Watch(args)) => run_watch_mode(logger, watch_command_from_args(args))
-            .await
-            .map_err(boxed_to_failure),
 
         // One-shot CLI tool subcommands: build the service once, then run the
         // command's erased runner (label + error policy live in `cli.rs`). No
@@ -182,13 +176,6 @@ fn error_kind(err: &MemoryError) -> &'static str {
 
 fn mode_label(cli: &Cli) -> &'static str {
     cli.command.as_ref().map_or("serve", Command::mode_label)
-}
-
-fn watch_command_from_args(args: WatchArgs) -> WatchCommand {
-    WatchCommand {
-        dir: args.dir,
-        interval_secs: args.interval_secs,
-    }
 }
 
 fn boxed_to_failure(err: Box<dyn std::error::Error>) -> ExitCode {

@@ -12,7 +12,7 @@ mod email;
 mod office;
 mod pdf;
 mod text;
-#[cfg(feature = "cli-watch")]
+#[cfg(feature = "fs-watch")]
 pub mod watcher;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

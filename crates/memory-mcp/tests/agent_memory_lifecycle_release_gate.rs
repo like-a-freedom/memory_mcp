@@ -65,7 +65,6 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 /// maintenance command authorized by ADR-0047.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
-    "watch",
     "reembed",
     "ingest",
     "extract",
