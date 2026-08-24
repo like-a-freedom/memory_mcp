@@ -52,7 +52,7 @@ mod episode;
 pub(crate) mod explanation;
 pub(crate) mod fact;
 #[cfg(feature = "fs-watch")]
-pub(crate) mod fs_watch;
+pub mod fs_watch;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 #[doc(hidden)]
@@ -114,8 +114,8 @@ pub use reembed::ReembedSummary;
 pub use util::ids;
 pub use util::{
     deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_fact_id, hash_prefix, validate_entity_candidate,
-    validate_fact_input, validate_ingest_request,
+    deterministic_episode_id, deterministic_episode_id_v2, deterministic_fact_id, hash_prefix,
+    validate_entity_candidate, validate_fact_input, validate_ingest_request,
 };
 
 pub(crate) use core::{log_args_with_duration, log_event};

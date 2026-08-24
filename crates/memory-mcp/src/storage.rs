@@ -27,7 +27,7 @@ pub(crate) mod entity_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
 mod helpers;
-pub(crate) mod inbox_revision_store;
+pub mod inbox_revision_store;
 mod migrations;
 mod procedures;
 mod queries;
@@ -51,6 +51,7 @@ pub(crate) use entity_store::EntityStoreClient;
 pub use episode_store::EpisodeStoreClient;
 pub use fact_store::FactStoreClient;
 pub use helpers::is_missing_index_error;
+pub use inbox_revision_store::InboxRevisionStoreClient;
 pub use procedures::ProcedureStore;
 pub use queries::{
     BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,

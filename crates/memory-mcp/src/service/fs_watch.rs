@@ -15,3 +15,7 @@ pub(crate) const STABILITY_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[cfg(feature = "fs-watch")]
 pub(crate) mod candidate;
+#[cfg(feature = "fs-watch")]
+pub mod processor;
+#[cfg(feature = "fs-watch")]
+pub mod telemetry;

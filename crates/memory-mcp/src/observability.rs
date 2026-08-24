@@ -16,6 +16,22 @@ pub const METRIC_OPERATION_DURATION_SECONDS: &str = "memory_operation_duration_s
 /// Bounded domain result counts by operation and result kind.
 pub const METRIC_OPERATION_RESULTS_TOTAL: &str = "memory_operation_results_total";
 
+/// Filesystem-watch metric family: revision outcomes.
+pub const METRIC_FS_WATCH_REVISIONS_TOTAL: &str = "memory_fs_watch_revisions_total";
+/// Filesystem-watch metric family: retry counts by bounded stage and reason.
+pub const METRIC_FS_WATCH_RETRIES_TOTAL: &str = "memory_fs_watch_retries_total";
+/// Filesystem-watch metric family: startup-scan file outcomes.
+pub const METRIC_FS_WATCH_SCAN_FILES_TOTAL: &str = "memory_fs_watch_scan_files_total";
+/// Filesystem-watch gauge: claimable queue depth.
+pub const METRIC_FS_WATCH_QUEUE_DEPTH: &str = "memory_fs_watch_queue_depth";
+/// Filesystem-watch gauge: in-flight revisions.
+pub const METRIC_FS_WATCH_INFLIGHT: &str = "memory_fs_watch_inflight";
+/// Filesystem-watch gauge: degraded watcher state.
+pub const METRIC_FS_WATCH_DEGRADED: &str = "memory_fs_watch_degraded";
+/// Filesystem-watch histogram: revision duration by bounded outcome.
+pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
+    "memory_fs_watch_revision_duration_seconds";
+
 const KNOWN_OPERATIONS: &[&str] = &[
     "ingest",
     "extract",

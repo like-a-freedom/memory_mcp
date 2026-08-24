@@ -24,13 +24,13 @@ pub(crate) const MAX_LAST_ERROR_CHARS: usize = 2048;
 
 /// Deterministic revision ID from the raw-byte SHA-256.
 #[allow(dead_code)]
-pub(crate) fn revision_id_from_hash(content_sha256: &str) -> InboxRevisionId {
+pub fn revision_id_from_hash(content_sha256: &str) -> InboxRevisionId {
     InboxRevisionId::from_hash(content_sha256)
 }
 
 /// Constructs a new record with all timestamps defaulted to `now`.
 #[allow(dead_code)]
-pub(crate) fn new_revision_record(
+pub fn new_revision_record(
     lineage: String,
     relative_path: String,
     content_sha256: String,
@@ -66,7 +66,7 @@ pub(crate) fn new_revision_record(
 }
 
 /// Serializes a record into the schema field set (surreal JSON).
-pub(crate) fn record_to_json(record: &InboxRevisionRecord) -> Value {
+pub fn record_to_json(record: &InboxRevisionRecord) -> Value {
     json!({
         "revision_id": record.revision_id.as_str(),
         "lineage": record.lineage,
@@ -93,7 +93,7 @@ pub(crate) fn record_to_json(record: &InboxRevisionRecord) -> Value {
 }
 
 /// Parses a record row back into the typed record.
-pub(crate) fn record_from_json(value: &Value) -> Option<InboxRevisionRecord> {
+pub fn record_from_json(value: &Value) -> Option<InboxRevisionRecord> {
     let object = value.as_object()?;
     let content_sha256 = string_from_value(object.get("content_sha256")?)?;
     Some(InboxRevisionRecord {
@@ -177,21 +177,22 @@ fn parse_failure_class(value: &str) -> Option<InboxFailureClass> {
 
 /// The narrow store client bound to the Active Namespace.
 #[derive(Clone)]
-#[cfg_attr(not(feature = "fs-watch"), allow(dead_code))]
-pub(crate) struct InboxRevisionStoreClient {
+#[allow(dead_code)]
+pub struct InboxRevisionStoreClient {
     db: BoundDbClient,
 }
 
-#[allow(dead_code)]
 impl InboxRevisionStoreClient {
-    pub(crate) fn new(db: BoundDbClient) -> Self {
-        Self { db }
+    pub fn new(db_client: std::sync::Arc<dyn crate::storage::DbClient>, namespace: String) -> Self {
+        Self {
+            db: BoundDbClient::new(db_client, namespace),
+        }
     }
 
     /// Create-or-select one revision for a lineage + content hash. When the
     /// row already exists, returns `(record, false)`; otherwise inserts the
     /// durable prepared snapshot and returns `(record, true)`.
-    pub(crate) async fn discover_prepared(
+    pub async fn discover_prepared(
         &self,
         record: &InboxRevisionRecord,
     ) -> Result<(InboxRevisionRecord, bool), MemoryError> {
@@ -223,16 +224,18 @@ impl InboxRevisionStoreClient {
         }
     }
 
-    /// Atomically leases one eligible (discovered or failed-with-expired-lease)
-    /// revision. Returns `None` when nothing is eligible.
-    pub(crate) async fn claim_next(
+    /// Atomically leases one eligible discovered revision. `failed` revisions
+    /// are only claimable after `requeue_failed_for_startup` resets them to
+    /// `discovered` for a new startup generation. Returns `None` when nothing
+    /// is eligible.
+    pub async fn claim_next(
         &self,
         owner: &str,
         lease_duration: Duration,
     ) -> Result<Option<ClaimedInboxRevision>, MemoryError> {
         let expires = Utc::now() + lease_duration;
         let sql = "UPDATE (SELECT id FROM inbox_revision \
-                   WHERE state IN ['discovered', 'failed'] \
+                   WHERE state = 'discovered' \
                    AND (lease_expires_at IS NONE OR lease_expires_at < time::now()) \
                    LIMIT 1) \
                    SET state = 'processing', lease_owner = $owner, \
@@ -269,7 +272,7 @@ impl InboxRevisionStoreClient {
 
     /// Compare-and-set advance of the processing stage, requiring the current
     /// lease owner.
-    pub(crate) async fn advance_stage(
+    pub async fn advance_stage(
         &self,
         revision_id: &InboxRevisionId,
         lease_owner: &str,
@@ -288,7 +291,7 @@ impl InboxRevisionStoreClient {
 
     /// Persists the durable episode id after ingest, requiring the current
     /// lease owner.
-    pub(crate) async fn record_episode(
+    pub async fn record_episode(
         &self,
         revision_id: &InboxRevisionId,
         lease_owner: &str,
@@ -308,7 +311,7 @@ impl InboxRevisionStoreClient {
 
     /// Marks a revision processed and clears the prepared-content snapshot.
     /// Only valid after the episode exists and extract succeeded.
-    pub(crate) async fn mark_processed(
+    pub async fn mark_processed(
         &self,
         revision_id: &InboxRevisionId,
         lease_owner: &str,
@@ -331,7 +334,7 @@ impl InboxRevisionStoreClient {
 
     /// Marks one cycle failed, retaining the prepared snapshot and classifying
     /// the failure. Compare-and-set on the current lease owner.
-    pub(crate) async fn mark_failed_cycle(
+    pub async fn mark_failed_cycle(
         &self,
         revision_id: &InboxRevisionId,
         lease_owner: &str,
@@ -361,7 +364,7 @@ impl InboxRevisionStoreClient {
 
     /// Releases an interrupted lease without a domain failure, retaining the
     /// prepared snapshot for later recovery.
-    pub(crate) async fn release_interrupted(
+    pub async fn release_interrupted(
         &self,
         revision_id: &InboxRevisionId,
         lease_owner: &str,
@@ -380,7 +383,7 @@ impl InboxRevisionStoreClient {
     }
 
     /// Requeues expired leases (crashed processors) back to `discovered`.
-    pub(crate) async fn requeue_expired_leases(
+    pub async fn requeue_expired_leases(
         &self,
     ) -> Result<usize, MemoryError> {
         let sql = "UPDATE inbox_revision \
@@ -398,7 +401,7 @@ impl InboxRevisionStoreClient {
 
     /// Requeues failed revisions for a new startup generation. A revision
     /// failed in the same generation is not requeued twice.
-    pub(crate) async fn requeue_failed_for_startup(
+    pub async fn requeue_failed_for_startup(
         &self,
         generation: &str,
     ) -> Result<usize, MemoryError> {
@@ -418,7 +421,7 @@ impl InboxRevisionStoreClient {
     }
 
     /// Count of discovered + failed (claimable) revisions.
-    pub(crate) async fn queue_depth(&self) -> Result<usize, MemoryError> {
+    pub async fn queue_depth(&self) -> Result<usize, MemoryError> {
         let sql = "SELECT count() AS cnt FROM inbox_revision WHERE state IN ['discovered', 'failed']";
         let result = self.db.query(sql, None).await?;
         Ok(count_result(&result))
@@ -520,8 +523,8 @@ mod tests {
                 .expect("connect in memory"),
         );
         db.apply_migrations("org").await.expect("apply migrations");
-        let bound = BoundDbClient::new(db.clone(), "org");
-        (InboxRevisionStoreClient::new(bound), db)
+        let store = InboxRevisionStoreClient::new(db.clone(), "org".to_string());
+        (store, db)
     }
 
     fn sample_record(lineage: &str, content: &str, now: DateTime<Utc>) -> InboxRevisionRecord {
