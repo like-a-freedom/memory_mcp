@@ -358,6 +358,7 @@ const EXPECTED_SCHEMA_TABLES: &[&str] = &[
     "claim_key_alias",
     "claim_policy",
     "entity_extraction_projection",
+    "inbox_revision",
 ];
 
 const EXPECTED_SCHEMA_ANALYZERS: &[&str] = &["memory_fts", "memory_fts_ru"];
@@ -912,6 +913,29 @@ fn required_schema_fields(table: &str) -> &'static [&'static str] {
             "fingerprint",
             "entity_ids",
         ],
+        "inbox_revision" => &[
+            "revision_id",
+            "lineage",
+            "relative_path",
+            "content_sha256",
+            "source_type",
+            "t_ref",
+            "prepared_content",
+            "state",
+            "processing_stage",
+            "expected_episode_id",
+            "episode_id",
+            "attempt_count",
+            "failure_count",
+            "retry_generation",
+            "lease_owner",
+            "lease_expires_at",
+            "failure_class",
+            "last_error",
+            "discovered_at",
+            "updated_at",
+            "processed_at",
+        ],
         _ => &[],
     }
 }
@@ -986,6 +1010,11 @@ fn required_schema_indexes(table: &str) -> &'static [&'static str] {
         "entity_extraction_projection" => &[
             "entity_extraction_projection_episode_idx",
             "entity_extraction_projection_ingested_idx",
+        ],
+        "inbox_revision" => &[
+            "inbox_revision_state_lease",
+            "inbox_revision_lineage_hash_unique",
+            "inbox_revision_relative_path",
         ],
         _ => &[],
     }

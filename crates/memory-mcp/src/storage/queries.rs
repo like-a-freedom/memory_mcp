@@ -493,6 +493,13 @@ fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
         "script_migration" => &["executed_at"],
         "embedding_state" => &["updated_at"],
         "embedding_job" => &["requested_at", "started_at", "updated_at", "finished_at"],
+        "inbox_revision" => &[
+            "t_ref",
+            "lease_expires_at",
+            "discovered_at",
+            "updated_at",
+            "processed_at",
+        ],
         _ => &[],
     }
 }

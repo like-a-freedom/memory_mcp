@@ -7,6 +7,7 @@ mod access;
 pub mod claim;
 mod domain;
 mod ids;
+pub(crate) mod inbox_revision;
 mod lifecycle_trace;
 mod memory_event;
 mod procedure;

@@ -27,6 +27,7 @@ pub(crate) mod entity_store;
 pub(crate) mod episode_store;
 pub(crate) mod fact_store;
 mod helpers;
+pub(crate) mod inbox_revision_store;
 mod migrations;
 mod procedures;
 mod queries;

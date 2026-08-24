@@ -907,6 +907,7 @@ fn validate_table_name(table: &str) -> Result<(), MemoryError> {
         "episode",
         "event_log",
         "fact",
+        "inbox_revision",
         "query_log",
         "script_migration",
         "task",
