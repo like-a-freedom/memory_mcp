@@ -51,6 +51,8 @@ pub(crate) mod entity_resolution;
 mod episode;
 pub(crate) mod explanation;
 pub(crate) mod fact;
+#[cfg(feature = "fs-watch")]
+pub(crate) mod fs_watch;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 #[doc(hidden)]

@@ -12,8 +12,6 @@ mod email;
 mod office;
 mod pdf;
 mod text;
-#[cfg(feature = "fs-watch")]
-pub mod watcher;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TextChunk {
@@ -392,6 +390,55 @@ fn unsupported_format(path: &Path) -> MemoryError {
     ))
 }
 
+/// Parses raw bytes for the filesystem watcher using the relative path's
+/// extension (and PDF magic bytes). Returns `(source_type, normalized text)`.
+#[cfg(feature = "fs-watch")]
+pub(crate) fn parse_bytes_for_watch(
+    relative_path: &str,
+    bytes: &[u8],
+) -> Result<(&'static str, String), MemoryError> {
+    let format = detect_format(Path::new(relative_path), bytes)?;
+    let prepared = finalize_text_chunks(format.parse(bytes)?)?;
+    if prepared.is_empty() {
+        return Err(MemoryError::Validation(format!(
+            "no extractable text found in {}",
+            relative_path
+        )));
+    }
+    let source_type = match format {
+        FileFormat::Email => "email",
+        _ => "document",
+    };
+    Ok((source_type, prepared))
+}
+
+/// Resolves the reference time for a watched file: EML uses the structured
+/// `Date` header; other formats use the filesystem modification time, falling
+/// back to observation time.
+#[cfg(feature = "fs-watch")]
+pub(crate) fn watch_reference_time(
+    relative_path: &str,
+    bytes: &[u8],
+    metadata: &std::fs::Metadata,
+) -> chrono::DateTime<chrono::Utc> {
+    let is_eml = Path::new(relative_path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("eml"));
+    if is_eml {
+        if let Ok(raw) = std::str::from_utf8(bytes)
+            && let Some(date) = email::parse_email_date_header(raw)
+        {
+            return date;
+        }
+    }
+    metadata
+        .modified()
+        .ok()
+        .map(chrono::DateTime::<chrono::Utc>::from)
+        .unwrap_or_else(chrono::Utc::now)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -631,9 +678,31 @@ mod tests {
     }
 
     #[test]
-    fn strip_html_to_text_decodes_html_entities() {
+    fn strips_html_to_text_decodes_html_entities() {
         let html = "<p>Tom &amp; Jerry &nbsp; fun</p>";
         let result = strip_html_to_text(html);
         assert!(result.contains("Tom & Jerry"));
+    }
+
+    #[test]
+    #[cfg(feature = "fs-watch")]
+    fn watch_reference_time_uses_eml_date_header_over_mtime() {
+        let bytes = b"Date: Thu, 13 Aug 2026 09:00:00 +0200\nSubject: hi\n\nbody";
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let metadata = std::fs::metadata(manifest.join("Cargo.toml")).expect("metadata");
+        let t_ref = watch_reference_time("mail.eml", bytes, &metadata);
+        assert_eq!(t_ref.to_rfc3339(), "2026-08-13T07:00:00+00:00");
+    }
+
+    #[test]
+    #[cfg(feature = "fs-watch")]
+    fn watch_reference_time_falls_back_to_mtime_for_documents() {
+        let bytes = b"plain document";
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let metadata = std::fs::metadata(manifest.join("Cargo.toml")).expect("metadata");
+        let t_ref = watch_reference_time("note.md", bytes, &metadata);
+        let mtime = metadata.modified().expect("mtime");
+        let expected: chrono::DateTime<chrono::Utc> = mtime.into();
+        assert!((t_ref - expected).num_seconds().abs() <= 1);
     }
 }

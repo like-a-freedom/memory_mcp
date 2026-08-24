@@ -9,12 +9,12 @@ use std::path::{Path, PathBuf};
 use crate::error::MemoryError;
 
 /// Environment variable that enables filesystem ingestion inside `serve`.
-#[cfg_attr(not(feature = "fs-watch"), allow(dead_code))]
+#[allow(dead_code)]
 pub const ENV_INGESTION_INBOX: &str = "MEMORY_INGESTION_INBOX";
 
 /// Validated filesystem-ingestion configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(feature = "fs-watch"), allow(dead_code))]
+#[allow(dead_code)]
 pub struct FsWatchConfig {
     pub inbox: PathBuf,
 }
@@ -24,7 +24,7 @@ pub struct FsWatchConfig {
 /// Returns `Ok(None)` when the variable is absent. A configured value must be
 /// a non-empty absolute path to an existing readable directory that is not a
 /// symlink; shell constructs such as `~` and `$HOME` are never expanded.
-#[cfg_attr(not(feature = "fs-watch"), allow(dead_code))]
+#[allow(dead_code)]
 pub fn from_env() -> Result<Option<FsWatchConfig>, MemoryError> {
     let Some(raw) = std::env::var_os(ENV_INGESTION_INBOX) else {
         return Ok(None);
