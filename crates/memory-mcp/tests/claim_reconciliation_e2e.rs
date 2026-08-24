@@ -325,3 +325,167 @@ async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
         "projection jobs must not duplicate"
     );
 }
+
+// ─── Explicit episode lineage drives claim projection ─────────────────────────
+
+/// Persists an episode directly with a versioned filesystem-style `source_id`
+/// and an explicit stable `source_lineage`, then runs the public extract path.
+async fn ingest_episode_with_lineage(
+    service: &MemoryService,
+    db_client: &Arc<SurrealDbClient>,
+    episode_id: &str,
+    source_id: &str,
+    lineage: &str,
+    content: &str,
+    t_ref: &str,
+) {
+    db_client
+        .create(
+            episode_id,
+            serde_json::json!({
+                "episode_id": episode_id,
+                "source_type": "document",
+                "source_id": source_id,
+                "content": content,
+                "t_ref": t_ref,
+                "t_ingested": t_ref,
+                "policy_tags": [],
+                "source_lineage": lineage,
+            }),
+            "org",
+        )
+        .await
+        .expect("create episode with lineage");
+    ExtractCapability::extract(&service.build_context(), episode_id, None, None)
+        .await
+        .expect("extract episode with lineage");
+}
+
+#[tokio::test]
+async fn claims_prefer_explicit_episode_lineage_over_versioned_source_id() {
+    let (service, db_client) = make_service().await;
+
+    // Two filesystem revisions of the same logical document: same lineage,
+    // distinct versioned source IDs (as the watcher would persist them).
+    ingest_episode_with_lineage(
+        &service,
+        &db_client,
+        "episode:fs-rev-1",
+        "fs:docs/spec.md:aaaa",
+        "fs:docs/spec.md",
+        "Budget is $5M.",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+    ingest_episode_with_lineage(
+        &service,
+        &db_client,
+        "episode:fs-rev-2",
+        "fs:docs/spec.md:bbbb",
+        "fs:docs/spec.md",
+        "Budget is $6M.",
+        "2026-06-02T00:00:00Z",
+    )
+    .await;
+
+    let db_for_wait = db_client.clone();
+    wait_for_claim_projection(move || {
+        let db = db_for_wait.clone();
+        async move {
+            db.query(
+                "SELECT count() AS cnt FROM claim WHERE source_episode_id IN ['episode:fs-rev-1', 'episode:fs-rev-2']",
+                None,
+                "org",
+            )
+            .await
+            .map(|v| {
+                serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default()
+            })
+            .map(|rows| {
+                rows.first()
+                    .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+                    .unwrap_or(0)
+                    > 0
+            })
+            .unwrap_or(false)
+        }
+    })
+    .await;
+
+    let lineages: Vec<String> = db_client
+        .query(
+            "SELECT source_lineage FROM claim WHERE source_episode_id IN ['episode:fs-rev-1', 'episode:fs-rev-2']",
+            None,
+            "org",
+        )
+        .await
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|r| {
+                    r.get("source_lineage")
+                        .and_then(|s| s.as_str().map(String::from))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    assert!(!lineages.is_empty(), "expected claims for both revisions");
+    for lineage in &lineages {
+        assert_eq!(
+            lineage, "fs:docs/spec.md",
+            "claims must carry the explicit lineage, got {lineage:?}"
+        );
+    }
+}
+
+/// Control: an ordinary episode (no explicit lineage) still uses its
+/// `source_id` as the claim-projection fallback lineage.
+#[tokio::test]
+async fn ordinary_episode_uses_source_id_as_claim_lineage_fallback() {
+    let (service, db_client) = make_service().await;
+
+    let ep = ingest_source(
+        &service,
+        "chat",
+        "src:fallback",
+        "Alice Smith reports ARR is $5M.",
+        "2026-06-01T00:00:00Z",
+    )
+    .await;
+
+    let db_for_wait = db_client.clone();
+    let ep_for_wait = ep.clone();
+    wait_for_claim_projection(move || {
+        let db = db_for_wait.clone();
+        let ep = ep_for_wait.clone();
+        async move { claim_count_for_episode(&db, &ep).await > 0 }
+    })
+    .await;
+
+    let lineages: Vec<String> = db_client
+        .query(
+            "SELECT source_lineage FROM claim WHERE source_episode_id = $ep",
+            Some(serde_json::json!({"ep": ep})),
+            "org",
+        )
+        .await
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|r| {
+                    r.get("source_lineage")
+                        .and_then(|s| s.as_str().map(String::from))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    assert!(!lineages.is_empty(), "expected at least one claim");
+    for lineage in &lineages {
+        assert_eq!(
+            lineage, "src:fallback",
+            "ordinary episodes fall back to source_id as lineage, got {lineage:?}"
+        );
+    }
+}

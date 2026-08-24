@@ -229,12 +229,19 @@ impl FactService {
             ctx.find_entity_records_by_ids(&entity_links).await?;
 
         // Pre-fetch episode source_id; also serves as the ADR-0008 source
-        // lineage for claim projection (the connector's stable record identifier).
+        // lineage for claim projection (the connector's stable record
+        // identifier). Filesystem episodes carry an explicit `source_lineage`
+        // that is preferred over the versioned `source_id`.
         let (episode_record, _) = ctx.find_episode_record(source_episode).await?;
         let episode_source_id = episode_record
             .as_ref()
             .and_then(|map| map.get("source_id"))
             .and_then(crate::service::value_helpers::string_from_value);
+        let episode_source_lineage = episode_record
+            .as_ref()
+            .and_then(|map| map.get("source_lineage"))
+            .and_then(crate::service::value_helpers::string_from_value)
+            .or_else(|| episode_source_id.clone());
 
         let entity_lookup = |entity_id: &str| Ok(entity_map.get(entity_id).cloned());
         let source_reference_lookup = |_episode_id: &str| Ok(episode_source_id.clone());
@@ -341,7 +348,7 @@ impl FactService {
                 policy_tags: &policy_tags,
                 entity_links: &claim_entity_links,
                 t_valid: claim_t_valid,
-                source_lineage: episode_source_id.as_deref(),
+                source_lineage: episode_source_lineage.as_deref(),
             };
             match claim_svc.after_fact_persisted(&claim_params).await {
                 Ok(summary) => claim_svc.record_post_fact_success(

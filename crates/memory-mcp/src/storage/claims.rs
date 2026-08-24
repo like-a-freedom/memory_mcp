@@ -767,7 +767,7 @@ mod tests {
     fn latest_registered_migration_is_expected() {
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "038_claim_source_span.surql");
+        assert_eq!(last.file_name, "039_filesystem_ingestion.surql");
     }
 
     #[test]

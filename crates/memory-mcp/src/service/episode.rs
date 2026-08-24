@@ -274,6 +274,7 @@ mod tests {
             scope: "org".to_string(),
             visibility_scope: String::new(),
             policy_tags: Vec::new(),
+            source_lineage: None,
         };
 
         assert!(should_extract_note_fact(&episode, &[]));
@@ -496,6 +497,7 @@ mod tests {
             scope: "org".to_string(),
             visibility_scope: String::new(),
             policy_tags: Vec::new(),
+            source_lineage: None,
         };
 
         let result = build_extract_log_result_with_metadata(

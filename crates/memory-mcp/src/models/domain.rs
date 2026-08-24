@@ -55,6 +55,12 @@ pub struct Episode {
     pub scope: String,
     pub visibility_scope: String,
     pub policy_tags: Vec<String>,
+    /// Stable source-lineage identifier (e.g. `fs:docs/spec.md`) for episodes
+    /// ingested by the filesystem watcher. Optional and never set by the public
+    /// `ingest` path; claim projection prefers it over the versioned
+    /// `source_id` as the reconciliation lineage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_lineage: Option<String>,
 }
 
 impl Episode {}

@@ -81,6 +81,10 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
                     .collect()
             })
             .unwrap_or_default(),
+        source_lineage: record
+            .get("source_lineage")
+            .and_then(json_string)
+            .map(ToString::to_string),
     })
 }
 

@@ -64,4 +64,21 @@ mod tests {
     fn default_budget_returns_5() {
         assert_eq!(default_budget(), 5);
     }
+
+    #[test]
+    fn episode_without_source_lineage_remains_compatible() {
+        let value = serde_json::json!({
+            "episode_id": "episode:legacy",
+            "source_type": "note",
+            "source_id": "source:legacy",
+            "content": "legacy",
+            "t_ref": "2026-08-24T00:00:00Z",
+            "t_ingested": "2026-08-24T00:00:01Z",
+            "scope": "",
+            "visibility_scope": "",
+            "policy_tags": []
+        });
+        let episode: Episode = serde_json::from_value(value).expect("legacy episode");
+        assert_eq!(episode.source_lineage, None);
+    }
 }

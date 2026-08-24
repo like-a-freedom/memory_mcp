@@ -249,8 +249,8 @@ fn print_reembed_summary(
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::Command;
     use crate::cli::Cli;
+    use crate::cli::Command;
     use clap::{CommandFactory, Parser};
 
     #[test]

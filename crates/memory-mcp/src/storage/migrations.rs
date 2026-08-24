@@ -139,6 +139,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "038_claim_source_span.surql",
             sql: include_str!("../../migrations/038_claim_source_span.surql"),
         },
+        MigrationScript {
+            file_name: "039_filesystem_ingestion.surql",
+            sql: include_str!("../../migrations/039_filesystem_ingestion.surql"),
+        },
     ]
 }
 
@@ -1210,6 +1214,15 @@ mod tests {
             versioned_migrations()
                 .iter()
                 .any(|migration| { migration.file_name == "036_migration_runner_state.surql" })
+        );
+    }
+
+    #[test]
+    fn versioned_migrations_includes_039_filesystem_ingestion() {
+        assert!(
+            versioned_migrations()
+                .iter()
+                .any(|migration| { migration.file_name == "039_filesystem_ingestion.surql" })
         );
     }
 

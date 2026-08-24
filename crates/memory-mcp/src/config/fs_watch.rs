@@ -56,14 +56,12 @@ fn validate_inbox_root(inbox: &Path) -> Result<(), MemoryError> {
             inbox.display()
         )));
     }
-    let metadata = inbox
-        .symlink_metadata()
-        .map_err(|err| {
-            MemoryError::ConfigInvalid(format!(
-                "{ENV_INGESTION_INBOX} must point to an existing directory, got `{}`: {err}",
-                inbox.display()
-            ))
-        })?;
+    let metadata = inbox.symlink_metadata().map_err(|err| {
+        MemoryError::ConfigInvalid(format!(
+            "{ENV_INGESTION_INBOX} must point to an existing directory, got `{}`: {err}",
+            inbox.display()
+        ))
+    })?;
     if metadata.file_type().is_symlink() {
         return Err(MemoryError::ConfigInvalid(format!(
             "{ENV_INGESTION_INBOX} must not be a symlink, got `{}`",
@@ -91,7 +89,9 @@ mod tests {
 
     #[test]
     fn absent_inbox_disables_filesystem_watch() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe { std::env::remove_var(ENV_INGESTION_INBOX) };
         assert_eq!(from_env().expect("absent env is valid"), None);
     }
@@ -99,7 +99,9 @@ mod tests {
     #[cfg(feature = "fs-watch")]
     #[test]
     fn valid_absolute_directory_enables_filesystem_watch() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().expect("temp inbox");
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, dir.path()) };
         let config = from_env().expect("valid inbox").expect("enabled");
@@ -108,7 +110,9 @@ mod tests {
 
     #[test]
     fn empty_inbox_is_rejected() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, "   ") };
         let err = from_env().expect_err("empty value must be rejected");
         assert!(matches!(err, MemoryError::ConfigInvalid(_)));
@@ -118,7 +122,9 @@ mod tests {
 
     #[test]
     fn relative_inbox_is_rejected() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, "relative/path") };
         let err = from_env().expect_err("relative value must be rejected");
         assert!(matches!(err, MemoryError::ConfigInvalid(_)));
@@ -128,7 +134,9 @@ mod tests {
 
     #[test]
     fn missing_inbox_is_rejected() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().expect("temp inbox");
         let missing = dir.path().join("does-not-exist");
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, &missing) };
@@ -140,7 +148,9 @@ mod tests {
 
     #[test]
     fn file_inbox_is_rejected() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().expect("temp inbox");
         let file = dir.path().join("note.txt");
         std::fs::write(&file, "x").expect("write file");
@@ -153,7 +163,9 @@ mod tests {
 
     #[test]
     fn symlink_root_inbox_is_rejected() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().expect("temp inbox");
         let target = dir.path().join("target");
         std::fs::create_dir_all(&target).expect("create target dir");
@@ -169,7 +181,9 @@ mod tests {
     #[cfg(not(feature = "fs-watch"))]
     #[test]
     fn configured_inbox_is_rejected_without_feature() {
-        let _guard = crate::config::env_lock().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = crate::config::env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().expect("temp inbox");
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, dir.path()) };
         let err = from_env().expect_err("configured inbox without fs-watch must be rejected");

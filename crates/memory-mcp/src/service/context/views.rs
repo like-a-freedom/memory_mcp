@@ -479,6 +479,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                source_lineage: None,
                 },
                 Episode {
                     episode_id: "episode:generic".to_string(),
@@ -490,6 +491,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                source_lineage: None,
                 },
             ],
             query_opt: Some("platform planning notes july 2025"),
@@ -522,6 +524,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
                 Episode {
                     episode_id: "episode:source-second".to_string(),
@@ -534,6 +537,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
                 Episode {
                     episode_id: "episode:content-first".to_string(),
@@ -545,6 +549,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
                 Episode {
                     episode_id: "episode:content-second".to_string(),
@@ -556,6 +561,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
             ],
             query_opt: Some("release checklist archive review"),
@@ -588,6 +594,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
                 Episode {
                     episode_id: "episode:weak".to_string(),
@@ -599,6 +606,7 @@ mod tests {
                     scope: "org".to_string(),
                     visibility_scope: String::new(),
                     policy_tags: Vec::new(),
+                    source_lineage: None,
                 },
             ],
             query_opt: Some("release checklist archive review"),
