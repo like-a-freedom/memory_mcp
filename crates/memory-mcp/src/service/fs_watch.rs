@@ -18,4 +18,6 @@ pub(crate) mod candidate;
 #[cfg(feature = "fs-watch")]
 pub mod processor;
 #[cfg(feature = "fs-watch")]
+pub mod runtime;
+#[cfg(feature = "fs-watch")]
 pub mod telemetry;

@@ -46,6 +46,9 @@ pub(crate) struct InboxRevisionProcessor {
     service: MemoryService,
     telemetry: FsWatchTelemetry,
     stop_dequeue: tokio_util::sync::CancellationToken,
+    /// Current lease, published so the runtime can release it on bounded
+    /// shutdown when the processor task is aborted.
+    current_lease: std::sync::Arc<tokio::sync::Mutex<Option<InboxRevisionLease>>>,
 }
 
 impl InboxRevisionProcessor {
@@ -54,12 +57,14 @@ impl InboxRevisionProcessor {
         service: MemoryService,
         telemetry: FsWatchTelemetry,
         stop_dequeue: tokio_util::sync::CancellationToken,
+        current_lease: std::sync::Arc<tokio::sync::Mutex<Option<InboxRevisionLease>>>,
     ) -> Self {
         Self {
             store,
             service,
             telemetry,
             stop_dequeue,
+            current_lease,
         }
     }
 
@@ -85,12 +90,14 @@ impl InboxRevisionProcessor {
                     continue;
                 }
             };
+            {
+                let mut guard = self.current_lease.lock().await;
+                *guard = Some(claim.lease.clone());
+            }
             let outcome = process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
-            match outcome {
-                ProcessOutcome::Processed => {}
-                ProcessOutcome::FailedNonRetryable
-                | ProcessOutcome::FailedRetriesExhausted
-                | ProcessOutcome::Interrupted => {}
+            {
+                let mut guard = self.current_lease.lock().await;
+                *guard = None;
             }
             self.telemetry.record_revision(outcome);
         }

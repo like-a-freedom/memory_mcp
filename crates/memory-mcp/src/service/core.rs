@@ -181,6 +181,15 @@ impl MemoryService {
         runtime
     }
 
+    /// Start the filesystem-ingestion runtime inside `serve`.
+    #[cfg(feature = "fs-watch")]
+    pub async fn start_fs_watch(
+        &self,
+        config: crate::config::fs_watch::FsWatchConfig,
+    ) -> Result<super::fs_watch::runtime::FsWatchRuntime, MemoryError> {
+        super::fs_watch::runtime::FsWatchRuntime::start(self.clone(), config).await
+    }
+
     /// Start the agent-memory lifecycle projection worker.
     ///
     /// The worker drains `event_projection_job` records and projects accepted

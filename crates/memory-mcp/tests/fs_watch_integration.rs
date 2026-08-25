@@ -317,3 +317,140 @@ async fn one_failed_revision_does_not_prevent_next_revision() {
         Some("processed")
     );
 }
+
+// ─── Tracked runtime ──────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn runtime_startup_scan_enqueues_and_processes_existing_files() {
+    use memory_mcp::config::fs_watch::FsWatchConfig;
+
+    let inbox = tempfile::tempdir().expect("temp inbox");
+    std::fs::write(
+        inbox.path().join("spec.md"),
+        "Alice Smith reports ARR is $5M.",
+    )
+    .expect("write markdown");
+    std::fs::write(inbox.path().join("ignored.json"), "{}").expect("write json");
+
+    let (service, db, _store) = make_pipeline().await;
+    let runtime = service
+        .start_fs_watch(FsWatchConfig {
+            inbox: inbox.path().to_path_buf(),
+        })
+        .await
+        .expect("start runtime");
+
+    // Wait for the scan + processor to complete the supported file.
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(15);
+    let mut processed = false;
+    while tokio::time::Instant::now() < deadline {
+        let rows = db
+            .query(
+                "SELECT count() AS cnt FROM inbox_revision WHERE state = 'processed'",
+                None,
+                "org",
+            )
+            .await
+            .expect("count processed");
+        let count = rows
+            .as_array()
+            .and_then(|rows| rows.first())
+            .and_then(|r| r.get("cnt"))
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0);
+        if count >= 1 {
+            processed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(processed, "startup scan should process the supported file");
+
+    // The episode exists with lineage.
+    let episodes = db
+        .query(
+            "SELECT count() AS cnt FROM episode WHERE source_lineage = 'fs:spec.md'",
+            None,
+            "org",
+        )
+        .await
+        .expect("count episodes");
+    let count = episodes
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|r| r.get("cnt"))
+        .and_then(|c| c.as_i64())
+        .unwrap_or(0);
+    assert_eq!(count, 1, "exactly one episode for the supported file");
+
+    // The unsupported file is skipped.
+    let unsupported = db
+        .query(
+            "SELECT count() AS cnt FROM inbox_revision WHERE relative_path = 'ignored.json'",
+            None,
+            "org",
+        )
+        .await
+        .expect("count unsupported");
+    let count = unsupported
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|r| r.get("cnt"))
+        .and_then(|c| c.as_i64())
+        .unwrap_or(0);
+    assert_eq!(count, 0, "unsupported file must be skipped");
+
+    runtime.shutdown().await;
+}
+
+#[tokio::test]
+async fn runtime_drops_supported_file_event_and_shutdown_is_bounded() {
+    use memory_mcp::config::fs_watch::FsWatchConfig;
+
+    let inbox = tempfile::tempdir().expect("temp inbox");
+    let (service, db, _store) = make_pipeline().await;
+    let runtime = service
+        .start_fs_watch(FsWatchConfig {
+            inbox: inbox.path().to_path_buf(),
+        })
+        .await
+        .expect("start runtime");
+
+    // Dropping a supported file into the inbox is picked up by the watcher.
+    std::fs::write(
+        inbox.path().join("event.md"),
+        "Alice Smith reports ARR is $5M.",
+    )
+    .expect("write file");
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(15);
+    let mut processed = false;
+    while tokio::time::Instant::now() < deadline {
+        let rows = db
+            .query(
+                "SELECT count() AS cnt FROM inbox_revision WHERE relative_path = 'event.md' AND state = 'processed'",
+                None,
+                "org",
+            )
+            .await
+            .expect("count processed");
+        let count = rows
+            .as_array()
+            .and_then(|rows| rows.first())
+            .and_then(|r| r.get("cnt"))
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0);
+        if count >= 1 {
+            processed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(processed, "watcher event should be processed");
+
+    // Shutdown must complete promptly and cleanly.
+    let shutdown = tokio::time::timeout(std::time::Duration::from_secs(35), runtime.shutdown())
+        .await
+        .expect("bounded shutdown");
+    assert!(shutdown.waited_secs <= 30);
+}

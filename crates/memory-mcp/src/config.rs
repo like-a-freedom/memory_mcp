@@ -3,7 +3,7 @@
 pub(crate) mod claims;
 mod constants;
 mod embedding;
-pub(crate) mod fs_watch;
+pub mod fs_watch;
 mod helpers;
 mod lifecycle;
 pub(crate) mod ner;
@@ -11,6 +11,7 @@ mod surreal;
 
 pub use constants::*;
 pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
+pub use fs_watch::{ENV_INGESTION_INBOX, FsWatchConfig};
 pub use lifecycle::LifecycleConfig;
 pub use ner::{
     GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
