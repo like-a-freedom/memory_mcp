@@ -121,15 +121,6 @@ pub fn is_symlink(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Determines the source type for a relative path (`email` for `.eml`,
-/// `document` otherwise).
-pub fn source_type_for_relative_path(relative: &str) -> &'static str {
-    match Path::new(relative).extension().and_then(|e| e.to_str()) {
-        Some("eml") => "email",
-        _ => "document",
-    }
-}
-
 /// Prepares a stable candidate for ingestion.
 ///
 /// Returns `Skipped` for symlinks, unsupported formats, and non-regular files;
@@ -205,15 +196,55 @@ pub async fn prepare_candidate(
         return Ok(CandidateOutcome::Skipped(CandidateSkipReason::Interrupted));
     }
 
-    // Hash raw bytes, then parse those exact bytes once.
-    let bytes = match std::fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(_) => {
+    // Read with a stable snapshot: open the file, capture metadata from the
+    // opened handle before reading, read all bytes, then re-read handle and
+    // path metadata. Accept only when file type, length, and mtime match
+    // before/after and the byte count equals the accepted length; otherwise
+    // retry until the stability timeout.
+    let (bytes, read_metadata) = loop {
+        if cancel.is_cancelled() {
+            return Ok(CandidateOutcome::Skipped(CandidateSkipReason::Interrupted));
+        }
+        if started.elapsed() >= timeout {
             return Ok(CandidateOutcome::Skipped(
                 CandidateSkipReason::NotRegularFile,
             ));
         }
+        let mut file = match std::fs::File::open(path) {
+            Ok(file) => file,
+            Err(_) => {
+                tokio::time::sleep(sample_interval).await;
+                continue;
+            }
+        };
+        let before = match file.metadata() {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                tokio::time::sleep(sample_interval).await;
+                continue;
+            }
+        };
+        let mut bytes = Vec::new();
+        if std::io::Read::read_to_end(&mut file, &mut bytes).is_err() {
+            tokio::time::sleep(sample_interval).await;
+            continue;
+        }
+        let after_handle = file.metadata().ok();
+        let after_path = path.metadata().ok();
+        let stable = |metadata: &std::fs::Metadata| {
+            metadata.is_file()
+                && metadata.len() == before.len()
+                && metadata.modified().ok() == before.modified().ok()
+        };
+        let matched = after_handle.as_ref().is_some_and(stable)
+            && after_path.as_ref().is_some_and(stable)
+            && bytes.len() as u64 == before.len();
+        if matched {
+            break (bytes, before);
+        }
+        tokio::time::sleep(sample_interval).await;
     };
+
     let content_sha256 = hex::encode(sha2::Sha256::digest(&bytes));
 
     // Format detection and parsing via the shared content-extraction module.
@@ -227,8 +258,11 @@ pub async fn prepare_candidate(
             }
         };
 
-    let t_ref =
-        crate::service::content_extraction::watch_reference_time(&relative_path, &bytes, &metadata);
+    let t_ref = crate::service::content_extraction::watch_reference_time(
+        &relative_path,
+        &bytes,
+        &read_metadata,
+    );
 
     let lineage = format!("fs:{relative_path}");
     let source_id = format!("{lineage}:{content_sha256}");

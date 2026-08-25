@@ -17,7 +17,6 @@ use crate::service::value_helpers::string_from_value;
 use crate::storage::BoundDbClient;
 
 /// Default lease duration for one revision claim.
-#[allow(dead_code)]
 pub(crate) const DEFAULT_REVISION_LEASE_SECS: i64 = 120;
 /// Bounded max `last_error` characters persisted with a failed revision.
 pub(crate) const MAX_LAST_ERROR_CHARS: usize = 2048;

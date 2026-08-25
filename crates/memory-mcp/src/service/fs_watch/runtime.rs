@@ -148,10 +148,6 @@ async fn run_watcher_cycle(
 /// Dispatches one watcher event through the shared discover→prepare→persist
 /// path.
 async fn handle_watch_event(store: &InboxRevisionStoreClient, inbox: &Path, event: &Event) {
-    eprintln!(
-        "[fs_watch.diag] event={:?} paths={:?}",
-        event.kind, event.paths
-    );
     if !(event.kind.is_create() || event.kind.is_modify()) {
         return;
     }
@@ -289,6 +285,18 @@ impl FsWatchRuntime {
         let _ = store.requeue_failed_for_startup(&generation).await;
         let _ = store.requeue_expired_leases().await;
 
+        service.logger.log(
+            crate::service::log_event(
+                "fs_watch.ready",
+                serde_json::json!({"inbox": config.inbox.display().to_string()}),
+                serde_json::json!({"status": "listening"}),
+                None,
+                None,
+                None,
+            ),
+            crate::logging::LogLevel::Info,
+        );
+
         let stop_discovery = CancellationToken::new();
         let stop_dequeue = CancellationToken::new();
         let current_lease = Arc::new(tokio::sync::Mutex::new(None));
@@ -352,7 +360,17 @@ impl FsWatchRuntime {
         let watcher_handle = self.watcher_handle;
         let scanner_handle = self.scanner_handle;
         let mut processor = self.processor;
-        let processor_handle = processor.handle.take().expect("processor handle");
+        let processor_handle = match processor.handle.take() {
+            Some(handle) => handle,
+            // The processor task is always spawned by `start`; a missing handle
+            // means shutdown raced construction and there is nothing to await.
+            None => {
+                return FsWatchShutdownOutcome {
+                    waited_secs: 0,
+                    lease_released: true,
+                };
+            }
+        };
         let db_client = self.db_client;
         let namespace = self.namespace;
 

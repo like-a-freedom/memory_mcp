@@ -304,7 +304,7 @@ printf '%s\n' '{"hook_event_name":"manual-precompact","reason":"manual context r
 Or inject a handcrafted summary directly:
 
 ```bash
-MEMORY_HOOK_CONTENT="Implemented watcher CLI and validated cli-watch tests" ./hooks/memory_stop_hook.sh
+MEMORY_HOOK_CONTENT="Implemented filesystem ingestion and validated fs-watch tests" ./hooks/memory_stop_hook.sh
 ```
 
 

@@ -170,7 +170,10 @@ mod tests {
         let target = dir.path().join("target");
         std::fs::create_dir_all(&target).expect("create target dir");
         let link = dir.path().join("link");
+        #[cfg(unix)]
         std::os::unix::fs::symlink(&target, &link).expect("create symlink");
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&target, &link).expect("create symlink");
         unsafe { std::env::set_var(ENV_INGESTION_INBOX, &link) };
         let err = from_env().expect_err("symlink root must be rejected");
         assert!(matches!(err, MemoryError::ConfigInvalid(_)));

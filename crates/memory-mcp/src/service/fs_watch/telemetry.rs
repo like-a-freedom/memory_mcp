@@ -97,8 +97,6 @@ impl FsWatchTelemetry {
         metrics::counter!(METRIC_FS_WATCH_REVISIONS_TOTAL, "outcome" => outcome).increment(1);
     }
 
-    pub(crate) fn record_success(&self) {}
-
     pub(crate) fn record_retry(&self, stage: &str, class: InboxFailureClass) {
         let stage = retry_stage_label(stage);
         let reason = retry_reason_label(class);

@@ -12,8 +12,6 @@
 
 use std::time::Duration;
 
-use chrono::Utc;
-
 use crate::error::MemoryError;
 use crate::models::inbox_revision::{
     ClaimedInboxRevision, InboxFailureClass, InboxProcessingStage, InboxRevisionLease,
@@ -75,9 +73,10 @@ impl InboxRevisionProcessor {
                 break;
             }
             let owner = format!("processor-{}", std::process::id());
+            let lease_secs = crate::storage::inbox_revision_store::DEFAULT_REVISION_LEASE_SECS;
             let claim = match self
                 .store
-                .claim_next(&owner, chrono::Duration::seconds(120))
+                .claim_next(&owner, chrono::Duration::seconds(lease_secs))
                 .await
             {
                 Ok(Some(claim)) => claim,
@@ -94,12 +93,35 @@ impl InboxRevisionProcessor {
                 let mut guard = self.current_lease.lock().await;
                 *guard = Some(claim.lease.clone());
             }
+            let relative_path = claim.record.relative_path.clone();
+            let revision_prefix = claim
+                .record
+                .content_sha256
+                .chars()
+                .take(12)
+                .collect::<String>();
             let outcome =
                 process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
             {
                 let mut guard = self.current_lease.lock().await;
                 *guard = None;
             }
+            self.service.logger.log(
+                crate::service::log_event(
+                    "fs_watch.revision",
+                    serde_json::json!({
+                        "path": relative_path,
+                        "revision": revision_prefix,
+                    }),
+                    serde_json::json!({
+                        "outcome": outcome_label(outcome),
+                    }),
+                    None,
+                    None,
+                    None,
+                ),
+                crate::logging::LogLevel::Info,
+            );
             self.telemetry.record_revision(outcome);
         }
     }
@@ -130,80 +152,171 @@ pub async fn process_claimed_revision(
         return ProcessOutcome::Interrupted;
     }
 
-    let mut attempt = 0u32;
-    loop {
-        attempt += 1;
-        let attempt_result = tokio::time::timeout(
-            PROCESSOR_ATTEMPT_TIMEOUT,
-            run_ingest_then_extract(
-                service,
+    // Phase 1: internal ingest, retried for transient model/extractor
+    // failures. Deterministic validation/corrupt failures and exhausted
+    // storage-layer retries are non-retryable here.
+    let ingest_outcome = retry_until_settled("ingest", MAX_PROCESSOR_ATTEMPTS, telemetry, || {
+        let source_type = source_type.clone();
+        let lineage = lineage.clone();
+        let content_hash = content_hash.clone();
+        let prepared_content = prepared_content.clone();
+        let log_source_id = log_source_id.clone();
+        async move {
+            let episode_id = service
+                .ingestion_service
+                .ingest_with_metadata(
+                    crate::models::IngestRequest {
+                        source_type,
+                        source_id: format!("{lineage}:{content_hash}"),
+                        content: prepared_content,
+                        t_ref,
+                        t_ingested: None,
+                        policy_tags: vec![],
+                    },
+                    None,
+                    IngestionMetadata {
+                        source_lineage: Some(lineage),
+                        log_source_id: Some(log_source_id),
+                    },
+                )
+                .await?;
+            Ok::<_, MemoryError>(episode_id)
+        }
+    })
+    .await;
+
+    let episode_id = match ingest_outcome {
+        SettleOutcome::Succeeded(episode_id) => episode_id,
+        SettleOutcome::Failed {
+            attempts,
+            non_retryable,
+        } => {
+            return fail_cycle(
                 store,
                 &revision_id,
                 &owner,
-                &prepared_content,
-                &source_type,
-                &lineage,
-                &content_hash,
-                &log_source_id,
-                &expected_episode_id,
-                t_ref,
-            ),
+                attempts,
+                non_retryable,
+                "ingest failed",
+            )
+            .await;
+        }
+    };
+
+    // The deterministic episode id must match what we precomputed.
+    if episode_id != expected_episode_id {
+        return fail_cycle_with_class(
+            store,
+            &revision_id,
+            &owner,
+            1,
+            InboxFailureClass::Storage,
+            "inbox revision episode id mismatch (storage invariant)",
         )
         .await;
+    }
 
-        match attempt_result {
-            Ok(Ok(())) => {
-                telemetry.record_success();
-                let _ = store.mark_processed(&revision_id, &owner).await;
-                return ProcessOutcome::Processed;
-            }
+    if let Err(_err) = store
+        .record_episode(&revision_id, &owner, &episode_id)
+        .await
+    {
+        return ProcessOutcome::Interrupted;
+    }
+
+    // Phase 2: extract, retried for transient model/extractor failures.
+    let extract_outcome = retry_until_settled("extract", MAX_PROCESSOR_ATTEMPTS, telemetry, || {
+        let episode_id = episode_id.clone();
+        let context = service.build_context();
+        async move {
+            crate::service::capabilities::extract::ExtractCapability::extract(
+                &context,
+                &episode_id,
+                None,
+                None,
+            )
+            .await
+            .map(|_| ())
+        }
+    })
+    .await;
+
+    match extract_outcome {
+        SettleOutcome::Succeeded(()) => {}
+        SettleOutcome::Failed {
+            attempts,
+            non_retryable,
+        } => {
+            return fail_cycle(
+                store,
+                &revision_id,
+                &owner,
+                attempts,
+                non_retryable,
+                "extract failed",
+            )
+            .await;
+        }
+    }
+
+    let _ = store.mark_processed(&revision_id, &owner).await;
+    ProcessOutcome::Processed
+}
+
+/// Outcome of a bounded retry cycle.
+enum SettleOutcome<T> {
+    Succeeded(T),
+    Failed {
+        attempts: u32,
+        /// `true` when the failure was deterministic (validation/corrupt/
+        /// non-transient storage) and was not retried; `false` when transient
+        /// retries were exhausted.
+        non_retryable: bool,
+    },
+}
+
+/// Retries a fallible operation with bounded exponential backoff for transient
+/// failures.
+async fn retry_until_settled<T, F, Fut>(
+    stage: &'static str,
+    max_attempts: u32,
+    telemetry: &FsWatchTelemetry,
+    mut operation: F,
+) -> SettleOutcome<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, MemoryError>>,
+{
+    let mut attempt = 0u32;
+    loop {
+        attempt += 1;
+        let outcome = tokio::time::timeout(PROCESSOR_ATTEMPT_TIMEOUT, operation()).await;
+        match outcome {
+            Ok(Ok(value)) => return SettleOutcome::Succeeded(value),
             Ok(Err(err)) => {
                 let class = classify_failure(&err);
-                telemetry.record_retry("ingest", class);
-                if !is_transient_class(class) {
-                    let _ = store
-                        .mark_failed_cycle(
-                            &revision_id,
-                            &owner,
-                            class,
-                            &err.to_string(),
-                            attempt,
-                            None,
-                        )
-                        .await;
-                    return ProcessOutcome::FailedNonRetryable;
+                telemetry.record_retry(stage, class);
+                if !is_retryable(&err, class) {
+                    return SettleOutcome::Failed {
+                        attempts: attempt,
+                        non_retryable: true,
+                    };
                 }
-                if attempt >= MAX_PROCESSOR_ATTEMPTS {
-                    let _ = store
-                        .mark_failed_cycle(
-                            &revision_id,
-                            &owner,
-                            class,
-                            &err.to_string(),
-                            attempt,
-                            None,
-                        )
-                        .await;
-                    return ProcessOutcome::FailedRetriesExhausted;
+                if attempt >= max_attempts {
+                    return SettleOutcome::Failed {
+                        attempts: attempt,
+                        non_retryable: false,
+                    };
                 }
                 let delay_ms = PROCESSOR_RETRY_BASE_MS << (attempt - 1).min(4);
                 tokio::time::sleep(Duration::from_millis(delay_ms)).await;
             }
             Err(_elapsed) => {
-                let class = InboxFailureClass::Timeout;
-                telemetry.record_retry("ingest", class);
-                if attempt >= MAX_PROCESSOR_ATTEMPTS {
-                    let _ = store
-                        .mark_failed_cycle(
-                            &revision_id,
-                            &owner,
-                            class,
-                            "processor attempt timed out",
-                            attempt,
-                            None,
-                        )
-                        .await;
-                    return ProcessOutcome::FailedRetriesExhausted;
+                telemetry.record_retry(stage, InboxFailureClass::Timeout);
+                if attempt >= max_attempts {
+                    return SettleOutcome::Failed {
+                        attempts: attempt,
+                        non_retryable: false,
+                    };
                 }
                 let delay_ms = PROCESSOR_RETRY_BASE_MS << (attempt - 1).min(4);
                 tokio::time::sleep(Duration::from_millis(delay_ms)).await;
@@ -212,63 +325,43 @@ pub async fn process_claimed_revision(
     }
 }
 
-/// Runs internal `ingest → extract` for a claimed revision.
-///
-/// Returns `Ok(())` only when the episode exists (or was created) and extract
-/// completed successfully.
-#[allow(clippy::too_many_arguments)]
-async fn run_ingest_then_extract(
-    service: &MemoryService,
+/// Marks a revision failed after a bounded retry cycle.
+async fn fail_cycle(
     store: &InboxRevisionStoreClient,
     revision_id: &crate::models::inbox_revision::InboxRevisionId,
     owner: &str,
-    prepared_content: &str,
-    source_type: &str,
-    lineage: &str,
-    content_sha256: &str,
-    log_source_id: &str,
-    expected_episode_id: &str,
-    t_ref: chrono::DateTime<Utc>,
-) -> Result<(), MemoryError> {
-    let request = crate::models::IngestRequest {
-        source_type: source_type.to_string(),
-        source_id: format!("{lineage}:{content_sha256}"),
-        content: prepared_content.to_string(),
-        t_ref,
-        t_ingested: None,
-        policy_tags: vec![],
+    attempts: u32,
+    non_retryable: bool,
+    message: &str,
+) -> ProcessOutcome {
+    let class = if non_retryable {
+        InboxFailureClass::Validation
+    } else {
+        InboxFailureClass::OtherTransient
     };
-    let episode_id = service
-        .ingestion_service
-        .ingest_with_metadata(
-            request,
-            None,
-            IngestionMetadata {
-                source_lineage: Some(lineage.to_string()),
-                log_source_id: Some(log_source_id.to_string()),
-            },
-        )
-        .await?;
+    let outcome = if non_retryable {
+        ProcessOutcome::FailedNonRetryable
+    } else {
+        ProcessOutcome::FailedRetriesExhausted
+    };
+    let _ = store
+        .mark_failed_cycle(revision_id, owner, class, message, attempts, None)
+        .await;
+    outcome
+}
 
-    // The deterministic episode id must match what we precomputed.
-    if episode_id != expected_episode_id {
-        return Err(MemoryError::Storage(
-            "inbox revision episode id mismatch (storage invariant)".to_string(),
-        ));
-    }
-
-    store
-        .record_episode(revision_id, owner, &episode_id)
-        .await?;
-
-    crate::service::capabilities::extract::ExtractCapability::extract(
-        &service.build_context(),
-        &episode_id,
-        None,
-        None,
-    )
-    .await?;
-    Ok(())
+async fn fail_cycle_with_class(
+    store: &InboxRevisionStoreClient,
+    revision_id: &crate::models::inbox_revision::InboxRevisionId,
+    owner: &str,
+    attempts: u32,
+    class: InboxFailureClass,
+    message: &str,
+) -> ProcessOutcome {
+    let _ = store
+        .mark_failed_cycle(revision_id, owner, class, message, attempts, None)
+        .await;
+    ProcessOutcome::FailedNonRetryable
 }
 
 fn classify_failure(err: &MemoryError) -> InboxFailureClass {
@@ -303,6 +396,17 @@ fn is_corrupt_content(message: &str) -> bool {
         || lowered.contains("failed to parse")
 }
 
+/// A failure is retryable by the processor only when it is a transient
+/// model/extractor/io/timeout class, and never when it is a storage error that
+/// already exhausted the storage-layer retry policy (`storage/client.rs` owns
+/// DB query retries; the processor must not multiply them).
+fn is_retryable(err: &MemoryError, class: InboxFailureClass) -> bool {
+    if let MemoryError::Storage(_) = err {
+        return crate::service::is_transient_db_error(err);
+    }
+    is_transient_class(class)
+}
+
 fn is_transient_class(class: InboxFailureClass) -> bool {
     matches!(
         class,
@@ -315,22 +419,14 @@ fn is_transient_class(class: InboxFailureClass) -> bool {
     )
 }
 
-/// Whether a claimed revision still belongs to this processor (ownership check
-/// used by shutdown).
-#[allow(dead_code)]
-pub(crate) fn lease_matches(claim: &ClaimedInboxRevision, owner: &str) -> bool {
-    claim.lease.owner == owner
-}
-
-/// Releases an interrupted claim (used by bounded shutdown).
-#[allow(dead_code)]
-pub(crate) async fn release_interrupted_claim(
-    store: &InboxRevisionStoreClient,
-    lease: &InboxRevisionLease,
-) -> Result<(), MemoryError> {
-    store
-        .release_interrupted(&lease.revision_id, &lease.owner)
-        .await
+/// Stable structured-log label for a processing outcome.
+fn outcome_label(outcome: ProcessOutcome) -> &'static str {
+    match outcome {
+        ProcessOutcome::Processed => "processed",
+        ProcessOutcome::FailedNonRetryable => "failed",
+        ProcessOutcome::FailedRetriesExhausted => "failed",
+        ProcessOutcome::Interrupted => "interrupted",
+    }
 }
 
 #[cfg(test)]
@@ -339,6 +435,7 @@ mod tests {
     use crate::service::fs_watch::telemetry::FsWatchTelemetry;
     use crate::service::util::deterministic_episode_id_v2;
     use crate::storage::{DbClient, SurrealDbClient};
+    use chrono::Utc;
     use sha2::Digest;
     use std::sync::Arc;
 
