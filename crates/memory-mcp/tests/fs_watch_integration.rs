@@ -1,6 +1,8 @@
 //! In-process integration tests for the filesystem ingestion pipeline:
 //! discovery, durable store, and sequential `ingest → extract` processing.
 
+#![cfg(feature = "fs-watch")]
+
 mod common;
 
 use std::sync::Arc;

@@ -51,13 +51,38 @@ pub(crate) enum CandidateSkipReason {
 
 /// Normalizes a candidate path relative to the inbox, rejecting escapes and
 /// symlinked components. Always uses `/` separators.
+///
+/// Containment is resolved against the canonicalized roots so platform
+/// aliasing (e.g. macOS `/var` ↔ `/private/var`, `/tmp` ↔ `/private/tmp`) does
+/// not reject a file that is physically inside the inbox; the returned
+/// relative path is always lexical (never canonical), preserving the
+/// configured lineage identity.
 pub(crate) fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<String, MemoryError> {
-    let relative = path.strip_prefix(inbox).map_err(|_| {
-        MemoryError::Validation(format!(
-            "candidate path `{}` is not inside inbox root",
-            path.display()
-        ))
-    })?;
+    let relative = match path.strip_prefix(inbox) {
+        Ok(relative) => relative.to_path_buf(),
+        Err(_) => {
+            // Fall back to canonical containment for platform path aliases
+            // (e.g. macOS `/var` ↔ `/private/var`).
+            let canonical_inbox = inbox.canonicalize().map_err(|_| {
+                MemoryError::Validation(format!(
+                    "candidate path `{}` is not inside inbox root",
+                    path.display()
+                ))
+            })?;
+            let canonical_path = path.canonicalize().map_err(|_| {
+                MemoryError::Validation(format!(
+                    "candidate path `{}` is not inside inbox root",
+                    path.display()
+                ))
+            })?;
+            canonical_path.strip_prefix(&canonical_inbox).map_err(|_| {
+                MemoryError::Validation(format!(
+                    "candidate path `{}` is not inside inbox root",
+                    path.display()
+                ))
+            })?.to_path_buf()
+        }
+    };
     let mut parts: Vec<String> = Vec::new();
     for component in relative.components() {
         match component {

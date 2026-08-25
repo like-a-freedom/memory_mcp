@@ -4,7 +4,7 @@
 //! enabled and that no forbidden identifier (path, hash, episode id) appears
 //! as a label or value.
 
-#![cfg(feature = "prometheus")]
+#![cfg(all(feature = "prometheus", feature = "fs-watch"))]
 
 use std::sync::OnceLock;
 

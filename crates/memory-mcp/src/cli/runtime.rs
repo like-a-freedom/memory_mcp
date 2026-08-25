@@ -94,6 +94,18 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
     // Keep a handle for background-worker shutdown. The runtime is shared via
     // `Arc` internally, so the clone observes the same cancellation token.
     let shutdown_service = memory_service.clone();
+
+    // Optional filesystem ingestion owned by this stdio process. Configuration
+    // is parsed before the transport starts so an invalid inbox fails startup.
+    let fs_watch_config = crate::config::fs_watch::from_env()?;
+    #[cfg(not(feature = "fs-watch"))]
+    let _ = fs_watch_config;
+    #[cfg(feature = "fs-watch")]
+    let fs_watch_runtime = match fs_watch_config {
+        Some(config) => Some(memory_service.start_fs_watch(config).await?),
+        None => None,
+    };
+
     let server = MemoryMcp::new(memory_service);
 
     logger.log(event!("op" => json!("main.serve_starting")), LogLevel::Info);
@@ -114,6 +126,20 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
         })
         .map_err(|err| log_and_return_error(logger, "main.error", err));
 
+    // Deterministic shutdown order: filesystem discovery/dequeue first, then
+    // the claim and lifecycle workers, then other background workers.
+    #[cfg(feature = "fs-watch")]
+    if let Some(runtime) = fs_watch_runtime {
+        let outcome = runtime.shutdown().await;
+        logger.log(
+            event!(
+                "op" => json!("fs_watch.shutdown"),
+                "waited_secs" => json!(outcome.waited_secs),
+                "lease_released" => json!(outcome.lease_released),
+            ),
+            LogLevel::Debug,
+        );
+    }
     claim_worker.shutdown().await;
     lifecycle_worker.shutdown().await;
     shutdown_service
