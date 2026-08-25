@@ -33,11 +33,11 @@ cargo build                              # Build everything
 cargo test -p memory_mcp                 # Test production crate
 cargo check                              # Fast compile check
 cargo clippy --workspace --all-targets \ # Lint (zero warnings required)
-  --features cli-watch,mcp-apps --locked -- -D warnings
+  --features fs-watch,mcp-apps --locked -- -D warnings
 cargo fmt --all --check                  # Format check (zero diff)
 cargo fmt --all                          # Auto-format
 cargo run -- serve                       # Start MCP server (stdio)
-cargo run --features cli-watch -- watch --path ./data  # Watch mode
+MEMORY_INGESTION_INBOX=/absolute/path cargo run --features fs-watch -- serve  # Serve with filesystem ingestion
 cargo run -- reembed                     # Rebuild embeddings
 ```
 
@@ -56,7 +56,7 @@ cargo run -- reembed                     # Rebuild embeddings
 - Changing dependencies in `Cargo.toml`
 
 **Always:**
-- Run `cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings` before shipping
+- Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps --locked -- -D warnings` before shipping
 - Add tests for new functionality
 - Follow the design principles below
 
@@ -99,7 +99,7 @@ Full contract: [`docs/agent_integration/CONTRACT.md`](docs/agent_integration/CON
 | `SURREALDB_USERNAME` | Auth username |
 | `SURREALDB_PASSWORD` | Auth password |
 
-**Feature flags (additive):** `cli-watch` (file watcher), `mcp-apps` (app sessions), `prometheus` (metrics), `metal` (explicit Metal GPU backend), `eval-support` (eval harness), `mimalloc` (optional server allocator), and `accelerate` (explicit Apple Accelerate CPU backend). The package default remains `[]`; neither allocator nor Apple backend is enabled implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md) and [the memory profile](docs/performance/MEMORY_PROFILE.md).
+**Feature flags (additive):** `fs-watch` (filesystem ingestion), `mcp-apps` (app sessions), `prometheus` (metrics), `metal` (explicit Metal GPU backend), `eval-support` (eval harness), `mimalloc` (optional server allocator), and `accelerate` (explicit Apple Accelerate CPU backend). The package default remains `[]`; neither allocator nor Apple backend is enabled implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md) and [the memory profile](docs/performance/MEMORY_PROFILE.md).
 
 ## Hooks
 

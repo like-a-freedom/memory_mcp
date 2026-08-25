@@ -27,6 +27,20 @@ has evidence to work with. Empty recall is not authority to widen a boundary.
 Credentials never enter arguments or persisted content. Sensitive business data
 is eligible only when the server's configured policy explicitly permits it.
 
+## Filesystem ingestion
+
+- Filesystem ingestion is an optional capability of `serve`, activated only by
+  `MEMORY_INGESTION_INBOX` (an existing absolute directory, not a symlink).
+- Files are ordinary source-labeled data: no elevated trust, no privileged
+  policy tags.
+- Each distinct set of bytes at a path is one immutable revision; renaming a
+  file starts a new lineage; deleting a file never invalidates memory.
+- A revision is `processed` only after `ingest → extract` succeeds. Failures are
+  retried once per startup; a failed file never stops MCP.
+- Supported formats: PDF, DOCX, XLSX, PPTX, Markdown, plain text, and EML.
+  Symlinks and unsupported files are skipped silently.
+- The `fs-watch` feature is required; official release binaries include it.
+
 ## Time and results
 
 `--as-of` asks what was both knowable and valid at the specified point.

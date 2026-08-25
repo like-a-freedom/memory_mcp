@@ -32,7 +32,7 @@ pub fn revision_id_from_hash(lineage: &str, content_sha256: &str) -> InboxRevisi
 }
 
 /// Constructs a new record with all timestamps defaulted to `now`.
-#[allow(dead_code)]
+#[allow(clippy::too_many_arguments, dead_code)]
 pub fn new_revision_record(
     lineage: String,
     relative_path: String,

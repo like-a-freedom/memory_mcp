@@ -425,12 +425,11 @@ pub(crate) fn watch_reference_time(
         .extension()
         .and_then(|value| value.to_str())
         .is_some_and(|value| value.eq_ignore_ascii_case("eml"));
-    if is_eml {
-        if let Ok(raw) = std::str::from_utf8(bytes)
-            && let Some(date) = email::parse_email_date_header(raw)
-        {
-            return date;
-        }
+    if is_eml
+        && let Ok(raw) = std::str::from_utf8(bytes)
+        && let Some(date) = email::parse_email_date_header(raw)
+    {
+        return date;
     }
     metadata
         .modified()

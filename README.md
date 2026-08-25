@@ -52,7 +52,7 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 - **Optional semantic retrieval providers** including in-process `local-candle`
 - **Pluggable NER backends** for entity extraction: `anno`, `regex`, explicit Anno NuNER ONNX, and two native Candle zero-shot GLiNER backends (selectable via `NER_EXTRACTOR`)
 - **SurrealDB support** for embedded and remote deployments
-- **Optional watch-mode ingestion** for filesystem-backed auto-ingest workflows
+- **Optional filesystem ingestion inside `serve`** for filesystem-backed auto-ingest workflows (activated by `MEMORY_INGESTION_INBOX`)
 - **MCP-native interface** for tool-driven agent workflows
 - **Structured logging** with predictable operational behavior
 
@@ -72,7 +72,7 @@ flowchart TD
     Operator["Operator / CI"]
 
     Agent -->|"stdio JSON-RPC"| MCP["MCP protocol layer\nhandlers, params, parsers, sessions"]
-    Hooks -->|"hidden lifecycle CLI\nsubcommands"| CLI["CLI layer\nserve, watch, reembed, init"]
+    Hooks -->|"hidden lifecycle CLI\nsubcommands"| CLI["CLI layer\nserve, reembed, init"]
     Operator --> CLI
 
     MCP --> Tools["Protocol-agnostic tools\ningest, extract, resolve, retrieve, explain, invalidate"]
@@ -330,19 +330,40 @@ cargo run --quiet --bin memory_mcp
 RocksDB location, set `SURREALDB_DATA_DIR`; otherwise the server uses a
 user-owned data directory by default.
 
-### Filesystem watch mode (optional)
+### Filesystem ingestion (optional, inside `serve`)
 
-The watch mode turns a directory into a **passive memory intake pipe**: drop or save files and the server auto-ingests them without manual tool calls.
+Filesystem ingestion turns a directory into a **passive memory intake pipe**:
+drop or save files into the configured inbox and the stdio MCP server ingests
+them through the full `ingest → extract` pipeline without manual tool calls.
 
-In real workflows, important content already lands on disk — email exports (`.eml`), meeting notes (`.md`, `.docx`), requirements specs, sizing documents. Instead of manually calling `ingest` for each file, the watcher monitors a directory and feeds new or changed files through the full extraction pipeline (NER → entity resolution → fact extraction → embedding) automatically.
+**Activation**
+
+Set `MEMORY_INGESTION_INBOX` to an existing absolute directory when starting
+`serve` (the variable is optional; when absent, startup behavior is unchanged).
+The binary must be built with the `fs-watch` feature (official release binaries
+include it). A binary compiled without the feature rejects a configured inbox
+with an actionable startup error.
+
+```bash
+# Single terminal — the MCP server owns filesystem ingestion
+RUST_LOG=info \
+  MEMORY_INGESTION_INBOX=$HOME/projects/atlas/inbox \
+  SURREALDB_DATA_DIR=$HOME/.memory-mcp/atlas \
+  memory_mcp serve
+```
 
 **What it does**
 
-- Recursively watches a directory for file **create** and **modify** events
-- Filters to supported file types only; unsupported files are silently skipped
-- Deduplicates rapid successive events per file (coalescing)
-- Dispatches qualifying files through the same `ingest` → `extract` pipeline used by MCP tool calls
-- Logs every step with structured events (visible at `RUST_LOG=info`/`debug`/`trace`)
+- Startup validates the inbox, attaches the OS watcher, then scans existing
+  supported files in the background (files cannot fall into a scan-to-watch gap)
+- Watches the inbox recursively for file **create** and **modify** events
+- Processes files only after size and modification time stabilize
+- Skips symlinks and unsupported file types silently
+- Tracks durable revisions: each distinct set of bytes at a path is one
+  immutable revision; renaming a file starts a new lineage; deleting a file
+  never invalidates memory
+- One failed file never stops ingestion or MCP; the watcher backend is
+  recreated with bounded backoff and then enters a logged degraded state
 
 **Supported file types**
 
@@ -358,42 +379,42 @@ In real workflows, important content already lands on disk — email exports (`.
 
 Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipped**.
 
-**User scenario**
+**MCP host example (Zed)**
 
-<details>
-<summary><strong>Example: auto-ingest a project inbox</strong></summary>
-
-```bash
-# Terminal 1 — start the MCP server (stdio, for VS Code / Copilot)
-RUST_LOG=info cargo run --quiet --bin memory_mcp -- serve
-
-# Terminal 2 — start the watcher on a project inbox
-cargo run --features cli-watch --quiet -- \
-  watch ~/projects/atlas/inbox \
-  --interval 5
+```json
+{
+  "context_servers": {
+    "memory_mcp": {
+      "command": "memory_mcp",
+      "args": [],
+      "env": {
+        "MEMORY_INGESTION_INBOX": "/absolute/path/to/inbox",
+        "SURREALDB_DATA_DIR": "/absolute/path/to/atlas-data"
+      }
+    }
+  }
+}
 ```
 
-Now any file dropped or saved in `~/projects/atlas/inbox/` is automatically ingested:
+**MCP host example (Claude Desktop)**
 
-```bash
-# Drop an email export
-cp ~/Downloads/acme_july_2025.eml ~/projects/atlas/inbox/
-
-# Save a requirements spec
-echo "# Air-gapped deployment requirement..." > ~/projects/atlas/inbox/airgap_req.md
-
-# Drop a sizing document
-cp ~/Documents/hw_sizing.xlsx ~/projects/atlas/inbox/
+```json
+{
+  "mcpServers": {
+    "memory_mcp": {
+      "command": "memory_mcp",
+      "args": [],
+      "env": {
+        "MEMORY_INGESTION_INBOX": "/absolute/path/to/inbox",
+        "SURREALDB_DATA_DIR": "/absolute/path/to/atlas-data"
+      }
+    }
+  }
+}
 ```
 
-Each file is processed within `--interval` seconds:
-1. Detected by the watcher
-2. Parsed (format-specific extraction)
-3. Ingested as an episode with `source_id = "watch:<path>"`
-4. Available for `extract` and `assemble_context` queries
-
-No manual `ingest` tool call needed.
-</details>
+Each stdio client process needs its own `SURREALDB_DATA_DIR`; changing only the
+database name or namespace does not avoid the embedded directory lock.
 
 ### Optional MCP apps surface
 
@@ -418,100 +439,87 @@ cargo clippy --all-targets --features mcp-apps
 <summary><strong>Architecture flow</strong></summary>
 
 ```
-CLI: memory_mcp watch <dir> [--interval Z]
+serve (stdio MCP) with MEMORY_INGESTION_INBOX set
   │
   ▼
-FsWatcher::run_with_interval(dir, interval, service)
+FsWatchRuntime::start(service, config)
   │
-  ├─ Validate: directory must exist and be readable
-  ├─ Initialize: notify::RecommendedWatcher (polling mode)
-  ├─ Watch: dir recursively for filesystem events
+  ├─ Validate: inbox must be absolute, readable, not a symlink
+  ├─ Attach OS watcher (watcher-first) — before the scan starts
+  ├─ Requeue: expired leases + one retry cycle for failed revisions
   │
-  └─ EVENT LOOP (blocks on rx.recv())
+  ├─ Spawn event bridge: forwards Create/Modify events
+  ├─ Spawn startup scan: enqueues existing supported files recursively
+  └─ Spawn sequential processor: drains the durable inbox revision store
+
+  SHARED DISCOVERY (both event bridge and scan)
        │
-       ├─ Event arrives (Create / Modify / Remove / Access / …)
+       ├─ prepare_candidate: reject symlinks + unsupported extensions,
+       │   wait for size + mtime stability
+       ├─ Hash raw bytes (SHA-256) → immutable revision identity
+       ├─ discover_prepared: persist durable prepared-content snapshot
        │
-       ├─ Filter: keep only Create + Modify events
-       ├─ Filter: keep only supported file types (7 formats)
-       │
-       ├─ Dedup: if same file triggered an ingest within
-       │         --interval seconds → skip (logged at trace)
-       │
-       ├─ Determine metadata:
-       │   • source_id = "watch:<file_path>"
-       │   • source_type = "email" (.eml) or "document" (all others)
-       │   • namespace = the server's startup-selected Active Namespace
-       │
-       ├─ Dispatch: service.ingest(IngestRequest { content: <file_path> })
-       │   └─ Internally: read file → detect format → extract text → chunk
-       │
-       ├─ Log: watcher.ingest_complete (with episode_id) at Info
-       │
-       └─ On error: log at Error and TERMINATE the watcher (fail-fast)
+       └─ Processor (sequential, lease-based):
+           ├─ ingest → extract (from the durable snapshot, never the path)
+           ├─ retry transient failures (bounded, exponential)
+           └─ mark processed; failed revisions requeue once per startup
 ```
+
 </details>
 
-**Deduplication behavior**
+**Revision and deduplication behavior**
 
 <details>
 <summary><strong>How rapid saves are handled</strong></summary>
 
-When you save a file, editors often fire multiple filesystem events in quick succession (write + metadata + timestamp). The watcher prevents duplicate ingests:
+When you save a file, editors often fire multiple filesystem events in quick succession (write + metadata + timestamp). Files are processed only after **size and modification time stabilize** (two consecutive matching samples), and each distinct set of raw bytes becomes exactly **one immutable inbox revision**:
 
-- Each file's **canonical path** (symlinks resolved, `..` normalized) is tracked in a `HashMap`
-- If the same file triggers another event **within `--interval` seconds** of its last ingest, the new event is **skipped**
-- Skipped events are logged at `trace` level with reason `interval_dedup`
+- Revision identity is SHA-256 over the raw bytes plus the normalized lineage (path relative to the inbox)
+- Re-scanning or re-observing identical bytes returns the existing revision — no duplicate episode or facts
+- A file that changes creates a **new revision** (new episode, same `source_lineage`)
+- Renaming a file starts a **new lineage** (new episode source lineage); deleting a file never invalidates memory
 
-Example with `--interval 5`:
-```
-12:00:00 — note.md modified → ingested ✓
-12:00:01 — note.md modified again → skipped (dedup, 1s < 5s)
-12:00:02 — note.md modified again → skipped (dedup, 2s < 5s)
-12:00:06 — note.md modified again → ingested ✓ (6s ≥ 5s)
-```
-
-The `--interval` flag controls both the poll frequency (how often notify scans the directory) **and** the dedup window (minimum time between ingests of the same file).
 </details>
 
 **Command-line reference**
 
 <details>
-<summary><strong>Flags and defaults</strong></summary>
+<summary><strong>Activation</strong></summary>
 
 ```
-memory_mcp watch <dir> [OPTIONS]
+MEMORY_INGESTION_INBOX=/absolute/path/to/inbox memory_mcp serve
 
-Required:
-  <dir>              Directory to watch (must exist and be readable)
-
-Optional:
-  --interval <secs>  Poll interval + dedup window in seconds (default: 2, min: 1)
+The variable must be a non-empty absolute path to an existing readable
+directory that is not a symlink. Omit it to keep filesystem ingestion
+disabled. The binary must include the `fs-watch` feature (official release
+binaries do); a binary compiled without it rejects a configured inbox with
+an actionable startup error.
 ```
 
 Important notes:
-- The `watch` subcommand requires the `cli-watch` feature. Without it, the binary returns an error.
-The watcher is **fail-fast**: any ingest error terminates the entire watch loop.
-The watcher **does not diff content** — every qualifying event triggers a full re-ingest of the file.
-`Remove`, `Access`, and `Metadata` change events are ignored.
+- One process watches exactly one inbox recursively; symlinks and unsupported
+  files are skipped.
+- Files are processed only after size and modification time stabilize.
+- Each distinct set of bytes is one immutable revision; renaming starts a new
+  lineage; deleting a file never invalidates memory.
+- One failed file or a degraded watcher backend never stops MCP or queued work.
 </details>
 
-**Logging during watch**
+**Logging during filesystem ingestion**
 
 <details>
 <summary><strong>What to expect at each log level</strong></summary>
 
-| Level | Watch events you'll see |
-|-------|------------------------|
-| `info` | `watcher.ready` (startup), `watcher.ingest_complete` (with `episode_id`) |
-| `debug` | `watcher.ingest_dispatch` (file path and source_type; storage uses the process Active Namespace) |
-| `trace` | `watcher.event_skipped` (dedup reason, elapsed vs interval) |
-| `warn` | — (none specific to watch) |
-| `error` | `watcher.ingest_error` (fatal — watcher terminates) |
+| Level | Events you'll see |
+|-------|-------------------|
+| `info` | `fs_watch` readiness, revision success/failure, startup-scan summary |
+| `debug` | per-revision discovery and stage transitions (relative path + short revision prefix only) |
+| `warn` | `fs_watch.degraded` (watcher backend exhausted after bounded backoff) |
+| `error` | revision failures with bounded failure class |
 
-Example info-level output for a successful ingest:
-```
-[2026-04-13T12:00:00.123Z] INFO  req=-       op=watcher.ingest_complete  episode_id=episode:abc123  path=watch:/inbox/note.md  source_type=document
-```
+Revision events contain relative paths and short revision prefixes only; file
+contents and absolute inbox roots never appear in logs except startup
+diagnostics.
 </details>
 
 ### VS Code MCP host example
@@ -705,7 +713,7 @@ Two startup behaviors keep this from blocking `serve`:
 - If no override is set and the provider is unreachable, the probe fails fast (single attempt, bounded by a short probe timeout) and the server degrades to lexical/graph-only retrieval instead of stalling startup.
 
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
-In normal `serve` / `watch` startup, the Active Namespace is checked before semantic retrieval is enabled.
+In normal `serve` startup, the Active Namespace is checked before semantic retrieval is enabled.
 If it is already marked `ready` for the same signature and has no missing vectors, semantic retrieval starts normally. If it is marked `backfill_pending`, startup resumes the recovery worker; a matching `ready` state with `embedding IS NONE` facts is also treated as resumable for compatibility with states written before the durable marker existed.
 If its state is missing but it is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
 If it is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors. When a signature differs but missing vectors exist, the service starts degraded and schedules safe backfill of only those missing vectors; the old persisted signature remains until `reembed` completes.
@@ -718,7 +726,7 @@ To switch, change the environment variables and restart. The server does **not**
 
 The runtime now separates two modes:
 
-**Normal mode** (`memory_mcp` or `memory_mcp watch ...`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
+**Normal mode** (`memory_mcp` or `memory_mcp serve`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
 **Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
 
 This keeps the public MCP tool surface unchanged while giving operators a deterministic recovery path after provider changes.
@@ -891,17 +899,17 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 
 `memory_mcp` emits structured logs across the plan-added functionality using the standard levels below:
 
-- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, watcher startup, watcher ingest completion, and community rebuild passes
-- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
-- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, watcher dedup skips, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
-- `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, and degraded worker passes
-- `error` — terminal failures such as watcher ingest errors or process-level startup/serve failures
+- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and revision completion, and community rebuild passes
+- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), filesystem revision discovery, view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
+- `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
+- `error` — terminal failures such as process-level startup/serve failures and bounded revision failures
 
 Recommended presets:
 
 - `RUST_LOG=info` for normal local/server usage
 - `RUST_LOG=debug` when validating new ingest/view-mode/graph behavior
-- `RUST_LOG=trace` when debugging retrieval tiers, cache behavior, or watcher dedup decisions
+- `RUST_LOG=trace` when debugging retrieval tiers, cache behavior, or filesystem-ingestion revision decisions
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
 
@@ -1135,8 +1143,7 @@ Every memory tool can be invoked directly from the command line. The CLI shares 
 
 | Command | Description |
 |---------|-------------|
-| `serve` (default) | Run the stdio MCP server |
-| `watch <dir>` | Watch a directory and auto-ingest files (requires `cli-watch` feature) |
+| `serve` (default) | Run the stdio MCP server. Set `MEMORY_INGESTION_INBOX` to enable filesystem ingestion (`fs-watch` feature) |
 | `reembed` | Rebuild all fact embeddings after a provider switch. Flags: `--max-failures N`, `--retry-failed` |
 | `lifecycle` | Inspect or run lifecycle maintenance: `dashboard`, `archive-candidates`, `restore-archived`, `recompute-decay`, `rebuild-communities` |
 | `ingest` | Store raw source material as an episode |

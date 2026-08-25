@@ -1,7 +1,7 @@
 .PHONY: eval-pr eval-release eval-nightly serve-release
 
 serve-release:
-	cargo run --release -- serve
+	cargo run --release --features fs-watch -- serve
 
 eval-pr:
 	@mkdir -p target/evals

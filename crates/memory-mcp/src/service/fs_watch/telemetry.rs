@@ -102,7 +102,8 @@ impl FsWatchTelemetry {
     pub(crate) fn record_retry(&self, stage: &str, class: InboxFailureClass) {
         let stage = retry_stage_label(stage);
         let reason = retry_reason_label(class);
-        metrics::counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => stage, "reason" => reason).increment(1);
+        metrics::counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => stage, "reason" => reason)
+            .increment(1);
     }
 
     pub(crate) fn record_scan_file(&self, outcome: &str) {
@@ -122,7 +123,11 @@ impl FsWatchTelemetry {
         metrics::gauge!(METRIC_FS_WATCH_DEGRADED).set(if degraded { 1.0 } else { 0.0 });
     }
 
-    pub(crate) fn record_revision_duration(&self, outcome: ProcessOutcome, duration: std::time::Duration) {
+    pub(crate) fn record_revision_duration(
+        &self,
+        outcome: ProcessOutcome,
+        duration: std::time::Duration,
+    ) {
         let outcome = revision_outcome_label(outcome);
         metrics::histogram!(METRIC_FS_WATCH_REVISION_DURATION_SECONDS, "outcome" => outcome)
             .record(duration.as_secs_f64());

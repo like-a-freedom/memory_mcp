@@ -27,7 +27,10 @@ impl ServeDriver {
     fn spawn(inbox: Option<&std::path::Path>) -> Self {
         let temp = tempfile::tempdir().expect("temp dir");
         let data_dir = temp.path().join("db");
-        Self::spawn_with_data_dir(inbox.map(std::path::Path::to_path_buf).as_deref(), Some(&data_dir))
+        Self::spawn_with_data_dir(
+            inbox.map(std::path::Path::to_path_buf).as_deref(),
+            Some(&data_dir),
+        )
     }
 
     fn spawn_with_data_dir(
@@ -139,10 +142,7 @@ impl ServeDriver {
                 Err(err) => panic!("failed to poll serve exit: {err}"),
             }
         }
-        assert!(
-            exited,
-            "serve must exit within the bounded shutdown window"
-        );
+        assert!(exited, "serve must exit within the bounded shutdown window");
     }
 }
 
@@ -257,7 +257,8 @@ fn separate_data_directories_coexist_without_ownership_conflict() {
 
     let mut first = ServeDriver::spawn_with_data_dir(Some(inbox_a.path()), Some(first_dir.path()));
     first.initialize();
-    let mut second = ServeDriver::spawn_with_data_dir(Some(inbox_b.path()), Some(second_dir.path()));
+    let mut second =
+        ServeDriver::spawn_with_data_dir(Some(inbox_b.path()), Some(second_dir.path()));
     second.initialize();
 
     first.shutdown();

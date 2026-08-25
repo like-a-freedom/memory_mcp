@@ -7,7 +7,7 @@
   "memory_gb": 16,
   "rust_toolchain": "stable",
   "build_flags": "--release",
-  "features": ["cli-watch", "mcp-apps"],
+  "features": ["fs-watch", "mcp-apps"],
   "provider": "local",
   "model": "local-cpu",
   "device": "cpu",

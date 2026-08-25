@@ -89,7 +89,7 @@ jobs:
         # `metal` is a macOS-only Candle backend.  Keep the Linux gate focused
         # on the features that are supported by the runner instead of making
         # `--all-features` try to compile Metal on Ubuntu.
-        run: cargo clippy --workspace --all-targets --features cli-watch,mcp-apps --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps --locked -- -D warnings
 
   clippy_macos:
     name: Rust clippy (macOS features)
@@ -123,6 +123,31 @@ jobs:
 
       - name: Run tests
         run: cargo test --workspace --lib --bins --tests --locked
+
+  fs_watch_windows:
+    name: Filesystem ingestion (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Run candidate path-normalization tests
+        shell: pwsh
+        run: |
+          cargo test -p memory_mcp service::fs_watch::candidate --features fs-watch --locked
+          if ($LASTEXITCODE -ne 0) { throw "candidate path normalization failed on Windows" }
+
+      - name: Run enabled process tests
+        shell: pwsh
+        run: |
+          cargo test -p memory_mcp --test fs_watch_process_enabled --features fs-watch --locked
+          if ($LASTEXITCODE -ne 0) { throw "fs_watch_process_enabled failed on Windows" }
 
   eval-pr:
     name: Evaluation PR profile
@@ -251,7 +276,7 @@ jobs:
           target: ${{ matrix.platform.target }}
 
       - name: Build binary
-        run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }} --locked
+        run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }} --features fs-watch --locked
 
       - name: Prepare artifact (Unix)
         if: matrix.platform.os != 'windows-latest'
@@ -331,6 +356,22 @@ jobs:
               --t-ref 2026-02-05T00:00:00Z
             if ($LASTEXITCODE -ne 0) { throw "NER selector $selector smoke failed" }
           }
+
+      - name: Smoke test filesystem ingestion (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        timeout-minutes: 15
+        run: |
+          MEMORY_RELEASE_BINARY=target/${{ matrix.platform.target }}/release/memory_mcp \
+            cargo test -p memory_mcp --test release_binary_fs_watch --features fs-watch -- --nocapture
+
+      - name: Smoke test filesystem ingestion (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $env:MEMORY_RELEASE_BINARY = "target\${{ matrix.platform.target }}\release\memory_mcp.exe"
+          cargo test -p memory_mcp --test release_binary_fs_watch --features fs-watch -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "filesystem ingestion release smoke failed" }
 
       - name: Generate SHA-256 (Unix)
         if: matrix.platform.os != 'windows-latest'

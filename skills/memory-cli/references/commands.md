@@ -33,16 +33,16 @@ therefore belongs to the canonicalize workflow, not read-only recall.
 
 - `memory_mcp serve` starts the stdio MCP server. With no subcommand, the binary
   also defaults to server mode.
-- `memory_mcp watch <DIR>` watches one resolved directory. Polling interval is
-  an optional flag.
+- Filesystem ingestion runs inside `serve`: set `MEMORY_INGESTION_INBOX` to an
+  existing absolute directory to activate it (`fs-watch` feature required;
+  official release binaries include it).
 - `memory_mcp reembed` rebuilds fact embeddings. `--max-failures 0` is
   fail-fast; `--retry-failed` limits work to facts recorded as failed by a prior
   run.
 
-`watch` availability depends on the binary feature set. `reembed` is
-interactive in a TTY, continues within its configured failure budget, and uses
-terminal states `running`, `completed`, `completed_with_errors`, `failed`, and
-`interrupted`.
+`reembed` is interactive in a TTY, continues within its configured failure
+budget, and uses terminal states `running`, `completed`, `completed_with_errors`,
+`failed`, and `interrupted`.
 
 Hidden lifecycle commands are implementation interfaces for installed hooks,
 not public commands for ad-hoc agent use.

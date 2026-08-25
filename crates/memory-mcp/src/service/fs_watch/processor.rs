@@ -18,8 +18,8 @@ use crate::error::MemoryError;
 use crate::models::inbox_revision::{
     ClaimedInboxRevision, InboxFailureClass, InboxProcessingStage, InboxRevisionLease,
 };
-use crate::service::ingestion::IngestionMetadata;
 use crate::service::MemoryService;
+use crate::service::ingestion::IngestionMetadata;
 use crate::storage::InboxRevisionStoreClient;
 
 use super::telemetry::FsWatchTelemetry;
@@ -94,7 +94,8 @@ impl InboxRevisionProcessor {
                 let mut guard = self.current_lease.lock().await;
                 *guard = Some(claim.lease.clone());
             }
-            let outcome = process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
+            let outcome =
+                process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
             {
                 let mut guard = self.current_lease.lock().await;
                 *guard = None;
@@ -153,9 +154,7 @@ pub async fn process_claimed_revision(
         match attempt_result {
             Ok(Ok(())) => {
                 telemetry.record_success();
-                let _ = store
-                    .mark_processed(&revision_id, &owner)
-                    .await;
+                let _ = store.mark_processed(&revision_id, &owner).await;
                 return ProcessOutcome::Processed;
             }
             Ok(Err(err)) => {
@@ -217,6 +216,7 @@ pub async fn process_claimed_revision(
 ///
 /// Returns `Ok(())` only when the episode exists (or was created) and extract
 /// completed successfully.
+#[allow(clippy::too_many_arguments)]
 async fn run_ingest_then_extract(
     service: &MemoryService,
     store: &InboxRevisionStoreClient,
@@ -273,7 +273,9 @@ async fn run_ingest_then_extract(
 
 fn classify_failure(err: &MemoryError) -> InboxFailureClass {
     match err {
-        MemoryError::Validation(message) if is_corrupt_content(message) => InboxFailureClass::Corrupt,
+        MemoryError::Validation(message) if is_corrupt_content(message) => {
+            InboxFailureClass::Corrupt
+        }
         MemoryError::Validation(_) => InboxFailureClass::Validation,
         MemoryError::Storage(message) if crate::service::is_transient_db_error(err) => {
             InboxFailureClass::Storage
@@ -281,11 +283,15 @@ fn classify_failure(err: &MemoryError) -> InboxFailureClass {
         MemoryError::Storage(message) if message.contains("table") => InboxFailureClass::Storage,
         MemoryError::Storage(_) => InboxFailureClass::Storage,
         MemoryError::Transient(message) if message.contains("model") => InboxFailureClass::Model,
-        MemoryError::Transient(message) if message.contains("timeout") => InboxFailureClass::Timeout,
+        MemoryError::Transient(message) if message.contains("timeout") => {
+            InboxFailureClass::Timeout
+        }
         MemoryError::Transient(_) => InboxFailureClass::OtherTransient,
         MemoryError::NotFound(_) => InboxFailureClass::Validation,
         MemoryError::Conflict(_) => InboxFailureClass::Validation,
-        MemoryError::ConfigMissing(_) | MemoryError::ConfigInvalid(_) => InboxFailureClass::Validation,
+        MemoryError::ConfigMissing(_) | MemoryError::ConfigInvalid(_) => {
+            InboxFailureClass::Validation
+        }
         MemoryError::BudgetExhausted(_) => InboxFailureClass::Validation,
     }
 }
@@ -343,8 +349,9 @@ mod tests {
                 .expect("connect in memory"),
         );
         db.apply_migrations("org").await.expect("migrations");
-        let service = MemoryService::new(db.clone(), "org".to_string(), "warn".to_string(), 50, 100)
-            .expect("service");
+        let service =
+            MemoryService::new(db.clone(), "org".to_string(), "warn".to_string(), 50, 100)
+                .expect("service");
         (service, db)
     }
 
@@ -387,8 +394,7 @@ mod tests {
             .expect("claim")
             .expect("claimable");
 
-        let outcome =
-            process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
         assert_eq!(outcome, ProcessOutcome::Processed);
 
         // Episode exists with lineage.
@@ -414,11 +420,11 @@ mod tests {
 
     #[tokio::test]
     async fn transient_extractor_failures_are_retried_within_bounds() {
+        use crate::service::EntityExtractor;
         use crate::service::embedding::DisabledEmbeddingProvider;
         use crate::service::entity_extraction::NerScheduling;
-        use crate::service::EntityExtractor;
-        use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
         struct FlakyExtractor {
             failed_once: AtomicBool,
@@ -473,11 +479,8 @@ mod tests {
         let t_ref = Utc::now();
         let content = "Alice Smith reports ARR is $5M.";
         let content_hash = hex::encode(sha2::Sha256::digest(content.as_bytes()));
-        let expected_episode_id = deterministic_episode_id_v2(
-            "document",
-            &format!("fs:retry:{content_hash}"),
-            t_ref,
-        );
+        let expected_episode_id =
+            deterministic_episode_id_v2("document", &format!("fs:retry:{content_hash}"), t_ref);
         let record = crate::storage::inbox_revision_store::new_revision_record(
             "fs:retry".to_string(),
             "retry.md".to_string(),
@@ -497,16 +500,15 @@ mod tests {
             .expect("claimable");
         // The flaky extractor fails once, then succeeds; the processor retries
         // within its bounded cycle and reaches Processed.
-        let outcome =
-            process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
         assert_eq!(outcome, ProcessOutcome::Processed);
     }
 
     #[tokio::test]
     async fn retries_exhausted_marks_failed_after_bounded_attempts() {
+        use crate::service::EntityExtractor;
         use crate::service::embedding::DisabledEmbeddingProvider;
         use crate::service::entity_extraction::NerScheduling;
-        use crate::service::EntityExtractor;
 
         struct AlwaysFailExtractor;
 
@@ -576,8 +578,7 @@ mod tests {
             .await
             .expect("claim")
             .expect("claimable");
-        let outcome =
-            process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
         assert_eq!(outcome, ProcessOutcome::FailedRetriesExhausted);
 
         let row = db

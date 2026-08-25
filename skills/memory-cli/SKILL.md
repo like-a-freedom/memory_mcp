@@ -94,17 +94,20 @@ reported explicitly; no write command ran during the recall workflow.
 *Completion:* a client completes initialization and can list the expected tools,
 or startup is reported failed with the process status and diagnostic.
 
-## Workflow: watch
+## Workflow: filesystem ingestion
 
-1. Resolve the exact directory to watch.
-2. Start `memory_mcp watch` only after confirming continuous ingestion is
-   intended.
-3. Observe per-file results; distinguish successful episode creation, empty
-   extraction, and failures.
-4. Stop the watcher deliberately and report unprocessed or failed files.
+1. Confirm filesystem ingestion is intended and that `MEMORY_INGESTION_INBOX`
+   points at an existing absolute directory.
+2. Start `memory_mcp serve` with `MEMORY_INGESTION_INBOX` set (the `fs-watch`
+   feature is required; official release binaries include it).
+3. Observe per-file results through the episode/fact store; distinguish
+   successful revision processing, skipped files, and failures.
+4. Report revision outcomes; failures are retried once per startup and never
+   stop MCP.
 
-*Completion:* the watched boundary and outcome counts are known; failures remain
-actionable and no directory outside the intended boundary was watched.
+*Completion:* the inbox boundary and processed-revision counts are known;
+failures remain actionable and no directory outside the intended boundary was
+watched.
 
 ## Workflow: re-embed
 

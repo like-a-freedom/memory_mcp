@@ -95,6 +95,10 @@ fn render(target: InitTarget) -> Result<serde_json::Value, MemoryError> {
         "mutates_files": false,
         "snippet": snippet,
         "next": NEXT_STEP,
+        "guidance": [
+            "Optional filesystem ingestion: set MEMORY_INGESTION_INBOX to an existing absolute directory; omit it to keep filesystem ingestion disabled.",
+            "Each embedded stdio Memory MCP process must use a unique SURREALDB_DATA_DIR; changing only the database name or namespace does not avoid the directory lock."
+        ],
     }))
 }
 
@@ -215,6 +219,35 @@ mod tests {
 
         for target in targets {
             let value = render(target).expect("renderer output");
+            assert_eq!(value["mutates_files"], false);
+        }
+    }
+
+    #[test]
+    fn every_renderer_keeps_fs_ingestion_optional_and_explains_storage_isolation() {
+        for target in [
+            InitTarget::Vscode,
+            InitTarget::ClaudeDesktop,
+            InitTarget::Codex,
+            InitTarget::Zed,
+            InitTarget::Env,
+        ] {
+            let value = render(target).expect("init target renders");
+            let snippet = value["snippet"].as_str().expect("snippet is a string");
+            assert!(!snippet.contains("MEMORY_INGESTION_INBOX"));
+
+            let guidance = value["guidance"]
+                .as_array()
+                .expect("guidance is an array")
+                .iter()
+                .map(|item| item.as_str().expect("guidance item is a string"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            assert!(guidance.contains("Optional filesystem ingestion"));
+            assert!(guidance.contains("MEMORY_INGESTION_INBOX"));
+            assert!(guidance.contains("existing absolute directory"));
+            assert!(guidance.contains("unique SURREALDB_DATA_DIR"));
+            assert!(guidance.contains("directory lock"));
             assert_eq!(value["mutates_files"], false);
         }
     }

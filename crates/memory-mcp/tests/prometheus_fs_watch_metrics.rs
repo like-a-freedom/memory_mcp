@@ -33,7 +33,8 @@ fn filesystem_watch_metric_families_are_exact_and_bounded() {
     // Emit every family directly with bounded labels.
     counter!(METRIC_FS_WATCH_REVISIONS_TOTAL, "outcome" => "processed").increment(1);
     counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => "ingest", "reason" => "model").increment(1);
-    counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => "extract", "reason" => "timeout").increment(1);
+    counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => "extract", "reason" => "timeout")
+        .increment(1);
     counter!(METRIC_FS_WATCH_SCAN_FILES_TOTAL, "outcome" => "enqueued").increment(1);
     counter!(METRIC_FS_WATCH_SCAN_FILES_TOTAL, "outcome" => "skipped_symlink").increment(1);
     gauge!(METRIC_FS_WATCH_QUEUE_DEPTH).set(4.0);
@@ -74,7 +75,8 @@ fn no_identifier_leaks_into_filesystem_watch_labels() {
     let handle = render_handle();
 
     counter!(METRIC_FS_WATCH_REVISIONS_TOTAL, "outcome" => "processed").increment(1);
-    counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => "ingest", "reason" => "storage").increment(1);
+    counter!(METRIC_FS_WATCH_RETRIES_TOTAL, "stage" => "ingest", "reason" => "storage")
+        .increment(1);
     counter!(METRIC_FS_WATCH_SCAN_FILES_TOTAL, "outcome" => "enqueued").increment(1);
 
     let output = handle.render();
