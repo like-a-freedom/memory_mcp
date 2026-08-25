@@ -242,39 +242,58 @@ impl SurrealDbClient {
         })
     }
 
+    /// Maps an embedded RocksDB initialization error into an actionable startup
+    /// error. RocksDB remains the final ownership arbiter; only known lock /
+    /// resource-busy signatures are translated.
+    fn map_embedded_init_error(data_dir: &PathBuf, message: &str) -> MemoryError {
+        let lowered = message.to_ascii_lowercase();
+        let is_lock_error = lowered.contains("resource busy")
+            || lowered.contains("lock")
+            || lowered.contains("would block")
+            || lowered.contains("permission denied");
+        if is_lock_error {
+            MemoryError::ConfigInvalid(format!(
+                "embedded data directory `{}` is locked by another Memory MCP process: {message}. \
+                 Each stdio client needs a unique SURREALDB_DATA_DIR (changing only the database \
+                 name or namespace does not avoid the directory lock), or use a remote SurrealDB.",
+                data_dir.display()
+            ))
+        } else {
+            MemoryError::Storage(format!("SurrealDB embedded init failed: {message}"))
+        }
+    }
+
     /// Connects to embedded RocksDB instance.
     async fn connect_embedded(config: &SurrealConfig) -> Result<DbEngine, MemoryError> {
-        use surrealdb::opt::{Config as SurrealOptConfig, capabilities::Capabilities};
+    use surrealdb::opt::{Config as SurrealOptConfig, capabilities::Capabilities};
 
-        let data_dir = PathBuf::from(config.data_dir_or_default());
-        ensure_dir_exists(data_dir.as_path())?;
+    let data_dir = PathBuf::from(config.data_dir_or_default());
+    ensure_dir_exists(data_dir.as_path())?;
 
-        let root = Root {
-            username: config.username.clone(),
-            password: config.password.clone(),
-        };
+    let root = Root {
+        username: config.username.clone(),
+        password: config.password.clone(),
+    };
 
-        let cfg = SurrealOptConfig::new()
-            .user(root.clone())
-            .capabilities(Capabilities::default());
+    let cfg = SurrealOptConfig::new()
+        .user(root.clone())
+        .capabilities(Capabilities::default());
 
-        let db = Surreal::new::<RocksDb>((data_dir, cfg))
-            .await
-            .map_err(|err| {
-                MemoryError::Storage(format!("SurrealDB embedded init failed: {err}"))
-            })?;
+    let db = Surreal::new::<RocksDb>((data_dir.clone(), cfg))
+        .await
+        .map_err(|err| Self::map_embedded_init_error(&data_dir, &err.to_string()))?;
 
-        db.signin(root)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
+    db.signin(root)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
 
-        db.use_ns(config.active_namespace().as_str())
-            .use_db(&config.db_name)
-            .await
-            .map_err(|err| MemoryError::Storage(format!("SurrealDB use_failed: {err}")))?;
+    db.use_ns(config.active_namespace().as_str())
+        .use_db(&config.db_name)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB use_failed: {err}")))?;
 
-        Ok(DbEngine::Local(Arc::new(db)))
-    }
+    Ok(DbEngine::Local(Arc::new(db)))
+}
 
     /// Connects to remote WebSocket instance.
     async fn connect_remote(config: &SurrealConfig) -> Result<DbEngine, MemoryError> {
@@ -929,6 +948,46 @@ mod tests {
 
     use super::*;
     use crate::logging::StdoutLogger;
+
+    #[test]
+    fn embedded_init_error_translates_lock_signatures_actionably() {
+        let data_dir = PathBuf::from("/tmp/locked-data-dir");
+
+        for message in [
+            "IO error: ... LOCK ... Resource busy",
+            "Resource busy: lock held by another process",
+            "database would block",
+            "LOCK: lock already held",
+        ] {
+            let error = SurrealDbClient::map_embedded_init_error(&data_dir, message);
+            let text = error.to_string();
+            assert!(
+                matches!(error, MemoryError::ConfigInvalid(_)),
+                "lock-like error must be ConfigInvalid: {message}"
+            );
+            assert!(
+                text.contains("/tmp/locked-data-dir"),
+                "must mention the data directory: {text}"
+            );
+            assert!(
+                text.contains("SURREALDB_DATA_DIR"),
+                "must mention unique SURREALDB_DATA_DIR: {text}"
+            );
+            assert!(
+                text.contains("remote SurrealDB"),
+                "must mention remote SurrealDB: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_init_error_retains_generic_wording_for_unrelated_failures() {
+        let data_dir = PathBuf::from("/tmp/data-dir");
+        let error = SurrealDbClient::map_embedded_init_error(&data_dir, "unsupported rocksdb options");
+        assert!(matches!(error, MemoryError::Storage(_)));
+        assert!(error.to_string().contains("SurrealDB embedded init failed"));
+        assert!(!error.to_string().contains("SURREALDB_DATA_DIR"));
+    }
 
     #[derive(Clone, Default)]
     struct RecordingDbClient {

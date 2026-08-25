@@ -27,6 +27,17 @@ impl ServeDriver {
     fn spawn(inbox: Option<&std::path::Path>) -> Self {
         let temp = tempfile::tempdir().expect("temp dir");
         let data_dir = temp.path().join("db");
+        Self::spawn_with_data_dir(inbox.map(std::path::Path::to_path_buf).as_deref(), Some(&data_dir))
+    }
+
+    fn spawn_with_data_dir(
+        inbox: Option<&std::path::Path>,
+        data_dir_override: Option<&std::path::Path>,
+    ) -> Self {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let data_dir = data_dir_override
+            .map(|path| path.to_path_buf())
+            .unwrap_or_else(|| temp.path().join("db"));
         let mut command = Command::new(binary());
         command
             .env_clear()
@@ -231,4 +242,24 @@ fn stdio_close_triggers_bounded_shutdown() {
     driver.initialize();
     // Closing stdin triggers a bounded watcher shutdown.
     driver.shutdown();
+}
+
+/// RocksDB on this platform allows a second process to open the same directory
+/// until the first write; lock failures are translated by the unit-tested
+/// `map_embedded_init_error`. This test documents that two processes with
+/// different data directories coexist without any ownership conflict.
+#[test]
+fn separate_data_directories_coexist_without_ownership_conflict() {
+    let first_dir = tempfile::tempdir().expect("first data dir");
+    let second_dir = tempfile::tempdir().expect("second data dir");
+    let inbox_a = tempfile::tempdir().expect("inbox a");
+    let inbox_b = tempfile::tempdir().expect("inbox b");
+
+    let mut first = ServeDriver::spawn_with_data_dir(Some(inbox_a.path()), Some(first_dir.path()));
+    first.initialize();
+    let mut second = ServeDriver::spawn_with_data_dir(Some(inbox_b.path()), Some(second_dir.path()));
+    second.initialize();
+
+    first.shutdown();
+    second.shutdown();
 }
