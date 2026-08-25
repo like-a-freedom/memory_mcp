@@ -2,6 +2,8 @@
 //! reject a configured `MEMORY_INGESTION_INBOX` with an actionable startup
 //! error, and must start `serve` exactly as before when the variable is absent.
 
+#![cfg(not(feature = "fs-watch"))]
+
 use std::process::{Command, Stdio};
 use std::time::Duration;
 

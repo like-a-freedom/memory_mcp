@@ -23,7 +23,7 @@ use crate::service::fs_watch::{
 
 /// Normalized content prepared from one immutable raw-byte revision.
 #[derive(Debug)]
-pub(crate) struct PreparedInboxRevision {
+pub struct PreparedInboxRevision {
     pub relative_path: String,
     pub lineage: String,
     pub content_sha256: String,
@@ -35,13 +35,13 @@ pub(crate) struct PreparedInboxRevision {
 
 /// Outcome of preparing one candidate path.
 #[derive(Debug)]
-pub(crate) enum CandidateOutcome {
+pub enum CandidateOutcome {
     Ready(Box<PreparedInboxRevision>),
     Skipped(CandidateSkipReason),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CandidateSkipReason {
+pub enum CandidateSkipReason {
     NotRegularFile,
     UnsupportedFormat,
     Symlink,
@@ -57,7 +57,7 @@ pub(crate) enum CandidateSkipReason {
 /// not reject a file that is physically inside the inbox; the returned
 /// relative path is always lexical (never canonical), preserving the
 /// configured lineage identity.
-pub(crate) fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<String, MemoryError> {
+pub fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<String, MemoryError> {
     let relative = match path.strip_prefix(inbox) {
         Ok(relative) => relative.to_path_buf(),
         Err(_) => {
@@ -75,22 +75,27 @@ pub(crate) fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<Stri
                     path.display()
                 ))
             })?;
-            canonical_path.strip_prefix(&canonical_inbox).map_err(|_| {
-                MemoryError::Validation(format!(
-                    "candidate path `{}` is not inside inbox root",
-                    path.display()
-                ))
-            })?.to_path_buf()
+            canonical_path
+                .strip_prefix(&canonical_inbox)
+                .map_err(|_| {
+                    MemoryError::Validation(format!(
+                        "candidate path `{}` is not inside inbox root",
+                        path.display()
+                    ))
+                })?
+                .to_path_buf()
         }
     };
     let mut parts: Vec<String> = Vec::new();
     for component in relative.components() {
         match component {
             Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
-            Component::ParentDir => return Err(MemoryError::Validation(format!(
-                "candidate path `{}` escapes the inbox root",
-                path.display()
-            ))),
+            Component::ParentDir => {
+                return Err(MemoryError::Validation(format!(
+                    "candidate path `{}` escapes the inbox root",
+                    path.display()
+                )));
+            }
             Component::CurDir => {}
             Component::RootDir | Component::Prefix(_) => {
                 return Err(MemoryError::Validation(format!(
@@ -110,7 +115,7 @@ pub(crate) fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<Stri
 }
 
 /// Returns `true` when the candidate's symlink metadata is a symlink.
-pub(crate) fn is_symlink(path: &Path) -> bool {
+pub fn is_symlink(path: &Path) -> bool {
     path.symlink_metadata()
         .map(|metadata| metadata.file_type().is_symlink())
         .unwrap_or(false)
@@ -118,7 +123,7 @@ pub(crate) fn is_symlink(path: &Path) -> bool {
 
 /// Determines the source type for a relative path (`email` for `.eml`,
 /// `document` otherwise).
-pub(crate) fn source_type_for_relative_path(relative: &str) -> &'static str {
+pub fn source_type_for_relative_path(relative: &str) -> &'static str {
     match Path::new(relative).extension().and_then(|e| e.to_str()) {
         Some("eml") => "email",
         _ => "document",
@@ -129,7 +134,7 @@ pub(crate) fn source_type_for_relative_path(relative: &str) -> &'static str {
 ///
 /// Returns `Skipped` for symlinks, unsupported formats, and non-regular files;
 /// `Interrupted` when the cancellation token fires during stabilization.
-pub(crate) async fn prepare_candidate(
+pub async fn prepare_candidate(
     inbox: &FsWatchConfig,
     path: &Path,
     stability: Option<(Duration, u8, Duration)>,
@@ -147,10 +152,16 @@ pub(crate) async fn prepare_candidate(
     }
     let metadata = match path.symlink_metadata() {
         Ok(metadata) => metadata,
-        Err(_) => return Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile)),
+        Err(_) => {
+            return Ok(CandidateOutcome::Skipped(
+                CandidateSkipReason::NotRegularFile,
+            ));
+        }
     };
     if !metadata.is_file() {
-        return Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile));
+        return Ok(CandidateOutcome::Skipped(
+            CandidateSkipReason::NotRegularFile,
+        ));
     }
 
     let relative_path = normalized_relative_path(&inbox.inbox, path)?;
@@ -164,12 +175,13 @@ pub(crate) async fn prepare_candidate(
         }
         let metadata = match path.symlink_metadata() {
             Ok(metadata) => metadata,
-            Err(_) => return Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile)),
+            Err(_) => {
+                return Ok(CandidateOutcome::Skipped(
+                    CandidateSkipReason::NotRegularFile,
+                ));
+            }
         };
-        let sample = (
-            metadata.len(),
-            metadata.modified().ok(),
-        );
+        let sample = (metadata.len(), metadata.modified().ok());
         if let Some(previous) = last_sample
             && previous == sample
         {
@@ -181,7 +193,9 @@ pub(crate) async fn prepare_candidate(
             break;
         }
         if started.elapsed() >= timeout {
-            return Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile));
+            return Ok(CandidateOutcome::Skipped(
+                CandidateSkipReason::NotRegularFile,
+            ));
         }
         last_sample = Some(sample);
         tokio::time::sleep(sample_interval).await;
@@ -194,17 +208,27 @@ pub(crate) async fn prepare_candidate(
     // Hash raw bytes, then parse those exact bytes once.
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
-        Err(_) => return Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile)),
+        Err(_) => {
+            return Ok(CandidateOutcome::Skipped(
+                CandidateSkipReason::NotRegularFile,
+            ));
+        }
     };
     let content_sha256 = hex::encode(sha2::Sha256::digest(&bytes));
 
     // Format detection and parsing via the shared content-extraction module.
-    let (source_type, prepared_content) = match crate::service::content_extraction::parse_bytes_for_watch(&relative_path, &bytes) {
-        Ok(parsed) => parsed,
-        Err(_) => return Ok(CandidateOutcome::Skipped(CandidateSkipReason::UnsupportedFormat)),
-    };
+    let (source_type, prepared_content) =
+        match crate::service::content_extraction::parse_bytes_for_watch(&relative_path, &bytes) {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return Ok(CandidateOutcome::Skipped(
+                    CandidateSkipReason::UnsupportedFormat,
+                ));
+            }
+        };
 
-    let t_ref = crate::service::content_extraction::watch_reference_time(&relative_path, &bytes, &metadata);
+    let t_ref =
+        crate::service::content_extraction::watch_reference_time(&relative_path, &bytes, &metadata);
 
     let lineage = format!("fs:{relative_path}");
     let source_id = format!("{lineage}:{content_sha256}");
@@ -270,12 +294,7 @@ mod tests {
 
         let config = config_for(dir.path());
         let rt = tokio::runtime::Runtime::new().expect("rt");
-        let outcome = rt.block_on(prepare_candidate(
-            &config,
-            &link,
-            None,
-            &no_cancel(),
-        ));
+        let outcome = rt.block_on(prepare_candidate(&config, &link, None, &no_cancel()));
         match outcome.expect("outcome") {
             CandidateOutcome::Skipped(reason) => assert_eq!(reason, CandidateSkipReason::Symlink),
             other => panic!("expected symlink skip, got {other:?}"),
@@ -290,12 +309,7 @@ mod tests {
 
         let config = config_for(dir.path());
         let rt = tokio::runtime::Runtime::new().expect("rt");
-        let outcome = rt.block_on(prepare_candidate(
-            &config,
-            &file,
-            None,
-            &no_cancel(),
-        ));
+        let outcome = rt.block_on(prepare_candidate(&config, &file, None, &no_cancel()));
         match outcome.expect("outcome") {
             CandidateOutcome::Skipped(reason) => {
                 assert_eq!(reason, CandidateSkipReason::UnsupportedFormat)
@@ -333,9 +347,9 @@ mod tests {
         let config = config_for(dir.path());
 
         let rt = tokio::runtime::Runtime::new().expect("rt");
-        let CandidateOutcome::Ready(first_prep) =
-            rt.block_on(prepare_candidate(&config, &first, None, &no_cancel()))
-                .expect("first")
+        let CandidateOutcome::Ready(first_prep) = rt
+            .block_on(prepare_candidate(&config, &first, None, &no_cancel()))
+            .expect("first")
         else {
             panic!("expected ready");
         };

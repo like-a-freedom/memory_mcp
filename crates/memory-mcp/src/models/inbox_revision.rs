@@ -30,6 +30,12 @@ impl std::fmt::Display for InboxRevisionId {
     }
 }
 
+impl From<String> for InboxRevisionId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
 /// Durable revision states. Exactly these four; `processing_stage` is recovery
 /// metadata, not a fifth public state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

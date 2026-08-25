@@ -22,10 +22,13 @@ pub(crate) const DEFAULT_REVISION_LEASE_SECS: i64 = 120;
 /// Bounded max `last_error` characters persisted with a failed revision.
 pub(crate) const MAX_LAST_ERROR_CHARS: usize = 2048;
 
-/// Deterministic revision ID from the raw-byte SHA-256.
+/// Deterministic revision ID from lineage + raw-byte SHA-256. A rename starts
+/// a new lineage and therefore a new revision even when the bytes are identical.
 #[allow(dead_code)]
-pub fn revision_id_from_hash(content_sha256: &str) -> InboxRevisionId {
-    InboxRevisionId::from_hash(content_sha256)
+pub fn revision_id_from_hash(lineage: &str, content_sha256: &str) -> InboxRevisionId {
+    use sha2::Digest;
+    let digest = sha2::Sha256::digest(format!("{lineage}\0{content_sha256}").as_bytes());
+    InboxRevisionId::from_hash(&hex::encode(digest))
 }
 
 /// Constructs a new record with all timestamps defaulted to `now`.
@@ -40,8 +43,9 @@ pub fn new_revision_record(
     expected_episode_id: String,
     now: DateTime<Utc>,
 ) -> InboxRevisionRecord {
+    let revision_id = revision_id_from_hash(&lineage, &content_sha256);
     InboxRevisionRecord {
-        revision_id: revision_id_from_hash(&content_sha256),
+        revision_id,
         lineage,
         relative_path,
         content_sha256,
@@ -97,15 +101,13 @@ pub fn record_from_json(value: &Value) -> Option<InboxRevisionRecord> {
     let object = value.as_object()?;
     let content_sha256 = string_from_value(object.get("content_sha256")?)?;
     Some(InboxRevisionRecord {
-        revision_id: InboxRevisionId::from_hash(&content_sha256),
+        revision_id: InboxRevisionId::from(string_from_value(object.get("revision_id")?)?),
         lineage: string_from_value(object.get("lineage")?)?,
         relative_path: string_from_value(object.get("relative_path")?)?,
         content_sha256: content_sha256.clone(),
         source_type: string_from_value(object.get("source_type")?)?,
         t_ref: crate::service::parse_iso(&string_from_value(object.get("t_ref")?)?)?,
-        prepared_content: object
-            .get("prepared_content")
-            .and_then(string_from_value),
+        prepared_content: object.get("prepared_content").and_then(string_from_value),
         state: parse_state(&string_from_value(object.get("state")?)?)?,
         processing_stage: parse_stage(&string_from_value(object.get("processing_stage")?)?)?,
         expected_episode_id: string_from_value(object.get("expected_episode_id")?)?,
@@ -206,15 +208,11 @@ impl InboxRevisionStoreClient {
                 Ok((parsed, true))
             }
             Err(MemoryError::Storage(message)) if is_revision_exists_error(&message) => {
-                let existing = self
-                    .db
-                    .select_one(revision_id)
-                    .await?
-                    .ok_or_else(|| {
-                        MemoryError::Storage(
-                            "duplicate inbox revision vanished during discover".to_string(),
-                        )
-                    })?;
+                let existing = self.db.select_one(revision_id).await?.ok_or_else(|| {
+                    MemoryError::Storage(
+                        "duplicate inbox revision vanished during discover".to_string(),
+                    )
+                })?;
                 let parsed = record_from_json(&existing).ok_or_else(|| {
                     MemoryError::Storage("failed to parse existing inbox revision".to_string())
                 })?;
@@ -383,9 +381,7 @@ impl InboxRevisionStoreClient {
     }
 
     /// Requeues expired leases (crashed processors) back to `discovered`.
-    pub async fn requeue_expired_leases(
-        &self,
-    ) -> Result<usize, MemoryError> {
+    pub async fn requeue_expired_leases(&self) -> Result<usize, MemoryError> {
         let sql = "UPDATE inbox_revision \
                    SET state = 'discovered', lease_owner = NONE, lease_expires_at = NONE, \
                    updated_at = type::datetime($now) \
@@ -401,10 +397,7 @@ impl InboxRevisionStoreClient {
 
     /// Requeues failed revisions for a new startup generation. A revision
     /// failed in the same generation is not requeued twice.
-    pub async fn requeue_failed_for_startup(
-        &self,
-        generation: &str,
-    ) -> Result<usize, MemoryError> {
+    pub async fn requeue_failed_for_startup(&self, generation: &str) -> Result<usize, MemoryError> {
         let sql = "UPDATE inbox_revision \
                    SET state = 'discovered', failure_count = 0, \
                    retry_generation = $generation, \
@@ -422,7 +415,8 @@ impl InboxRevisionStoreClient {
 
     /// Count of discovered + failed (claimable) revisions.
     pub async fn queue_depth(&self) -> Result<usize, MemoryError> {
-        let sql = "SELECT count() AS cnt FROM inbox_revision WHERE state IN ['discovered', 'failed']";
+        let sql =
+            "SELECT count() AS cnt FROM inbox_revision WHERE state IN ['discovered', 'failed']";
         let result = self.db.query(sql, None).await?;
         Ok(count_result(&result))
     }
@@ -571,10 +565,7 @@ mod tests {
         let (store, _db) = make_store().await;
         let now = now();
         let record = sample_record("fs:a", "payload", now);
-        store
-            .discover_prepared(&record)
-            .await
-            .expect("discover");
+        store.discover_prepared(&record).await.expect("discover");
 
         let owner_a = format!("worker-{}", std::process::id());
         let owner_b = "worker-other";
@@ -598,10 +589,7 @@ mod tests {
         let (store, _db) = make_store().await;
         let now = now();
         let record = sample_record("fs:b", "snapshot", now);
-        store
-            .discover_prepared(&record)
-            .await
-            .expect("discover");
+        store.discover_prepared(&record).await.expect("discover");
 
         let owner = "worker-crashed";
         let claim = store
@@ -614,10 +602,7 @@ mod tests {
         // Simulate a crashed processor: the lease expires.
         tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
 
-        let requeued = store
-            .requeue_expired_leases()
-            .await
-            .expect("requeue");
+        let requeued = store.requeue_expired_leases().await.expect("requeue");
         assert_eq!(requeued, 1);
 
         let again = store
@@ -626,7 +611,10 @@ mod tests {
             .expect("reclaim")
             .expect("reclaimable after expiry");
         assert_eq!(again.prepared_content, "snapshot");
-        assert_eq!(again.record.processing_stage, InboxProcessingStage::Prepared);
+        assert_eq!(
+            again.record.processing_stage,
+            InboxProcessingStage::Prepared
+        );
     }
 
     #[tokio::test]
@@ -634,10 +622,7 @@ mod tests {
         let (store, _db) = make_store().await;
         let now = now();
         let record = sample_record("fs:c", "bad", now);
-        store
-            .discover_prepared(&record)
-            .await
-            .expect("discover");
+        store.discover_prepared(&record).await.expect("discover");
 
         let owner = "worker-fail";
         let claim = store
@@ -683,10 +668,7 @@ mod tests {
         let (store, _db) = make_store().await;
         let now = now();
         let record = sample_record("fs:d", "lease", now);
-        store
-            .discover_prepared(&record)
-            .await
-            .expect("discover");
+        store.discover_prepared(&record).await.expect("discover");
 
         let owner = "worker-a";
         let claim = store
@@ -697,14 +679,22 @@ mod tests {
 
         // A different owner cannot advance the stage.
         let err = store
-            .advance_stage(&claim.record.revision_id, "worker-b", InboxProcessingStage::Ingesting)
+            .advance_stage(
+                &claim.record.revision_id,
+                "worker-b",
+                InboxProcessingStage::Ingesting,
+            )
             .await
             .expect_err("wrong owner must fail");
         assert!(err.to_string().contains("not leased"));
 
         // The real owner can.
         store
-            .advance_stage(&claim.record.revision_id, owner, InboxProcessingStage::Ingesting)
+            .advance_stage(
+                &claim.record.revision_id,
+                owner,
+                InboxProcessingStage::Ingesting,
+            )
             .await
             .expect("advance");
     }
@@ -714,10 +704,7 @@ mod tests {
         let (store, _db) = make_store().await;
         let now = now();
         let record = sample_record("fs:e", "done", now);
-        store
-            .discover_prepared(&record)
-            .await
-            .expect("discover");
+        store.discover_prepared(&record).await.expect("discover");
 
         let owner = "worker-a";
         let claim = store

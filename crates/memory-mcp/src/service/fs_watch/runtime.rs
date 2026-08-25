@@ -27,8 +27,8 @@ use crate::service::fs_watch::candidate::{
 use crate::service::fs_watch::processor::InboxRevisionProcessor;
 use crate::service::fs_watch::telemetry::FsWatchTelemetry;
 use crate::service::{MemoryService, deterministic_episode_id_v2};
-use crate::storage::inbox_revision_store::new_revision_record;
 use crate::storage::InboxRevisionStoreClient;
+use crate::storage::inbox_revision_store::new_revision_record;
 
 /// Startup generation marker for requeueing failed revisions once per start.
 fn startup_generation() -> String {
@@ -120,12 +120,14 @@ async fn run_watcher_cycle(
     .map_err(|err| {
         MemoryError::Storage(format!("failed to initialize filesystem watcher: {err}"))
     })?;
-    watcher.watch(inbox, RecursiveMode::Recursive).map_err(|err| {
-        MemoryError::Storage(format!(
-            "failed to watch inbox directory `{}`: {err}",
-            inbox.display()
-        ))
-    })?;
+    watcher
+        .watch(inbox, RecursiveMode::Recursive)
+        .map_err(|err| {
+            MemoryError::Storage(format!(
+                "failed to watch inbox directory `{}`: {err}",
+                inbox.display()
+            ))
+        })?;
 
     loop {
         tokio::select! {
@@ -145,11 +147,11 @@ async fn run_watcher_cycle(
 
 /// Dispatches one watcher event through the shared discover→prepare→persist
 /// path.
-async fn handle_watch_event(
-    store: &InboxRevisionStoreClient,
-    inbox: &Path,
-    event: &Event,
-) {
+async fn handle_watch_event(store: &InboxRevisionStoreClient, inbox: &Path, event: &Event) {
+    eprintln!(
+        "[fs_watch.diag] event={:?} paths={:?}",
+        event.kind, event.paths
+    );
     if !(event.kind.is_create() || event.kind.is_modify()) {
         return;
     }
@@ -164,7 +166,8 @@ async fn discover_path(store: &InboxRevisionStoreClient, inbox: &Path, path: &Pa
         inbox: inbox.to_path_buf(),
     };
     let cancel = CancellationToken::new();
-    let Ok(CandidateOutcome::Ready(prepared)) = prepare_candidate(&config, path, None, &cancel).await
+    let Ok(CandidateOutcome::Ready(prepared)) =
+        prepare_candidate(&config, path, None, &cancel).await
     else {
         return;
     };
@@ -253,10 +256,7 @@ fn build_record(prepared: &PreparedInboxRevision) -> InboxRevisionRecord {
 impl FsWatchRuntime {
     /// Validates backend attachment synchronously, then spawns the event
     /// bridge, startup scan, and sequential processor.
-    pub async fn start(
-        service: MemoryService,
-        config: FsWatchConfig,
-    ) -> Result<Self, MemoryError> {
+    pub async fn start(service: MemoryService, config: FsWatchConfig) -> Result<Self, MemoryError> {
         let telemetry = FsWatchTelemetry::new();
         let store = InboxRevisionStoreClient::new(
             service.db_client.clone(),
@@ -265,22 +265,22 @@ impl FsWatchRuntime {
 
         // Synchronously validate that the watcher can attach before the MCP
         // transport is ready.
-        let mut probe = RecommendedWatcher::new(
-            |_| {},
-            Config::default().with_follow_symlinks(false),
-        )
-        .map_err(|err| {
-            MemoryError::ConfigInvalid(format!(
-                "failed to initialize filesystem watcher for `{}`: {err}",
-                config.inbox.display()
-            ))
-        })?;
-        probe.watch(&config.inbox, RecursiveMode::Recursive).map_err(|err| {
-            MemoryError::ConfigInvalid(format!(
-                "failed to watch inbox `{}`: {err}",
-                config.inbox.display()
-            ))
-        })?;
+        let mut probe =
+            RecommendedWatcher::new(|_| {}, Config::default().with_follow_symlinks(false))
+                .map_err(|err| {
+                    MemoryError::ConfigInvalid(format!(
+                        "failed to initialize filesystem watcher for `{}`: {err}",
+                        config.inbox.display()
+                    ))
+                })?;
+        probe
+            .watch(&config.inbox, RecursiveMode::Recursive)
+            .map_err(|err| {
+                MemoryError::ConfigInvalid(format!(
+                    "failed to watch inbox `{}`: {err}",
+                    config.inbox.display()
+                ))
+            })?;
         drop(probe);
 
         // Recovery: requeue failed revisions once per startup generation and
@@ -377,8 +377,7 @@ impl FsWatchRuntime {
                     handle.abort();
                 }
                 let lease_released = if let Some(lease) = lease {
-                    let store =
-                        InboxRevisionStoreClient::new(db_client, namespace);
+                    let store = InboxRevisionStoreClient::new(db_client, namespace);
                     store
                         .release_interrupted(&lease.revision_id, &lease.owner)
                         .await
