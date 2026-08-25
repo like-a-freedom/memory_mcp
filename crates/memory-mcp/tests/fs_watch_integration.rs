@@ -8,7 +8,7 @@ mod common;
 use std::sync::Arc;
 
 use chrono::Utc;
-use memory_mcp::models::inbox_revision::InboxFailureClass;
+use memory_mcp::models::inbox_revision::{InboxFailureClass, InboxProcessingStage};
 use memory_mcp::service::MemoryService;
 use memory_mcp::service::fs_watch::candidate::CandidateOutcome;
 use memory_mcp::service::fs_watch::processor::{ProcessOutcome, process_claimed_revision};
@@ -731,4 +731,115 @@ async fn crash_before_record_episode_recovers_through_expected_episode_id() {
         row.get("episode_id").and_then(|v| v.as_str()),
         Some(expected_episode_id.as_str())
     );
+}
+
+#[tokio::test]
+async fn crash_after_stage_ingesting_before_episode_creation_recovers() {
+    let (service, db, store) = make_pipeline().await;
+    let t_ref = Utc::now();
+    let content = "Alice Smith reports ARR is $5M.";
+    let hash = content_sha256(content);
+    let expected_episode_id = memory_mcp::service::deterministic_episode_id_v2(
+        "document",
+        &format!("fs:crash3:{hash}"),
+        t_ref,
+    );
+    let record = new_revision_record(
+        "fs:crash3".to_string(),
+        "crash3.md".to_string(),
+        hash,
+        "document".to_string(),
+        t_ref,
+        content.to_string(),
+        expected_episode_id.clone(),
+        Utc::now(),
+    );
+    store.discover_prepared(&record).await.expect("discover");
+
+    // Crash after the stage advanced to `ingesting` but before the episode
+    // was created: no episode exists.
+    let owner = "crashed-worker";
+    store
+        .claim_next(owner, chrono::Duration::seconds(1))
+        .await
+        .expect("claim")
+        .expect("claimable");
+    store
+        .advance_stage(&record.revision_id, owner, InboxProcessingStage::Ingesting)
+        .await
+        .expect("advance stage");
+    let no_episodes = db
+        .query(
+            "SELECT count() AS cnt FROM episode WHERE source_lineage = 'fs:crash3'",
+            None,
+            "org",
+        )
+        .await
+        .expect("count episodes");
+    let count = no_episodes
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|r| r.get("cnt"))
+        .and_then(|c| c.as_i64())
+        .unwrap_or(0);
+    assert_eq!(count, 0, "episode must not exist yet");
+
+    // Crash: lease expires, the revision is requeued.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    store.requeue_expired_leases().await.expect("requeue");
+
+    // Recovery runs the full ingest → extract cycle from the snapshot.
+    let outcome = process_first_claim(&service, &store).await;
+    assert_eq!(outcome, ProcessOutcome::Processed);
+
+    let row = db
+        .select_one(record.revision_id.as_str(), "org")
+        .await
+        .expect("select row")
+        .expect("row");
+    assert_eq!(row.get("state").and_then(|v| v.as_str()), Some("processed"));
+    assert_eq!(
+        row.get("episode_id").and_then(|v| v.as_str()),
+        Some(expected_episode_id.as_str())
+    );
+}
+
+#[tokio::test]
+async fn source_path_deleted_before_restart_does_not_block_recovery() {
+    // A revision discovered and processed from a file that is deleted before
+    // restart must recover purely from the durable snapshot: the processor
+    // never rereads the live path.
+    let (service, _db, store) = make_pipeline().await;
+    let t_ref = Utc::now();
+    let content = "Alice Smith reports ARR is $5M.";
+    let hash = content_sha256(content);
+    let expected_episode_id = memory_mcp::service::deterministic_episode_id_v2(
+        "document",
+        &format!("fs:crash4:{hash}"),
+        t_ref,
+    );
+    let record = new_revision_record(
+        "fs:crash4".to_string(),
+        "crash4.md".to_string(),
+        hash,
+        "document".to_string(),
+        t_ref,
+        content.to_string(),
+        expected_episode_id,
+        Utc::now(),
+    );
+    store.discover_prepared(&record).await.expect("discover");
+
+    // Crash after discovery; the source file is deleted before restart.
+    let owner = "crashed-worker";
+    store
+        .claim_next(owner, chrono::Duration::seconds(1))
+        .await
+        .expect("claim")
+        .expect("claimable");
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    store.requeue_expired_leases().await.expect("requeue");
+
+    let outcome = process_first_claim(&service, &store).await;
+    assert_eq!(outcome, ProcessOutcome::Processed);
 }

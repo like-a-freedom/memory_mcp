@@ -512,10 +512,9 @@ Important notes:
 
 | Level | Events you'll see |
 |-------|-------------------|
-| `info` | `fs_watch` readiness, revision success/failure, startup-scan summary |
-| `debug` | per-revision discovery and stage transitions (relative path + short revision prefix only) |
+| `info` | `fs_watch.ready` (startup), `fs_watch.revision` (per-revision outcome: relative path + short revision prefix only) |
 | `warn` | `fs_watch.degraded` (watcher backend exhausted after bounded backoff) |
-| `error` | revision failures with bounded failure class |
+| `debug` | `fs_watch.shutdown` outcome on clean exit |
 
 Revision events contain relative paths and short revision prefixes only; file
 contents and absolute inbox roots never appear in logs except startup
@@ -899,11 +898,11 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 
 `memory_mcp` emits structured logs across the plan-added functionality using the standard levels below:
 
-- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and revision completion, and community rebuild passes
-- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), filesystem revision discovery, view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and per-revision outcomes, and community rebuild passes
+- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
 - `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
 - `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
-- `error` — terminal failures such as process-level startup/serve failures and bounded revision failures
+- `error` — terminal failures such as process-level startup/serve failures
 
 Recommended presets:
 

@@ -228,7 +228,9 @@ async fn run_startup_scan(
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::Interrupted)) => {
                     telemetry.record_scan_file("interrupted");
                 }
-                Ok(CandidateOutcome::Skipped(CandidateSkipReason::OutsideRoot)) => {}
+                Ok(CandidateOutcome::Skipped(CandidateSkipReason::OutsideRoot)) => {
+                    telemetry.record_scan_file("skipped_outside_root");
+                }
                 Err(_) => telemetry.record_scan_file("failed_read"),
             }
         }
@@ -284,6 +286,11 @@ impl FsWatchRuntime {
         let generation = startup_generation();
         let _ = store.requeue_failed_for_startup(&generation).await;
         let _ = store.requeue_expired_leases().await;
+
+        // Queue-depth gauge reflects the durable backlog after recovery.
+        if let Ok(depth) = store.queue_depth().await {
+            telemetry.set_queue_depth(depth);
+        }
 
         service.logger.log(
             crate::service::log_event(

@@ -38,6 +38,7 @@ const KNOWN_SCAN_OUTCOMES: &[&str] = &[
     "skipped_symlink",
     "skipped_unsupported",
     "skipped_not_regular",
+    "skipped_outside_root",
     "failed_read",
     "interrupted",
 ];

@@ -17,6 +17,7 @@ use crate::service::value_helpers::string_from_value;
 use crate::storage::BoundDbClient;
 
 /// Default lease duration for one revision claim.
+#[cfg_attr(not(feature = "fs-watch"), allow(dead_code))]
 pub(crate) const DEFAULT_REVISION_LEASE_SECS: i64 = 120;
 /// Bounded max `last_error` characters persisted with a failed revision.
 pub(crate) const MAX_LAST_ERROR_CHARS: usize = 2048;
@@ -580,6 +581,29 @@ mod tests {
         assert!(
             claim_b.is_none(),
             "a second claimer must not own the same revision"
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_claimers_never_both_win_the_same_revision() {
+        let (store, _db) = make_store().await;
+        let now = now();
+        let record = sample_record("fs:race", "payload", now);
+        store.discover_prepared(&record).await.expect("discover");
+
+        // Two independent store clients race for the same revision; the
+        // atomic UPDATE-SELECT in `claim_next` must let exactly one win.
+        let client_a = store.clone();
+        let client_b = store.clone();
+        let (result_a, result_b) = tokio::join!(
+            client_a.claim_next("racer-a", Duration::seconds(30)),
+            client_b.claim_next("racer-b", Duration::seconds(30)),
+        );
+        let won_a = result_a.expect("claim a").is_some();
+        let won_b = result_b.expect("claim b").is_some();
+        assert!(
+            won_a ^ won_b,
+            "exactly one concurrent claimer must win (a={won_a}, b={won_b})"
         );
     }
 

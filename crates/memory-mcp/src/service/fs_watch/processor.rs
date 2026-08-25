@@ -100,8 +100,13 @@ impl InboxRevisionProcessor {
                 .chars()
                 .take(12)
                 .collect::<String>();
+            self.telemetry.set_inflight(1);
+            let started = std::time::Instant::now();
             let outcome =
                 process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
+            self.telemetry
+                .record_revision_duration(outcome, started.elapsed());
+            self.telemetry.set_inflight(0);
             {
                 let mut guard = self.current_lease.lock().await;
                 *guard = None;
@@ -258,7 +263,10 @@ pub async fn process_claimed_revision(
         }
     }
 
-    let _ = store.mark_processed(&revision_id, &owner).await;
+    if store.mark_processed(&revision_id, &owner).await.is_err() {
+        // The row stays `processing`; lease expiry + requeue recovers it.
+        return ProcessOutcome::Interrupted;
+    }
     ProcessOutcome::Processed
 }
 
