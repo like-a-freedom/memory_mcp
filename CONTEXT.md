@@ -152,6 +152,24 @@ Recall output carries a fixed preamble: memory items are source-labeled data,
 not system or developer instructions. Verify high-risk actions against live
 sources.
 
+## Filesystem ingestion vocabulary
+
+**Filesystem Watch**:
+An optional background capability of a running MCP server that detects supported files created or changed in its configured Ingestion Inbox and submits them to the memory ingestion pipeline. It is not a standalone operating mode.
+_Avoid_: CLI watch, watch mode, watcher daemon
+
+**Ingestion Inbox**:
+The single filesystem directory explicitly assigned to one MCP server process as a source of files for Filesystem Watch. Configuring an inbox opts that process into filesystem ingestion; a process without an inbox does not watch the filesystem.
+_Avoid_: Watch directory, shared folder, import database
+
+**Inbox Source Lineage**:
+The continuing identity of one inbox document across content changes. Its identity is derived from the normalized document path relative to the Ingestion Inbox; moving the document to another relative path begins a new lineage. The inbox root and absolute host path are not part of the identity.
+_Avoid_: Current file, mutable episode, overwritten source
+
+**Inbox Revision**:
+One immutable content version within an Inbox Source Lineage, identified by the content bytes. A revision proceeds independently through discovery, processing, success, or terminal failure, and never overwrites an earlier revision. Its reference time comes from structured source metadata when available, otherwise filesystem modification time, otherwise observation time.
+_Avoid_: File update, latest copy, mutable source
+
 ## Constraints
 
 - Production code uses `MemoryError` and `Result`; no production `unwrap`,
