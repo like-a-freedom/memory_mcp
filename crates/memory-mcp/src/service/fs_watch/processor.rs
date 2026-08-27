@@ -394,6 +394,7 @@ fn classify_failure(err: &MemoryError) -> InboxFailureClass {
             InboxFailureClass::Validation
         }
         MemoryError::BudgetExhausted(_) => InboxFailureClass::Validation,
+        MemoryError::ModelNotReady(_) => InboxFailureClass::Model,
     }
 }
 
