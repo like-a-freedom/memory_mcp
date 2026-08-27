@@ -13,7 +13,7 @@ use super::MemoryError;
 mod anno;
 mod anno_onnx;
 mod classifier;
-mod gliner;
+pub mod gliner;
 mod lfm2_gliner;
 mod regex;
 
@@ -184,12 +184,12 @@ pub(crate) type BackendBoxFuture =
     Pin<Box<dyn Future<Output = Result<Arc<dyn EntityExtractor>, MemoryError>> + Send>>;
 
 /// Shared build inputs available to every backend constructor.
-pub(crate) struct NerBuildContext {
-    pub(crate) data_dir: std::path::PathBuf,
-    pub(crate) logger: crate::logging::StdoutLogger,
+pub struct NerBuildContext {
+    pub data_dir: std::path::PathBuf,
+    pub logger: crate::logging::StdoutLogger,
     /// Model-progress sink selected by the hosting process: JSON lines on
     /// stderr for MCP stdio, human-readable lines on stderr for the CLI.
-    pub(crate) progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
+    pub progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
 }
 
 impl Clone for NerBuildContext {
