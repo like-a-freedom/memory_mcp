@@ -13,15 +13,15 @@ use tempfile::TempDir;
 
 use memory_mcp::config::{ModelBackedNerConfig, NativeGlinerConfig};
 use memory_mcp::logging::StdoutLogger;
+#[allow(unused_imports)]
+use memory_mcp::service::EntityExtractor;
+use memory_mcp::service::NerBuildContext;
+use memory_mcp::service::entity_extraction_gliner as gliner;
 use memory_mcp::service::model_artifacts::{
     ArtifactRole, CapturingSink, HfArtifactFetcher, HfRevisionResolver, ModelProgressSink,
     NerArtifactStore, PersistedArtifactState, RevisionState, RevisionStatus, SystemClock,
     ValidationStatus, artifact_identity, persist_state, read_state,
 };
-use memory_mcp::service::entity_extraction_gliner as gliner;
-#[allow(unused_imports)]
-use memory_mcp::service::EntityExtractor;
-use memory_mcp::service::NerBuildContext;
 
 const GLINER_FIXTURE_DIR: &str = "tests/models/ner/urchade--gliner_multi-v2.1";
 const SEEDED_REVISION: &str = "443d26d654e0324125a96bebd8e796c14ff2efe6";

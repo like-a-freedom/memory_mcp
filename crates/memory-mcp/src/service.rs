@@ -8,19 +8,19 @@
 
 pub use core::MemoryService;
 pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
+pub use entity_extraction::NerBuildContext;
 #[doc(hidden)]
 pub use entity_extraction::VagoLfm2EntityExtractor;
 pub use entity_extraction::{
     AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor, NerScheduling,
     RegexEntityExtractor, create_entity_extractor,
 };
-pub use entity_extraction::NerBuildContext;
 pub mod entity_extraction_gliner {
     //! Public re-exports of the Classic GLiNER backend helpers used by
     //! real-fixture integration tests. Production callers should construct
     //! the extractor through the normal backend registry, not these items.
-    pub use crate::service::entity_extraction::gliner as gliner;
-    pub use gliner::{build_from_store, CLASSIC_GLINER_SPEC};
+    pub use crate::service::entity_extraction::gliner;
+    pub use gliner::{CLASSIC_GLINER_SPEC, build_from_store};
 }
 // Re-exported from the neutral `crate::error` home (ADR-0045).
 pub use crate::error::MemoryError;
@@ -63,9 +63,9 @@ pub(crate) mod fact;
 pub mod fs_watch;
 pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
+pub(crate) mod model_artifact_refresh;
 #[doc(hidden)]
 pub mod model_artifacts;
-pub(crate) mod model_artifact_refresh;
 mod model_runtime;
 mod query;
 mod reembed;

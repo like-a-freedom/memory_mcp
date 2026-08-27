@@ -156,8 +156,8 @@ mod tests {
         ArtifactRole, CapturingSink, NerArtifactStore, PersistedArtifactState, RevisionState,
         RevisionStatus, SystemClock, ValidationStatus, persist_state,
     };
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
 
     fn native() -> NativeGlinerConfig {
@@ -185,10 +185,7 @@ mod tests {
     }
     #[async_trait::async_trait]
     impl super::super::model_artifacts::RevisionResolver for CountingResolver {
-        async fn latest(
-            &self,
-            _repository: &str,
-        ) -> Result<String, crate::service::MemoryError> {
+        async fn latest(&self, _repository: &str) -> Result<String, crate::service::MemoryError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(self.revision.to_string())
         }
@@ -206,8 +203,7 @@ mod tests {
             _progress: &dyn super::super::model_artifacts::ModelProgressSink,
             _cancellation: &tokio_util::sync::CancellationToken,
         ) -> Result<(), crate::service::MemoryError> {
-            std::fs::create_dir_all(target.parent().expect("parent"))
-                .expect("create parent");
+            std::fs::create_dir_all(target.parent().expect("parent")).expect("create parent");
             std::fs::write(target, format!("content-of-{}", requirement.path))
                 .expect("write artifact");
             Ok(())
@@ -219,7 +215,8 @@ mod tests {
             calls: Arc::new(AtomicUsize::new(0)),
             revision: "candidate-1",
         });
-        let fetcher: Arc<dyn super::super::model_artifacts::ArtifactFetcher> = Arc::new(FakeFetcher);
+        let fetcher: Arc<dyn super::super::model_artifacts::ArtifactFetcher> =
+            Arc::new(FakeFetcher);
         let progress: Arc<dyn super::super::model_artifacts::ModelProgressSink> =
             Arc::new(CapturingSink::default());
         let clock: Arc<dyn super::super::model_artifacts::Clock> = Arc::new(SystemClock);
@@ -239,7 +236,9 @@ mod tests {
         // `refresh_candidate` directly.
         let temp = TempDir::new().expect("temp");
         let store = make_store(&temp);
-        let _ = store.refresh_candidate(&spec(), CancellationToken::new()).await;
+        let _ = store
+            .refresh_candidate(&spec(), CancellationToken::new())
+            .await;
         // Outcome events are emitted by `refresh_candidate`; this test
         // only asserts that the runtime spawn/shutdown pair is well-formed.
         let progress: Arc<dyn ModelProgressSink> = Arc::new(CapturingSink::default());
@@ -269,7 +268,10 @@ mod tests {
             Some("ner.artifact_refresh.candidate_ready")
         );
         assert_eq!(
-            event.get("result").and_then(|v| v.get("activation")).and_then(|v| v.as_str()),
+            event
+                .get("result")
+                .and_then(|v| v.get("activation"))
+                .and_then(|v| v.as_str()),
             Some("next_restart")
         );
     }
@@ -285,7 +287,12 @@ mod tests {
             event.get("op").and_then(|v| v.as_str()),
             Some("ner.artifact_refresh.up_to_date")
         );
-        assert!(event.get("result").and_then(|v| v.get("activation")).is_none());
+        assert!(
+            event
+                .get("result")
+                .and_then(|v| v.get("activation"))
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -300,7 +307,10 @@ mod tests {
             Some("ner.artifact_refresh.failed")
         );
         assert_eq!(
-            event.get("result").and_then(|v| v.get("activation")).and_then(|v| v.as_str()),
+            event
+                .get("result")
+                .and_then(|v| v.get("activation"))
+                .and_then(|v| v.as_str()),
             Some("unchanged")
         );
     }
@@ -338,9 +348,8 @@ mod tests {
         let layout_root = temp.path().join("models").join("ner").join("gliner");
         std::fs::create_dir_all(&layout_root).expect("dirs");
         persist_state(&layout_root.join("state.json"), &state).expect("persist");
-        let reloaded =
-            super::super::model_artifacts::read_state(&layout_root.join("state.json"))
-                .expect("read");
+        let reloaded = super::super::model_artifacts::read_state(&layout_root.join("state.json"))
+            .expect("read");
         assert!(reloaded.candidate().is_some());
     }
 }

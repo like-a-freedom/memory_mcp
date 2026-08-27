@@ -75,8 +75,7 @@ pub struct MemoryService {
     /// can construct an `UnavailableEntityExtractor` if it ever needs to
     /// (e.g. when the refresh task must mirror a configured config). Held
     /// only when the backend is Classic GLiNER.
-    pub(crate) ner_artifact_refresh_native:
-        Option<crate::config::NativeGlinerConfig>,
+    pub(crate) ner_artifact_refresh_native: Option<crate::config::NativeGlinerConfig>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -301,21 +300,19 @@ impl MemoryService {
                 let default_root = std::path::PathBuf::from(&effective_data_dir)
                     .join("models")
                     .join("ner");
-                let store_root = native
-                    .model
-                    .cache_dir
-                    .clone()
-                    .unwrap_or(default_root);
+                let store_root = native.model.cache_dir.clone().unwrap_or(default_root);
                 let progress_for_refresh: std::sync::Arc<
                     dyn crate::service::model_artifacts::ModelProgressSink,
                 > = std::sync::Arc::new(
                     crate::service::model_artifacts::JsonLineProgressSink::new(),
                 );
                 (
-                    Some(super::super::model_artifact_refresh::NerArtifactRefreshConfig {
-                        store_root,
-                        progress: progress_for_refresh,
-                    }),
+                    Some(
+                        super::super::model_artifact_refresh::NerArtifactRefreshConfig {
+                            store_root,
+                            progress: progress_for_refresh,
+                        },
+                    ),
                     Some(native.clone()),
                 )
             } else {

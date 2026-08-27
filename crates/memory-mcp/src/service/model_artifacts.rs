@@ -216,7 +216,7 @@ impl NerArtifactStore {
         use crate::service::model_artifacts::manifest::LocalCheckpointIssue;
         use crate::service::model_artifacts::state::{
             PersistedArtifactState, PersistedArtifactStateV1, RevisionStateV1,
-            SchemaVersionEnvelope, STATE_SCHEMA_VERSION,
+            STATE_SCHEMA_VERSION, SchemaVersionEnvelope,
         };
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
@@ -281,9 +281,7 @@ impl NerArtifactStore {
         crate::service::model_artifacts::manifest::PreparedCheckpoint,
         crate::service::model_artifacts::manifest::LocalCheckpointIssue,
     > {
-        use crate::service::model_artifacts::manifest::{
-            LocalCheckpointIssue, PreparedCheckpoint,
-        };
+        use crate::service::model_artifacts::manifest::{LocalCheckpointIssue, PreparedCheckpoint};
         let revision_dir = layout.revision_dir(&record.revision);
         if !is_complete(&revision_dir, spec) {
             return Err(LocalCheckpointIssue::Incomplete {
@@ -598,25 +596,19 @@ impl NerArtifactStore {
         &self,
         spec: &NerArtifactSpec,
         cancellation: tokio_util::sync::CancellationToken,
-    ) -> Result<
-        crate::service::model_artifacts::CandidateRefreshOutcome,
-        MemoryError,
-    > {
+    ) -> Result<crate::service::model_artifacts::CandidateRefreshOutcome, MemoryError> {
         let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
         let state = read_state(&layout.state_path)?;
 
         // If HEAD is already known-incompatible, return without retrying.
-        let resolved = self
-            .resolve_latest(spec.repository)
-            .await
-            .map_err(|err| {
-                self.emit(&ModelProgressEvent::failed(
-                    spec.extractor_id,
-                    ModelProgressPhase::Resolve,
-                    err.to_string(),
-                ));
-                err
-            })?;
+        let resolved = self.resolve_latest(spec.repository).await.map_err(|err| {
+            self.emit(&ModelProgressEvent::failed(
+                spec.extractor_id,
+                ModelProgressPhase::Resolve,
+                err.to_string(),
+            ));
+            err
+        })?;
 
         if state.incompatibility_for(&resolved).is_some() {
             self.emit(&ModelProgressEvent::completed(
@@ -706,9 +698,7 @@ impl NerArtifactStore {
             ))
         })?;
         std::fs::rename(&staging, &revision_dir).map_err(|err| {
-            MemoryError::Storage(format!(
-                "cannot activate revision {resolved}: {err}"
-            ))
+            MemoryError::Storage(format!("cannot activate revision {resolved}: {err}"))
         })?;
         // The staged directory has been atomically renamed; disarm the guard
         // so the revisions directory is not removed on drop.
@@ -884,10 +874,7 @@ impl NerArtifactStore {
         &self,
         spec: &NerArtifactSpec,
         revision: &str,
-    ) -> Result<
-        crate::service::model_artifacts::PreparedCheckpoint,
-        MemoryError,
-    > {
+    ) -> Result<crate::service::model_artifacts::PreparedCheckpoint, MemoryError> {
         let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
         let mut state = read_state(&layout.state_path)?;
         let record = state
@@ -970,10 +957,7 @@ impl NerArtifactStore {
         spec: &NerArtifactSpec,
         revision: &str,
         reason: &str,
-    ) -> Result<
-        Option<crate::service::model_artifacts::PreparedCheckpoint>,
-        MemoryError,
-    > {
+    ) -> Result<Option<crate::service::model_artifacts::PreparedCheckpoint>, MemoryError> {
         let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
         let mut state = read_state(&layout.state_path)?;
         let now = self.clock.now_secs();
