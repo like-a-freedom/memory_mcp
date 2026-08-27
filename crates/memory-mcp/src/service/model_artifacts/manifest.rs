@@ -121,6 +121,17 @@ pub struct LocalCheckpointSet {
     pub issue: Option<LocalCheckpointIssue>,
 }
 
+/// Outcome of one background `refresh_candidate` attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CandidateRefreshOutcome {
+    /// Resolved HEAD already matches the on-disk known-good or candidate.
+    UpToDate { revision: String },
+    /// A new candidate was staged and persisted.
+    CandidateReady { revision: String },
+    /// The resolved HEAD is already known-incompatible; no work performed.
+    SuppressedIncompatible { revision: String },
+}
+
 /// Computes a stable SHA-256 identity from actual on-disk artifacts.
 ///
 /// Entries are sorted by relative path; each is rendered as

@@ -56,7 +56,7 @@ pub struct RevisionState {
 
 /// Schema-v1 revision record, used only for in-memory migration.
 #[derive(Debug, Clone, Deserialize)]
-struct RevisionStateV1 {
+pub(crate) struct RevisionStateV1 {
     revision: String,
     artifact_identity: String,
     validation_status: ValidationStatus,
@@ -68,7 +68,7 @@ struct RevisionStateV1 {
 
 impl RevisionStateV1 {
     /// Promotes a schema-v1 record to schema-v2 semantics.
-    fn into_v2(self) -> RevisionState {
+    pub(crate) fn into_v2(self) -> RevisionState {
         let role = if self.incompatible.is_some() {
             ArtifactRole::Incompatible
         } else {
@@ -110,10 +110,10 @@ pub struct PersistedArtifactState {
 /// Schema-v1 envelope, used only to inspect the wire schema version and to
 /// migrate legacy records. The struct mirrors the original on-disk shape.
 #[derive(Debug, Deserialize)]
-struct PersistedArtifactStateV1 {
-    schema_version: u8,
+pub(crate) struct PersistedArtifactStateV1 {
+    pub(crate) schema_version: u8,
     #[serde(default)]
-    revisions: Vec<RevisionStateV1>,
+    pub(crate) revisions: Vec<RevisionStateV1>,
 }
 
 impl PersistedArtifactState {
@@ -129,15 +129,14 @@ impl PersistedArtifactState {
     /// persisted. Refresh always writes a single candidate, so multiples are
     /// treated as a state defect (returned through the typed local inspection
     /// rather than silently selecting a different one).
-    #[allow(dead_code)]
-    pub(crate) fn candidate(&self) -> Option<&RevisionState> {
+    pub fn candidate(&self) -> Option<&RevisionState> {
         self.revisions.iter().find(|record| record.role == ArtifactRole::Candidate)
     }
 
     /// Returns non-incompatible, non-candidate revisions ordered most-recent
     /// first. The ordinary known-good selector only considers records with
     /// role [`ArtifactRole::KnownGood`].
-    pub(crate) fn known_goods(&self) -> impl Iterator<Item = &RevisionState> {
+    pub fn known_goods(&self) -> impl Iterator<Item = &RevisionState> {
         self.revisions
             .iter()
             .filter(|record| record.role == ArtifactRole::KnownGood)
@@ -219,8 +218,8 @@ pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
 }
 
 #[derive(Deserialize)]
-struct SchemaVersionEnvelope {
-    schema_version: u8,
+pub(crate) struct SchemaVersionEnvelope {
+    pub(crate) schema_version: u8,
 }
 
 /// Persists state atomically: write a sibling temp file, `sync_all`, rename.

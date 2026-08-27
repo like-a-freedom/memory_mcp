@@ -12,6 +12,7 @@ use memory_mcp::service::model_artifacts::{
     NerArtifactStore, RevisionResolver, SystemClock,
 };
 use tempfile::TempDir;
+use tokio_util::sync::CancellationToken;
 
 // Re-exported for test ergonomics; must compile to the public contract.
 const _: fn() = || {
@@ -132,8 +133,14 @@ impl ArtifactFetcher for FakeFetcher {
         requirement: &ArtifactRequirement,
         target: &std::path::Path,
         progress: &dyn ModelProgressSink,
+        cancellation: &tokio_util::sync::CancellationToken,
     ) -> Result<(), MemoryError> {
         self.fetch_calls.fetch_add(1, Ordering::SeqCst);
+        if cancellation.is_cancelled() {
+            return Err(MemoryError::Transient(
+                "NER artifact refresh cancelled".to_string(),
+            ));
+        }
         {
             let mut remaining = self.fail_after.lock().expect("fail_after lock");
             if let Some(count) = remaining.as_mut().filter(|count| **count > 0) {
@@ -731,4 +738,261 @@ fn inspect_local_propagates_permission_error_as_storage_failure() {
     // Restore perms before asserting to allow cleanup.
     let _ = std::fs::set_permissions(&dir, original);
     assert!(matches!(err, MemoryError::Storage(_)));
+}
+
+// ── Candidate lifecycle (Task 3) ────────────────────────────────────────
+
+#[test]
+fn refresh_persists_candidate_without_runtime_verified_status() {
+    use memory_mcp::service::model_artifacts::ArtifactRole;
+    use memory_mcp::service::model_artifacts::ValidationStatus;
+    use memory_mcp::service::model_artifacts::read_state;
+    let temp = TempDir::new().expect("temp dir");
+    let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(
+        &temp,
+        Arc::new(FakeResolver::ok("candidate-1")),
+        Arc::new(FakeFetcher::new()),
+    );
+    let outcome = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("refresh");
+    assert!(matches!(
+        outcome,
+        memory_mcp::service::model_artifacts::CandidateRefreshOutcome::CandidateReady { ref revision }
+            if revision == "candidate-1"
+    ));
+
+    let state_path = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("state.json");
+    let state = read_state(&state_path).expect("read state");
+    let candidate = state.candidate().expect("candidate present");
+    assert_eq!(candidate.revision, "candidate-1");
+    assert_ne!(
+        candidate.validation_status,
+        ValidationStatus::RuntimeRegressionVerified
+    );
+    assert_eq!(candidate.role, ArtifactRole::Candidate);
+}
+
+#[test]
+fn refresh_returns_up_to_date_when_persisted_candidate_matches_resolved_revision() {
+    use memory_mcp::service::model_artifacts::CandidateRefreshOutcome;
+    let temp = TempDir::new().expect("temp dir");
+    let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(
+        &temp,
+        Arc::new(FakeResolver::ok("candidate-1")),
+        Arc::new(FakeFetcher::new()),
+    );
+    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("first refresh");
+    let outcome = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("second refresh");
+    assert!(matches!(
+        outcome,
+        CandidateRefreshOutcome::UpToDate { ref revision } if revision == "candidate-1"
+    ));
+}
+
+#[test]
+fn refresh_returns_suppressed_incompatible_when_revision_is_already_incompatible() {
+    use memory_mcp::service::model_artifacts::CandidateRefreshOutcome;
+    let temp = TempDir::new().expect("temp dir");
+    // First, seed a known-good "good-1" so record_incompatible can succeed.
+    {
+        let resolver = Arc::new(FakeResolver::ok("good-1"));
+        let store = NerArtifactStore::with_parts(
+            temp.path().join("models").join("ner"),
+            resolver,
+            Arc::new(FakeFetcher::new()),
+            Arc::new(CapturingSink::default()),
+            Arc::new(SystemClock),
+        );
+        let _ = block_on(store.prepare(&test_spec())).expect("seed known-good");
+    }
+    // Then mark "bad-1" as incompatible (with "good-1" still present as fallback).
+    let resolver = Arc::new(FakeResolver::ok("bad-1"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.record_incompatible(&test_spec(), "bad-1", "smoke failed"))
+        .expect("record incompatible");
+    let outcome = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("suppressed refresh");
+    assert!(matches!(
+        outcome,
+        CandidateRefreshOutcome::SuppressedIncompatible { ref revision } if revision == "bad-1"
+    ));
+}
+
+#[test]
+fn promote_candidate_changes_role_to_known_good_and_preserves_previous_known_good() {
+    use memory_mcp::service::model_artifacts::{
+        ArtifactRole, PreparedCheckpoint, ValidationStatus, artifact_identity, read_state,
+    };
+    let temp = TempDir::new().expect("temp dir");
+    // Seed a known-good "old-good" via the standard prepare path.
+    let resolver_a = Arc::new(FakeResolver::ok("old-good"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_a,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.prepare(&test_spec())).expect("seed known-good");
+
+    // New store refreshes a candidate "candidate-2".
+    let resolver_b = Arc::new(FakeResolver::ok("candidate-2"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_b,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("refresh");
+
+    // Promote the candidate.
+    let promoted: PreparedCheckpoint = store
+        .promote_candidate(&test_spec(), "candidate-2")
+        .expect("promote");
+    assert_eq!(promoted.revision, "candidate-2");
+    assert_eq!(
+        promoted.validation_status,
+        ValidationStatus::RuntimeRegressionVerified
+    );
+    let state_path = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("state.json");
+    let state = read_state(&state_path).expect("read");
+    let promoted_record = state
+        .revisions
+        .iter()
+        .find(|r| r.revision == "candidate-2")
+        .expect("promoted record");
+    assert_eq!(promoted_record.role, ArtifactRole::KnownGood);
+    let previous = state
+        .revisions
+        .iter()
+        .find(|r| r.revision == "old-good")
+        .expect("previous known-good kept");
+    assert_eq!(previous.role, ArtifactRole::KnownGood);
+    let revision_dir = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("revisions")
+        .join("candidate-2");
+    let recomputed = artifact_identity(
+        &revision_dir,
+        &test_spec()
+            .all_requirements()
+            .copied()
+            .collect::<Vec<_>>(),
+    )
+    .expect("identity");
+    assert_eq!(promoted.artifact_identity, recomputed);
+}
+
+#[test]
+fn reject_candidate_returns_previous_known_good() {
+    use memory_mcp::service::model_artifacts::ArtifactRole;
+    use memory_mcp::service::model_artifacts::read_state;
+    let temp = TempDir::new().expect("temp dir");
+    let resolver_a = Arc::new(FakeResolver::ok("good-1"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_a,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.prepare(&test_spec())).expect("seed good-1");
+
+    let resolver_b = Arc::new(FakeResolver::ok("bad-1"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_b,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("refresh");
+    let fallback = store
+        .reject_candidate(&test_spec(), "bad-1", "smoke failed")
+        .expect("reject")
+        .expect("previous known-good present");
+    assert_eq!(fallback.revision, "good-1");
+    let state_path = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("state.json");
+    let state = read_state(&state_path).expect("read");
+    let bad_record = state
+        .revisions
+        .iter()
+        .find(|r| r.revision == "bad-1")
+        .expect("bad-1 record");
+    assert_eq!(bad_record.role, ArtifactRole::Incompatible);
+    let bad_dir = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("revisions")
+        .join("bad-1");
+    assert!(!bad_dir.exists(), "bad-1 directory must be removed");
+}
+
+#[test]
+fn reject_candidate_returns_none_when_no_previous_known_good_exists() {
+    let temp = TempDir::new().expect("temp dir");
+    let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(
+        &temp,
+        Arc::new(FakeResolver::ok("candidate-x")),
+        Arc::new(FakeFetcher::new()),
+    );
+    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("refresh");
+    let fallback = store
+        .reject_candidate(&test_spec(), "candidate-x", "smoke failed")
+        .expect("reject");
+    assert!(fallback.is_none());
+}
+
+#[test]
+fn candidate_is_never_returned_by_known_good_selector() {
+    use memory_mcp::service::model_artifacts::read_state;
+    let temp = TempDir::new().expect("temp dir");
+    let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(
+        &temp,
+        Arc::new(FakeResolver::ok("candidate-only")),
+        Arc::new(FakeFetcher::new()),
+    );
+    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
+        .expect("refresh");
+    let state_path = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("state.json");
+    let state = read_state(&state_path).expect("read");
+    assert!(state.known_goods().next().is_none());
+    assert!(state.candidate().is_some());
 }

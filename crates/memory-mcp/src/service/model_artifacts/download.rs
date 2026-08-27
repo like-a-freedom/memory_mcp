@@ -6,7 +6,7 @@
 //! byte-progress stall watchdog: downloads fail after 60 seconds without
 //! forward progress, not after a total wall-clock duration.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -66,12 +66,16 @@ pub trait RevisionResolver: Send + Sync {
 #[async_trait]
 pub trait ArtifactFetcher: Send + Sync {
     /// Downloads `requirement` from `repository` at `revision` into `target`,
-    /// reporting byte progress through `progress`.
+    /// reporting byte progress through `progress`. The cancellation token is
+    /// observed before the request is sent, between each chunk, and before
+    /// the atomic rename of the partial file into place.
     ///
     /// # Errors
     ///
     /// Returns a [`MemoryError::Storage`] on network failure or when no bytes
-    /// arrive for [`DOWNLOAD_STALL_TIMEOUT_SECS`].
+    /// arrive for [`DOWNLOAD_STALL_TIMEOUT_SECS`]. Returns
+    /// [`MemoryError::Transient`] when `cancellation` is observed; this is
+    /// classified as a stop (not a failure) by the refresh runtime.
     async fn fetch(
         &self,
         repository: &str,
@@ -79,6 +83,7 @@ pub trait ArtifactFetcher: Send + Sync {
         requirement: &ArtifactRequirement,
         target: &Path,
         progress: &dyn ModelProgressSink,
+        cancellation: &tokio_util::sync::CancellationToken,
     ) -> Result<(), MemoryError>;
 }
 
@@ -163,23 +168,38 @@ impl ArtifactFetcher for HfArtifactFetcher {
         requirement: &ArtifactRequirement,
         target: &Path,
         progress: &dyn ModelProgressSink,
+        cancellation: &tokio_util::sync::CancellationToken,
     ) -> Result<(), MemoryError> {
+        if cancellation.is_cancelled() {
+            return Err(MemoryError::Transient(
+                "NER artifact refresh cancelled".to_string(),
+            ));
+        }
         let url = format!(
             "https://huggingface.co/{repository}/resolve/{revision}/{}",
             requirement.path
         );
-        let response = self
-            .http
-            .get(&url)
-            .send()
-            .await
-            .map_err(|err| {
-                MemoryError::Storage(format!("download {} failed: {err}", requirement.path))
-            })?
-            .error_for_status()
-            .map_err(|err| {
-                MemoryError::Storage(format!("download {} failed: {err}", requirement.path))
-            })?;
+        // `error_for_status()` is fused with the `send` future so we cannot
+        // await `send` inside `tokio::select!` cleanly. Poll the future
+        // inside the loop to surface cancellation between retries.
+        let send_fut = self.http.get(&url).send();
+        let response = tokio::select! {
+            result = send_fut => {
+                result.map_err(|err| MemoryError::Storage(format!(
+                    "download {} failed: {err}",
+                    requirement.path
+                )))?
+            }
+            _ = cancellation.cancelled() => {
+                return Err(MemoryError::Transient(
+                    "NER artifact refresh cancelled".to_string(),
+                ));
+            }
+        }
+        .error_for_status()
+        .map_err(|err| {
+            MemoryError::Storage(format!("download {} failed: {err}", requirement.path))
+        })?;
 
         let total_bytes = response
             .content_length()
@@ -195,6 +215,7 @@ impl ArtifactFetcher for HfArtifactFetcher {
             })?;
         }
         let tmp = target.with_extension("part");
+        let _part_guard = PartialFileGuard::new(&tmp);
         let mut file = tokio::fs::File::create(&tmp).await.map_err(|err| {
             MemoryError::Storage(format!("cannot create {}: {err}", tmp.display()))
         })?;
@@ -207,12 +228,20 @@ impl ArtifactFetcher for HfArtifactFetcher {
         let mut hasher = Sha256::new();
 
         loop {
-            let tick = tokio::time::timeout(STALL_CHECK_INTERVAL, response.chunk());
-            match tick.await {
+            let chunk_fut = response.chunk();
+            let tick = tokio::time::timeout(STALL_CHECK_INTERVAL, chunk_fut);
+            let next = tokio::select! {
+                result = tick => result,
+                _ = cancellation.cancelled() => {
+                    return Err(MemoryError::Transient(
+                        "NER artifact refresh cancelled".to_string(),
+                    ));
+                }
+            };
+            match next {
                 Err(_) => {
                     // Interval elapsed without a chunk: check for stall.
                     if last_byte_at.elapsed() >= stall_timeout {
-                        let _ = tokio::fs::remove_file(&tmp).await;
                         return Err(MemoryError::Storage(format!(
                             "download of {} stalled: no bytes for {stall_timeout:?}",
                             requirement.path
@@ -240,7 +269,6 @@ impl ArtifactFetcher for HfArtifactFetcher {
                 }
                 Ok(Ok(None)) => break,
                 Ok(Err(err)) => {
-                    let _ = tokio::fs::remove_file(&tmp).await;
                     return Err(MemoryError::Storage(format!(
                         "download of {} failed: {err}",
                         requirement.path
@@ -248,25 +276,64 @@ impl ArtifactFetcher for HfArtifactFetcher {
                 }
             }
         }
+        if cancellation.is_cancelled() {
+            return Err(MemoryError::Transient(
+                "NER artifact refresh cancelled".to_string(),
+            ));
+        }
         file.flush().await.map_err(|err| {
             MemoryError::Storage(format!("cannot flush {}: {err}", tmp.display()))
         })?;
         if let Some(expected) = requirement.sha256 {
             let actual = hex::encode(hasher.finalize());
             if let Err(err) = verify_checksum(&actual, expected, requirement.path) {
-                let _ = tokio::fs::remove_file(&tmp).await;
                 return Err(err);
             }
         }
+        // Drop the file handle so the rename below is atomic.
+        drop(file);
         tokio::fs::rename(&tmp, target).await.map_err(|err| {
-            let _ = std::fs::remove_file(&tmp);
             MemoryError::Storage(format!(
                 "cannot finalize {} -> {}: {err}",
                 tmp.display(),
                 target.display()
             ))
         })?;
+        // Successfully renamed: the guard must NOT remove the destination.
+        _part_guard.commit();
         Ok(())
+    }
+}
+
+/// RAII guard that removes a partial download file on drop unless
+/// [`PartialFileGuard::commit`] is called. Cancellation, transport errors,
+/// and panic unwinds all observe the cleanup.
+pub struct PartialFileGuard {
+    path: PathBuf,
+    committed: bool,
+}
+
+impl PartialFileGuard {
+    fn new(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            committed: false,
+        }
+    }
+
+    /// Disarms the guard so the file is preserved on drop.
+    fn commit(mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for PartialFileGuard {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+        // Best-effort cleanup; the file may already be gone.
+        let _ = std::fs::remove_file(&self.path);
     }
 }
 

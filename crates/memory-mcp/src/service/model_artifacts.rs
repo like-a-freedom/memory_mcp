@@ -16,8 +16,8 @@ pub use download::{
 };
 pub use lease::{Lease, LeaseRecord};
 pub use manifest::{
-    ArtifactRequirement, LocalCheckpointIssue, LocalCheckpointSet, NerArtifactSpec,
-    PreparedCheckpoint, RevisionStatus, ValidationStatus, artifact_identity,
+    ArtifactRequirement, CandidateRefreshOutcome, LocalCheckpointIssue, LocalCheckpointSet,
+    NerArtifactSpec, PreparedCheckpoint, RevisionStatus, ValidationStatus, artifact_identity,
 };
 pub use progress::{
     CapturingSink, CliProgressSink, JsonLineProgressSink, ModelProgressEvent, ModelProgressPhase,
@@ -445,6 +445,10 @@ impl NerArtifactStore {
                 staging.display()
             ))
         })?;
+        // Legacy `prepare()` path is uncancellable: a fresh never-cancelled
+        // token keeps callers' behavior unchanged while exercising the same
+        // cancellation-aware fetcher.
+        let never_cancelled = tokio_util::sync::CancellationToken::new();
         for requirement in spec.files {
             let target = staging.join(requirement.path);
             if let Err(err) = self
@@ -455,6 +459,7 @@ impl NerArtifactStore {
                     requirement,
                     &target,
                     self.progress.as_ref(),
+                    &never_cancelled,
                 )
                 .await
             {
@@ -474,6 +479,7 @@ impl NerArtifactStore {
                         requirement,
                         &target,
                         self.progress.as_ref(),
+                        &never_cancelled,
                     )
                     .await
                 {
@@ -579,6 +585,440 @@ impl NerArtifactStore {
         }
         let prepared = self.prepare_known_good(spec, &state, RevisionStatus::LatestIncompatible)?;
         Ok(prepared)
+    }
+
+    /// Stages a new candidate revision without promoting it.
+    ///
+    /// Reuses the existing resolve/lease/staging/checksum mechanics, but
+    /// persists role [`state::ArtifactRole::Candidate`] and never assigns
+    /// [`ValidationStatus::RuntimeRegressionVerified`]. Promotion to
+    /// [`state::ArtifactRole::KnownGood`] happens only on next-start via
+    /// [`Self::promote_candidate`].
+    pub async fn refresh_candidate(
+        &self,
+        spec: &NerArtifactSpec,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> Result<
+        crate::service::model_artifacts::CandidateRefreshOutcome,
+        MemoryError,
+    > {
+        let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
+        let state = read_state(&layout.state_path)?;
+
+        // If HEAD is already known-incompatible, return without retrying.
+        let resolved = self
+            .resolve_latest(spec.repository)
+            .await
+            .map_err(|err| {
+                self.emit(&ModelProgressEvent::failed(
+                    spec.extractor_id,
+                    ModelProgressPhase::Resolve,
+                    err.to_string(),
+                ));
+                err
+            })?;
+
+        if state.incompatibility_for(&resolved).is_some() {
+            self.emit(&ModelProgressEvent::completed(
+                spec.extractor_id,
+                ModelProgressPhase::Fallback,
+                format!("suppressed already-incompatible revision {resolved}"),
+            ));
+            return Ok(
+                crate::service::model_artifacts::CandidateRefreshOutcome::SuppressedIncompatible {
+                    revision: resolved,
+                },
+            );
+        }
+
+        // Reuse a known-good if it already matches HEAD.
+        if let Some(record) = state
+            .known_goods()
+            .find(|record| record.revision == resolved)
+        {
+            let revision_dir = layout.revision_dir(&record.revision);
+            if is_complete(&revision_dir, spec) {
+                self.emit(&ModelProgressEvent::completed(
+                    spec.extractor_id,
+                    ModelProgressPhase::Verify,
+                    format!("up to date at revision {}", record.revision),
+                ));
+                return Ok(
+                    crate::service::model_artifacts::CandidateRefreshOutcome::UpToDate {
+                        revision: resolved,
+                    },
+                );
+            }
+        }
+
+        // Skip work if a complete candidate already exists for the resolved
+        // revision; refresh is idempotent for the same HEAD.
+        if let Some(record) = state.candidate() {
+            if record.revision == resolved {
+                let revision_dir = layout.revision_dir(&resolved);
+                if is_complete(&revision_dir, spec) {
+                    self.emit(&ModelProgressEvent::completed(
+                        spec.extractor_id,
+                        ModelProgressPhase::Verify,
+                        format!("up to date at candidate revision {resolved}"),
+                    ));
+                    return Ok(
+                        crate::service::model_artifacts::CandidateRefreshOutcome::UpToDate {
+                            revision: resolved,
+                        },
+                    );
+                }
+            }
+        }
+
+        // Acquire lease and download to a staging directory.
+        let lease_path = layout.leases.join(format!("{resolved}.json"));
+        let staging = self.stage_path(&layout, &resolved);
+        let _lease = self
+            .acquire_refresh_lease(spec, &lease_path, &resolved, &staging, &cancellation)
+            .await?;
+
+        self.emit(&ModelProgressEvent::started(
+            spec.extractor_id,
+            ModelProgressPhase::Download,
+        ));
+        std::fs::create_dir_all(&staging).map_err(|err| {
+            MemoryError::Storage(format!(
+                "cannot create staging {}: {err}",
+                staging.display()
+            ))
+        })?;
+        self.fetch_all_files(spec, &resolved, &staging, &cancellation)
+            .await?;
+
+        let identity = artifact_identity(
+            &staging,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        )?;
+
+        // Atomic commit into the revisions layout.
+        let revision_dir = layout.revision_dir(&resolved);
+        std::fs::create_dir_all(&layout.revisions).map_err(|err| {
+            MemoryError::Storage(format!(
+                "cannot create revisions dir {}: {err}",
+                layout.revisions.display()
+            ))
+        })?;
+        if let Err(err) = std::fs::rename(&staging, &revision_dir) {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(MemoryError::Storage(format!(
+                "cannot activate revision {resolved}: {err}"
+            )));
+        }
+        drop(_lease);
+
+        // Persist as Candidate; never set RuntimeRegressionVerified here.
+        let now = self.clock.now_secs();
+        let mut state = read_state(&layout.state_path)?;
+        state.revisions.retain(|record| record.revision != resolved);
+        state.revisions.push(RevisionState {
+            revision: resolved.clone(),
+            artifact_identity: identity,
+            validation_status: ValidationStatus::ReleaseParityVerified,
+            revision_status: RevisionStatus::Latest,
+            activated_at: now,
+            role: state::ArtifactRole::Candidate,
+            incompatible: None,
+        });
+        // Keep at most one candidate.
+        let mut kept = Vec::new();
+        let mut candidate_kept = false;
+        let mut known_kept = 0usize;
+        let mut ordered: Vec<&RevisionState> = state.revisions.iter().collect();
+        ordered.sort_by_key(|record| std::cmp::Reverse(record.activated_at));
+        for record in ordered {
+            match record.role {
+                state::ArtifactRole::Candidate if !candidate_kept => {
+                    kept.push(record.clone());
+                    candidate_kept = true;
+                }
+                state::ArtifactRole::KnownGood if known_kept < 2 => {
+                    kept.push(record.clone());
+                    known_kept += 1;
+                }
+                state::ArtifactRole::Incompatible => {
+                    kept.push(record.clone());
+                }
+                _ => {}
+            }
+        }
+        state.revisions = kept;
+        persist_state(&layout.state_path, &state)?;
+
+        self.emit(&ModelProgressEvent::completed(
+            spec.extractor_id,
+            ModelProgressPhase::Activate,
+            format!("staged candidate revision {resolved}"),
+        ));
+
+        Ok(
+            crate::service::model_artifacts::CandidateRefreshOutcome::CandidateReady {
+                revision: resolved,
+            },
+        )
+    }
+
+    /// Acquires a per-revision lease, blocking while another live process
+    /// holds it. Cancellation is observed before each retry sleep.
+    async fn acquire_refresh_lease(
+        &self,
+        spec: &NerArtifactSpec,
+        lease_path: &std::path::Path,
+        revision: &str,
+        staging: &std::path::Path,
+        cancellation: &tokio_util::sync::CancellationToken,
+    ) -> Result<Lease, MemoryError> {
+        loop {
+            if cancellation.is_cancelled() {
+                return Err(MemoryError::Transient(
+                    "NER artifact refresh cancelled".to_string(),
+                ));
+            }
+            let record = LeaseRecord {
+                extractor: spec.extractor_id.to_string(),
+                revision: revision.to_string(),
+                pid: std::process::id(),
+                created_at: self.clock.now_secs(),
+                heartbeat_at: self.clock.now_secs(),
+                staging: staging.to_path_buf(),
+            };
+            match Lease::acquire(lease_path, &record) {
+                Ok(Some(lease)) => return Ok(lease),
+                Ok(None) => {
+                    // Check whether we can reclaim an expired heartbeat.
+                    if let Ok(Some(held)) = Lease::read(lease_path) {
+                        if lease::can_reclaim(&held, self.clock.now_secs()) {
+                            let _ = std::fs::remove_file(lease_path);
+                            continue;
+                        }
+                    }
+                    self.emit(&ModelProgressEvent::started(
+                        spec.extractor_id,
+                        ModelProgressPhase::WaitForLease,
+                    ));
+                    tokio::select! {
+                        _ = cancellation.cancelled() => {
+                            return Err(MemoryError::Transient(
+                                "NER artifact refresh cancelled".to_string(),
+                            ));
+                        }
+                        _ = async {
+                            loop {
+                                if !lease_path.exists() {
+                                    break;
+                                }
+                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                            }
+                        } => {}
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
+    }
+
+    /// Fetches all primary and companion files into `staging`, observing
+    /// cancellation between each requirement.
+    async fn fetch_all_files(
+        &self,
+        spec: &NerArtifactSpec,
+        revision: &str,
+        staging: &std::path::Path,
+        cancellation: &tokio_util::sync::CancellationToken,
+    ) -> Result<(), MemoryError> {
+        for requirement in spec.files {
+            if cancellation.is_cancelled() {
+                return Err(MemoryError::Transient(
+                    "NER artifact refresh cancelled".to_string(),
+                ));
+            }
+            let target = staging.join(requirement.path);
+            self.fetcher
+                .fetch(
+                    spec.repository,
+                    revision,
+                    requirement,
+                    &target,
+                    self.progress.as_ref(),
+                    cancellation,
+                )
+                .await?;
+        }
+        if let Some(companion) = spec.companion_repository {
+            let companion_revision = self.resolve_latest(companion).await?;
+            for requirement in spec.companion_files {
+                if cancellation.is_cancelled() {
+                    return Err(MemoryError::Transient(
+                        "NER artifact refresh cancelled".to_string(),
+                    ));
+                }
+                let target = staging.join(requirement.path);
+                self.fetcher
+                    .fetch(
+                        companion,
+                        &companion_revision,
+                        requirement,
+                        &target,
+                        self.progress.as_ref(),
+                        cancellation,
+                    )
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Promotes the named candidate to role [`state::ArtifactRole::KnownGood`]
+    /// with [`ValidationStatus::RuntimeRegressionVerified`]. Fails when the
+    /// record is not a candidate, the revision does not match, or the
+    /// on-disk artifact identity diverges.
+    pub fn promote_candidate(
+        &self,
+        spec: &NerArtifactSpec,
+        revision: &str,
+    ) -> Result<
+        crate::service::model_artifacts::PreparedCheckpoint,
+        MemoryError,
+    > {
+        let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
+        let mut state = read_state(&layout.state_path)?;
+        let record = state
+            .candidate()
+            .filter(|record| record.revision == revision)
+            .ok_or_else(|| {
+                MemoryError::Storage(format!(
+                    "no Candidate revision {revision} for {}",
+                    spec.repository
+                ))
+            })?
+            .clone();
+        let revision_dir = layout.revision_dir(&record.revision);
+        if !is_complete(&revision_dir, spec) {
+            return Err(MemoryError::Storage(format!(
+                "candidate revision {revision} files are incomplete"
+            )));
+        }
+        let identity = artifact_identity(
+            &revision_dir,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        )?;
+        if identity != record.artifact_identity {
+            return Err(MemoryError::Storage(format!(
+                "candidate revision {revision} identity mismatch"
+            )));
+        }
+        let now = self.clock.now_secs();
+        // Update the existing record's role; do not duplicate it.
+        for entry in state.revisions.iter_mut() {
+            if entry.revision == revision {
+                entry.role = state::ArtifactRole::KnownGood;
+                entry.validation_status = ValidationStatus::RuntimeRegressionVerified;
+                entry.activated_at = now;
+                entry.artifact_identity = identity.clone();
+            }
+        }
+        // Retain: at most one Candidate plus the two most recent KnownGood
+        // entries; always keep all Incompatibility records.
+        state
+            .revisions
+            .sort_by_key(|record| std::cmp::Reverse(record.activated_at));
+        let mut kept: Vec<RevisionState> = Vec::new();
+        let mut candidate_kept = false;
+        let mut known_kept = 0usize;
+        for entry in state.revisions.drain(..) {
+            match entry.role {
+                state::ArtifactRole::Candidate if !candidate_kept => {
+                    kept.push(entry);
+                    candidate_kept = true;
+                }
+                state::ArtifactRole::KnownGood if known_kept < 2 => {
+                    kept.push(entry);
+                    known_kept += 1;
+                }
+                state::ArtifactRole::Incompatible => {
+                    kept.push(entry);
+                }
+                _ => {}
+            }
+        }
+        state.revisions = kept;
+        persist_state(&layout.state_path, &state)?;
+        self.retain(spec, &layout, &record.revision)?;
+        Ok(crate::service::model_artifacts::PreparedCheckpoint {
+            root: revision_dir,
+            repository: spec.repository.to_string(),
+            revision: record.revision,
+            artifact_identity: identity,
+            revision_status: record.revision_status,
+            validation_status: ValidationStatus::RuntimeRegressionVerified,
+        })
+    }
+
+    /// Marks the named candidate as incompatible, removes its artifact
+    /// directory, and returns the newest identity-verified known-good
+    /// checkpoint when present.
+    pub fn reject_candidate(
+        &self,
+        spec: &NerArtifactSpec,
+        revision: &str,
+        reason: &str,
+    ) -> Result<
+        Option<crate::service::model_artifacts::PreparedCheckpoint>,
+        MemoryError,
+    > {
+        let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
+        let mut state = read_state(&layout.state_path)?;
+        let now = self.clock.now_secs();
+        let mut found_candidate = false;
+        for entry in state.revisions.iter_mut() {
+            if entry.revision == revision && entry.role == state::ArtifactRole::Candidate {
+                entry.role = state::ArtifactRole::Incompatible;
+                entry.validation_status = ValidationStatus::RuntimeRegressionVerified;
+                entry.activated_at = now;
+                entry.artifact_identity = String::new();
+                entry.incompatible = Some(state::IncompatibilityRecord {
+                    commit: revision.to_string(),
+                    reason: reason.to_string(),
+                    recorded_at: now,
+                });
+                found_candidate = true;
+            }
+        }
+        if !found_candidate {
+            return Err(MemoryError::Storage(format!(
+                "no Candidate revision {revision} to reject"
+            )));
+        }
+        persist_state(&layout.state_path, &state)?;
+        let revision_dir = layout.revision_dir(revision);
+        let _ = std::fs::remove_dir_all(&revision_dir);
+        // Find the newest known-good record and verify it on disk.
+        let known_good_record = state
+            .known_goods()
+            .next()
+            .filter(|record| is_complete(&layout.revision_dir(&record.revision), spec))
+            .cloned();
+        if let Some(record) = known_good_record {
+            let revision_dir = layout.revision_dir(&record.revision);
+            let identity = artifact_identity(
+                &revision_dir,
+                &spec.all_requirements().copied().collect::<Vec<_>>(),
+            )?;
+            return Ok(Some(crate::service::model_artifacts::PreparedCheckpoint {
+                root: revision_dir,
+                repository: spec.repository.to_string(),
+                revision: record.revision,
+                artifact_identity: identity,
+                revision_status: record.revision_status,
+                validation_status: record.validation_status,
+            }));
+        }
+        Ok(None)
     }
 
     /// Prepares the persisted last known-good revision.
