@@ -77,6 +77,13 @@ impl LifecycleConfig {
     /// ```rust
     /// use memory_mcp::config::LifecycleConfig;
     ///
+    /// // Ensure the doc test is not affected by a developer's shell
+    // environment that pre-sets `LIFECYCLE_ENABLED`.
+    /// let _ = std::env::var_os("LIFECYCLE_ENABLED").map(|_| {
+    ///     // SAFETY: the doc test runs single-threaded and does not
+    /// // touch other process-wide state.
+    /// unsafe { std::env::remove_var("LIFECYCLE_ENABLED") }
+    /// });
     /// let config = LifecycleConfig::from_env();
     /// assert!(!config.enabled); // disabled by default
     /// ```
