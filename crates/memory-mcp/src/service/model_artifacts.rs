@@ -16,8 +16,8 @@ pub use download::{
 };
 pub use lease::{Lease, LeaseRecord};
 pub use manifest::{
-    ArtifactRequirement, NerArtifactSpec, PreparedCheckpoint, RevisionStatus, ValidationStatus,
-    artifact_identity,
+    ArtifactRequirement, LocalCheckpointIssue, LocalCheckpointSet, NerArtifactSpec,
+    PreparedCheckpoint, RevisionStatus, ValidationStatus, artifact_identity,
 };
 pub use progress::{
     CapturingSink, CliProgressSink, JsonLineProgressSink, ModelProgressEvent, ModelProgressPhase,
@@ -100,6 +100,18 @@ pub struct NerArtifactStore {
     clock: Arc<dyn Clock>,
 }
 
+/// Outcome of reading the local artifact state.
+enum ReadStateOutcome {
+    /// State was read and (if necessary) migrated to v2 semantics.
+    Ok(crate::service::model_artifacts::state::PersistedArtifactState),
+    /// Recoverable defect that the caller should report through
+    /// [`crate::service::model_artifacts::manifest::LocalCheckpointSet::issue`].
+    Recoverable(crate::service::model_artifacts::manifest::LocalCheckpointIssue),
+    /// Unrecoverable I/O error (permission, unreadable directory) that the
+    /// caller must surface as a startup-fatal error.
+    Fatal(MemoryError),
+}
+
 impl NerArtifactStore {
     /// Creates a store with default Hugging Face resolver/fetcher and the
     /// system clock.
@@ -138,6 +150,169 @@ impl NerArtifactStore {
             state
                 .last_known_good()
                 .map(|record| record.revision.clone())
+        })
+    }
+
+    /// Inspects local checkpoints for `spec` without invoking the resolver,
+    /// fetcher, lease, or any remote operation.
+    ///
+    /// Recoverable defects (missing/zero-byte files, identity mismatch,
+    /// malformed/unsupported state) are returned in [`LocalCheckpointSet::issue`]
+    /// while the independently verified role is still returned if usable.
+    /// Permission errors and unreadable directory I/O are propagated as
+    /// [`MemoryError::Storage`].
+    pub fn inspect_local(
+        &self,
+        spec: &NerArtifactSpec,
+    ) -> Result<crate::service::model_artifacts::manifest::LocalCheckpointSet, MemoryError> {
+        use crate::service::model_artifacts::manifest::LocalCheckpointSet;
+        let layout = ExtractorLayout::new(&self.root, spec.extractor_id);
+
+        // Read state through the typed envelope so unsupported future
+        // schemas surface as `LocalCheckpointIssue::UnsupportedStateVersion`
+        // instead of pretending the local store is empty. Permission and other
+        // I/O errors are NOT recoverable, so they propagate as `Storage`.
+        let state = match self.read_state_typed(&layout.state_path) {
+            ReadStateOutcome::Ok(state) => state,
+            ReadStateOutcome::Recoverable(issue) => {
+                return Ok(LocalCheckpointSet {
+                    candidate: None,
+                    known_good: None,
+                    issue: Some(issue),
+                });
+            }
+            ReadStateOutcome::Fatal(err) => return Err(err),
+        };
+
+        let mut result = LocalCheckpointSet::default();
+
+        // Candidate first; refresh writes a single candidate so the newest
+        // persisted candidate is the only one we honor.
+        if let Some(record) = state.candidate() {
+            match self.verify_local_record(spec, &layout, record) {
+                Ok(checkpoint) => result.candidate = Some(checkpoint),
+                Err(issue) => result.issue = Some(issue),
+            }
+        }
+
+        // Known-good selector excludes candidates by construction.
+        for record in state.known_goods() {
+            if result.known_good.is_some() {
+                break;
+            }
+            match self.verify_local_record(spec, &layout, record) {
+                Ok(checkpoint) => result.known_good = Some(checkpoint),
+                Err(issue) => result.issue = Some(issue),
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Reads state while preserving the typed defect categories. Operational
+    /// I/O errors (permission denied, unreadable directory) bubble up so the
+    /// caller can fail startup; recoverable state defects are reported.
+    fn read_state_typed(&self, path: &std::path::Path) -> ReadStateOutcome {
+        use crate::service::model_artifacts::manifest::LocalCheckpointIssue;
+        use crate::service::model_artifacts::state::{
+            PersistedArtifactState, PersistedArtifactStateV1, RevisionStateV1,
+            SchemaVersionEnvelope, STATE_SCHEMA_VERSION,
+        };
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return ReadStateOutcome::Ok(PersistedArtifactState::new());
+            }
+            Err(err) => {
+                return ReadStateOutcome::Fatal(MemoryError::Storage(format!(
+                    "cannot read artifact state {}: {err}",
+                    path.display()
+                )));
+            }
+        };
+        let envelope: SchemaVersionEnvelope = match serde_json::from_slice(&bytes) {
+            Ok(envelope) => envelope,
+            Err(err) => {
+                return ReadStateOutcome::Recoverable(LocalCheckpointIssue::MalformedState {
+                    summary: err.to_string(),
+                });
+            }
+        };
+        if envelope.schema_version > STATE_SCHEMA_VERSION && envelope.schema_version != 1 {
+            return ReadStateOutcome::Recoverable(LocalCheckpointIssue::UnsupportedStateVersion {
+                found: envelope.schema_version,
+            });
+        }
+        if envelope.schema_version == 1 {
+            let legacy: PersistedArtifactStateV1 = match serde_json::from_slice(&bytes) {
+                Ok(legacy) => legacy,
+                Err(err) => {
+                    return ReadStateOutcome::Recoverable(LocalCheckpointIssue::MalformedState {
+                        summary: err.to_string(),
+                    });
+                }
+            };
+            return ReadStateOutcome::Ok(PersistedArtifactState {
+                schema_version: STATE_SCHEMA_VERSION,
+                revisions: legacy
+                    .revisions
+                    .into_iter()
+                    .map(RevisionStateV1::into_v2)
+                    .collect(),
+            });
+        }
+        match serde_json::from_slice::<PersistedArtifactState>(&bytes) {
+            Ok(state) => ReadStateOutcome::Ok(state),
+            Err(err) => ReadStateOutcome::Recoverable(LocalCheckpointIssue::MalformedState {
+                summary: err.to_string(),
+            }),
+        }
+    }
+
+    /// Verifies a single persisted record's on-disk state without touching
+    /// the network. Recomputes the artifact identity, checks file presence
+    /// and non-zero size, and returns a typed defect on mismatch.
+    fn verify_local_record(
+        &self,
+        spec: &NerArtifactSpec,
+        layout: &ExtractorLayout,
+        record: &crate::service::model_artifacts::state::RevisionState,
+    ) -> Result<
+        crate::service::model_artifacts::manifest::PreparedCheckpoint,
+        crate::service::model_artifacts::manifest::LocalCheckpointIssue,
+    > {
+        use crate::service::model_artifacts::manifest::{
+            LocalCheckpointIssue, PreparedCheckpoint,
+        };
+        let revision_dir = layout.revision_dir(&record.revision);
+        if !is_complete(&revision_dir, spec) {
+            return Err(LocalCheckpointIssue::Incomplete {
+                revision: record.revision.clone(),
+            });
+        }
+        let identity = match crate::service::model_artifacts::artifact_identity(
+            &revision_dir,
+            &spec.all_requirements().copied().collect::<Vec<_>>(),
+        ) {
+            Ok(identity) => identity,
+            Err(_) => {
+                return Err(LocalCheckpointIssue::Incomplete {
+                    revision: record.revision.clone(),
+                });
+            }
+        };
+        if identity != record.artifact_identity {
+            return Err(LocalCheckpointIssue::IdentityMismatch {
+                revision: record.revision.clone(),
+            });
+        }
+        Ok(PreparedCheckpoint {
+            root: revision_dir,
+            repository: spec.repository.to_string(),
+            revision: record.revision.clone(),
+            artifact_identity: identity,
+            revision_status: record.revision_status,
+            validation_status: record.validation_status,
         })
     }
 
