@@ -229,6 +229,24 @@ impl MemoryService {
         runtime
     }
 
+    /// Starts the one-shot Classic GLiNER artifact refresh task when the
+    /// configured backend is Classic GLiNER. Returns `None` for any other
+    /// backend. The caller is responsible for awaiting the returned
+    /// runtime's `shutdown()` to ensure cancellation and join.
+    pub(crate) fn start_ner_artifact_refresh(
+        &self,
+    ) -> Option<super::model_artifact_refresh::NerArtifactRefreshRuntime> {
+        let config = self.ner_artifact_refresh_config.clone()?;
+        let native = self.ner_artifact_refresh_native.clone()?;
+        let spec = super::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone();
+        Some(super::model_artifact_refresh::NerArtifactRefreshRuntime::start(
+            config,
+            spec,
+            native,
+            self.logger.clone(),
+        ))
+    }
+
     /// Shut down the lifecycle background workers (decay, archival, community).
     ///
     /// Cancels all worker tasks and joins them. Safe to call when no workers

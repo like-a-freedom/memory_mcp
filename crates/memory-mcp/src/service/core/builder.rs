@@ -66,6 +66,17 @@ pub struct MemoryService {
     /// tasks. Limits in-flight extraction tasks to prevent unbounded task
     /// spawning under load.
     pub(crate) triple_extraction_semaphore: Arc<tokio::sync::Semaphore>,
+    /// Optional Classic GLiNER refresh config retained for the post-readiness
+    /// background runtime. Only populated when the configured backend is
+    /// Classic GLiNER.
+    pub(crate) ner_artifact_refresh_config:
+        Option<super::super::model_artifact_refresh::NerArtifactRefreshConfig>,
+    /// Native config captured at build time so the post-readiness runtime
+    /// can construct an `UnavailableEntityExtractor` if it ever needs to
+    /// (e.g. when the refresh task must mirror a configured config). Held
+    /// only when the backend is Classic GLiNER.
+    pub(crate) ner_artifact_refresh_native:
+        Option<crate::config::NativeGlinerConfig>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -281,6 +292,36 @@ impl MemoryService {
         )
         .await?;
 
+        // Capture the Classic GLiNER refresh config only when the configured
+        // backend is Classic GLiNER. The runtime starts after MCP readiness
+        // (see `run_stdio_server`); it is intentionally not spawned here.
+        let (ner_artifact_refresh_config, ner_artifact_refresh_native) =
+            if let crate::config::NerExtractorConfig::ClassicGliner(native) = &config.ner.extractor
+            {
+                let default_root = std::path::PathBuf::from(&effective_data_dir)
+                    .join("models")
+                    .join("ner");
+                let store_root = native
+                    .model
+                    .cache_dir
+                    .clone()
+                    .unwrap_or(default_root);
+                let progress_for_refresh: std::sync::Arc<
+                    dyn crate::service::model_artifacts::ModelProgressSink,
+                > = std::sync::Arc::new(
+                    crate::service::model_artifacts::JsonLineProgressSink::new(),
+                );
+                (
+                    Some(super::super::model_artifact_refresh::NerArtifactRefreshConfig {
+                        store_root,
+                        progress: progress_for_refresh,
+                    }),
+                    Some(native.clone()),
+                )
+            } else {
+                (None, None)
+            };
+
         let runtime_provider = embedding_provider.clone();
         let mut service = Self::new_with_embedding_provider(
             db_client.clone(),
@@ -295,6 +336,8 @@ impl MemoryService {
         .with_query_logging_enabled(config.query_logging_enabled)
         .with_query_log_retention_days(config.query_log_retention_days);
         service.lifecycle_config = config.lifecycle.clone();
+        service.ner_artifact_refresh_config = ner_artifact_refresh_config;
+        service.ner_artifact_refresh_native = ner_artifact_refresh_native;
         service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
             runtime_provider,
             target.as_ref().map(|value| value.signature.clone()),
@@ -512,6 +555,8 @@ impl MemoryService {
             triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
                 crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
             )),
+            ner_artifact_refresh_config: None,
+            ner_artifact_refresh_native: None,
         })
     }
 

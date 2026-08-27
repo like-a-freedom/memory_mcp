@@ -118,6 +118,10 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
 
     logger.log(event!("op" => json!("main.running")), LogLevel::Info);
 
+    // Start the one-shot Classic GLiNER refresh only after MCP readiness so
+    // the background fetch cannot consume the `initialize` deadline.
+    let ner_refresh = shutdown_service.start_ner_artifact_refresh();
+
     let result = service
         .waiting()
         .await
@@ -127,7 +131,8 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
         .map_err(|err| log_and_return_error(logger, "main.error", err));
 
     // Deterministic shutdown order: filesystem discovery/dequeue first, then
-    // the claim and lifecycle workers, then other background workers.
+    // the claim and lifecycle workers, then other background workers, then
+    // finally the NER refresh task.
     #[cfg(feature = "fs-watch")]
     if let Some(runtime) = fs_watch_runtime {
         let outcome = runtime.shutdown().await;
@@ -145,6 +150,9 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
     shutdown_service
         .shutdown_lifecycle_background_workers()
         .await;
+    if let Some(runtime) = ner_refresh {
+        runtime.shutdown().await;
+    }
     result
 }
 
