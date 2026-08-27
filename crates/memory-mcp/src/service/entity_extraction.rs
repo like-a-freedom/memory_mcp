@@ -24,6 +24,9 @@ pub use gliner::GlinerEntityExtractor;
 #[allow(unused_imports)]
 pub use lfm2_gliner::VagoLfm2EntityExtractor;
 pub use regex::RegexEntityExtractor;
+pub(crate) use unavailable::UnavailableEntityExtractor;
+
+mod unavailable;
 
 /// How an entity extractor must be scheduled by the episode pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
