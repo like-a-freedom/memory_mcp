@@ -88,6 +88,39 @@ pub struct PreparedCheckpoint {
     pub validation_status: ValidationStatus,
 }
 
+/// Recoverable defect observed while inspecting a persisted local checkpoint.
+///
+/// Permission errors and unreadable directory I/O are not represented here:
+/// they are propagated as `MemoryError::Storage` because background refresh
+/// cannot safely repair an inaccessible store.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LocalCheckpointIssue {
+    /// Required files are missing or zero-byte on disk.
+    Incomplete { revision: String },
+    /// Recomputed artifact identity differs from the persisted identity.
+    IdentityMismatch { revision: String },
+    /// State JSON could not be parsed.
+    MalformedState { summary: String },
+    /// State JSON carried a schema version this build cannot interpret.
+    UnsupportedStateVersion { found: u8 },
+}
+
+/// Result of inspecting a local extractor store without network access.
+///
+/// At most one candidate and one known-good checkpoint are returned, even if
+/// multiple records of the same role exist. A non-`None` [`Self::issue`]
+/// reports a recoverably bad record so the caller can decide whether the
+/// independently verified role is still usable.
+#[derive(Debug, Clone, Default)]
+pub struct LocalCheckpointSet {
+    /// Staged revision awaiting next-start runtime validation.
+    pub candidate: Option<PreparedCheckpoint>,
+    /// Latest runtime-verified revision.
+    pub known_good: Option<PreparedCheckpoint>,
+    /// Sanitized defect description, when at least one record was bad.
+    pub issue: Option<LocalCheckpointIssue>,
+}
+
 /// Computes a stable SHA-256 identity from actual on-disk artifacts.
 ///
 /// Entries are sorted by relative path; each is rendered as
