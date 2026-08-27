@@ -601,14 +601,16 @@ impl NerArtifactStore {
         let state = read_state(&layout.state_path)?;
 
         // If HEAD is already known-incompatible, return without retrying.
-        let resolved = self.resolve_latest(spec.repository).await.map_err(|err| {
-            self.emit(&ModelProgressEvent::failed(
-                spec.extractor_id,
-                ModelProgressPhase::Resolve,
-                err.to_string(),
-            ));
-            err
-        })?;
+        let resolved = self
+            .resolve_latest(spec.repository)
+            .await
+            .inspect_err(|err| {
+                self.emit(&ModelProgressEvent::failed(
+                    spec.extractor_id,
+                    ModelProgressPhase::Resolve,
+                    err.to_string(),
+                ));
+            })?;
 
         if state.incompatibility_for(&resolved).is_some() {
             self.emit(&ModelProgressEvent::completed(
@@ -645,21 +647,21 @@ impl NerArtifactStore {
 
         // Skip work if a complete candidate already exists for the resolved
         // revision; refresh is idempotent for the same HEAD.
-        if let Some(record) = state.candidate() {
-            if record.revision == resolved {
-                let revision_dir = layout.revision_dir(&resolved);
-                if is_complete(&revision_dir, spec) {
-                    self.emit(&ModelProgressEvent::completed(
-                        spec.extractor_id,
-                        ModelProgressPhase::Verify,
-                        format!("up to date at candidate revision {resolved}"),
-                    ));
-                    return Ok(
-                        crate::service::model_artifacts::CandidateRefreshOutcome::UpToDate {
-                            revision: resolved,
-                        },
-                    );
-                }
+        if let Some(record) = state.candidate()
+            && record.revision == resolved
+        {
+            let revision_dir = layout.revision_dir(&resolved);
+            if is_complete(&revision_dir, spec) {
+                self.emit(&ModelProgressEvent::completed(
+                    spec.extractor_id,
+                    ModelProgressPhase::Verify,
+                    format!("up to date at candidate revision {resolved}"),
+                ));
+                return Ok(
+                    crate::service::model_artifacts::CandidateRefreshOutcome::UpToDate {
+                        revision: resolved,
+                    },
+                );
             }
         }
 
@@ -784,11 +786,11 @@ impl NerArtifactStore {
                 Ok(Some(lease)) => return Ok(lease),
                 Ok(None) => {
                     // Check whether we can reclaim an expired heartbeat.
-                    if let Ok(Some(held)) = Lease::read(lease_path) {
-                        if lease::can_reclaim(&held, self.clock.now_secs()) {
-                            let _ = std::fs::remove_file(lease_path);
-                            continue;
-                        }
+                    if let Ok(Some(held)) = Lease::read(lease_path)
+                        && lease::can_reclaim(&held, self.clock.now_secs())
+                    {
+                        let _ = std::fs::remove_file(lease_path);
+                        continue;
                     }
                     self.emit(&ModelProgressEvent::started(
                         spec.extractor_id,
