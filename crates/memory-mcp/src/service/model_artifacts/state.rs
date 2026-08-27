@@ -111,6 +111,7 @@ pub struct PersistedArtifactState {
 /// migrate legacy records. The struct mirrors the original on-disk shape.
 #[derive(Debug, Deserialize)]
 pub(crate) struct PersistedArtifactStateV1 {
+    #[allow(dead_code)]
     pub(crate) schema_version: u8,
     #[serde(default)]
     pub(crate) revisions: Vec<RevisionStateV1>,

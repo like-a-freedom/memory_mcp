@@ -996,3 +996,300 @@ fn candidate_is_never_returned_by_known_good_selector() {
     assert!(state.known_goods().next().is_none());
     assert!(state.candidate().is_some());
 }
+
+// ── Cancellation debris (Task 4) ───────────────────────────────────────
+
+fn store_root_for(temp: &TempDir) -> std::path::PathBuf {
+    temp.path().join("models").join("ner")
+}
+
+fn assert_no_part_or_staging(temp: &TempDir) {
+    let store_root = store_root_for(temp);
+    let gliner_root = store_root.join("test-extractor");
+    let staging = gliner_root.join("staging");
+    let leases = gliner_root.join("leases");
+    if staging.exists() {
+        let entries: Vec<_> = std::fs::read_dir(&staging)
+        .expect("read staging")
+        .map_while(Result::ok)
+        .collect();
+        assert!(entries.is_empty(), "staging not empty: {entries:?}");
+    }
+    if leases.exists() {
+        let entries: Vec<_> = std::fs::read_dir(&leases)
+        .expect("read leases")
+        .map_while(Result::ok)
+        .collect();
+        assert!(entries.is_empty(), "leases not empty: {entries:?}");
+    }
+    // Walk revisions to confirm no `.part` files survived.
+    let revisions = gliner_root.join("revisions");
+    if revisions.exists() {
+        for entry in std::fs::read_dir(&revisions).expect("read revisions") {
+            let entry = entry.expect("entry");
+            let path = entry.path();
+            if path.is_dir() {
+                for inner in std::fs::read_dir(&path).expect("read rev") {
+                    let inner = inner.expect("inner");
+                    let name = inner.file_name();
+                    assert!(
+                        !name.to_string_lossy().ends_with(".part"),
+                        ".part debris at {}",
+                        inner.path().display()
+                    );
+                }
+            }
+        }
+    }
+}
+
+struct BlockingFetcher {
+    phase: Arc<std::sync::Mutex<BlockingPhase>>,
+    started: std::sync::Mutex<bool>,
+    started_notify: std::sync::Condvar,
+    resume: Arc<std::sync::Mutex<bool>>,
+    #[allow(dead_code)]
+    resume_notify: std::sync::Condvar,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+enum BlockingPhase {
+    /// Block before acquiring the lease.
+    Lease,
+    /// Block after lease is acquired but before any fetch call.
+    PreFetch,
+    /// Block after the first chunk is delivered to disk.
+    MidStream,
+    /// Block between the first and second file of multi-file acquisition.
+    BetweenFiles,
+}
+
+impl BlockingFetcher {
+    fn new(phase: BlockingPhase) -> Self {
+        Self {
+            phase: Arc::new(std::sync::Mutex::new(phase)),
+            started: std::sync::Mutex::new(false),
+            started_notify: std::sync::Condvar::new(),
+            resume: Arc::new(std::sync::Mutex::new(false)),
+            resume_notify: std::sync::Condvar::new(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ArtifactFetcher for BlockingFetcher {
+    async fn fetch(
+        &self,
+        _repository: &str,
+        _revision: &str,
+        requirement: &ArtifactRequirement,
+        target: &std::path::Path,
+        _progress: &dyn ModelProgressSink,
+        cancellation: &tokio_util::sync::CancellationToken,
+    ) -> Result<(), MemoryError> {
+        let phase = *self.phase.lock().expect("phase");
+        match phase {
+            BlockingPhase::Lease | BlockingPhase::PreFetch => {
+                {
+                    let mut started = self.started.lock().expect("started");
+                    *started = true;
+                }
+                self.started_notify.notify_all();
+                loop {
+                    {
+                        let resume = *self.resume.lock().expect("resume");
+                        if resume {
+                            break;
+                        }
+                    }
+                    if cancellation.is_cancelled() {
+                        return Err(MemoryError::Transient(
+                            "NER artifact refresh cancelled".to_string(),
+                        ));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+            }
+            BlockingPhase::MidStream => {
+                std::fs::create_dir_all(target.parent().expect("parent"))
+                    .expect("create parent");
+                std::fs::write(target, b"partial").expect("write partial");
+                {
+                    let mut started = self.started.lock().expect("started");
+                    *started = true;
+                }
+                self.started_notify.notify_all();
+                loop {
+                    {
+                        let resume = *self.resume.lock().expect("resume");
+                        if resume {
+                            break;
+                        }
+                    }
+                    if cancellation.is_cancelled() {
+                        let _ = std::fs::remove_file(target);
+                        return Err(MemoryError::Transient(
+                            "NER artifact refresh cancelled".to_string(),
+                        ));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                let _ = std::fs::remove_file(target);
+            }
+            BlockingPhase::BetweenFiles => {
+                std::fs::create_dir_all(target.parent().expect("parent"))
+                    .expect("create parent");
+                std::fs::write(target, format!("content-of-{}", requirement.path))
+                    .expect("write content");
+                if requirement.path == "model.bin" {
+                    {
+                        let mut started = self.started.lock().expect("started");
+                        *started = true;
+                    }
+                    self.started_notify.notify_all();
+                    loop {
+                        {
+                            let resume = *self.resume.lock().expect("resume");
+                            if resume {
+                                break;
+                            }
+                        }
+                        if cancellation.is_cancelled() {
+                            return Err(MemoryError::Transient(
+                                "NER artifact refresh cancelled".to_string(),
+                            ));
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn await_signal(fetcher: &BlockingFetcher) {
+    let mut started = fetcher.started.lock().expect("started");
+    let mut spins = 0;
+    while !*started && spins < 200 {
+        started = fetcher
+            .started_notify
+            .wait_timeout(started, std::time::Duration::from_millis(25))
+            .expect("wait started")
+            .0;
+        spins += 1;
+    }
+}
+
+#[test]
+fn cancellation_during_response_wait_leaves_no_debris() {
+    let temp = TempDir::new().expect("temp dir");
+    let fetcher = Arc::new(BlockingFetcher::new(BlockingPhase::PreFetch));
+    let store = NerArtifactStore::with_parts(
+        store_root_for(&temp),
+        Arc::new(FakeResolver::ok("abc123")),
+        fetcher.clone(),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let cancellation = CancellationToken::new();
+    let cancel_token = cancellation.clone();
+    let fetcher_clone = fetcher.clone();
+    std::thread::spawn(move || {
+        await_signal(&fetcher_clone);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        cancel_token.cancel();
+    });
+    let result = block_on(store.refresh_candidate(&test_spec(), cancellation));
+    assert!(matches!(
+        result,
+        Err(MemoryError::Transient(_)) | Err(MemoryError::Storage(_))
+    ));
+    assert_no_part_or_staging(&temp);
+}
+
+#[test]
+fn cancellation_mid_stream_leaves_no_part_file() {
+    let temp = TempDir::new().expect("temp dir");
+    let fetcher = Arc::new(BlockingFetcher::new(BlockingPhase::MidStream));
+    let store = NerArtifactStore::with_parts(
+        store_root_for(&temp),
+        Arc::new(FakeResolver::ok("abc123")),
+        fetcher.clone(),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let cancellation = CancellationToken::new();
+    let cancel_token = cancellation.clone();
+    let fetcher_clone = fetcher.clone();
+    std::thread::spawn(move || {
+        await_signal(&fetcher_clone);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        cancel_token.cancel();
+    });
+    let result = block_on(store.refresh_candidate(&test_spec(), cancellation));
+    assert!(matches!(
+        result,
+        Err(MemoryError::Transient(_)) | Err(MemoryError::Storage(_))
+    ));
+    assert_no_part_or_staging(&temp);
+}
+
+#[test]
+fn cancellation_between_files_cleans_first_file_and_staging() {
+    let temp = TempDir::new().expect("temp dir");
+    let fetcher = Arc::new(BlockingFetcher::new(BlockingPhase::BetweenFiles));
+    let store = NerArtifactStore::with_parts(
+        store_root_for(&temp),
+        Arc::new(FakeResolver::ok("abc123")),
+        fetcher.clone(),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let cancellation = CancellationToken::new();
+    let cancel_token = cancellation.clone();
+    let fetcher_clone = fetcher.clone();
+    std::thread::spawn(move || {
+        await_signal(&fetcher_clone);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        cancel_token.cancel();
+    });
+    let result = block_on(store.refresh_candidate(&test_spec(), cancellation));
+    assert!(matches!(
+        result,
+        Err(MemoryError::Transient(_)) | Err(MemoryError::Storage(_))
+    ));
+    assert_no_part_or_staging(&temp);
+}
+
+#[test]
+fn refresh_cancellation_releases_lease() {
+    let temp = TempDir::new().expect("temp dir");
+    let fetcher = Arc::new(BlockingFetcher::new(BlockingPhase::MidStream));
+    let store = NerArtifactStore::with_parts(
+        store_root_for(&temp),
+        Arc::new(FakeResolver::ok("abc123")),
+        fetcher.clone(),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let cancellation = CancellationToken::new();
+    let cancel_token = cancellation.clone();
+    let fetcher_clone = fetcher.clone();
+    std::thread::spawn(move || {
+        await_signal(&fetcher_clone);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        cancel_token.cancel();
+    });
+    let _ = block_on(store.refresh_candidate(&test_spec(), cancellation));
+    let lease_path = store_root_for(&temp)
+        .join("test-extractor")
+        .join("leases")
+        .join("abc123.json");
+    assert!(
+        !lease_path.exists(),
+        "lease must be released after cancellation: {}",
+        lease_path.display()
+    );
+}

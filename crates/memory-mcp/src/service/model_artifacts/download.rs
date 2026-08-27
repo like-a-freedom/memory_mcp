@@ -373,4 +373,24 @@ mod tests {
             other => panic!("expected Validation error, got {other}"),
         }
     }
+
+    #[test]
+    fn partial_file_guard_removes_uncommitted_file_on_drop() {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let part = temp.path().join("model.bin.part");
+        std::fs::write(&part, b"partial").expect("write part");
+        let guard = PartialFileGuard::new(&part);
+        drop(guard);
+        assert!(!part.exists(), ".part must be removed on drop");
+    }
+
+    #[test]
+    fn partial_file_guard_preserves_file_when_committed() {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let part = temp.path().join("model.bin.part");
+        std::fs::write(&part, b"partial").expect("write part");
+        let guard = PartialFileGuard::new(&part);
+        guard.commit();
+        assert!(part.exists(), "committed .part must remain on disk");
+    }
 }
