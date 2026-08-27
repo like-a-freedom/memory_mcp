@@ -688,6 +688,7 @@ impl NerArtifactStore {
                 staging.display()
             ))
         })?;
+        let staging_guard = StagingDirGuard::new(&staging);
         self.fetch_all_files(spec, &resolved, &staging, &cancellation)
             .await?;
 
@@ -704,12 +705,14 @@ impl NerArtifactStore {
                 layout.revisions.display()
             ))
         })?;
-        if let Err(err) = std::fs::rename(&staging, &revision_dir) {
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(MemoryError::Storage(format!(
+        std::fs::rename(&staging, &revision_dir).map_err(|err| {
+            MemoryError::Storage(format!(
                 "cannot activate revision {resolved}: {err}"
-            )));
-        }
+            ))
+        })?;
+        // The staged directory has been atomically renamed; disarm the guard
+        // so the revisions directory is not removed on drop.
+        staging_guard.commit();
         drop(_lease);
 
         // Persist as Candidate; never set RuntimeRegressionVerified here.
@@ -1192,4 +1195,35 @@ fn is_complete(root: &Path, spec: &NerArtifactSpec) -> bool {
     // its companion tokenizer is not reusable and must not bypass re-fetch.
     spec.all_requirements()
         .all(|requirement| root.join(requirement.path).is_file())
+}
+
+/// RAII guard that removes a staged artifact directory on drop unless
+/// [`StagingDirGuard::commit`] is called. A future call that would have
+/// renamed the staged directory into `revisions/` must disarm the guard
+/// only after the rename succeeds.
+pub(crate) struct StagingDirGuard {
+    path: PathBuf,
+    committed: bool,
+}
+
+impl StagingDirGuard {
+    pub(crate) fn new(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            committed: false,
+        }
+    }
+
+    pub(crate) fn commit(mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for StagingDirGuard {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
 }
