@@ -36,6 +36,19 @@ impl StdioMcpProcess {
             .env("NER_EXTRACTOR", "anno")
             .env("RUST_LOG", "warn")
             .env_remove("SURREALDB_URL")
+            // The parent shell may export model-specific NER overrides
+            // (e.g. `NER_MAX_CONCURRENCY` or `GLINER_DEVICE`) that the
+            // lightweight `anno` selector rejects. Drop them so the
+            // subprocess always starts with a clean per-test config.
+            .env_remove("NER_MAX_CONCURRENCY")
+            .env_remove("NER_CACHE_DIR")
+            .env_remove("NER_LABELS")
+            .env_remove("NER_THRESHOLD")
+            .env_remove("NER_IDLE_UNLOAD_SECS")
+            .env_remove("GLINER_BATCH_SIZE")
+            .env_remove("GLINER_MAX_BATCH_TOKENS")
+            .env_remove("GLINER_DEVICE")
+            .env_remove("MEMORY_EVAL_NER_ARTIFACT_BASE_URL")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
