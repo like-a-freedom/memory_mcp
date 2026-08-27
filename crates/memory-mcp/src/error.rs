@@ -28,6 +28,14 @@ pub enum MemoryError {
     /// The capture budget is exhausted before episode preparation.
     #[error("budget exhausted: {0}")]
     BudgetExhausted(String),
+
+    /// The configured model is not available locally; restart after the
+    /// background preparation completes. Distinct from
+    /// [`MemoryError::Storage`] and [`MemoryError::Transient`] because the
+    /// active extractor is immutable in this process and retries cannot
+    /// change the outcome.
+    #[error("model not ready: {0}")]
+    ModelNotReady(String),
 }
 
 /// Returns `true` if the error is a transient database error that can be retried.
@@ -83,6 +91,8 @@ mod tests {
         let err = MemoryError::Transient("embedding timeout".into());
         assert!(!is_transient_db_error(&err));
         let err = MemoryError::ConfigMissing("SURREALDB_URL".into());
+        assert!(!is_transient_db_error(&err));
+        let err = MemoryError::ModelNotReady("classic gliner".into());
         assert!(!is_transient_db_error(&err));
     }
 }

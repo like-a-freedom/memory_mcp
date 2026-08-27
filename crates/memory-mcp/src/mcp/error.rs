@@ -99,6 +99,17 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             });
             ErrorData::invalid_request(err.to_string(), Some(data))
         }
+        MemoryError::ModelNotReady(msg) => {
+            let data = json!({
+                "kind": "model_not_ready",
+                "guidance": "Wait for background preparation to complete, then restart Memory MCP.",
+                "explanation": msg,
+                "retryable": false,
+                "restart_required": true,
+                "activation": "next_restart",
+            });
+            ErrorData::internal_error(err.to_string(), Some(data))
+        }
     }
 }
 
@@ -379,6 +390,22 @@ mod tests {
         let data = err.data.expect("data should be Some");
         assert_eq!(data["guidance"], "Fix the input");
         assert_eq!(data["explanation"], "The input was malformed");
+    }
+
+    // -- ModelNotReady mapping ---------------------------------------------
+
+    #[test]
+    fn model_not_ready_requires_restart_and_is_not_retryable() {
+        let mapped = mcp_error(MemoryError::ModelNotReady(
+            "The configured Classic GLiNER checkpoint is not available locally.".into(),
+        ));
+        let data = mapped.data.expect("error data");
+        assert_eq!(data["kind"], "model_not_ready");
+        assert_eq!(data["retryable"], false);
+        assert_eq!(data["restart_required"], true);
+        assert_eq!(data["activation"], "next_restart");
+        assert!(data["guidance"].is_string());
+        assert!(data["explanation"].is_string());
     }
 
     // -- ParsedNotFound ---------------------------------------------------
