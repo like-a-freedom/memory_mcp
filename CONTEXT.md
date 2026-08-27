@@ -170,6 +170,44 @@ _Avoid_: Current file, mutable episode, overwritten source
 One immutable content version within an Inbox Source Lineage, identified by the content bytes. A revision proceeds independently through discovery, processing, success, or terminal failure, and never overwrites an earlier revision. Its reference time comes from structured source metadata when available, otherwise filesystem modification time, otherwise observation time.
 _Avoid_: File update, latest copy, mutable source
 
+## SaaS tenancy vocabulary
+
+**External Identity**:
+A verified OAuth identity identified by the stable pair of issuer and subject. It authenticates an Account but never names or selects storage directly.
+_Avoid_: User token, email identity, namespace identity
+
+**Account**:
+The stable Memory MCP identity to which one or more External Identities may authenticate. In the initial SaaS model each Account owns exactly one Tenant.
+_Avoid_: OAuth subject, access token, namespace
+
+**Tenant**:
+The strict private-memory ownership and authorization boundary of the SaaS deployment. The initial model has one Account per Tenant and does not share memory between Tenants.
+_Avoid_: User token, workspace, shared scope
+
+**Tenant Namespace**:
+The SurrealDB namespace exclusively bound to one Tenant by control-plane state. It is selected from authenticated server context and is never accepted as a data-plane request argument.
+_Avoid_: Active Namespace, user-supplied namespace, scope
+
+**Tenant Registry**:
+The control-plane mapping from Accounts and External Identities to Tenant storage bindings and provisioning state. It is isolated from Tenant Namespaces and is not accessible through MCP domain tools.
+_Avoid_: Namespace lookup table, request scope, tenant data
+
+**Tenant Runtime**:
+A bounded, process-local activation of services for exactly one Tenant Namespace. It is selected only after authentication and Tenant Registry resolution, is never rebound to another Tenant, and may be unloaded without changing Tenant data or identity.
+_Avoid_: Active Namespace, transport session, user connection, mutable tenant context
+
+**Account API Key**:
+A named, independently revocable credential owned by an Account and presented as a Bearer credential. Its secret is shown only when issued; durable state contains an identifier and irreversible verifier, never the recoverable secret. In the initial SaaS model every valid key authorizes the full public MCP capability set of its Account.
+_Avoid_: OAuth identity, Tenant selector, stored secret
+
+**Authenticated Principal**:
+The request-scoped server identity produced by successful credential verification and Account-to-Tenant resolution. API keys and future OAuth access tokens produce the same principal shape; neither credential contents nor MCP arguments select a Tenant Namespace.
+_Avoid_: Access token, transport session, namespace parameter
+
+**Active Namespace**:
+The single immutable SurrealDB namespace selected at startup by a local stdio server process. It remains a local deployment concept and is not the SaaS Tenant Namespace selected for an authenticated HTTP request.
+_Avoid_: Tenant Namespace, dynamic namespace, request namespace
+
 ## Constraints
 
 - Production code uses `MemoryError` and `Result`; no production `unwrap`,
@@ -182,10 +220,11 @@ _Avoid_: File update, latest copy, mutable source
   procedure revocation remain separate operations.
 - Never let recall or a background worker manufacture a corrective fact as a
   retrieval side effect.
-- Memory MCP uses one Active Namespace per server process. Namespace is storage
-  configuration, not a per-memory domain partition or data-plane request field.
-- Scope, project, collection, basket, tenant, and vault are not Memory MCP
-  partitioning concepts.
+- A local stdio server process uses one Active Namespace. The SaaS HTTP profile
+  instead resolves an authenticated Tenant to an immutable Tenant Runtime;
+  neither profile accepts namespace selection as a data-plane request field.
+- Scope, project, collection, basket, and vault are not Memory MCP partitioning
+  concepts. Tenant is the private ownership boundary of the SaaS HTTP profile.
 - Zero-configuration startup uses embedded SurrealDB, Active Namespace `main`,
   and database `memory`; it requires no `SURREALDB_*` variables, external
   service, or credentials.
