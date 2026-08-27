@@ -239,12 +239,14 @@ impl MemoryService {
         let config = self.ner_artifact_refresh_config.clone()?;
         let native = self.ner_artifact_refresh_native.clone()?;
         let spec = super::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone();
-        Some(super::model_artifact_refresh::NerArtifactRefreshRuntime::start(
-            config,
-            spec,
-            native,
-            self.logger.clone(),
-        ))
+        Some(
+            super::model_artifact_refresh::NerArtifactRefreshRuntime::start(
+                config,
+                spec,
+                native,
+                self.logger.clone(),
+            ),
+        )
     }
 
     /// Shut down the lifecycle background workers (decay, archival, community).

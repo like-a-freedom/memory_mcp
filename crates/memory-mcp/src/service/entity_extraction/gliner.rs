@@ -1651,8 +1651,7 @@ pub(crate) fn build(
             .clone()
             .unwrap_or_else(|| context.data_dir.join("models").join("ner"));
         let progress = context.progress.clone();
-        let store =
-            crate::service::model_artifacts::NerArtifactStore::new(store_root, progress)?;
+        let store = crate::service::model_artifacts::NerArtifactStore::new(store_root, progress)?;
         build_from_store(&native, &context, &store).await
     })
 }
@@ -1688,10 +1687,10 @@ pub async fn build_from_store(
                 if let Some(known_good) = inspected.known_good {
                     return build_known_good(native, context, &known_good).await;
                 }
-                return Ok(std::sync::Arc::new(
-                    UnavailableEntityExtractor::classic_gliner(native),
-                )
-                    as std::sync::Arc<dyn EntityExtractor>);
+                return Ok(
+                    std::sync::Arc::new(UnavailableEntityExtractor::classic_gliner(native))
+                        as std::sync::Arc<dyn EntityExtractor>,
+                );
             }
         }
     }
@@ -1700,8 +1699,10 @@ pub async fn build_from_store(
         return build_known_good(native, context, &known_good).await;
     }
 
-    Ok(std::sync::Arc::new(UnavailableEntityExtractor::classic_gliner(native))
-        as std::sync::Arc<dyn EntityExtractor>)
+    Ok(
+        std::sync::Arc::new(UnavailableEntityExtractor::classic_gliner(native))
+            as std::sync::Arc<dyn EntityExtractor>,
+    )
 }
 
 async fn build_known_good(
@@ -1709,11 +1710,8 @@ async fn build_known_good(
     context: &super::NerBuildContext,
     checkpoint: &crate::service::model_artifacts::PreparedCheckpoint,
 ) -> Result<std::sync::Arc<dyn EntityExtractor>, MemoryError> {
-    let extractor = GlinerEntityExtractor::new_with_checkpoint(
-        checkpoint,
-        native,
-        context.logger.clone(),
-    )?;
+    let extractor =
+        GlinerEntityExtractor::new_with_checkpoint(checkpoint, native, context.logger.clone())?;
     Ok(std::sync::Arc::new(extractor) as std::sync::Arc<dyn EntityExtractor>)
 }
 
@@ -1723,20 +1721,14 @@ async fn try_promote_candidate(
     store: &crate::service::model_artifacts::NerArtifactStore,
     candidate: &crate::service::model_artifacts::PreparedCheckpoint,
 ) -> Result<std::sync::Arc<dyn EntityExtractor>, MemoryError> {
-    let extractor = GlinerEntityExtractor::new_with_checkpoint(
-        candidate,
-        native,
-        context.logger.clone(),
-    )?;
+    let extractor =
+        GlinerEntityExtractor::new_with_checkpoint(candidate, native, context.logger.clone())?;
     extractor.probe_and_install().await?;
     let promoted = store.promote_candidate(&CLASSIC_GLINER_SPEC, &candidate.revision)?;
     // The promoted record is now the source of truth; the extractor was
     // already probe-installed above so the first real extraction reuses it.
-    let extractor = GlinerEntityExtractor::new_with_checkpoint(
-        &promoted,
-        native,
-        context.logger.clone(),
-    )?;
+    let extractor =
+        GlinerEntityExtractor::new_with_checkpoint(&promoted, native, context.logger.clone())?;
     Ok(std::sync::Arc::new(extractor) as std::sync::Arc<dyn EntityExtractor>)
 }
 
@@ -2187,7 +2179,7 @@ mod tests {
     use crate::service::entity_extraction::{NerBuildContext, NerScheduling};
     use crate::service::model_artifacts::{
         ArtifactFetcher, ArtifactRequirement, CapturingSink, ModelProgressSink, NerArtifactStore,
-        RevisionStatus, RevisionResolver, SystemClock, ValidationStatus, artifact_identity,
+        RevisionResolver, RevisionStatus, SystemClock, ValidationStatus, artifact_identity,
         persist_state,
     };
     use std::path::PathBuf;
@@ -2220,7 +2212,9 @@ mod tests {
                 _cancellation: &tokio_util::sync::CancellationToken,
             ) -> Result<(), MemoryError> {
                 self.0.fetch_add(1, Ordering::SeqCst);
-                Err(MemoryError::Storage("not allowed in local startup".to_string()))
+                Err(MemoryError::Storage(
+                    "not allowed in local startup".to_string(),
+                ))
             }
         }
         Arc::new(StubFetcher(AtomicUsize::new(0)))
@@ -2383,9 +2377,7 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let original = std::fs::metadata(&layout_root)
-                .expect("meta")
-                .permissions();
+            let original = std::fs::metadata(&layout_root).expect("meta").permissions();
             std::fs::set_permissions(&layout_root, std::fs::Permissions::from_mode(0o000))
                 .expect("set perms");
             let store = NerArtifactStore::with_parts(

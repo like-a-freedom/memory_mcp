@@ -175,8 +175,7 @@ fn make_store(
     fetcher: Arc<FakeFetcher>,
 ) -> (NerArtifactStore, Arc<CapturingSink>, Arc<FakeFetcher>) {
     let resolver = Arc::new(resolver);
-    let (store, sink, _fetcher, _resolver) =
-        make_store_with_resolver(temp_dir, resolver, fetcher);
+    let (store, sink, _fetcher, _resolver) = make_store_with_resolver(temp_dir, resolver, fetcher);
     (store, sink, _fetcher)
 }
 
@@ -615,7 +614,11 @@ fn inspect_local_reports_unsupported_state_version() {
         Arc::new(FakeResolver::ok("abc123")),
         Arc::new(FakeFetcher::new()),
     );
-    let dir = temp.path().join("models").join("ner").join("test-extractor");
+    let dir = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor");
     std::fs::create_dir_all(&dir).expect("create dir");
     std::fs::write(
         dir.join("state.json"),
@@ -633,11 +636,11 @@ fn inspect_local_reports_unsupported_state_version() {
 
 #[test]
 fn inspect_local_keeps_known_good_when_candidate_record_is_unreadable() {
+    use memory_mcp::service::model_artifacts::RevisionStatus;
+    use memory_mcp::service::model_artifacts::ValidationStatus;
     use memory_mcp::service::model_artifacts::{
         ArtifactRole, PersistedArtifactState, RevisionState, persist_state,
     };
-    use memory_mcp::service::model_artifacts::RevisionStatus;
-    use memory_mcp::service::model_artifacts::ValidationStatus;
     let temp = TempDir::new().expect("temp dir");
     let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(
         &temp,
@@ -697,8 +700,7 @@ fn inspect_local_keeps_known_good_when_candidate_record_is_unreadable() {
         ],
     )
     .expect("identity");
-    let mut state =
-        memory_mcp::service::model_artifacts::read_state(&state_path).expect("read");
+    let mut state = memory_mcp::service::model_artifacts::read_state(&state_path).expect("read");
     state.revisions[0].artifact_identity = new_identity;
     persist_state(&state_path, &state).expect("repersist");
 
@@ -726,12 +728,15 @@ fn inspect_local_propagates_permission_error_as_storage_failure() {
         Arc::new(FakeFetcher::new()),
     );
     // Restrict the extractor directory to be unreadable.
-    let dir = temp.path().join("models").join("ner").join("test-extractor");
+    let dir = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor");
     std::fs::create_dir_all(&dir).expect("create dir");
     std::fs::write(dir.join("state.json"), "{}").expect("write state");
     let original = std::fs::metadata(&dir).expect("meta").permissions();
-    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000))
-        .expect("set perms");
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).expect("set perms");
     let err = store
         .inspect_local(&test_spec())
         .expect_err("permission failure must be fatal");
@@ -753,8 +758,8 @@ fn refresh_persists_candidate_without_runtime_verified_status() {
         Arc::new(FakeResolver::ok("candidate-1")),
         Arc::new(FakeFetcher::new()),
     );
-    let outcome = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
-        .expect("refresh");
+    let outcome =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
     assert!(matches!(
         outcome,
         memory_mcp::service::model_artifacts::CandidateRefreshOutcome::CandidateReady { ref revision }
@@ -857,8 +862,8 @@ fn promote_candidate_changes_role_to_known_good_and_preserves_previous_known_goo
         Arc::new(CapturingSink::default()),
         Arc::new(SystemClock),
     );
-    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
-        .expect("refresh");
+    let _ =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
 
     // Promote the candidate.
     let promoted: PreparedCheckpoint = store
@@ -897,10 +902,7 @@ fn promote_candidate_changes_role_to_known_good_and_preserves_previous_known_goo
         .join("candidate-2");
     let recomputed = artifact_identity(
         &revision_dir,
-        &test_spec()
-            .all_requirements()
-            .copied()
-            .collect::<Vec<_>>(),
+        &test_spec().all_requirements().copied().collect::<Vec<_>>(),
     )
     .expect("identity");
     assert_eq!(promoted.artifact_identity, recomputed);
@@ -929,8 +931,8 @@ fn reject_candidate_returns_previous_known_good() {
         Arc::new(CapturingSink::default()),
         Arc::new(SystemClock),
     );
-    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
-        .expect("refresh");
+    let _ =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
     let fallback = store
         .reject_candidate(&test_spec(), "bad-1", "smoke failed")
         .expect("reject")
@@ -967,8 +969,8 @@ fn reject_candidate_returns_none_when_no_previous_known_good_exists() {
         Arc::new(FakeResolver::ok("candidate-x")),
         Arc::new(FakeFetcher::new()),
     );
-    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
-        .expect("refresh");
+    let _ =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
     let fallback = store
         .reject_candidate(&test_spec(), "candidate-x", "smoke failed")
         .expect("reject");
@@ -984,8 +986,8 @@ fn candidate_is_never_returned_by_known_good_selector() {
         Arc::new(FakeResolver::ok("candidate-only")),
         Arc::new(FakeFetcher::new()),
     );
-    let _ = block_on(store.refresh_candidate(&test_spec(), CancellationToken::new()))
-        .expect("refresh");
+    let _ =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
     let state_path = temp
         .path()
         .join("models")
@@ -1010,16 +1012,16 @@ fn assert_no_part_or_staging(temp: &TempDir) {
     let leases = gliner_root.join("leases");
     if staging.exists() {
         let entries: Vec<_> = std::fs::read_dir(&staging)
-        .expect("read staging")
-        .map_while(Result::ok)
-        .collect();
+            .expect("read staging")
+            .map_while(Result::ok)
+            .collect();
         assert!(entries.is_empty(), "staging not empty: {entries:?}");
     }
     if leases.exists() {
         let entries: Vec<_> = std::fs::read_dir(&leases)
-        .expect("read leases")
-        .map_while(Result::ok)
-        .collect();
+            .expect("read leases")
+            .map_while(Result::ok)
+            .collect();
         assert!(entries.is_empty(), "leases not empty: {entries:?}");
     }
     // Walk revisions to confirm no `.part` files survived.
@@ -1112,8 +1114,7 @@ impl ArtifactFetcher for BlockingFetcher {
                 }
             }
             BlockingPhase::MidStream => {
-                std::fs::create_dir_all(target.parent().expect("parent"))
-                    .expect("create parent");
+                std::fs::create_dir_all(target.parent().expect("parent")).expect("create parent");
                 std::fs::write(target, b"partial").expect("write partial");
                 {
                     let mut started = self.started.lock().expect("started");
@@ -1138,8 +1139,7 @@ impl ArtifactFetcher for BlockingFetcher {
                 let _ = std::fs::remove_file(target);
             }
             BlockingPhase::BetweenFiles => {
-                std::fs::create_dir_all(target.parent().expect("parent"))
-                    .expect("create parent");
+                std::fs::create_dir_all(target.parent().expect("parent")).expect("create parent");
                 std::fs::write(target, format!("content-of-{}", requirement.path))
                     .expect("write content");
                 if requirement.path == "model.bin" {

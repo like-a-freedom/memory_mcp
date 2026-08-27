@@ -350,9 +350,7 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
             // Send headers with a large content-length so the client
             // keeps reading. The body never arrives, which keeps the
             // refresh fetch blocked while we drive `initialize`.
-            let _ = stream.write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n",
-            );
+            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n");
             let _ = stream.flush();
             let _ = gate_rx.recv();
         }
@@ -370,7 +368,10 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
         .env("EMBEDDINGS_ENABLED", "false")
         .env("NER_EXTRACTOR", "urchade/gliner_multi-v2.1")
         .env("NER_CACHE_DIR", temp.path().join("absent-cache"))
-        .env("MEMORY_EVAL_NER_ARTIFACT_BASE_URL", format!("http://{addr}"))
+        .env(
+            "MEMORY_EVAL_NER_ARTIFACT_BASE_URL",
+            format!("http://{addr}"),
+        )
         .env_remove("SURREALDB_URL")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

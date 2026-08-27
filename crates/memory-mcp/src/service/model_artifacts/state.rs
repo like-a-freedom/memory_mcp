@@ -131,7 +131,9 @@ impl PersistedArtifactState {
     /// treated as a state defect (returned through the typed local inspection
     /// rather than silently selecting a different one).
     pub fn candidate(&self) -> Option<&RevisionState> {
-        self.revisions.iter().find(|record| record.role == ArtifactRole::Candidate)
+        self.revisions
+            .iter()
+            .find(|record| record.role == ArtifactRole::Candidate)
     }
 
     /// Returns non-incompatible, non-candidate revisions ordered most-recent
@@ -184,12 +186,13 @@ pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
     })?;
     match envelope.schema_version {
         1 => {
-            let legacy: PersistedArtifactStateV1 = serde_json::from_slice(&bytes).map_err(|err| {
-                MemoryError::Storage(format!(
-                    "invalid artifact state v1 {}: {err}",
-                    path.display()
-                ))
-            })?;
+            let legacy: PersistedArtifactStateV1 =
+                serde_json::from_slice(&bytes).map_err(|err| {
+                    MemoryError::Storage(format!(
+                        "invalid artifact state v1 {}: {err}",
+                        path.display()
+                    ))
+                })?;
             Ok(PersistedArtifactState {
                 schema_version: STATE_SCHEMA_VERSION,
                 revisions: legacy
@@ -200,13 +203,9 @@ pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
             })
         }
         STATE_SCHEMA_VERSION => {
-            let state: PersistedArtifactState =
-                serde_json::from_slice(&bytes).map_err(|err| {
-                    MemoryError::Storage(format!(
-                        "invalid artifact state {}: {err}",
-                        path.display()
-                    ))
-                })?;
+            let state: PersistedArtifactState = serde_json::from_slice(&bytes).map_err(|err| {
+                MemoryError::Storage(format!("invalid artifact state {}: {err}", path.display()))
+            })?;
             Ok(state)
         }
         other => Err(MemoryError::Storage(format!(
@@ -334,11 +333,9 @@ mod tests {
     #[test]
     fn last_known_good_skips_incompatible_and_candidate_revisions() {
         let mut state = PersistedArtifactState::new();
-        state.revisions.push(sample_revision(
-            "bad",
-            ArtifactRole::Incompatible,
-            0,
-        ));
+        state
+            .revisions
+            .push(sample_revision("bad", ArtifactRole::Incompatible, 0));
         state.revisions.push(RevisionState {
             revision: "bad".to_string(),
             artifact_identity: "id".to_string(),
@@ -352,16 +349,12 @@ mod tests {
                 recorded_at: 0,
             }),
         });
-        state.revisions.push(sample_revision(
-            "candidate",
-            ArtifactRole::Candidate,
-            1,
-        ));
-        state.revisions.push(sample_revision(
-            "good",
-            ArtifactRole::KnownGood,
-            2,
-        ));
+        state
+            .revisions
+            .push(sample_revision("candidate", ArtifactRole::Candidate, 1));
+        state
+            .revisions
+            .push(sample_revision("good", ArtifactRole::KnownGood, 2));
         assert_eq!(
             state.last_known_good().map(|r| r.revision.as_str()),
             Some("good")
@@ -470,10 +463,17 @@ mod tests {
     #[test]
     fn schema_v2_candidate_is_never_returned_as_known_good() {
         let mut state = PersistedArtifactState::new();
-        state.revisions.push(sample_revision("candidate", ArtifactRole::Candidate, 20));
-        state.revisions.push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
+        state
+            .revisions
+            .push(sample_revision("candidate", ArtifactRole::Candidate, 20));
+        state
+            .revisions
+            .push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
 
-        assert_eq!(state.candidate().map(|r| r.revision.as_str()), Some("candidate"));
+        assert_eq!(
+            state.candidate().map(|r| r.revision.as_str()),
+            Some("candidate")
+        );
         assert_eq!(
             state.known_goods().next().map(|r| r.revision.as_str()),
             Some("known-good")
@@ -485,8 +485,12 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let path = dir.path().join("state.json");
         let mut state = PersistedArtifactState::new();
-        state.revisions.push(sample_revision("candidate", ArtifactRole::Candidate, 20));
-        state.revisions.push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
+        state
+            .revisions
+            .push(sample_revision("candidate", ArtifactRole::Candidate, 20));
+        state
+            .revisions
+            .push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
         persist_state(&path, &state).expect("persist");
 
         let raw = std::fs::read_to_string(&path).expect("read raw");
@@ -497,7 +501,10 @@ mod tests {
         let loaded = read_state(&path).expect("read");
         assert_eq!(loaded.schema_version, 2);
         assert_eq!(loaded.revisions.len(), 2);
-        assert_eq!(loaded.candidate().map(|r| r.revision.as_str()), Some("candidate"));
+        assert_eq!(
+            loaded.candidate().map(|r| r.revision.as_str()),
+            Some("candidate")
+        );
         assert_eq!(
             loaded.known_goods().next().map(|r| r.revision.as_str()),
             Some("known-good")

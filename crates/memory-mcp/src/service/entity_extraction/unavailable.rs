@@ -79,7 +79,10 @@ impl EntityExtractor for UnavailableEntityExtractor {
         }
     }
 
-    async fn extract_candidates(&self, _content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+    async fn extract_candidates(
+        &self,
+        _content: &str,
+    ) -> Result<Vec<EntityCandidate>, MemoryError> {
         Err(MemoryError::ModelNotReady(
             "The configured Classic GLiNER checkpoint is not available locally.".to_string(),
         ))
@@ -136,7 +139,10 @@ mod tests {
         let fp = extractor.fingerprint();
         assert_eq!(fp.selector, crate::config::SELECTOR_CLASSIC_GLINER);
         assert_eq!(fp.backend, "gliner");
-        assert_eq!(fp.repository.as_deref(), Some(crate::config::SELECTOR_CLASSIC_GLINER));
+        assert_eq!(
+            fp.repository.as_deref(),
+            Some(crate::config::SELECTOR_CLASSIC_GLINER)
+        );
         assert_eq!(fp.labels, vec!["person", "company"]);
         assert_eq!(fp.threshold, Some(0.3));
         assert_eq!(fp.revision, None);
@@ -158,10 +164,8 @@ mod tests {
 
     #[tokio::test]
     async fn unavailable_default_extraction_returns_model_not_ready() {
-        let extractor = UnavailableEntityExtractor::classic_gliner(&config(
-            vec!["person".into()],
-            Some(0.5),
-        ));
+        let extractor =
+            UnavailableEntityExtractor::classic_gliner(&config(vec!["person".into()], Some(0.5)));
         let err = extractor
             .extract_candidates("Alice from Acme")
             .await
@@ -171,10 +175,8 @@ mod tests {
 
     #[tokio::test]
     async fn unavailable_custom_label_extraction_also_returns_model_not_ready() {
-        let extractor = UnavailableEntityExtractor::classic_gliner(&config(
-            vec!["person".into()],
-            Some(0.5),
-        ));
+        let extractor =
+            UnavailableEntityExtractor::classic_gliner(&config(vec!["person".into()], Some(0.5)));
         let err = extractor
             .extract_candidates_with_labels("Alice", &["fictional".into()])
             .await
@@ -184,10 +186,8 @@ mod tests {
 
     #[tokio::test]
     async fn unavailable_custom_label_extraction_with_empty_labels_still_fails() {
-        let extractor = UnavailableEntityExtractor::classic_gliner(&config(
-            vec!["person".into()],
-            Some(0.5),
-        ));
+        let extractor =
+            UnavailableEntityExtractor::classic_gliner(&config(vec!["person".into()], Some(0.5)));
         // Empty custom labels must NOT silently return success.
         let err = extractor
             .extract_candidates_with_labels("Alice", &[])
