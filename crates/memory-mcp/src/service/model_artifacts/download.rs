@@ -301,9 +301,7 @@ impl ArtifactFetcher for HfArtifactFetcher {
         })?;
         if let Some(expected) = requirement.sha256 {
             let actual = hex::encode(hasher.finalize());
-            if let Err(err) = verify_checksum(&actual, expected, requirement.path) {
-                return Err(err);
-            }
+            verify_checksum(&actual, expected, requirement.path)?;
         }
         // Drop the file handle so the rename below is atomic.
         drop(file);
