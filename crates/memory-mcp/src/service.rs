@@ -14,6 +14,14 @@ pub use entity_extraction::{
     AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor, NerScheduling,
     RegexEntityExtractor, create_entity_extractor,
 };
+pub use entity_extraction::NerBuildContext;
+pub mod entity_extraction_gliner {
+    //! Public re-exports of the Classic GLiNER backend helpers used by
+    //! real-fixture integration tests. Production callers should construct
+    //! the extractor through the normal backend registry, not these items.
+    pub use crate::service::entity_extraction::gliner as gliner;
+    pub use gliner::{build_from_store, CLASSIC_GLINER_SPEC};
+}
 // Re-exported from the neutral `crate::error` home (ADR-0045).
 pub use crate::error::MemoryError;
 pub(crate) use crate::error::is_transient_db_error;
