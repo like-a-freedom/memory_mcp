@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::future::Future;
 use std::time::Duration;
 
@@ -227,16 +228,134 @@ where
 }
 
 fn map_send_error(err: reqwest::Error) -> RemoteRequestFailure {
-    if err.is_timeout() || err.is_connect() || err.is_request() || err.is_body() {
+    let classification = classify_send_error(&err);
+    if classification.is_retryable_transport() {
         return RemoteRequestFailure::Retryable(RetryableRemoteRequestFailure {
-            message: format!("embedding request transport failure: {err}"),
+            message: format!("embedding request transport failure: {classification}"),
             retry_after: None,
         });
     }
 
     RemoteRequestFailure::Fatal(MemoryError::Storage(format!(
-        "embedding request failed: {err}"
+        "embedding request failed: {classification}"
     )))
+}
+
+/// Classifies a `reqwest::Error` and produces a structured message that
+/// distinguishes the failure category (timeout, connect, dns, request,
+/// body, decode, redirect, status, builder) and includes the URL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendErrorCategory {
+    Timeout,
+    Connect,
+    Dns,
+    Request,
+    Body,
+    Decode,
+    Redirect,
+    Builder,
+    Other,
+}
+
+impl SendErrorCategory {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
+            Self::Connect => "connect",
+            Self::Dns => "dns",
+            Self::Request => "request",
+            Self::Body => "body",
+            Self::Decode => "decode",
+            Self::Redirect => "redirect",
+            Self::Builder => "builder",
+            Self::Other => "transport",
+        }
+    }
+
+    fn is_retryable_transport(self) -> bool {
+        matches!(
+            self,
+            Self::Timeout | Self::Connect | Self::Dns | Self::Request | Self::Body
+        )
+    }
+}
+
+struct ClassifiedSendError {
+    category: SendErrorCategory,
+    url: Option<String>,
+    source: Option<String>,
+    display: String,
+}
+
+impl ClassifiedSendError {
+    fn is_retryable_transport(&self) -> bool {
+        self.category.is_retryable_transport()
+    }
+}
+
+impl std::fmt::Display for ClassifiedSendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.category.label(), self.display)?;
+        if let Some(url) = &self.url {
+            write!(f, "; url={}", redact_endpoint_for_log(url))?;
+        }
+        if let Some(source) = &self.source {
+            write!(f, "; source={source}")?;
+        }
+        Ok(())
+    }
+}
+
+fn classify_send_error(err: &reqwest::Error) -> ClassifiedSendError {
+    let category = if err.is_timeout() {
+        SendErrorCategory::Timeout
+    } else if err.is_connect() {
+        // `is_connect` covers TCP-level failures including DNS resolution
+        // errors reported as `ConnectError` on most platforms. We
+        // distinguish the "host cannot be resolved" case by inspecting
+        // the chain for a resolver error.
+        if error_chain_contains(err, "resolve") || error_chain_contains(err, "dns") {
+            SendErrorCategory::Dns
+        } else {
+            SendErrorCategory::Connect
+        }
+    } else if err.is_request() {
+        SendErrorCategory::Request
+    } else if err.is_body() {
+        SendErrorCategory::Body
+    } else if err.is_decode() {
+        SendErrorCategory::Decode
+    } else if err.is_redirect() {
+        SendErrorCategory::Redirect
+    } else if err.is_builder() {
+        SendErrorCategory::Builder
+    } else {
+        SendErrorCategory::Other
+    };
+
+    let url = err.url().map(|u| u.to_string());
+    let source = err.source().map(|s| s.to_string());
+    let display = err.to_string();
+    ClassifiedSendError {
+        category,
+        url,
+        source,
+        display,
+    }
+}
+
+fn error_chain_contains(err: &reqwest::Error, needle: &str) -> bool {
+    let mut current: Option<&dyn std::error::Error> = Some(err);
+    while let Some(e) = current {
+        if e.to_string()
+            .to_lowercase()
+            .contains(&needle.to_lowercase())
+        {
+            return true;
+        }
+        current = e.source();
+    }
+    false
 }
 
 async fn response_json(
@@ -427,7 +546,10 @@ async fn request_openai_embedding_once(
         .send()
         .await
         .map_err(|err| {
-            MemoryError::Transient(format!("embedding probe transport failure: {err}"))
+            let classification = classify_send_error(&err);
+            MemoryError::Transient(format!(
+                "embedding probe transport failure: {classification}"
+            ))
         })?;
     let body =
         response_json(response, &endpoint, model)
@@ -458,7 +580,10 @@ async fn request_ollama_body_once(
         .send()
         .await
         .map_err(|err| {
-            MemoryError::Transient(format!("embedding probe transport failure: {err}"))
+            let classification = classify_send_error(&err);
+            MemoryError::Transient(format!(
+                "embedding probe transport failure: {classification}"
+            ))
         })?;
 
     response_json(response, &endpoint, model)
@@ -745,5 +870,68 @@ mod tests {
         assert!(message.contains("model=test-model"));
         assert!(message.contains("route not found"));
         server.await.expect("server task");
+    }
+
+    /// The probe must classify the transport error category and include the
+    /// endpoint URL in the message, so an operator can distinguish a
+    /// connection refused, request timeout, or DNS failure.
+    #[tokio::test]
+    async fn remote_probe_transport_error_classifies_category_and_endpoint() {
+        // Bind and immediately drop so the port is closed; any connection
+        // attempt will receive ECONNREFUSED.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let address = listener.local_addr().expect("addr");
+        drop(listener);
+
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .expect("http client");
+        let base_url = format!("http://{address}/v1");
+        let error = detect_openai_embedding_dimension(&client, &base_url, "test-model", None)
+            .await
+            .expect_err("closed port must fail the probe");
+        let message = error.to_string();
+
+        // The probe must distinguish "connection refused" from "timeout"
+        // and "DNS" — the operator needs that to diagnose the failure.
+        assert!(
+            message.contains("connect")
+                || message.contains("refused")
+                || message.contains("timeout"),
+            "transport probe error must classify the failure category, got: {message}"
+        );
+        // The redacted endpoint URL must appear in the message.
+        assert!(
+            message.contains(&format!("{}/v1/embeddings", address))
+                || message.contains(&address.to_string()),
+            "transport probe error must include the redacted endpoint URL, got: {message}"
+        );
+    }
+
+    /// The probe must include the endpoint URL even when the host cannot be
+    /// resolved (DNS failure), so the operator can spot a misconfiguration.
+    #[tokio::test]
+    async fn remote_probe_transport_error_surfaces_dns_failure_with_endpoint() {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .expect("http client");
+        let base_url = "http://this-host-does-not-exist.invalid./v1";
+        let error = detect_openai_embedding_dimension(&client, base_url, "test-model", None)
+            .await
+            .expect_err("DNS failure must fail the probe");
+        let message = error.to_string();
+
+        assert!(
+            message.contains("dns") || message.contains("resolve") || message.contains("connect"),
+            "DNS failure must classify the transport error, got: {message}"
+        );
+        assert!(
+            message.contains("/v1/embeddings") || message.contains("invalid"),
+            "DNS failure must include the endpoint URL, got: {message}"
+        );
     }
 }
