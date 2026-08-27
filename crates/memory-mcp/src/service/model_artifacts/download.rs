@@ -102,10 +102,24 @@ impl HfRevisionResolver {
     }
 }
 
+/// Returns the base URL used by [`HfRevisionResolver`] and
+/// [`HfArtifactFetcher`]. Production builds hit `huggingface.co`; test
+/// builds with `--features eval-support` may redirect to a local server
+/// through the `MEMORY_EVAL_NER_ARTIFACT_BASE_URL` environment variable.
+fn hf_base_url() -> String {
+    #[cfg(feature = "eval-support")]
+    {
+        if let Ok(base) = std::env::var("MEMORY_EVAL_NER_ARTIFACT_BASE_URL") {
+            return base.trim_end_matches('/').to_string();
+        }
+    }
+    "https://huggingface.co".to_string()
+}
+
 #[async_trait]
 impl RevisionResolver for HfRevisionResolver {
     async fn latest(&self, repository: &str) -> Result<String, MemoryError> {
-        let url = format!("https://huggingface.co/api/models/{repository}");
+        let url = format!("{}/api/models/{}", hf_base_url(), repository);
         let response = self
             .http
             .get(&url)
@@ -176,7 +190,8 @@ impl ArtifactFetcher for HfArtifactFetcher {
             ));
         }
         let url = format!(
-            "https://huggingface.co/{repository}/resolve/{revision}/{}",
+            "{}/{repository}/resolve/{revision}/{}",
+            hf_base_url(),
             requirement.path
         );
         // `error_for_status()` is fused with the `send` future so we cannot
