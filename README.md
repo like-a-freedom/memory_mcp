@@ -692,6 +692,36 @@ LIFECYCLE_ARCHIVAL_AGE_DAYS=90
 # GLINER_DEVICE=cpu
 ```
 
+### Classic GLiNER (background refresh)
+
+`NER_EXTRACTOR=urchade/gliner_multi-v2.1` is the only model-backed
+selector that performs remote acquisition. The classic GLiNER backend
+follows these rules so MCP readiness never waits on the network:
+
+- **First install** with no local cache: the MCP `initialize` request
+  succeeds immediately. Extraction is unavailable in this process; the
+  server returns a structured `model_not_ready` error with
+  `retryable=false`, `restart_required=true`, and
+  `activation=next_restart`. A background refresh task starts **after**
+  MCP readiness and downloads the 1+ GB checkpoint with cancel-safe
+  staging.
+- **Operator guidance**: the structured event
+  `ner.artifact_refresh.candidate_ready` (with `activation=next_restart`)
+  on stderr/logs means a new revision was staged locally. Restart Memory
+  MCP (and therefore Zed) to activate it. Retrying `extract` in the
+  same process cannot activate the model — the active extractor and
+  fingerprint are immutable for the process lifetime.
+- **Download-free alternatives**: `NER_EXTRACTOR=anno` (the default),
+  `NER_EXTRACTOR=regex`, and `NER_EXTRACTOR=anno-onnx` (CPU only, manual
+  checkpoint) do not perform network acquisition. Anno and Regex are
+  the recommended choices for offline installs.
+- **Operational failures** (inaccessible `NER_CACHE_DIR`, missing read
+  permissions) remain explicit startup errors and never silently
+  downgrade extraction.
+
+See ADR-0051 for the state machine, cancellation guarantees, and
+rejected alternatives.
+
 ### Embedding providers and switching
 
 The server supports three embedding backends, controlled by `EMBEDDINGS_PROVIDER`:
