@@ -1721,14 +1721,13 @@ async fn try_promote_candidate(
     store: &crate::service::model_artifacts::NerArtifactStore,
     candidate: &crate::service::model_artifacts::PreparedCheckpoint,
 ) -> Result<std::sync::Arc<dyn EntityExtractor>, MemoryError> {
+    // The first construction is what gets probe-loaded and installed;
+    // after promotion we must keep the same instance so the first real
+    // extraction reuses the validated model rather than reloading it.
     let extractor =
         GlinerEntityExtractor::new_with_checkpoint(candidate, native, context.logger.clone())?;
     extractor.probe_and_install().await?;
-    let promoted = store.promote_candidate(&CLASSIC_GLINER_SPEC, &candidate.revision)?;
-    // The promoted record is now the source of truth; the extractor was
-    // already probe-installed above so the first real extraction reuses it.
-    let extractor =
-        GlinerEntityExtractor::new_with_checkpoint(&promoted, native, context.logger.clone())?;
+    let _promoted = store.promote_candidate(&CLASSIC_GLINER_SPEC, &candidate.revision)?;
     Ok(std::sync::Arc::new(extractor) as std::sync::Arc<dyn EntityExtractor>)
 }
 

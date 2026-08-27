@@ -962,6 +962,59 @@ fn reject_candidate_returns_previous_known_good() {
 }
 
 #[test]
+fn reject_candidate_does_not_manufacture_runtime_regression_verified() {
+    use memory_mcp::service::model_artifacts::ArtifactRole;
+    use memory_mcp::service::model_artifacts::ValidationStatus;
+    use memory_mcp::service::model_artifacts::read_state;
+    let temp = TempDir::new().expect("temp dir");
+    // Seed a known-good.
+    let resolver_a = Arc::new(FakeResolver::ok("good-1"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_a,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ = block_on(store.prepare(&test_spec())).expect("seed good-1");
+    // Refresh a candidate.
+    let resolver_b = Arc::new(FakeResolver::ok("bad-1"));
+    let store = NerArtifactStore::with_parts(
+        temp.path().join("models").join("ner"),
+        resolver_b,
+        Arc::new(FakeFetcher::new()),
+        Arc::new(CapturingSink::default()),
+        Arc::new(SystemClock),
+    );
+    let _ =
+        block_on(store.refresh_candidate(&test_spec(), CancellationToken::new())).expect("refresh");
+    let _ = store
+        .reject_candidate(&test_spec(), "bad-1", "smoke failed")
+        .expect("reject");
+    let state_path = temp
+        .path()
+        .join("models")
+        .join("ner")
+        .join("test-extractor")
+        .join("state.json");
+    let state = read_state(&state_path).expect("read");
+    let bad_record = state
+        .revisions
+        .iter()
+        .find(|r| r.revision == "bad-1")
+        .expect("bad-1 record");
+    assert_eq!(bad_record.role, ArtifactRole::Incompatible);
+    // The candidate's static validation status must be preserved; rejecting
+    // a candidate must never manufacture `RuntimeRegressionVerified` (the
+    // global constraint that only successful runtime validation may
+    // produce that status).
+    assert_ne!(
+        bad_record.validation_status,
+        ValidationStatus::RuntimeRegressionVerified
+    );
+}
+
+#[test]
 fn reject_candidate_returns_none_when_no_previous_known_good_exists() {
     let temp = TempDir::new().expect("temp dir");
     let (store, _sink, _fetcher, _resolver) = make_store_with_resolver(

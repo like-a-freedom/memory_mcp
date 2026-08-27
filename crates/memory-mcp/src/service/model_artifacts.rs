@@ -967,7 +967,11 @@ impl NerArtifactStore {
         for entry in state.revisions.iter_mut() {
             if entry.revision == revision && entry.role == state::ArtifactRole::Candidate {
                 entry.role = state::ArtifactRole::Incompatible;
-                entry.validation_status = ValidationStatus::RuntimeRegressionVerified;
+                // The candidate's static validation status is preserved:
+                // a runtime probe failure does not manufacture
+                // `RuntimeRegressionVerified` (Global Constraints). The
+                // incompatibility record and the role change already
+                // document the rejection.
                 entry.activated_at = now;
                 entry.artifact_identity = String::new();
                 entry.incompatible = Some(state::IncompatibilityRecord {
