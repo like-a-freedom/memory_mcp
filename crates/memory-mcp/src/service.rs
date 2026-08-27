@@ -65,6 +65,7 @@ pub(crate) mod ingestion;
 pub(crate) mod lifecycle;
 #[doc(hidden)]
 pub mod model_artifacts;
+pub(crate) mod model_artifact_refresh;
 mod model_runtime;
 mod query;
 mod reembed;
