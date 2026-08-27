@@ -160,6 +160,7 @@ fn seed_gliner_store(temp_dir: &TempDir) -> PathBuf {
         validation_status: ValidationStatus::RuntimeRegressionVerified,
         revision_status: RevisionStatus::Latest,
         activated_at: 1_700_000_000,
+        role: memory_mcp::service::model_artifacts::ArtifactRole::KnownGood,
         incompatible: None,
     });
     persist_state(&store_root.join("gliner").join("state.json"), &state)

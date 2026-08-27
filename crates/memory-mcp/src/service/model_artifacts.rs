@@ -24,7 +24,8 @@ pub use progress::{
     ModelProgressSink, ThrottledProgressSink,
 };
 pub use state::{
-    IncompatibilityRecord, PersistedArtifactState, RevisionState, persist_state, read_state,
+    ArtifactRole, IncompatibilityRecord, PersistedArtifactState, RevisionState, persist_state,
+    read_state,
 };
 
 /// Embedded RU/EN/mixed runtime-regression corpus for unseen upstream
@@ -377,6 +378,7 @@ impl NerArtifactStore {
             validation_status: ValidationStatus::RuntimeRegressionVerified,
             revision_status: RevisionStatus::LatestIncompatible,
             activated_at: now,
+            role: state::ArtifactRole::Incompatible,
             incompatible: Some(state::IncompatibilityRecord {
                 commit: commit.to_string(),
                 reason: reason.to_string(),
@@ -485,6 +487,7 @@ impl NerArtifactStore {
             validation_status: ValidationStatus::RuntimeRegressionVerified,
             revision_status,
             activated_at: now,
+            role: state::ArtifactRole::KnownGood,
             incompatible: None,
         });
         state

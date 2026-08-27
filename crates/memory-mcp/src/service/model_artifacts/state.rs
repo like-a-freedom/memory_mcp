@@ -7,12 +7,32 @@
 
 use std::path::Path;
 
+use serde::Deserialize;
+
 use crate::service::MemoryError;
 
 use super::manifest::{RevisionStatus, ValidationStatus};
 
 /// Version of the persisted state schema.
-pub const STATE_SCHEMA_VERSION: u8 = 1;
+pub const STATE_SCHEMA_VERSION: u8 = 2;
+
+/// Durable role of one revision in the artifact lifecycle.
+///
+/// A revision begins as [`ArtifactRole::Candidate`] once static acquisition
+/// succeeds; only successful next-start runtime validation promotes it to
+/// [`ArtifactRole::KnownGood`]. A failed runtime validation moves it to
+/// [`ArtifactRole::Incompatible`]. Known-good revisions are the only ones
+/// returned by the ordinary selectors at startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactRole {
+    /// Staged revision awaiting next-start runtime validation.
+    Candidate,
+    /// Runtime-validated, fully usable revision.
+    KnownGood,
+    /// Revision marked incompatible after a runtime failure; never reused.
+    Incompatible,
+}
 
 /// One revision's durable record.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -27,9 +47,43 @@ pub struct RevisionState {
     pub revision_status: RevisionStatus,
     /// Unix epoch seconds when this revision was activated.
     pub activated_at: i64,
+    /// Durable lifecycle role.
+    pub role: ArtifactRole,
     /// When `Some`, this revision is known-incompatible and must not be retried.
     #[serde(default)]
     pub incompatible: Option<IncompatibilityRecord>,
+}
+
+/// Schema-v1 revision record, used only for in-memory migration.
+#[derive(Debug, Clone, Deserialize)]
+struct RevisionStateV1 {
+    revision: String,
+    artifact_identity: String,
+    validation_status: ValidationStatus,
+    revision_status: RevisionStatus,
+    activated_at: i64,
+    #[serde(default)]
+    incompatible: Option<IncompatibilityRecord>,
+}
+
+impl RevisionStateV1 {
+    /// Promotes a schema-v1 record to schema-v2 semantics.
+    fn into_v2(self) -> RevisionState {
+        let role = if self.incompatible.is_some() {
+            ArtifactRole::Incompatible
+        } else {
+            ArtifactRole::KnownGood
+        };
+        RevisionState {
+            revision: self.revision,
+            artifact_identity: self.artifact_identity,
+            validation_status: self.validation_status,
+            revision_status: self.revision_status,
+            activated_at: self.activated_at,
+            role,
+            incompatible: self.incompatible,
+        }
+    }
 }
 
 /// Why a revision was rejected, keyed by commit so it is not retried
@@ -48,9 +102,18 @@ pub struct IncompatibilityRecord {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PersistedArtifactState {
     pub schema_version: u8,
-    /// Most recent first; contains active + retained previous known-good entries.
+    /// Most recent first; contains candidate, known-good, and incompatibility entries.
     #[serde(default)]
     pub revisions: Vec<RevisionState>,
+}
+
+/// Schema-v1 envelope, used only to inspect the wire schema version and to
+/// migrate legacy records. The struct mirrors the original on-disk shape.
+#[derive(Debug, Deserialize)]
+struct PersistedArtifactStateV1 {
+    schema_version: u8,
+    #[serde(default)]
+    revisions: Vec<RevisionStateV1>,
 }
 
 impl PersistedArtifactState {
@@ -62,11 +125,27 @@ impl PersistedArtifactState {
         }
     }
 
-    /// Returns the active (most recent non-incompatible) revision state.
-    pub(crate) fn last_known_good(&self) -> Option<&RevisionState> {
+    /// Returns the single role-`Candidate` revision, if exactly one is
+    /// persisted. Refresh always writes a single candidate, so multiples are
+    /// treated as a state defect (returned through the typed local inspection
+    /// rather than silently selecting a different one).
+    #[allow(dead_code)]
+    pub(crate) fn candidate(&self) -> Option<&RevisionState> {
+        self.revisions.iter().find(|record| record.role == ArtifactRole::Candidate)
+    }
+
+    /// Returns non-incompatible, non-candidate revisions ordered most-recent
+    /// first. The ordinary known-good selector only considers records with
+    /// role [`ArtifactRole::KnownGood`].
+    pub(crate) fn known_goods(&self) -> impl Iterator<Item = &RevisionState> {
         self.revisions
             .iter()
-            .find(|state| state.incompatible.is_none())
+            .filter(|record| record.role == ArtifactRole::KnownGood)
+    }
+
+    /// Returns the active (most recent role-`KnownGood`) revision state.
+    pub(crate) fn last_known_good(&self) -> Option<&RevisionState> {
+        self.known_goods().next()
     }
 
     /// Returns the incompatibility record for a commit, if present.
@@ -81,7 +160,9 @@ impl PersistedArtifactState {
 }
 
 /// Reads and validates the persisted state, returning an empty state when
-/// the file is absent.
+/// the file is absent. Schema-v1 files migrate in memory to v2 semantics
+/// without rewriting the file on disk; every successful write emits
+/// [`STATE_SCHEMA_VERSION`].
 pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
@@ -95,18 +176,51 @@ pub fn read_state(path: &Path) -> Result<PersistedArtifactState, MemoryError> {
             )));
         }
     };
-    let state: PersistedArtifactState = serde_json::from_slice(&bytes).map_err(|err| {
+
+    // Inspect the wire schema version first so an unsupported future schema
+    // does not get silently re-deserialized into a structurally compatible v2.
+    let envelope: SchemaVersionEnvelope = serde_json::from_slice(&bytes).map_err(|err| {
         MemoryError::Storage(format!("invalid artifact state {}: {err}", path.display()))
     })?;
-    if state.schema_version != STATE_SCHEMA_VERSION {
-        return Err(MemoryError::Storage(format!(
+    match envelope.schema_version {
+        1 => {
+            let legacy: PersistedArtifactStateV1 = serde_json::from_slice(&bytes).map_err(|err| {
+                MemoryError::Storage(format!(
+                    "invalid artifact state v1 {}: {err}",
+                    path.display()
+                ))
+            })?;
+            Ok(PersistedArtifactState {
+                schema_version: STATE_SCHEMA_VERSION,
+                revisions: legacy
+                    .revisions
+                    .into_iter()
+                    .map(RevisionStateV1::into_v2)
+                    .collect(),
+            })
+        }
+        STATE_SCHEMA_VERSION => {
+            let state: PersistedArtifactState =
+                serde_json::from_slice(&bytes).map_err(|err| {
+                    MemoryError::Storage(format!(
+                        "invalid artifact state {}: {err}",
+                        path.display()
+                    ))
+                })?;
+            Ok(state)
+        }
+        other => Err(MemoryError::Storage(format!(
             "artifact state {} has unsupported schema version {} (expected {})",
             path.display(),
-            state.schema_version,
+            other,
             STATE_SCHEMA_VERSION
-        )));
+        ))),
     }
-    Ok(state)
+}
+
+#[derive(Deserialize)]
+struct SchemaVersionEnvelope {
+    schema_version: u8,
 }
 
 /// Persists state atomically: write a sibling temp file, `sync_all`, rename.
@@ -167,16 +281,28 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    fn sample_revision(revision: &str, role: ArtifactRole, activated_at: i64) -> RevisionState {
+        RevisionState {
+            revision: revision.to_string(),
+            artifact_identity: format!("identity-{revision}"),
+            validation_status: match role {
+                ArtifactRole::KnownGood => ValidationStatus::RuntimeRegressionVerified,
+                _ => ValidationStatus::ReleaseParityVerified,
+            },
+            revision_status: RevisionStatus::Latest,
+            activated_at,
+            role,
+            incompatible: None,
+        }
+    }
+
     fn sample_state() -> PersistedArtifactState {
         let mut state = PersistedArtifactState::new();
-        state.revisions.push(RevisionState {
-            revision: "abc123".to_string(),
-            artifact_identity: "identity-a".to_string(),
-            validation_status: ValidationStatus::ReleaseParityVerified,
-            revision_status: RevisionStatus::Latest,
-            activated_at: 1_700_000_000,
-            incompatible: None,
-        });
+        state.revisions.push(sample_revision(
+            "abc123",
+            ArtifactRole::KnownGood,
+            1_700_000_000,
+        ));
         state
     }
 
@@ -187,13 +313,14 @@ mod tests {
         let state = sample_state();
         persist_state(&path, &state).expect("persist");
         let loaded = read_state(&path).expect("read");
-        assert_eq!(loaded.schema_version, 1);
+        assert_eq!(loaded.schema_version, STATE_SCHEMA_VERSION);
         assert_eq!(loaded.revisions.len(), 1);
         assert_eq!(loaded.revisions[0].revision, "abc123");
         assert_eq!(
             loaded.revisions[0].validation_status,
-            ValidationStatus::ReleaseParityVerified
+            ValidationStatus::RuntimeRegressionVerified
         );
+        assert_eq!(loaded.revisions[0].role, ArtifactRole::KnownGood);
     }
 
     #[test]
@@ -205,28 +332,36 @@ mod tests {
     }
 
     #[test]
-    fn last_known_good_skips_incompatible_revisions() {
+    fn last_known_good_skips_incompatible_and_candidate_revisions() {
         let mut state = PersistedArtifactState::new();
+        state.revisions.push(sample_revision(
+            "bad",
+            ArtifactRole::Incompatible,
+            0,
+        ));
         state.revisions.push(RevisionState {
             revision: "bad".to_string(),
             artifact_identity: "id".to_string(),
             validation_status: ValidationStatus::RuntimeRegressionVerified,
             revision_status: RevisionStatus::LatestIncompatible,
             activated_at: 0,
+            role: ArtifactRole::Incompatible,
             incompatible: Some(IncompatibilityRecord {
                 commit: "bad".to_string(),
                 reason: "smoke probe failed".to_string(),
                 recorded_at: 0,
             }),
         });
-        state.revisions.push(RevisionState {
-            revision: "good".to_string(),
-            artifact_identity: "id".to_string(),
-            validation_status: ValidationStatus::ReleaseParityVerified,
-            revision_status: RevisionStatus::Latest,
-            activated_at: 1,
-            incompatible: None,
-        });
+        state.revisions.push(sample_revision(
+            "candidate",
+            ArtifactRole::Candidate,
+            1,
+        ));
+        state.revisions.push(sample_revision(
+            "good",
+            ArtifactRole::KnownGood,
+            2,
+        ));
         assert_eq!(
             state.last_known_good().map(|r| r.revision.as_str()),
             Some("good")
@@ -261,5 +396,127 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("collect");
         assert_eq!(entries.len(), 1);
+    }
+
+    // ── Schema-v2 role migration (Task 1) ──────────────────────────────
+
+    #[test]
+    fn schema_v1_non_incompatible_records_migrate_to_known_good() {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("state.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "schema_version": 1,
+              "revisions": [{
+                "revision": "old-good",
+                "artifact_identity": "abc",
+                "validation_status": "runtime_regression_verified",
+                "revision_status": "latest",
+                "activated_at": 10,
+                "incompatible": null
+              }]
+            }"#,
+        )
+        .expect("write state");
+
+        let state = read_state(&path).expect("read v1 state");
+        assert_eq!(state.schema_version, STATE_SCHEMA_VERSION);
+        assert_eq!(
+            state
+                .known_goods()
+                .map(|r| r.revision.as_str())
+                .collect::<Vec<_>>(),
+            vec!["old-good"]
+        );
+        assert!(state.candidate().is_none());
+    }
+
+    #[test]
+    fn schema_v1_incompatible_records_migrate_to_incompatible_role() {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("state.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "schema_version": 1,
+              "revisions": [{
+                "revision": "bad",
+                "artifact_identity": "abc",
+                "validation_status": "runtime_regression_verified",
+                "revision_status": "latest_incompatible",
+                "activated_at": 10,
+                "incompatible": {
+                  "commit": "bad",
+                  "reason": "smoke probe failed",
+                  "recorded_at": 10
+                }
+              }]
+            }"#,
+        )
+        .expect("write state");
+
+        let state = read_state(&path).expect("read v1 state");
+        assert_eq!(state.known_goods().count(), 0);
+        let record = state
+            .revisions
+            .iter()
+            .find(|record| record.revision == "bad")
+            .expect("bad revision migrated");
+        assert_eq!(record.role, ArtifactRole::Incompatible);
+        assert!(state.incompatibility_for("bad").is_some());
+    }
+
+    #[test]
+    fn schema_v2_candidate_is_never_returned_as_known_good() {
+        let mut state = PersistedArtifactState::new();
+        state.revisions.push(sample_revision("candidate", ArtifactRole::Candidate, 20));
+        state.revisions.push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
+
+        assert_eq!(state.candidate().map(|r| r.revision.as_str()), Some("candidate"));
+        assert_eq!(
+            state.known_goods().next().map(|r| r.revision.as_str()),
+            Some("known-good")
+        );
+    }
+
+    #[test]
+    fn schema_v2_round_trip_persists_role_and_schema_version() {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("state.json");
+        let mut state = PersistedArtifactState::new();
+        state.revisions.push(sample_revision("candidate", ArtifactRole::Candidate, 20));
+        state.revisions.push(sample_revision("known-good", ArtifactRole::KnownGood, 10));
+        persist_state(&path, &state).expect("persist");
+
+        let raw = std::fs::read_to_string(&path).expect("read raw");
+        assert!(raw.contains("\"schema_version\": 2"));
+        assert!(raw.contains("\"role\": \"candidate\""));
+        assert!(raw.contains("\"role\": \"known_good\""));
+
+        let loaded = read_state(&path).expect("read");
+        assert_eq!(loaded.schema_version, 2);
+        assert_eq!(loaded.revisions.len(), 2);
+        assert_eq!(loaded.candidate().map(|r| r.revision.as_str()), Some("candidate"));
+        assert_eq!(
+            loaded.known_goods().next().map(|r| r.revision.as_str()),
+            Some("known-good")
+        );
+    }
+
+    #[test]
+    fn unsupported_state_version_is_rejected_as_typed_error() {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("state.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "schema_version": 7,
+              "revisions": []
+            }"#,
+        )
+        .expect("write state");
+        let err = read_state(&path).expect_err("unsupported schema must be rejected");
+        assert!(matches!(err, MemoryError::Storage(_)));
     }
 }
