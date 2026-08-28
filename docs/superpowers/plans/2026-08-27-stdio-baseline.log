@@ -1,0 +1,13 @@
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test test_mcp_extract_no_input_returns_invalid_params_error ... ok
+test test_mcp_explain_rejects_legacy_object_aliases ... ok
+test test_mcp_ingest_validation_error ... ok
+test test_mcp_extract_rejects_ambiguous_episode_and_content_input ... ok
+test test_mcp_explain_loads_episode_context ... ok
+test test_mcp_explain_mixed_array ... ok
+test test_mcp_assemble_context_timeline_mode_passes_optional_fields ... ok
+test test_mcp_tools_flow ... ok
+test test_mcp_full_flow_end_to_end ... ok
+test test_mcp_extract_task_lifecycle_over_stdio ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.49s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s

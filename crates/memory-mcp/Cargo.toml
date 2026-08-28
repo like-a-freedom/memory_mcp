@@ -19,7 +19,6 @@ chrono.workspace = true
 clap.workspace = true
 hex.workspace = true
 hf-hub.workspace = true
-hmac = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 http-body = { workspace = true, optional = true }
 http-body-util = { workspace = true, optional = true }
@@ -34,7 +33,6 @@ oauth2 = { workspace = true, optional = true }
 ort = { version = "=2.0.0-rc.12", features = ["ndarray"] }
 mimalloc = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
 regex.workspace = true
 reqwest.workspace = true
 rmcp.workspace = true
@@ -44,17 +42,12 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 strsim.workspace = true
-subtle = { workspace = true, optional = true }
 surrealdb.workspace = true
 thiserror.workspace = true
 tokenizers.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
-tower = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
-tower-service = { workspace = true, optional = true }
 unicode-normalization.workspace = true
-uuid = { workspace = true, optional = true }
 zip.workspace = true
 
 [features]
@@ -73,17 +66,10 @@ eval-support = []
 streamable-http = [
     "rmcp/transport-streamable-http-server",
     "dep:axum",
-    "dep:tower",
-    "dep:tower-http",
-    "dep:tower-service",
     "dep:http",
     "dep:http-body",
     "dep:http-body-util",
     "dep:bytes",
-    "dep:uuid",
-    "dep:rand",
-    "dep:hmac",
-    "dep:subtle",
 ]
 control-plane = [
     "streamable-http",
@@ -92,10 +78,6 @@ control-plane = [
     "dep:chacha20poly1305",
     "dep:base64",
 ]
-control-plane-ui = ["control-plane"]
-# Test-only: exposes #[cfg(any(test, feature = "test-fixtures"))] fixtures to
-# integration tests in tests/. Declared so cfg references pass unexpected_cfgs.
-test-fixtures = []
 
 [[bin]]
 name = "memory_mcp_http"
