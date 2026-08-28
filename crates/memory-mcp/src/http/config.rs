@@ -144,7 +144,143 @@ fn deserialize_hex_32<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[u8;
         .map_err(|_| serde::de::Error::custom("hex key must be exactly 32 bytes"))
 }
 
+fn require_env(k: &str) -> Result<String, MemoryError> {
+    std::env::var(k).map_err(|_| MemoryError::ConfigMissing(k.into()))
+}
+
+fn optional_env(k: &str) -> Option<String> {
+    std::env::var(k).ok().filter(|value| !value.trim().is_empty())
+}
+
+fn parse_env_or<T>(k: &str, default: T) -> Result<T, MemoryError>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    match std::env::var(k) {
+        Ok(v) => v
+            .parse::<T>()
+            .map_err(|_| MemoryError::ConfigInvalid(k.into())),
+        Err(_) => Ok(default),
+    }
+}
+
+fn parse_csv(k: &str) -> Result<Vec<String>, MemoryError> {
+    match std::env::var(k) {
+        Ok(v) => Ok(v
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()),
+        Err(_) => Ok(Vec::new()),
+    }
+}
+
+fn parse_bool(k: &str, default: bool) -> Result<bool, MemoryError> {
+    match std::env::var(k) {
+        Ok(v) => v
+            .parse::<bool>()
+            .map_err(|_| MemoryError::ConfigInvalid(k.into())),
+        Err(_) => Ok(default),
+    }
+}
+
+fn parse_hex_32_env(k: &str) -> Result<[u8; 32], MemoryError> {
+    let raw = require_env(k)?;
+    let bytes = hex::decode(&raw).map_err(|_| MemoryError::ConfigInvalid(k.into()))?;
+    bytes
+        .try_into()
+        .map_err(|_| MemoryError::ConfigInvalid(k.into()))
+}
+
 impl HttpConfig {
+    /// Loads the HTTP config from process environment variables.
+    pub fn from_env() -> Result<Self, MemoryError> {
+        let default_bind: SocketAddr = DEFAULT_BIND.parse().expect("DEFAULT_BIND parses");
+        let bind = parse_env_or("MEMORY_MCP_HTTP_BIND", default_bind)?;
+        let public_base_url = require_env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")?;
+        let allowed_hosts = parse_csv("ALLOWED_HOSTS")?;
+        let allowed_origins = parse_csv("ALLOWED_ORIGINS")?;
+        let body_limit_bytes: usize = parse_env_or("MEMORY_MCP_HTTP_BODY_LIMIT", DEFAULT_BODY_LIMIT_BYTES)?;
+        let request_deadline = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
+            DEFAULT_REQUEST_DEADLINE.as_secs(),
+        )?);
+        let shutdown_grace = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS",
+            DEFAULT_SHUTDOWN_GRACE.as_secs(),
+        )?);
+        let trusted_proxy_cidrs = parse_csv("MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS")?
+            .into_iter()
+            .map(|s| TrustedCidr::parse(&s))
+            .collect::<Result<Vec<_>, _>>()?;
+        let api_key_pepper = require_env("MEMORY_MCP_API_KEY_PEPPER")?;
+        let identity_index_key = parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?;
+        let control_plane_session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
+        let oidc_state_key = parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?;
+        let oidc_nonce_key = parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?;
+        let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
+        let signup_mode = match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
+            "invite_only" => SignupMode::InviteOnly,
+            "open" => SignupMode::Open,
+            other => {
+                return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
+            }
+        };
+        let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
+        let enable_control_plane_ui =
+            parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
+        let oidc_issuer = optional_env("MEMORY_MCP_HTTP_OIDC_ISSUER").unwrap_or_default();
+        let oidc_client_id = optional_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID").unwrap_or_default();
+        let oidc_audience = optional_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE").unwrap_or_default();
+        let oidc_redirect_uri =
+            optional_env("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI").unwrap_or_default();
+        let oidc_allowed_alg = optional_env("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG")
+            .unwrap_or_else(|| "RS256".into());
+
+        let control_db = SurrealTargetConfig {
+            url: require_env("SURREALDB_CONTROL_URL")?,
+            username: require_env("SURREALDB_CONTROL_USERNAME")?,
+            password: require_env("SURREALDB_CONTROL_PASSWORD")?,
+            database: require_env("SURREALDB_CONTROL_DB")?,
+            namespace: require_env("SURREALDB_CONTROL_NAMESPACE")?,
+        };
+        let tenant_db = SurrealTargetConfig {
+            url: require_env("SURREALDB_TENANT_URL")?,
+            username: require_env("SURREALDB_TENANT_USERNAME")?,
+            password: require_env("SURREALDB_TENANT_PASSWORD")?,
+            database: require_env("SURREALDB_TENANT_DB")?,
+            namespace: require_env("SURREALDB_TENANT_NAMESPACE")?,
+        };
+
+        Ok(Self {
+            bind,
+            public_base_url,
+            trusted_proxy_cidrs,
+            allowed_hosts,
+            allowed_origins,
+            body_limit_bytes,
+            request_deadline,
+            shutdown_grace,
+            control_db,
+            tenant_db,
+            api_key_pepper,
+            identity_index_key,
+            control_plane_session_key,
+            oidc_state_key,
+            oidc_nonce_key,
+            csrf_key,
+            oidc_issuer,
+            oidc_client_id,
+            oidc_audience,
+            oidc_redirect_uri,
+            oidc_allowed_alg,
+            signup_mode,
+            enable_control_plane,
+            enable_control_plane_ui,
+        })
+    }
+
     pub fn validate(&self) -> Result<(), MemoryError> {
         if self.bind.ip().is_unspecified() && !self.public_base_url.contains("localhost") {
             eprintln!(
@@ -239,7 +375,88 @@ impl SurrealTargetConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::sync::Mutex;
+
+    // Edition 2024: set_var/remove_var are unsafe. ENV_LOCK serializes all
+    // env-mutating tests in this module, which is the safety condition.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_env<F: FnOnce()>(vars: &[(&str, &str)], f: F) {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        for k in [
+            "MEMORY_MCP_HTTP_BIND",
+            "MEMORY_MCP_HTTP_PUBLIC_BASE_URL",
+            "ALLOWED_HOSTS",
+            "ALLOWED_ORIGINS",
+            "MEMORY_MCP_API_KEY_PEPPER",
+            "MEMORY_MCP_HTTP_SIGNUP_MODE",
+            "MEMORY_MCP_HTTP_BODY_LIMIT",
+            "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
+            "MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS",
+            "MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS",
+            "SURREALDB_CONTROL_URL",
+            "SURREALDB_CONTROL_USERNAME",
+            "SURREALDB_CONTROL_PASSWORD",
+            "SURREALDB_CONTROL_DB",
+            "SURREALDB_CONTROL_NAMESPACE",
+            "SURREALDB_TENANT_URL",
+            "SURREALDB_TENANT_USERNAME",
+            "SURREALDB_TENANT_PASSWORD",
+            "SURREALDB_TENANT_DB",
+            "SURREALDB_TENANT_NAMESPACE",
+            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE",
+            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI",
+            "MEMORY_MCP_HTTP_CSRF_KEY",
+            "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
+            "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
+            "MEMORY_MCP_HTTP_SESSION_KEY",
+            "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+        ] {
+            // SAFETY: serialized by ENV_LOCK; no other thread reads these vars in tests.
+            unsafe { env::remove_var(k); }
+        }
+        for (k, v) in vars {
+            // SAFETY: same as above.
+            unsafe { env::set_var(k, v); }
+        }
+        f();
+        for (k, _) in vars {
+            // SAFETY: same as above.
+            unsafe { env::remove_var(k); }
+        }
+    }
+
+    fn base_required_env() -> Vec<(&'static str, String)> {
+        let pepper = "x".repeat(40);
+        let key = "0".repeat(64);
+        vec![
+            ("MEMORY_MCP_HTTP_BIND", "127.0.0.1:8080".into()),
+            ("MEMORY_MCP_HTTP_PUBLIC_BASE_URL", "http://localhost".into()),
+            ("ALLOWED_HOSTS", "localhost".into()),
+            ("ALLOWED_ORIGINS", "http://localhost".into()),
+            ("MEMORY_MCP_API_KEY_PEPPER", pepper),
+            ("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY", key.clone()),
+            ("MEMORY_MCP_HTTP_SIGNUP_MODE", "invite_only".into()),
+            ("MEMORY_MCP_HTTP_CSRF_KEY", key.clone()),
+            ("MEMORY_MCP_HTTP_OIDC_STATE_KEY", key.clone()),
+            ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY", key.clone()),
+            ("MEMORY_MCP_HTTP_SESSION_KEY", key),
+            ("SURREALDB_CONTROL_URL", "ws://localhost:8000".into()),
+            ("SURREALDB_CONTROL_USERNAME", "root".into()),
+            ("SURREALDB_CONTROL_PASSWORD", "root".into()),
+            ("SURREALDB_CONTROL_DB", "control".into()),
+            ("SURREALDB_CONTROL_NAMESPACE", "control".into()),
+            ("SURREALDB_TENANT_URL", "ws://localhost:8000".into()),
+            ("SURREALDB_TENANT_USERNAME", "root".into()),
+            ("SURREALDB_TENANT_PASSWORD", "root".into()),
+            ("SURREALDB_TENANT_DB", "tenant".into()),
+            ("SURREALDB_TENANT_NAMESPACE", "tenant".into()),
+            ("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "false".into()),
+            ("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", "false".into()),
+        ]
+    }
 
     #[test]
     fn parses_ipv4_cidr() {
@@ -268,5 +485,29 @@ mod tests {
     #[test]
     fn default_for_test_validates() {
         HttpConfig::default_for_test().validate().expect("valid");
+    }
+
+    #[test]
+    fn http_config_loads_from_env_with_minimum_required() {
+        let vars = base_required_env();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("config loads");
+            cfg.validate().expect("valid");
+            assert_eq!(cfg.bind.port(), 8080);
+            assert_eq!(cfg.allowed_hosts, vec!["localhost".to_string()]);
+            assert_eq!(cfg.signup_mode, SignupMode::InviteOnly);
+        });
+    }
+
+    #[test]
+    fn http_config_rejects_wildcard_origin() {
+        let mut vars = base_required_env();
+        vars[3] = ("ALLOWED_ORIGINS", "*".into());
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("parses");
+            assert!(matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(_))));
+        });
     }
 }
