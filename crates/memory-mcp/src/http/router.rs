@@ -12,5 +12,8 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
         .route("/health/live", get(super::health::live))
         .route("/health/ready", get(super::health::ready))
         .route("/mcp", post(super::transport::mcp_handler))
+        .layer(axum::middleware::from_fn(
+            super::middleware::reject_non_post_mcp,
+        ))
         .with_state(state)
 }
