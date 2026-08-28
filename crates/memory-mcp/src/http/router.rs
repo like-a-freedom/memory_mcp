@@ -19,5 +19,8 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
             state.clone(),
             super::middleware::host_origin,
         ))
+        .layer(axum::middleware::from_fn(
+            super::middleware::inject_sse_headers,
+        ))
         .with_state(state)
 }

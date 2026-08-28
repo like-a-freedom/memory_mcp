@@ -8,6 +8,7 @@ pub mod router;
 pub mod server;
 pub mod shutdown;
 pub mod transport;
+pub mod validation;
 
 use std::sync::Arc;
 
