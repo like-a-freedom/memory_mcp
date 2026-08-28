@@ -2,13 +2,13 @@
 
 use std::sync::Arc;
 
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 
 use super::HttpState;
 
 pub fn build_router(state: Arc<HttpState>) -> Router {
-    let mut router = Router::new()
+    let router = Router::new()
         .route("/health/live", get(super::health::live))
         .route("/health/ready", get(super::health::ready))
         .route("/mcp", post(super::transport::mcp_handler))
@@ -23,8 +23,6 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
             super::middleware::inject_sse_headers,
         ));
     #[cfg(feature = "prometheus")]
-    {
-        router = router.route("/metrics", get(super::metrics::prometheus));
-    }
+    let router = router.route("/metrics", get(super::metrics::prometheus));
     router.with_state(state)
 }

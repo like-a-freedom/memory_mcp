@@ -49,12 +49,10 @@ impl Body for DeadlineBody {
                 .is_some_and(|deadline| Instant::now() >= deadline);
         if expired {
             self.finished = true;
-            return Poll::Ready(Some(Err(axum::Error::new(
-                std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "HTTP response deadline exceeded",
-                ),
-            ))));
+            return Poll::Ready(Some(Err(axum::Error::new(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "HTTP response deadline exceeded",
+            )))));
         }
         match self.inner.as_mut().poll_frame(cx) {
             Poll::Ready(None) => {
@@ -87,8 +85,8 @@ pub fn with_body_deadline(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::pin::Pin;
     use http_body_util::BodyExt;
+    use std::pin::Pin;
 
     #[tokio::test]
     async fn deadline_body_allows_completion_before_timeout() {
@@ -99,14 +97,11 @@ mod tests {
 
     #[tokio::test]
     async fn deadline_body_returns_timeout_error_when_expired() {
-        use http_body::Body as _;
-        let mut body =
-            DeadlineBody::new(axum::body::Body::from("late"), Some(Duration::ZERO));
+        let mut body = DeadlineBody::new(axum::body::Body::from("late"), Some(Duration::ZERO));
         // Poll once to drive the timer.
-        let frame = std::future::poll_fn(|cx| {
-            <DeadlineBody as Body>::poll_frame(Pin::new(&mut body), cx)
-        })
-        .await;
+        let frame =
+            std::future::poll_fn(|cx| <DeadlineBody as Body>::poll_frame(Pin::new(&mut body), cx))
+                .await;
         assert!(frame.is_some());
         assert!(frame.unwrap().is_err());
     }

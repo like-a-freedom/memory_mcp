@@ -5,10 +5,10 @@
 
 use std::process::ExitCode;
 
+use memory_mcp::http::HttpState;
 use memory_mcp::http::config::HttpConfig;
 use memory_mcp::http::router;
 use memory_mcp::http::server;
-use memory_mcp::http::HttpState;
 use memory_mcp::logging::{LogLevel, StdoutLogger};
 
 #[tokio::main]
@@ -63,20 +63,14 @@ async fn main() -> ExitCode {
         #[cfg(unix)]
         {
             use tokio::signal::unix::{SignalKind, signal};
-            let mut terminate = match signal(SignalKind::terminate()) {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            };
-            match terminate.as_mut() {
-                Some(t) => {
-                    tokio::select! {
-                        _ = tokio::signal::ctrl_c() => {}
-                        _ = t.recv() => {}
-                    }
+            let mut terminate = signal(SignalKind::terminate()).ok();
+            if let Some(t) = terminate.as_mut() {
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {}
+                    _ = t.recv() => {}
                 }
-                None => {
-                    let _ = tokio::signal::ctrl_c().await;
-                }
+            } else {
+                let _ = tokio::signal::ctrl_c().await;
             }
         }
         #[cfg(not(unix))]
