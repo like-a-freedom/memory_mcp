@@ -5,9 +5,11 @@ work, per `docs/superpowers/plans/2026-08-27-streamable-http-saas.md` Task 1.1.
 
 ## Test results
 
+This is a narrative companion to `2026-08-27-stdio-baseline.log` (the single
+source of truth for the captured test counts).
+
 - `cargo test -p memory_mcp --test service_acceptance` — 27 passed, 0 failed
 - `cargo test -p memory_mcp --test tools_e2e` — 11 passed, 0 failed
-  (later re-run after Phase 1.3: 12 passed, 0 failed)
 - `cargo test -p memory_mcp --test tools_shared` — 8 passed, 0 failed
 - `cargo build -p memory_mcp` — clean, no warnings
 
