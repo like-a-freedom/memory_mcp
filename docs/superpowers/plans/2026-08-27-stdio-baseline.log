@@ -19,8 +19,9 @@ The 8 stdio tool names registered in crates/memory-mcp/src/mcp/handlers.rs:
   6. explain
   7. open_app
   8. app_command
-(grep reference: line 257 ingest, 283 extract, 295 resolve, 308 invalidate,
- 321 open_app, 391 app_command, 475 assemble_context; explain at 270.)
+(grep reference: #[tool( macro sites at handlers.rs:254 ingest, 267 explain,
+ 280 extract, 292 resolve, 305 invalidate, 318 open_app, 388 app_command,
+ 472 assemble_context.)
 
 === Step 3: default-features compile (local-only build) ===
 $ cargo build -p memory_mcp
