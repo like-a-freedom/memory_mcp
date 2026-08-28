@@ -129,8 +129,8 @@ _Avoid_: Embedding config, provider state, index state
 ## App surface vocabulary
 
 **App Session**:
-A process-scoped interactive session opened through `open_app` for one app (inspector, diff, graph, ingestion review, lifecycle), carrying a typed payload, bounded by an optional TTL, and closed explicitly or by expiry.
-_Avoid_: UI session, connection, workspace
+A tenant-owned interactive application resource opened through `open_app` for one app (inspector, diff, graph, ingestion review, lifecycle), carrying versioned typed state, bounded by idle and absolute expiry, and closed explicitly or by expiry. In the SaaS HTTP profile it is durable within the Tenant Namespace and accessible from any replica; it is never an MCP transport session. A local stdio deployment may keep equivalent state process-local.
+_Avoid_: MCP session, transport session, connection, workspace
 
 ## Trust model
 
@@ -203,6 +203,22 @@ _Avoid_: OAuth identity, Tenant selector, stored secret
 **Authenticated Principal**:
 The request-scoped server identity produced by successful credential verification and Account-to-Tenant resolution. API keys and future OAuth access tokens produce the same principal shape; neither credential contents nor MCP arguments select a Tenant Namespace.
 _Avoid_: Access token, transport session, namespace parameter
+
+**Control Plane Session**:
+A short-lived server-side browser session created after successful OIDC login for Account registration and credential administration. It is represented to the browser only by a secure opaque cookie and is distinct from an App Session, Account API Key, OAuth access token, and MCP transport state.
+_Avoid_: App Session, MCP session, API key, browser token
+
+**Tenant Task**:
+A durable, tenant-owned long-running MCP Task used for extraction work that may outlive one HTTP request or replica. Its state, cancellation intent, lease generation, and terminal result live in the Tenant Namespace; process-local task state is never authoritative in the SaaS profile.
+_Avoid_: Background spawn, request future, transport session
+
+**Tenant Change Event**:
+A durable, ordered invalidation record committed with a tenant-owned App or resource change. A subscription emits its resource identity and revision so the client can reread canonical state; it is not a replayable copy of every intermediate resource value.
+_Avoid_: SSE event ID, transport replay, process notification
+
+**Live-system Purge**:
+The irreversible removal of an Account and Tenant from the active SurrealDB deployment after recent authentication and explicit confirmation. It does not rewrite immutable historical backups, which remain governed by the selected SurrealDB deployment's retention and restore behavior.
+_Avoid_: Fact invalidation, backup erasure, recovery window
 
 **Active Namespace**:
 The single immutable SurrealDB namespace selected at startup by a local stdio server process. It remains a local deployment concept and is not the SaaS Tenant Namespace selected for an authenticated HTTP request.
