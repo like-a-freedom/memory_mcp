@@ -226,6 +226,39 @@ impl SurrealDbClient {
         Self::connect_in_memory(database, active_namespace, log_level).await
     }
 
+    /// Connects to a privileged remote SurrealDB endpoint and binds one
+    /// namespace/database. The HTTP profile uses a root credential
+    /// because later provisioning must issue namespace/database DDL;
+    /// stdio never calls this constructor.
+    pub async fn connect_bound(
+        url: &str,
+        username: &str,
+        password: &str,
+        namespace: &str,
+        database: &str,
+        log_level: &str,
+    ) -> Result<Self, MemoryError> {
+        let db = Surreal::new::<Ws>(url)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB connect failed: {err}")))?;
+        db.signin(Root {
+            username: username.to_string(),
+            password: password.to_string(),
+        })
+        .await
+        .map_err(|err| MemoryError::Storage(format!("SurrealDB signin failed: {err}")))?;
+        db.use_ns(namespace)
+            .use_db(database)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("SurrealDB use_failed: {err}")))?;
+        Ok(Self {
+            engine: DbEngine::Remote(Arc::new(db)),
+            active_namespace: namespace.to_string(),
+            logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        })
+    }
+
     /// Connects to SurrealDB using the provided configuration.
     pub async fn connect(config: &SurrealConfig) -> Result<Self, MemoryError> {
         let active_namespace = config.active_namespace().as_str().to_string();

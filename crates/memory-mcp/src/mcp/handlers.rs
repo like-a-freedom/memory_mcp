@@ -65,6 +65,11 @@ pub struct MemoryMcp {
     session_manager: SessionManager,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
+    /// When true, advertise and negotiate only MCP 2026-07-28 (HTTP SaaS
+    /// profile, ADR-0052). Stdio constructors leave this false,
+    /// preserving the frozen stdio behavior (ADR-0038) regardless of
+    /// feature flags.
+    modern_protocol_only: bool,
 }
 
 impl MemoryMcp {
@@ -81,6 +86,15 @@ impl MemoryMcp {
             session_manager: SessionManager::new(),
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
+            modern_protocol_only: false,
+        }
+    }
+
+    /// HTTP SaaS profile constructor: modern protocol only.
+    pub fn new_modern(service: MemoryService) -> Self {
+        Self {
+            modern_protocol_only: true,
+            ..Self::new(service)
         }
     }
 
@@ -109,6 +123,18 @@ impl MemoryMcp {
         .with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
+    /// HTTP profile server info: tools + tasks always; resources only
+    /// when `mcp-apps` is compiled. Does not advertise MRTR, roots,
+    /// sampling, elicitation, prompts-change, or tool-list-change.
+    fn build_http_server_info(&self) -> ServerInfo {
+        let builder = ServerCapabilities::builder()
+            .enable_tools()
+            .enable_tasks();
+        #[cfg(feature = "mcp-apps")]
+        let builder = builder.enable_resources();
+        ServerInfo::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
+    }
+
     fn invalid_params(message: impl Into<String>) -> ErrorData {
         session::invalid_params(message)
     }
@@ -135,7 +161,27 @@ async fn extract_response(
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for MemoryMcp {
     fn get_info(&self) -> ServerInfo {
-        Self::build_server_info()
+        let mut info = if self.modern_protocol_only {
+            self.build_http_server_info()
+        } else {
+            Self::build_server_info()
+        };
+        if self.modern_protocol_only {
+            // Pin the negotiation fallback: rmcp falls back to this
+            // version when a client requests one we do not support.
+            info = info.with_protocol_version(rmcp::model::ProtocolVersion::V_2026_07_28);
+        }
+        info
+    }
+
+    fn supported_protocol_versions(
+        &self,
+    ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
+        if self.modern_protocol_only {
+            std::borrow::Cow::Owned(vec![rmcp::model::ProtocolVersion::V_2026_07_28])
+        } else {
+            std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
+        }
     }
 
     async fn call_tool(
