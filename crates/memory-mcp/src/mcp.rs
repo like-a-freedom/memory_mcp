@@ -18,7 +18,7 @@ pub use params::*;
 pub use response::{AppCommandResult, OpenAppResult};
 
 mod error;
-mod handlers;
+pub mod handlers;
 mod params;
 mod parsers;
 pub(crate) mod resources;
