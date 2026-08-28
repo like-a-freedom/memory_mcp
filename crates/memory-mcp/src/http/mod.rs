@@ -5,7 +5,9 @@ pub mod config;
 pub mod health;
 pub mod metrics;
 pub mod middleware;
+pub mod registry;
 pub mod router;
+pub mod runtime;
 pub mod server;
 pub mod shutdown;
 pub mod transport;
@@ -16,15 +18,18 @@ use std::sync::Arc;
 use config::HttpConfig;
 
 /// Process-wide HTTP state. Phase 3 shape: config + the tenantless MCP
-/// factory. Later tasks extend this struct (Task 3.8 metrics handle,
-/// Task 3.9 shutdown/admission/registry, Task 4.4 authenticator, Task
-/// 4.5 account_resolver, Task 5.6 pool).
+/// factory + shutdown/admission/registry stubs. Later tasks extend
+/// this struct (Task 4.4 authenticator, Task 4.5 account_resolver,
+/// Task 5.6 pool).
 pub struct HttpState {
     pub config: HttpConfig,
     /// Phase 3 dispatch factory: clones a prebuilt tenantless handler
     /// per request. Replaced by the runtime-pool guard in Task 5.6.
     pub mcp_factory:
         Arc<dyn Fn() -> Result<crate::mcp::handlers::MemoryMcp, std::io::Error> + Send + Sync>,
+    pub shutdown: shutdown::ShutdownState,
+    pub admission: Arc<runtime::pool::AdmissionGate>,
+    pub registry: registry::RegistryHandle,
     #[cfg(feature = "prometheus")]
     pub metrics_handle: metrics_exporter_prometheus::PrometheusHandle,
 }
@@ -41,6 +46,9 @@ impl HttpState {
         Ok(Arc::new(Self {
             mcp_factory: Arc::new(move || Ok((*mcp).clone())),
             config,
+            shutdown: shutdown::ShutdownState::new(),
+            admission: Arc::new(runtime::pool::AdmissionGate::new()),
+            registry: registry::RegistryHandle::stub(),
             metrics_handle,
         }))
     }
@@ -51,6 +59,9 @@ impl HttpState {
         Ok(Arc::new(Self {
             mcp_factory: Arc::new(move || Ok((*mcp).clone())),
             config,
+            shutdown: shutdown::ShutdownState::new(),
+            admission: Arc::new(runtime::pool::AdmissionGate::new()),
+            registry: registry::RegistryHandle::stub(),
         }))
     }
 }
