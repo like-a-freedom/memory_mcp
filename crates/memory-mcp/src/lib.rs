@@ -51,6 +51,9 @@ pub mod service;
 pub mod storage;
 pub mod tools;
 
+#[cfg(feature = "streamable-http")]
+pub mod http;
+
 #[cfg(feature = "eval-support")]
 #[doc(hidden)]
 pub mod eval_support;
