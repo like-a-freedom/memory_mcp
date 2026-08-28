@@ -8,7 +8,7 @@ use axum::Router;
 use super::HttpState;
 
 pub fn build_router(state: Arc<HttpState>) -> Router {
-    Router::new()
+    let mut router = Router::new()
         .route("/health/live", get(super::health::live))
         .route("/health/ready", get(super::health::ready))
         .route("/mcp", post(super::transport::mcp_handler))
@@ -21,6 +21,10 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
         ))
         .layer(axum::middleware::from_fn(
             super::middleware::inject_sse_headers,
-        ))
-        .with_state(state)
+        ));
+    #[cfg(feature = "prometheus")]
+    {
+        router = router.route("/metrics", get(super::metrics::prometheus));
+    }
+    router.with_state(state)
 }
