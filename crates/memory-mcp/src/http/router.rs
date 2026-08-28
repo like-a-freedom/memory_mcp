@@ -15,5 +15,9 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
         .layer(axum::middleware::from_fn(
             super::middleware::reject_non_post_mcp,
         ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::middleware::host_origin,
+        ))
         .with_state(state)
 }
