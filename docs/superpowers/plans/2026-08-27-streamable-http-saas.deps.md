@@ -1,6 +1,11 @@
 # Cargo.toml change proposal — Streamable HTTP SaaS
 
-This proposal requires explicit user approval before any change is applied.
+**Status: approved and applied 2026-08-28; see commits `2e430f3b`, `4330a652`, `96bd9e2c` on `streamable-http-mcp`.**
+
+This proposal required explicit user approval before any change was applied;
+approval was given during the Phase 2 implementation session. The verbatim
+block below is the proposal as originally submitted; the section after it
+documents the three intentional deviations that were applied.
 
 ## Applied deviations from the verbatim block below
 
@@ -30,6 +35,21 @@ from this proposal in three places, applied during code review:
    (they are documented in Phase 10 / Task 10.9 for the UI crate and
    Phase 4+ for fixtures). Restored.
 
+4. **`rand` and `uuid` restored after being dropped in the first review
+   pass.** The proposal lists `rand` and `uuid` for `streamable-http`
+   (request IDs, nonce material). Round 1 dropped them as speculative;
+   round 2 restored them because `streamable-http` is the home for the
+   API-key auth and request-correlation code in Phase 4+ Tasks 4.3 and
+   5.6, which require both. Kept.
+
+5. **`src/bin/memory_mcp_http.rs` placeholder stub.** The proposal's
+   `[[bin]] required-features = ["streamable-http"]` block requires the
+   binary's source file to exist when the feature is enabled. The Phase
+   3 Task 3.10 composition root has not been written yet, so the file
+   is a fail-loud placeholder (`eprintln!` + `std::process::exit(1)`)
+   that does not run a server. This is a Phase 2 file change made
+   unavoidable by the proposal's own `[[bin]]` declaration.
+
 ## Workspace `Cargo.toml`
 
 Add (or update) these workspace dependencies:
@@ -50,7 +70,7 @@ Add (or update) these workspace dependencies:
 | `subtle` | `2` | none | `[]` | constant-time comparison for secrets |
 | `oauth2` | `5` | none | `[]` | optional control-plane Authorization Code + PKCE client |
 | `jsonwebtoken` | `11` | none | `[]` | optional OIDC ID/access-token signature and claim validation |
-| `chacha20poly1305` | `0.10` | none | `[]` | authenticated encryption for short-lived OIDC flow material |
+| `chacha20poly1305` | `0.10` | none | `[]` | authenticated encryption for short-lived OIDC flow material — *see deviation 1 above; not in the applied `Cargo.toml`* |
 | `base64` | `0.22` | none | `[]` | URL-safe PKCE verifier/challenge encoding |
 
 ## `crates/memory-mcp/Cargo.toml`

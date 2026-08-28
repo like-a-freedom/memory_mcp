@@ -3,8 +3,9 @@
 //! # rmcp 3.1.2 API surface (verified 2026-08-28)
 //!
 //! The following types and methods are confirmed against the installed
-//! `rmcp 3.1.2` source at
-//! `~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rmcp-3.1.2/`:
+//! `rmcp 3.1.2` source. Line numbers are stable while `Cargo.lock`
+//! resolves the `rmcp` dep to `3.1.2` (currently pinned via the
+//! workspace entry in `Cargo.toml`).
 //!
 //! - `rmcp::transport::streamable_http_server::StreamableHttpServerConfig`
 //!   (`src/transport/streamable_http_server/tower.rs:60`).
