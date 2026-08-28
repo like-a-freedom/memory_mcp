@@ -27,10 +27,10 @@ pub async fn reject_non_post_mcp(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use axum::routing::{get, post};
-    use axum::Router;
     use tower_service::Service;
 
     async fn mcp_stub() -> &'static str {
@@ -103,10 +103,7 @@ const NO_BUFFERING: HeaderValue = HeaderValue::from_static("no");
 /// All other responses pass through untouched. Runs as the OUTERMOST
 /// layer so it observes the final response after every other
 /// middleware.
-pub async fn inject_sse_headers(
-    req: axum::extract::Request,
-    next: Next,
-) -> Response {
+pub async fn inject_sse_headers(req: axum::extract::Request, next: Next) -> Response {
     let mut resp = next.run(req).await;
     let is_sse = resp
         .headers()
@@ -126,10 +123,10 @@ pub async fn inject_sse_headers(
 #[cfg(test)]
 mod sse_headers_tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::header;
     use axum::routing::get;
-    use axum::Router;
     use tower_service::Service;
 
     async fn sse_stub() -> (
@@ -211,8 +208,13 @@ pub async fn host_origin(
         .extensions()
         .get::<axum::extract::connect_info::ConnectInfo<std::net::SocketAddr>>()
         .map(|info| info.0.ip());
-    let trusted_peer = peer
-        .is_some_and(|ip| state.config.trusted_proxy_cidrs.iter().any(|c| c.contains(ip)));
+    let trusted_peer = peer.is_some_and(|ip| {
+        state
+            .config
+            .trusted_proxy_cidrs
+            .iter()
+            .any(|c| c.contains(ip))
+    });
     let host_header = if trusted_peer {
         headers
             .get("x-forwarded-host")
@@ -229,10 +231,10 @@ pub async fn host_origin(
     {
         return Err((StatusCode::FORBIDDEN, "host not allowed"));
     }
-    if let Some(origin) = headers.get("origin").and_then(|h| h.to_str().ok()) {
-        if !state.config.allowed_origins.iter().any(|o| o == origin) {
-            return Err((StatusCode::FORBIDDEN, "origin not allowed"));
-        }
+    if let Some(origin) = headers.get("origin").and_then(|h| h.to_str().ok())
+        && !state.config.allowed_origins.iter().any(|o| o == origin)
+    {
+        return Err((StatusCode::FORBIDDEN, "origin not allowed"));
     }
     Ok(next.run(req).await)
 }
@@ -240,10 +242,10 @@ pub async fn host_origin(
 #[cfg(test)]
 mod host_origin_tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::Request;
     use axum::routing::get;
-    use axum::Router;
     use tower_service::Service;
 
     async fn echo() -> &'static str {

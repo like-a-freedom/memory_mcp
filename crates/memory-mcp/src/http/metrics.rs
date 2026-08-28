@@ -6,6 +6,7 @@
 //! because two scrape surfaces for one recorder is a configuration
 //! error.
 
+#[cfg(feature = "prometheus")]
 use crate::error::MemoryError;
 
 /// Install the process-wide recorder and return its render handle.
@@ -51,7 +52,10 @@ pub async fn prometheus(
 ) {
     (
         axum::http::StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
         state.metrics_handle.render(),
     )
 }
