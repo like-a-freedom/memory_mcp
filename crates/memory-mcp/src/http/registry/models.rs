@@ -145,6 +145,30 @@ pub enum UsageCounter {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyedVerifier(pub [u8; 32]); // HMAC-SHA256(pepper, secret)
 
+impl KeyedVerifier {
+    /// Compute HMAC-SHA256(pepper, secret) into a fixed-size
+    /// verifier. Used by Task 4.7 when issuing new API keys.
+    pub fn compute(pepper: &[u8], secret: &[u8]) -> Self {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        // HMAC-SHA256 accepts a key of any length, so
+        // `new_from_slice` cannot fail here; the expect documents
+        // that invariant rather than hiding a real error path.
+        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(pepper)
+            .expect("HMAC-SHA256 accepts any key length");
+        mac.update(secret);
+        Self(mac.finalize().into_bytes().into())
+    }
+
+    /// Constant-time verify of `(pepper, secret)` against the
+    /// stored verifier.
+    pub fn verify(&self, pepper: &[u8], secret: &[u8]) -> bool {
+        use subtle::ConstantTimeEq;
+        let expected = Self::compute(pepper, secret).0;
+        expected.ct_eq(&self.0).into()
+    }
+}
+
 /// Opaque-id helpers. All ids are server-generated UUID v4s
 /// with a type tag prefix so log scrapers and metrics can group
 /// by id type without parsing the namespace.
