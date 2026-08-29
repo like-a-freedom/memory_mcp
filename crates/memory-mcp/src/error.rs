@@ -114,9 +114,15 @@ mod tests {
 
     #[test]
     fn auth_and_unavailable_variants_display_stable_prefixes() {
-        assert!(MemoryError::Auth("x".into()).to_string().starts_with("auth error:"));
-        assert!(MemoryError::Unavailable("x".into())
-            .to_string()
-            .starts_with("unavailable:"));
+        assert!(
+            MemoryError::Auth("x".into())
+                .to_string()
+                .starts_with("auth error:")
+        );
+        assert!(
+            MemoryError::Unavailable("x".into())
+                .to_string()
+                .starts_with("unavailable:")
+        );
     }
 }

@@ -36,8 +36,7 @@ pub struct PrincipalCache {
 
 impl PrincipalCache {
     pub fn new(capacity: usize) -> Self {
-        let cap = std::num::NonZeroUsize::new(capacity)
-            .expect("capacity is a non-zero constant");
+        let cap = std::num::NonZeroUsize::new(capacity).expect("capacity is a non-zero constant");
         Self {
             positive: Mutex::new(LruCache::new(cap)),
             negative: Mutex::new(LruCache::new(cap)),
@@ -60,12 +59,7 @@ impl PrincipalCache {
         }
     }
 
-    pub fn put_positive(
-        &self,
-        key_id: String,
-        account: Arc<Account>,
-        verifier: KeyedVerifier,
-    ) {
+    pub fn put_positive(&self, key_id: String, account: Arc<Account>, verifier: KeyedVerifier) {
         let cached = Arc::new(CachedPrincipal { account, verifier });
         Self::lock(&self.positive).put(key_id, (cached, Instant::now()));
     }

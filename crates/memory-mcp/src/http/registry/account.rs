@@ -70,10 +70,7 @@ mod tests {
         async fn ping(&self) -> bool {
             true
         }
-        async fn find_account_by_id(
-            &self,
-            _id: &str,
-        ) -> Result<Option<Account>, MemoryError> {
+        async fn find_account_by_id(&self, _id: &str) -> Result<Option<Account>, MemoryError> {
             Ok(Some(Account {
                 id: "acct_1".into(),
                 status: AccountStatus::Active,
@@ -94,10 +91,7 @@ mod tests {
         ) -> Result<Option<Tenant>, MemoryError> {
             Ok(self.tenant.clone())
         }
-        async fn find_tenant_by_id(
-            &self,
-            _tenant_id: &str,
-        ) -> Result<Option<Tenant>, MemoryError> {
+        async fn find_tenant_by_id(&self, _tenant_id: &str) -> Result<Option<Tenant>, MemoryError> {
             Ok(None)
         }
         // The remaining methods are not exercised by these tests.
@@ -175,11 +169,7 @@ mod tests {
         ) -> Result<u64, MemoryError> {
             unimplemented!()
         }
-        async fn append_provisioning_event(
-            &self,
-            _: &str,
-            _: &str,
-        ) -> Result<(), MemoryError> {
+        async fn append_provisioning_event(&self, _: &str, _: &str) -> Result<(), MemoryError> {
             unimplemented!()
         }
         async fn load_plan(

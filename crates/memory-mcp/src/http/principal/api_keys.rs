@@ -126,46 +126,52 @@ mod tests {
         assert!(ApiKeyCredential::parse("sk_mem_xxx").is_err());
         assert!(ApiKeyCredential::parse("mem_sk_").is_err());
         assert!(ApiKeyCredential::parse("mem_sk_onlyone").is_err());
-        assert!(ApiKeyCredential::parse(
-            "mem_tk_ak_01234567-89ab-4cde-8f01-23456789abcd_abcdefabcdefabcdefabcdefabcdefabcd"
-        )
-        .is_err());
-        assert!(ApiKeyCredential::parse(
-            "mem_sk_xx_01234567-89ab-4cde-8f01-23456789abcd_abcdefabcdefabcdefabcdefabcdefabcd"
-        )
-        .is_err());
+        assert!(
+            ApiKeyCredential::parse(
+                "mem_tk_ak_01234567-89ab-4cde-8f01-23456789abcd_abcdefabcdefabcdefabcdefabcdefabcd"
+            )
+            .is_err()
+        );
+        assert!(
+            ApiKeyCredential::parse(
+                "mem_sk_xx_01234567-89ab-4cde-8f01-23456789abcd_abcdefabcdefabcdefabcdefabcdefabcd"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn rejects_over_max_length() {
         let s = "a".repeat(1024);
-        assert!(ApiKeyCredential::parse(&format!(
-            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{s}"
-        ))
-        .is_err());
+        assert!(
+            ApiKeyCredential::parse(&format!(
+                "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{s}"
+            ))
+            .is_err()
+        );
     }
 
     #[test]
     fn rejects_non_urlsafe_characters() {
-        assert!(ApiKeyCredential::parse(
-            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_secret with space padding padding"
-        )
-        .is_err());
+        assert!(
+            ApiKeyCredential::parse(
+                "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_secret with space padding padding"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn rejects_short_secret() {
-        assert!(ApiKeyCredential::parse(
-            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_tooshort"
-        )
-        .is_err());
+        assert!(
+            ApiKeyCredential::parse("mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_tooshort")
+                .is_err()
+        );
     }
 
     #[test]
     fn rejects_missing_secret() {
-        assert!(
-            ApiKeyCredential::parse("mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd").is_err()
-        );
+        assert!(ApiKeyCredential::parse("mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd").is_err());
     }
 
     #[test]
