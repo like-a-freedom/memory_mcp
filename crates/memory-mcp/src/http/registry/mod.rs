@@ -1,5 +1,7 @@
 //! Tenant Registry seam (ADR-0052). Phase 3 stub; real store in Phase 4.
 
+pub mod models;
+
 /// Phase 3 stub handle. `ping()` always returns `true` because no
 /// real store is wired yet. Phase 4 replaces this with a real
 /// control-namespace-backed handle.
