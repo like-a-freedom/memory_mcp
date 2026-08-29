@@ -20,7 +20,10 @@ pub async fn live() -> &'static str {
 
 pub async fn ready(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
     let (status, body) = if state.shutdown.is_shutting_down() {
-        (StatusCode::SERVICE_UNAVAILABLE, json!({"status": "shutting_down"}))
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({"status": "shutting_down"}),
+        )
     } else if state.admission.is_closed() {
         (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -49,7 +52,8 @@ mod tests {
 
     #[tokio::test]
     async fn ready_returns_ok_when_registry_reachable() {
-        let router = super::super::router::build_router(super::super::HttpState::default_for_test().await);
+        let router =
+            super::super::router::build_router(super::super::HttpState::default_for_test().await);
         let mut svc = router;
         let req = axum::http::Request::builder()
             .uri("/health/ready")

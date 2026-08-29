@@ -1,4 +1,4 @@
-//! HTTP SaaS transport (ADR-0052). Phase 3+ implementation lives here.
+//! HTTP SaaS transport (ADR-0052).
 //!
 //! # rmcp 3.1.2 API surface (verified 2026-08-28)
 //!
@@ -40,19 +40,29 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::Body;
+use axum::extract::{Request, State};
+use axum::response::Response;
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
-use rmcp::transport::streamable_http_server::{
-    StreamableHttpServerConfig, StreamableHttpService,
-};
+use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use tokio_util::sync::CancellationToken;
 
 use super::config::HttpConfig;
+use super::validation::with_body_deadline;
 
-pub const PROTOCOL_VERSION: &str = "2026-07-28";
+/// The single protocol version advertised and accepted by the HTTP
+/// profile. Any other value comes back as 400 from rmcp's header
+/// check; the `supported_protocol_versions` override removes any
+/// fallback ambiguity. Aliased to the crate-level constant so the
+/// literal value is declared in exactly one place.
+pub use crate::mcp::handlers::PROTOCOL_VERSION_2026_07_28 as PROTOCOL_VERSION;
+
+/// Subscriptions listen methods that produce a long-lived SSE
+/// stream and must not be bounded by the request-deadline body wrap.
+const SUBSCRIPTION_METHODS: &[&str] = &["subscriptions/listen", "subscribe", "stream"];
 
 /// Single production config builder. Every construction of the rmcp
-/// service goes through this function — no second default builder
-/// exists (a second builder would be dead code under clippy -D).
+/// service goes through this function.
 pub fn build_server_config(
     http: &HttpConfig,
     cancellation_token: CancellationToken,
@@ -74,27 +84,43 @@ pub fn build_mcp_service<H, F>(
     config: StreamableHttpServerConfig,
 ) -> StreamableHttpService<H, NeverSessionManager>
 where
-    H: rmcp::ServerHandler + Send + 'static,
+    H: rmcp::ServerHandler + Clone + Send + 'static,
     F: Fn() -> Result<H, std::io::Error> + Send + Sync + 'static,
 {
     StreamableHttpService::new(factory, Arc::new(NeverSessionManager::default()), config)
 }
 
-use axum::body::Body;
-use axum::extract::{Request, State};
-use axum::response::Response;
-
-/// Phase 3 production handler: dispatches through the tenantless factory
-/// in state. Task 5.6 replaces the body with runtime-pool dispatch.
+/// Phase 3 production handler. Reads the per-request subscription
+/// flag from `Mcp-Method` so the long-lived SSE stream is NOT
+/// wrapped by the body deadline (a deadline on a long-lived stream
+/// would close it before clients finish listening).
 pub async fn mcp_handler(
     State(state): State<std::sync::Arc<super::HttpState>>,
     req: Request,
 ) -> Response {
-    let svc = build_mcp_service_from_arc(
-        state.mcp_factory.clone(),
-        build_server_config(&state.config, super::shutdown::cancellation_token()),
+    let is_subscription = is_subscription_request(&req);
+    let svc = build_mcp_service(
+        {
+            let handler = Arc::clone(&state.shared_handler);
+            move || Ok((*handler).clone())
+        },
+        build_server_config(&state.config, state.shutdown.token()),
     );
-    forward(svc, req).await
+    let response = forward(svc, req).await;
+    if is_subscription {
+        response
+    } else {
+        with_body_deadline(response, Some(state.config.request_deadline))
+    }
+}
+
+fn is_subscription_request(req: &Request) -> bool {
+    let method = req
+        .headers()
+        .get("mcp-method")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    SUBSCRIPTION_METHODS.contains(&method)
 }
 
 /// Builds the Phase 3 tenantless handler over the configured tenant
@@ -102,22 +128,14 @@ pub async fn mcp_handler(
 /// smoke runs); anything else connects to the remote endpoint.
 pub async fn build_tenantless_handler(
     cfg: &HttpConfig,
-) -> Result<std::sync::Arc<crate::mcp::handlers::MemoryMcp>, crate::error::MemoryError> {
+) -> Result<Arc<crate::mcp::handlers::MemoryMcp>, crate::error::MemoryError> {
     use crate::storage::DbClient;
     let t = &cfg.tenant_db;
     let client = if t.url == "mem://" {
         crate::storage::SurrealDbClient::connect_in_memory(&t.database, &t.namespace, "warn")
             .await?
     } else {
-        crate::storage::SurrealDbClient::connect_bound(
-            &t.url,
-            &t.username,
-            &t.password,
-            &t.namespace,
-            &t.database,
-            "warn",
-        )
-        .await?
+        crate::storage::SurrealDbClient::connect_bound(&cfg.tenant_db, "warn").await?
     };
     client.apply_migrations(&t.namespace).await?;
     let service = crate::service::MemoryService::new(
@@ -127,9 +145,9 @@ pub async fn build_tenantless_handler(
         100,
         100,
     )?;
-    Ok(std::sync::Arc::new(
-        crate::mcp::handlers::MemoryMcp::new_modern(service),
-    ))
+    Ok(Arc::new(crate::mcp::handlers::MemoryMcp::new_modern(
+        service,
+    )))
 }
 
 /// Forward path shared by `mcp_handler` and the future pool-aware
@@ -141,34 +159,20 @@ pub async fn forward(
 ) -> Response {
     let (parts, body) = req.into_parts();
     let http_req: http::Request<axum::body::Body> = http::Request::from_parts(parts, body);
-    match <_ as tower_service::Service<http::Request<axum::body::Body>>>::call(
-        &mut svc, http_req,
-    )
-    .await
+    match <_ as tower_service::Service<http::Request<axum::body::Body>>>::call(&mut svc, http_req)
+        .await
     {
         Ok(resp) => resp.map(Body::new),
         Err(infallible) => match infallible {},
     }
 }
 
-/// Helper: build a service from a closure that clones a pre-built
-/// handler per request. Convenient for tests and the Phase 3
-/// tenantless dispatch path.
-pub fn build_mcp_service_from_arc<H>(
-    factory: Arc<dyn Fn() -> Result<H, std::io::Error> + Send + Sync>,
-    config: StreamableHttpServerConfig,
-) -> StreamableHttpService<H, NeverSessionManager>
-where
-    H: rmcp::ServerHandler + Send + 'static,
-{
-    let f = move || factory();
-    build_mcp_service(f, config)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::http::Method;
+    use rmcp::model::ProtocolVersion;
+    use tower_service::Service;
 
     // Mechanism: stateless_protocol_metadata_required = true rejects
     // legacy requests (they carry no per-request _meta protocol
@@ -176,7 +180,6 @@ mod tests {
     // alone would pass it.
     #[tokio::test]
     async fn unsupported_legacy_version_returns_bad_request() {
-        use tower_service::Service;
         let state = crate::http::HttpState::default_for_test().await;
         let mut router = super::super::router::build_router(state);
         let req = axum::http::Request::builder()
@@ -190,5 +193,26 @@ mod tests {
             .unwrap();
         let resp: Response = router.call(req).await.unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn subscription_request_detection() {
+        let req = axum::http::Request::builder()
+            .header("mcp-method", "subscriptions/listen")
+            .body(Body::empty())
+            .unwrap();
+        assert!(is_subscription_request(&req));
+        let req = axum::http::Request::builder()
+            .header("mcp-method", "tools/call")
+            .body(Body::empty())
+            .unwrap();
+        assert!(!is_subscription_request(&req));
+    }
+
+    #[test]
+    fn protocol_version_alias_is_2026_07_28() {
+        // Re-export alias; the canonical assertion lives in
+        // mcp::handlers::tests.
+        assert_eq!(PROTOCOL_VERSION, ProtocolVersion::V_2026_07_28);
     }
 }

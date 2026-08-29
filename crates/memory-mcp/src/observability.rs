@@ -151,6 +151,26 @@ pub fn install() -> Result<(), MemoryError> {
     Ok(())
 }
 
+/// Process-wide handle to the installed Prometheus recorder.
+/// First call installs the recorder; subsequent calls return the
+/// same handle. Returns `None` when the `prometheus` feature is off.
+///
+/// Use this from test fixtures and from the HTTP composition root
+/// to avoid the double-install panic.
+#[cfg(feature = "prometheus")]
+pub fn shared_test_handle() -> Option<metrics_exporter_prometheus::PrometheusHandle> {
+    use std::sync::OnceLock;
+    static HANDLE: OnceLock<Option<metrics_exporter_prometheus::PrometheusHandle>> =
+        OnceLock::new();
+    HANDLE
+        .get_or_init(|| {
+            metrics_exporter_prometheus::PrometheusBuilder::new()
+                .install_recorder()
+                .ok()
+        })
+        .clone()
+}
+
 #[cfg(feature = "prometheus")]
 fn parse_listen_addr() -> Result<Option<SocketAddr>, MemoryError> {
     match std::env::var(ENV_PROMETHEUS_LISTEN_ADDR) {
@@ -226,17 +246,9 @@ mod tests {
     #[test]
     #[cfg(feature = "prometheus")]
     fn operation_metrics_emit_expected_families() {
-        use std::sync::OnceLock;
-
-        let handle = {
-            static HANDLE: OnceLock<metrics_exporter_prometheus::PrometheusHandle> =
-                OnceLock::new();
-            HANDLE.get_or_init(|| {
-                metrics_exporter_prometheus::PrometheusBuilder::new()
-                    .install_recorder()
-                    .expect("Prometheus recorder installs once")
-            })
-        };
+        // Shares the OnceLock with `http::HttpState::test_metrics_handle`
+        // so the recorder installs at most once per process.
+        let handle = super::shared_test_handle().expect("prometheus enabled");
 
         let mut metrics = OperationMetrics::new("ingest");
         metrics.record_result("episodes", 2);

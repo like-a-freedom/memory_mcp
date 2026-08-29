@@ -1,7 +1,10 @@
 //! Coordinated shutdown state for the HTTP profile (spec §17).
+//!
+//! Each `HttpState` owns its own `ShutdownState` so test/application
+//! instances do not share a cancelled token.
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
 
 use tokio_util::sync::CancellationToken;
 
@@ -34,13 +37,4 @@ impl ShutdownState {
     pub fn token(&self) -> CancellationToken {
         self.token.clone()
     }
-}
-
-/// Process-global cancellation token used as the default for the
-/// Streamable HTTP service config. Test/application code that needs
-/// an independent lifecycle should construct a `ShutdownState` and
-/// pass its token to `transport::build_server_config`.
-pub fn cancellation_token() -> CancellationToken {
-    static CT: OnceLock<CancellationToken> = OnceLock::new();
-    CT.get_or_init(CancellationToken::new).clone()
 }

@@ -8,6 +8,7 @@ mod helpers;
 mod lifecycle;
 pub(crate) mod ner;
 mod surreal;
+mod target;
 
 pub use constants::*;
 pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
@@ -19,6 +20,7 @@ pub use ner::{
 };
 pub(crate) use surreal::StorageBackend;
 pub use surreal::{ActiveNamespace, SurrealConfig, SurrealConfigBuilder};
+pub use target::SurrealTargetConfig;
 
 #[cfg(test)]
 pub(crate) fn env_lock() -> &'static std::sync::Mutex<()> {
