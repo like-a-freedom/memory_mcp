@@ -9,11 +9,11 @@ use std::time::{Duration, Instant};
 
 use lru::LruCache;
 
+use super::AuthenticatedPrincipal;
 use super::api_keys::ApiKeyCredential;
 use super::cache::PrincipalCache;
-use super::AuthenticatedPrincipal;
-use crate::http::registry::models::{AccountStatus, ApiKeyStatus};
 use crate::http::registry::RegistryStore;
+use crate::http::registry::models::{AccountStatus, ApiKeyStatus};
 
 pub enum AuthDecision {
     Allow(AuthenticatedPrincipal),
@@ -32,8 +32,7 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(capacity: usize, window: Duration, max_per_window: u32) -> Self {
-        let cap = std::num::NonZeroUsize::new(capacity)
-            .expect("capacity is a non-zero constant");
+        let cap = std::num::NonZeroUsize::new(capacity).expect("capacity is a non-zero constant");
         Self {
             window,
             max_per_window,
@@ -113,9 +112,7 @@ impl Authenticator {
         let key = match self.store.find_api_key(cred.key_id()).await {
             Ok(Some(k))
                 if k.status == ApiKeyStatus::Active
-                    && k.expires_at
-                        .map(|e| e > chrono::Utc::now())
-                        .unwrap_or(true)
+                    && k.expires_at.map(|e| e > chrono::Utc::now()).unwrap_or(true)
                     && k.verifier.verify(&self.pepper, cred.secret()) =>
             {
                 k
@@ -176,9 +173,9 @@ impl Authenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::registry::RegistryHandle;
     use crate::http::registry::models::{ApiKey, KeyedVerifier};
     use crate::http::registry::storage::SurrealRegistryStore;
-    use crate::http::registry::RegistryHandle;
 
     fn store_with_key(secret: &[u8], pepper: &[u8]) -> (Arc<dyn RegistryStore>, KeyedVerifier) {
         let verifier = KeyedVerifier::compute(pepper, secret);

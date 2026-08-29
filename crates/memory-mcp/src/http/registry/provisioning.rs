@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::http::registry::models::Tenant;
 use crate::http::registry::RegistryStore;
+use crate::http::registry::models::Tenant;
 
 /// Durable enqueue: append a provisioning event for the reserved
 /// tenant. Idempotency is enforced by the store (duplicate
@@ -19,5 +19,7 @@ pub async fn enqueue_provisioning(
     store: &Arc<dyn RegistryStore>,
     tenant: &Tenant,
 ) -> Result<(), MemoryError> {
-    store.append_provisioning_event(&tenant.id, "reserved").await
+    store
+        .append_provisioning_event(&tenant.id, "reserved")
+        .await
 }

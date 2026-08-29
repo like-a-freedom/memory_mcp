@@ -36,7 +36,8 @@ pub trait RegistryStore: Send + Sync + 'static {
         subject_verifier: &[u8; 32],
     ) -> Result<Option<Account>, MemoryError>;
 
-    async fn find_tenant_by_account(&self, account_id: &str) -> Result<Option<Tenant>, MemoryError>;
+    async fn find_tenant_by_account(&self, account_id: &str)
+    -> Result<Option<Tenant>, MemoryError>;
     async fn find_tenant_by_id(&self, tenant_id: &str) -> Result<Option<Tenant>, MemoryError>;
 
     async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
@@ -175,10 +176,7 @@ impl RegistryStore for SurrealRegistryStore {
     // "control-plane")]` calls from real code (the registry is
     // only reached from the auth pipeline, which is itself
     // behind a feature flag).
-    async fn find_account_by_id(
-        &self,
-        _account_id: &str,
-    ) -> Result<Option<Account>, MemoryError> {
+    async fn find_account_by_id(&self, _account_id: &str) -> Result<Option<Account>, MemoryError> {
         unimplemented!("SurrealRegistryStore::find_account_by_id lands in Task 5.x")
     }
     async fn find_account_by_identity(
@@ -206,11 +204,7 @@ impl RegistryStore for SurrealRegistryStore {
     async fn list_api_keys(&self, _account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
         unimplemented!("SurrealRegistryStore::list_api_keys lands in Task 5.x")
     }
-    async fn revoke_api_key(
-        &self,
-        _account_id: &str,
-        _key_id: &str,
-    ) -> Result<(), MemoryError> {
+    async fn revoke_api_key(&self, _account_id: &str, _key_id: &str) -> Result<(), MemoryError> {
         unimplemented!("SurrealRegistryStore::revoke_api_key lands in Task 5.x")
     }
     async fn touch_api_key(

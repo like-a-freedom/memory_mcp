@@ -10,8 +10,8 @@ use axum::middleware::Next;
 use axum::response::Response;
 use std::sync::Arc;
 
-use super::principal::auth::AuthDecision;
 use super::HttpState;
+use super::principal::auth::AuthDecision;
 
 /// Reject every non-POST method on `/mcp` (spec §4). Runs before
 /// routing; all other paths pass through untouched. Defense in depth
@@ -85,10 +85,10 @@ pub async fn request_deadline(
 #[cfg(test)]
 mod deadline_tests {
     use super::*;
+    use axum::Router;
+    use axum::routing::get;
     use std::sync::Arc;
     use std::time::Duration;
-    use axum::routing::get;
-    use axum::Router;
     use tower_service::Service;
 
     async fn slow_stub() -> Response {
@@ -105,7 +105,9 @@ mod deadline_tests {
         cfg.shutdown_grace = Duration::from_millis(1);
         let mut state = crate::http::HttpState::default_for_test().await;
         let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
-        Arc::get_mut(&mut inner.core).expect("single core owner").config = cfg;
+        Arc::get_mut(&mut inner.core)
+            .expect("single core owner")
+            .config = cfg;
         let mut svc =
             Router::new()
                 .route("/", get(slow_stub))

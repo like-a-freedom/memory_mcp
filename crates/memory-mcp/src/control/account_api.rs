@@ -7,16 +7,16 @@
 
 use std::sync::Arc;
 
+use axum::Extension;
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Extension;
 
 use super::error::ApiError;
 use super::operator::OperatorPrincipal;
+use crate::http::HttpState;
 use crate::http::registry::models::*;
 use crate::http::registry::provisioning::enqueue_provisioning;
-use crate::http::HttpState;
 
 #[derive(serde::Deserialize)]
 pub struct CreateAccountRequest {
@@ -60,12 +60,12 @@ pub async fn create_account(
 mod tests {
     use super::*;
     use crate::control::operator;
+    use crate::http::registry::RegistryHandle;
+    use crate::http::registry::RegistryStore;
     use crate::http::registry::account::AccountResolver;
     use crate::http::registry::models::{
         Account, AccountStatus, ApiKey, ApiKeyMeta, Plan, Tenant, TenantStatus, UsageCounter,
     };
-    use crate::http::registry::RegistryHandle;
-    use crate::http::registry::RegistryStore;
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -114,10 +114,7 @@ mod tests {
         ) -> Result<Option<Tenant>, crate::error::MemoryError> {
             Ok(None)
         }
-        async fn find_api_key(
-            &self,
-            _: &str,
-        ) -> Result<Option<ApiKey>, crate::error::MemoryError> {
+        async fn find_api_key(&self, _: &str) -> Result<Option<ApiKey>, crate::error::MemoryError> {
             unimplemented!()
         }
         async fn write_api_key(&self, _: &ApiKey) -> Result<(), crate::error::MemoryError> {
@@ -139,17 +136,11 @@ mod tests {
         ) -> Result<(), crate::error::MemoryError> {
             unimplemented!()
         }
-        async fn write_account(
-            &self,
-            account: &Account,
-        ) -> Result<(), crate::error::MemoryError> {
+        async fn write_account(&self, account: &Account) -> Result<(), crate::error::MemoryError> {
             self.log.accounts.lock().unwrap().push(account.clone());
             Ok(())
         }
-        async fn write_tenant(
-            &self,
-            tenant: &Tenant,
-        ) -> Result<(), crate::error::MemoryError> {
+        async fn write_tenant(&self, tenant: &Tenant) -> Result<(), crate::error::MemoryError> {
             self.log.tenants.lock().unwrap().push(tenant.clone());
             Ok(())
         }
@@ -291,7 +282,9 @@ mod tests {
             shared_handler,
             shutdown: crate::http::shutdown::ShutdownState::new(),
             admission: Arc::new(crate::http::runtime::pool::AdmissionGate::new()),
-            registry: RegistryHandle { store: store.clone() },
+            registry: RegistryHandle {
+                store: store.clone(),
+            },
             authenticator,
             account_resolver,
         });
@@ -299,9 +292,8 @@ mod tests {
         let router = Router::new()
             .route(
                 "/api/v1/operator/accounts",
-                post(create_account).layer(axum::middleware::from_fn(
-                    operator::stub_operator_inject,
-                )),
+                post(create_account)
+                    .layer(axum::middleware::from_fn(operator::stub_operator_inject)),
             )
             .with_state(state.clone());
         (router, state)
