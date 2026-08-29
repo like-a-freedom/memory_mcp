@@ -1,5 +1,6 @@
 //! Tenant Registry seam (ADR-0052). Phase 3 stub; real store in Phase 4.
 
+pub mod account;
 pub mod migrations;
 pub mod models;
 pub mod storage;
