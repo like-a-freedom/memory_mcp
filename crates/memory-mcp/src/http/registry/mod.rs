@@ -27,4 +27,11 @@ impl RegistryHandle {
     pub async fn ping(&self) -> bool {
         self.store.ping().await
     }
+
+    /// Clone the inner `Arc<dyn RegistryStore>`. The authenticator
+    /// (Task 4.4) takes the store by trait-object, not by handle,
+    /// so the handle is a thin facade over the store.
+    pub fn store_clone(&self) -> Arc<dyn RegistryStore> {
+        Arc::clone(&self.store)
+    }
 }
