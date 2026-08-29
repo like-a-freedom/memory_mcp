@@ -8,6 +8,10 @@
 use axum::http::{Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::Response;
+use std::sync::Arc;
+
+use super::principal::auth::AuthDecision;
+use super::HttpState;
 
 /// Reject every non-POST method on `/mcp` (spec §4). Runs before
 /// routing; all other paths pass through untouched. Defense in depth
@@ -21,6 +25,34 @@ pub async fn reject_non_post_mcp(
     if path == "/mcp" && method != Method::POST {
         return Err((StatusCode::METHOD_NOT_ALLOWED, "POST required"));
     }
+    Ok(next.run(req).await)
+}
+
+/// Bearer-token authenticator (ADR-0052, plan §4.6). Wired only
+/// on `/mcp`. Returns 401 without distinguishing missing,
+/// unknown, expired, revoked, or malformed keys. The raw
+/// `Authorization` value is never logged or surfaced.
+pub async fn authenticate(
+    axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
+    mut req: axum::extract::Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let header = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    let decision = match header.as_deref() {
+        Some(h) if h.starts_with("Bearer ") => {
+            state.authenticator.authenticate_bearer(&h[7..]).await
+        }
+        _ => AuthDecision::Deny,
+    };
+    let principal = match decision {
+        AuthDecision::Allow(principal) => principal,
+        _ => return Err(StatusCode::UNAUTHORIZED),
+    };
+    req.extensions_mut().insert(principal);
     Ok(next.run(req).await)
 }
 
@@ -53,9 +85,10 @@ pub async fn request_deadline(
 #[cfg(test)]
 mod deadline_tests {
     use super::*;
-    use axum::Router;
-    use axum::routing::get;
+    use std::sync::Arc;
     use std::time::Duration;
+    use axum::routing::get;
+    use axum::Router;
     use tower_service::Service;
 
     async fn slow_stub() -> Response {
@@ -72,7 +105,7 @@ mod deadline_tests {
         cfg.shutdown_grace = Duration::from_millis(1);
         let mut state = crate::http::HttpState::default_for_test().await;
         let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
-        inner.config = cfg;
+        Arc::get_mut(&mut inner.core).expect("single core owner").config = cfg;
         let mut svc =
             Router::new()
                 .route("/", get(slow_stub))
@@ -359,5 +392,48 @@ mod host_origin_tests {
             .unwrap();
         let resp = r.call(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+}
+
+#[cfg(test)]
+mod auth_tests {
+    use super::*;
+    use axum::Router;
+    use axum::routing::post;
+    use tower_service::Service;
+
+    async fn accept_any(_: axum::extract::Request) -> Response {
+        Response::new(axum::body::Body::empty())
+    }
+
+    #[tokio::test]
+    async fn missing_bearer_returns_401() {
+        let state = crate::http::HttpState::default_for_test().await;
+        let mut svc = Router::new()
+            .route("/", post(accept_any))
+            .layer(axum::middleware::from_fn_with_state(state, authenticate));
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri("/")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn non_bearer_scheme_returns_401() {
+        let state = crate::http::HttpState::default_for_test().await;
+        let mut svc = Router::new()
+            .route("/", post(accept_any))
+            .layer(axum::middleware::from_fn_with_state(state, authenticate));
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri("/")
+            .header("authorization", "Basic abc")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 }

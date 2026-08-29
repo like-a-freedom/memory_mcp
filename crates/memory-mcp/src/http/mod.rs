@@ -20,21 +20,29 @@ use std::sync::Arc;
 
 use config::HttpConfig;
 
-/// Process-wide HTTP state. Phase 3 shape: config + the tenantless MCP
-/// handler + shutdown/admission/registry stubs. Later tasks extend
-/// this struct (Task 4.4 authenticator, Task 4.5 account_resolver,
-/// Task 5.6 pool).
-pub struct HttpState {
+/// Common fields between the `prometheus` and `!prometheus`
+/// builds. Lets the constructor share one body via the
+/// `#[cfg]`-only `metrics_handle` field added by each `new_tenantless`
+/// arm.
+pub struct HttpStateCore {
     pub config: HttpConfig,
-    /// Phase 3 dispatch: every request clones this single tenantless
-    /// handler. Task 5.6 replaces the field with a runtime-pool guard.
     pub shared_handler: Arc<crate::mcp::handlers::MemoryMcp>,
     pub shutdown: shutdown::ShutdownState,
     pub admission: Arc<runtime::pool::AdmissionGate>,
     pub registry: registry::RegistryHandle,
+    pub authenticator: Arc<principal::auth::Authenticator>,
+    pub account_resolver: Arc<registry::account::AccountResolver>,
+}
+
+/// Process-wide HTTP state. Phase 3 shape: config + the tenantless
+/// MCP handler + shutdown/admission/registry. Phase 4 added the
+/// authenticator and account→tenant resolver (Tasks 4.4, 4.5).
+/// Task 5.6 replaces `shared_handler` with a runtime-pool guard.
+pub struct HttpState {
+    pub core: Arc<HttpStateCore>,
     /// The Prometheus handle is `Some` only when the `prometheus`
-    /// feature is enabled. When `None`, the `/metrics` route is not
-    /// wired into the router.
+    /// feature is enabled. When `None`, the `/metrics` route is
+    /// not wired into the router.
     #[cfg(feature = "prometheus")]
     pub metrics_handle: Option<MetricsHandle>,
 }
@@ -43,22 +51,17 @@ pub struct HttpState {
 pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
 
 impl HttpState {
-    /// Phase 3 production constructor: single-tenant handler over the
-    /// configured tenant target (no auth yet — auth lands in Phase 4).
-    /// The two arms only differ in the metrics handle type; the
-    /// shared `Self { ... }` literal is the same shape either way.
+    /// Phase 4 production constructor: tenantless handler + auth +
+    /// resolver. The two arms differ only in the metrics handle
+    /// type; the shared core is constructed once.
     #[cfg(feature = "prometheus")]
     pub async fn new_tenantless(
         config: HttpConfig,
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let shared_handler = transport::build_tenantless_handler(&config).await?;
+        let core = Self::build_core(config).await?;
         Ok(Arc::new(Self {
-            config,
-            shared_handler,
-            shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::new()),
-            registry: registry::RegistryHandle::stub(),
+            core,
             metrics_handle,
         }))
     }
@@ -67,13 +70,35 @@ impl HttpState {
     pub async fn new_tenantless(
         config: HttpConfig,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
+        let core = Self::build_core(config).await?;
+        Ok(Arc::new(Self { core }))
+    }
+
+    async fn build_core(
+        config: HttpConfig,
+    ) -> Result<Arc<HttpStateCore>, crate::error::MemoryError> {
         let shared_handler = transport::build_tenantless_handler(&config).await?;
-        Ok(Arc::new(Self {
+        let registry = registry::RegistryHandle::stub();
+        let store = registry.store_clone();
+        let authenticator = Arc::new(principal::auth::Authenticator::new(
+            store.clone(),
+            Arc::new(principal::cache::PrincipalCache::new(1024)),
+            config.api_key_pepper.as_bytes().to_vec(),
+            Arc::new(principal::auth::RateLimiter::new(
+                4096,
+                std::time::Duration::from_secs(1),
+                20,
+            )),
+        ));
+        let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        Ok(Arc::new(HttpStateCore {
             config,
             shared_handler,
             shutdown: shutdown::ShutdownState::new(),
             admission: Arc::new(runtime::pool::AdmissionGate::new()),
-            registry: registry::RegistryHandle::stub(),
+            registry,
+            authenticator,
+            account_resolver,
         }))
     }
 }
@@ -109,5 +134,14 @@ impl HttpState {
                 .await
                 .expect("tenantless test state builds")
         }
+    }
+}
+
+// Convenience accessors so existing call sites that read
+// `state.config`, `state.shared_handler`, etc. keep compiling.
+impl std::ops::Deref for HttpState {
+    type Target = HttpStateCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
     }
 }
