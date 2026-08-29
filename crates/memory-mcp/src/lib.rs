@@ -55,6 +55,9 @@ pub mod tools;
 #[cfg(feature = "streamable-http")]
 pub mod http;
 
+#[cfg(feature = "control-plane")]
+pub mod control;
+
 #[cfg(feature = "eval-support")]
 #[doc(hidden)]
 pub mod eval_support;

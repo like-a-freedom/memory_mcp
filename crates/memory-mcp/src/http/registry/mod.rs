@@ -3,6 +3,7 @@
 pub mod account;
 pub mod migrations;
 pub mod models;
+pub mod provisioning;
 pub mod storage;
 
 pub use storage::{RegistryStore, SurrealRegistryStore};
