@@ -110,6 +110,24 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             });
             ErrorData::internal_error(err.to_string(), Some(data))
         }
+        MemoryError::Auth(_msg) => {
+            // Do not leak which check failed. The message is for
+            // server-side logs only; the client sees a generic
+            // 401/403-shaped response.
+            let data = json!({
+                "kind": "auth",
+                "guidance": "The credential was rejected. Re-authenticate and retry.",
+            });
+            ErrorData::invalid_request(err.to_string(), Some(data))
+        }
+        MemoryError::Unavailable(msg) => {
+            let data = json!({
+                "guidance": "The request cannot be served right now but may be later. Retry with backoff.",
+                "explanation": msg,
+                "retryable": true,
+            });
+            ErrorData::internal_error(err.to_string(), Some(data))
+        }
     }
 }
 

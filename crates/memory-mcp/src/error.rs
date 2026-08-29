@@ -36,6 +36,18 @@ pub enum MemoryError {
     /// change the outcome.
     #[error("model not ready: {0}")]
     ModelNotReady(String),
+
+    /// Authentication or authorization failed (bad/unknown/revoked
+    /// credential, expired key, suspended account). Never reveals
+    /// which check failed to the caller.
+    #[error("auth error: {0}")]
+    Auth(String),
+
+    /// The request cannot be served right now but may be later
+    /// (provisioning in flight, schema incompatible, draining).
+    /// Maps to HTTP 503 with retry guidance.
+    #[error("unavailable: {0}")]
+    Unavailable(String),
 }
 
 /// Returns `true` if the error is a transient database error that can be retried.
@@ -94,5 +106,17 @@ mod tests {
         assert!(!is_transient_db_error(&err));
         let err = MemoryError::ModelNotReady("classic gliner".into());
         assert!(!is_transient_db_error(&err));
+        let err = MemoryError::Auth("bad credential".into());
+        assert!(!is_transient_db_error(&err));
+        let err = MemoryError::Unavailable("draining".into());
+        assert!(!is_transient_db_error(&err));
+    }
+
+    #[test]
+    fn auth_and_unavailable_variants_display_stable_prefixes() {
+        assert!(MemoryError::Auth("x".into()).to_string().starts_with("auth error:"));
+        assert!(MemoryError::Unavailable("x".into())
+            .to_string()
+            .starts_with("unavailable:"));
     }
 }
