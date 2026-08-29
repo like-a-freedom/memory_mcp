@@ -157,7 +157,9 @@ fn error_exit_code(err: &MemoryError) -> u8 {
         | MemoryError::ConfigInvalid(_)
         | MemoryError::Conflict(_)
         | MemoryError::BudgetExhausted(_)
-        | MemoryError::ModelNotReady(_) => 1,
+        | MemoryError::ModelNotReady(_)
+        | MemoryError::Auth(_)
+        | MemoryError::Unavailable(_) => 1,
     }
 }
 
@@ -173,6 +175,8 @@ fn error_kind(err: &MemoryError) -> &'static str {
         MemoryError::Conflict(_) => "Conflict",
         MemoryError::BudgetExhausted(_) => "BudgetExhausted",
         MemoryError::ModelNotReady(_) => "ModelNotReady",
+        MemoryError::Auth(_) => "Auth",
+        MemoryError::Unavailable(_) => "Unavailable",
     }
 }
 

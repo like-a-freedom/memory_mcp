@@ -3,6 +3,7 @@
 
 pub mod config;
 pub mod health;
+pub mod leases;
 pub mod logging;
 pub mod metrics;
 pub mod middleware;
@@ -56,7 +57,7 @@ impl HttpState {
             shared_handler,
             shutdown: shutdown::ShutdownState::new(),
             admission: Arc::new(runtime::pool::AdmissionGate::new()),
-            registry: registry::RegistryHandle,
+            registry: registry::RegistryHandle::stub(),
             metrics_handle,
         }))
     }
@@ -71,7 +72,7 @@ impl HttpState {
             shared_handler,
             shutdown: shutdown::ShutdownState::new(),
             admission: Arc::new(runtime::pool::AdmissionGate::new()),
-            registry: registry::RegistryHandle,
+            registry: registry::RegistryHandle::stub(),
         }))
     }
 }
