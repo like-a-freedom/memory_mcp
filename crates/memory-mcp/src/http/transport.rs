@@ -172,7 +172,6 @@ mod tests {
     use super::*;
     use axum::http::Method;
     use rmcp::model::ProtocolVersion;
-    use tower_service::Service;
 
     // Mechanism: stateless_protocol_metadata_required = true rejects
     // legacy requests (they carry no per-request _meta protocol
@@ -180,18 +179,18 @@ mod tests {
     // alone would pass it.
     #[tokio::test]
     async fn unsupported_legacy_version_returns_bad_request() {
+        // Call mcp_handler directly so the auth middleware (Task
+        // 4.6) does not short-circuit with 401.
         let state = crate::http::HttpState::default_for_test().await;
-        let mut router = super::super::router::build_router(state);
         let req = axum::http::Request::builder()
             .method(Method::POST)
             .uri("/mcp")
-            .header("host", "localhost")
             .header("MCP-Protocol-Version", "2025-03-26")
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
             .body(Body::from(r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#))
             .unwrap();
-        let resp: Response = router.call(req).await.unwrap();
+        let resp: Response = mcp_handler(State(state), req).await;
         assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 
