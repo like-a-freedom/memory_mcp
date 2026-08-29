@@ -50,13 +50,18 @@ pub async fn prometheus(
     [(axum::http::header::HeaderName, &'static str); 1],
     String,
 ) {
+    let body = state
+        .metrics_handle
+        .as_ref()
+        .map(|h| h.render())
+        .unwrap_or_default();
     (
         axum::http::StatusCode::OK,
         [(
             axum::http::header::CONTENT_TYPE,
             "text/plain; version=0.0.4",
         )],
-        state.metrics_handle.render(),
+        body,
     )
 }
 

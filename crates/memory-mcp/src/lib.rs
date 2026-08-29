@@ -31,13 +31,6 @@
 //! }
 //! ```
 //!
-//! # SaaS tenant invariant
-//!
-//! Memory MCP has one namespace per process in the stdio profile (ADR-0038)
-//! and a bounded pool of namespaces in the HTTP SaaS profile (ADR-0052).
-//! Namespace MUST never be selected through MCP arguments, URL paths, OAuth
-//! claims, or API-key contents. In every profile the Tenant is derived from
-//! an `AuthenticatedPrincipal` resolved by authentication, never by request.
 
 pub mod cli;
 pub mod config;
@@ -47,6 +40,14 @@ pub mod mcp;
 pub mod models;
 pub mod observability;
 pub mod runner;
+
+/// # SaaS tenant invariant
+///
+/// Memory MCP has one namespace per process in the stdio profile (ADR-0038)
+/// and a bounded pool of namespaces in the HTTP SaaS profile (ADR-0052).
+/// Namespace MUST never be selected through MCP arguments, URL paths, OAuth
+/// claims, or API-key contents. In every profile the Tenant is derived from
+/// an `AuthenticatedPrincipal` resolved by authentication, never by request.
 pub mod service;
 pub mod storage;
 pub mod tools;

@@ -1,15 +1,14 @@
 //! HTTP SaaS profile composition root (ADR-0052). Loads `HttpConfig`
-//! from environment, builds `HttpState`, installs the Prometheus
-//! recorder (when the `prometheus` feature is enabled), runs the
-//! signal handler, and serves until shutdown.
+//! from environment, builds `HttpState`, runs the signal watcher,
+//! and serves until shutdown.
 
 use std::process::ExitCode;
 
-use memory_mcp::http::HttpState;
 use memory_mcp::http::config::HttpConfig;
 use memory_mcp::http::router;
+use memory_mcp::http::runtime::{bootstrap, signal as signal_watcher};
 use memory_mcp::http::server;
-use memory_mcp::logging::{LogLevel, StdoutLogger};
+use memory_mcp::logging::StdoutLogger;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -25,86 +24,28 @@ async fn main() -> ExitCode {
         eprintln!("config invalid: {err}");
         return ExitCode::from(2);
     }
-
-    #[cfg(feature = "prometheus")]
-    let state = {
-        if let Err(err) = memory_mcp::http::metrics::validate_no_listener_env() {
-            eprintln!("config invalid: {err}");
-            return ExitCode::from(2);
-        }
-        let handle = match memory_mcp::http::metrics::install_recorder() {
-            Ok(h) => h,
-            Err(err) => {
-                eprintln!("metrics init error: {err}");
-                return ExitCode::from(2);
-            }
-        };
-        match HttpState::new_tenantless(cfg.clone(), handle).await {
-            Ok(s) => s,
-            Err(err) => {
-                eprintln!("tenant runtime init error: {err}");
-                return ExitCode::from(2);
-            }
-        }
-    };
-    #[cfg(not(feature = "prometheus"))]
-    let state = match HttpState::new_tenantless(cfg.clone()).await {
+    if let Err(msg) = bootstrap::validate_no_listener_env() {
+        eprintln!("{msg}");
+        return ExitCode::from(2);
+    }
+    let state = match bootstrap::build_state(&cfg).await {
         Ok(s) => s,
-        Err(err) => {
-            eprintln!("tenant runtime init error: {err}");
-            return ExitCode::from(2);
+        Err((code, msg)) => {
+            eprintln!("{msg}");
+            return code;
         }
     };
 
-    let shutdown = state.shutdown.clone();
-    let signal_shutdown = shutdown.clone();
-    let admission = state.admission.clone();
-    tokio::spawn(async move {
-        #[cfg(unix)]
-        {
-            use tokio::signal::unix::{SignalKind, signal};
-            let mut terminate = signal(SignalKind::terminate()).ok();
-            if let Some(t) = terminate.as_mut() {
-                tokio::select! {
-                    _ = tokio::signal::ctrl_c() => {}
-                    _ = t.recv() => {}
-                }
-            } else {
-                let _ = tokio::signal::ctrl_c().await;
-            }
-        }
-        #[cfg(not(unix))]
-        {
-            let _ = tokio::signal::ctrl_c().await;
-        }
-        admission.close();
-        signal_shutdown.begin();
-    });
+    signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
-    let router = router::build_router(state);
-    logger.log(
-        std::collections::HashMap::from([
-            ("event".to_string(), serde_json::Value::from("http_start")),
-            (
-                "profile".to_string(),
-                serde_json::Value::from("streamable_http_saas"),
-            ),
-            (
-                "bind".to_string(),
-                serde_json::Value::from(cfg.bind.to_string()),
-            ),
-            (
-                "control_plane".to_string(),
-                serde_json::Value::from(cfg.enable_control_plane),
-            ),
-            (
-                "embedded_tenant_db".to_string(),
-                serde_json::Value::from(cfg.tenant_db.url == "mem://"),
-            ),
-        ]),
-        LogLevel::Info,
-    );
-    if let Err(err) = server::serve(cfg, router, shutdown).await {
+    bootstrap::emit_startup_log(&logger, &cfg);
+    if let Err(err) = server::serve(
+        cfg,
+        router::build_router(state.clone()),
+        state.shutdown.clone(),
+    )
+    .await
+    {
         eprintln!("server error: {err}");
         return ExitCode::FAILURE;
     }

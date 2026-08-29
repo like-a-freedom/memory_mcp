@@ -8,6 +8,12 @@ pub struct AdmissionGate {
     closed: AtomicBool,
 }
 
+impl Default for AdmissionGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AdmissionGate {
     pub fn new() -> Self {
         Self {
@@ -21,11 +27,5 @@ impl AdmissionGate {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
-    }
-}
-
-impl Default for AdmissionGate {
-    fn default() -> Self {
-        Self::new()
     }
 }

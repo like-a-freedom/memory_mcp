@@ -13,6 +13,7 @@ pub const DEFAULT_REQUEST_DEADLINE: Duration = Duration::from_secs(120);
 pub const DEFAULT_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
 pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &[]; // must be set explicitly in production
 pub const DEFAULT_ALLOWED_ORIGINS: &[&str] = &[];
+pub const DEFAULT_OIDC_ALG: &str = "RS256";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct HttpConfig {
@@ -29,16 +30,7 @@ pub struct HttpConfig {
     pub control_db: SurrealTargetConfig,
     pub tenant_db: SurrealTargetConfig,
     pub api_key_pepper: String,
-    #[serde(deserialize_with = "deserialize_hex_32")]
-    pub identity_index_key: [u8; 32],
-    #[serde(deserialize_with = "deserialize_hex_32")]
-    pub control_plane_session_key: [u8; 32],
-    #[serde(deserialize_with = "deserialize_hex_32")]
-    pub oidc_state_key: [u8; 32],
-    #[serde(deserialize_with = "deserialize_hex_32")]
-    pub oidc_nonce_key: [u8; 32],
-    #[serde(deserialize_with = "deserialize_hex_32")]
-    pub csrf_key: [u8; 32],
+    pub keys: HmacKeys,
     pub oidc_issuer: String,
     pub oidc_client_id: String,
     pub oidc_audience: String,
@@ -49,14 +41,21 @@ pub struct HttpConfig {
     pub enable_control_plane_ui: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct SurrealTargetConfig {
-    pub url: String,
-    pub username: String,
-    pub password: String,
-    pub database: String,
-    pub namespace: String, // separate for control vs. tenant
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct HmacKeys {
+    #[serde(deserialize_with = "deserialize_hex_32")]
+    pub identity_index: [u8; 32],
+    #[serde(deserialize_with = "deserialize_hex_32")]
+    pub control_plane_session: [u8; 32],
+    #[serde(deserialize_with = "deserialize_hex_32")]
+    pub oidc_state: [u8; 32],
+    #[serde(deserialize_with = "deserialize_hex_32")]
+    pub oidc_nonce: [u8; 32],
+    #[serde(deserialize_with = "deserialize_hex_32")]
+    pub csrf: [u8; 32],
 }
+
+pub use crate::config::SurrealTargetConfig;
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -149,7 +148,9 @@ fn require_env(k: &str) -> Result<String, MemoryError> {
 }
 
 fn optional_env(k: &str) -> Option<String> {
-    std::env::var(k).ok().filter(|value| !value.trim().is_empty())
+    std::env::var(k)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn parse_env_or<T>(k: &str, default: T) -> Result<T, MemoryError>
@@ -201,7 +202,8 @@ impl HttpConfig {
         let public_base_url = require_env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")?;
         let allowed_hosts = parse_csv("ALLOWED_HOSTS")?;
         let allowed_origins = parse_csv("ALLOWED_ORIGINS")?;
-        let body_limit_bytes: usize = parse_env_or("MEMORY_MCP_HTTP_BODY_LIMIT", DEFAULT_BODY_LIMIT_BYTES)?;
+        let body_limit_bytes: usize =
+            parse_env_or("MEMORY_MCP_HTTP_BODY_LIMIT", DEFAULT_BODY_LIMIT_BYTES)?;
         let request_deadline = Duration::from_secs(parse_env_or(
             "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
             DEFAULT_REQUEST_DEADLINE.as_secs(),
@@ -215,11 +217,13 @@ impl HttpConfig {
             .map(|s| TrustedCidr::parse(&s))
             .collect::<Result<Vec<_>, _>>()?;
         let api_key_pepper = require_env("MEMORY_MCP_API_KEY_PEPPER")?;
-        let identity_index_key = parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?;
-        let control_plane_session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
-        let oidc_state_key = parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?;
-        let oidc_nonce_key = parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?;
-        let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
+        let keys = HmacKeys {
+            identity_index: parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?,
+            control_plane_session: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
+            oidc_state: parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?,
+            oidc_nonce: parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?,
+            csrf: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
+        };
         let signup_mode = match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
             "invite_only" => SignupMode::InviteOnly,
             "open" => SignupMode::Open,
@@ -228,15 +232,14 @@ impl HttpConfig {
             }
         };
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
-        let enable_control_plane_ui =
-            parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
+        let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
         let oidc_issuer = optional_env("MEMORY_MCP_HTTP_OIDC_ISSUER").unwrap_or_default();
         let oidc_client_id = optional_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID").unwrap_or_default();
         let oidc_audience = optional_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE").unwrap_or_default();
         let oidc_redirect_uri =
             optional_env("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI").unwrap_or_default();
         let oidc_allowed_alg = optional_env("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG")
-            .unwrap_or_else(|| "RS256".into());
+            .unwrap_or_else(|| DEFAULT_OIDC_ALG.into());
 
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
@@ -265,11 +268,7 @@ impl HttpConfig {
             control_db,
             tenant_db,
             api_key_pepper,
-            identity_index_key,
-            control_plane_session_key,
-            oidc_state_key,
-            oidc_nonce_key,
-            csrf_key,
+            keys,
             oidc_issuer,
             oidc_client_id,
             oidc_audience,
@@ -342,32 +341,21 @@ impl HttpConfig {
             control_db: SurrealTargetConfig::default_for_test(),
             tenant_db: SurrealTargetConfig::default_for_test(),
             api_key_pepper: "x".repeat(40),
-            identity_index_key: [0; 32],
-            control_plane_session_key: [0; 32],
-            oidc_state_key: [0; 32],
-            oidc_nonce_key: [0; 32],
-            csrf_key: [0; 32],
+            keys: HmacKeys {
+                identity_index: [0; 32],
+                control_plane_session: [0; 32],
+                oidc_state: [0; 32],
+                oidc_nonce: [0; 32],
+                csrf: [0; 32],
+            },
             oidc_issuer: "https://issuer.invalid".into(),
             oidc_client_id: "test-client".into(),
             oidc_audience: "memory-mcp".into(),
             oidc_redirect_uri: "http://localhost/auth/oidc/callback".into(),
-            oidc_allowed_alg: "RS256".into(),
+            oidc_allowed_alg: DEFAULT_OIDC_ALG.into(),
             signup_mode: SignupMode::InviteOnly,
             enable_control_plane: false,
             enable_control_plane_ui: false,
-        }
-    }
-}
-
-#[cfg(any(test, feature = "test-fixtures"))]
-impl SurrealTargetConfig {
-    pub fn default_for_test() -> Self {
-        Self {
-            url: "mem://".into(),
-            username: "root".into(),
-            password: "root".into(),
-            database: "memory_test".into(),
-            namespace: "test".into(),
         }
     }
 }
@@ -415,16 +403,22 @@ mod tests {
             "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
         ] {
             // SAFETY: serialized by ENV_LOCK; no other thread reads these vars in tests.
-            unsafe { env::remove_var(k); }
+            unsafe {
+                env::remove_var(k);
+            }
         }
         for (k, v) in vars {
             // SAFETY: same as above.
-            unsafe { env::set_var(k, v); }
+            unsafe {
+                env::set_var(k, v);
+            }
         }
         f();
         for (k, _) in vars {
             // SAFETY: same as above.
-            unsafe { env::remove_var(k); }
+            unsafe {
+                env::remove_var(k);
+            }
         }
     }
 
@@ -468,12 +462,8 @@ mod tests {
     #[test]
     fn parses_ipv6_cidr() {
         let c = TrustedCidr::parse("2001:db8::/32").unwrap();
-        assert!(c.contains(IpAddr::V6(Ipv6Addr::new(
-            0x2001, 0xdb8, 0, 0, 0, 0, 0, 1
-        ))));
-        assert!(!c.contains(IpAddr::V6(Ipv6Addr::new(
-            0xfe80, 0, 0, 0, 0, 0, 0, 1
-        ))));
+        assert!(c.contains(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1))));
+        assert!(!c.contains(IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1))));
     }
 
     #[test]

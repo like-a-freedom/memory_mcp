@@ -58,6 +58,13 @@ mod apps;
 ///     Ok(())
 /// }
 /// ```
+/// The single protocol version advertised and accepted by the HTTP
+/// profile (ADR-0052). Stdio (ADR-0038) never references this.
+/// Lives in this module (not http::transport) so non-HTTP feature
+/// sets compile without depending on the http module.
+pub const PROTOCOL_VERSION_2026_07_28: rmcp::model::ProtocolVersion =
+    rmcp::model::ProtocolVersion::V_2026_07_28;
+
 #[derive(Clone)]
 pub struct MemoryMcp {
     service: Arc<MemoryService>,
@@ -127,9 +134,7 @@ impl MemoryMcp {
     /// when `mcp-apps` is compiled. Does not advertise MRTR, roots,
     /// sampling, elicitation, prompts-change, or tool-list-change.
     fn build_http_server_info(&self) -> ServerInfo {
-        let builder = ServerCapabilities::builder()
-            .enable_tools()
-            .enable_tasks();
+        let builder = ServerCapabilities::builder().enable_tools().enable_tasks();
         #[cfg(feature = "mcp-apps")]
         let builder = builder.enable_resources();
         ServerInfo::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
@@ -169,7 +174,7 @@ impl ServerHandler for MemoryMcp {
         if self.modern_protocol_only {
             // Pin the negotiation fallback: rmcp falls back to this
             // version when a client requests one we do not support.
-            info = info.with_protocol_version(rmcp::model::ProtocolVersion::V_2026_07_28);
+            info = info.with_protocol_version(PROTOCOL_VERSION_2026_07_28);
         }
         info
     }
@@ -178,7 +183,7 @@ impl ServerHandler for MemoryMcp {
         &self,
     ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
         if self.modern_protocol_only {
-            std::borrow::Cow::Owned(vec![rmcp::model::ProtocolVersion::V_2026_07_28])
+            std::borrow::Cow::Owned(vec![PROTOCOL_VERSION_2026_07_28])
         } else {
             std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
         }
@@ -551,6 +556,7 @@ mod tests {
     use chrono::Datelike;
     #[cfg(feature = "mcp-apps")]
     use chrono::{TimeZone, Utc};
+    use rmcp::model::ProtocolVersion;
     #[cfg(feature = "mcp-apps")]
     use rmcp::model::{ReadResourceRequestParams, ResourceContents};
     use serde_json::{Value, json};
@@ -626,6 +632,11 @@ mod tests {
 
     fn schema_json<T: schemars::JsonSchema>() -> serde_json::Value {
         serde_json::to_value(schemars::schema_for!(T)).expect("schema json")
+    }
+
+    #[test]
+    fn protocol_version_2026_07_28_is_canonical() {
+        assert_eq!(PROTOCOL_VERSION_2026_07_28, ProtocolVersion::V_2026_07_28);
     }
 
     #[test]
