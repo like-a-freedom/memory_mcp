@@ -85,6 +85,7 @@ control-plane = [
     "dep:oauth2",
     "dep:jsonwebtoken",
     "dep:base64",
+    "axum/json",
 ]
 control-plane-ui = ["control-plane"]
 # Test-only: exposes #[cfg(any(test, feature = "test-fixtures"))] fixtures to
