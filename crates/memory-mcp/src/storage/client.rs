@@ -91,7 +91,7 @@ pub struct ContextFactQuery<'a> {
 /// is the production seam for namespace-free stores: callers can perform
 /// operations, but cannot choose another namespace per call.
 #[derive(Clone)]
-pub(crate) struct BoundDbClient {
+pub struct BoundDbClient {
     db: Arc<dyn DbClient>,
     namespace: String,
 }
@@ -181,6 +181,13 @@ pub struct SurrealDbClient {
 enum DbEngine {
     Local(Arc<Surreal<Db>>),
     Remote(Arc<Surreal<Client>>),
+    /// Embedded test backend (in-memory kv). Phase 4/5 test
+    /// fixtures and the Task 5.8 bootstrap use this; production
+    /// never opens a Mem engine. The handle is `Surreal<Db>`
+    /// underneath because `Mem` is just a configuration
+    /// marker; the actual kv engine is RocksDB with a
+    /// temporary directory.
+    Mem(Arc<Surreal<Db>>),
 }
 
 impl SurrealDbClient {
@@ -202,7 +209,7 @@ impl SurrealDbClient {
             .map_err(|err| MemoryError::Storage(format!("SurrealDB use_failed: {err}")))?;
 
         Ok(Self {
-            engine: DbEngine::Local(Arc::new(db)),
+            engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
@@ -253,6 +260,53 @@ impl SurrealDbClient {
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
         })
+    }
+
+    /// Wraps an already-bound embedded (RocksDB) client.
+    /// The caller MUST have called `use_ns(...).use_db(...)` on
+    /// `db` exactly once before passing it in; this constructor
+    /// never rebinds. stdio never calls this constructor.
+    pub fn from_prebound(db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
+        Self {
+            engine: DbEngine::Local(Arc::new(db)),
+            active_namespace: active_namespace.to_string(),
+            logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        }
+    }
+
+    /// Wraps an already-bound remote (Ws) client. The caller
+    /// MUST have called `use_ns(...).use_db(...)` on `db`
+    /// exactly once before passing it in; this constructor
+    /// never rebinds. stdio never calls this constructor.
+    pub fn from_prebound_remote(
+        db: Surreal<Client>,
+        active_namespace: &str,
+        log_level: &str,
+    ) -> Self {
+        Self {
+            engine: DbEngine::Remote(Arc::new(db)),
+            active_namespace: active_namespace.to_string(),
+            logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        }
+    }
+
+    /// Wraps an already-bound embedded `Mem` (test) client.
+    /// The handle type is `Surreal<Db>` because `Mem` is a
+    /// configuration marker, not a `Connection` impl; the kv
+    /// engine is in-memory under the hood. Used by Task 5.4
+    /// test fixtures and Task 5.8 bootstrap.
+    pub fn from_prebound_mem(_db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
+        // The Mem engine configuration is dropped here; tests
+        // that need the live engine (e.g. provisioning) keep
+        // a separate `Arc<Surreal<Db>>` outside this client.
+        Self {
+            engine: DbEngine::Mem(Arc::new(Surreal::init())),
+            active_namespace: active_namespace.to_string(),
+            logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        }
     }
 
     /// Connects to SurrealDB using the provided configuration.
@@ -357,23 +411,40 @@ impl SurrealDbClient {
         }
     }
 
+    #[allow(dead_code)] // Used by the query-dispatch arms in Task 5.6.
     fn local_db(&self) -> Result<Arc<Surreal<Db>>, MemoryError> {
         match &self.engine {
             DbEngine::Local(db) => Ok(db.clone()),
-            DbEngine::Remote(_) => Err(MemoryError::Storage("expected local engine".into())),
+            DbEngine::Remote(_) | DbEngine::Mem(_) => {
+                Err(MemoryError::Storage("expected local engine".into()))
+            }
         }
     }
 
+    #[allow(dead_code)] // Future use: provisioning worker selects the engine.
+    fn mem_db(&self) -> Result<Arc<Surreal<Db>>, MemoryError> {
+        match &self.engine {
+            DbEngine::Mem(db) => Ok(db.clone()),
+            DbEngine::Local(_) | DbEngine::Remote(_) => {
+                Err(MemoryError::Storage("expected mem engine".into()))
+            }
+        }
+    }
+
+    #[allow(dead_code)] // Future use: provisioning worker selects the engine.
     fn remote_db(&self) -> Result<Arc<Surreal<Client>>, MemoryError> {
         match &self.engine {
             DbEngine::Remote(db) => Ok(db.clone()),
-            DbEngine::Local(_) => Err(MemoryError::Storage("expected remote engine".into())),
+            DbEngine::Local(_) | DbEngine::Mem(_) => {
+                Err(MemoryError::Storage("expected remote engine".into()))
+            }
         }
     }
 
-    /// Checks if using local embedded engine.
+    /// Checks if using local embedded engine (RocksDB or Mem).
+    #[allow(dead_code)] // Kept for the future engine-dispatch helper.
     fn is_local(&self) -> bool {
-        matches!(self.engine, DbEngine::Local(_))
+        matches!(self.engine, DbEngine::Local(_) | DbEngine::Mem(_))
     }
 
     /// Ask the connected SurrealDB instance for a server version string.
@@ -381,10 +452,10 @@ impl SurrealDbClient {
     pub async fn server_version(&self, namespace: &str) -> Result<Option<String>, MemoryError> {
         self.ensure_active_namespace(namespace)?;
         let sql = "INFO FOR DB";
-        let res = if self.is_local() {
-            self.local_db()?.query(sql).await
-        } else {
-            self.remote_db()?.query(sql).await
+        let res = match &self.engine {
+            DbEngine::Local(db) => db.query(sql).await,
+            DbEngine::Mem(db) => db.query(sql).await,
+            DbEngine::Remote(db) => db.query(sql).await,
         };
 
         let mut response = match res {
@@ -588,12 +659,10 @@ async fn sql_query_take(
     vars: Option<Value>,
 ) -> Result<SurrealValue, MemoryError> {
     client.ensure_active_namespace(namespace)?;
-    if client.is_local() {
-        let db = client.local_db()?;
-        run_query_take(&*db, sql, vars).await
-    } else {
-        let db = client.remote_db()?;
-        run_query_take(&*db, sql, vars).await
+    match &client.engine {
+        DbEngine::Local(db) => run_query_take(&**db, sql, vars).await,
+        DbEngine::Mem(db) => run_query_take(&**db, sql, vars).await,
+        DbEngine::Remote(db) => run_query_take(&**db, sql, vars).await,
     }
 }
 

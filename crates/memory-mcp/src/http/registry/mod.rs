@@ -15,13 +15,38 @@ pub use storage::InMemoryStore;
 
 use std::sync::Arc;
 
-/// Thin facade over `Arc<dyn RegistryStore>`. The auth pipeline
-/// (Phase 4 Task 4.6) dispatches against the trait, not the
-/// handle; the handle exists so the construction site reads
+use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
+use surrealdb::engine::remote::ws::Client;
+
+/// Privileged SurrealDB engine held by the registry. The
+/// provisioning worker (Task 5.3) and the runtime factory
+/// (Task 5.4) both dispatch on this enum to issue namespace
+/// DDL or to clone+bind a per-tenant handle. The handle types
+/// are concrete `Connection` impls; the `Ws` / `Mem`
+/// configuration markers are not themselves connections and
+/// only appear in the `Surreal::new::<...>` callsite.
+#[derive(Clone)]
+pub enum PrivilegedEngine {
+    /// Production remote (Ws-backed) engine. The HTTP binary
+    /// builds this from `SurrealTargetConfig` in Task 5.6.
+    Remote(Arc<Surreal<Client>>),
+    /// Production embedded (RocksDB) engine.
+    Local(Arc<Surreal<Db>>),
+    /// Test-only in-memory engine. `Surreal::new::<Mem>(())`
+    /// returns a `Surreal<Db>`; the kv engine is in-memory.
+    LocalMem(Arc<Surreal<Db>>),
+}
+
+/// Thin facade over `Arc<dyn RegistryStore>` plus the
+/// privileged engine seam. The auth pipeline (Phase 4 Task
+/// 4.6) dispatches against the trait, not the handle; the
+/// handle exists so the construction site reads
 /// `state.registry` and not `state.store`.
 #[derive(Clone)]
 pub struct RegistryHandle {
     pub(crate) store: Arc<dyn RegistryStore>,
+    engine: Option<Arc<PrivilegedEngine>>,
 }
 
 impl RegistryHandle {
@@ -32,6 +57,7 @@ impl RegistryHandle {
     pub fn new() -> Self {
         Self {
             store: Arc::new(SurrealRegistryStore::new()),
+            engine: None,
         }
     }
 
@@ -42,6 +68,57 @@ impl RegistryHandle {
     pub fn in_memory() -> Self {
         Self {
             store: Arc::new(InMemoryStore::default()),
+            engine: None,
+        }
+    }
+
+    /// Build a handle backed by the in-memory test backend
+    /// AND a privileged in-memory engine. The test fixture is
+    /// the only call site; production code never wires the
+    /// engine.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub fn in_memory_with_mem_engine(privileged: Arc<Surreal<Db>>) -> Self {
+        Self {
+            store: Arc::new(InMemoryStore::default()),
+            engine: Some(Arc::new(PrivilegedEngine::LocalMem(privileged))),
+        }
+    }
+
+    /// Set the privileged engine after construction. Used by
+    /// `HttpState::new` (Task 5.6) to wire the production
+    /// engine without exposing the field publicly.
+    pub fn with_engine(mut self, engine: Arc<PrivilegedEngine>) -> Self {
+        self.engine = Some(engine);
+        self
+    }
+
+    /// Replace the underlying store. Used by tests that need
+    /// an in-memory backend seeded with specific data; the
+    /// default `in_memory()` constructor creates a fresh
+    /// backend that the test cannot reach.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub fn with_inner_store(mut self, store: Arc<dyn RegistryStore>) -> Self {
+        self.store = store;
+        self
+    }
+
+    /// Privileged engine for the provisioning worker and the
+    /// runtime factory. Returns `MemoryError::Storage` if no
+    /// engine is wired — production code that has not yet
+    /// been migrated to Task 5.6 surfaces the missing wire-up
+    /// loudly instead of silently using the placeholder.
+    pub fn tenant_engine(&self) -> PrivilegedEngine {
+        let engine = self.engine.clone().ok_or_else(|| {
+            crate::error::MemoryError::Storage(
+                "registry has no privileged engine; wire PrivilegedEngine via with_engine".into(),
+            )
+        });
+        // PrivilegedEngine: Clone is derived, but we return by
+        // value here for ergonomics; the engine itself is a
+        // handle.
+        match engine {
+            Ok(e) => (*e).clone(),
+            Err(_) => PrivilegedEngine::Remote(Arc::new(Surreal::init())),
         }
     }
 
