@@ -28,15 +28,31 @@ pub async fn reject_non_post_mcp(
     Ok(next.run(req).await)
 }
 
+/// Build a 401 response with the `WWW-Authenticate: Bearer`
+/// challenge. Used by `authenticate` (and any other auth
+/// middleware that needs the same shape). The body is empty so
+/// the response carries no information about why the request
+/// was rejected.
+fn unauthorized_response() -> Response {
+    let mut response = Response::new(axum::body::Body::empty());
+    *response.status_mut() = StatusCode::UNAUTHORIZED;
+    response.headers_mut().insert(
+        axum::http::header::WWW_AUTHENTICATE,
+        axum::http::HeaderValue::from_static("Bearer realm=\"memory-mcp\""),
+    );
+    response
+}
+
 /// Bearer-token authenticator (ADR-0052, plan §4.6). Wired only
-/// on `/mcp`. Returns 401 without distinguishing missing,
+/// on `/mcp`. Returns 401 (with `WWW-Authenticate: Bearer
+/// realm="memory-mcp"`) without distinguishing missing,
 /// unknown, expired, revoked, or malformed keys. The raw
 /// `Authorization` value is never logged or surfaced.
 pub async fn authenticate(
     axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
     mut req: axum::extract::Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Response {
     let header = req
         .headers()
         .get(axum::http::header::AUTHORIZATION)
@@ -50,10 +66,10 @@ pub async fn authenticate(
     };
     let principal = match decision {
         AuthDecision::Allow(principal) => principal,
-        _ => return Err(StatusCode::UNAUTHORIZED),
+        _ => return unauthorized_response(),
     };
     req.extensions_mut().insert(principal);
-    Ok(next.run(req).await)
+    next.run(req).await
 }
 
 /// Wraps the inner service in `tokio::time::timeout(deadline, ...)`.
@@ -87,7 +103,6 @@ mod deadline_tests {
     use super::*;
     use axum::Router;
     use axum::routing::get;
-    use std::sync::Arc;
     use std::time::Duration;
     use tower_service::Service;
 
@@ -105,9 +120,7 @@ mod deadline_tests {
         cfg.shutdown_grace = Duration::from_millis(1);
         let mut state = crate::http::HttpState::default_for_test().await;
         let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
-        Arc::get_mut(&mut inner.core)
-            .expect("single core owner")
-            .config = cfg;
+        inner.config = cfg;
         let mut svc =
             Router::new()
                 .route("/", get(slow_stub))
@@ -409,7 +422,7 @@ mod auth_tests {
     }
 
     #[tokio::test]
-    async fn missing_bearer_returns_401() {
+    async fn missing_bearer_returns_401_with_www_authenticate() {
         let state = crate::http::HttpState::default_for_test().await;
         let mut svc = Router::new()
             .route("/", post(accept_any))
@@ -421,10 +434,16 @@ mod auth_tests {
             .unwrap();
         let resp = svc.call(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            resp.headers()
+                .get(axum::http::header::WWW_AUTHENTICATE)
+                .map(|v| v.to_str().unwrap()),
+            Some("Bearer realm=\"memory-mcp\""),
+        );
     }
 
     #[tokio::test]
-    async fn non_bearer_scheme_returns_401() {
+    async fn non_bearer_scheme_returns_401_with_www_authenticate() {
         let state = crate::http::HttpState::default_for_test().await;
         let mut svc = Router::new()
             .route("/", post(accept_any))
@@ -437,5 +456,50 @@ mod auth_tests {
             .unwrap();
         let resp = svc.call(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert!(
+            resp.headers()
+                .contains_key(axum::http::header::WWW_AUTHENTICATE)
+        );
+    }
+
+    #[tokio::test]
+    async fn router_level_wiring_returns_401_on_post_mcp() {
+        // Proves the spec-mandated "Auth applies ONLY to /mcp" by
+        // building the production router and hitting /mcp with
+        // no credentials. /health/live and /health/ready pass
+        // through without auth.
+        use crate::http::router as build_router;
+        let state = crate::http::HttpState::default_for_test().await;
+        let router = build_router::build_router(state);
+
+        // /mcp without auth -> 401 + WWW-Authenticate.
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header("host", "localhost")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let mut svc = router;
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert!(
+            resp.headers()
+                .contains_key(axum::http::header::WWW_AUTHENTICATE)
+        );
+
+        // /health/live is unauthenticated; rebuild a fresh
+        // router to drive the second request.
+        let state2 = crate::http::HttpState::default_for_test().await;
+        let router2 = build_router::build_router(state2);
+        let req = axum::http::Request::builder()
+            .method("GET")
+            .uri("/health/live")
+            .header("host", "localhost")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let mut svc = router2;
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

@@ -52,8 +52,15 @@ mod tests {
 
     #[tokio::test]
     async fn ready_returns_ok_when_registry_reachable() {
-        let router =
-            super::super::router::build_router(super::super::HttpState::default_for_test().await);
+        // Build a state whose registry is the in-memory backend
+        // (which always reports reachable), then construct the
+        // router. The Phase 4 default state uses the production
+        // placeholder (ping == false); this test exercises the
+        // /health/ready path with a reachable backend.
+        let mut state = super::super::HttpState::default_for_test().await;
+        let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
+        inner.registry = super::super::registry::RegistryHandle::in_memory();
+        let router = super::super::router::build_router(state);
         let mut svc = router;
         let req = axum::http::Request::builder()
             .uri("/health/ready")

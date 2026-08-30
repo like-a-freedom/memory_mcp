@@ -13,7 +13,7 @@ pub struct ExternalIdentity {
     pub issuer: String,
     /// HMAC(identity_index_key, normalized_issuer || ":" || subject).
     /// Raw OIDC `sub` is never persisted.
-    pub subject_verifier: [u8; 32],
+    pub subject_verifier: SubjectVerifier,
     pub account_id: String,
     pub created_at: DateTime<Utc>,
 }
@@ -144,6 +144,21 @@ pub enum UsageCounter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyedVerifier(pub [u8; 32]); // HMAC-SHA256(pepper, secret)
+
+/// HMAC-SHA256(identity_index_key, normalized_issuer || ":" || subject).
+/// Newtype so callers cannot pass a raw 32-byte slice where an
+/// HMAC-indexed key is required.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct SubjectVerifier(pub [u8; 32]);
+
+/// Pairing of an OIDC issuer and a `SubjectVerifier`. The
+/// `Account ↔ ExternalIdentity` lookup index is the (issuer,
+/// subject_verifier) unique pair.
+#[derive(Debug, Clone)]
+pub struct IdentityRef {
+    pub issuer: String,
+    pub subject_verifier: SubjectVerifier,
+}
 
 impl KeyedVerifier {
     /// Compute HMAC-SHA256(pepper, secret) into a fixed-size

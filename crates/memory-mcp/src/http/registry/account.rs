@@ -56,174 +56,8 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, NamespaceBinding, Tenant, TenantStatus,
     };
-    use crate::http::registry::storage::SurrealRegistryStore;
+    use crate::http::registry::storage::{InMemoryStore, SurrealRegistryStore};
     use std::sync::Arc;
-
-    /// In-memory stub of `RegistryStore` that returns a fixed
-    /// `find_tenant_by_account` result.
-    struct Stub {
-        tenant: Option<Tenant>,
-    }
-
-    #[async_trait::async_trait]
-    impl crate::http::registry::storage::RegistryStore for Stub {
-        async fn ping(&self) -> bool {
-            true
-        }
-        async fn find_account_by_id(&self, _id: &str) -> Result<Option<Account>, MemoryError> {
-            Ok(Some(Account {
-                id: "acct_1".into(),
-                status: AccountStatus::Active,
-                tenant_id: "ten_1".into(),
-                created_at: chrono::Utc::now(),
-            }))
-        }
-        async fn find_account_by_identity(
-            &self,
-            _issuer: &str,
-            _subject_verifier: &[u8; 32],
-        ) -> Result<Option<Account>, MemoryError> {
-            Ok(None)
-        }
-        async fn find_tenant_by_account(
-            &self,
-            _account_id: &str,
-        ) -> Result<Option<Tenant>, MemoryError> {
-            Ok(self.tenant.clone())
-        }
-        async fn find_tenant_by_id(&self, _tenant_id: &str) -> Result<Option<Tenant>, MemoryError> {
-            Ok(None)
-        }
-        // The remaining methods are not exercised by these tests.
-        async fn find_api_key(
-            &self,
-            _: &str,
-        ) -> Result<Option<crate::http::registry::models::ApiKey>, MemoryError> {
-            unimplemented!()
-        }
-        async fn write_api_key(
-            &self,
-            _: &crate::http::registry::models::ApiKey,
-        ) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn list_api_keys(
-            &self,
-            _: &str,
-        ) -> Result<Vec<crate::http::registry::models::ApiKeyMeta>, MemoryError> {
-            unimplemented!()
-        }
-        async fn revoke_api_key(&self, _: &str, _: &str) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn touch_api_key(
-            &self,
-            _: &str,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn write_account(&self, _: &Account) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn write_tenant(&self, _: &Tenant) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_state(
-            &self,
-            _: &str,
-            _: u64,
-            _: TenantStatus,
-            _: TenantStatus,
-        ) -> Result<u64, MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_schema_version(
-            &self,
-            _: &str,
-            _: u64,
-            _: u32,
-        ) -> Result<u64, MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_state_fenced(
-            &self,
-            _: &str,
-            _: u64,
-            _: TenantStatus,
-            _: TenantStatus,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<u64, MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_schema_version_fenced(
-            &self,
-            _: &str,
-            _: u64,
-            _: u32,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<u64, MemoryError> {
-            unimplemented!()
-        }
-        async fn append_provisioning_event(&self, _: &str, _: &str) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn load_plan(
-            &self,
-            _: &str,
-        ) -> Result<crate::http::registry::models::Plan, MemoryError> {
-            unimplemented!()
-        }
-        async fn increment_usage(
-            &self,
-            _: &str,
-            _: crate::http::registry::models::UsageCounter,
-            _: u64,
-        ) -> Result<u64, MemoryError> {
-            unimplemented!()
-        }
-        async fn list_due_provisioning(
-            &self,
-            _: u32,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<Vec<Tenant>, MemoryError> {
-            unimplemented!()
-        }
-        async fn claim_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: chrono::DateTime<chrono::Utc>,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError> {
-            unimplemented!()
-        }
-        async fn heartbeat_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: u64,
-            _: chrono::DateTime<chrono::Utc>,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-        async fn release_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<(), MemoryError> {
-            unimplemented!()
-        }
-    }
 
     fn tenant(status: TenantStatus) -> Tenant {
         Tenant {
@@ -242,11 +76,26 @@ mod tests {
         }
     }
 
+    async fn store_with(tenant: Option<Tenant>) -> Arc<dyn RegistryStore> {
+        let store: Arc<dyn RegistryStore> = Arc::new(InMemoryStore::default());
+        store
+            .write_account(&Account {
+                id: "acct_1".into(),
+                status: AccountStatus::Active,
+                tenant_id: "ten_1".into(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .unwrap();
+        if let Some(t) = tenant {
+            store.write_tenant(&t).await.unwrap();
+        }
+        store
+    }
+
     #[tokio::test]
     async fn returns_ready_when_tenant_state_is_ready() {
-        let store: Arc<dyn RegistryStore> = Arc::new(Stub {
-            tenant: Some(tenant(TenantStatus::Ready)),
-        });
+        let store = store_with(Some(tenant(TenantStatus::Ready))).await;
         let r = AccountResolver::new(store);
         match r.resolve_ready_tenant("acct_1").await.unwrap() {
             ResolvedTenant::Ready(t) => assert_eq!(t.id, "ten_1"),
@@ -255,10 +104,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn returns_provisioning_when_state_is_reserved_or_migrating() {
-        let store: Arc<dyn RegistryStore> = Arc::new(Stub {
-            tenant: Some(tenant(TenantStatus::Migrating)),
-        });
+    async fn returns_provisioning_when_state_is_migrating() {
+        let store = store_with(Some(tenant(TenantStatus::Migrating))).await;
         let r = AccountResolver::new(store);
         match r.resolve_ready_tenant("acct_1").await.unwrap() {
             ResolvedTenant::Provisioning(s, id) => {
@@ -271,7 +118,7 @@ mod tests {
 
     #[tokio::test]
     async fn returns_not_found_when_tenant_missing() {
-        let store: Arc<dyn RegistryStore> = Arc::new(Stub { tenant: None });
+        let store = store_with(None).await;
         let r = AccountResolver::new(store);
         match r.resolve_ready_tenant("acct_1").await.unwrap() {
             ResolvedTenant::NotFound => {}
@@ -281,9 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn returns_suspended_when_tenant_state_is_suspended() {
-        let store: Arc<dyn RegistryStore> = Arc::new(Stub {
-            tenant: Some(tenant(TenantStatus::Suspended)),
-        });
+        let store = store_with(Some(tenant(TenantStatus::Suspended))).await;
         let r = AccountResolver::new(store);
         match r.resolve_ready_tenant("acct_1").await.unwrap() {
             ResolvedTenant::Suspended => {}
@@ -292,19 +137,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unconnected_store_does_not_implement_find_tenant_by_account() {
-        // SurrealRegistryStore::new_unconnected() returns
-        // unimplemented!() for these methods; the production path
-        // is wired in Task 5.x. The production wiring is covered
-        // by the integration tests in tests/. We assert here only
-        // that the resolver does not short-circuit on a fresh
-        // AccountResolver; the production behavior is tested
-        // end-to-end in Phase 5.
-        //
-        // We cannot call `resolve_ready_tenant` because the
-        // underlying method panics; we instead verify the
-        // constructor does not panic.
-        let s: Arc<dyn RegistryStore> = Arc::new(SurrealRegistryStore::new_unconnected());
-        let _r = AccountResolver::new(s);
+    async fn production_store_returns_unavailable_for_find_tenant() {
+        // The Phase 4 production placeholder returns
+        // MemoryError::Unavailable from every read; the resolver
+        // surfaces that as a typed Err. The wiring is in Task 5.x.
+        let s: Arc<dyn RegistryStore> = Arc::new(SurrealRegistryStore::new());
+        let r = AccountResolver::new(s);
+        let res = r.resolve_ready_tenant("acct_1").await;
+        assert!(matches!(res, Err(MemoryError::Unavailable(_))));
     }
 }

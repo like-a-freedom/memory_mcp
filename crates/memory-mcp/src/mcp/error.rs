@@ -110,24 +110,19 @@ pub fn mcp_error(err: MemoryError) -> ErrorData {
             });
             ErrorData::internal_error(err.to_string(), Some(data))
         }
-        MemoryError::Auth(_msg) => {
-            // Do not leak which check failed. The message is for
-            // server-side logs only; the client sees a generic
-            // 401/403-shaped response.
-            let data = json!({
-                "kind": "auth",
-                "guidance": "The credential was rejected. Re-authenticate and retry.",
-            });
-            ErrorData::invalid_request(err.to_string(), Some(data))
-        }
-        MemoryError::Unavailable(msg) => {
-            let data = json!({
-                "guidance": "The request cannot be served right now but may be later. Retry with backoff.",
-                "explanation": msg,
+        // `Auth` and `Unavailable` are HTTP-only variants: the
+        // stdio profile never produces them, and the HTTP
+        // profile never calls `mcp_error` (the auth pipeline
+        // returns the response directly). The wildcard arm keeps
+        // the match exhaustive without mapping a body shape
+        // that the spec forbids leaking.
+        MemoryError::Auth(_) | MemoryError::Unavailable(_) => ErrorData::internal_error(
+            "request not served".to_string(),
+            Some(json!({
+                "guidance": "The request could not be served. Consult server-side logs for the original error.",
                 "retryable": true,
-            });
-            ErrorData::internal_error(err.to_string(), Some(data))
-        }
+            })),
+        ),
     }
 }
 

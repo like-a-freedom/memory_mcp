@@ -46,6 +46,10 @@ roxmltree = "0.21.1"
 schemars = "1.2.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+# Pinned to 0.10.9 because `hmac 0.12` pulls `digest 0.10.3` which
+# expects `sha2 0.10`; the `0.11` series does not expose the
+# necessary digest 0.10 features. Recorded in
+# `docs/superpowers/plans/2026-08-27-streamable-http-saas.deps.md`.
 sha2 = "0.10.9"
 strsim = "0.11.1"
 subtle = "2"
