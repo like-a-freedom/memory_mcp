@@ -35,6 +35,50 @@ impl<'a> LeaseFence<'a> {
     }
 }
 
+// ─── ensure_namespace (Task 5.2) ──────────────────────────────────
+
+/// Idempotent DDL: create the namespace and database if they
+/// do not exist. Operates on a privileged `Surreal<C>` handle
+/// held by the provisioning worker; never callable from an
+/// ordinary tenant-bound credential.
+pub async fn ensure_namespace<C>(
+    privileged: &surrealdb::Surreal<C>,
+    namespace: &str,
+    database: &str,
+) -> Result<(), MemoryError>
+where
+    C: surrealdb::Connection,
+{
+    if !is_safe_identifier(namespace) || !is_safe_identifier(database) {
+        return Err(MemoryError::Validation(
+            "namespace/database name must be server-generated tns_/db identifier".into(),
+        ));
+    }
+    privileged
+        .query(format!("DEFINE NAMESPACE IF NOT EXISTS `{namespace}`;"))
+        .await
+        .map_err(|err| MemoryError::Storage(format!("define namespace failed: {err}")))?;
+    let bound = privileged.clone();
+    bound
+        .use_ns(namespace)
+        .use_db(database)
+        .await
+        .map_err(|err| MemoryError::Storage(format!("bind for define database failed: {err}")))?;
+    bound
+        .query(format!("DEFINE DATABASE IF NOT EXISTS `{database}`;"))
+        .await
+        .map_err(|err| MemoryError::Storage(format!("define database failed: {err}")))?;
+    Ok(())
+}
+
+/// Server-generated identifiers only: ascii alphanumerics and
+/// underscore. Backtick-quoting alone prevents SQL injection,
+/// but rejecting non-conforming names here is a defense in
+/// depth.
+pub fn is_safe_identifier(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// Abstract control store. Backed by a privileged SurrealDB
 /// credential in production; the `InMemoryStore` test backend is
 /// the only non-test impl Phase 4 ships.
@@ -502,5 +546,44 @@ mod tests {
         assert_eq!(got.id, "acct_1");
         let t = s.find_tenant_by_account("acct_1").await.unwrap().unwrap();
         assert_eq!(t.id, "ten_1");
+    }
+}
+
+// ─── ensure_namespace tests (Task 5.2) ────────────────────────────
+
+#[cfg(test)]
+mod ensure_namespace_tests {
+    use super::*;
+    use surrealdb::Surreal;
+    use surrealdb::engine::local::Mem;
+
+    #[tokio::test]
+    async fn ensure_namespace_is_idempotent() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        ensure_namespace(&db, "ns_a", "db_a").await.unwrap();
+        ensure_namespace(&db, "ns_a", "db_a").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn ensure_namespace_rejects_non_server_generated_names() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        let r = ensure_namespace(&db, "ns;drop", "db_a").await;
+        assert!(matches!(r, Err(MemoryError::Validation(_))));
+    }
+
+    #[test]
+    fn is_safe_identifier_accepts_tns_prefix() {
+        assert!(is_safe_identifier("tns_abc123"));
+        assert!(is_safe_identifier("memory"));
+    }
+
+    #[test]
+    fn is_safe_identifier_rejects_injection_chars() {
+        assert!(!is_safe_identifier("ns;drop"));
+        assert!(!is_safe_identifier(""));
+        assert!(!is_safe_identifier("with space"));
+        assert!(!is_safe_identifier("with`backtick"));
     }
 }
