@@ -132,7 +132,7 @@ mod tests {
             config: crate::http::config::HttpConfig::default_for_test(),
             shared_handler,
             shutdown: crate::http::shutdown::ShutdownState::new(),
-            admission: Arc::new(crate::http::runtime::pool::AdmissionGate::new()),
+            admission: Arc::new(crate::http::runtime::pool::AdmissionGate::open()),
             registry: crate::http::registry::RegistryHandle::in_memory()
                 .with_inner_store(store.clone()),
             authenticator,
