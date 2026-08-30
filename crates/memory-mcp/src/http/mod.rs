@@ -110,7 +110,7 @@ impl HttpState {
             config,
             shared_handler,
             shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::new()),
+            admission: Arc::new(runtime::pool::AdmissionGate::open()),
             registry,
             authenticator,
             account_resolver,
