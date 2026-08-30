@@ -21,17 +21,15 @@ use std::sync::Arc;
 
 use config::HttpConfig;
 
-/// Process-wide HTTP state. Phase 3 shape: config + the
-/// tenantless MCP handler + shutdown/admission/registry. Phase 4
-/// added the authenticator and account→tenant resolver
-/// (Tasks 4.4, 4.5). Task 5.6 replaces `shared_handler` with a
-/// runtime-pool guard.
+/// Process-wide HTTP state. Phase 5 shape: config + the
+/// runtime pool + shutdown/admission/registry/auth/resolver.
 pub struct HttpState {
     pub config: HttpConfig,
-    /// Phase 3 dispatch: every request clones this single
-    /// tenantless handler. Task 5.6 replaces the field with a
-    /// runtime-pool guard.
-    pub shared_handler: Arc<crate::mcp::handlers::MemoryMcp>,
+    /// The runtime pool (Task 5.5). The `acquire_runtime`
+    /// middleware calls `acquire_or_wait`; the `mcp_handler`
+    /// extracts the resulting `OperationGuard` and moves it
+    /// into the response body.
+    pub pool: Arc<runtime::pool::Pool>,
     pub shutdown: shutdown::ShutdownState,
     pub admission: Arc<runtime::pool::AdmissionGate>,
     pub registry: registry::RegistryHandle,
@@ -52,16 +50,19 @@ pub struct HttpState {
 pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
 
 impl HttpState {
-    /// Phase 4 production constructor: tenantless handler + auth
-    /// + resolver. The two arms differ only in the metrics
-    /// handle type.
+    /// Phase 5 production constructor: registry + auth + resolver
+    /// + runtime pool. The two arms differ only in the metrics
+    /// handle type. Environment-driven pool overrides land with
+    /// Task 6.4.
     #[cfg(feature = "prometheus")]
-    pub async fn new_tenantless(
+    pub async fn new(
         config: HttpConfig,
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let shared_handler = transport::build_tenantless_handler(&config).await?;
         let registry = registry::RegistryHandle::new();
+        let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
+            registry.clone(),
+        )));
         let store = registry.store_clone();
         let authenticator = Arc::new(principal::auth::Authenticator::new(
             store.clone(),
@@ -76,9 +77,9 @@ impl HttpState {
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
         Ok(Arc::new(Self {
             config,
-            shared_handler,
+            pool,
             shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::new()),
+            admission: Arc::new(runtime::pool::AdmissionGate::open()),
             registry,
             authenticator,
             account_resolver,
@@ -86,14 +87,13 @@ impl HttpState {
         }))
     }
 
-    /// Phase 4 production constructor: tenantless handler + auth
-    /// + resolver (no Prometheus).
+    /// Phase 5 production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
-    pub async fn new_tenantless(
-        config: HttpConfig,
-    ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let shared_handler = transport::build_tenantless_handler(&config).await?;
+    pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = registry::RegistryHandle::new();
+        let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
+            registry.clone(),
+        )));
         let store = registry.store_clone();
         let authenticator = Arc::new(principal::auth::Authenticator::new(
             store.clone(),
@@ -108,7 +108,7 @@ impl HttpState {
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
         Ok(Arc::new(Self {
             config,
-            shared_handler,
+            pool,
             shutdown: shutdown::ShutdownState::new(),
             admission: Arc::new(runtime::pool::AdmissionGate::open()),
             registry,
@@ -138,16 +138,14 @@ impl HttpState {
         let config = HttpConfig::default_for_test();
         #[cfg(feature = "prometheus")]
         {
-            Self::new_tenantless(config, Self::test_metrics_handle())
+            Self::new(config, Self::test_metrics_handle())
                 .await
-                .expect("tenantless test state builds")
+                .expect("HTTP state for test builds")
         }
         #[cfg(not(feature = "prometheus"))]
         {
             let _ = Self::test_metrics_handle();
-            Self::new_tenantless(config)
-                .await
-                .expect("tenantless test state builds")
+            Self::new(config).await.expect("HTTP state for test builds")
         }
     }
 }

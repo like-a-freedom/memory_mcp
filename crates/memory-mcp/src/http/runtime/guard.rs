@@ -55,6 +55,18 @@ pub struct ResponseLease {
     _admission: AdmissionPermit,
 }
 
+/// `Arc` clone handle for the admission permit so it can be
+/// stored in request extensions (axum requires `Clone`).
+#[derive(Clone)]
+pub struct AdmissionPermitRef(pub Arc<AdmissionPermit>);
+
+impl std::ops::Deref for AdmissionPermitRef {
+    type Target = AdmissionPermit;
+    fn deref(&self) -> &AdmissionPermit {
+        &self.0
+    }
+}
+
 impl ResponseLease {
     pub fn new(operation: Option<OperationGuard>, admission: AdmissionPermit) -> Self {
         Self {
@@ -70,6 +82,22 @@ impl ResponseLease {
 pub struct LeasedBody<B> {
     inner: Pin<Box<B>>,
     _lease: Option<ResponseLease>,
+}
+
+/// Cloneable extension wrappers. `axum::Extension<T>` requires
+/// `T: Clone`, but the underlying `OperationGuard` and
+/// `AdmissionPermit` are not Clone. The wrapper takes the
+/// value by `Arc` clone so the same ownership is shared
+/// between the request extensions and the response body
+/// wrapper.
+#[derive(Clone)]
+pub struct OperationGuardRef(pub Arc<OperationGuard>);
+
+impl std::ops::Deref for OperationGuardRef {
+    type Target = OperationGuard;
+    fn deref(&self) -> &OperationGuard {
+        &self.0
+    }
 }
 
 impl<B> LeasedBody<B> {

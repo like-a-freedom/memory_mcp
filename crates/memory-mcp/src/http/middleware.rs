@@ -72,6 +72,96 @@ pub async fn authenticate(
     next.run(req).await
 }
 
+/// Tenant runtime acquisition (ADR-0052, plan §5.6). Runs
+/// after `authenticate` so the principal is available. Resolves
+/// the Tenant via `account_resolver`, acquires a global
+/// admission permit (or a separate subscription permit for
+/// `subscriptions/listen`), and acquires a pinned runtime from
+/// the pool. On any error returns a clean 4xx/5xx so the
+/// caller never sees a half-acquired state.
+pub async fn acquire_runtime(
+    axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use crate::http::registry::account::ResolvedTenant;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    let principal = match req
+        .extensions()
+        .get::<super::principal::AuthenticatedPrincipal>()
+        .cloned()
+    {
+        Some(p) => p,
+        None => {
+            return (StatusCode::UNAUTHORIZED, "missing authenticated principal").into_response();
+        }
+    };
+    let tenant = match state
+        .account_resolver
+        .resolve_ready_tenant(principal.account_id())
+        .await
+    {
+        Ok(ResolvedTenant::Ready(t)) => t,
+        Ok(ResolvedTenant::Provisioning(_, _)) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, "tenant provisioning").into_response();
+        }
+        Ok(ResolvedTenant::Suspended) => {
+            return (StatusCode::FORBIDDEN, "tenant suspended").into_response();
+        }
+        Ok(ResolvedTenant::Failed(_)) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, "tenant failed").into_response();
+        }
+        Ok(ResolvedTenant::NotFound) | Err(_) => {
+            return (StatusCode::NOT_FOUND, "tenant not found").into_response();
+        }
+    };
+    let is_subscription = req
+        .headers()
+        .get("mcp-method")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|method| method == "subscriptions/listen");
+    let permit = match state.admission.try_acquire_for(is_subscription) {
+        Ok(p) => p,
+        Err(()) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "admission capacity exhausted",
+            )
+                .into_response();
+        }
+    };
+    let guard = match state.pool.acquire_or_wait(&tenant).await {
+        Ok(g) => g,
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "runtime pool capacity exhausted",
+            )
+                .into_response();
+        }
+    };
+    // The handler extracts these by `remove::<T>`. Wrap in
+    // `Arc` to satisfy axum's `Extension<T: Clone>` bound.
+    let permit_ref = super::runtime::guard::AdmissionPermitRef(std::sync::Arc::new(permit));
+    let guard_ref = super::runtime::guard::OperationGuardRef(std::sync::Arc::new(guard));
+    req.extensions_mut().insert(permit_ref);
+    req.extensions_mut().insert(guard_ref);
+    let mut resp = next.run(req).await;
+    // Log context: hex of the first 8 bytes of the SHA-256 of
+    // the tenant id. Cheap and stable across processes.
+    use sha2::Digest;
+    let digest = sha2::Sha256::digest(tenant.id.as_bytes());
+    let fingerprint = hex::encode(&digest[..8]);
+    resp.extensions_mut()
+        .insert(crate::http::logging::TenantLogContext {
+            tenant_fingerprint: fingerprint,
+            ..Default::default()
+        });
+    resp
+}
+
 /// Wraps the inner service in `tokio::time::timeout(deadline, ...)`.
 /// On timeout, returns 503 + `deadline exceeded` body. Runs as the
 /// OUTERMOST request-side layer so all other middleware and the
