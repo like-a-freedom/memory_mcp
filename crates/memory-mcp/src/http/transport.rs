@@ -90,28 +90,72 @@ where
     StreamableHttpService::new(factory, Arc::new(NeverSessionManager::default()), config)
 }
 
-/// Phase 3 production handler. Reads the per-request subscription
-/// flag from `Mcp-Method` so the long-lived SSE stream is NOT
-/// wrapped by the body deadline (a deadline on a long-lived stream
-/// would close it before clients finish listening).
+/// Phase 5 production handler. The runtime guard and admission
+/// permit were inserted by `acquire_runtime`; this handler
+/// extracts them and moves the guard into a `ResponseLease`
+/// wrapped around the body so the pin and permit are not
+/// released until the body is fully consumed.
 pub async fn mcp_handler(
     State(state): State<std::sync::Arc<super::HttpState>>,
-    req: Request,
+    mut req: Request,
 ) -> Response {
+    // Remove the wrapped (Arc-cloneable) permits. The
+    // inner `OperationGuard` is then moved into the
+    // `ResponseLease`; the `Arc<AdmissionPermit>` is dropped
+    // by the response body when the stream ends.
+    let Some(guard_ref) = req
+        .extensions_mut()
+        .remove::<super::runtime::guard::OperationGuardRef>()
+    else {
+        return with_body_deadline(
+            axum::response::IntoResponse::into_response((
+                axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                "runtime guard missing",
+            )),
+            Some(state.config.request_deadline),
+        );
+    };
+    let Some(permit_ref) = req
+        .extensions_mut()
+        .remove::<super::runtime::guard::AdmissionPermitRef>()
+    else {
+        return with_body_deadline(
+            axum::response::IntoResponse::into_response((
+                axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                "admission permit missing",
+            )),
+            Some(state.config.request_deadline),
+        );
+    };
     let is_subscription = is_subscription_request(&req);
+    let runtime = guard_ref.runtime().clone();
+    let request_handler = runtime.mcp_service.clone();
     let svc = build_mcp_service(
-        {
-            let handler = Arc::clone(&state.shared_handler);
-            move || Ok((*handler).clone())
-        },
+        move || Ok(request_handler.clone()),
         build_server_config(&state.config, state.shutdown.token()),
     );
     let response = forward(svc, req).await;
-    if is_subscription {
-        response
-    } else {
-        with_body_deadline(response, Some(state.config.request_deadline))
-    }
+    let (parts, body) = response.into_parts();
+    // We move the `OperationGuard` out of the Arc; the
+    // `Arc<OperationGuardRef>` in extensions was the only
+    // owner, so this is safe.
+    let operation = (!is_subscription).then(|| match Arc::try_unwrap(guard_ref.0) {
+        Ok(g) => g,
+        Err(_) => panic!("guard_ref Arc has unexpected clones"),
+    });
+    let lease = super::runtime::guard::ResponseLease::new(
+        operation,
+        match Arc::try_unwrap(permit_ref.0) {
+            Ok(p) => p,
+            Err(_) => panic!("permit_ref Arc has unexpected clones"),
+        },
+    );
+    let timeout = (!is_subscription).then_some(state.config.request_deadline);
+    let body = super::validation::DeadlineBody::new(body, timeout);
+    axum::response::Response::from_parts(
+        parts,
+        axum::body::Body::new(super::runtime::guard::LeasedBody::new(body, lease)),
+    )
 }
 
 fn is_subscription_request(req: &Request) -> bool {
@@ -121,33 +165,6 @@ fn is_subscription_request(req: &Request) -> bool {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     SUBSCRIPTION_METHODS.contains(&method)
-}
-
-/// Builds the Phase 3 tenantless handler over the configured tenant
-/// target. `mem://` selects the embedded in-memory engine (tests,
-/// smoke runs); anything else connects to the remote endpoint.
-pub async fn build_tenantless_handler(
-    cfg: &HttpConfig,
-) -> Result<Arc<crate::mcp::handlers::MemoryMcp>, crate::error::MemoryError> {
-    use crate::storage::DbClient;
-    let t = &cfg.tenant_db;
-    let client = if t.url == "mem://" {
-        crate::storage::SurrealDbClient::connect_in_memory(&t.database, &t.namespace, "warn")
-            .await?
-    } else {
-        crate::storage::SurrealDbClient::connect_bound(&cfg.tenant_db, "warn").await?
-    };
-    client.apply_migrations(&t.namespace).await?;
-    let service = crate::service::MemoryService::new(
-        std::sync::Arc::new(client),
-        t.namespace.clone(),
-        "warn".into(),
-        100,
-        100,
-    )?;
-    Ok(Arc::new(crate::mcp::handlers::MemoryMcp::new_modern(
-        service,
-    )))
 }
 
 /// Forward path shared by `mcp_handler` and the future pool-aware

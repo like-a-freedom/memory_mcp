@@ -123,18 +123,17 @@ mod tests {
             rate,
         ));
         let account_resolver = Arc::new(AccountResolver::new(store.clone()));
-        let shared_handler = crate::http::transport::build_tenantless_handler(
-            &crate::http::config::HttpConfig::default_for_test(),
-        )
-        .await
-        .expect("tenantless handler builds in test");
+        let registry =
+            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let pool = Arc::new(crate::http::runtime::pool::Pool::with_defaults(
+            std::sync::Arc::new(registry.clone()),
+        ));
         let state = Arc::new(HttpState {
             config: crate::http::config::HttpConfig::default_for_test(),
-            shared_handler,
+            pool,
             shutdown: crate::http::shutdown::ShutdownState::new(),
             admission: Arc::new(crate::http::runtime::pool::AdmissionGate::open()),
-            registry: crate::http::registry::RegistryHandle::in_memory()
-                .with_inner_store(store.clone()),
+            registry,
             authenticator,
             account_resolver,
         });

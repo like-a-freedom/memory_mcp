@@ -22,7 +22,7 @@ pub async fn build_state(
             Ok(h) => Some(h),
             Err(err) => return Err((ExitCode::from(2), format!("metrics init error: {err}"))),
         };
-        match HttpState::new_tenantless(cfg.clone(), handle).await {
+        match HttpState::new(cfg.clone(), handle).await {
             Ok(s) => Ok(s),
             Err(err) => Err((
                 ExitCode::from(2),
@@ -31,7 +31,7 @@ pub async fn build_state(
         }
     }
     #[cfg(not(feature = "prometheus"))]
-    match HttpState::new_tenantless(cfg.clone()).await {
+    match HttpState::new(cfg.clone()).await {
         Ok(s) => Ok(s),
         Err(err) => Err((
             ExitCode::from(2),

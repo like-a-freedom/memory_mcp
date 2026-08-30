@@ -8,9 +8,19 @@ use axum::routing::{get, post};
 use super::HttpState;
 
 pub fn build_router(state: Arc<HttpState>) -> Router {
-    let mcp_route = post(super::transport::mcp_handler).layer(
-        axum::middleware::from_fn_with_state(state.clone(), super::middleware::authenticate),
-    );
+    // Route-scoped layers added EARLIER are INNER (run
+    // later). `acquire_runtime` runs after `authenticate`
+    // because the principal must be in the request
+    // extensions before the resolver runs.
+    let mcp_route = post(super::transport::mcp_handler)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::middleware::acquire_runtime,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::middleware::authenticate,
+        ));
     let router = Router::new()
         .route("/health/live", get(super::health::live))
         .route("/health/ready", get(super::health::ready))
