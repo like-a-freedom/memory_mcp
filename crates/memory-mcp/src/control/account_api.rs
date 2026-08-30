@@ -133,9 +133,8 @@ mod tests {
             shared_handler,
             shutdown: crate::http::shutdown::ShutdownState::new(),
             admission: Arc::new(crate::http::runtime::pool::AdmissionGate::new()),
-            registry: crate::http::registry::RegistryHandle {
-                store: store.clone(),
-            },
+            registry: crate::http::registry::RegistryHandle::in_memory()
+                .with_inner_store(store.clone()),
             authenticator,
             account_resolver,
         });

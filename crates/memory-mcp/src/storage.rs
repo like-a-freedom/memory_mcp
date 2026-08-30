@@ -18,7 +18,7 @@
 mod agent_memory;
 pub(crate) mod app_store;
 pub(crate) mod claims;
-mod client;
+pub(crate) mod client;
 pub(crate) mod close;
 pub(crate) mod context_store;
 pub(crate) mod embedding_backfill_store;
