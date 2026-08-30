@@ -7,14 +7,17 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
 use lru::LruCache;
 
 use super::AuthenticatedPrincipal;
 use super::api_keys::ApiKeyCredential;
 use super::cache::PrincipalCache;
 use crate::http::registry::RegistryStore;
-use crate::http::registry::models::{AccountStatus, ApiKeyStatus};
+use crate::http::registry::models::{AccountStatus, ApiKey, ApiKeyStatus};
+use crate::http::sync::recover_lock;
 
+#[derive(Debug)]
 pub enum AuthDecision {
     Allow(AuthenticatedPrincipal),
     Deny,
@@ -41,7 +44,7 @@ impl RateLimiter {
     }
 
     pub fn allow(&self, key_id: &str) -> bool {
-        let mut g = self.windows.lock().unwrap_or_else(|e| e.into_inner());
+        let mut g = recover_lock(&self.windows);
         let now = Instant::now();
         match g.get_mut(key_id) {
             Some((start, count)) if now.duration_since(*start) < self.window => {
@@ -57,6 +60,13 @@ impl RateLimiter {
             }
         }
     }
+}
+
+/// Predicate: is the given `ApiKey` still valid for use? Used by
+/// both the request-path verifier and the subscription revalidator
+/// (`is_current`).
+fn is_key_current(key: &ApiKey, now: DateTime<Utc>) -> bool {
+    key.status == ApiKeyStatus::Active && key.expires_at.map(|expiry| expiry > now).unwrap_or(true)
 }
 
 pub struct Authenticator {
@@ -92,80 +102,94 @@ impl Authenticator {
         if !self.rate_limiter.allow(cred.key_id()) {
             return AuthDecision::Deny;
         }
+        let now = Utc::now();
+        let mut verified = false;
+        let mut principal: Option<AuthenticatedPrincipal> = None;
+
         if let Some(cached) = self.cache.get_positive(cred.key_id()) {
             // Preserve the ≤60s revocation bound without weakening
             // secret verification: a cache hit still verifies the
             // supplied secret.
             if cached.verifier.verify(&self.pepper, cred.secret()) {
-                let _ = self
-                    .store
-                    .touch_api_key(cred.key_id(), chrono::Utc::now())
-                    .await;
-                return AuthDecision::Allow(AuthenticatedPrincipal::ApiKey {
+                verified = true;
+                principal = Some(AuthenticatedPrincipal::ApiKey {
                     account: cached.account.clone(),
                     key_id: cred.key_id().to_owned(),
                 });
             }
+        } else {
+            // Store lookup. The verifier check happens against
+            // the registry-stored verifier; we re-fetch the
+            // verifier field from the store (not from the
+            // credential) so a rotated key still works.
+            let key = self.store.find_api_key(cred.key_id()).await.ok().flatten();
+            if let Some(k) = key
+                && is_key_current(&k, now)
+                && k.verifier.verify(&self.pepper, cred.secret())
+            {
+                let account = self
+                    .store
+                    .find_account_by_id(&k.account_id)
+                    .await
+                    .ok()
+                    .flatten();
+                if let Some(account) = account
+                    && account.status == AccountStatus::Active
+                {
+                    let account = Arc::new(account);
+                    self.cache.put_positive(
+                        cred.key_id().to_string(),
+                        account.clone(),
+                        k.verifier.clone(),
+                    );
+                    principal = Some(AuthenticatedPrincipal::ApiKey {
+                        account,
+                        key_id: cred.key_id().to_owned(),
+                    });
+                    verified = true;
+                }
+            }
+        }
+
+        if !verified {
             self.cache.put_negative(cred.key_id().to_string());
             return AuthDecision::Deny;
         }
-        let key = match self.store.find_api_key(cred.key_id()).await {
-            Ok(Some(k))
-                if k.status == ApiKeyStatus::Active
-                    && k.expires_at.map(|e| e > chrono::Utc::now()).unwrap_or(true)
-                    && k.verifier.verify(&self.pepper, cred.secret()) =>
-            {
-                k
-            }
-            _ => {
-                self.cache.put_negative(cred.key_id().to_string());
-                return AuthDecision::Deny;
-            }
-        };
-        let account = match self.store.find_account_by_id(&key.account_id).await {
-            Ok(Some(a)) if a.status == AccountStatus::Active => Arc::new(a),
-            _ => {
-                self.cache.put_negative(cred.key_id().to_string());
-                return AuthDecision::Deny;
-            }
-        };
-        self.cache.put_positive(
-            cred.key_id().to_string(),
-            account.clone(),
-            key.verifier.clone(),
-        );
+
         // Update last_used_at with a monotonic/CAS registry write.
         // A transient telemetry timestamp failure must not turn an
         // already valid request into an authentication failure, and
         // the raw secret is never written.
-        let _ = self.store.touch_api_key(&key.id, chrono::Utc::now()).await;
-        AuthDecision::Allow(AuthenticatedPrincipal::ApiKey {
-            account,
-            key_id: cred.key_id().to_owned(),
-        })
+        let _ = self.store.touch_api_key(cred.key_id(), now).await;
+        principal
+            .map(AuthDecision::Allow)
+            .unwrap_or(AuthDecision::Deny)
     }
 
     pub async fn is_current(&self, principal: &AuthenticatedPrincipal) -> bool {
+        let now = Utc::now();
         match principal {
             AuthenticatedPrincipal::ApiKey { account, key_id } => {
-                matches!(
-                    self.store.find_api_key(key_id).await,
-                    Ok(Some(key)) if key.account_id == account.id
-                        && key.status == ApiKeyStatus::Active
-                        && key
-                            .expires_at
-                            .map(|expiry| expiry > chrono::Utc::now())
-                            .unwrap_or(true)
-                ) && matches!(
-                    self.store.find_account_by_id(&account.id).await,
-                    Ok(Some(current)) if current.status == AccountStatus::Active
-                )
+                let key = self.store.find_api_key(key_id).await.ok().flatten();
+                let current = self
+                    .store
+                    .find_account_by_id(&account.id)
+                    .await
+                    .ok()
+                    .flatten();
+                let key_ok =
+                    key.is_some_and(|k| k.account_id == account.id && is_key_current(&k, now));
+                let account_ok = current.is_some_and(|a| a.status == AccountStatus::Active);
+                key_ok && account_ok
             }
             #[cfg(feature = "control-plane")]
-            AuthenticatedPrincipal::Oidc { account, .. } => matches!(
-                self.store.find_account_by_id(&account.id).await,
-                Ok(Some(current)) if current.status == AccountStatus::Active
-            ),
+            AuthenticatedPrincipal::Oidc { account, .. } => self
+                .store
+                .find_account_by_id(&account.id)
+                .await
+                .ok()
+                .flatten()
+                .is_some_and(|a| a.status == AccountStatus::Active),
         }
     }
 }
@@ -173,17 +197,18 @@ impl Authenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::registry::RegistryHandle;
-    use crate::http::registry::models::{ApiKey, KeyedVerifier};
-    use crate::http::registry::storage::SurrealRegistryStore;
+    use crate::http::registry::models::{
+        Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
+    };
+    use crate::http::registry::storage::InMemoryStore;
 
-    fn store_with_key(secret: &[u8], pepper: &[u8]) -> (Arc<dyn RegistryStore>, KeyedVerifier) {
-        let verifier = KeyedVerifier::compute(pepper, secret);
-        let store: Arc<dyn RegistryStore> = Arc::new(SurrealRegistryStore::new_unconnected());
-        // The unconnected store returns Ok(None) for every query,
-        // which the authenticator treats as Deny. Useful for the
-        // path-only tests below.
-        (store, verifier)
+    fn active_account(id: &str, tenant_id: &str) -> Account {
+        Account {
+            id: id.to_string(),
+            status: AccountStatus::Active,
+            tenant_id: tenant_id.to_string(),
+            created_at: Utc::now(),
+        }
     }
 
     #[tokio::test]
@@ -206,7 +231,7 @@ mod tests {
 
     #[tokio::test]
     async fn unparseable_header_returns_deny() {
-        let (store, _v) = store_with_key(b"x", b"p");
+        let store: Arc<dyn RegistryStore> = Arc::new(InMemoryStore::default());
         let auth = Authenticator::new(
             store,
             Arc::new(PrincipalCache::new(8)),
@@ -218,29 +243,83 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn registry_handle_exposes_store() {
-        // Sanity: RegistryHandle is the bridge from HttpState to
-        // the Arc<dyn RegistryStore> the authenticator takes.
-        let handle = RegistryHandle::stub();
-        let _ = handle.ping().await;
-    }
-
-    #[allow(dead_code)]
-    fn _check_api_key_shape() {
-        // Reference-only: a fully-populated ApiKey round-trips
-        // through serde. The actual round-trip is exercised in
-        // the registry models test module.
+    async fn valid_bearer_returns_allow() {
+        // Build a credential whose key_id matches a key the store
+        // knows about, and whose secret verifies against the
+        // stored verifier.
+        let store = Arc::new(InMemoryStore::default());
+        let pepper = b"pepper";
+        let secret = b"Ab3defghij0123456789Ab3defghij0123456789";
         let k = ApiKey {
-            id: "ak_test".into(),
-            account_id: "acct_test".into(),
-            name: "test".into(),
-            verifier: KeyedVerifier([1u8; 32]),
+            id: "ak_01234567-89ab-4cde-8f01-23456789abcd".into(),
+            account_id: "acct_1".into(),
+            name: "k1".into(),
+            verifier: KeyedVerifier::compute(pepper, secret),
             status: ApiKeyStatus::Active,
-            created_at: chrono::Utc::now(),
+            created_at: Utc::now(),
             expires_at: None,
             last_used_at: None,
             version: 1,
         };
-        assert_eq!(k.status, ApiKeyStatus::Active);
+        store.write_api_key(&k).await.unwrap();
+        store
+            .write_account(&active_account("acct_1", "ten_1"))
+            .await
+            .unwrap();
+        let auth = Authenticator::new(
+            store,
+            Arc::new(PrincipalCache::new(8)),
+            pepper.to_vec(),
+            Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
+        );
+        let raw = format!(
+            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{}",
+            std::str::from_utf8(secret).unwrap()
+        );
+        let d = auth.authenticate_bearer(&raw).await;
+        match d {
+            AuthDecision::Allow(AuthenticatedPrincipal::ApiKey { account, .. }) => {
+                assert_eq!(account.id, "acct_1");
+            }
+            other => panic!("expected Allow(ApiKey), got {other:?}"),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unreachable"),
+        }
+    }
+
+    #[tokio::test]
+    async fn wrong_secret_returns_deny() {
+        let store = Arc::new(InMemoryStore::default());
+        let pepper = b"pepper";
+        let real_secret = b"Ab3defghij0123456789Ab3defghij0123456789";
+        let wrong_secret = b"Bb3defghij0123456789Ab3defghij0123456789";
+        let k = ApiKey {
+            id: "ak_01234567-89ab-4cde-8f01-23456789abcd".into(),
+            account_id: "acct_1".into(),
+            name: "k1".into(),
+            verifier: KeyedVerifier::compute(pepper, real_secret),
+            status: ApiKeyStatus::Active,
+            created_at: Utc::now(),
+            expires_at: None,
+            last_used_at: None,
+            version: 1,
+        };
+        store.write_api_key(&k).await.unwrap();
+        store
+            .write_account(&active_account("acct_1", "ten_1"))
+            .await
+            .unwrap();
+        let auth = Authenticator::new(
+            store,
+            Arc::new(PrincipalCache::new(8)),
+            pepper.to_vec(),
+            Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
+        );
+        let raw = format!(
+            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{}",
+            std::str::from_utf8(wrong_secret).unwrap()
+        );
+        let d = auth.authenticate_bearer(&raw).await;
+        assert!(matches!(d, AuthDecision::Deny));
     }
 }

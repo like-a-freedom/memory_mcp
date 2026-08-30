@@ -16,7 +16,7 @@ use crate::http::registry::models::Account;
 /// The request-scoped authenticated identity. Every namespace
 /// decision derives from this value — never from MCP arguments,
 /// URL paths, or claims.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum AuthenticatedPrincipal {
     ApiKey {
         account: Arc<Account>,

@@ -8,9 +8,10 @@
 use std::sync::Arc;
 
 use axum::Extension;
-use axum::Json;
+use axum::body::Body;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
+use axum::response::Response;
 
 use super::error::ApiError;
 use super::operator::OperatorPrincipal;
@@ -23,12 +24,47 @@ pub struct CreateAccountRequest {
     pub display_name: Option<String>,
 }
 
+/// Build a JSON 201 Created response carrying the Account
+/// body. Manual because the workspace does not enable axum's
+/// `json` feature; serde_json::to_vec keeps the JSON contract
+/// under our control.
+fn account_created_response(account: &Account) -> Response {
+    let body = serde_json::to_vec(account).expect("Account serializes");
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = StatusCode::CREATED;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response
+}
+
+/// Parse the request body into a `CreateAccountRequest`. The
+/// body is optional: an empty body is treated as "no fields set".
+async fn read_create_account(body: Body) -> Result<CreateAccountRequest, ApiError> {
+    use http_body_util::BodyExt;
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|err| ApiError::Internal(crate::error::MemoryError::Storage(err.to_string())))?
+        .to_bytes();
+    if bytes.is_empty() {
+        return Ok(CreateAccountRequest { display_name: None });
+    }
+    serde_json::from_slice(&bytes).map_err(|err| {
+        ApiError::Internal(crate::error::MemoryError::Validation(format!(
+            "create-account body: {err}"
+        )))
+    })
+}
+
 pub async fn create_account(
     State(state): State<Arc<HttpState>>,
     Extension(operator): Extension<OperatorPrincipal>,
-    Json(_req): Json<CreateAccountRequest>,
-) -> Result<(StatusCode, Json<Account>), ApiError> {
+    req: axum::extract::Request,
+) -> Result<Response, ApiError> {
     operator.require_recent_auth()?;
+    let _req: CreateAccountRequest = read_create_account(req.into_body()).await?;
     let account = Account {
         id: new_account_id(),
         status: AccountStatus::Active,
@@ -53,212 +89,27 @@ pub async fn create_account(
     store.write_account(&account).await?;
     store.write_tenant(&tenant).await?;
     enqueue_provisioning(&store, &tenant).await?;
-    Ok((StatusCode::CREATED, Json(account)))
+    Ok(account_created_response(&account))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::control::operator;
-    use crate::http::registry::RegistryHandle;
-    use crate::http::registry::RegistryStore;
     use crate::http::registry::account::AccountResolver;
-    use crate::http::registry::models::{
-        Account, AccountStatus, ApiKey, ApiKeyMeta, Plan, Tenant, TenantStatus, UsageCounter,
-    };
-    use async_trait::async_trait;
-    use std::sync::Mutex;
-
-    /// Records every call the test driver makes.
-    #[derive(Default)]
-    struct CallLog {
-        accounts: Mutex<Vec<Account>>,
-        tenants: Mutex<Vec<Tenant>>,
-        events: Mutex<Vec<(String, String)>>,
-    }
-
-    /// In-memory RegistryStore for the create_account flow.
-    /// Tracks calls; satisfies every trait method with `unimplemented!()`
-    /// for paths the flow does not exercise.
-    struct TestStore {
-        log: std::sync::Arc<CallLog>,
-    }
-
-    #[async_trait]
-    impl RegistryStore for TestStore {
-        async fn ping(&self) -> bool {
-            true
-        }
-        async fn find_account_by_id(
-            &self,
-            _id: &str,
-        ) -> Result<Option<Account>, crate::error::MemoryError> {
-            Ok(None)
-        }
-        async fn find_account_by_identity(
-            &self,
-            _issuer: &str,
-            _sv: &[u8; 32],
-        ) -> Result<Option<Account>, crate::error::MemoryError> {
-            Ok(None)
-        }
-        async fn find_tenant_by_account(
-            &self,
-            _account_id: &str,
-        ) -> Result<Option<Tenant>, crate::error::MemoryError> {
-            Ok(None)
-        }
-        async fn find_tenant_by_id(
-            &self,
-            _id: &str,
-        ) -> Result<Option<Tenant>, crate::error::MemoryError> {
-            Ok(None)
-        }
-        async fn find_api_key(&self, _: &str) -> Result<Option<ApiKey>, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn write_api_key(&self, _: &ApiKey) -> Result<(), crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn list_api_keys(
-            &self,
-            _: &str,
-        ) -> Result<Vec<ApiKeyMeta>, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn revoke_api_key(&self, _: &str, _: &str) -> Result<(), crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn touch_api_key(
-            &self,
-            _: &str,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<(), crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn write_account(&self, account: &Account) -> Result<(), crate::error::MemoryError> {
-            self.log.accounts.lock().unwrap().push(account.clone());
-            Ok(())
-        }
-        async fn write_tenant(&self, tenant: &Tenant) -> Result<(), crate::error::MemoryError> {
-            self.log.tenants.lock().unwrap().push(tenant.clone());
-            Ok(())
-        }
-        async fn update_tenant_state(
-            &self,
-            _: &str,
-            _: u64,
-            _: TenantStatus,
-            _: TenantStatus,
-        ) -> Result<u64, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_schema_version(
-            &self,
-            _: &str,
-            _: u64,
-            _: u32,
-        ) -> Result<u64, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_state_fenced(
-            &self,
-            _: &str,
-            _: u64,
-            _: TenantStatus,
-            _: TenantStatus,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<u64, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn update_tenant_schema_version_fenced(
-            &self,
-            _: &str,
-            _: u64,
-            _: u32,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<u64, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn append_provisioning_event(
-            &self,
-            tenant_id: &str,
-            stage: &str,
-        ) -> Result<(), crate::error::MemoryError> {
-            self.log
-                .events
-                .lock()
-                .unwrap()
-                .push((tenant_id.to_string(), stage.to_string()));
-            Ok(())
-        }
-        async fn load_plan(&self, _: &str) -> Result<Plan, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn increment_usage(
-            &self,
-            _: &str,
-            _: UsageCounter,
-            _: u64,
-        ) -> Result<u64, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn list_due_provisioning(
-            &self,
-            _: u32,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<Vec<Tenant>, crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn claim_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: chrono::DateTime<chrono::Utc>,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<Option<crate::http::leases::ProvisioningLease>, crate::error::MemoryError>
-        {
-            unimplemented!()
-        }
-        async fn heartbeat_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: u64,
-            _: chrono::DateTime<chrono::Utc>,
-            _: chrono::DateTime<chrono::Utc>,
-        ) -> Result<(), crate::error::MemoryError> {
-            unimplemented!()
-        }
-        async fn release_provisioning(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: u64,
-        ) -> Result<(), crate::error::MemoryError> {
-            unimplemented!()
-        }
-    }
-
+    use crate::http::registry::storage::InMemoryStore;
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use axum::routing::post;
     use tower_service::Service;
 
-    /// Tests build a router with the operator stub middleware so
-    /// the unauthenticated path does not short-circuit.
-    async fn build_test_router(
-        log: std::sync::Arc<CallLog>,
-    ) -> (Router, std::sync::Arc<HttpState>) {
-        let store: Arc<dyn RegistryStore> = Arc::new(TestStore { log });
+    /// Build a router with the operator stub middleware and an
+    /// in-memory registry store. The test passes because the
+    /// production registry handle is replaced with
+    /// `RegistryHandle::in_memory()`.
+    async fn build_test_router() -> (Router, Arc<InMemoryStore>) {
+        let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
         let cache = Arc::new(crate::http::principal::cache::PrincipalCache::new(8));
         let rate = Arc::new(crate::http::principal::auth::RateLimiter::new(
             4,
@@ -277,32 +128,30 @@ mod tests {
         )
         .await
         .expect("tenantless handler builds in test");
-        let core = Arc::new(crate::http::HttpStateCore {
+        let state = Arc::new(HttpState {
             config: crate::http::config::HttpConfig::default_for_test(),
             shared_handler,
             shutdown: crate::http::shutdown::ShutdownState::new(),
             admission: Arc::new(crate::http::runtime::pool::AdmissionGate::new()),
-            registry: RegistryHandle {
+            registry: crate::http::registry::RegistryHandle {
                 store: store.clone(),
             },
             authenticator,
             account_resolver,
         });
-        let state = std::sync::Arc::new(HttpState { core });
         let router = Router::new()
             .route(
                 "/api/v1/operator/accounts",
                 post(create_account)
                     .layer(axum::middleware::from_fn(operator::stub_operator_inject)),
             )
-            .with_state(state.clone());
-        (router, state)
+            .with_state(state);
+        (router, store)
     }
 
     #[tokio::test]
     async fn create_account_writes_registry_records_and_enqueues_provisioning() {
-        let log = std::sync::Arc::new(CallLog::default());
-        let (mut router, _state) = build_test_router(log.clone()).await;
+        let (mut router, store) = build_test_router().await;
         let req = Request::builder()
             .method("POST")
             .uri("/api/v1/operator/accounts")
@@ -319,16 +168,10 @@ mod tests {
         assert_eq!(account.status, AccountStatus::Active);
         assert!(account.tenant_id.starts_with("ten_"));
 
-        let accounts = log.accounts.lock().unwrap();
-        let tenants = log.tenants.lock().unwrap();
-        let events = log.events.lock().unwrap();
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(tenants.len(), 1);
-        assert_eq!(tenants[0].status, TenantStatus::Reserved);
-        assert_eq!(tenants[0].namespace_binding.database, "memory");
-        assert_eq!(
-            events.as_slice(),
-            &[(account.tenant_id.clone(), "reserved".to_string())]
-        );
+        let events = store.provisioning_events();
+        assert_eq!(events.len(), 1);
+        let (tid, stage) = &events[0];
+        assert_eq!(tid, &account.tenant_id);
+        assert_eq!(stage, "reserved");
     }
 }

@@ -14,12 +14,13 @@
 //! the workspace does not depend on `parking_lot`, and adding it
 //! for this one hot path would violate the dependency gate.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use lru::LruCache;
 
 use crate::http::registry::models::{Account, KeyedVerifier};
+use crate::http::sync::recover_lock;
 
 const POSITIVE_TTL: Duration = Duration::from_secs(60);
 const NEGATIVE_TTL: Duration = Duration::from_secs(5);
@@ -43,13 +44,8 @@ impl PrincipalCache {
         }
     }
 
-    fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-        // A poisoned guard still protects the data; recover instead of panic.
-        m.lock().unwrap_or_else(|e| e.into_inner())
-    }
-
     pub fn get_positive(&self, key_id: &str) -> Option<Arc<CachedPrincipal>> {
-        let mut g = Self::lock(&self.positive);
+        let mut g = recover_lock(&self.positive);
         let v = g.get(key_id)?;
         if v.1.elapsed() > POSITIVE_TTL {
             g.pop(key_id);
@@ -61,11 +57,11 @@ impl PrincipalCache {
 
     pub fn put_positive(&self, key_id: String, account: Arc<Account>, verifier: KeyedVerifier) {
         let cached = Arc::new(CachedPrincipal { account, verifier });
-        Self::lock(&self.positive).put(key_id, (cached, Instant::now()));
+        recover_lock(&self.positive).put(key_id, (cached, Instant::now()));
     }
 
     pub fn get_negative(&self, key_id: &str) -> bool {
-        let mut g = Self::lock(&self.negative);
+        let mut g = recover_lock(&self.negative);
         match g.get(key_id) {
             Some(t) if t.elapsed() > NEGATIVE_TTL => {
                 g.pop(key_id);
@@ -77,12 +73,12 @@ impl PrincipalCache {
     }
 
     pub fn put_negative(&self, key_id: String) {
-        Self::lock(&self.negative).put(key_id, Instant::now());
+        recover_lock(&self.negative).put(key_id, Instant::now());
     }
 
     pub fn invalidate(&self, key_id: &str) {
-        Self::lock(&self.positive).pop(key_id);
-        Self::lock(&self.negative).pop(key_id);
+        recover_lock(&self.positive).pop(key_id);
+        recover_lock(&self.negative).pop(key_id);
     }
 }
 
