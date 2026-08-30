@@ -140,6 +140,44 @@ pub trait RegistryStore: Send + Sync + 'static {
         lease: &LeaseFence<'_>,
     ) -> Result<u64, MemoryError>;
 
+    /// Fenced CAS-update of the schema version. Predicate is
+    /// `(version, status, owner, lease, generation)`. Returns
+    /// the new version on success.
+    async fn update_tenant_schema_version_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        new_schema_version: u32,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+    ) -> Result<u64, MemoryError>;
+
+    /// Claim a provisioning lease for `tenant_id`. The
+    /// implementation is responsible for fencing: if a prior
+    /// lease is still active under a different owner the
+    /// scheduler extends the generation and returns the new
+    /// lease. Returns `None` if the tenant is already in a
+    /// terminal state.
+    async fn claim_provisioning(
+        &self,
+        tenant_id: &str,
+        owner_id: &str,
+        lease_id: &str,
+        lease_ttl_secs: i64,
+    ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError>;
+
+    /// Release a previously-claimed lease. CAS-clears the
+    /// `provisioning_lease` field; only succeeds when the
+    /// stored owner/lease/gen match the caller's.
+    async fn release_provisioning_lease(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+    ) -> Result<(), MemoryError>;
+
     /// Append a provisioning event (durable seam consumed by the
     /// Task 6.2 scheduler; written by `enqueue_provisioning`,
     /// Task 4.7).
@@ -246,6 +284,35 @@ impl RegistryStore for SurrealRegistryStore {
         _lease: &LeaseFence<'_>,
     ) -> Result<u64, MemoryError> {
         Err(unavailable("update_tenant_state_fenced"))
+    }
+    async fn update_tenant_schema_version_fenced(
+        &self,
+        _tenant_id: &str,
+        _expected_version: u64,
+        _new_schema_version: u32,
+        _lease_owner_id: &str,
+        _lease_id: &str,
+        _fencing_generation: u64,
+    ) -> Result<u64, MemoryError> {
+        Err(unavailable("update_tenant_schema_version_fenced"))
+    }
+    async fn claim_provisioning(
+        &self,
+        _tenant_id: &str,
+        _owner_id: &str,
+        _lease_id: &str,
+        _lease_ttl_secs: i64,
+    ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError> {
+        Err(unavailable("claim_provisioning"))
+    }
+    async fn release_provisioning_lease(
+        &self,
+        _tenant_id: &str,
+        _lease_owner_id: &str,
+        _lease_id: &str,
+        _fencing_generation: u64,
+    ) -> Result<(), MemoryError> {
+        Err(unavailable("release_provisioning_lease"))
     }
     async fn append_provisioning_event(
         &self,
@@ -468,6 +535,122 @@ impl RegistryStore for InMemoryStore {
         t.status = to;
         t.version += 1;
         Ok(t.version)
+    }
+    async fn update_tenant_schema_version_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        new_schema_version: u32,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} schema-version CAS failed: version {} (expected {})",
+                t.version, expected_version
+            )));
+        }
+        match &t.provisioning_lease {
+            Some(stored)
+                if stored.owner_id == lease_owner_id
+                    && stored.lease_id == lease_id
+                    && stored.fencing_generation == fencing_generation => {}
+            Some(stored) => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} schema-version fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
+                    stored.owner_id,
+                    stored.lease_id,
+                    stored.fencing_generation,
+                    lease_owner_id,
+                    lease_id,
+                    fencing_generation,
+                )));
+            }
+            None => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} schema-version fenced CAS failed: no active lease"
+                )));
+            }
+        }
+        t.schema_version = new_schema_version;
+        t.version += 1;
+        Ok(t.version)
+    }
+    async fn claim_provisioning(
+        &self,
+        tenant_id: &str,
+        owner_id: &str,
+        lease_id: &str,
+        lease_ttl_secs: i64,
+    ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError> {
+        use crate::http::registry::models::ProvisioningLeaseState;
+        use crate::http::registry::models::TenantStatus as S;
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if matches!(t.status, S::Ready | S::Deleting | S::Purged) {
+            return Ok(None);
+        }
+        let now = chrono::Utc::now();
+        let new_generation = match &t.provisioning_lease {
+            Some(existing) if existing.expires_at > now => existing.fencing_generation + 1,
+            _ => t
+                .provisioning_lease
+                .as_ref()
+                .map(|l| l.fencing_generation)
+                .unwrap_or(0),
+        };
+        let lease = ProvisioningLeaseState {
+            owner_id: owner_id.to_string(),
+            lease_id: lease_id.to_string(),
+            expires_at: now + chrono::Duration::seconds(lease_ttl_secs),
+            fencing_generation: new_generation,
+            heartbeat_at: now,
+        };
+        t.provisioning_lease = Some(lease.clone());
+        t.version += 1;
+        Ok(Some(crate::http::leases::ProvisioningLease {
+            owner_id: lease.owner_id,
+            lease_id: lease.lease_id,
+            fencing_generation: lease.fencing_generation,
+            expires_at: lease.expires_at,
+            heartbeat_at: lease.heartbeat_at,
+        }))
+    }
+    async fn release_provisioning_lease(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+    ) -> Result<(), MemoryError> {
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        match &t.provisioning_lease {
+            Some(stored)
+                if stored.owner_id == lease_owner_id
+                    && stored.lease_id == lease_id
+                    && stored.fencing_generation == fencing_generation =>
+            {
+                t.provisioning_lease = None;
+                t.version += 1;
+                Ok(())
+            }
+            _ => Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} release failed: lease mismatch"
+            ))),
+        }
     }
     async fn append_provisioning_event(
         &self,
