@@ -14,6 +14,27 @@ use std::sync::Mutex;
 use super::models::*;
 use crate::error::MemoryError;
 
+/// Compact view of the lease fields the registry uses for
+/// fenced CAS predicates. The `&str` borrows let callers pass
+/// `&ProvisioningLease` without copying; the struct stays
+/// `Copy` so the trait method can take it by value.
+#[derive(Debug, Clone, Copy)]
+pub struct LeaseFence<'a> {
+    pub owner_id: &'a str,
+    pub lease_id: &'a str,
+    pub fencing_generation: u64,
+}
+
+impl<'a> LeaseFence<'a> {
+    pub fn from_lease(lease: &'a crate::http::leases::ProvisioningLease) -> Self {
+        Self {
+            owner_id: &lease.owner_id,
+            lease_id: &lease.lease_id,
+            fencing_generation: lease.fencing_generation,
+        }
+    }
+}
+
 /// Abstract control store. Backed by a privileged SurrealDB
 /// credential in production; the `InMemoryStore` test backend is
 /// the only non-test impl Phase 4 ships.
@@ -47,6 +68,33 @@ pub trait RegistryStore: Send + Sync + 'static {
 
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError>;
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError>;
+
+    /// CAS-update the tenant's status. The predicate is
+    /// `version = $expected_version AND status = $from`. Returns
+    /// the new version on success, `MemoryError::Conflict` on
+    /// stale read.
+    async fn update_tenant_state(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) -> Result<u64, MemoryError>;
+
+    /// Fenced CAS-update the tenant's status. The predicate
+    /// adds `provisioning_lease.owner_id = $owner_id AND
+    /// provisioning_lease.lease_id = $lease_id AND
+    /// provisioning_lease.fencing_generation = $generation`
+    /// to the unfenced CAS, so a stale worker cannot advance
+    /// a tenant whose lease has been reassigned.
+    async fn update_tenant_state_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+        lease: &LeaseFence<'_>,
+    ) -> Result<u64, MemoryError>;
 
     /// Append a provisioning event (durable seam consumed by the
     /// Task 6.2 scheduler; written by `enqueue_provisioning`,
@@ -135,6 +183,25 @@ impl RegistryStore for SurrealRegistryStore {
     }
     async fn write_tenant(&self, _tenant: &Tenant) -> Result<(), MemoryError> {
         Err(unavailable("write_tenant"))
+    }
+    async fn update_tenant_state(
+        &self,
+        _tenant_id: &str,
+        _expected_version: u64,
+        _from: TenantStatus,
+        _to: TenantStatus,
+    ) -> Result<u64, MemoryError> {
+        Err(unavailable("update_tenant_state"))
+    }
+    async fn update_tenant_state_fenced(
+        &self,
+        _tenant_id: &str,
+        _expected_version: u64,
+        _from: TenantStatus,
+        _to: TenantStatus,
+        _lease: &LeaseFence<'_>,
+    ) -> Result<u64, MemoryError> {
+        Err(unavailable("update_tenant_state_fenced"))
     }
     async fn append_provisioning_event(
         &self,
@@ -274,18 +341,89 @@ impl RegistryStore for InMemoryStore {
         Ok(())
     }
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
-        self.accounts
-            .lock()
-            .expect("in-memory store poisoned")
-            .push(account.clone());
+        let mut accounts = self.accounts.lock().expect("in-memory store poisoned");
+        if let Some(slot) = accounts.iter_mut().find(|a| a.id == account.id) {
+            *slot = account.clone();
+        } else {
+            accounts.push(account.clone());
+        }
         Ok(())
     }
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
-        self.tenants
-            .lock()
-            .expect("in-memory store poisoned")
-            .push(tenant.clone());
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        if let Some(slot) = tenants.iter_mut().find(|t| t.id == tenant.id) {
+            *slot = tenant.clone();
+        } else {
+            tenants.push(tenant.clone());
+        }
         Ok(())
+    }
+    async fn update_tenant_state(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version || t.status != from {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
+                t.version, expected_version, t.status, from
+            )));
+        }
+        t.status = to;
+        t.version += 1;
+        Ok(t.version)
+    }
+    async fn update_tenant_state_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+        lease: &LeaseFence<'_>,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version || t.status != from {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
+                t.version, expected_version, t.status, from
+            )));
+        }
+        match &t.provisioning_lease {
+            Some(stored)
+                if stored.owner_id == lease.owner_id
+                    && stored.lease_id == lease.lease_id
+                    && stored.fencing_generation == lease.fencing_generation => {}
+            Some(stored) => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
+                    stored.owner_id,
+                    stored.lease_id,
+                    stored.fencing_generation,
+                    lease.owner_id,
+                    lease.lease_id,
+                    lease.fencing_generation,
+                )));
+            }
+            None => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} fenced CAS failed: no active lease"
+                )));
+            }
+        }
+        t.status = to;
+        t.version += 1;
+        Ok(t.version)
     }
     async fn append_provisioning_event(
         &self,
