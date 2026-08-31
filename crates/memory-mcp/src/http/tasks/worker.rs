@@ -88,10 +88,7 @@ impl TaskStore for DurableTaskStore {
             .await?;
         let rows: Vec<Value> = serde_json::from_value(existing)
             .map_err(|e| MemoryError::Storage(format!("task enqueue dedupe: {e}")))?;
-        if let Some(existing_id) = rows
-            .first()
-            .and_then(|first| record_id_str(&first["id"]))
-        {
+        if let Some(existing_id) = rows.first().and_then(|first| record_id_str(&first["id"])) {
             return Ok(existing_id);
         }
         self.db
