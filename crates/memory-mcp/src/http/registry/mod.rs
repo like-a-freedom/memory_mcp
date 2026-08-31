@@ -5,6 +5,7 @@
 pub mod account;
 pub mod migrations;
 pub mod models;
+pub mod plan;
 pub mod provisioning;
 pub mod storage;
 

@@ -84,8 +84,7 @@ async fn bootstrap_one(
         // inside REPLICA_SCHEMA_RANGE or the binary's
         // N/N-1 gate (Task 6.3) bounces it from Ready. A
         // real Reserved tenant is N-1 waiting to migrate.
-        schema_version: crate::http::leases::migration::CURRENT_SCHEMA_VERSION
-            .saturating_sub(1),
+        schema_version: crate::http::leases::migration::CURRENT_SCHEMA_VERSION.saturating_sub(1),
         retry_stage: None,
         provisioning_lease: None,
         created_at: now,
