@@ -17,9 +17,13 @@ mod tests {
 
     #[test]
     fn tenant_task_table_is_present_in_migration() {
-        let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "migrations", "041_tenant_tasks.surql"]
-            .iter()
-            .collect();
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "migrations",
+            "041_tenant_tasks.surql",
+        ]
+        .iter()
+        .collect();
         let body = std::fs::read_to_string(&path).expect("migration file exists");
         assert!(
             body.contains("DEFINE TABLE IF NOT EXISTS tenant_task"),

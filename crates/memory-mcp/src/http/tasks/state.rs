@@ -179,7 +179,10 @@ mod tests {
         // the intent and aborted BEFORE writing facts;
         // CompletedBeforeCancel means the worker committed
         // facts and only then observed the intent.
-        assert_ne!(TaskState::CancelledBeforeCommit, TaskState::CompletedBeforeCancel);
+        assert_ne!(
+            TaskState::CancelledBeforeCommit,
+            TaskState::CompletedBeforeCancel
+        );
         // And both serialize to distinct snake_case strings.
         assert_eq!(
             serde_json::to_string(&TaskState::CancelledBeforeCommit).unwrap(),
