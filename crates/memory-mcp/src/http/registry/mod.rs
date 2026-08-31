@@ -39,6 +39,66 @@ pub enum PrivilegedEngine {
     LocalMem(Arc<Surreal<Db>>),
 }
 
+impl PrivilegedEngine {
+    /// Bind the engine to a tenant namespace and return a
+    /// `SurrealDbClient` ready for queries. The cleanup
+    /// scheduler uses this to issue per-tenant DELETEs
+    /// against `app_session`.
+    pub async fn bind(
+        &self,
+        tenant: &super::registry::models::Tenant,
+    ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
+        use crate::storage::client::SurrealDbClient;
+        match self {
+            PrivilegedEngine::Remote(privileged) => {
+                let ns_client = (**privileged).clone();
+                ns_client
+                    .use_ns(&tenant.namespace_binding.namespace)
+                    .use_db(&tenant.namespace_binding.database)
+                    .await
+                    .map_err(|err| {
+                        crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
+                    })?;
+                Ok(Arc::new(SurrealDbClient::from_prebound_remote(
+                    ns_client,
+                    &tenant.namespace_binding.namespace,
+                    "info",
+                )))
+            }
+            PrivilegedEngine::Local(privileged) => {
+                let ns_client = (**privileged).clone();
+                ns_client
+                    .use_ns(&tenant.namespace_binding.namespace)
+                    .use_db(&tenant.namespace_binding.database)
+                    .await
+                    .map_err(|err| {
+                        crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
+                    })?;
+                Ok(Arc::new(SurrealDbClient::from_prebound(
+                    ns_client,
+                    &tenant.namespace_binding.namespace,
+                    "info",
+                )))
+            }
+            PrivilegedEngine::LocalMem(privileged) => {
+                let ns_client = (**privileged).clone();
+                ns_client
+                    .use_ns(&tenant.namespace_binding.namespace)
+                    .use_db(&tenant.namespace_binding.database)
+                    .await
+                    .map_err(|err| {
+                        crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
+                    })?;
+                Ok(Arc::new(SurrealDbClient::from_prebound_mem(
+                    ns_client,
+                    &tenant.namespace_binding.namespace,
+                    "info",
+                )))
+            }
+        }
+    }
+}
+
 /// Thin facade over `Arc<dyn RegistryStore>` plus the
 /// privileged engine seam. The auth pipeline (Phase 4 Task
 /// 4.6) dispatches against the trait, not the handle; the
@@ -138,6 +198,15 @@ impl RegistryHandle {
             Ok(e) => (*e).clone(),
             Err(_) => PrivilegedEngine::Remote(Arc::new(Surreal::init())),
         }
+    }
+
+    /// Optional access to the privileged engine. Returns
+    /// `None` when no engine is wired; callers that need
+    /// to skip a tenant (e.g. the cleanup scheduler on a
+    /// test path) use this rather than panicking through
+    /// `tenant_engine()`'s storage-error fallback.
+    pub fn tenant_engine_optional(&self) -> Option<PrivilegedEngine> {
+        self.engine.as_ref().map(|e| (**e).clone())
     }
 
     pub async fn ping(&self) -> bool {
