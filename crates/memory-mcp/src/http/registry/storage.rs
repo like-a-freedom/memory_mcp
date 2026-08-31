@@ -178,6 +178,31 @@ pub trait RegistryStore: Send + Sync + 'static {
         fencing_generation: u64,
     ) -> Result<(), MemoryError>;
 
+    /// Heartbeat an active lease: extend `expires_at` and
+    /// bump `heartbeat_at` if `(owner_id, lease_id,
+    /// fencing_generation)` matches the stored row. Returns
+    /// `Err(Conflict)` on a stale or missing lease.
+    async fn heartbeat_provisioning(
+        &self,
+        tenant_id: &str,
+        owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        heartbeat_at: chrono::DateTime<chrono::Utc>,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), MemoryError>;
+
+    /// List tenants that are due for (re)provisioning. A
+    /// tenant is due when it is in `Reserved`, `Migrating`,
+    /// or `Suspended` AND its stored lease (if any) is
+    /// expired. Limit caps the page size; the scheduler
+    /// walks pages until the result is empty.
+    async fn list_due_provisioning(
+        &self,
+        limit: usize,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
+
     /// Append a provisioning event (durable seam consumed by the
     /// Task 6.2 scheduler; written by `enqueue_provisioning`,
     /// Task 4.7).
@@ -313,6 +338,26 @@ impl RegistryStore for SurrealRegistryStore {
         _fencing_generation: u64,
     ) -> Result<(), MemoryError> {
         Err(unavailable("release_provisioning_lease"))
+    }
+
+    async fn heartbeat_provisioning(
+        &self,
+        _tenant_id: &str,
+        _owner_id: &str,
+        _lease_id: &str,
+        _fencing_generation: u64,
+        _heartbeat_at: chrono::DateTime<chrono::Utc>,
+        _expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), MemoryError> {
+        Err(unavailable("heartbeat_provisioning"))
+    }
+
+    async fn list_due_provisioning(
+        &self,
+        _limit: usize,
+        _now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        Err(unavailable("list_due_provisioning"))
     }
     async fn append_provisioning_event(
         &self,
@@ -601,12 +646,16 @@ impl RegistryStore for InMemoryStore {
         }
         let now = chrono::Utc::now();
         let new_generation = match &t.provisioning_lease {
+            // An active lease held by someone else gets
+            // stolen: the new claim increments the
+            // generation so the previous holder's commits
+            // become stale.
             Some(existing) if existing.expires_at > now => existing.fencing_generation + 1,
-            _ => t
-                .provisioning_lease
-                .as_ref()
-                .map(|l| l.fencing_generation)
-                .unwrap_or(0),
+            // No lease or an expired lease: a fresh claim
+            // starts at generation 1 (gen=0 means "no
+            // claim has ever happened" and is the implicit
+            // starting fence for all tenants).
+            _ => 1u64,
         };
         let lease = ProvisioningLeaseState {
             owner_id: owner_id.to_string(),
@@ -651,6 +700,70 @@ impl RegistryStore for InMemoryStore {
                 "tenant {tenant_id} release failed: lease mismatch"
             ))),
         }
+    }
+    async fn heartbeat_provisioning(
+        &self,
+        tenant_id: &str,
+        owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        heartbeat_at: chrono::DateTime<chrono::Utc>,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), MemoryError> {
+        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        let stored_matches = t
+            .provisioning_lease
+            .as_ref()
+            .map(|stored| {
+                stored.owner_id == owner_id
+                    && stored.lease_id == lease_id
+                    && stored.fencing_generation == fencing_generation
+            })
+            .unwrap_or(false);
+        if stored_matches {
+            let stored = t.provisioning_lease.as_mut().expect("checked above");
+            stored.heartbeat_at = heartbeat_at;
+            stored.expires_at = expires_at;
+            t.version += 1;
+            Ok(())
+        } else {
+            Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} heartbeat failed: lease mismatch"
+            )))
+        }
+    }
+    async fn list_due_provisioning(
+        &self,
+        limit: usize,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut out = Vec::new();
+        for t in tenants.iter() {
+            if !matches!(
+                t.status,
+                TenantStatus::Reserved | TenantStatus::Migrating | TenantStatus::Suspended
+            ) {
+                continue;
+            }
+            let lease_active = t
+                .provisioning_lease
+                .as_ref()
+                .map(|l| l.expires_at > now)
+                .unwrap_or(false);
+            if lease_active {
+                continue;
+            }
+            out.push(t.clone());
+            if out.len() >= limit {
+                break;
+            }
+        }
+        Ok(out)
     }
     async fn append_provisioning_event(
         &self,
