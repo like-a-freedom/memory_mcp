@@ -24,6 +24,22 @@ use crate::http::registry::models::TenantStatus;
 use crate::http::registry::provisioning::transition_fenced;
 use crate::http::registry::storage::LeaseFence;
 
+/// The schema version this binary ships. The actual
+/// migrations live in
+/// `crates/memory-mcp/migrations/*.surql` and bump this
+/// constant via the release process; the runner copies the
+/// value out at compile time so the test path can compare
+/// against it without an env var.
+pub const CURRENT_SCHEMA_VERSION: u32 = 30;
+
+/// Inclusive range of schema versions this replica can
+/// serve. The lower bound is `CURRENT_SCHEMA_VERSION - 1`
+/// so a rolling N → N+1 deployment keeps tenants with
+/// schema N reachable on the old replica while the new
+/// replica migrates them to N+1.
+pub const REPLICA_SCHEMA_RANGE: std::ops::RangeInclusive<u32> =
+    CURRENT_SCHEMA_VERSION.saturating_sub(1)..=CURRENT_SCHEMA_VERSION;
+
 /// Best-effort warn helper. Mirrors the pool's helper; the
 /// workspace does not yet depend on `tracing` or `log`.
 #[allow(dead_code)]
@@ -57,7 +73,14 @@ impl ApplyMigrations for NoopMigrations {
         Ok(())
     }
     async fn apply_migrations(&self, _namespace: &str) -> Result<u32, MemoryError> {
-        Ok(0)
+        // The apply_migrations contract is the new
+        // schema_version after a successful run, not the
+        // number of migrations applied. NoopMigrations is
+        // the test fixture for the state machine; the real
+        // DDL runner computes the target from the
+        // migrations directory and the binary's
+        // CURRENT_SCHEMA_VERSION.
+        Ok(CURRENT_SCHEMA_VERSION)
     }
 }
 
@@ -77,11 +100,26 @@ pub async fn provision_one(
         .find_tenant_by_id(tenant_id)
         .await?
         .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-
     // Re-entry: if the tenant is already in a later state
-    // (e.g. another worker already advanced it), we no-op.
+    // (e.g. another worker already advanced it), we no-op
+    // before any schema or state CAS. This is what makes
+    // `ten_3` (Ready, schema=1) a benign no-op regardless
+    // of the current binary's REPLICA_SCHEMA_RANGE.
     if tenant.status == TenantStatus::Ready {
         return Ok(());
+    }
+
+    // N/N-1 schema compatibility (Task 6.3). A tenant whose
+    // schema_version sits outside this replica's range is
+    // skipped — the scheduler will pick it up on a
+    // compatible replica, or the data plane will surface
+    // the Unavailable (→503) until the tenant is migrated
+    // forward.
+    if !REPLICA_SCHEMA_RANGE.contains(&tenant.schema_version) {
+        return Err(MemoryError::Unavailable(format!(
+            "tenant {tenant_id} schema_version {} outside replica range {:?}",
+            tenant.schema_version, REPLICA_SCHEMA_RANGE
+        )));
     }
 
     let retry_from = tenant.retry_stage;
@@ -380,6 +418,27 @@ mod tests {
         store.write_tenant(tenant).await.unwrap();
     }
 
+    fn reserved_tenant(id: &str, namespace: &str) -> Tenant {
+        Tenant {
+            id: id.to_string(),
+            status: TenantStatus::Reserved,
+            namespace_binding: NamespaceBinding {
+                namespace: namespace.to_string(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            // The Reserved test fixture must sit inside
+            // REPLICA_SCHEMA_RANGE so the N/N-1 gate in
+            // provision_one does not bounce it. Real Reserved
+            // tenants are N-1 (waiting to migrate to N).
+            schema_version: CURRENT_SCHEMA_VERSION.saturating_sub(1),
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        }
+    }
+
     /// Seed a tenant with the supplied lease already attached
     /// (so `transition_fenced` does not see a missing lease).
     async fn seed_with_lease(store: &InMemoryStore, tenant_id: &str, lease: &ProvisioningLease) {
@@ -405,7 +464,7 @@ mod tests {
                 database: "memory".into(),
             },
             plan_version: 1,
-            schema_version: 0,
+            schema_version: CURRENT_SCHEMA_VERSION.saturating_sub(1),
             retry_stage: None,
             provisioning_lease: None,
             created_at: Utc::now(),
@@ -443,7 +502,7 @@ mod tests {
                 database: "memory".into(),
             },
             plan_version: 1,
-            schema_version: 0,
+            schema_version: CURRENT_SCHEMA_VERSION.saturating_sub(1),
             retry_stage: None,
             provisioning_lease: None,
             created_at: Utc::now(),
@@ -496,13 +555,13 @@ mod tests {
                 database: "memory".into(),
             },
             plan_version: 1,
-            schema_version: 0,
+            schema_version: CURRENT_SCHEMA_VERSION.saturating_sub(1),
             retry_stage: None,
             provisioning_lease: None,
             created_at: Utc::now(),
             version: 0,
         };
-        store.write_tenant(&tenant).await.unwrap();
+        seed_reserved(&store, &tenant).await;
         run_due_provisioning_for(registry.clone(), store.clone(), 1, Utc::now())
             .await
             .expect("scheduler tick");
@@ -513,5 +572,54 @@ mod tests {
             .expect("present");
         assert_eq!(after.status, TenantStatus::Ready);
         assert!(after.provisioning_lease.is_none());
+    }
+
+    #[tokio::test]
+    async fn replica_skips_tenant_outside_schema_range() {
+        let store = Arc::new(InMemoryStore::default());
+        // Place the tenant at a schema_version that sits
+        // below REPLICA_SCHEMA_RANGE.start().
+        let too_old = REPLICA_SCHEMA_RANGE.start().saturating_sub(1);
+        let mut tenant = reserved_tenant("ten_old", "tns_old");
+        tenant.schema_version = too_old;
+        seed_reserved(&store, &tenant).await;
+        let lease = lease_for("ten_old");
+        seed_with_lease(&store, "ten_old", &lease).await;
+        let result = provision_one(store.clone(), "ten_old", lease, Arc::new(NoopMigrations)).await;
+        assert!(
+            matches!(result, Err(MemoryError::Unavailable(_))),
+            "expected Unavailable for out-of-range schema, got: {result:?}"
+        );
+        // The tenant must remain in its original status;
+        // provision_one must not advance it.
+        let after = store
+            .find_tenant_by_id("ten_old")
+            .await
+            .expect("read")
+            .expect("present");
+        assert_eq!(after.status, TenantStatus::Reserved);
+    }
+
+    #[tokio::test]
+    async fn migration_after_compatible_roll_marks_tenant_ready() {
+        let store = Arc::new(InMemoryStore::default());
+        // Place the tenant at REPLICA_SCHEMA_RANGE.start()
+        // (i.e. one step behind current) so a single
+        // provision_one call lands it on CURRENT_SCHEMA_VERSION.
+        let mut tenant = reserved_tenant("ten_roll", "tns_roll");
+        tenant.schema_version = *REPLICA_SCHEMA_RANGE.start();
+        seed_reserved(&store, &tenant).await;
+        let lease = lease_for("ten_roll");
+        seed_with_lease(&store, "ten_roll", &lease).await;
+        provision_one(store.clone(), "ten_roll", lease, Arc::new(NoopMigrations))
+            .await
+            .expect("provision succeeds on N-1");
+        let after = store
+            .find_tenant_by_id("ten_roll")
+            .await
+            .expect("read")
+            .expect("present");
+        assert_eq!(after.status, TenantStatus::Ready);
+        assert_eq!(after.schema_version, CURRENT_SCHEMA_VERSION);
     }
 }
