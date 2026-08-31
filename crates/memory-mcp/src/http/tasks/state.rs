@@ -85,36 +85,23 @@ pub trait TaskStore: Send + Sync + 'static {
     /// episode path enforces).
     async fn enqueue(
         &self,
-        tenant_id: &str,
         fingerprint: &str,
         params: serde_json::Value,
     ) -> Result<String, MemoryError>;
 
     /// Load the durable record (state, version, progress,
     /// result, error). A missing record is `Ok(None)`.
-    async fn load(
-        &self,
-        tenant_id: &str,
-        task_id: &str,
-    ) -> Result<Option<TenantTaskRecord>, MemoryError>;
+    async fn load(&self, task_id: &str) -> Result<Option<TenantTaskRecord>, MemoryError>;
 
     /// Set cancellation intent; never deletes (spec §10.2).
-    async fn set_cancellation_intent(
-        &self,
-        tenant_id: &str,
-        task_id: &str,
-    ) -> Result<(), MemoryError>;
+    async fn set_cancellation_intent(&self, task_id: &str) -> Result<(), MemoryError>;
 
     /// Claim a queued task or a running task whose lease
     /// has expired. Increments the generation, sets
     /// owner/id/expiry, and returns the resulting
     /// `TaskHandle`. `Ok(None)` when no task is due; never
     /// creates a second task for the same fingerprint.
-    async fn claim_next_due(
-        &self,
-        tenant_id: &str,
-        replica_id: &str,
-    ) -> Result<Option<TaskHandle>, MemoryError>;
+    async fn claim_next_due(&self, replica_id: &str) -> Result<Option<TaskHandle>, MemoryError>;
 
     /// Update progress with a `lease_generation = current`
     /// CAS.
@@ -144,16 +131,16 @@ pub trait TaskStore: Send + Sync + 'static {
 
     /// Requeue `running` tasks whose lease expired back to
     /// `Queued`. Returns the number of tasks requeued.
-    async fn requeue_expired_running(&self, tenant_id: &str) -> Result<u64, MemoryError>;
+    async fn requeue_expired_running(&self) -> Result<u64, MemoryError>;
 
     /// Reconcile the terminal outcome from durable
     /// artifacts + fingerprint (spec §10.2). Returns the
     /// number of tasks reconciled.
-    async fn reconcile_artifacts(&self, tenant_id: &str) -> Result<u64, MemoryError>;
+    async fn reconcile_artifacts(&self) -> Result<u64, MemoryError>;
 
     /// Delete rows past `retention_expiry`. Returns the
     /// number deleted.
-    async fn delete_expired(&self, tenant_id: &str) -> Result<u64, MemoryError>;
+    async fn delete_expired(&self) -> Result<u64, MemoryError>;
 }
 
 #[cfg(test)]

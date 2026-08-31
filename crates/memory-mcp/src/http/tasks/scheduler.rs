@@ -48,17 +48,18 @@ pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(),
             bound_db,
             tenant.namespace_binding.namespace.clone(),
         ));
-        let task_store = crate::http::tasks::worker::DurableTaskStore::new(bound_db.clone());
+        let task_store =
+            crate::http::tasks::worker::DurableTaskStore::new(bound_db.clone(), tenant.id.clone());
         // Retry expired running tasks.
-        if let Err(e) = task_store.requeue_expired_running(&tenant.id).await {
+        if let Err(e) = task_store.requeue_expired_running().await {
             eprintln!("memory_mcp::tasks: requeue failed for {}: {e}", tenant.id);
         }
         // Reconcile artifacts (bounded seam for now).
-        if let Err(e) = task_store.reconcile_artifacts(&tenant.id).await {
+        if let Err(e) = task_store.reconcile_artifacts().await {
             eprintln!("memory_mcp::tasks: reconcile failed for {}: {e}", tenant.id);
         }
         // Delete expired retention rows.
-        if let Err(e) = task_store.delete_expired(&tenant.id).await {
+        if let Err(e) = task_store.delete_expired().await {
             eprintln!(
                 "memory_mcp::tasks: delete_expired failed for {}: {e}",
                 tenant.id

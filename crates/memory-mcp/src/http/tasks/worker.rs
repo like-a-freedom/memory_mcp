@@ -33,11 +33,12 @@ pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 
 pub struct DurableTaskStore {
     db: Arc<BoundDbClient>,
+    tenant_id: String,
 }
 
 impl DurableTaskStore {
-    pub fn new(db: Arc<BoundDbClient>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<BoundDbClient>, tenant_id: String) -> Self {
+        Self { db, tenant_id }
     }
 
     fn to_datetime(t: DateTime<Utc>) -> String {
@@ -62,12 +63,7 @@ fn record_id_str(v: &Value) -> Option<String> {
 
 #[async_trait::async_trait]
 impl TaskStore for DurableTaskStore {
-    async fn enqueue(
-        &self,
-        tenant_id: &str,
-        fingerprint: &str,
-        params: Value,
-    ) -> Result<String, MemoryError> {
+    async fn enqueue(&self, fingerprint: &str, params: Value) -> Result<String, MemoryError> {
         let now = Utc::now();
         let retention = now + chrono::Duration::seconds(RETENTION_SECS);
         let id = uuid::Uuid::new_v4().to_string();
@@ -81,7 +77,7 @@ impl TaskStore for DurableTaskStore {
                  WHERE tenant_id = $tenant_id AND fingerprint = $fingerprint AND state != 'failed' \
                  LIMIT 1;",
                 Some(json!({
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                     "fingerprint": fingerprint,
                 })),
             )
@@ -105,7 +101,7 @@ impl TaskStore for DurableTaskStore {
                  retention_expiry = type::datetime($retention);",
                 Some(json!({
                     "id": id,
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                     "fingerprint": fingerprint,
                     "params": params,
                     "now": Self::to_datetime(now),
@@ -116,18 +112,14 @@ impl TaskStore for DurableTaskStore {
         Ok(id)
     }
 
-    async fn load(
-        &self,
-        tenant_id: &str,
-        task_id: &str,
-    ) -> Result<Option<TenantTaskRecord>, MemoryError> {
+    async fn load(&self, task_id: &str) -> Result<Option<TenantTaskRecord>, MemoryError> {
         let result = self
             .db
             .query(
                 "SELECT * FROM tenant_task WHERE id = type::record('tenant_task', $task_id) AND tenant_id = $tenant_id LIMIT 1;",
                 Some(json!({
                     "task_id": task_id,
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                 })),
             )
             .await?;
@@ -139,11 +131,7 @@ impl TaskStore for DurableTaskStore {
         }
     }
 
-    async fn set_cancellation_intent(
-        &self,
-        tenant_id: &str,
-        task_id: &str,
-    ) -> Result<(), MemoryError> {
+    async fn set_cancellation_intent(&self, task_id: &str) -> Result<(), MemoryError> {
         // Cooperative intent, never deletes. A Queued task
         // becomes Cancelled; a Running task becomes
         // CancelRequested (the worker observes the intent
@@ -159,7 +147,7 @@ impl TaskStore for DurableTaskStore {
                  WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id;",
                 Some(json!({
                     "id": task_id,
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
                 })),
             )
@@ -167,11 +155,7 @@ impl TaskStore for DurableTaskStore {
         Ok(())
     }
 
-    async fn claim_next_due(
-        &self,
-        tenant_id: &str,
-        replica_id: &str,
-    ) -> Result<Option<TaskHandle>, MemoryError> {
+    async fn claim_next_due(&self, replica_id: &str) -> Result<Option<TaskHandle>, MemoryError> {
         let now = Utc::now();
         // Pick a queued task or a running task whose lease
         // has expired, bump generation to 1 (or prev+1),
@@ -193,7 +177,7 @@ impl TaskStore for DurableTaskStore {
                     "owner": replica_id,
                     "lease_expiry": Self::to_datetime(now + chrono::Duration::seconds(60)),
                     "now": Self::to_datetime(now),
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                 })),
             )
             .await?;
@@ -208,7 +192,7 @@ impl TaskStore for DurableTaskStore {
                     .and_then(|v| v.as_u64())
                     .ok_or_else(|| MemoryError::Storage("task claim: no generation".into()))?;
                 Ok(Some(TaskHandle {
-                    tenant_id: tenant_id.to_string(),
+                    tenant_id: self.tenant_id.clone(),
                     task_id,
                     lease_owner: replica_id.to_string(),
                     lease_generation,
@@ -271,7 +255,7 @@ impl TaskStore for DurableTaskStore {
         .await
     }
 
-    async fn requeue_expired_running(&self, tenant_id: &str) -> Result<u64, MemoryError> {
+    async fn requeue_expired_running(&self) -> Result<u64, MemoryError> {
         let now = Utc::now();
         let result = self
             .db
@@ -280,7 +264,7 @@ impl TaskStore for DurableTaskStore {
                  WHERE tenant_id = $tenant_id AND state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)) \
                  RETURN id;",
                 Some(json!({
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
                 })),
             )
@@ -290,7 +274,7 @@ impl TaskStore for DurableTaskStore {
         Ok(rows.len() as u64)
     }
 
-    async fn reconcile_artifacts(&self, _tenant_id: &str) -> Result<u64, MemoryError> {
+    async fn reconcile_artifacts(&self) -> Result<u64, MemoryError> {
         // The reconciler derives the terminal outcome from
         // durable artifacts + fingerprint. The concrete
         // artifact scan is the extraction pipeline's job
@@ -300,14 +284,14 @@ impl TaskStore for DurableTaskStore {
         Ok(0)
     }
 
-    async fn delete_expired(&self, tenant_id: &str) -> Result<u64, MemoryError> {
+    async fn delete_expired(&self) -> Result<u64, MemoryError> {
         let now = Utc::now();
         let result = self
             .db
             .query(
                 "DELETE FROM tenant_task WHERE tenant_id = $tenant_id AND type::datetime(retention_expiry) <= type::datetime($now) RETURN id;",
                 Some(json!({
-                    "tenant_id": tenant_id,
+                    "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
                 })),
             )
@@ -468,14 +452,14 @@ mod tests {
             .await
             .expect("define tenant_task table");
         let bound = Arc::new(BoundDbClient::new(client, "task_tests"));
-        DurableTaskStore::new(bound)
+        DurableTaskStore::new(bound, "test_tenant".into())
     }
 
     #[tokio::test]
     async fn enqueue_dedupes_by_fingerprint() {
         let store = fresh_store().await;
         let id1 = store
-            .enqueue("ten_a", "fp_1", json!({"source": "a"}))
+            .enqueue("fp_1", json!({"source": "a"}))
             .await
             .expect("first enqueue");
         // Inspect the raw row so the dedupe failure is
@@ -483,7 +467,7 @@ mod tests {
         let raw = store
             .db
             .query(
-                "SELECT * FROM tenant_task WHERE tenant_id = 'ten_a' AND fingerprint = 'fp_1';",
+                "SELECT * FROM tenant_task WHERE tenant_id = 'test_tenant' AND fingerprint = 'fp_1';",
                 None,
             )
             .await
@@ -501,7 +485,7 @@ mod tests {
         let id_field = first_row.get("id");
         eprintln!("raw row: {first_row:?}  id field: {id_field:?}");
         let id2 = store
-            .enqueue("ten_a", "fp_1", json!({"source": "a"}))
+            .enqueue("fp_1", json!({"source": "a"}))
             .await
             .expect("duplicate enqueue");
         assert_eq!(id1, id2, "same fingerprint must return the same task id");
@@ -510,12 +494,9 @@ mod tests {
     #[tokio::test]
     async fn stale_fenced_worker_cannot_transition_terminal_state() {
         let store = fresh_store().await;
-        let id = store
-            .enqueue("ten_b", "fp_2", json!({}))
-            .await
-            .expect("enqueue");
+        let id = store.enqueue("fp_2", json!({})).await.expect("enqueue");
         let handle = store
-            .claim_next_due("ten_b", "replica_a")
+            .claim_next_due("replica_a")
             .await
             .expect("claim")
             .expect("task due");
@@ -535,7 +516,7 @@ mod tests {
             )
             .await;
         let stolen = store
-            .claim_next_due("ten_b", "replica_b")
+            .claim_next_due("replica_b")
             .await
             .expect("claim")
             .expect("running task with expired lease is claimable");
@@ -554,18 +535,15 @@ mod tests {
     #[tokio::test]
     async fn cancel_during_running_does_not_rollback_committed_facts() {
         let store = fresh_store().await;
-        let id = store
-            .enqueue("ten_c", "fp_3", json!({}))
-            .await
-            .expect("enqueue");
+        let id = store.enqueue("fp_3", json!({})).await.expect("enqueue");
         let handle = store
-            .claim_next_due("ten_c", "replica_a")
+            .claim_next_due("replica_a")
             .await
             .expect("claim")
             .expect("task due");
         // Worker sets intent after committing facts.
         store
-            .set_cancellation_intent("ten_c", &id)
+            .set_cancellation_intent(&id)
             .await
             .expect("set intent");
         // The task is now cancel_requested; the worker
@@ -575,23 +553,16 @@ mod tests {
             .complete_fenced(&handle, json!({"ok": true}), true)
             .await
             .expect("complete before cancel");
-        let record = store
-            .load("ten_c", &id)
-            .await
-            .expect("load")
-            .expect("present");
+        let record = store.load(&id).await.expect("load").expect("present");
         assert_eq!(record.state, TaskState::CompletedBeforeCancel);
     }
 
     #[tokio::test]
     async fn reconciler_recovers_terminal_outcome_from_artifacts() {
         let store = fresh_store().await;
-        let id = store
-            .enqueue("ten_d", "fp_4", json!({}))
-            .await
-            .expect("enqueue");
+        let id = store.enqueue("fp_4", json!({})).await.expect("enqueue");
         let handle = store
-            .claim_next_due("ten_d", "replica_a")
+            .claim_next_due("replica_a")
             .await
             .expect("claim")
             .expect("task due");
@@ -601,13 +572,9 @@ mod tests {
         // fingerprint + artifact presence. The concrete
         // artifact scan is wired in Task 8.5; this test
         // pins the seam's contract (idempotent, bounded).
-        let count = store.reconcile_artifacts("ten_d").await.expect("reconcile");
+        let count = store.reconcile_artifacts().await.expect("reconcile");
         assert_eq!(count, 0, "reconciler seam is idempotent and bounded");
-        let record = store
-            .load("ten_d", &id)
-            .await
-            .expect("load")
-            .expect("present");
+        let record = store.load(&id).await.expect("load").expect("present");
         // The record is untouched by the empty reconciler.
         assert_eq!(record.state, TaskState::Running);
         let _ = handle;
@@ -616,12 +583,9 @@ mod tests {
     #[tokio::test]
     async fn expired_tasks_are_deleted_after_retention_window() {
         let store = fresh_store().await;
-        let id = store
-            .enqueue("ten_e", "fp_5", json!({}))
-            .await
-            .expect("enqueue");
+        let id = store.enqueue("fp_5", json!({})).await.expect("enqueue");
         let handle = store
-            .claim_next_due("ten_e", "replica_a")
+            .claim_next_due("replica_a")
             .await
             .expect("claim")
             .expect("task due");
@@ -630,7 +594,7 @@ mod tests {
             .await
             .expect("complete");
         // Retention is 7 days; nothing is due yet.
-        let deleted = store.delete_expired("ten_e").await.expect("delete");
+        let deleted = store.delete_expired().await.expect("delete");
         assert_eq!(deleted, 0);
         // Backdate the retention_expiry so the row is due.
         let now = Utc::now();
@@ -644,10 +608,7 @@ mod tests {
                 })),
             )
             .await;
-        let deleted = store
-            .delete_expired("ten_e")
-            .await
-            .expect("delete backdated");
+        let deleted = store.delete_expired().await.expect("delete backdated");
         assert_eq!(deleted, 1);
     }
 }
