@@ -26,9 +26,13 @@ mod tests {
     /// file and asserting the table is defined.
     #[test]
     fn app_session_table_is_present_in_migration() {
-        let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "migrations", "040_app_sessions.surql"]
-            .iter()
-            .collect();
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "migrations",
+            "040_app_sessions.surql",
+        ]
+        .iter()
+        .collect();
         let body = std::fs::read_to_string(&path).expect("migration file exists");
         assert!(
             body.contains("DEFINE TABLE IF NOT EXISTS app_session"),

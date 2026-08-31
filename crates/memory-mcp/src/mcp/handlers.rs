@@ -70,6 +70,14 @@ pub struct MemoryMcp {
     service: Arc<MemoryService>,
     #[cfg(feature = "mcp-apps")]
     session_manager: SessionManager,
+    /// Durable app-session backend, wired only by the
+    /// HTTP SaaS path. When `Some`, `open_app` and
+    /// `app_command` route through `AppSessionStore`
+    /// against the tenant's SurrealDB namespace; when
+    /// `None`, the dispatch falls through to the
+    /// in-memory `session_manager` (stdio and tests).
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    durable_app_sessions: Option<std::sync::Arc<crate::http::app_sessions::store::AppSessionStore>>,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
     /// When true, advertise and negotiate only MCP 2026-07-28 (HTTP SaaS
@@ -91,6 +99,8 @@ impl MemoryMcp {
             service: Arc::new(service),
             #[cfg(feature = "mcp-apps")]
             session_manager: SessionManager::new(),
+            #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+            durable_app_sessions: None,
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
             modern_protocol_only: false,
@@ -103,6 +113,21 @@ impl MemoryMcp {
             modern_protocol_only: true,
             ..Self::new(service)
         }
+    }
+
+    /// Wire the durable `AppSessionStore` so `open_app`
+    /// and `app_command` route through the tenant's
+    /// SurrealDB namespace rather than the in-process
+    /// store. The HTTP SaaS path calls this on
+    /// `MemoryMcp::new_modern` before installing the
+    /// handler into the request pipeline.
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    pub fn with_durable_app_sessions(
+        mut self,
+        store: std::sync::Arc<crate::http::app_sessions::store::AppSessionStore>,
+    ) -> Self {
+        self.durable_app_sessions = Some(store);
+        self
     }
 
     /// Returns a reference to the underlying `MemoryService`.

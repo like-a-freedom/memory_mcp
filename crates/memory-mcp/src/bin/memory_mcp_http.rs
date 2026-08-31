@@ -44,16 +44,19 @@ async fn main() -> ExitCode {
 
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
-    let scheduler_hooks = match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only()
-        .map(|hooks| {
-            hooks.with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
-        }) {
-        Ok(hooks) => hooks,
-        Err(err) => {
-            eprintln!("scheduler config error: {err}");
-            return ExitCode::from(2);
-        }
-    };
+    let scheduler_hooks =
+        match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only().map(
+            |hooks| {
+                hooks
+                    .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
+            },
+        ) {
+            Ok(hooks) => hooks,
+            Err(err) => {
+                eprintln!("scheduler config error: {err}");
+                return ExitCode::from(2);
+            }
+        };
     let scheduler = memory_mcp::http::leases::scheduler::start(
         state.registry.clone(),
         scheduler_hooks,
