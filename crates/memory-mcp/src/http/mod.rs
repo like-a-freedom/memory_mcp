@@ -1,6 +1,7 @@
 //! HTTP SaaS profile (ADR-0052). Gated on `streamable-http` in lib.rs:
 //! `#[cfg(feature = "streamable-http")] pub mod http;`
 
+pub mod app_sessions;
 pub mod config;
 pub mod health;
 pub mod leases;

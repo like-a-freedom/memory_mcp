@@ -79,12 +79,12 @@ streamable-http = [
     "dep:rand",
     "dep:hmac",
     "dep:subtle",
+    "dep:base64",
 ]
 control-plane = [
     "streamable-http",
     "dep:oauth2",
     "dep:jsonwebtoken",
-    "dep:base64",
 ]
 control-plane-ui = ["control-plane"]
 # Test-only: exposes #[cfg(any(test, feature = "test-fixtures"))] fixtures to
