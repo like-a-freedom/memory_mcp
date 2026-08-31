@@ -14,6 +14,7 @@ pub mod router;
 pub mod runtime;
 pub mod server;
 pub mod shutdown;
+pub mod subscriptions;
 pub mod sync;
 pub mod tasks;
 pub mod transport;
