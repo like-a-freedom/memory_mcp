@@ -281,6 +281,21 @@ impl HttpConfig {
     }
 
     pub fn validate(&self) -> Result<(), MemoryError> {
+        // Reject the test-only bootstrap env var unless the
+        // `test-fixtures` feature is enabled (Task 5.8).
+        // The literal is intentional: a production build
+        // cannot accidentally gain the bootstrap impl by
+        // name resolution.
+        #[cfg(not(feature = "test-fixtures"))]
+        if std::env::var("MEMORY_MCP_HTTP_TEST_BOOTSTRAP")
+            .ok()
+            .is_some()
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "MEMORY_MCP_HTTP_TEST_BOOTSTRAP is only valid with the test-fixtures feature"
+                    .into(),
+            ));
+        }
         if self.bind.ip().is_unspecified() && !self.public_base_url.contains("localhost") {
             eprintln!(
                 "memory_mcp::http::config: binding to unspecified address; production must run behind a reverse proxy"

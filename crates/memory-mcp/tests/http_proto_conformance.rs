@@ -31,6 +31,12 @@ fn free_port() -> u16 {
     listener.local_addr().expect("local addr").port()
 }
 
+/// Fixed bootstrap API key for the conformance suite. The
+/// `name=key` form is `<account_name>=<api_key>`; the test
+/// env var (5.8) is `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`.
+const BOOTSTRAP_KEY: &str =
+    "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_conformancesuite0123456789abcdef";
+
 fn base_env(port: u16) -> Vec<(String, String)> {
     let zeros = "0".repeat(64);
     vec![
@@ -65,6 +71,10 @@ fn base_env(port: u16) -> Vec<(String, String)> {
         (
             "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI".into(),
             "false".into(),
+        ),
+        (
+            "MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
+            format!("conformance={BOOTSTRAP_KEY}"),
         ),
     ]
 }
@@ -227,6 +237,7 @@ async fn no_mcp_session_id_header_is_set() {
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2026-07-28")
         .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await
@@ -259,6 +270,7 @@ async fn server_discover_advertises_only_2026_07_28() {
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2026-07-28")
         .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await
@@ -287,6 +299,7 @@ async fn unsupported_legacy_version_returns_400() {
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2025-03-26")
         .header("Mcp-Method", "ping")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await
@@ -305,6 +318,7 @@ async fn body_over_limit_returns_413() {
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2026-07-28")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(big)
         .send()
         .await
@@ -332,6 +346,7 @@ async fn missing_accept_returns_406() {
         .header("MCP-Protocol-Version", "2026-07-28")
         .header("Mcp-Method", "ping")
         .header("accept", "*/*")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await
@@ -359,6 +374,7 @@ async fn header_body_mismatch_returns_header_mismatch_error() {
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2026-07-28")
         .header("Mcp-Method", "ping")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await
@@ -390,6 +406,7 @@ async fn tools_call_requires_matching_mcp_name() {
         .header("accept", "application/json, text/event-stream")
         .header("MCP-Protocol-Version", "2026-07-28")
         .header("Mcp-Method", "tools/call")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
         .body(body.to_string())
         .send()
         .await

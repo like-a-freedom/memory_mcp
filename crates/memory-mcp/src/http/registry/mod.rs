@@ -84,6 +84,23 @@ impl RegistryHandle {
         }
     }
 
+    /// Convenience: build a Mem engine and use it for both the
+    /// in-memory store and the privileged handle. The
+    /// resulting handle is the test-only fixture used by the
+    /// conformance suite (Task 5.8).
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub async fn in_memory_with_default_mem_engine() -> Self {
+        let db = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
+            .await
+            .expect("mem engine init");
+        db.use_ns("control").use_db("control").await.unwrap();
+        let db_arc: Arc<Surreal<Db>> = Arc::new(db);
+        Self {
+            store: Arc::new(InMemoryStore::default()),
+            engine: Some(Arc::new(PrivilegedEngine::LocalMem(db_arc))),
+        }
+    }
+
     /// Set the privileged engine after construction. Used by
     /// `HttpState::new` (Task 5.6) to wire the production
     /// engine without exposing the field publicly.

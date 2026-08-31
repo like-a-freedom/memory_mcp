@@ -17,6 +17,9 @@ pub mod sync;
 pub mod transport;
 pub mod validation;
 
+#[cfg(feature = "test-fixtures")]
+pub mod test_bootstrap;
+
 use std::sync::Arc;
 
 use config::HttpConfig;
@@ -59,7 +62,7 @@ impl HttpState {
         config: HttpConfig,
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = registry::RegistryHandle::new();
+        let registry = Self::build_registry().await;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -90,7 +93,7 @@ impl HttpState {
     /// Phase 5 production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = registry::RegistryHandle::new();
+        let registry = Self::build_registry().await;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -115,6 +118,24 @@ impl HttpState {
             authenticator,
             account_resolver,
         }))
+    }
+
+    /// Build the registry handle. Test-fixtures builds use
+    /// the in-memory backend with a privileged Mem engine so
+    /// the bootstrap (Task 5.8) can write accounts, tenants,
+    /// and api keys, and the runtime pool can build
+    /// per-tenant handles. Production builds use the
+    /// placeholder; Task 5.x replaces the placeholder with a
+    /// real SurrealDB backend.
+    async fn build_registry() -> registry::RegistryHandle {
+        #[cfg(any(test, feature = "test-fixtures"))]
+        {
+            registry::RegistryHandle::in_memory_with_default_mem_engine().await
+        }
+        #[cfg(not(any(test, feature = "test-fixtures")))]
+        {
+            registry::RegistryHandle::new()
+        }
     }
 }
 

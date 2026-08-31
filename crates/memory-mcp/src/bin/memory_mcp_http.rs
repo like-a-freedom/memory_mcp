@@ -36,6 +36,12 @@ async fn main() -> ExitCode {
         }
     };
 
+    #[cfg(feature = "test-fixtures")]
+    if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_bootstrap(&state).await {
+        eprintln!("test bootstrap error: {err}");
+        return ExitCode::from(2);
+    }
+
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
     bootstrap::emit_startup_log(&logger, &cfg);
