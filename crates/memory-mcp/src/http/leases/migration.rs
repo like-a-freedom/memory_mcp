@@ -24,6 +24,13 @@ use crate::http::registry::models::TenantStatus;
 use crate::http::registry::provisioning::transition_fenced;
 use crate::http::registry::storage::LeaseFence;
 
+/// Best-effort warn helper. Mirrors the pool's helper; the
+/// workspace does not yet depend on `tracing` or `log`.
+#[allow(dead_code)]
+fn tracing_warn(message: &str) {
+    let _ = message;
+}
+
 /// What `provision_one` needs from a privileged SurrealDB
 /// engine: `ensure_namespace` (Task 5.2) plus the ability to
 /// apply the versioned migrations in `storage/migrations.rs`
@@ -188,6 +195,24 @@ pub async fn provision_one(
         &lease,
     )
     .await?;
+    // Release the lease. Best-effort: a stale release is
+    // surfaced as `Conflict`; the tenant is already Ready and
+    // the operator can clear the lease via the next scheduler
+    // sweep. We do not regress the Ready transition on a
+    // release failure.
+    if let Err(error) = store
+        .release_provisioning_lease(
+            tenant_id,
+            &lease.owner_id,
+            &lease.lease_id,
+            lease.fencing_generation,
+        )
+        .await
+    {
+        tracing_warn(&format!(
+            "post-Ready lease release failed for {tenant_id}: {error}"
+        ));
+    }
     Ok(())
 }
 
