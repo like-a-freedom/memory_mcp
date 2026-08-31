@@ -15,6 +15,7 @@ pub mod runtime;
 pub mod server;
 pub mod shutdown;
 pub mod sync;
+pub mod tasks;
 pub mod transport;
 pub mod validation;
 
