@@ -49,6 +49,7 @@ async fn main() -> ExitCode {
             |hooks| {
                 hooks
                     .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
+                    .with_additional_job(memory_mcp::http::tasks::scheduler::scheduler_job())
             },
         ) {
             Ok(hooks) => hooks,
