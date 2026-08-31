@@ -8,6 +8,7 @@
 //! commit; the scheduler module owns the retry /
 //! reconcile / retention pass.
 
+pub mod scheduler;
 pub mod state;
 pub mod worker;
 
