@@ -20,18 +20,18 @@ pub const REGISTRY_MIGRATION_DIR: &str = "crates/memory-mcp/migrations";
 /// Apply every `*.surql` file in the registry migration
 /// directory against the bound control client. The function
 /// signature is the seam `SurrealRegistryStore::connect_*`
-/// calls; the real SurrealDB query path lands in Phase 6
-/// (Task 6.1 lease primitive + Task 6.2 scheduler). Phase 5
-/// ships the in-memory recorder so the test path is exercised
-/// end-to-end.
+/// calls; the production store is currently a placeholder
+/// that returns `Unavailable` from every read, so this
+/// function is exercised through the in-memory recorder
+/// (which is what the test path binds).
 pub async fn apply_registry_migrations(
     store: &Arc<SurrealRegistryStore>,
 ) -> Result<Vec<String>, MemoryError> {
-    // Phase 5: the production store is a placeholder that
-    // returns Unavailable from every read. The migration
-    // recorder (a thin wrapper around the in-memory backend)
-    // is what tests exercise; the real SurrealDB query path
-    // lands in Phase 6.
+    // The production store is a placeholder that returns
+    // Unavailable from every read. The migration recorder
+    // (a thin wrapper around the in-memory backend) is what
+    // tests exercise; the real SurrealDB query path is
+    // not yet wired.
     let recorder: Arc<dyn RegistryStore> = store.clone();
     let migrations = list_migrations();
     for m in &migrations {

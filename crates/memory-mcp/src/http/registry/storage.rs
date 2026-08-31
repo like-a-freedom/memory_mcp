@@ -236,7 +236,7 @@ impl Default for SurrealRegistryStore {
 
 fn unavailable(method: &str) -> MemoryError {
     MemoryError::Unavailable(format!(
-        "SurrealRegistryStore::{method} is not yet wired; the SQL backend lands in Phase 6 (Task 6.1 lease primitive + Task 6.2 scheduler); Phase 5 ships the trait surface + InMemoryStore test backend + the test-fixtures bootstrap so the conformance suite is green"
+        "SurrealRegistryStore::{method} is not yet wired; the production store returns Unavailable and the test path uses InMemoryStore through the test-fixtures bootstrap"
     ))
 }
 

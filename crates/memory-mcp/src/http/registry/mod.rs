@@ -151,9 +151,9 @@ impl RegistryHandle {
         Arc::clone(&self.store)
     }
 
-    /// Build a handle from a store without an engine. The
-    /// scheduler path (Task 6.2) uses this for tests; the
-    /// production binary uses `Self::new()` or
+    /// Build a handle from a store without an engine.
+    /// The scheduler uses this for tests; the production
+    /// binary uses `Self::new()` or
     /// `Self::in_memory_with_default_mem_engine`.
     #[cfg(any(test, feature = "test-fixtures"))]
     pub fn from_store(store: Arc<dyn RegistryStore>) -> Self {

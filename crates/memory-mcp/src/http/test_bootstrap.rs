@@ -80,10 +80,10 @@ async fn bootstrap_one(
             database: "memory".into(),
         },
         plan_version: 1,
-        // The conformance suite's bootstrap tenant must sit
-        // inside REPLICA_SCHEMA_RANGE or the binary's
-        // N/N-1 gate (Task 6.3) bounces it from Ready. A
-        // real Reserved tenant is N-1 waiting to migrate.
+        // The conformance suite's bootstrap tenant must
+        // sit inside REPLICA_SCHEMA_RANGE or the binary's
+        // N/N-1 gate bounces it from Ready. A real
+        // Reserved tenant is N-1 waiting to migrate.
         schema_version: crate::http::leases::migration::CURRENT_SCHEMA_VERSION.saturating_sub(1),
         retry_stage: None,
         provisioning_lease: None,

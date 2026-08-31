@@ -109,7 +109,7 @@ pub async fn provision_one(
         return Ok(());
     }
 
-    // N/N-1 schema compatibility (Task 6.3). A tenant whose
+    // N/N-1 schema compatibility. A tenant whose
     // schema_version sits outside this replica's range is
     // skipped — the scheduler will pick it up on a
     // compatible replica, or the data plane will surface
@@ -324,9 +324,9 @@ pub async fn run_due_provisioning_for(
         // `provision_one` (which already runs migrations
         // and then releases) and rely on the
         // `with_heartbeat` helper only when the work is
-        // long-running. For Phase 6.2 the migration pass
-        // itself is bounded; if it ever exceeds the lease
-        // window the next scheduler tick will reclaim.
+        // long-running. The current migration pass is
+        // bounded; if it ever exceeds the lease window
+        // the next scheduler tick will reclaim.
         if let Err(error) =
             provision_one(store.clone(), &tenant.id, typed, Arc::new(NoopMigrations)).await
         {
