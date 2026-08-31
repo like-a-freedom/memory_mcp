@@ -44,16 +44,35 @@ async fn main() -> ExitCode {
 
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
+    let scheduler_hooks =
+        match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only() {
+            Ok(hooks) => hooks,
+            Err(err) => {
+                eprintln!("scheduler config error: {err}");
+                return ExitCode::from(2);
+            }
+        };
+    let scheduler = memory_mcp::http::leases::scheduler::start(
+        state.registry.clone(),
+        scheduler_hooks,
+        state.shutdown.token(),
+    );
+
     bootstrap::emit_startup_log(&logger, &cfg);
-    if let Err(err) = server::serve(
+    let server_result = server::serve(
         cfg,
         router::build_router(state.clone()),
         state.shutdown.clone(),
     )
-    .await
-    {
-        eprintln!("server error: {err}");
-        return ExitCode::FAILURE;
+    .await;
+    state.admission.close();
+    state.shutdown.begin();
+    scheduler.join().await;
+    match server_result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("server error: {err}");
+            ExitCode::FAILURE
+        }
     }
-    ExitCode::SUCCESS
 }
