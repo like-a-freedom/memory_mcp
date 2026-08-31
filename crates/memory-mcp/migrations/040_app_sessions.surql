@@ -12,7 +12,7 @@ DEFINE FIELD IF NOT EXISTS handle ON app_session TYPE string;
 DEFINE FIELD IF NOT EXISTS tenant_id ON app_session TYPE string;
 DEFINE FIELD IF NOT EXISTS app ON app_session TYPE string;
 DEFINE FIELD IF NOT EXISTS version ON app_session TYPE int;
-DEFINE FIELD IF NOT EXISTS payload ON app_session TYPE object;
+DEFINE FIELD IF NOT EXISTS payload ON app_session TYPE object FLEXIBLE;
 DEFINE FIELD IF NOT EXISTS idle_expiry ON app_session TYPE datetime;
 DEFINE FIELD IF NOT EXISTS absolute_expiry ON app_session TYPE datetime;
 DEFINE INDEX IF NOT EXISTS idx_app_session_handle ON app_session FIELDS handle UNIQUE;

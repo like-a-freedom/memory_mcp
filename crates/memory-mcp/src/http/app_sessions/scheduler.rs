@@ -15,13 +15,13 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
+#[allow(unused_imports)]
+use crate::http::registry::RegistryStore;
 
 /// The cleanup job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
 pub fn scheduler_job() -> SchedulerJob {
-    Arc::new(|registry| {
-        Box::pin(async move { cleanup_expired_for_all(&registry).await })
-    })
+    Arc::new(|registry| Box::pin(async move { cleanup_expired_for_all(&registry).await }))
 }
 
 /// Walk at most 100 ready tenants per cycle, binding
@@ -30,10 +30,7 @@ pub fn scheduler_job() -> SchedulerJob {
 /// `app_session` for expired rows. The job is
 /// short-lived; it does not hold a per-tenant runtime
 /// pin while iterating.
-pub async fn cleanup_expired_for_all(
-    registry: &RegistryHandle,
-) -> Result<(), MemoryError> {
-    use crate::http::registry::RegistryStore;
+pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
     let store = registry.store_clone();
     let now = chrono::Utc::now();
     let due = store.list_due_provisioning(100, now).await?;
