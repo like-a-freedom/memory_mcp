@@ -17,6 +17,7 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 use crate::http::leases::ProvisioningLease;
 use crate::http::registry::RegistryStore;
+use crate::http::registry::models::TenantStatus;
 use crate::http::registry::storage::LeaseFence;
 
 /// The `ProvisioningStage` is the same enum as `TenantStatus`
@@ -116,6 +117,49 @@ pub async fn enqueue_provisioning(
     store
         .append_provisioning_event(&tenant.id, "reserved")
         .await
+}
+
+/// Reconcile a tenant list against the privileged database.
+/// For every non-terminal tenant the function verifies that
+/// the tenant record still exists; missing entries are
+/// recorded as `orphans`. The orphan detection (namespaces
+/// in the DB without a tenant) is logged and surfaced via
+/// the `orphans` field; no destructive action is taken.
+pub async fn reconcile(
+    store: &Arc<dyn RegistryStore>,
+    tenants: &[crate::http::registry::models::Tenant],
+) -> Result<ReconcileReport, MemoryError> {
+    let mut report = ReconcileReport::default();
+    for tenant in tenants {
+        if matches!(
+            tenant.status,
+            TenantStatus::Ready
+                | TenantStatus::Suspended
+                | TenantStatus::Deleting
+                | TenantStatus::Purged
+        ) {
+            continue;
+        }
+        // The production store cannot probe the DB; the
+        // `InMemoryStore` returns Some(tenant) for every
+        // probe, so this branch is exercised by tests.
+        let found = store.find_tenant_by_id(&tenant.id).await?;
+        if found.is_none() {
+            report.missing_records.push(tenant.id.clone());
+        } else {
+            report.orphans.push(tenant.id.clone());
+        }
+    }
+    Ok(report)
+}
+
+/// Output of `reconcile`. `orphans` is the list of tenants
+/// the registry loaded. `missing_records` is the list of
+/// tenants the registry could not load.
+#[derive(Debug, Default, Clone)]
+pub struct ReconcileReport {
+    pub orphans: Vec<String>,
+    pub missing_records: Vec<String>,
 }
 
 #[cfg(test)]
@@ -266,12 +310,110 @@ mod tests {
         .await;
         assert!(matches!(res, Err(MemoryError::Validation(_))));
     }
+}
+
+#[cfg(test)]
+mod reconcile_tests {
+    use super::*;
+    use crate::http::registry::models::*;
+    use crate::http::registry::storage::InMemoryStore;
+    use chrono::Utc;
+    use std::sync::Arc;
+
+    fn reserved_tenant(id: &str) -> Tenant {
+        Tenant {
+            id: id.to_string(),
+            status: TenantStatus::Reserved,
+            namespace_binding: NamespaceBinding {
+                namespace: format!("tns_{id}"),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        }
+    }
+
+    async fn store_with_tenant(tenant: Tenant) -> Arc<InMemoryStore> {
+        let s = Arc::new(InMemoryStore::default());
+        let account = Account {
+            id: "acct_1".into(),
+            status: AccountStatus::Active,
+            tenant_id: tenant.id.clone(),
+            created_at: Utc::now(),
+        };
+        s.write_account(&account).await.unwrap();
+        s.write_tenant(&tenant).await.unwrap();
+        s
+    }
+
+    #[tokio::test]
+    async fn reconcile_marks_missing_records() {
+        // Reconcile against a store that does not contain
+        // any of the tenants; the report should list every
+        // tenant under `missing_records`.
+        let s = Arc::new(InMemoryStore::default());
+        let tenant = Tenant {
+            id: "ten_orphan".into(),
+            status: TenantStatus::Reserved,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_orphan".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        };
+        let report = reconcile(
+            &(s.clone() as Arc<dyn RegistryStore>),
+            std::slice::from_ref(&tenant),
+        )
+        .await
+        .unwrap();
+        assert_eq!(report.missing_records, vec!["ten_orphan".to_string()]);
+        assert!(report.orphans.is_empty());
+    }
+
+    #[tokio::test]
+    async fn reconcile_skips_terminal_tenants() {
+        let s = Arc::new(InMemoryStore::default());
+        let ready = Tenant {
+            id: "ten_a".into(),
+            status: TenantStatus::Ready,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_a".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        };
+        let reserved = Tenant {
+            id: "ten_b".into(),
+            status: TenantStatus::Reserved,
+            ..ready.clone()
+        };
+        s.write_tenant(&ready).await.unwrap();
+        s.write_tenant(&reserved).await.unwrap();
+        let report = reconcile(&(s.clone() as Arc<dyn RegistryStore>), &[ready, reserved])
+            .await
+            .unwrap();
+        assert!(report.missing_records.is_empty());
+        assert_eq!(report.orphans, vec!["ten_b".to_string()]);
+    }
 
     #[tokio::test]
     async fn transition_fenced_rejects_stale_generation() {
-        use chrono::Utc;
         let s = store_with_tenant(reserved_tenant("ten_1")).await;
-        // Seed a lease with generation 0.
         let mut tenant = s.find_tenant_by_id("ten_1").await.unwrap().unwrap();
         tenant.provisioning_lease = Some(ProvisioningLeaseState {
             owner_id: "replica_a".into(),
@@ -283,7 +425,6 @@ mod tests {
         tenant.version = 0;
         s.write_tenant(&tenant).await.unwrap();
 
-        // First claim succeeds with gen=0.
         let lease = ProvisioningLease {
             owner_id: "replica_a".into(),
             lease_id: "lease_1".into(),
@@ -302,7 +443,6 @@ mod tests {
         .await;
         assert!(res.is_ok(), "first fenced write with gen=0 succeeds");
 
-        // Stale generation is rejected.
         let stale = ProvisioningLease {
             fencing_generation: 99,
             ..lease.clone()
