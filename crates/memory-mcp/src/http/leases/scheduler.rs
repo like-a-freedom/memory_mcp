@@ -1,11 +1,11 @@
-//! Tier-1 process scheduler (ADR-0046, plan §6.2).
+//! Process scheduler.
 //!
 //! Each cycle discovers due work through the registry. Each
 //! job is responsible for acquiring a datastore-time lease,
 //! heartbeating while its bounded pass runs, and releasing
-//! only its own lease. App Session cleanup, Task retry, and
-//! subscription/outbox jobs are registered by Tasks 7–9; the
-//! provisioning job is registered here.
+//! only its own lease. App Session cleanup, retry, and
+//! subscription/outbox jobs are registered alongside the
+//! provisioning job through `with_additional_job`.
 //!
 //! Constructing hooks with an empty job list returns a
 //! configuration error: there is no implicit "do nothing"

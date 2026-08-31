@@ -9,8 +9,7 @@ use tokio::sync::Mutex;
 use lru::LruCache;
 
 /// Local warn helper. The workspace does not depend on
-/// `tracing`; use `log::warn!` once `log` is added (out of
-/// scope for Phase 5). For now the helper is a no-op and
+/// `tracing` or `log`; for now the helper is a no-op and
 /// the caller surfaces the error in the response.
 #[allow(dead_code)]
 fn tracing_warn(message: &str) {
@@ -476,9 +475,9 @@ mod tests {
         assert!(pool.contains_ready("ten_y").await);
     }
 
-    // ─── Spec §5.5 Step 6 tests ─────────────────────────────────
+    // ─── Pool contract tests ──────────────────────────────────────
 
-    /// Spec test 1: 8 concurrent acquirers for the same
+    /// Pool test 1: 8 concurrent acquirers for the same
     /// tenant should single-flight into a single activation.
     #[tokio::test]
     async fn single_flight_activation_runs_once() {
@@ -508,9 +507,9 @@ mod tests {
         assert_eq!(pool.activation_count("ten_single").await, 1);
     }
 
-    /// Spec test 2: a pinned runtime is not evicted by the
-    /// idle-eviction path (no-op for Phase 5, but the spec
-    /// assertion is that the pin holds the slot).
+    /// Pool test 2: a pinned runtime is not evicted by
+    /// the idle-eviction path. The pin holds the slot
+    /// until the guard is dropped.
     #[tokio::test]
     async fn pinned_runtime_is_not_evicted() {
         let pool = test_pool().await;
@@ -526,8 +525,8 @@ mod tests {
         drop(guard);
     }
 
-    /// Spec test 3: the response body holds the pin and the
-    /// admission permit until it is dropped. The test does
+    /// Pool test 3: the response body holds the pin and
+    /// the admission permit until it is dropped. The test does
     /// not need a real OperationGuard; it directly checks
     /// the AdmissionPermit RAII lifecycle through
     /// `ResponseLease` + `LeasedBody`.
@@ -552,9 +551,9 @@ mod tests {
         );
     }
 
-    /// Spec test 4: capacity overflow returns 503 (the
-    /// pool returns `PoolError::CapacityTimeout`; the HTTP
-    /// middleware maps that to 503).
+    /// Pool test 4: capacity overflow returns
+    /// `PoolError::CapacityTimeout`; the HTTP middleware
+    /// maps that to 503.
     #[tokio::test]
     async fn capacity_overflow_returns_503() {
         // cap=1 means the second distinct tenant cannot
@@ -583,7 +582,7 @@ mod tests {
         );
     }
 
-    /// Spec test 5: a failed activation puts the slot in
+    /// Pool test 5: a failed activation puts the slot in
     /// negative backoff; subsequent acquirers see
     /// `ActivationFailed` without re-attempting.
     #[tokio::test]

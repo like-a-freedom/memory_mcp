@@ -333,14 +333,13 @@ impl HttpConfig {
                 "control-plane UI requires the control-plane-ui feature".into(),
             ));
         }
-        // Spec §13: fs-watch is the stdio-only ingestion
-        // path. The HTTP SaaS profile must not enable it;
-        // a deployment that sets the env var while
-        // running the HTTP binary has misconfigured itself.
+        // fs-watch is the stdio-only ingestion path. The
+        // HTTP SaaS profile must not enable it; a
+        // deployment that sets the env var while running
+        // the HTTP binary has misconfigured itself.
         if std::env::var("SURREALDB_FS_WATCH_INBOX").is_ok() {
             return Err(MemoryError::ConfigInvalid(
-                "SURREALDB_FS_WATCH_INBOX must not be set in the HTTP SaaS profile (spec §13)"
-                    .into(),
+                "SURREALDB_FS_WATCH_INBOX must not be set in the HTTP SaaS profile".into(),
             ));
         }
         Ok(())
@@ -542,10 +541,10 @@ mod tests {
 
     #[test]
     fn rejects_open_signup_without_quotas() {
-        // open_signup_quotas_set() currently returns false;
-        // Task 6.4 will replace it once the per-tenant plan
-        // table is wired. Until then Open signup must be
-        // rejected at startup.
+        // open_signup_quotas_set() currently returns false
+        // because the per-tenant plan table is not yet
+        // wired. Until it is, Open signup must be rejected
+        // at startup.
         let mut cfg = HttpConfig::default_for_test();
         cfg.signup_mode = SignupMode::Open;
         assert!(matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(_))));

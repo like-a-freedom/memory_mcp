@@ -1,4 +1,4 @@
-//! Plan and quota enforcement (ADR-0052, plan §6.4).
+//! Plan and quota enforcement.
 //!
 //! The `Plan` struct captures the per-tenant limits. The
 //! enforcement points live at the tool handlers
@@ -28,9 +28,10 @@ pub struct Plan {
     /// Max concurrent extractions for a single tenant. The
     /// extract tool checks this at handler entry.
     pub extraction_concurrency: u32,
-    /// Max open app sessions per tenant. Phase 7 binds
-    /// this; for Phase 6 the field is tracked but not
-    /// enforced.
+    /// Max open app sessions per tenant. The App Session
+    /// handler enforces this; the field is tracked on the
+    /// `Plan` so the limit can be queried without an
+    /// extra round trip.
     pub max_open_app_sessions: u32,
     /// Max active API keys per account. The control plane
     /// rejects new keys above the cap.
@@ -133,8 +134,8 @@ pub fn enforce_ingest(
     if counter.ingest_current_minute >= plan.ingest_per_minute {
         // The window expires 60s after the start of the
         // current minute. A more accurate retry-after
-        // would project forward; for Phase 6 we use the
-        // coarse "wait the rest of this window" value.
+        // would project forward; we use the coarse
+        // "wait the rest of this window" value.
         let elapsed = (now - counter.window_start).num_seconds();
         let retry = (60 - elapsed).max(1) as u32;
         return QuotaDecision::Deny {

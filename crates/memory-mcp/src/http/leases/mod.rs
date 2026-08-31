@@ -1,4 +1,4 @@
-//! Provisioning leases (ADR-0052, plan §6.1).
+//! Provisioning leases.
 //!
 //! `ProvisioningLease` is the durable claim returned by
 //! `RegistryStore::claim_provisioning`. The fenced CAS in
