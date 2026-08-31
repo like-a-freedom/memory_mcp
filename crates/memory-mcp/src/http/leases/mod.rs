@@ -18,6 +18,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub mod migration;
+pub mod scheduler;
 
 /// Stored shape of a `provisioning_lease` in the
 /// `tenant_provisioning_lease` table.
