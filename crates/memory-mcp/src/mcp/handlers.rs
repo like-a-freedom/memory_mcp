@@ -271,6 +271,35 @@ impl ServerHandler for MemoryMcp {
                     None,
                 )
             })?;
+
+            // Durable backend: enqueue via TaskStore and return a seed
+            // CreateTaskResult. The worker picks up the task asynchronously.
+            #[cfg(feature = "streamable-http")]
+            if let Some(task_store) = self.durable_tasks.as_ref() {
+                let task_id = task_store
+                    .enqueue(
+                        &request.name,
+                        serde_json::to_value(&params).unwrap_or_default(),
+                    )
+                    .await
+                    .map_err(|error| {
+                        ErrorData::internal_error(
+                            format!("failed to enqueue extract task: {error}"),
+                            None,
+                        )
+                    })?;
+                let now = chrono::Utc::now().to_rfc3339();
+                let seed = rmcp::model::Task::new(
+                    task_id,
+                    rmcp::model::TaskStatus::Working,
+                    now.clone(),
+                    now,
+                )
+                .with_status_message("Task accepted");
+                return Ok(CallToolResponse::Task(CreateTaskResult::new(seed)));
+            }
+
+            // In-memory fallback (stdio, tests without durable overlay).
             let service = Arc::clone(&self.service);
             let task = self.tasks.spawn(
                 TaskOptions::new().with_status_message("Task accepted"),
@@ -304,6 +333,53 @@ impl ServerHandler for MemoryMcp {
         request: GetTaskParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<GetTaskResult, ErrorData> {
+        // Durable overlay: try TaskStore first, fall back to in-memory.
+        #[cfg(feature = "streamable-http")]
+        if let Some(task_store) = self.durable_tasks.as_ref()
+            && let Some(record) = task_store.load(&request.task_id).await.map_err(|error| {
+                ErrorData::internal_error(format!("failed to load task: {error}"), None)
+            })?
+        {
+            let status = match record.state {
+                crate::http::tasks::state::TaskState::Queued
+                | crate::http::tasks::state::TaskState::Running => rmcp::model::TaskStatus::Working,
+                crate::http::tasks::state::TaskState::Completed => {
+                    rmcp::model::TaskStatus::Completed
+                }
+                crate::http::tasks::state::TaskState::Failed => rmcp::model::TaskStatus::Failed,
+                _ => rmcp::model::TaskStatus::Cancelled,
+            };
+            let now = chrono::Utc::now().to_rfc3339();
+            let task = rmcp::model::Task::new(
+                request.task_id,
+                status,
+                record.created_at.to_rfc3339(),
+                now,
+            );
+            let payload = match status {
+                rmcp::model::TaskStatus::Working => rmcp::model::TaskPayload::Working,
+                rmcp::model::TaskStatus::Completed => {
+                    let result = record
+                        .result
+                        .unwrap_or_else(|| serde_json::json!({"status": "completed"}));
+                    rmcp::model::TaskPayload::Completed {
+                        result: result.as_object().cloned().unwrap_or_default(),
+                    }
+                }
+                rmcp::model::TaskStatus::Failed => {
+                    let error = record.error.unwrap_or_else(
+                        || serde_json::json!({"code": -1, "message": "task failed"}),
+                    );
+                    rmcp::model::TaskPayload::Failed {
+                        error: error.as_object().cloned().unwrap_or_default(),
+                    }
+                }
+                _ => rmcp::model::TaskPayload::Cancelled,
+            };
+            return Ok(GetTaskResult::new(rmcp::model::DetailedTask::new(
+                task, payload,
+            )));
+        }
         Ok(GetTaskResult::new(self.tasks.get_task(&request.task_id)?))
     }
 
@@ -321,6 +397,17 @@ impl ServerHandler for MemoryMcp {
         request: CancelTaskParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<(), ErrorData> {
+        // Durable overlay: delegate to TaskStore::set_cancellation_intent.
+        #[cfg(feature = "streamable-http")]
+        if let Some(task_store) = self.durable_tasks.as_ref() {
+            task_store
+                .set_cancellation_intent(&request.task_id)
+                .await
+                .map_err(|error| {
+                    ErrorData::internal_error(format!("failed to cancel task: {error}"), None)
+                })?;
+            return Ok(());
+        }
         self.tasks.cancel_task(&request.task_id)
     }
 

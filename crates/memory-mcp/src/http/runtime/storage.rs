@@ -69,7 +69,10 @@ impl TenantRuntime {
                     .with_durable_app_sessions(Arc::new(AppSessionStore::new(bound_db.clone())));
             }
             mcp_service = mcp_service.with_durable_tasks(Arc::new(
-                crate::http::tasks::worker::DurableTaskStore::new(bound_db.clone()),
+                crate::http::tasks::worker::DurableTaskStore::new(
+                    bound_db.clone(),
+                    tenant.id.clone(),
+                ),
             ));
         }
         Ok(Self {
