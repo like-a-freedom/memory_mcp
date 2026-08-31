@@ -78,6 +78,12 @@ pub struct MemoryMcp {
     /// in-memory `session_manager` (stdio and tests).
     #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
     durable_app_sessions: Option<std::sync::Arc<crate::http::app_sessions::store::AppSessionStore>>,
+    /// Durable task overlay. When `Some`, `get_task`,
+    /// `cancel_task`, and the `extract` path dispatch
+    /// through the `TaskStore` seam rather than the
+    /// in-memory `TaskManager`.
+    #[cfg(feature = "streamable-http")]
+    durable_tasks: Option<std::sync::Arc<dyn crate::http::tasks::state::TaskStore>>,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
     /// When true, advertise and negotiate only MCP 2026-07-28 (HTTP SaaS
@@ -101,6 +107,8 @@ impl MemoryMcp {
             session_manager: SessionManager::new(),
             #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
             durable_app_sessions: None,
+            #[cfg(feature = "streamable-http")]
+            durable_tasks: None,
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
             modern_protocol_only: false,
@@ -128,6 +136,36 @@ impl MemoryMcp {
     ) -> Self {
         self.durable_app_sessions = Some(store);
         self
+    }
+
+    /// Wire the durable `TaskStore` so `get_task` and
+    /// `cancel_task` dispatch through the tenant's
+    /// `tenant_task` table rather than the in-memory
+    /// `TaskManager`. The HTTP SaaS path calls this on
+    /// `MemoryMcp::new_modern` before the handler is
+    /// installed into the request pipeline.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_durable_tasks(
+        mut self,
+        tasks: std::sync::Arc<dyn crate::http::tasks::state::TaskStore>,
+    ) -> Self {
+        self.durable_tasks = Some(tasks);
+        self
+    }
+
+    /// Accessor for the durable task overlay. Returns
+    /// `Some` when the HTTP SaaS path has wired the
+    /// backend; `None` for stdio and tests that haven't
+    /// called `with_durable_tasks`.
+    #[cfg(feature = "streamable-http")]
+    #[expect(
+        dead_code,
+        reason = "wired by get_task / cancel_task dispatch in Task 8.5"
+    )]
+    pub(crate) fn durable_tasks(
+        &self,
+    ) -> Option<&std::sync::Arc<dyn crate::http::tasks::state::TaskStore>> {
+        self.durable_tasks.as_ref()
     }
 
     /// Returns a reference to the underlying `MemoryService`.

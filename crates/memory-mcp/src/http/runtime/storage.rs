@@ -56,7 +56,22 @@ impl TenantRuntime {
             100, // rate_limit_rps; plan-driven value arrives with quotas (Task 6.4)
             100, // rate_limit_burst
         )?;
-        let mcp_service = MemoryMcp::new_modern(service);
+        let mut mcp_service = MemoryMcp::new_modern(service);
+
+        // Wire durable backends. The stdio path never reaches
+        // this function (it uses the test pool), so the
+        // feature-gated overlay is unconditional here.
+        {
+            #[cfg(feature = "mcp-apps")]
+            {
+                use crate::http::app_sessions::store::AppSessionStore;
+                mcp_service = mcp_service
+                    .with_durable_app_sessions(Arc::new(AppSessionStore::new(bound_db.clone())));
+            }
+            mcp_service = mcp_service.with_durable_tasks(Arc::new(
+                crate::http::tasks::worker::DurableTaskStore::new(bound_db.clone()),
+            ));
+        }
         Ok(Self {
             tenant_id: tenant.id.clone(),
             namespace,
