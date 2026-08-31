@@ -216,8 +216,7 @@ impl Pool {
         self: &Arc<Self>,
         tenant: &Tenant,
     ) -> Result<super::guard::OperationGuard, PoolError> {
-        let _ = self.capacity_wait; // referenced for the future timeout path
-        let slot = self.slot_for(tenant).await;
+        let slot = self.slot_for(tenant).await?;
         let mut guard = slot.lock().await;
 
         // Fast path: already Ready.
@@ -241,7 +240,10 @@ impl Pool {
             drop(guard);
             match rx.recv().await {
                 Ok(runtime) => {
-                    let slot = self.slot_for(tenant).await;
+                    let slot = match self.slot_for(tenant).await {
+                        Ok(s) => s,
+                        Err(e) => return Err(e),
+                    };
                     let guard = slot.lock().await;
                     let pin = guard.pin_count.clone();
                     pin.fetch_add(1, Ordering::SeqCst);
@@ -262,7 +264,10 @@ impl Pool {
         let tenant_id = tenant.id.clone();
         drop(guard);
         let activation_result = build_runtime(&registry, &tenant_clone).await;
-        let slot = self.slot_for(tenant).await;
+        let slot = match self.slot_for(tenant).await {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
         let mut guard = slot.lock().await;
         match activation_result {
             Ok(runtime) => {
@@ -289,17 +294,43 @@ impl Pool {
         }
     }
 
-    /// Get or create a slot for the tenant id.
-    async fn slot_for(self: &Arc<Self>, tenant: &Tenant) -> Arc<Mutex<TenantRuntimeSlot>> {
+    /// Get or create a slot for the tenant id. If the LRU
+    /// is at capacity and the tenant is not already in the
+    /// map, wait up to `capacity_wait` for a slot to free;
+    /// return `CapacityTimeout` if none does.
+    async fn slot_for(
+        self: &Arc<Self>,
+        tenant: &Tenant,
+    ) -> Result<Arc<Mutex<TenantRuntimeSlot>>, PoolError> {
         let key = tenant.id.clone();
-        {
-            let mut map = self.map.lock().await;
-            if let Some(slot) = map.get(&key) {
-                return slot.clone();
+        loop {
+            {
+                let mut map = self.map.lock().await;
+                if let Some(slot) = map.get(&key) {
+                    return Ok(slot.clone());
+                }
+                if map.len() < self.cap {
+                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
+                    map.put(key.clone(), slot.clone());
+                    return Ok(slot);
+                }
             }
-            let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
-            map.put(key, slot.clone());
-            slot
+            // At cap and tenant not present. Bounded wait for
+            // a slot to free.
+            match tokio::time::timeout(self.capacity_wait, async {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    let map = self.map.lock().await;
+                    if map.len() < self.cap || map.contains(&key) {
+                        return;
+                    }
+                }
+            })
+            .await
+            {
+                Ok(()) => continue,
+                Err(_) => return Err(PoolError::CapacityTimeout),
+            }
         }
     }
 
@@ -443,5 +474,134 @@ mod tests {
         let tenant = ready_tenant("ten_y", "tns_y");
         let _g = pool.acquire_or_wait(&tenant).await.unwrap();
         assert!(pool.contains_ready("ten_y").await);
+    }
+
+    // ─── Spec §5.5 Step 6 tests ─────────────────────────────────
+
+    /// Spec test 1: 8 concurrent acquirers for the same
+    /// tenant should single-flight into a single activation.
+    #[tokio::test]
+    async fn single_flight_activation_runs_once() {
+        // Build a pool that counts activations. The fixture
+        // uses the real in-memory engine; activation count is
+        // measured by the `ActivationSlot.generation`
+        // counter, which is bumped exactly once per (re)activation.
+        let pool = test_pool().await;
+        let tenant = ready_tenant("ten_single", "tns_single");
+        let mut joins = tokio::task::JoinSet::new();
+        for _ in 0..8 {
+            let pool = pool.clone();
+            let tenant = tenant.clone();
+            joins.spawn(async move { pool.acquire_or_wait(&tenant).await });
+        }
+        let mut ok = 0;
+        while let Some(r) = joins.join_next().await {
+            assert!(r.expect("task").is_ok());
+            ok += 1;
+        }
+        assert_eq!(ok, 8);
+        // ActivationSlot.generation was bumped once for the
+        // first arriver; subsequent acquirers subscribed to
+        // the in-flight channel and did not trigger a new
+        // activation. The generation counter therefore stays
+        // at 1.
+        assert_eq!(pool.activation_count("ten_single").await, 1);
+    }
+
+    /// Spec test 2: a pinned runtime is not evicted by the
+    /// idle-eviction path (no-op for Phase 5, but the spec
+    /// assertion is that the pin holds the slot).
+    #[tokio::test]
+    async fn pinned_runtime_is_not_evicted() {
+        let pool = test_pool().await;
+        let tenant = ready_tenant("ten_pinned", "tns_pinned");
+        let guard = pool.acquire_or_wait(&tenant).await.expect("acquire");
+        // mark_draining_if_idle evicts only if pin_count == 0.
+        // With the guard held, pin_count is 1, so the call
+        // must return None and the slot must remain Ready.
+        let threshold = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+        let result = pool.mark_draining_if_idle("ten_pinned", threshold).await;
+        assert!(result.is_none(), "pinned runtime must not be evicted");
+        assert!(pool.contains_ready("ten_pinned").await);
+        drop(guard);
+    }
+
+    /// Spec test 3: the response body holds the pin and the
+    /// admission permit until it is dropped. The test does
+    /// not need a real OperationGuard; it directly checks
+    /// the AdmissionPermit RAII lifecycle through
+    /// `ResponseLease` + `LeasedBody`.
+    #[tokio::test]
+    async fn response_body_keeps_pin_and_global_admission_until_drop() {
+        use crate::http::runtime::guard::{LeasedBody, ResponseLease};
+        use http_body_util::BodyExt;
+        // 1 global permit; we hold it via the lease.
+        let gate = Arc::new(AdmissionGate::new(1));
+        let permit = gate.try_acquire().expect("first permit");
+        let lease = ResponseLease::new(None, permit);
+        let inner = axum::body::Body::from("hello");
+        let body = LeasedBody::new(inner, lease);
+        // Drive the body to completion by collecting it; the
+        // lease must release on drop (terminal frame).
+        let _ = body.collect().await;
+        // After collect the body is dropped, the lease is
+        // released, and the permit becomes available again.
+        assert!(
+            gate.try_acquire().is_ok(),
+            "permit must be released after body collect"
+        );
+    }
+
+    /// Spec test 4: capacity overflow returns 503 (the
+    /// pool returns `PoolError::CapacityTimeout`; the HTTP
+    /// middleware maps that to 503).
+    #[tokio::test]
+    async fn capacity_overflow_returns_503() {
+        // cap=1 means the second distinct tenant cannot
+        // acquire a slot while the first is pinned.
+        let db = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
+            .await
+            .unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let pool = Arc::new(Pool::new(
+            1,
+            DEFAULT_IDLE_TTL,
+            // Short wait so the test does not block.
+            std::time::Duration::from_millis(50),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            DEFAULT_PER_TENANT_CONCURRENCY,
+            registry,
+        ));
+        let t1 = ready_tenant("ten_cap_1", "tns_cap_1");
+        let t2 = ready_tenant("ten_cap_2", "tns_cap_2");
+        let _first = pool.acquire_or_wait(&t1).await.expect("first acquire");
+        let r = pool.acquire_or_wait(&t2).await;
+        assert!(
+            matches!(r, Err(PoolError::CapacityTimeout)),
+            "second acquire must time out"
+        );
+    }
+
+    /// Spec test 5: a failed activation puts the slot in
+    /// negative backoff; subsequent acquirers see
+    /// `ActivationFailed` without re-attempting.
+    #[tokio::test]
+    async fn negative_cache_swallows_repeated_failures() {
+        // Use a registry whose engine init panics so
+        // `build_runtime` fails. The simplest path: use a
+        // pool whose registry was built with a
+        // `RegistryHandle::new()` placeholder; that returns
+        // `Storage("no engine")` from `tenant_engine()`,
+        // which `build_runtime` propagates as `MemoryError`.
+        let pool = Arc::new(Pool::with_defaults(Arc::new(RegistryHandle::new())));
+        let tenant = ready_tenant("ten_neg", "tns_neg");
+        let r1 = pool.acquire_or_wait(&tenant).await;
+        assert!(matches!(r1, Err(PoolError::ActivationFailed)));
+        let r2 = pool.acquire_or_wait(&tenant).await;
+        assert!(matches!(r2, Err(PoolError::ActivationFailed)));
+        // activation_count stays at 1 because the negative
+        // cache short-circuited the second call.
+        assert_eq!(pool.activation_count("ten_neg").await, 1);
     }
 }

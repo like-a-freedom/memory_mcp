@@ -23,7 +23,6 @@ use crate::http::leases::migration::{NoopMigrations, provision_one};
 use crate::http::leases::{ProvisioningLease, migration::ApplyMigrations};
 use crate::http::principal::api_keys::ApiKeyCredential;
 use crate::http::registry::models::*;
-use crate::http::registry::storage::LeaseFence;
 
 pub const ENV_TEST_BOOTSTRAP: &str = "MEMORY_MCP_HTTP_TEST_BOOTSTRAP";
 
@@ -125,6 +124,5 @@ async fn bootstrap_one(
     // registry holds a Ready tenant without the real DDL
     // running.
     provision_one(store.clone(), &tenant.id, lease, migrations).await?;
-    let _ = LeaseFence::from_lease; // silence unused-import
     Ok(())
 }
