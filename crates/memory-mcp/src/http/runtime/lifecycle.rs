@@ -1,4 +1,4 @@
-//! Runtime lifecycle states (ADR-0052, plan §5.5).
+//! Runtime lifecycle states.
 //!
 //! Each `TenantRuntimeSlot` carries a `RuntimePhase` that the
 //! pool mutates under a per-tenant mutex. The transitions

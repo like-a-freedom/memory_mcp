@@ -1,4 +1,4 @@
-//! Durable subscriptions and transactional outbox (spec §11).
+//! Durable subscriptions and transactional outbox.
 //!
 //! The outbox ensures every canonical mutation atomically
 //! increments a tenant-local sequence and emits a

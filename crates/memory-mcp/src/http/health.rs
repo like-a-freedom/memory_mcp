@@ -2,8 +2,6 @@
 //!
 //! `live` is a trivial 200 OK. `ready` returns 503 when the process is
 //! shutting down, admission is closed, or the registry probe fails.
-//! Phase 3 uses the stub `RegistryHandle::stub()` (always reachable);
-//! Phase 4 replaces it with a real control-namespace probe.
 
 use std::sync::Arc;
 

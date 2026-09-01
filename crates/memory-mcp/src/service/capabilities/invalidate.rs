@@ -8,7 +8,7 @@ use crate::storage::CloseTimestamps;
 pub struct InvalidateCapability;
 
 impl InvalidateCapability {
-    /// Invalidates a fact by closing both bi-temporal fields (ADR-0039).
+    /// Invalidates a fact by closing both bi-temporal fields.
     ///
     /// The fact is looked up to verify existence, then closed through the
     /// storage close owner: `t_invalid` takes the caller-supplied valid time,

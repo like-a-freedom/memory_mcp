@@ -1,10 +1,10 @@
-//! Narrow store owning the durable `embedding_state:fact` record (ADR-0043).
+//! Narrow store owning the durable `embedding_state:fact` record.
 //!
 //! Every write to the embedding state record goes through this store: it owns
 //! the record ID, the typed status vocabulary, the record shape, and the
 //! upsert protocol. Startup bootstrap, Embedding Recovery, and Reembed all
 //! write through it. The record is the durable crash-resume marker for
-//! recovery (ADR-0042), so its schema is a load-bearing invariant owned here.
+//! recovery, so its schema is a load-bearing invariant owned here.
 //!
 //! Reads stay JSON-shaped at the decision seam: `decide_embedding_startup`
 //! is a pure, exhaustively tested function over the record JSON.

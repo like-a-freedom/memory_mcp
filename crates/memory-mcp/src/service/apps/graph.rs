@@ -571,7 +571,7 @@ pub(crate) fn intro_chain_from_start(
 /// walking `GraphDirection::Incoming` edges inward from the target and
 /// returning the smallest discovered chain to any starting entity.
 ///
-/// Free function (not a method on `MemoryService`) so later stages of ADR-0024
+/// Free function (not a method on `MemoryService`) so later stages
 /// can supply any context that exposes an `AppStore`, without dragging a
 /// `MemoryService` construction into the call.
 pub(crate) async fn find_intro_chain(

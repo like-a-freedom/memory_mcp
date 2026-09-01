@@ -1,4 +1,4 @@
-//! Provisioning state machine (ADR-0052, plan §5.1).
+//! Provisioning state machine.
 //!
 //! The `can_transition` table is the durable seam: every status
 //! change goes through it. Two callers exist:
@@ -26,8 +26,7 @@ use crate::http::registry::storage::LeaseFence;
 pub use crate::http::registry::models::TenantStatus as ProvisioningStage;
 
 /// CAS-update the tenant's status without a fencing
-/// predicate. Use only for operator state changes (Task 6.5
-/// / Phase 10 control plane).
+/// predicate. Use only for operator state changes.
 pub async fn transition(
     store: &dyn RegistryStore,
     tenant_id: &str,
@@ -73,9 +72,8 @@ pub async fn transition_fenced(
         .await
 }
 
-/// The legal transition table (plan §5.1 Step 1). Anything
-/// outside this set is a programmer error and surfaces as
-/// `MemoryError::Validation`.
+/// The legal transition table. Anything outside this set is a
+/// programmer error and surfaces as `MemoryError::Validation`.
 pub fn can_transition(from: ProvisioningStage, to: ProvisioningStage) -> bool {
     use ProvisioningStage::*;
     match (from, to) {
@@ -106,10 +104,9 @@ pub fn can_transition(from: ProvisioningStage, to: ProvisioningStage) -> bool {
 }
 
 /// Durable enqueue: append a provisioning event for the
-/// reserved tenant. The Phase 4 control API calls this after
-/// writing a reserved Tenant. The Task 6.2 scheduler consumes
-/// the events; the bootstrap (Task 5.8) calls it for each
-/// ready tenant.
+/// reserved tenant. The control API calls this after writing a
+/// reserved Tenant. The scheduler consumes the events; bootstrap
+/// calls it for each ready tenant.
 pub async fn enqueue_provisioning(
     store: &Arc<dyn RegistryStore>,
     tenant: &crate::http::registry::models::Tenant,

@@ -1,4 +1,4 @@
-//! Operation guard + response lease + leased body (ADR-0052, plan §5.5).
+//! Operation guard + response lease + leased body.
 //!
 //! `OperationGuard` keeps a Tenant Runtime pinned for the
 //! duration of an HTTP request. `ResponseLease` couples the

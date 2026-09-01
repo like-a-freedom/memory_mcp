@@ -1,7 +1,7 @@
 //! Narrow reembed store: owns the fact-scan queries behind the batch reembed
 //! worker.
 //!
-//! Per ADR-0027 the SQL for a capability lives next to the store that owns
+//! The SQL for a capability lives next to the store that owns
 //! it, not on the universal `DbClient`. This store is the single home for
 //! "which facts have a stale embedding signature" — `MemoryService::reembed_all_facts`
 //! depends on it instead of reaching through `db_client` directly.
@@ -41,8 +41,7 @@ impl ReembedStoreClient {
     /// Drops the fact embedding HNSW index in the process-bound namespace.
     ///
     /// Idempotent: removing an absent index reports [`IndexRemoval::AlreadyAbsent`]
-    /// instead of erroring (C2 — the DDL and its tolerance rule live here,
-    /// per ADR-0027/0044).
+    /// instead of erroring (C2 — the DDL and its tolerance rule live here).
     pub async fn remove_embedding_index(&self) -> Result<IndexRemoval, MemoryError> {
         let sql = format!("REMOVE INDEX {EMBEDDING_INDEX_NAME} ON TABLE fact");
         match self.db.query(&sql, None).await {
@@ -203,7 +202,7 @@ mod tests {
     async fn count_and_select_return_empty_when_fact_table_missing() {
         // Before migrations the `fact` table does not exist; both queries
         // must degrade to empty instead of erroring (same as the old
-        // `DbClient` behavior preserved by ADR-0027 relocation).
+        // `DbClient` behavior preserved by store relocation).
         let db_name = format!(
             "reembed_store_unmigrated_{}",
             std::time::SystemTime::now()

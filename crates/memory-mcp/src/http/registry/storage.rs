@@ -1,10 +1,10 @@
-//! Control-namespace storage trait (ADR-0052, plan §4.1).
+//! Control-namespace storage trait.
 //!
-//! Phase 4 ships the trait surface, the production placeholder
-//! that returns `MemoryError::Unavailable` (so a misrouted
-//! production request becomes a 503, not a panic), and an
-//! in-memory test backend. The SurrealDB-backed production store
-//! is added in Task 5.x against the migrations in `migrations.rs`.
+//! Ships the trait surface, the production placeholder that returns
+//! `MemoryError::Unavailable` (so a misrouted production request
+//! becomes a 503, not a panic), and an in-memory test backend. The
+//! SurrealDB-backed production store is added in a later milestone
+//! against the migrations in `migrations.rs`.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -35,7 +35,7 @@ impl<'a> LeaseFence<'a> {
     }
 }
 
-// ─── ensure_namespace (Task 5.2) ──────────────────────────────────
+// ─── ensure_namespace ─────────────────────────────────────
 
 /// Idempotent DDL: create the namespace and database if they
 /// do not exist. Operates on a privileged `Surreal<C>` handle
@@ -81,7 +81,7 @@ pub fn is_safe_identifier(s: &str) -> bool {
 
 /// Abstract control store. Backed by a privileged SurrealDB
 /// credential in production; the `InMemoryStore` test backend is
-/// the only non-test impl Phase 4 ships.
+/// the only non-test impl.
 ///
 /// Methods are named after the records they touch; the SQL
 /// implementation does not use the `DbClient` trait because the
@@ -204,15 +204,14 @@ pub trait RegistryStore: Send + Sync + 'static {
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
 
     /// Append a provisioning event (durable seam consumed by the
-    /// Task 6.2 scheduler; written by `enqueue_provisioning`,
-    /// Task 4.7).
+    /// scheduler; written by `enqueue_provisioning`).
     async fn append_provisioning_event(
         &self,
         tenant_id: &str,
         stage: &str,
     ) -> Result<(), MemoryError>;
 
-    // -- Control-plane OIDC / session methods (Task 10.1) --
+    // -- Control-plane OIDC / session methods --
 
     /// Store OIDC flow material keyed by HMAC(state).
     #[cfg(feature = "control-plane")]
@@ -250,11 +249,10 @@ pub trait RegistryStore: Send + Sync + 'static {
     async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError>;
 }
 
-/// Phase 4 production placeholder. Every method that would
-/// require Task 5.x SQL returns `MemoryError::Unavailable`. The
-/// struct exists so the type bound `Arc<dyn RegistryStore>` is
-/// non-empty; `InMemoryStore` is what every test in Phase 4
-/// actually uses.
+/// Production placeholder. Every method that would require SQL
+/// returns `MemoryError::Unavailable`. The struct exists so the
+/// type bound `Arc<dyn RegistryStore>` is non-empty; `InMemoryStore`
+/// is what every test actually uses.
 pub struct SurrealRegistryStore {
     _private: (),
 }
@@ -992,7 +990,7 @@ mod tests {
     }
 }
 
-// ─── ensure_namespace tests (Task 5.2) ────────────────────────────
+// ─── ensure_namespace tests ───────────────────────────────
 
 #[cfg(test)]
 mod ensure_namespace_tests {

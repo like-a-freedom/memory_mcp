@@ -1,4 +1,4 @@
-//! API key parser (ADR-0052, plan §4.3).
+//! API key parser.
 //!
 //! The structured key format is `mem_sk_<key_id>_<secret>` where
 //! `key_id = ak_<uuid v4>`. Splitting on `_` yields

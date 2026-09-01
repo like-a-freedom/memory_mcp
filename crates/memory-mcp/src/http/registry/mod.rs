@@ -1,6 +1,5 @@
-//! Tenant Registry seam (ADR-0052). Phase 4 production
-//! placeholder + InMemoryStore backend (test-only). The
-//! privileged SurrealDB store is added in Task 5.x.
+//! Tenant Registry seam with InMemoryStore backend (test-only). The
+//! privileged SurrealDB store is added in a later milestone.
 
 pub mod account;
 pub mod migrations;
@@ -21,16 +20,15 @@ use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::ws::Client;
 
 /// Privileged SurrealDB engine held by the registry. The
-/// provisioning worker (Task 5.3) and the runtime factory
-/// (Task 5.4) both dispatch on this enum to issue namespace
-/// DDL or to clone+bind a per-tenant handle. The handle types
-/// are concrete `Connection` impls; the `Ws` / `Mem`
-/// configuration markers are not themselves connections and
-/// only appear in the `Surreal::new::<...>` callsite.
+/// provisioning worker and the runtime factory both dispatch on
+/// this enum to issue namespace DDL or to clone+bind a per-tenant
+/// handle. The handle types are concrete `Connection` impls; the
+/// `Ws` / `Mem` configuration markers are not themselves
+/// connections and only appear in the `Surreal::new::<...>` callsite.
 #[derive(Clone)]
 pub enum PrivilegedEngine {
     /// Production remote (Ws-backed) engine. The HTTP binary
-    /// builds this from `SurrealTargetConfig` in Task 5.6.
+    /// builds this from `SurrealTargetConfig`.
     Remote(Arc<Surreal<Client>>),
     /// Production embedded (RocksDB) engine.
     Local(Arc<Surreal<Db>>),
@@ -100,10 +98,9 @@ impl PrivilegedEngine {
 }
 
 /// Thin facade over `Arc<dyn RegistryStore>` plus the
-/// privileged engine seam. The auth pipeline (Phase 4 Task
-/// 4.6) dispatches against the trait, not the handle; the
-/// handle exists so the construction site reads
-/// `state.registry` and not `state.store`.
+/// privileged engine seam. The auth pipeline dispatches against
+/// the trait, not the handle; the handle exists so the
+/// construction site reads `state.registry` and not `state.store`.
 #[derive(Clone)]
 pub struct RegistryHandle {
     pub(crate) store: Arc<dyn RegistryStore>,
@@ -111,10 +108,10 @@ pub struct RegistryHandle {
 }
 
 impl RegistryHandle {
-    /// Build a production handle. Phase 4 ships the
-    /// `SurrealRegistryStore` placeholder (every read returns
-    /// `MemoryError::Unavailable`); Task 5.x replaces the inner
-    /// store with a real SurrealDB-backed implementation.
+    /// Build a production handle. Ships the `SurrealRegistryStore`
+    /// placeholder (every read returns `MemoryError::Unavailable`);
+    /// a later milestone replaces the inner store with a real
+    /// SurrealDB-backed implementation.
     pub fn new() -> Self {
         Self {
             store: Arc::new(SurrealRegistryStore::new()),
@@ -148,7 +145,7 @@ impl RegistryHandle {
     /// Convenience: build a Mem engine and use it for both the
     /// in-memory store and the privileged handle. The
     /// resulting handle is the test-only fixture used by the
-    /// conformance suite (Task 5.8).
+    /// conformance suite.
     #[cfg(any(test, feature = "test-fixtures"))]
     pub async fn in_memory_with_default_mem_engine() -> Self {
         let db = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
@@ -163,8 +160,8 @@ impl RegistryHandle {
     }
 
     /// Set the privileged engine after construction. Used by
-    /// `HttpState::new` (Task 5.6) to wire the production
-    /// engine without exposing the field publicly.
+    /// `HttpState::new` to wire the production engine without
+    /// exposing the field publicly.
     pub fn with_engine(mut self, engine: Arc<PrivilegedEngine>) -> Self {
         self.engine = Some(engine);
         self
@@ -182,9 +179,9 @@ impl RegistryHandle {
 
     /// Privileged engine for the provisioning worker and the
     /// runtime factory. Returns `MemoryError::Storage` if no
-    /// engine is wired — production code that has not yet
-    /// been migrated to Task 5.6 surfaces the missing wire-up
-    /// loudly instead of silently using the placeholder.
+    /// engine is wired — code that has not yet been migrated
+    /// surfaces the missing wire-up loudly instead of silently
+    /// using the placeholder.
     pub fn tenant_engine(&self) -> PrivilegedEngine {
         let engine = self.engine.clone().ok_or_else(|| {
             crate::error::MemoryError::Storage(
@@ -214,8 +211,8 @@ impl RegistryHandle {
     }
 
     /// Clone the inner `Arc<dyn RegistryStore>`. The authenticator
-    /// (Task 4.4) takes the store by trait-object, not by handle,
-    /// so the handle is a thin facade over the store.
+    /// takes the store by trait-object, not by handle, so the
+    /// handle is a thin facade over the store.
     pub fn store_clone(&self) -> Arc<dyn RegistryStore> {
         Arc::clone(&self.store)
     }

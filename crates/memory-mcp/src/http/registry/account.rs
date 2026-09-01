@@ -1,8 +1,8 @@
-//! Account → Tenant resolver (ADR-0052, plan §4.5).
+//! Account → Tenant resolver.
 //!
-//! A missing tenant is a RESOLUTION OUTCOME (NotFound → 404 in
-//! Task 5.6), not an `Auth` error — the caller was already
-//! authenticated. Do not map it to `MemoryError::Auth`.
+//! A missing tenant is a RESOLUTION OUTCOME (NotFound → 404),
+//! not an `Auth` error — the caller was already authenticated.
+//! Do not map it to `MemoryError::Auth`.
 
 use std::sync::Arc;
 
@@ -15,9 +15,8 @@ pub struct AccountResolver {
 }
 
 /// Outcome of resolving an account to a tenant. The Tenant
-/// Runtime (Task 5.6) consumes the `Ready` arm; the others
-/// become specific 4xx/5xx responses at the auth-pipeline
-/// boundary.
+/// Runtime consumes the `Ready` arm; the others become specific
+/// 4xx/5xx responses at the auth-pipeline boundary.
 #[derive(Debug)]
 pub enum ResolvedTenant {
     Ready(Tenant),
@@ -138,9 +137,9 @@ mod tests {
 
     #[tokio::test]
     async fn production_store_returns_unavailable_for_find_tenant() {
-        // The Phase 4 production placeholder returns
+        // The production placeholder returns
         // MemoryError::Unavailable from every read; the resolver
-        // surfaces that as a typed Err. The wiring is in Task 5.x.
+        // surfaces that as a typed Err.
         let s: Arc<dyn RegistryStore> = Arc::new(SurrealRegistryStore::new());
         let r = AccountResolver::new(s);
         let res = r.resolve_ready_tenant("acct_1").await;

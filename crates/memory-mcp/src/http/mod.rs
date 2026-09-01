@@ -1,4 +1,4 @@
-//! HTTP SaaS profile (ADR-0052). Gated on `streamable-http` in lib.rs:
+//! HTTP SaaS profile. Gated on `streamable-http` in lib.rs:
 //! `#[cfg(feature = "streamable-http")] pub mod http;`
 
 pub mod app_sessions;
@@ -27,11 +27,11 @@ use std::sync::Arc;
 
 use config::HttpConfig;
 
-/// Process-wide HTTP state. Phase 5 shape: config + the
+/// Process-wide HTTP state. Config + the
 /// runtime pool + shutdown/admission/registry/auth/resolver.
 pub struct HttpState {
     pub config: HttpConfig,
-    /// The runtime pool (Task 5.5). The `acquire_runtime`
+    /// The runtime pool. The `acquire_runtime`
     /// middleware calls `acquire_or_wait`; the `mcp_handler`
     /// extracts the resulting `OperationGuard` and moves it
     /// into the response body.
@@ -40,9 +40,9 @@ pub struct HttpState {
     pub admission: Arc<runtime::pool::AdmissionGate>,
     pub registry: registry::RegistryHandle,
     /// Bearer-token authenticator. The auth middleware
-    /// (Task 4.6) dispatches to it for every POST /mcp.
+    /// dispatches to it for every POST /mcp.
     pub authenticator: Arc<principal::auth::Authenticator>,
-    /// Account → Tenant resolver. The Tenant Runtime (Task 5.6)
+    /// Account → Tenant resolver. The Tenant Runtime
     /// consumes the `Ready` arm; the others become 4xx/5xx.
     pub account_resolver: Arc<registry::account::AccountResolver>,
     /// OIDC client for the control-plane login flow.
@@ -60,10 +60,9 @@ pub struct HttpState {
 pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
 
 impl HttpState {
-    /// Phase 5 production constructor: registry + auth + resolver
+    /// Production constructor: registry + auth + resolver
     /// + runtime pool. The two arms differ only in the metrics
-    /// handle type. Environment-driven pool overrides land with
-    /// Task 6.4.
+    /// handle type.
     #[cfg(feature = "prometheus")]
     pub async fn new(
         config: HttpConfig,
@@ -114,7 +113,7 @@ impl HttpState {
         }))
     }
 
-    /// Phase 5 production constructor (no Prometheus).
+    /// Production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = Self::build_registry().await;
@@ -163,11 +162,10 @@ impl HttpState {
 
     /// Build the registry handle. Test-fixtures builds use
     /// the in-memory backend with a privileged Mem engine so
-    /// the bootstrap (Task 5.8) can write accounts, tenants,
+    /// the bootstrap can write accounts, tenants,
     /// and api keys, and the runtime pool can build
     /// per-tenant handles. Production builds use the
-    /// placeholder; Task 5.x replaces the placeholder with a
-    /// real SurrealDB backend.
+    /// placeholder.
     async fn build_registry() -> registry::RegistryHandle {
         #[cfg(any(test, feature = "test-fixtures"))]
         {

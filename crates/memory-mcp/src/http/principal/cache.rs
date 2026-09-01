@@ -1,4 +1,4 @@
-//! LRU caches for authentication decisions (ADR-0052, plan §4.4).
+//! LRU caches for authentication decisions.
 //!
 //! Two caches live here:
 //!

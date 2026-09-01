@@ -1,4 +1,4 @@
-//! HTTP SaaS profile composition root (ADR-0052). Loads `HttpConfig`
+//! HTTP SaaS profile composition root. Loads `HttpConfig`
 //! from environment, builds `HttpState`, runs the signal watcher,
 //! and serves until shutdown.
 

@@ -1,4 +1,4 @@
-//! MCP protocol shaping for app sessions (ADR-0045).
+//! MCP protocol shaping for app sessions.
 //!
 //! Session state lives in [`crate::service::apps::session`]; this module
 //! maps service results to `rmcp::ErrorData` and shapes protocol envelopes.

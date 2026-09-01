@@ -182,8 +182,7 @@ impl ServiceContext {
         crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
-    /// Returns the bi-temporal close owner bound to the Active Namespace
-    /// (ADR-0039: the only place that composes close operations).
+    /// Returns the bi-temporal close owner bound to the Active Namespace.
     pub(crate) fn close_store(&self) -> crate::storage::CloseStoreClient {
         crate::storage::CloseStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }

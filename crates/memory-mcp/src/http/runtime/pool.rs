@@ -1,4 +1,4 @@
-//! Runtime pool + admission gate (ADR-0052, plan §5.5).
+//! Runtime pool + admission gate.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -32,12 +32,10 @@ pub enum PoolError {
     ShuttingDown,
 }
 
-// ─── Admission gate (Task 5.5 upgrade) ────────────────────────────
+// ─── Admission gate ───────────────────────────────────────
 
-/// Admission gate. Phase 3 shipped the stub gate with only
-/// `closed` and `is_closed()`. Task 5.5 adds the global
-/// request and subscription budgets plus the
-/// `AdmissionPermit` RAII handle.
+/// Admission gate. Provides global request and subscription
+/// budgets plus the `AdmissionPermit` RAII handle.
 pub struct AdmissionGate {
     global_limit: u32,
     global_active: AtomicU32,
@@ -53,9 +51,8 @@ impl Default for AdmissionGate {
 }
 
 impl AdmissionGate {
-    /// Default global in-flight request bound (spec §7.3
-    /// admission control). Environment-configurable override
-    /// arrives with Task 6.4 quotas.
+    /// Default global in-flight request bound. Environment-configurable
+    /// override arrives with the quota system.
     pub fn new(global_limit: u32) -> Self {
         Self {
             global_limit,
@@ -66,7 +63,7 @@ impl AdmissionGate {
         }
     }
 
-    /// Back-compat with the Phase 3 constructor.
+    /// Back-compat with the earlier constructor.
     pub fn open() -> Self {
         Self::default()
     }
@@ -140,11 +137,11 @@ impl Drop for AdmissionPermit {
     }
 }
 
-// ─── Pool (Task 5.5) ──────────────────────────────────────────────
+// ─── Pool ─────────────────────────────────────────────────
 
-/// Spec §7.3 defaults: 32 active, 15-min idle, 2-sec
-/// capacity wait, 30-sec activation timeout, 4 per-tenant
-/// concurrency. Environment overrides arrive with Task 6.4.
+/// Defaults: 32 active, 15-min idle, 2-sec capacity wait,
+/// 30-sec activation timeout, 4 per-tenant concurrency.
+/// Environment overrides arrive with the quota system.
 pub const DEFAULT_POOL_CAP: usize = 32;
 pub const DEFAULT_IDLE_TTL: Duration = Duration::from_secs(15 * 60);
 pub const DEFAULT_CAPACITY_WAIT: Duration = Duration::from_secs(2);
@@ -152,14 +149,14 @@ pub const DEFAULT_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DEFAULT_PER_TENANT_CONCURRENCY: u32 = 4;
 
 /// LRU pool of Tenant Runtimes. `acquire_or_wait` is the
-/// single production entry point used by the HTTP pipeline
-/// (Task 5.6). The pool holds a `RegistryHandle` so it can
-/// call `build_runtime`; the handle is cheap to clone.
+/// single production entry point used by the HTTP pipeline.
+/// The pool holds a `RegistryHandle` so it can call
+/// `build_runtime`; the handle is cheap to clone.
 pub struct Pool {
     map: Mutex<LruCache<String, Arc<Mutex<TenantRuntimeSlot>>>>,
     registry: Arc<crate::http::registry::RegistryHandle>,
     cap: usize,
-    #[allow(dead_code)] // Read by future idle-eviction tick (Task 6.2).
+    #[allow(dead_code)] // Read by future idle-eviction tick.
     idle_ttl: Duration,
     capacity_wait: Duration,
     #[allow(dead_code)] // Used by future per-tenant activation timeout.
@@ -334,8 +331,8 @@ impl Pool {
     }
 
     /// Test-only: mark a slot as Draining if it has been idle
-    /// since `threshold`. The current spec leaves the
-    /// eviction tick to Task 6.2; this helper is the
+    /// since `threshold`. The current implementation leaves the
+    /// eviction tick to the scheduler; this helper is the
     /// production path used by the unit tests.
     #[allow(dead_code)]
     pub async fn mark_draining_if_idle(

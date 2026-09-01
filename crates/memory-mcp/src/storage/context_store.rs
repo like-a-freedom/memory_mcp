@@ -1,6 +1,6 @@
 //! Narrow context assembly store over `Arc<dyn DbClient>`.
 //!
-//! Capability seams replaced by concrete structs per ADR-0024. Queries are
+//! Capability seams replaced by concrete structs. Queries are
 //! owned here, not on a trait that forwards to `DbClient`. Context Assembly
 //! consumers (ranking, lexical, semantic, temporal, graph, alias expansion,
 //! views, experience, triple, logging) depend on this struct instead of the
@@ -174,7 +174,7 @@ impl ContextStoreClient {
     }
 
     /// Episodes linked to an entity through the fact→edge graph
-    /// (`entity ←edge← fact →episode`), newest first (ADR-0044: graph-shaped
+    /// (`entity ←edge← fact →episode`), newest first (graph-shaped
     /// read-model queries belong to this store).
     pub async fn select_episodes_via_entity(
         &self,
@@ -211,7 +211,7 @@ impl ContextAccessLogClient {
     }
 
     /// Deletes query-log rows older than `cutoff` and returns how many were
-    /// removed (ADR-0044: the retention DELETE lives in the owning store).
+    /// removed (the retention DELETE lives in the owning store).
     pub async fn prune_expired_logs(&self, cutoff: &str) -> Result<usize, MemoryError> {
         let deleted = self
             .db

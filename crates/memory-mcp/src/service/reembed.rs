@@ -70,8 +70,8 @@ enum BatchOutcome {
 impl MemoryService {
     /// Drops the embedding HNSW index in the active namespace.
     ///
-    /// The DDL and its idempotency rule live in [`ReembedStoreClient`]
-    /// (C2); this method only orchestrates logging around the call.
+    /// The DDL and its idempotency rule live in [`ReembedStoreClient`];
+    /// this method only orchestrates logging around the call.
     async fn remove_embedding_index(&self, namespace: &str) -> Result<(), MemoryError> {
         use crate::storage::{EMBEDDING_INDEX_NAME, IndexRemoval};
         self.logger.log(
@@ -122,7 +122,7 @@ impl MemoryService {
     }
 
     /// Creates the embedding HNSW index in the active namespace with the
-    /// target dimension. The DDL lives in [`ReembedStoreClient`] (C2).
+    /// target dimension. The DDL lives in [`ReembedStoreClient`].
     async fn define_embedding_index(
         &self,
         namespace: &str,

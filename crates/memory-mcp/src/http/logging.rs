@@ -1,4 +1,4 @@
-//! Bounded request logging middleware (spec §"Logging").
+//! Bounded request logging middleware.
 //!
 //! The logger must NEVER record URI paths, headers, bodies,
 //! credentials, namespace names, email, or memory content. This
@@ -33,8 +33,7 @@ struct RequestLog<'a> {
 }
 
 /// Per-request context stored as an axum extension. Populated by
-/// the auth layer (Task 4.4) and the principal extractor (Task 4.5).
-/// Phase 3 emits placeholder values; Phase 4 fills them in.
+/// the auth layer and the principal extractor.
 #[derive(Default, Clone, Debug)]
 pub struct TenantLogContext {
     pub request_id: String,

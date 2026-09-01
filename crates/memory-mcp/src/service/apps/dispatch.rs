@@ -1,4 +1,4 @@
-//! Typed command-dispatch table for the `app_command` MCP tool (ADR-0023).
+//! Typed command-dispatch table for the `app_command` MCP tool.
 //!
 //! Each app command declares a static [`AppCommandDescriptor`] carrying its
 //! action aliases, its owning app, and a typed executor. Adding or renaming a

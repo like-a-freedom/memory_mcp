@@ -53,7 +53,7 @@ pub struct MemoryService {
     /// Shared per-session exposure-trace registry for selective recall.
     ///
     /// Holds at most 32 traces per session for 30 minutes. Persists only when a
-    /// later significant capture links a trace (ADR-0016 AD-7).
+    /// later significant capture links a trace.
     pub(crate) trace_registry: Arc<super::super::agent_memory::recall::SessionTraceRegistry>,
     /// Owned runtime for the lifecycle background workers (decay, archival,
     /// community). `None` when constructed via the test builders that do not

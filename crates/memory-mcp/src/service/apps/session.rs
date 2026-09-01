@@ -1,4 +1,4 @@
-//! App-session state store (ADR-0045).
+//! App-session state store.
 //!
 //! Owns session identity, expiry, and payload persistence. Returns
 //! [`MemoryError`]s; the MCP layer maps them to protocol errors.

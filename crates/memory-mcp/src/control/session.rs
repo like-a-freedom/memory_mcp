@@ -1,4 +1,4 @@
-//! Control Plane Session (Task 10.2, spec §5.3).
+//! Control Plane Session.
 //!
 //! Server-side session record with keyed cookie hash,
 //! idle + absolute expiry. The raw cookie value is never

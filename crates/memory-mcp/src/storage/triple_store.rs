@@ -4,7 +4,7 @@
 //! All reads and writes on the table go through this narrow store so the
 //! service layer expresses intent (create / find-conflicting / close)
 //! instead of supplying SQL. Closes delegate to the bi-temporal close
-//! owner (ADR-0039).
+//! owner.
 
 use std::sync::Arc;
 
@@ -80,7 +80,7 @@ impl TripleStoreClient {
             .collect())
     }
 
-    /// Closes a triple via the bi-temporal close owner (ADR-0039): both
+    /// Closes a triple via the bi-temporal close owner: both
     /// `t_invalid` and `t_invalid_ingested` are set together. Triples carry
     /// no `invalidation_reason` field, so no reason is persisted.
     pub(crate) async fn close_triple(&self, triple_id: &str) -> Result<(), MemoryError> {
@@ -242,7 +242,7 @@ mod tests {
             stored
                 .get("t_invalid_ingested")
                 .is_some_and(|v| !v.is_null()),
-            "t_invalid_ingested must be closed whenever t_invalid is (ADR-0039): {stored}"
+            "t_invalid_ingested must be closed whenever t_invalid is: {stored}"
         );
     }
 }

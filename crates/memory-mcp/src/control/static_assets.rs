@@ -1,4 +1,4 @@
-//! Static asset serving for the optional Dioxus SPA (Task 10.8).
+//! Static asset serving for the optional Dioxus SPA.
 //!
 //! When `control-plane-ui` is enabled, built assets are embedded
 //! via `include_bytes!` and served under `/` with a fallback to

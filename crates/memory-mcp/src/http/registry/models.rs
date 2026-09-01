@@ -1,8 +1,8 @@
-//! Registry record models (ADR-0052, plan §4.2).
+//! Registry record models.
 //!
-//! These types are the durable shape of the control namespace
-//! (Phase 4). The trait surface in `storage.rs` and the API key
-//! parser in `principal/api_keys.rs` reference them.
+//! These types are the durable shape of the control namespace.
+//! The trait surface in `storage.rs` and the API key parser in
+//! `principal/api_keys.rs` reference them.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -162,7 +162,7 @@ pub struct IdentityRef {
 
 impl KeyedVerifier {
     /// Compute HMAC-SHA256(pepper, secret) into a fixed-size
-    /// verifier. Used by Task 4.7 when issuing new API keys.
+    /// verifier. Used when issuing new API keys.
     pub fn compute(pepper: &[u8], secret: &[u8]) -> Self {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;

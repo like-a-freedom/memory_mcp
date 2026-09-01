@@ -1,4 +1,4 @@
-//! App session cleanup scheduler (plan §7.2 Step 4).
+//! App session cleanup scheduler.
 //!
 //! The job is a process-level bounded pass, not a
 //! per-tenant loop. It walks up to 100 ready tenants

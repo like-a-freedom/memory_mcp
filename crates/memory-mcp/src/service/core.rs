@@ -20,8 +20,7 @@ impl MemoryService {
         crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
     }
 
-    /// Read-side store for the batch reembed worker (ADR-0027: reembed SQL
-    /// lives in its owning store, not on `DbClient`).
+    /// Read-side store for the batch reembed worker.
     pub(crate) fn reembed_store(&self) -> crate::storage::ReembedStoreClient {
         crate::storage::ReembedStoreClient::new(
             self.db_client.clone(),
@@ -48,7 +47,7 @@ impl MemoryService {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
     }
 
-    /// Episode-domain store (ADR-0027: episode queries live in the store).
+    /// Episode-domain store.
     pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
         crate::storage::EpisodeStoreClient::new(
             self.db_client.clone(),

@@ -1,11 +1,11 @@
-//! Operator principal seam (ADR-0052, plan §4.7).
+//! Operator principal seam.
 //!
-//! Phase 4 stub: with the `test-fixtures` feature, the stub
+//! Stub: with the `test-fixtures` feature, the stub
 //! middleware accepts `X-Operator-Auth: stub`; without
-//! `test-fixtures` there is NO operator injection in Phase 4
-//! (operator endpoints are unreachable until Phase 10).
+//! `test-fixtures` there is no operator injection
+//! (operator endpoints are unreachable until OIDC).
 //!
-//! Phase 10 (Task 10.6) replaces this with OIDC-derived operator
+//! OIDC replaces this with derived operator
 //! identity; the accessor name (`require_recent_auth`) stays.
 
 use std::sync::Arc;
@@ -22,16 +22,14 @@ pub struct OperatorPrincipal {
 }
 
 impl OperatorPrincipal {
-    /// Phase 4 stub: always recent. Task 10.4 enforces the
-    /// 10-minute bound.
+    /// Stub: always recent.
     pub fn require_recent_auth(&self) -> Result<(), ApiError> {
         Ok(())
     }
 }
 
 /// Test-fixtures-only stub middleware. Injects the operator
-/// principal for the Phase 4–9 operator endpoints. Removed by
-/// Task 10.6 (OIDC operators).
+/// principal.
 #[cfg(any(test, feature = "test-fixtures"))]
 pub async fn stub_operator_inject(
     mut req: axum::extract::Request,
@@ -66,7 +64,7 @@ pub fn test_operator_router(state: Arc<crate::http::HttpState>) -> axum::Router 
 }
 
 // ---------------------------------------------------------------------------
-// Operator API endpoints (Task 10.6)
+// Operator API endpoints
 // ---------------------------------------------------------------------------
 
 /// GET /api/v1/operator/tenants/:id — read provisioning state.

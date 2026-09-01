@@ -1,4 +1,4 @@
-//! Recent-auth gate for destructive operations (Task 10.4, spec §5.3).
+//! Recent-auth gate for destructive operations.
 //!
 //! Requires OIDC reauthentication within a configurable window
 //! before allowing credential creation, identity linking, or

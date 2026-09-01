@@ -1,4 +1,4 @@
-//! CSRF token issuance and verification (Task 10.3, spec §3.1).
+//! CSRF token issuance and verification.
 //!
 //! CSRF tokens are HMACs of `(account_id, session_id, csrf_key)`.
 //! Required on all `/api/v1` state-changing endpoints.

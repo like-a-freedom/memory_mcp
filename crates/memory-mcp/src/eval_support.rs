@@ -94,8 +94,8 @@ pub fn classify_isolation_violation(
     None
 }
 
-/// Read-only, feature-gated evidence seam over persisted claim relations
-/// (eval-v2-closure Task 2). It performs a read-only storage query, then
+/// Read-only, feature-gated evidence seam over persisted claim relations.
+/// It performs a read-only storage query, then
 /// exposes immutable evaluation views only — no mutation and never reachable
 /// through MCP.
 pub struct ClaimEvidenceReader {

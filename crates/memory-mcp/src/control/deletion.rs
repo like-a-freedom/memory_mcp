@@ -1,6 +1,6 @@
-//! Account deletion flow (Task 10.7, spec §14).
+//! Account deletion flow.
 //!
-//! 1. Recent OIDC reauthentication (Task 10.4).
+//! 1. Recent OIDC reauthentication.
 //! 2. Display notice: no export/recovery.
 //! 3. Typed-phrase confirmation by the user.
 //! 4. Server-issued short-lived one-use confirmation token.

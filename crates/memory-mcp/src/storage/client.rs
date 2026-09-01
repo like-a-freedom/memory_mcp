@@ -181,12 +181,11 @@ pub struct SurrealDbClient {
 enum DbEngine {
     Local(Arc<Surreal<Db>>),
     Remote(Arc<Surreal<Client>>),
-    /// Embedded test backend (in-memory kv). Phase 4/5 test
-    /// fixtures and the Task 5.8 bootstrap use this; production
-    /// never opens a Mem engine. The handle is `Surreal<Db>`
-    /// underneath because `Mem` is just a configuration
-    /// marker; the actual kv engine is RocksDB with a
-    /// temporary directory.
+    /// Embedded test backend (in-memory kv). Test fixtures and
+    /// bootstrap use this; production never opens a Mem engine.
+    /// The handle is `Surreal<Db>` underneath because `Mem` is
+    /// just a configuration marker; the actual kv engine is
+    /// RocksDB with a temporary directory.
     Mem(Arc<Surreal<Db>>),
 }
 
@@ -295,8 +294,8 @@ impl SurrealDbClient {
     /// Wraps an already-bound embedded `Mem` (test) client.
     /// The handle type is `Surreal<Db>` because `Mem` is a
     /// configuration marker, not a `Connection` impl; the kv
-    /// engine is in-memory under the hood. Used by Task 5.4
-    /// test fixtures and Task 5.8 bootstrap.
+    /// engine is in-memory under the hood. Used by test
+    /// fixtures and bootstrap.
     pub fn from_prebound_mem(_db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
         // The Mem engine configuration is dropped here; tests
         // that need the live engine (e.g. provisioning) keep

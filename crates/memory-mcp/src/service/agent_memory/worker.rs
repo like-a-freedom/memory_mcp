@@ -107,14 +107,14 @@ impl Default for LifecycleWorkerRuntime {
 // `projection::run_projection_pass` on each poll tick.
 
 /// Shared worker mechanics: empty-poll backoff. Delegates to
-/// `service::durable_work::empty_poll_backoff` (ADR-0026 single timing home).
+/// `service::durable_work::empty_poll_backoff`.
 #[must_use]
 pub fn empty_poll_interval() -> std::time::Duration {
     durable_work::empty_poll_backoff()
 }
 
 /// Shared worker mechanics: transient-error backoff. Delegates to
-/// `service::durable_work::transient_error_backoff` (ADR-0026 single timing home).
+/// `service::durable_work::transient_error_backoff`.
 #[must_use]
 pub fn transient_backoff() -> std::time::Duration {
     durable_work::transient_error_backoff()
