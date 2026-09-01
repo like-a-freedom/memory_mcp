@@ -6,7 +6,7 @@
 |----------|---------|-----------------|
 | `MEMORY_MCP_API_KEY_PEPPER` | HMAC pepper for API key verification | Invalidates all existing API keys |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers | Requires OIDC identity relinking |
-| `MEMORY_MCP_HTTP_SESSION_SIGNING_KEY` | Session cookie signing key | Invalidates all browser sessions |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers | Invalidates all browser sessions |
 | `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | OIDC state nonce encryption key | Invalidates in-flight login flows |
 | `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | OIDC nonce encryption key | Invalidates in-flight login flows |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | CSRF token HMAC key | Invalidates all CSRF tokens |
