@@ -67,14 +67,16 @@ impl TaskStore for DurableTaskStore {
         let now = Utc::now();
         let retention = now + chrono::Duration::seconds(RETENTION_SECS);
         let id = uuid::Uuid::new_v4().to_string();
-        // Duplicate fingerprint for the same tenant: return
-        // the existing task id instead of creating a second
-        // task. The dedupe key is (tenant_id, fingerprint).
+        // Dedup: if a non-failed task with this fingerprint
+        // exists, return its id. The UNIQUE index on
+        // (tenant_id, fingerprint) prevents concurrent
+        // duplicates at the DB level.
         let existing = self
             .db
             .query(
-                "SELECT * FROM tenant_task \
-                 WHERE tenant_id = $tenant_id AND fingerprint = $fingerprint AND state != 'failed' \
+                "SELECT id FROM tenant_task \
+                 WHERE tenant_id = $tenant_id AND fingerprint = $fingerprint \
+                 AND state != 'failed' \
                  LIMIT 1;",
                 Some(json!({
                     "tenant_id": self.tenant_id.as_str(),
@@ -138,7 +140,8 @@ impl TaskStore for DurableTaskStore {
         // before committing facts and aborts). Terminal
         // states are untouched.
         let now = Utc::now();
-        self.db
+        let result = self
+            .db
             .query(
                 "UPDATE tenant_task SET \
                  cancellation_intent = true, \
@@ -152,6 +155,11 @@ impl TaskStore for DurableTaskStore {
                 })),
             )
             .await?;
+        let rows: Vec<Value> = serde_json::from_value(result)
+            .map_err(|e| MemoryError::Storage(format!("cancel intent result: {e}")))?;
+        if rows.is_empty() {
+            return Err(MemoryError::NotFound(format!("task {task_id} not found")));
+        }
         Ok(())
     }
 
@@ -232,10 +240,9 @@ impl TaskStore for DurableTaskStore {
         };
         self.fenced_update(
             handle,
-            &format!(
-                "UPDATE tenant_task SET state = '{final_state}', result = $result, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND lease_generation = $gen"
-            ),
+            "UPDATE tenant_task SET state = $state, result = $result, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND lease_generation = $gen",
             Some(json!({
+                "state": final_state,
                 "result": result,
                 "now": Self::to_datetime(Utc::now()),
             })),
@@ -478,12 +485,7 @@ mod tests {
             1,
             "exactly one task row after first enqueue"
         );
-        // The id field may be a string (custom id) or the
-        // record id object. Inspect both so the dedupe
-        // projection is deterministic.
-        let first_row = &raw_rows[0];
-        let id_field = first_row.get("id");
-        eprintln!("raw row: {first_row:?}  id field: {id_field:?}");
+        assert!(!raw_rows.is_empty(), "exactly one task row");
         let id2 = store
             .enqueue("fp_1", json!({"source": "a"}))
             .await

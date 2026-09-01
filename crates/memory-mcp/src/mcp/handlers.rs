@@ -153,21 +153,6 @@ impl MemoryMcp {
         self
     }
 
-    /// Accessor for the durable task overlay. Returns
-    /// `Some` when the HTTP SaaS path has wired the
-    /// backend; `None` for stdio and tests that haven't
-    /// called `with_durable_tasks`.
-    #[cfg(feature = "streamable-http")]
-    #[expect(
-        dead_code,
-        reason = "wired by get_task / cancel_task dispatch in Task 8.5"
-    )]
-    pub(crate) fn durable_tasks(
-        &self,
-    ) -> Option<&std::sync::Arc<dyn crate::http::tasks::state::TaskStore>> {
-        self.durable_tasks.as_ref()
-    }
-
     /// Returns a reference to the underlying `MemoryService`.
     ///
     /// This can be used to access service methods directly if needed.
@@ -388,6 +373,15 @@ impl ServerHandler for MemoryMcp {
         request: UpdateTaskParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<(), ErrorData> {
+        // Durable overlay: v1 tasks don't support input
+        // requests, so update_task is invalid.
+        #[cfg(feature = "streamable-http")]
+        if self.durable_tasks.is_some() {
+            return Err(ErrorData::invalid_params(
+                "durable tasks do not support update_task in v1",
+                None,
+            ));
+        }
         self.tasks
             .update_task(&request.task_id, request.input_responses)
     }
