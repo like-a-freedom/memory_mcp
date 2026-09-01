@@ -26,11 +26,6 @@ impl Drop for Server {
     }
 }
 
-fn free_port() -> u16 {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind ephemeral");
-    listener.local_addr().expect("local addr").port()
-}
-
 const BOOTSTRAP_KEY: &str =
     "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_proxystreaming0123456789abcdef12";
 
@@ -77,7 +72,7 @@ fn base_env(port: u16) -> Vec<(String, String)> {
 }
 
 async fn spawn_server() -> Server {
-    let port = free_port();
+    let port = 0;
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"));
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     for (key, value) in base_env(port) {

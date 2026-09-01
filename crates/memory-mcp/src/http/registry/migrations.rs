@@ -1,9 +1,8 @@
-//! Control-namespace migrations.
+//! Control-namespace migration catalog.
 //!
-//! The runtime `apply_registry_migrations` is the seam that the
-//! production `SurrealRegistryStore` calls during connect. The
-//! registry migration directory lists the catalog of SQL files
-//! to apply; tests assert the directory and catalog contents.
+//! The durable runner lives on `SurrealRegistryStore` so it can use the same
+//! bound SurrealDB connection as the registry. This module owns only the
+//! append-only catalog and the public adapter used by startup.
 
 use std::sync::Arc;
 
@@ -13,27 +12,22 @@ use crate::http::registry::storage::SurrealRegistryStore;
 /// Path to the registry migration directory.
 pub const REGISTRY_MIGRATION_DIR: &str = "crates/memory-mcp/migrations";
 
-/// Catalog of migration file basenames the registry applies in
-/// order. Each file must exist under `REGISTRY_MIGRATION_DIR`.
-///
-/// Production code applies these against the connected control
-/// database with checksums and a durable ledger; the production
-/// implementation is wired by `SurrealRegistryStore::connect`.
+/// Catalog of migration file basenames for the control namespace. Tenant-only
+/// schemas (App Sessions, Tasks, outbox, and task artifacts) are applied by the
+/// tenant migration runner and must not be installed in the registry.
 pub const REGISTRY_MIGRATIONS: &[&str] = &[
     "001_registry",
-    "044_task_artifacts",
     "045_deletion_and_usage_hardening",
+    "046_registry_correctness",
 ];
 
-/// Apply the registry migration catalog against the bound
-/// control client. The catalog is `REGISTRY_MIGRATIONS` in
-/// order. Production code calls this from
-/// `SurrealRegistryStore::connect`; the placeholder returns
-/// `Unavailable` until the durable store is wired.
+/// Apply the registry migration catalog through the durable store. The store
+/// performs checksum validation, lease-based claiming, recovery of expired
+/// `applying` rows, and postcondition checks.
 pub async fn apply_registry_migrations(
-    _store: &Arc<SurrealRegistryStore>,
+    store: &Arc<SurrealRegistryStore>,
 ) -> Result<Vec<String>, MemoryError> {
-    Ok(REGISTRY_MIGRATIONS.iter().map(|s| s.to_string()).collect())
+    store.apply_migrations().await
 }
 
 /// Migration ids the registry needs. The actual SQL is in the
@@ -56,8 +50,9 @@ mod tests {
     fn list_migrations_contains_required_files() {
         let m = list_migrations();
         assert!(m.contains(&"001_registry".to_string()));
-        assert!(m.contains(&"044_task_artifacts".to_string()));
+        assert!(!m.contains(&"044_task_artifacts".to_string()));
         assert!(m.contains(&"045_deletion_and_usage_hardening".to_string()));
+        assert!(m.contains(&"046_registry_correctness".to_string()));
     }
 
     #[test]

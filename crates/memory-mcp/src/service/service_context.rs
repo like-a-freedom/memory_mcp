@@ -51,6 +51,8 @@ pub struct ServiceContext {
     pub(crate) claim_service: crate::service::claims::projection::ClaimService,
     /// Bounded-concurrency semaphore for fire-and-forget triple extraction.
     pub(crate) triple_extraction_semaphore: Arc<tokio::sync::Semaphore>,
+    #[cfg(feature = "streamable-http")]
+    pub(crate) outbox_enabled: bool,
 }
 
 /// Narrow infrastructure seam for the context retrieval pipeline.
@@ -184,7 +186,15 @@ impl ServiceContext {
 
     /// Returns the bi-temporal close owner bound to the Active Namespace.
     pub(crate) fn close_store(&self) -> crate::storage::CloseStoreClient {
-        crate::storage::CloseStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+        let store = crate::storage::CloseStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        );
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            return store.with_outbox();
+        }
+        store
     }
 
     /// Returns the triple store handle bound to the Active Namespace — the

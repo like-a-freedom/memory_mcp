@@ -5,6 +5,7 @@
 
 DEFINE TABLE IF NOT EXISTS tenant_change_sequence SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS value ON tenant_change_sequence TYPE int DEFAULT 0;
+UPSERT tenant_change_sequence:default SET value = 0;
 
 DEFINE TABLE IF NOT EXISTS tenant_change_event SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS event_seq ON tenant_change_event TYPE int;

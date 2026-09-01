@@ -55,7 +55,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, NamespaceBinding, Tenant, TenantStatus,
     };
-    use crate::http::registry::storage::{InMemoryStore, SurrealRegistryStore};
+    use crate::http::registry::storage::InMemoryStore;
     use std::sync::Arc;
 
     fn tenant(status: TenantStatus) -> Tenant {
@@ -133,16 +133,5 @@ mod tests {
             ResolvedTenant::Suspended => {}
             other => panic!("expected Suspended, got {other:?}"),
         }
-    }
-
-    #[tokio::test]
-    async fn production_store_returns_unavailable_for_find_tenant() {
-        // The production placeholder returns
-        // MemoryError::Unavailable from every read; the resolver
-        // surfaces that as a typed Err.
-        let s: Arc<dyn RegistryStore> = Arc::new(SurrealRegistryStore::new());
-        let r = AccountResolver::new(s);
-        let res = r.resolve_ready_tenant("acct_1").await;
-        assert!(matches!(res, Err(MemoryError::Unavailable(_))));
     }
 }

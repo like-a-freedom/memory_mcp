@@ -39,7 +39,12 @@ DEFINE FIELD IF NOT EXISTS plan_version ON tenant TYPE int
 DEFINE FIELD IF NOT EXISTS schema_version ON tenant TYPE int
     ASSERT $value >= 0;
 DEFINE FIELD IF NOT EXISTS retry_stage ON tenant TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS provisioning_lease ON tenant TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS provisioning_lease ON tenant TYPE option<object> FLEXIBLE;
+DEFINE FIELD IF NOT EXISTS provisioning_lease.owner_id ON tenant TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS provisioning_lease.lease_id ON tenant TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS provisioning_lease.expires_at ON tenant TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS provisioning_lease.fencing_generation ON tenant TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS provisioning_lease.heartbeat_at ON tenant TYPE option<datetime>;
 DEFINE FIELD IF NOT EXISTS version ON tenant TYPE int
     ASSERT $value >= 0;
 DEFINE FIELD IF NOT EXISTS created_at ON tenant TYPE datetime
@@ -62,8 +67,8 @@ DEFINE FIELD IF NOT EXISTS id ON api_key TYPE string
 DEFINE FIELD IF NOT EXISTS account_id ON api_key TYPE string
     ASSERT $value != NONE AND $value != "";
 DEFINE FIELD IF NOT EXISTS name ON api_key TYPE string;
-DEFINE FIELD IF NOT EXISTS verifier ON api_key TYPE object;
-DEFINE FIELD IF NOT EXISTS verifier.0 ON api_key TYPE array;
+DEFINE FIELD IF NOT EXISTS verifier ON api_key TYPE string
+    ASSERT $value != NONE AND $value != "";
 DEFINE FIELD IF NOT EXISTS status ON api_key TYPE string
     ASSERT $value IN ["active", "revoked"];
 DEFINE FIELD IF NOT EXISTS created_at ON api_key TYPE datetime
@@ -83,8 +88,8 @@ DEFINE FIELD IF NOT EXISTS id ON external_identity TYPE string
     ASSERT $value != NONE AND $value != "";
 DEFINE FIELD IF NOT EXISTS issuer ON external_identity TYPE string
     ASSERT $value != NONE AND $value != "";
-DEFINE FIELD IF NOT EXISTS subject_verifier ON external_identity TYPE object;
-DEFINE FIELD IF NOT EXISTS subject_verifier.0 ON external_identity TYPE array;
+DEFINE FIELD IF NOT EXISTS subject_verifier ON external_identity TYPE string
+    ASSERT $value != NONE AND $value != "";
 DEFINE FIELD IF NOT EXISTS account_id ON external_identity TYPE string
     ASSERT $value != NONE AND $value != "";
 DEFINE FIELD IF NOT EXISTS created_at ON external_identity TYPE datetime

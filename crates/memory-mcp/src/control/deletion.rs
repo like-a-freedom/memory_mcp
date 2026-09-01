@@ -7,11 +7,18 @@
 //! 5. Durable credential/session revocation.
 //! 6. Idempotent logical deletion job.
 
+use std::sync::Arc;
+
 use chrono::Utc;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 use super::error::ApiError;
 use super::recent_auth;
 use super::session::ControlPlaneSession;
+use crate::error::MemoryError;
+use crate::http::registry::RegistryHandle;
+use crate::http::registry::storage::RegistryStore;
 
 /// The typed phrase the user must type to confirm deletion.
 pub const DELETION_TYPED_PHRASE: &str = "DELETE my account";
@@ -45,32 +52,137 @@ pub fn validate_typed_phrase(phrase: &str) -> bool {
     phrase.trim() == DELETION_TYPED_PHRASE
 }
 
-/// Execute the deletion flow: validate recent auth, typed phrase,
-/// revoke sessions, and mark account for deletion.
+/// Derive the durable verifier for a one-use confirmation token. The raw token
+/// is returned only to the browser in the start response and is never persisted.
+pub fn token_verifier(key: &[u8; 32], token: &str) -> Result<String, crate::error::MemoryError> {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|_| crate::error::MemoryError::ConfigInvalid("deletion token key".into()))?;
+    mac.update(token.as_bytes());
+    Ok(hex::encode(mac.finalize().into_bytes()))
+}
+
+/// Execute the safe deletion-start path. The caller supplies only the durable
+/// challenge verifier; the store consumes the challenge and performs every
+/// control-plane mutation in one transaction/critical section.
 pub async fn execute_deletion(
     session: &ControlPlaneSession,
     typed_phrase: &str,
-    store: &dyn crate::http::registry::storage::RegistryStore,
+    challenge_verifier: &str,
+    store: &dyn RegistryStore,
 ) -> Result<(), ApiError> {
-    // Step 1: Recent auth check (10 minutes).
     recent_auth::require_recent_auth(session, recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-
-    // Step 3: Typed phrase validation.
     if !validate_typed_phrase(typed_phrase) {
         return Err(ApiError::Forbidden);
     }
+    store
+        .begin_account_deletion(
+            challenge_verifier,
+            &session.account_id,
+            &session.id,
+            Utc::now(),
+        )
+        .await?;
+    Ok(())
+}
 
-    // Step 5: Revoke the current session.
-    store.delete_session(&session.cookie_hash).await?;
+const DELETION_OWNER_ID: &str = "deletion-scheduler";
+const DELETION_LEASE_TTL_SECS: i64 = 60;
+const DELETION_BATCH_SIZE: usize = 64;
+const APP_SESSION_CLEANUP_SQL: &str =
+    "DELETE FROM app_session WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now();";
+const TASK_CLEANUP_SQL: &str = "DELETE FROM tenant_task WHERE retention_expiry <= time::now() AND state IN ['completed', 'completed_before_cancel', 'cancelled', 'cancelled_before_commit', 'failed'];";
 
-    // Step 6: Mark account as deleting (terminal state).
-    let mut account = store.find_account_by_id(&session.account_id).await?;
-    if let Some(ref mut acct) = account {
-        acct.status = crate::http::registry::models::AccountStatus::Deleting;
-        store.write_account(acct).await?;
+/// Run one crash-safe deletion pass. The registry lease is the only worker
+/// lease: it fences both tenant-local cleanup and the final tombstone update.
+pub async fn run_deletion_worker(registry: RegistryHandle) -> Result<(), MemoryError> {
+    let store = registry.store_clone();
+    let tenants = store
+        .list_deleting_tenants(DELETION_BATCH_SIZE, Utc::now())
+        .await?;
+    if tenants.is_empty() {
+        return Ok(());
+    }
+    let engine = registry.tenant_engine()?;
+    let mut first_error = None;
+
+    for tenant in tenants {
+        let lease_id = uuid::Uuid::new_v4().to_string();
+        let Some(lease) = store
+            .claim_provisioning(
+                &tenant.id,
+                DELETION_OWNER_ID,
+                &lease_id,
+                DELETION_LEASE_TTL_SECS,
+            )
+            .await?
+        else {
+            continue;
+        };
+        let tenant_id = tenant.id.clone();
+        let tenant_id_for_work = tenant_id.clone();
+        let namespace = tenant.namespace_binding.namespace.clone();
+        let store_for_work = Arc::clone(&store);
+        let engine_for_work = engine.clone();
+        let lease_for_work = lease.clone();
+        let cleanup = lease
+            .run_with_heartbeat(registry.clone(), &tenant_id, async move {
+                let client = engine_for_work.bind(&tenant).await?;
+                match client
+                    .execute_migration_script(APP_SESSION_CLEANUP_SQL, &namespace)
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(error) if missing_app_session_table(&error) => {}
+                    Err(error) => return Err(error),
+                }
+                match client
+                    .execute_migration_script(TASK_CLEANUP_SQL, &namespace)
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(error) if missing_task_table(&error) => {}
+                    Err(error) => return Err(error),
+                }
+                store_for_work
+                    .finalize_account_deletion(
+                        &tenant_id_for_work,
+                        &lease_for_work.owner_id,
+                        &lease_for_work.lease_id,
+                        lease_for_work.fencing_generation,
+                        Utc::now(),
+                    )
+                    .await
+            })
+            .await;
+
+        if let Err(error) = cleanup {
+            let _ = lease.release(store.as_ref(), &tenant_id).await;
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
     }
 
-    Ok(())
+    first_error.map_or(Ok(()), Err)
+}
+
+fn missing_app_session_table(error: &MemoryError) -> bool {
+    missing_table(error, "app_session")
+}
+
+fn missing_task_table(error: &MemoryError) -> bool {
+    missing_table(error, "tenant_task")
+}
+
+fn missing_table(error: &MemoryError, table: &str) -> bool {
+    let MemoryError::Storage(message) = error else {
+        return false;
+    };
+    let lower = message.to_ascii_lowercase();
+    lower.contains(table)
+        && ((lower.contains("does not exist") && lower.contains("table"))
+            || lower.contains("unknown table")
+            || lower.contains("table not found"))
 }
 
 #[cfg(test)]

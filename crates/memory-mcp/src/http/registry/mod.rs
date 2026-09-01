@@ -1,5 +1,8 @@
-//! Tenant Registry seam with InMemoryStore backend (test-only). The
-//! privileged SurrealDB store is added in a later milestone.
+//! Tenant Registry and its durable SurrealDB composition seams.
+//!
+//! `InMemoryStore` is available only to tests and test-fixture builds. Production
+//! startup must construct `SurrealRegistryStore` and provide a privileged engine
+//! explicitly; there is no silent in-memory fallback.
 
 pub mod account;
 pub mod migrations;
@@ -8,12 +11,14 @@ pub mod plan;
 pub mod provisioning;
 pub mod storage;
 
+pub mod surreal_store;
+
 pub use storage::{RegistryStore, SurrealRegistryStore};
 
 #[cfg(any(test, feature = "test-fixtures"))]
 pub use storage::InMemoryStore;
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
@@ -47,6 +52,16 @@ impl PrivilegedEngine {
         tenant: &super::registry::models::Tenant,
     ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
         use crate::storage::client::SurrealDbClient;
+        // `use_ns/use_db` is a connection-session mutation. Surreal clones
+        // isolate the resulting bound adapter, but concurrent binds on the
+        // same underlying local/remote engine can conflict while the session
+        // command is being applied. Serialize only that short bind operation;
+        // tenant queries remain concurrent after each clone is bound.
+        static BIND_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+        let _bind_guard = BIND_LOCK
+            .get_or_init(|| tokio::sync::Mutex::new(()))
+            .lock()
+            .await;
         match self {
             PrivilegedEngine::Remote(privileged) => {
                 let ns_client = (**privileged).clone();
@@ -108,17 +123,6 @@ pub struct RegistryHandle {
 }
 
 impl RegistryHandle {
-    /// Build a production handle. Ships the `SurrealRegistryStore`
-    /// placeholder (every read returns `MemoryError::Unavailable`);
-    /// a later milestone replaces the inner store with a real
-    /// SurrealDB-backed implementation.
-    pub fn new() -> Self {
-        Self {
-            store: Arc::new(SurrealRegistryStore::new()),
-            engine: None,
-        }
-    }
-
     /// Build a handle backed by the in-memory test backend.
     /// Feature-gated on `test-fixtures` so a production build
     /// cannot accidentally swap it in.
@@ -211,10 +215,16 @@ impl RegistryHandle {
         Arc::clone(&self.store)
     }
 
+    /// Ensure the deployment's version-1 signup plan exists without
+    /// overwriting an operator-managed durable plan.
+    pub async fn ensure_plan(&self, plan: &models::Plan) -> Result<(), crate::error::MemoryError> {
+        self.store.ensure_plan(plan).await
+    }
+
     /// Build a handle from a store without an engine.
-    /// The scheduler uses this for tests; the production
-    /// binary uses `Self::new()` or
-    /// `Self::in_memory_with_default_mem_engine`.
+    /// This is intentionally available only to tests and fixture
+    /// builds: production tenant activation requires an explicit
+    /// privileged engine.
     #[cfg(any(test, feature = "test-fixtures"))]
     pub fn from_store(store: Arc<dyn RegistryStore>) -> Self {
         Self {
@@ -222,10 +232,13 @@ impl RegistryHandle {
             engine: None,
         }
     }
-}
 
-impl Default for RegistryHandle {
-    fn default() -> Self {
-        Self::new()
+    /// Build the production handle from the durable registry store and
+    /// the separately configured privileged tenant engine.
+    pub fn from_durable(store: Arc<dyn RegistryStore>, engine: PrivilegedEngine) -> Self {
+        Self {
+            store,
+            engine: Some(Arc::new(engine)),
+        }
     }
 }

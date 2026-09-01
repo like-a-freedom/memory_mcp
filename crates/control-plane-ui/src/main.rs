@@ -2,8 +2,9 @@
 
 use dioxus::prelude::*;
 
-#[allow(dead_code)]
 mod api;
+mod pages;
+mod router;
 
 fn main() {
     dioxus::launch(App);
@@ -12,10 +13,6 @@ fn main() {
 #[component]
 fn App() -> Element {
     rsx! {
-        div {
-            h1 { "Memory MCP Control Plane" }
-            p { "Login to manage your account." }
-            a { href: "/api/v1/auth/authorize", "Login with OIDC" }
-        }
+        router::AppRouter {}
     }
 }

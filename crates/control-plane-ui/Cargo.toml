@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 dioxus = { version = "0.7", features = ["web"] }
+dioxus-router = "0.7"
 serde = { workspace = true }
 serde_json = { workspace = true }
 gloo-net = { version = "0.7", features = ["http"] }

@@ -71,6 +71,12 @@ impl HttpState {
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = Self::build_registry(&config).await?;
+        let signup_plan = registry::models::Plan {
+            id: "free".into(),
+            version: 1,
+            limits: config.signup_plan_limits.clone().unwrap_or_default(),
+        };
+        registry.ensure_plan(&signup_plan).await?;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -119,6 +125,12 @@ impl HttpState {
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = Self::build_registry(&config).await?;
+        let signup_plan = registry::models::Plan {
+            id: "free".into(),
+            version: 1,
+            limits: config.signup_plan_limits.clone().unwrap_or_default(),
+        };
+        registry.ensure_plan(&signup_plan).await?;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -162,12 +174,9 @@ impl HttpState {
         }))
     }
 
-    /// Build the registry handle. Test-fixtures builds use
-    /// the in-memory backend with a privileged Mem engine so
-    /// the bootstrap can write accounts, tenants,
-    /// and api keys, and the runtime pool can build
-    /// per-tenant handles. Production builds use the
-    /// placeholder.
+    /// Build the registry handle. Test-fixture builds deliberately use an
+    /// in-memory backend; every production build connects the control registry
+    /// and tenant privileged engine from their independent environment targets.
     async fn build_registry(
         config: &HttpConfig,
     ) -> Result<registry::RegistryHandle, crate::error::MemoryError> {
@@ -178,9 +187,22 @@ impl HttpState {
         }
         #[cfg(not(any(test, feature = "test-fixtures")))]
         {
-            let _ = config;
-            Err(crate::error::MemoryError::ConfigInvalid(
-                "HTTP SaaS production registry is not wired; refusing to start with an in-memory or placeholder registry".into(),
+            let store = registry::SurrealRegistryStore::connect(&config.control_db).await?;
+            // Embedded RocksDB permits one process handle per path. Reuse the
+            // control connection when both targets intentionally point at the
+            // same endpoint; remote deployments may still use independent
+            // connections when the targets differ.
+            let engine = if config.control_db.url == config.tenant_db.url
+                && config.control_db.username == config.tenant_db.username
+                && config.control_db.password == config.tenant_db.password
+            {
+                store.privileged_engine()
+            } else {
+                registry::SurrealRegistryStore::connect_engine(&config.tenant_db).await?
+            };
+            Ok(registry::RegistryHandle::from_durable(
+                std::sync::Arc::new(store),
+                engine,
             ))
         }
     }

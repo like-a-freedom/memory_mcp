@@ -22,27 +22,54 @@ pub enum ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let (status, message) = match self {
-            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
-            ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
-            ApiError::NotFound => (StatusCode::NOT_FOUND, "not found"),
-            ApiError::Conflict => (StatusCode::CONFLICT, "conflict"),
-            ApiError::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "temporarily unavailable"),
-            ApiError::ReauthRequired => {
-                (StatusCode::UNAUTHORIZED, "recent authentication required")
+        let (status, code, message) = match self {
+            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", "unauthorized"),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "forbidden"),
+            ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found", "not found"),
+            ApiError::Conflict => (StatusCode::CONFLICT, "conflict", "conflict"),
+            ApiError::Unavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "temporarily_unavailable",
+                "temporarily unavailable",
+            ),
+            ApiError::ReauthRequired => (
+                StatusCode::UNAUTHORIZED,
+                "recent_auth_required",
+                "recent authentication required",
+            ),
+            // Internal details are logged server-side; the response body stays
+            // generic and carries only a correlation id for support.
+            ApiError::Internal(error) => {
+                eprintln!("memory_mcp::control: internal API error: {error}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "internal error",
+                )
             }
-            // Internal details are logged server-side; the
-            // response body stays generic (no storage/error-shape
-            // leak).
-            ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
         };
-        (status, message).into_response()
+        let body = serde_json::json!({
+            "error": {"code": code, "message": message},
+            "correlation_id": uuid::Uuid::new_v4().to_string(),
+        });
+        (
+            status,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            body.to_string(),
+        )
+            .into_response()
     }
 }
 
 impl From<MemoryError> for ApiError {
     fn from(err: MemoryError) -> Self {
-        ApiError::Internal(err)
+        match err {
+            MemoryError::NotFound(_) => ApiError::NotFound,
+            MemoryError::Conflict(_) => ApiError::Conflict,
+            MemoryError::Unavailable(_) | MemoryError::Transient(_) => ApiError::Unavailable,
+            MemoryError::Validation(_) | MemoryError::ConfigInvalid(_) => ApiError::Internal(err),
+            other => ApiError::Internal(other),
+        }
     }
 }
 

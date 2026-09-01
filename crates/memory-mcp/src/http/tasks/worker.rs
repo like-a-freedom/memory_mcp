@@ -51,7 +51,10 @@ impl DurableTaskStore {
 /// "tenant_task"}}`; a plain string is accepted too.
 fn record_id_str(v: &Value) -> Option<String> {
     match v {
-        Value::String(s) => Some(s.clone()),
+        Value::String(s) => Some(
+            s.rsplit_once(':')
+                .map_or_else(|| s.clone(), |(_, key)| key.to_owned()),
+        ),
         Value::Object(o) => o
             .get("RecordId")
             .and_then(|r| r.get("key"))
@@ -170,7 +173,6 @@ impl TaskStore for DurableTaskStore {
                 "UPDATE (SELECT id FROM tenant_task \
                  WHERE tenant_id = $tenant_id \
                    AND (state = 'queued' \
-                        OR state = 'cancel_requested' \
                         OR (state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)))) \
                  LIMIT 1) SET \
                  lease_owner = $owner, \
@@ -265,7 +267,7 @@ impl TaskStore for DurableTaskStore {
         let result = self
             .db
             .query(
-                "UPDATE tenant_task SET state = 'queued', lease_owner = NONE, lease_expiry = NONE, updated_at = type::datetime($now) WHERE tenant_id = $tenant_id AND state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)) RETURN id;",
+                "UPDATE tenant_task SET state = IF cancellation_intent = true THEN 'cancelled' ELSE 'queued' END, lease_owner = NONE, lease_expiry = NONE, updated_at = type::datetime($now) WHERE tenant_id = $tenant_id AND state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)) RETURN id;",
                 Some(json!({
                     "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
@@ -278,12 +280,51 @@ impl TaskStore for DurableTaskStore {
     }
 
     async fn reconcile_artifacts(&self) -> Result<u64, MemoryError> {
-        // The reconciler derives the terminal outcome from
-        // durable artifacts + fingerprint. The concrete
-        // artifact scan is the extraction pipeline's job.
-        // For now the seam returns 0 and the scheduler skips
-        // the pass.
-        Ok(0)
+        let result = self
+            .db
+            .query(
+                "SELECT * FROM task_artifact WHERE tenant_id = $tenant_id AND state = 'committed'",
+                Some(json!({"tenant_id": self.tenant_id.as_str()})),
+            )
+            .await;
+        let result = match result {
+            Ok(result) => result,
+            Err(MemoryError::Storage(message))
+                if message.contains("task_artifact") && message.contains("does not exist") =>
+            {
+                return Ok(0);
+            }
+            Err(error) => return Err(error),
+        };
+        let artifacts: Vec<Value> = serde_json::from_value(result).map_err(|error| {
+            MemoryError::Storage(format!("task artifact reconciliation: {error}"))
+        })?;
+        let mut reconciled = 0;
+        for artifact in artifacts {
+            let Some(task_id) = artifact.get("task_id").and_then(Value::as_str) else {
+                continue;
+            };
+            let fact_ids = artifact
+                .get("fact_ids")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            let episode_id = artifact.get("episode_id").cloned().unwrap_or(Value::Null);
+            let result = self
+                .db
+                .query(
+                    "UPDATE tenant_task SET state = 'completed', result = $result, version = version + 1, updated_at = time::now() WHERE id = type::record('tenant_task', $task_id) AND tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'] RETURN AFTER",
+                    Some(json!({
+                        "task_id": task_id,
+                        "tenant_id": self.tenant_id.as_str(),
+                        "result": {"episode_id": episode_id, "fact_ids": fact_ids},
+                    })),
+                )
+                .await?;
+            let rows: Vec<Value> = serde_json::from_value(result)
+                .map_err(|error| MemoryError::Storage(format!("task artifact update: {error}")))?;
+            reconciled += u64::from(!rows.is_empty());
+        }
+        Ok(reconciled)
     }
 
     async fn delete_expired(&self) -> Result<u64, MemoryError> {
@@ -291,7 +332,7 @@ impl TaskStore for DurableTaskStore {
         let result = self
             .db
             .query(
-                "DELETE FROM tenant_task WHERE tenant_id = $tenant_id AND type::datetime(retention_expiry) <= type::datetime($now) RETURN id;",
+                "DELETE FROM tenant_task WHERE tenant_id = $tenant_id AND type::datetime(retention_expiry) <= type::datetime($now) AND state IN ['completed', 'completed_before_cancel', 'cancelled', 'cancelled_before_commit', 'failed'] RETURN id;",
                 Some(json!({
                     "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
@@ -305,6 +346,72 @@ impl TaskStore for DurableTaskStore {
 }
 
 impl DurableTaskStore {
+    /// Persist the extraction artifact before the terminal Task transition.
+    /// The two writes form an explicit reconciliation boundary: if the process
+    /// crashes between them, `reconcile_artifacts` can safely project the same
+    /// committed result onto the Task row.
+    pub async fn record_artifact_fenced(
+        &self,
+        handle: &TaskHandle,
+        result: &Value,
+    ) -> Result<(), MemoryError> {
+        let fingerprint = self
+            .load(&handle.task_id)
+            .await?
+            .map(|task| task.fingerprint)
+            .unwrap_or_default();
+        let facts = result
+            .get("result")
+            .and_then(|value| value.get("facts"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let fact_ids = facts
+            .iter()
+            .filter_map(|fact| fact.get("fact_id").and_then(Value::as_str))
+            .map(str::to_owned)
+            .map(Value::String)
+            .collect::<Vec<_>>();
+        let episode_id = result
+            .get("result")
+            .and_then(|value| value.get("episode_id"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        let check = self
+            .db
+            .query(
+                "SELECT id FROM tenant_task WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested'] LIMIT 1",
+                Some(json!({
+                    "id": handle.task_id,
+                    "tenant_id": handle.tenant_id.as_str(),
+                    "owner": handle.lease_owner.as_str(),
+                    "gen": handle.lease_generation,
+                })),
+            )
+            .await?;
+        let check_rows: Vec<Value> = serde_json::from_value(check)
+            .map_err(|error| MemoryError::Storage(format!("task artifact fence check: {error}")))?;
+        if check_rows.is_empty() {
+            return Err(MemoryError::Conflict(format!(
+                "task {} artifact fence was lost",
+                handle.task_id
+            )));
+        }
+        self.db
+            .query(
+                "UPSERT type::record('task_artifact', $task_id) SET task_id = $task_id, tenant_id = $tenant_id, fingerprint = $fingerprint, episode_id = $episode_id, fact_ids = $fact_ids, state = 'committed', completed_at = time::now(), created_at = time::now()",
+                Some(json!({
+                    "task_id": handle.task_id,
+                    "tenant_id": handle.tenant_id,
+                    "fingerprint": fingerprint,
+                    "episode_id": episode_id,
+                    "fact_ids": fact_ids,
+                })),
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn find_existing_id(&self, fingerprint: &str) -> Result<Option<String>, MemoryError> {
         let existing = self
             .db
@@ -399,6 +506,7 @@ fn project(row: &Value) -> Result<TenantTaskRecord, MemoryError> {
         }
     };
     let version = get("version")?.as_u64().unwrap_or(0);
+    let params = get_opt("params");
     let cancellation_intent = get("cancellation_intent")?.as_bool().unwrap_or(false);
     let parse_dt = |v: &Value| -> Result<DateTime<Utc>, MemoryError> {
         // Surreal returns datetimes as JSON objects
@@ -423,6 +531,7 @@ fn project(row: &Value) -> Result<TenantTaskRecord, MemoryError> {
         fingerprint,
         state,
         version,
+        params,
         cancellation_intent,
         lease_owner: get_opt("lease_owner").as_str().map(String::from),
         lease_generation: get_opt("lease_generation").as_u64(),

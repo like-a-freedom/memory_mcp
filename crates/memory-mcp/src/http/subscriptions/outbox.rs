@@ -31,65 +31,108 @@ pub struct TenantChangeEvent {
     pub created_at: DateTime<Utc>,
 }
 
-/// Apply a mutation and emit a change event atomically.
+/// Internal parameterized mutation used by canonical write owners.
 ///
-/// `mutation_sql` is a validated, parameterized SQL string
-/// that the caller has constructed from internal DTOs — never
-/// from user input. `event` describes the change to be
-/// recorded after the mutation succeeds.
+/// The SQL statement is assembled by a crate-owned store. Values are carried
+/// separately so user-controlled content never has to be interpolated into the
+/// transaction script.
+#[derive(Debug, Clone)]
+pub(crate) struct TenantMutation {
+    sql: String,
+    vars: serde_json::Value,
+}
+
+impl TenantMutation {
+    pub(crate) fn new(
+        sql: impl Into<String>,
+        vars: serde_json::Value,
+    ) -> Result<Self, MemoryError> {
+        if !vars.is_null() && !vars.is_object() {
+            return Err(MemoryError::Validation(
+                "outbox mutation variables must be a JSON object".to_string(),
+            ));
+        }
+        Ok(Self {
+            sql: sql.into(),
+            vars,
+        })
+    }
+}
+
+/// Apply a trusted, parameterized mutation and emit a change event atomically.
 ///
-/// Phase 1: atomically increment the sequence and capture
-/// the new value. Phase 2: apply the mutation and insert
-/// the event as a single SurrealDB script. If phase 2
-/// fails, the sequence is incremented but no event is
-/// emitted — the next successful commit uses the gap.
-/// This is acceptable because the sequence is a monotonic
-/// counter, not a strict counter. A single-script
-/// approach (combining all three operations) was explored
-/// but SurrealDB's multi-statement RETURN value semantics
-/// are incompatible with the `extract_records` helper.
+/// The sequence increment, mutation, and event insert execute in one
+/// SurrealDB transaction. A failed mutation therefore rolls back both the
+/// event and the sequence increment. The event sequence is always assigned by
+/// the transaction; `event.sequence` is intentionally ignored.
+pub(crate) async fn commit_tenant_mutation_with_event(
+    db: &BoundDbClient,
+    mutation: TenantMutation,
+    event: TenantChangeEvent,
+) -> Result<(), MemoryError> {
+    let mut vars = match mutation.vars {
+        serde_json::Value::Null => serde_json::Map::new(),
+        serde_json::Value::Object(vars) => vars,
+        _ => {
+            return Err(MemoryError::Validation(
+                "outbox mutation variables must be a JSON object".to_string(),
+            ));
+        }
+    };
+    for reserved in ["__outbox_resource_id", "__outbox_revision", "__outbox_kind"] {
+        if vars.contains_key(reserved) {
+            return Err(MemoryError::Validation(format!(
+                "outbox mutation variables reserve {reserved}"
+            )));
+        }
+    }
+    vars.insert(
+        "__outbox_resource_id".to_string(),
+        serde_json::Value::String(event.resource_id),
+    );
+    vars.insert(
+        "__outbox_revision".to_string(),
+        serde_json::json!(event.revision),
+    );
+    vars.insert(
+        "__outbox_kind".to_string(),
+        serde_json::Value::String(event.change_kind),
+    );
+
+    let script = format!(
+        "BEGIN TRANSACTION; UPDATE tenant_change_sequence:default SET value = value + 1; LET $outbox_event_seq = (SELECT VALUE value FROM tenant_change_sequence:default LIMIT 1)[0]; {}; CREATE tenant_change_event SET event_seq = $outbox_event_seq, resource_id = $__outbox_resource_id, rev = $__outbox_revision, change_kind = $__outbox_kind, created_at = time::now(); COMMIT TRANSACTION;",
+        mutation.sql
+    );
+    let vars = serde_json::Value::Object(vars);
+    for attempt in 0..5u64 {
+        match db.query(&script, Some(vars.clone())).await {
+            Ok(_) => return Ok(()),
+            Err(error) if is_retryable_transaction_conflict(&error) && attempt < 4 => {
+                tokio::time::sleep(std::time::Duration::from_millis(10 * (attempt + 1))).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(MemoryError::Unavailable(
+        "outbox transaction retry budget exhausted".into(),
+    ))
+}
+
+fn is_retryable_transaction_conflict(error: &MemoryError) -> bool {
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("transaction conflict") || message.contains("write conflict")
+}
+
+/// Compatibility wrapper for internal tests and already-validated statements
+/// that do not need additional bindings. New production write owners should
+/// use [`TenantMutation`] and `commit_tenant_mutation_with_event`.
 pub async fn commit_mutation_with_event(
     db: &BoundDbClient,
     mutation_sql: &str,
     event: TenantChangeEvent,
 ) -> Result<(), MemoryError> {
-    // Phase 1: increment sequence atomically.
-    let seq_result = db
-        .query(
-            "UPDATE `tenant_change_sequence` SET `value` = `value` + 1 RETURN AFTER;",
-            None,
-        )
-        .await?;
-    let seq_val: u64 = seq_result
-        .as_array()
-        .and_then(|arr| arr.first())
-        .and_then(|v| v.get("value"))
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| MemoryError::Storage("outbox sequence parse failed".into()))?;
-
-    // Phase 2: mutation + event insert as one script.
-    // mutation_sql is trusted internal code (never user input).
-    let script = format!(
-        "{mutation_sql};\n\
-         CREATE tenant_change_event SET \
-         event_seq = $event_seq, \
-         resource_id = $resource_id, \
-         rev = $rev, \
-         change_kind = $change_kind, \
-         created_at = time::now();",
-    );
-    db.query(
-        &script,
-        Some(serde_json::json!({
-            "event_seq": seq_val,
-            "resource_id": event.resource_id,
-            "rev": event.revision,
-            "change_kind": event.change_kind,
-        })),
-    )
-    .await?;
-
-    Ok(())
+    let mutation = TenantMutation::new(mutation_sql, serde_json::Value::Null)?;
+    commit_tenant_mutation_with_event(db, mutation, event).await
 }
 
 #[cfg(test)]
@@ -113,7 +156,7 @@ mod tests {
             .query(
                 "DEFINE TABLE tenant_change_sequence SCHEMAFULL; \
                  DEFINE FIELD value ON tenant_change_sequence TYPE int DEFAULT 0; \
-                 CREATE tenant_change_sequence SET value = 0; \
+                 UPSERT tenant_change_sequence:default SET value = 0; \
                  DEFINE TABLE tenant_change_event SCHEMAFULL; \
                  DEFINE FIELD event_seq ON tenant_change_event TYPE int; \
                  DEFINE FIELD resource_id ON tenant_change_event TYPE string; \
@@ -163,11 +206,14 @@ mod tests {
 
         // Verify the sequence was incremented.
         let seq = db
-            .query("SELECT `value` FROM `tenant_change_sequence`;", None)
+            .query(
+                "SELECT VALUE value FROM tenant_change_sequence:default;",
+                None,
+            )
             .await
             .expect("query seq");
         let seq_val: Vec<serde_json::Value> = serde_json::from_value(seq).expect("parse seq");
-        assert_eq!(seq_val[0]["value"], 1);
+        assert_eq!(seq_val[0], 1);
     }
 
     #[tokio::test]

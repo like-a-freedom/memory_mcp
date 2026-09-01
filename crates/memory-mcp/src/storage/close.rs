@@ -125,17 +125,31 @@ pub(crate) fn build_close_query(
 #[derive(Clone)]
 pub(crate) struct CloseStoreClient {
     db: BoundDbClient,
+    #[cfg(feature = "streamable-http")]
+    outbox_enabled: bool,
 }
 
 impl CloseStoreClient {
     pub(crate) fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
         Self {
             db: BoundDbClient::new(db, namespace),
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
         }
     }
 
     pub(crate) fn from_bound(db: BoundDbClient) -> Self {
-        Self { db }
+        Self {
+            db,
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
+        }
+    }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn with_outbox(mut self) -> Self {
+        self.outbox_enabled = true;
+        self
     }
 
     /// Closes a bi-temporal record (fact/edge/triple): sets both `t_invalid`
@@ -148,6 +162,27 @@ impl CloseStoreClient {
         reason: Option<&str>,
     ) -> Result<(), MemoryError> {
         let (sql, vars) = build_close_query(record_id, timestamps, reason)?;
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            let close_sql = sql.replace("RETURN NONE", "RETURN BEFORE");
+            let mutation_sql = format!(
+                "LET $closed = ({close_sql}); IF array::len($closed) = 0 {{ THROW 'record to invalidate was not found'; }}"
+            );
+            let mutation =
+                crate::http::subscriptions::outbox::TenantMutation::new(mutation_sql, vars)?;
+            return crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+                &self.db,
+                mutation,
+                crate::http::subscriptions::outbox::TenantChangeEvent {
+                    sequence: 0,
+                    resource_id: "ui://memory/apps/inspector".into(),
+                    revision: 1,
+                    change_kind: "record_invalidated".into(),
+                    created_at: chrono::Utc::now(),
+                },
+            )
+            .await;
+        }
         self.db.query(&sql, Some(vars)).await?;
         Ok(())
     }
@@ -289,6 +324,14 @@ mod tests {
             .apply_migrations("org")
             .await
             .expect("apply migrations");
+        #[cfg(feature = "streamable-http")]
+        db_client
+            .execute_migration_script(
+                include_str!("../../migrations/042_tenant_change_event.surql"),
+                "org",
+            )
+            .await
+            .expect("apply HTTP outbox migration");
         let store = CloseStoreClient::new(db_client.clone(), "org");
         (store, db_client)
     }
@@ -316,6 +359,33 @@ mod tests {
             )
             .await
             .expect("seed fact should succeed");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn outbox_enabled_close_emits_invalidation_atomically() {
+        let (store, db_client) = embedded_close_store().await;
+        seed_fact(&db_client, "fact:outbox_close").await;
+        store
+            .with_outbox()
+            .close_record(
+                "fact:outbox_close",
+                &CloseTimestamps::now(),
+                Some("test_invalidation"),
+            )
+            .await
+            .expect("close with outbox");
+        let events = db_client
+            .query(
+                "SELECT * FROM tenant_change_event WHERE change_kind = $kind",
+                Some(json!({"kind": "record_invalidated"})),
+                "org",
+            )
+            .await
+            .expect("select invalidation event");
+        let events: Vec<Value> = serde_json::from_value(events).expect("parse events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["resource_id"], "ui://memory/apps/inspector");
     }
 
     #[tokio::test]

@@ -9,12 +9,31 @@ backup into a fresh deployment.
 
 2. **Restore** into a fresh namespace pair (`control_restore`, `tenant_restore`).
 
-3. **Boot** `memory_mcp_http` against the restored pair:
+3. **Boot** `memory_mcp_http` against the restored pair. The HTTP profile
+   requires separate control and tenant bindings; use remote `ws://`/`wss://`
+   targets or the documented non-production `rocksdb://` profile:
    ```bash
-   MEMORY_MCP_SURREALDB_URL=surreal://... \
-   MEMORY_MCP_SURREALDB_NS=control_restore \
-   MEMORY_MCP_SURREALDB_DB=tenant_restore \
-   cargo run --features streamable-http,control-plane --bin memory_mcp_http
+   SURREALDB_CONTROL_URL=wss://.../rpc \
+   SURREALDB_CONTROL_USERNAME=... \
+   SURREALDB_CONTROL_PASSWORD=... \
+   SURREALDB_CONTROL_NAMESPACE=control_restore \
+   SURREALDB_CONTROL_DB=registry_restore \
+   SURREALDB_TENANT_URL=wss://.../rpc \
+   SURREALDB_TENANT_USERNAME=... \
+   SURREALDB_TENANT_PASSWORD=... \
+   SURREALDB_TENANT_NAMESPACE=tenant_restore \
+   SURREALDB_TENANT_DB=tenant_restore \
+   MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
+   ALLOWED_HOSTS=mcp.example.com \
+   ALLOWED_ORIGINS=https://mcp.example.com \
+   MEMORY_MCP_API_KEY_PEPPER=... \
+   MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
+   MEMORY_MCP_HTTP_SESSION_KEY=... \
+   MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
+   MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
+   MEMORY_MCP_HTTP_CSRF_KEY=... \
+   MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
+   cargo run --locked --features streamable-http,control-plane --bin memory_mcp_http
    ```
 
 4. **Provisioning workers** detect missing tenants; no resurrection of "deleted" Tenants is auto-attempted.
@@ -22,7 +41,7 @@ backup into a fresh deployment.
 5. **Before opening ingress**, rotate:
    - API-key pepper (`MEMORY_MCP_API_KEY_PEPPER`)
    - OIDC identity-index key (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`); require users to relink restored OIDC identities
-   - Control Plane Session cookie/verifier key (`MEMORY_MCP_HTTP_SESSION_SIGNING_KEY`)
+   - Control Plane Session cookie/verifier key (`MEMORY_MCP_HTTP_SESSION_KEY`)
    - OIDC state and nonce keys (`MEMORY_MCP_HTTP_OIDC_STATE_KEY`, `MEMORY_MCP_HTTP_OIDC_NONCE_KEY`)
    - CSRF keys (`MEMORY_MCP_HTTP_CSRF_KEY`)
 

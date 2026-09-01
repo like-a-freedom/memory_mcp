@@ -44,6 +44,21 @@ impl TenantRuntime {
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
     ) -> Result<Self, MemoryError> {
+        Self::from_bound_client_with_plan(
+            tenant,
+            tenant_db,
+            crate::http::registry::plan::Plan::default(),
+        )
+    }
+
+    /// Construct a runtime with the immutable plan selected during activation.
+    /// The plan is copied into the MCP adapter so app/task admission cannot
+    /// silently fall back to a process-wide constant.
+    pub fn from_bound_client_with_plan(
+        tenant: &Tenant,
+        tenant_db: Arc<SurrealDbClient>,
+        plan: crate::http::registry::plan::Plan,
+    ) -> Result<Self, MemoryError> {
         let namespace = tenant.namespace_binding.namespace.clone();
         let database = tenant.namespace_binding.database.clone();
         let bound_db = Arc::new(BoundDbClient::new(tenant_db.clone(), namespace.clone()));
@@ -51,10 +66,13 @@ impl TenantRuntime {
             tenant_db.clone(),
             namespace.clone(),
             "info".into(),
-            100, // rate_limit_rps; configurable via quotas
+            100, // rate_limit_rps; access-payload limiter remains separate
             100, // rate_limit_burst
-        )?;
-        let mut mcp_service = MemoryMcp::new_modern(service);
+        )?
+        .with_http_outbox();
+        let mut mcp_service = MemoryMcp::new_modern(service)
+            .with_tenant_id(tenant.id.clone())
+            .with_tenant_plan(plan);
 
         // Wire durable backends. The stdio path never reaches
         // this function (it uses the test pool), so the
@@ -63,8 +81,9 @@ impl TenantRuntime {
             #[cfg(feature = "mcp-apps")]
             {
                 use crate::http::app_sessions::store::AppSessionStore;
-                mcp_service = mcp_service
-                    .with_durable_app_sessions(Arc::new(AppSessionStore::new(bound_db.clone())));
+                mcp_service = mcp_service.with_durable_app_sessions(Arc::new(
+                    AppSessionStore::new(bound_db.clone()).with_outbox(),
+                ));
             }
             mcp_service = mcp_service.with_durable_tasks(Arc::new(
                 crate::http::tasks::worker::DurableTaskStore::new(
@@ -73,7 +92,10 @@ impl TenantRuntime {
                 ),
             ));
             mcp_service = mcp_service.with_durable_subscriptions(Arc::new(
-                crate::http::subscriptions::DurableSubscriptionStore::new(bound_db.clone()),
+                crate::http::subscriptions::DurableSubscriptionStore::new(
+                    bound_db.clone(),
+                    tenant.id.clone(),
+                ),
             ));
         }
         Ok(Self {
@@ -97,6 +119,12 @@ pub async fn build_runtime(
     registry: &super::super::registry::RegistryHandle,
     tenant: &Tenant,
 ) -> Result<TenantRuntime, MemoryError> {
+    let plan = crate::http::registry::plan::Plan::from(
+        &registry
+            .store_clone()
+            .load_plan(tenant.plan_version)
+            .await?,
+    );
     let tenant_db = match registry.tenant_engine()? {
         super::super::registry::PrivilegedEngine::Remote(privileged) => {
             let ns_client = (*privileged).clone();
@@ -138,7 +166,7 @@ pub async fn build_runtime(
             ))
         }
     };
-    TenantRuntime::from_bound_client(tenant, tenant_db)
+    TenantRuntime::from_bound_client_with_plan(tenant, tenant_db, plan)
 }
 
 #[cfg(test)]

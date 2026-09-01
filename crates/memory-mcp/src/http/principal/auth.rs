@@ -107,13 +107,22 @@ impl Authenticator {
         let mut principal: Option<AuthenticatedPrincipal> = None;
 
         if let Some(cached) = self.cache.get_positive(cred.key_id()) {
-            // Preserve the ≤60s revocation bound without weakening
-            // secret verification: a cache hit still verifies the
-            // supplied secret.
-            if cached.verifier.verify(&self.pepper, cred.secret()) {
+            // A positive cache hit still re-reads the account status. This
+            // closes the deletion revocation window without requiring the
+            // cache to become a second source of account lifecycle truth.
+            let current_account = self
+                .store
+                .find_account_by_id(&cached.account.id)
+                .await
+                .ok()
+                .flatten();
+            if cached.verifier.verify(&self.pepper, cred.secret())
+                && let Some(account) = current_account
+                && account.status == AccountStatus::Active
+            {
                 verified = true;
                 principal = Some(AuthenticatedPrincipal::ApiKey {
-                    account: cached.account.clone(),
+                    account: Arc::new(account),
                     key_id: cred.key_id().to_owned(),
                 });
             }

@@ -6,6 +6,7 @@
 
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 use crate::error::MemoryError;
@@ -25,7 +26,7 @@ pub fn generate_session_cookie_value() -> String {
 }
 
 /// Server-side session record.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlPlaneSession {
     pub id: String,
     /// Keyed hash of the raw cookie value.
@@ -37,7 +38,7 @@ pub struct ControlPlaneSession {
 }
 
 impl ControlPlaneSession {
-    /// Create a new session with 1h idle / 24h absolute expiry.
+    /// Create a new session with 30-minute idle / 24-hour absolute expiry.
     pub fn new(
         account: &Account,
         raw_cookie: &str,
@@ -52,7 +53,7 @@ impl ControlPlaneSession {
             )?),
             account_id: account.id.clone(),
             auth_time: now,
-            idle_expiry: now + chrono::Duration::hours(1),
+            idle_expiry: now + chrono::Duration::minutes(30),
             absolute_expiry: now + chrono::Duration::hours(24),
         })
     }
@@ -68,11 +69,11 @@ pub fn build_session_cookie(
     )
 }
 
-/// Resolve a session from a raw cookie value.
-pub async fn resolve_session(
+/// Resolve and refresh a server-side session from a raw cookie value.
+pub async fn resolve_session_record(
     state: &crate::http::HttpState,
     cookie_value: &str,
-) -> Result<Account, super::error::ApiError> {
+) -> Result<ControlPlaneSession, super::error::ApiError> {
     let cookie_hash = hex::encode(
         keyed_session_hash(
             &state.config.keys.control_plane_session,
@@ -80,27 +81,45 @@ pub async fn resolve_session(
         )
         .map_err(super::error::ApiError::Internal)?,
     );
-    let session = state
-        .registry
-        .store_clone()
+    let store = state.registry.store_clone();
+    let session = store
         .find_session(&cookie_hash)
         .await
         .map_err(super::error::ApiError::Internal)?
         .ok_or(super::error::ApiError::Unauthorized)?;
-    if session.absolute_expiry < Utc::now() {
+    let account = store
+        .find_account_by_id(&session.account_id)
+        .await
+        .map_err(super::error::ApiError::Internal)?
+        .ok_or(super::error::ApiError::Unauthorized)?;
+    if account.status != crate::http::registry::models::AccountStatus::Active {
         return Err(super::error::ApiError::Unauthorized);
     }
-    if session.idle_expiry < Utc::now() {
+    let now = Utc::now();
+    if session.absolute_expiry <= now || session.idle_expiry <= now {
         return Err(super::error::ApiError::Unauthorized);
     }
-    let account = state
+    let next_idle = (now + chrono::Duration::minutes(30)).min(session.absolute_expiry);
+    store
+        .touch_session(&session.id, next_idle)
+        .await
+        .map_err(super::error::ApiError::Internal)?;
+    Ok(session)
+}
+
+/// Resolve a session from a raw cookie value and return its Account.
+pub async fn resolve_session(
+    state: &crate::http::HttpState,
+    cookie_value: &str,
+) -> Result<Account, super::error::ApiError> {
+    let session = resolve_session_record(state, cookie_value).await?;
+    state
         .registry
         .store_clone()
         .find_account_by_id(&session.account_id)
         .await
         .map_err(super::error::ApiError::Internal)?
-        .ok_or(super::error::ApiError::Unauthorized)?;
-    Ok(account)
+        .ok_or(super::error::ApiError::Unauthorized)
 }
 
 #[cfg(test)]

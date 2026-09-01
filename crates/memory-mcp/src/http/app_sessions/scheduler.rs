@@ -17,6 +17,7 @@ use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
 #[allow(unused_imports)]
 use crate::http::registry::RegistryStore;
+use crate::storage::client::DbClient;
 
 /// The cleanup job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
@@ -32,8 +33,7 @@ pub fn scheduler_job() -> SchedulerJob {
 /// pin while iterating.
 pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
     let store = registry.store_clone();
-    let now = chrono::Utc::now();
-    let due = store.list_due_provisioning(100, now).await?;
+    let due = store.list_ready_tenants(None, 100).await?;
     for tenant in due {
         // Production path: bind the tenant namespace
         // through the privileged engine and issue the
@@ -55,14 +55,23 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
                 continue;
             }
         };
-        let _ = db;
-        // The production DELETE is parameterized; the
-        // test path never reaches this branch because
-        // tenant_engine_optional() returns None. Wiring
-        // a real Surreal-backed delete from here is
-        // covered by the engine backend landed in a
-        // later phase; for now the helper establishes
-        // the shape and the dispatch loop.
+        if let Err(error) = db
+            .query(
+                "DELETE FROM app_session WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now()",
+                None,
+                &tenant.namespace_binding.namespace,
+            )
+            .await
+        {
+            if error.to_string().contains("app_session")
+                && error.to_string().contains("does not exist")
+            {
+                continue;
+            }
+            return Err(MemoryError::Storage(format!(
+                "expired app-session cleanup failed: {error}"
+            )));
+        }
     }
     Ok(())
 }

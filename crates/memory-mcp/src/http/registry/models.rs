@@ -134,14 +134,39 @@ impl Default for Plan {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub const DEFAULT_MAX_INGESTED_BYTES: u64 = 1_073_741_824;
+pub const DEFAULT_MAX_EPISODE_COUNT: u64 = 100_000;
+pub const DEFAULT_INGEST_PER_MINUTE: u32 = 60;
+pub const DEFAULT_MAX_OPEN_APP_SESSIONS: u32 = 32;
+pub const DEFAULT_MAX_ACTIVE_API_KEYS: u32 = 5;
+pub const DEFAULT_PER_TENANT_REQUEST_CONCURRENCY: u32 = 4;
+pub const DEFAULT_EXTRACTION_CONCURRENCY: u32 = 2;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanLimits {
     pub max_ingested_bytes: u64,
     pub max_episode_count: u64,
+    pub ingest_per_minute: u32,
     pub max_open_app_sessions: u32,
     pub max_active_api_keys: u32,
     pub per_tenant_request_concurrency: u32,
     pub extraction_concurrency: u32,
+}
+
+impl Default for PlanLimits {
+    fn default() -> Self {
+        Self {
+            // These are conservative development/free-tier defaults. Production
+            // deployments should provision the versioned plan in the Registry.
+            max_ingested_bytes: DEFAULT_MAX_INGESTED_BYTES,
+            max_episode_count: DEFAULT_MAX_EPISODE_COUNT,
+            ingest_per_minute: DEFAULT_INGEST_PER_MINUTE,
+            max_open_app_sessions: DEFAULT_MAX_OPEN_APP_SESSIONS,
+            max_active_api_keys: DEFAULT_MAX_ACTIVE_API_KEYS,
+            per_tenant_request_concurrency: DEFAULT_PER_TENANT_REQUEST_CONCURRENCY,
+            extraction_concurrency: DEFAULT_EXTRACTION_CONCURRENCY,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -275,9 +300,17 @@ mod tests {
     }
 
     #[test]
-    fn plan_limits_default_is_zero() {
+    fn plan_limits_default_is_safe_free_tier() {
         let l = PlanLimits::default();
-        assert_eq!(l.max_ingested_bytes, 0);
-        assert_eq!(l.per_tenant_request_concurrency, 0);
+        assert_eq!(l.max_ingested_bytes, DEFAULT_MAX_INGESTED_BYTES);
+        assert_eq!(l.max_episode_count, DEFAULT_MAX_EPISODE_COUNT);
+        assert_eq!(l.ingest_per_minute, DEFAULT_INGEST_PER_MINUTE);
+        assert_eq!(l.max_open_app_sessions, DEFAULT_MAX_OPEN_APP_SESSIONS);
+        assert_eq!(l.max_active_api_keys, DEFAULT_MAX_ACTIVE_API_KEYS);
+        assert_eq!(
+            l.per_tenant_request_concurrency,
+            DEFAULT_PER_TENANT_REQUEST_CONCURRENCY
+        );
+        assert_eq!(l.extraction_concurrency, DEFAULT_EXTRACTION_CONCURRENCY);
     }
 }

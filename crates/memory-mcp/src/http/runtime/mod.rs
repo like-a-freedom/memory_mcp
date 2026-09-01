@@ -1,6 +1,4 @@
-//! Runtime pool with a stub gate; real pool implementation pending.
-
-pub mod activation;
+//! Runtime pool and tenant-bound lifecycle management.
 pub mod bootstrap;
 pub mod guard;
 pub mod lifecycle;

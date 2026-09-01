@@ -201,6 +201,7 @@ mod tests {
             .insert(super::super::middleware::ValidatedMcpRequest {
                 method: "subscriptions/listen".to_owned(),
                 subscription: true,
+                ingest_source_bytes: None,
             });
         assert!(is_subscription_request(&req));
 
@@ -219,6 +220,7 @@ mod tests {
             .insert(super::super::middleware::ValidatedMcpRequest {
                 method: "tools/call".to_owned(),
                 subscription: false,
+                ingest_source_bytes: None,
             });
         assert!(!is_subscription_request(&ordinary));
     }

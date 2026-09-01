@@ -2,9 +2,11 @@
 -- Control-namespace deletion challenges/tombstones, usage rows,
 -- and tenant audit hooks (Task 1, Task 11, Task 12).
 --
--- Records here are durable and non-reusable. They are never
--- physically deleted; logical deletion invalidates a record via
--- its expiry/consumed_at/terminal-state fields.
+-- Account, tenant, identity, namespace-binding, API-key, challenge,
+-- session, and audit rows are durable and non-reusable. Deletion is
+-- logical: lifecycle fields and terminal states are updated, never
+-- physically removed. The deletion worker may physically remove only
+-- expired tenant-local `app_session` rows.
 
 -- ----- deletion_challenge -----
 DEFINE TABLE IF NOT EXISTS deletion_challenge SCHEMAFULL
@@ -64,6 +66,11 @@ DEFINE FIELD IF NOT EXISTS deletion_completed_at ON account TYPE option<datetime
 DEFINE FIELD IF NOT EXISTS deletion_started_at ON tenant TYPE option<datetime>;
 DEFINE FIELD IF NOT EXISTS deletion_completed_at ON tenant TYPE option<datetime>;
 
+-- A retained tenant tombstone permanently reserves its namespace. This
+-- prevents a later account from being routed to historical tenant data.
+DEFINE INDEX IF NOT EXISTS idx_tenant_namespace_binding
+    ON tenant FIELDS namespace_binding.namespace UNIQUE;
+
 -- ----- control_plane_session extras for durable cookies -----
 DEFINE TABLE IF NOT EXISTS control_plane_session SCHEMAFULL
     PERMISSIONS
@@ -95,7 +102,9 @@ DEFINE TABLE IF NOT EXISTS oidc_request SCHEMAFULL
 
 DEFINE FIELD IF NOT EXISTS state_hash ON oidc_request TYPE string
     ASSERT $value != NONE AND $value != "";
-DEFINE FIELD IF NOT EXISTS sealed_payload ON oidc_request TYPE bytes;
+-- The payload is already AEAD ciphertext; base64 keeps this schema portable
+-- between local and remote SurrealDB transports.
+DEFINE FIELD IF NOT EXISTS sealed_payload ON oidc_request TYPE string;
 DEFINE FIELD IF NOT EXISTS aead_nonce ON oidc_request TYPE array
     ASSERT array::len($value) = 12;
 DEFINE FIELD IF NOT EXISTS expires_at ON oidc_request TYPE datetime;
@@ -127,6 +136,8 @@ DEFINE FIELD IF NOT EXISTS correlation_id ON audit_event TYPE string
 
 DEFINE INDEX IF NOT EXISTS idx_audit_event_account
     ON audit_event FIELDS account_id, occurred_at;
+DEFINE INDEX IF NOT EXISTS idx_audit_event_action_correlation
+    ON audit_event FIELDS action, correlation_id UNIQUE;
 
 -- ----- migration_ledger (durable catalog state for control namespace) -----
 DEFINE TABLE IF NOT EXISTS migration_ledger SCHEMAFULL
@@ -144,6 +155,8 @@ DEFINE FIELD IF NOT EXISTS started_at ON migration_ledger TYPE datetime
     DEFAULT time::now();
 DEFINE FIELD IF NOT EXISTS completed_at ON migration_ledger TYPE option<datetime>;
 DEFINE FIELD IF NOT EXISTS error ON migration_ledger TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS owner ON migration_ledger TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS lease_expires_at ON migration_ledger TYPE option<datetime>;
 
 DEFINE INDEX IF NOT EXISTS idx_migration_ledger_file
     ON migration_ledger FIELDS file_name UNIQUE;

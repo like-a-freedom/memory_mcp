@@ -38,6 +38,8 @@ pub(crate) struct EmbeddingPayload {
 #[derive(Clone)]
 pub struct FactService {
     db: crate::storage::FactStoreClient,
+    #[cfg(feature = "streamable-http")]
+    outbox_enabled: bool,
 }
 
 /// Result of persisting a fact, reporting whether a new record was created
@@ -49,7 +51,17 @@ pub(crate) struct CreateFactOutcome {
 
 impl FactService {
     pub fn new(db_client: crate::storage::FactStoreClient) -> Self {
-        Self { db: db_client }
+        Self {
+            db: db_client,
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
+        }
+    }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn with_outbox(mut self) -> Self {
+        self.outbox_enabled = true;
+        self
     }
 
     /// Creates a fact record with a deterministic ID.
@@ -116,11 +128,38 @@ impl FactService {
             payload.insert("embedding_updated_at".to_string(), json!(ep.updated_at));
         }
 
-        let created = self.db.create(&fact_id, Value::Object(payload)).await?;
-        if created.is_null() {
-            return Err(MemoryError::Storage(
-                "failed to persist fact record".to_string(),
-            ));
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            match self
+                .db
+                .create_with_event(&fact_id, Value::Object(payload))
+                .await
+            {
+                Ok(()) => {}
+                Err(MemoryError::Storage(message)) if message.contains("already exists") => {
+                    return Ok(CreateFactOutcome {
+                        fact_id,
+                        created: false,
+                    });
+                }
+                Err(error) => return Err(error),
+            }
+        } else {
+            let created = self.db.create(&fact_id, Value::Object(payload)).await?;
+            if created.is_null() {
+                return Err(MemoryError::Storage(
+                    "failed to persist fact record".to_string(),
+                ));
+            }
+        }
+        #[cfg(not(feature = "streamable-http"))]
+        {
+            let created = self.db.create(&fact_id, Value::Object(payload)).await?;
+            if created.is_null() {
+                return Err(MemoryError::Storage(
+                    "failed to persist fact record".to_string(),
+                ));
+            }
         }
         Ok(CreateFactOutcome {
             fact_id,

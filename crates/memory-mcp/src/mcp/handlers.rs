@@ -26,8 +26,10 @@ use crate::models::{AssembledContextItem, ExplainItem};
 #[cfg(feature = "mcp-apps")]
 use crate::service::AppCommandInput;
 use crate::service::MemoryService;
-#[cfg(feature = "mcp-apps")]
+#[cfg(all(feature = "mcp-apps", not(feature = "streamable-http")))]
 use std::time::Instant;
+#[cfg(feature = "streamable-http")]
+use std::time::{Duration, Instant};
 
 use super::error::mcp_error;
 use super::params::*;
@@ -100,6 +102,17 @@ pub struct MemoryMcp {
     /// authorization rechecks.
     #[cfg(feature = "streamable-http")]
     subscription_authenticator: Option<std::sync::Arc<crate::http::principal::auth::Authenticator>>,
+    /// Immutable tenant identity attached by the HTTP runtime. It is never
+    /// accepted from MCP arguments and is absent for stdio.
+    #[cfg(feature = "streamable-http")]
+    tenant_id: Option<String>,
+    /// Durable plan loaded from the control Registry for this tenant. It is
+    /// attached by the runtime builder and never comes from MCP arguments.
+    #[cfg(feature = "streamable-http")]
+    tenant_plan: Option<crate::http::registry::plan::Plan>,
+    /// Tenant-scoped extraction concurrency for synchronous tool calls.
+    #[cfg(feature = "streamable-http")]
+    extraction_semaphore: Option<Arc<tokio::sync::Semaphore>>,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
     /// When true, advertise and negotiate only MCP 2026-07-28. Stdio
@@ -130,6 +143,12 @@ impl MemoryMcp {
             subscription_principal: None,
             #[cfg(feature = "streamable-http")]
             subscription_authenticator: None,
+            #[cfg(feature = "streamable-http")]
+            tenant_id: None,
+            #[cfg(feature = "streamable-http")]
+            tenant_plan: None,
+            #[cfg(feature = "streamable-http")]
+            extraction_semaphore: None,
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
             modern_protocol_only: false,
@@ -200,6 +219,26 @@ impl MemoryMcp {
         self
     }
 
+    /// Attach the immutable tenant id to an HTTP runtime handler.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
+        self.tenant_id = Some(tenant_id.into());
+        self
+    }
+
+    /// Attach the durable plan selected by the control Registry. The setter is
+    /// HTTP-only; stdio never carries a tenant plan.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_tenant_plan(mut self, plan: crate::http::registry::plan::Plan) -> Self {
+        let permits = match usize::try_from(plan.extraction_concurrency) {
+            Ok(value) => value.max(1),
+            Err(_) => usize::MAX,
+        };
+        self.extraction_semaphore = Some(Arc::new(tokio::sync::Semaphore::new(permits)));
+        self.tenant_plan = Some(plan);
+        self
+    }
+
     /// Returns a reference to the underlying `MemoryService`.
     ///
     /// This can be used to access service methods directly if needed.
@@ -267,6 +306,24 @@ fn durable_task_fingerprint(tool_name: &str, params: &serde_json::Value) -> Stri
     hasher.update([0]);
     hasher.update(serde_json::to_vec(params).unwrap_or_default());
     format!("{tool_name}:{}", hex::encode(hasher.finalize()))
+}
+
+#[cfg(feature = "streamable-http")]
+async fn ensure_subscription_authorization(
+    authenticator: &crate::http::principal::auth::Authenticator,
+    principal: &crate::http::principal::AuthenticatedPrincipal,
+) -> Result<(), ErrorData> {
+    match tokio::time::timeout(Duration::from_secs(5), authenticator.is_current(principal)).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(ErrorData::internal_error(
+            "subscription authorization expired",
+            None,
+        )),
+        Err(_) => Err(ErrorData::internal_error(
+            "subscription authorization recheck timed out",
+            None,
+        )),
+    }
 }
 
 async fn extract_response(
@@ -519,7 +576,11 @@ impl ServerHandler for MemoryMcp {
         &self,
         requested: &rmcp::model::SubscriptionFilter,
     ) -> Option<rmcp::model::SubscriptionFilter> {
-        self.subscription_store.as_ref().map(|_| requested.clone())
+        self.subscription_store.as_ref()?;
+        let tenant_id = self.tenant_id.as_deref()?;
+        crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(tenant_id, requested)
+            .ok()
+            .map(|filter| filter.to_rmcp_filter())
     }
 
     #[cfg(feature = "streamable-http")]
@@ -532,6 +593,7 @@ impl ServerHandler for MemoryMcp {
         let store = self.subscription_store.clone();
         let principal = self.subscription_principal.clone();
         let authenticator = self.subscription_authenticator.clone();
+        let tenant_id = self.tenant_id.clone();
         async move {
             let Some(store) = store else {
                 return Err(rmcp::ErrorData::method_not_found::<
@@ -550,41 +612,80 @@ impl ServerHandler for MemoryMcp {
                     None,
                 ));
             };
-            let mut cursor = store
-                .current_sequence()
+            let Some(tenant_id) = tenant_id else {
+                return Err(rmcp::ErrorData::internal_error(
+                    "subscription tenant binding missing",
+                    None,
+                ));
+            };
+            let filter = crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(
+                tenant_id,
+                context.accepted(),
+            )
+            .map_err(|error| rmcp::ErrorData::invalid_params(error.to_string(), None))?;
+
+            ensure_subscription_authorization(&authenticator, &principal).await?;
+            store
+                .validate_filter(&filter)
                 .await
+                .map_err(|error| rmcp::ErrorData::invalid_params(error.to_string(), None))?;
+            let mut cursor = tokio::time::timeout(Duration::from_secs(5), store.current_sequence())
+                .await
+                .map_err(|_| {
+                    rmcp::ErrorData::internal_error("subscription sequence read timed out", None)
+                })?
                 .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
+
+            let mut last_auth_check = Instant::now();
+            let mut queue = crate::http::subscriptions::stream::CoalescingQueue::new(
+                crate::http::subscriptions::stream::DEFAULT_QUEUE_CAPACITY,
+            );
+            let mut poll_tick = tokio::time::interval(Duration::from_secs(1));
             loop {
                 tokio::select! {
                     _ = context.cancelled() => return Ok(()),
-                    batch = store.next_batch(cursor) => {
-                        if !authenticator.is_current(&principal).await {
-                            return Err(rmcp::ErrorData::internal_error(
-                                "subscription authorization expired",
-                                None,
-                            ));
+                    _ = poll_tick.tick() => {
+                        if last_auth_check.elapsed() >= Duration::from_secs(30) {
+                            ensure_subscription_authorization(&authenticator, &principal).await?;
+                            last_auth_check = Instant::now();
                         }
-                        let batch = batch.map_err(|error| {
-                            rmcp::ErrorData::internal_error(
-                                error.to_string(),
-                                None,
-                            )
-                        })?;
+                        let batch = tokio::time::timeout(
+                            Duration::from_secs(5),
+                            store.next_batch(cursor, &filter),
+                        )
+                        .await
+                        .map_err(|_| rmcp::ErrorData::internal_error(
+                            "subscription outbox read timed out",
+                            None,
+                        ))?
+                        .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
                         for event in batch {
                             cursor = cursor.max(event.sequence);
-                            crate::http::subscriptions::stream::send_invalidation(
-                                context.sink(),
-                                event,
-                            )
-                            .await
-                            .map_err(|error| {
+                            queue.push(event).map_err(|_| {
                                 rmcp::ErrorData::internal_error(
-                                    error.to_string(),
+                                    "subscription disconnected: slow consumer",
                                     None,
                                 )
                             })?;
                         }
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        while let Some(event) = queue.pop_front() {
+                            if last_auth_check.elapsed() >= Duration::from_secs(30) {
+                                ensure_subscription_authorization(&authenticator, &principal).await?;
+                                last_auth_check = Instant::now();
+                            }
+                            tokio::select! {
+                                _ = context.cancelled() => return Ok(()),
+                                result = crate::http::subscriptions::stream::send_invalidation_with_timeout(
+                                    context.sink(),
+                                    event,
+                                ) => {
+                                    result.map_err(|error| rmcp::ErrorData::internal_error(
+                                        error.to_string(),
+                                        None,
+                                    ))?;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -627,6 +728,14 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExtractParams>,
     ) -> Result<Json<ToolResponse<ExtractResult>>, ErrorData> {
+        #[cfg(feature = "streamable-http")]
+        let _permit =
+            match self.extraction_semaphore.as_ref() {
+                Some(semaphore) => Some(semaphore.clone().acquire_owned().await.map_err(|_| {
+                    Self::internal_error("extraction concurrency is shutting down")
+                })?),
+                None => None,
+            };
         extract_response(Arc::clone(&self.service), params.0)
             .await
             .map(Json)
@@ -770,13 +879,32 @@ impl MemoryMcp {
                 direction: p.direction.clone(),
                 depth: p.depth,
             };
-            let outcome = crate::service::apps::session_lifecycle::execute_app_command(
-                &self.service,
-                &self.session_manager,
-                &p.session_id,
-                input,
-            )
-            .await;
+            let outcome = {
+                #[cfg(all(feature = "streamable-http", feature = "mcp-apps"))]
+                if self.durable_app_sessions.is_some() {
+                    self.execute_durable_app_command(&p.session_id, input).await
+                } else {
+                    crate::service::apps::session_lifecycle::execute_app_command(
+                        &self.service,
+                        &self.session_manager,
+                        &p.session_id,
+                        input,
+                    )
+                    .await
+                    .map_err(mcp_error)
+                }
+                #[cfg(not(feature = "streamable-http"))]
+                {
+                    crate::service::apps::session_lifecycle::execute_app_command(
+                        &self.service,
+                        &self.session_manager,
+                        &p.session_id,
+                        input,
+                    )
+                    .await
+                    .map_err(mcp_error)
+                }
+            };
 
             match outcome {
                 Ok(command_result) => {
@@ -806,7 +934,7 @@ impl MemoryMcp {
                         timer.elapsed(),
                         Some(&request_id),
                     );
-                    Err(mcp_error(err))
+                    Err(err)
                 }
             }
         }
