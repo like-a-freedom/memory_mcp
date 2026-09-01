@@ -15,4 +15,6 @@ pub mod error;
 pub mod oidc;
 pub mod operator;
 #[cfg(feature = "control-plane")]
+pub mod recent_auth;
+#[cfg(feature = "control-plane")]
 pub mod session;
