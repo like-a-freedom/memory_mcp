@@ -129,7 +129,18 @@ pub async fn mcp_handler(
     };
     let is_subscription = is_subscription_request(&req);
     let runtime = guard_ref.runtime().clone();
-    let request_handler = runtime.mcp_service.clone();
+    let mut request_handler = runtime.mcp_service.clone();
+    // Attach subscription authorization when the principal
+    // is available. The auth middleware inserts it into
+    // request extensions before this handler runs.
+    if let Some(principal) = req
+        .extensions()
+        .get::<super::principal::AuthenticatedPrincipal>()
+        .cloned()
+    {
+        request_handler =
+            request_handler.with_subscription_authorization(principal, state.authenticator.clone());
+    }
     let svc = build_mcp_service(
         move || Ok(request_handler.clone()),
         build_server_config(&state.config, state.shutdown.token()),
