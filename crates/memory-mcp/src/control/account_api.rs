@@ -136,6 +136,8 @@ mod tests {
             registry,
             authenticator,
             account_resolver,
+            #[cfg(feature = "control-plane")]
+            oidc_client: None,
         });
         let router = Router::new()
             .route(

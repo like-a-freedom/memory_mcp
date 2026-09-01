@@ -539,6 +539,167 @@ pub fn unseal_oidc_payload(
     })
 }
 
+// ---------------------------------------------------------------------------
+// HTTP handlers (Task 10.1 Steps 3-4)
+// ---------------------------------------------------------------------------
+
+/// GET /api/v1/auth/authorize — initiate OIDC login.
+pub async fn authorize(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::http::HttpState>>,
+) -> Result<axum::response::Redirect, super::error::ApiError> {
+    let pkce = PkceCode::new();
+    let state_token = OidcState::new();
+    let nonce = OidcNonce::new();
+
+    // Seal the flow material and store keyed hash + ciphertext.
+    let state_hash = hex::encode(identity_subject_verifier(
+        &state.config.keys.oidc_state,
+        "",
+        state_token.as_str(),
+    )?);
+    let (sealed, aead_nonce) =
+        seal_oidc_payload(&state.config.keys.oidc_state, &state_token, &nonce, &pkce)?;
+
+    #[cfg(feature = "control-plane")]
+    state
+        .registry
+        .store_clone()
+        .store_oidc_request(&state_hash, &sealed, &aead_nonce)
+        .await?;
+
+    let oidc = state
+        .oidc_client
+        .as_ref()
+        .ok_or(super::error::ApiError::Unavailable)?;
+    let url = oidc.authorize_url(&state_token, &pkce, &nonce);
+    Ok(axum::response::Redirect::to(&url))
+}
+
+/// GET /api/v1/auth/callback — OIDC provider redirects here.
+pub async fn callback(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::http::HttpState>>,
+    axum::extract::Query(params): axum::extract::Query<OidcCallback>,
+) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), super::error::ApiError> {
+    // Reject if the provider reported an error.
+    if params.error.is_some() {
+        return Err(super::error::ApiError::Unauthorized);
+    }
+
+    // Hash the incoming state to look up the sealed request.
+    let state_hash = hex::encode(identity_subject_verifier(
+        &state.config.keys.oidc_state,
+        "",
+        &params.state,
+    )?);
+
+    #[cfg(feature = "control-plane")]
+    let (sealed, aead_nonce) = state
+        .registry
+        .store_clone()
+        .take_oidc_request(&state_hash)
+        .await?
+        .ok_or(super::error::ApiError::Unauthorized)?;
+
+    #[cfg(not(feature = "control-plane"))]
+    {
+        let _ = (&sealed, &aead_nonce);
+        return Err(super::error::ApiError::Unavailable);
+    }
+
+    let stored = unseal_oidc_payload(&state.config.keys.oidc_state, &sealed, &aead_nonce)?;
+
+    // Reject expired requests (TTL 10 minutes).
+    if stored.expires_at < Utc::now() {
+        return Err(super::error::ApiError::Unauthorized);
+    }
+
+    // RFC 9207 issuer check.
+    if params
+        .iss
+        .as_deref()
+        .is_some_and(|issuer| issuer != state.config.oidc_issuer)
+    {
+        return Err(super::error::ApiError::Unauthorized);
+    }
+
+    let code = params.code.ok_or(super::error::ApiError::Unauthorized)?;
+
+    let oidc = state
+        .oidc_client
+        .as_ref()
+        .ok_or(super::error::ApiError::Unavailable)?;
+
+    let tokens = oidc.exchange_code(code, stored.pkce).await?;
+    let claims = oidc.validate_id_token(&tokens.id_token).await?;
+
+    // Validate nonce matches the one we generated for this request.
+    if claims.nonce.as_deref() != Some(stored.nonce.as_str()) {
+        return Err(super::error::ApiError::Unauthorized);
+    }
+
+    let subject_verifier =
+        identity_subject_verifier(&state.config.keys.identity_index, &claims.iss, &claims.sub)?;
+
+    let account =
+        upsert_account_for_identity(state.clone(), &claims.iss, &subject_verifier).await?;
+
+    let cookie_value = super::session::generate_session_cookie_value();
+    let session = super::session::ControlPlaneSession::new(&account, &cookie_value, &state.config)?;
+    state.registry.store_clone().store_session(&session).await?;
+
+    let cookie = super::session::build_session_cookie(cookie_value, &state.config);
+    let mut headers = axum::http::header::HeaderMap::new();
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        cookie.parse().map_err(|_| {
+            super::error::ApiError::Internal(MemoryError::ConfigInvalid(
+                "invalid cookie header".into(),
+            ))
+        })?,
+    );
+    Ok((headers, axum::response::Redirect::to("/")))
+}
+
+/// Find or create an Account for an OIDC identity. Idempotent:
+/// if an account already exists for this (issuer, subject_verifier),
+/// return it; otherwise create a new one when signup policy permits.
+async fn upsert_account_for_identity(
+    state: std::sync::Arc<crate::http::HttpState>,
+    issuer: &str,
+    subject_verifier: &[u8; 32],
+) -> Result<crate::http::registry::models::Account, super::error::ApiError> {
+    use crate::http::registry::models::SubjectVerifier;
+
+    let sv = SubjectVerifier(*subject_verifier);
+    let store = state.registry.store_clone();
+
+    // Try to find existing account by identity.
+    if let Some(account) = store.find_account_by_identity(issuer, &sv).await? {
+        return Ok(account);
+    }
+
+    // Check signup policy.
+    match state.config.signup_mode {
+        crate::http::config::SignupMode::InviteOnly => {
+            return Err(super::error::ApiError::Forbidden);
+        }
+        crate::http::config::SignupMode::Open => {}
+    }
+
+    // Create new account.
+    let now = chrono::Utc::now();
+    let account = crate::http::registry::models::Account {
+        id: uuid::Uuid::new_v4().to_string(),
+        status: crate::http::registry::models::AccountStatus::Active,
+        tenant_id: String::new(),
+        created_at: now,
+    };
+
+    store.write_account(&account).await?;
+
+    Ok(account)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
