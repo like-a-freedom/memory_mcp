@@ -292,7 +292,7 @@ mod tests {
 }
 
 // =======================================================================
-// SSE response header injection (added in Task 3.7)
+// SSE response header injection
 // =======================================================================
 
 use axum::http::header::HeaderValue;

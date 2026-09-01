@@ -97,7 +97,7 @@ pub async fn build_runtime(
     registry: &super::super::registry::RegistryHandle,
     tenant: &Tenant,
 ) -> Result<TenantRuntime, MemoryError> {
-    let tenant_db = match registry.tenant_engine() {
+    let tenant_db = match registry.tenant_engine()? {
         super::super::registry::PrivilegedEngine::Remote(privileged) => {
             let ns_client = (*privileged).clone();
             ns_client
