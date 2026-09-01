@@ -167,10 +167,10 @@ impl KeyedVerifier {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;
         // HMAC-SHA256 accepts a key of any length, so
-        // `new_from_slice` cannot fail here; the expect documents
-        // that invariant rather than hiding a real error path.
+        // `new_from_slice` cannot fail; unreachable documents
+        // that invariant.
         let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(pepper)
-            .expect("HMAC-SHA256 accepts any key length");
+            .unwrap_or_else(|_| unreachable!("HMAC accepts any key length"));
         mac.update(secret);
         Self(mac.finalize().into_bytes().into())
     }

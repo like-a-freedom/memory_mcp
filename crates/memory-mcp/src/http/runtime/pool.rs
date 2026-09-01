@@ -584,11 +584,11 @@ mod tests {
     /// `ActivationFailed` without re-attempting.
     #[tokio::test]
     async fn negative_cache_swallows_repeated_failures() {
-        // Use a registry whose engine init panics so
+        // Use a registry whose engine init fails so
         // `build_runtime` fails. The simplest path: use a
         // pool whose registry was built with a
         // `RegistryHandle::new()` placeholder; that returns
-        // `Storage("no engine")` from `tenant_engine()`,
+        // `Storage("no engine")` error from `tenant_engine()`,
         // which `build_runtime` propagates as `MemoryError`.
         let pool = Arc::new(Pool::with_defaults(Arc::new(RegistryHandle::new())));
         let tenant = ready_tenant("ten_neg", "tns_neg");

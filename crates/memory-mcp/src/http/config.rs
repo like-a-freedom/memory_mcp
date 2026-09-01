@@ -197,7 +197,9 @@ fn parse_hex_32_env(k: &str) -> Result<[u8; 32], MemoryError> {
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.
     pub fn from_env() -> Result<Self, MemoryError> {
-        let default_bind: SocketAddr = DEFAULT_BIND.parse().expect("DEFAULT_BIND parses");
+        let default_bind: SocketAddr = DEFAULT_BIND
+            .parse()
+            .map_err(|e| MemoryError::ConfigInvalid(format!("DEFAULT_BIND parse failed: {e}")))?;
         let bind = parse_env_or("MEMORY_MCP_HTTP_BIND", default_bind)?;
         let public_base_url = require_env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")?;
         let allowed_hosts = parse_csv("ALLOWED_HOSTS")?;

@@ -182,19 +182,13 @@ impl RegistryHandle {
     /// engine is wired — code that has not yet been migrated
     /// surfaces the missing wire-up loudly instead of silently
     /// using the placeholder.
-    pub fn tenant_engine(&self) -> PrivilegedEngine {
+    pub fn tenant_engine(&self) -> Result<PrivilegedEngine, crate::error::MemoryError> {
         let engine = self.engine.clone().ok_or_else(|| {
             crate::error::MemoryError::Storage(
                 "registry has no privileged engine; wire PrivilegedEngine via with_engine".into(),
             )
-        });
-        // PrivilegedEngine: Clone is derived, but we return by
-        // value here for ergonomics; the engine itself is a
-        // handle.
-        match engine {
-            Ok(e) => (*e).clone(),
-            Err(_) => PrivilegedEngine::Remote(Arc::new(Surreal::init())),
-        }
+        })?;
+        Ok((*engine).clone())
     }
 
     /// Optional access to the privileged engine. Returns

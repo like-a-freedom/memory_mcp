@@ -34,7 +34,9 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(capacity: usize, window: Duration, max_per_window: u32) -> Self {
-        let cap = std::num::NonZeroUsize::new(capacity).expect("capacity is a non-zero constant");
+        debug_assert!(capacity > 0, "RateLimiter capacity must be non-zero");
+        let cap = std::num::NonZeroUsize::new(capacity)
+            .unwrap_or_else(|| unreachable!("capacity is a non-zero constant"));
         Self {
             window,
             max_per_window,
