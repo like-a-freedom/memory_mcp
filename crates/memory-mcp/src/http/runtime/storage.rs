@@ -74,6 +74,9 @@ impl TenantRuntime {
                     tenant.id.clone(),
                 ),
             ));
+            mcp_service = mcp_service.with_durable_subscriptions(Arc::new(
+                crate::http::subscriptions::DurableSubscriptionStore::new(bound_db.clone()),
+            ));
         }
         Ok(Self {
             tenant_id: tenant.id.clone(),

@@ -84,6 +84,20 @@ pub struct MemoryMcp {
     /// in-memory `TaskManager`.
     #[cfg(feature = "streamable-http")]
     durable_tasks: Option<std::sync::Arc<dyn crate::http::tasks::state::TaskStore>>,
+    /// Durable subscription store. When `Some`, the
+    /// handler advertises resource subscriptions and
+    /// dispatches `subscriptions/listen` through the
+    /// outbox-backed store.
+    #[cfg(feature = "streamable-http")]
+    subscription_store: Option<std::sync::Arc<dyn crate::http::subscriptions::SubscriptionStore>>,
+    /// Request-scoped subscription principal. Set per
+    /// request via `with_subscription_authorization`.
+    #[cfg(feature = "streamable-http")]
+    subscription_principal: Option<crate::http::principal::AuthenticatedPrincipal>,
+    /// Request-scoped authenticator for subscription
+    /// authorization rechecks.
+    #[cfg(feature = "streamable-http")]
+    subscription_authenticator: Option<std::sync::Arc<crate::http::principal::auth::Authenticator>>,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
     /// When true, advertise and negotiate only MCP 2026-07-28 (HTTP SaaS
@@ -109,6 +123,12 @@ impl MemoryMcp {
             durable_app_sessions: None,
             #[cfg(feature = "streamable-http")]
             durable_tasks: None,
+            #[cfg(feature = "streamable-http")]
+            subscription_store: None,
+            #[cfg(feature = "streamable-http")]
+            subscription_principal: None,
+            #[cfg(feature = "streamable-http")]
+            subscription_authenticator: None,
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
             modern_protocol_only: false,
@@ -153,6 +173,32 @@ impl MemoryMcp {
         self
     }
 
+    /// Wire the durable subscription store so the handler
+    /// advertises resource subscriptions and dispatches
+    /// `subscriptions/listen` through the outbox.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_durable_subscriptions(
+        mut self,
+        store: std::sync::Arc<dyn crate::http::subscriptions::SubscriptionStore>,
+    ) -> Self {
+        self.subscription_store = Some(store);
+        self
+    }
+
+    /// Attach request-scoped subscription authorization.
+    /// Called per request in the transport handler before
+    /// building the per-request `StreamableHttpService`.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_subscription_authorization(
+        mut self,
+        principal: crate::http::principal::AuthenticatedPrincipal,
+        authenticator: std::sync::Arc<crate::http::principal::auth::Authenticator>,
+    ) -> Self {
+        self.subscription_principal = Some(principal);
+        self.subscription_authenticator = Some(authenticator);
+        self
+    }
+
     /// Returns a reference to the underlying `MemoryService`.
     ///
     /// This can be used to access service methods directly if needed.
@@ -184,7 +230,18 @@ impl MemoryMcp {
     fn build_http_server_info(&self) -> ServerInfo {
         let builder = ServerCapabilities::builder().enable_tools().enable_tasks();
         #[cfg(feature = "mcp-apps")]
-        let builder = builder.enable_resources();
+        let builder = {
+            let b = builder.enable_resources();
+            // Advertise resource subscriptions only when
+            // the durable subscription backend is attached.
+            #[cfg(feature = "streamable-http")]
+            let b = if self.subscription_store.is_some() {
+                b.enable_resources_subscribe()
+            } else {
+                b
+            };
+            b
+        };
         ServerInfo::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
@@ -441,6 +498,83 @@ impl ServerHandler for MemoryMcp {
         _context: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
         self.read_resource_result(request).await.map(Into::into)
+    }
+
+    #[cfg(feature = "streamable-http")]
+    fn accepted_subscription_filter(
+        &self,
+        requested: &rmcp::model::SubscriptionFilter,
+    ) -> Option<rmcp::model::SubscriptionFilter> {
+        self.subscription_store.as_ref().map(|_| requested.clone())
+    }
+
+    #[cfg(feature = "streamable-http")]
+    fn listen(
+        &self,
+        context: rmcp::service::SubscriptionContext,
+    ) -> impl std::future::Future<Output = Result<(), rmcp::ErrorData>>
+    + rmcp::service::MaybeSendFuture
+    + '_ {
+        let store = self.subscription_store.clone();
+        let principal = self.subscription_principal.clone();
+        let authenticator = self.subscription_authenticator.clone();
+        async move {
+            let Some(store) = store else {
+                return Err(rmcp::ErrorData::method_not_found::<
+                    rmcp::model::SubscriptionsListenRequestMethod,
+                >());
+            };
+            let Some(principal) = principal else {
+                return Err(rmcp::ErrorData::internal_error(
+                    "subscription principal missing",
+                    None,
+                ));
+            };
+            let Some(authenticator) = authenticator else {
+                return Err(rmcp::ErrorData::internal_error(
+                    "subscription authenticator missing",
+                    None,
+                ));
+            };
+            let mut cursor = store
+                .current_sequence()
+                .await
+                .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
+            loop {
+                tokio::select! {
+                    _ = context.cancelled() => return Ok(()),
+                    batch = store.next_batch(cursor) => {
+                        if !authenticator.is_current(&principal).await {
+                            return Err(rmcp::ErrorData::internal_error(
+                                "subscription authorization expired",
+                                None,
+                            ));
+                        }
+                        let batch = batch.map_err(|error| {
+                            rmcp::ErrorData::internal_error(
+                                error.to_string(),
+                                None,
+                            )
+                        })?;
+                        for event in batch {
+                            cursor = cursor.max(event.sequence);
+                            crate::http::subscriptions::stream::send_invalidation(
+                                context.sink(),
+                                event,
+                            )
+                            .await
+                            .map_err(|error| {
+                                rmcp::ErrorData::internal_error(
+                                    error.to_string(),
+                                    None,
+                                )
+                            })?;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        }
     }
 }
 
