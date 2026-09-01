@@ -44,7 +44,10 @@ pub struct TenantChangeEvent {
 /// fails, the sequence is incremented but no event is
 /// emitted — the next successful commit uses the gap.
 /// This is acceptable because the sequence is a monotonic
-/// counter, not a strict counter.
+/// counter, not a strict counter. A single-script
+/// approach (combining all three operations) was explored
+/// but SurrealDB's multi-statement RETURN value semantics
+/// are incompatible with the `extract_records` helper.
 pub async fn commit_mutation_with_event(
     db: &BoundDbClient,
     mutation_sql: &str,
