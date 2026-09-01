@@ -8,6 +8,8 @@
 //! HTTP build does not compile in operator endpoints.
 
 pub mod account_api;
+#[cfg(feature = "control-plane")]
+pub mod csrf;
 pub mod error;
 #[cfg(feature = "control-plane")]
 pub mod oidc;
