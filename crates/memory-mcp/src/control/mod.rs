@@ -10,6 +10,8 @@
 pub mod account_api;
 #[cfg(feature = "control-plane")]
 pub mod csrf;
+#[cfg(feature = "control-plane")]
+pub mod deletion;
 pub mod error;
 #[cfg(feature = "control-plane")]
 pub mod oidc;
@@ -18,3 +20,5 @@ pub mod operator;
 pub mod recent_auth;
 #[cfg(feature = "control-plane")]
 pub mod session;
+#[cfg(feature = "control-plane")]
+pub mod static_assets;
