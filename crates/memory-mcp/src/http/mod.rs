@@ -45,6 +45,10 @@ pub struct HttpState {
     /// Account → Tenant resolver. The Tenant Runtime (Task 5.6)
     /// consumes the `Ready` arm; the others become 4xx/5xx.
     pub account_resolver: Arc<registry::account::AccountResolver>,
+    /// OIDC client for the control-plane login flow.
+    /// `None` when the control plane is disabled.
+    #[cfg(feature = "control-plane")]
+    pub oidc_client: Option<Arc<crate::control::oidc::OidcClient>>,
     /// The Prometheus handle is `Some` only when the `prometheus`
     /// feature is enabled. When `None`, the `/metrics` route is
     /// not wired into the router.
@@ -81,6 +85,21 @@ impl HttpState {
             )),
         ));
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        #[cfg(feature = "control-plane")]
+        let oidc_client = if config.enable_control_plane {
+            Some(Arc::new(
+                crate::control::oidc::OidcClient::new(
+                    &config.oidc_issuer,
+                    &config.oidc_client_id,
+                    &config.oidc_audience,
+                    &config.oidc_redirect_uri,
+                    &config.oidc_allowed_alg,
+                )
+                .await?,
+            ))
+        } else {
+            None
+        };
         Ok(Arc::new(Self {
             config,
             pool,
@@ -89,6 +108,8 @@ impl HttpState {
             registry,
             authenticator,
             account_resolver,
+            #[cfg(feature = "control-plane")]
+            oidc_client,
             metrics_handle,
         }))
     }
@@ -112,6 +133,21 @@ impl HttpState {
             )),
         ));
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        #[cfg(feature = "control-plane")]
+        let oidc_client = if config.enable_control_plane {
+            Some(Arc::new(
+                crate::control::oidc::OidcClient::new(
+                    &config.oidc_issuer,
+                    &config.oidc_client_id,
+                    &config.oidc_audience,
+                    &config.oidc_redirect_uri,
+                    &config.oidc_allowed_alg,
+                )
+                .await?,
+            ))
+        } else {
+            None
+        };
         Ok(Arc::new(Self {
             config,
             pool,
@@ -120,6 +156,8 @@ impl HttpState {
             registry,
             authenticator,
             account_resolver,
+            #[cfg(feature = "control-plane")]
+            oidc_client,
         }))
     }
 
