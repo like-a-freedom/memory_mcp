@@ -19,10 +19,15 @@ use crate::storage::client::BoundDbClient;
 /// mutation that produced it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantChangeEvent {
+    #[serde(rename = "event_seq")]
     pub sequence: u64,
     pub resource_id: String,
+    #[serde(rename = "rev")]
     pub revision: u64,
     pub change_kind: String,
+    /// Server-set timestamp. On INSERT, the DB uses
+    /// `time::now()`; this field is ignored in the
+    /// write path but populated on read.
     pub created_at: DateTime<Utc>,
 }
 
@@ -33,16 +38,19 @@ pub struct TenantChangeEvent {
 /// from user input. `event` describes the change to be
 /// recorded after the mutation succeeds.
 ///
-/// The sequence is incremented atomically within the
-/// transaction. If any statement fails, the entire
-/// transaction is rolled back and no event is emitted.
+/// Phase 1: atomically increment the sequence and capture
+/// the new value. Phase 2: apply the mutation and insert
+/// the event as a single SurrealDB script. If phase 2
+/// fails, the sequence is incremented but no event is
+/// emitted — the next successful commit uses the gap.
+/// This is acceptable because the sequence is a monotonic
+/// counter, not a strict counter.
 pub async fn commit_mutation_with_event(
     db: &BoundDbClient,
     mutation_sql: &str,
     event: TenantChangeEvent,
 ) -> Result<(), MemoryError> {
-    use serde_json::json;
-
+    // Phase 1: increment sequence atomically.
     let seq_result = db
         .query(
             "UPDATE `tenant_change_sequence` SET `value` = `value` + 1 RETURN AFTER;",
@@ -56,18 +64,20 @@ pub async fn commit_mutation_with_event(
         .and_then(|v| v.as_u64())
         .ok_or_else(|| MemoryError::Storage("outbox sequence parse failed".into()))?;
 
-    // Apply the mutation.
-    db.query(mutation_sql, None).await?;
-
-    // Insert the event with the incremented sequence.
-    db.query(
-        "CREATE tenant_change_event SET \
+    // Phase 2: mutation + event insert as one script.
+    // mutation_sql is trusted internal code (never user input).
+    let script = format!(
+        "{mutation_sql};\n\
+         CREATE tenant_change_event SET \
          event_seq = $event_seq, \
          resource_id = $resource_id, \
          rev = $rev, \
          change_kind = $change_kind, \
          created_at = time::now();",
-        Some(json!({
+    );
+    db.query(
+        &script,
+        Some(serde_json::json!({
             "event_seq": seq_val,
             "resource_id": event.resource_id,
             "rev": event.revision,
