@@ -101,6 +101,64 @@ impl EntityStoreClient {
             .await?;
         Ok(())
     }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) async fn create_with_event(
+        &self,
+        entity_id: &str,
+        content: Value,
+    ) -> Result<(), MemoryError> {
+        let Some((table, key)) = entity_id.split_once(':') else {
+            return Err(MemoryError::Validation(
+                "entity id must include a table prefix".into(),
+            ));
+        };
+        if table != "entity" || key.is_empty() {
+            return Err(MemoryError::Validation(
+                "entity id has an invalid table prefix".into(),
+            ));
+        }
+        let mutation = crate::http::subscriptions::outbox::TenantMutation::new(
+            "CREATE type::record('entity', $entity_key) CONTENT $entity_content",
+            json!({"entity_key": key, "entity_content": content}),
+        )?;
+        crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+            &self.db,
+            mutation,
+            crate::http::subscriptions::outbox::TenantChangeEvent {
+                sequence: 0,
+                resource_id: "ui://memory/apps/graph".into(),
+                revision: 1,
+                change_kind: "entity_created".into(),
+                created_at: chrono::Utc::now(),
+            },
+        )
+        .await
+    }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) async fn add_alias_with_event(
+        &self,
+        entity_id: &str,
+        normalized_alias: &str,
+    ) -> Result<(), MemoryError> {
+        let mutation = crate::http::subscriptions::outbox::TenantMutation::new(
+            "LET $updated = UPDATE type::record($id) SET aliases += [$alias] RETURN AFTER; IF array::len($updated) = 0 { THROW 'entity alias target was not found'; }",
+            json!({"id": entity_id, "alias": normalized_alias}),
+        )?;
+        crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+            &self.db,
+            mutation,
+            crate::http::subscriptions::outbox::TenantChangeEvent {
+                sequence: 0,
+                resource_id: "ui://memory/apps/graph".into(),
+                revision: 1,
+                change_kind: "entity_alias_added".into(),
+                created_at: chrono::Utc::now(),
+            },
+        )
+        .await
+    }
 }
 
 fn entity_id_from_record(record: &Value) -> Option<String> {
@@ -136,6 +194,14 @@ mod tests {
             .apply_migrations("org")
             .await
             .expect("apply migrations");
+        #[cfg(feature = "streamable-http")]
+        db_client
+            .execute_migration_script(
+                include_str!("../../migrations/042_tenant_change_event.surql"),
+                "org",
+            )
+            .await
+            .expect("apply HTTP outbox migration");
         db_client
     }
 
@@ -153,6 +219,37 @@ mod tests {
         )
         .await
         .expect("seed entity");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn create_with_event_commits_entity_and_invalidation_atomically() {
+        let db = make_db().await;
+        let store = EntityStoreClient::new(db.clone(), "org");
+        store
+            .create_with_event(
+                "entity:outbox_test",
+                json!({
+                    "entity_id": "entity:outbox_test",
+                    "entity_type": "person",
+                    "canonical_name": "Outbox Test",
+                    "canonical_name_normalized": "outbox test",
+                    "aliases": [],
+                }),
+            )
+            .await
+            .expect("entity and event commit");
+        let events = db
+            .query(
+                "SELECT * FROM tenant_change_event WHERE resource_id = $resource",
+                Some(json!({"resource": "ui://memory/apps/graph"})),
+                "org",
+            )
+            .await
+            .expect("select event");
+        let events: Vec<Value> = serde_json::from_value(events).expect("parse event");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["change_kind"], "entity_created");
     }
 
     #[tokio::test]

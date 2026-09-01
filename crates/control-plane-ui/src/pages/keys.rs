@@ -6,10 +6,10 @@ use crate::api::ApiClient;
 
 #[component]
 pub fn KeysPage() -> Element {
-    let mut keys = use_signal(|| Vec::<crate::api::ApiKeyMeta>::new());
+    let mut keys = use_signal(Vec::<crate::api::ApiKeyMeta>::new);
     let mut new_key_secret = use_signal(|| None::<String>);
-    let mut new_key_name = use_signal(|| String::new());
-    let error = use_signal(|| None::<String>);
+    let mut new_key_name = use_signal(String::new);
+    let mut error = use_signal(|| None::<String>);
 
     use_effect(move || {
         let api = ApiClient::new("/".to_string());
@@ -29,9 +29,8 @@ pub fn KeysPage() -> Element {
                 Ok(resp) => {
                     new_key_secret.set(Some(resp.secret));
                     // Refresh list
-                    match api.list_keys().await {
-                        Ok(list) => keys.set(list),
-                        Err(_) => {}
+                    if let Ok(list) = api.list_keys().await {
+                        keys.set(list);
                     }
                 }
                 Err(e) => error.set(Some(e.message)),
@@ -70,7 +69,7 @@ pub fn KeysPage() -> Element {
                             td { "{key.name}" }
                             td { "{key.status}" }
                             td { "{key.created_at}" }
-                            td { key.expires_at.as_deref().unwrap_or("never") }
+                            td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
                             td {
                                 button {
                                     onclick: {

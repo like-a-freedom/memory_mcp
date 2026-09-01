@@ -79,6 +79,18 @@ pub async fn get_account(
     json_response(StatusCode::OK, &resp)
 }
 
+/// GET /api/v1/account/csrf — return the session-bound CSRF token.
+pub async fn csrf_token(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+) -> Result<Response, ApiError> {
+    let token =
+        super::csrf::compute_csrf(&state.config.keys.csrf, &session.account_id, &session.id)?;
+    json_response(StatusCode::OK, &serde_json::json!({"csrf_token": token}))
+}
+
 /// Request body for creating an API key.
 #[derive(serde::Deserialize)]
 pub struct CreateApiKeyRequest {
@@ -155,7 +167,19 @@ pub async fn create_api_key(
         version: 0,
     };
 
-    state.registry.store_clone().write_api_key(&key).await?;
+    let store = state.registry.store_clone();
+    let account = store
+        .find_account_by_id(&session.account_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let tenant = store
+        .find_tenant_by_id(&account.tenant_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let plan = store.load_plan(tenant.plan_version).await?;
+    store
+        .create_api_key_if_below_limit(&key, plan.limits.max_active_api_keys)
+        .await?;
 
     let resp = CreateApiKeyResponse {
         id: key.id.clone(),
@@ -217,43 +241,167 @@ pub async fn revoke_api_key(
 
 /// GET /api/v1/account/identity_links — list linked External Identities.
 pub async fn list_identity_links(
-    _state: State<Arc<HttpState>>,
-    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
 ) -> Result<Response, ApiError> {
-    // ExternalIdentity linking is not wired yet; fail closed
-    // instead of presenting an empty list as authoritative.
-    Err(ApiError::Unavailable)
+    let identities = state
+        .registry
+        .store_clone()
+        .find_external_identities(&session.account_id)
+        .await?;
+    json_response(StatusCode::OK, &identities)
+}
+
+#[derive(serde::Deserialize)]
+pub struct LinkIdentityRequest {
+    pub issuer: String,
+    pub subject: String,
+}
+
+/// POST /api/v1/account/identity_links — link an external identity after
+/// recent authentication. The raw subject is immediately converted to a keyed
+/// blind index and is never sent to the registry store.
+pub async fn link_identity(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+    body: Body,
+) -> Result<StatusCode, ApiError> {
+    super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
+    let bytes = http_body_util::BodyExt::collect(body)
+        .await
+        .map_err(|error| ApiError::Internal(crate::error::MemoryError::Storage(error.to_string())))?
+        .to_bytes();
+    let request: LinkIdentityRequest = serde_json::from_slice(&bytes).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Validation(format!(
+            "link identity body: {error}"
+        )))
+    })?;
+    let subject_verifier = super::oidc::identity_subject_verifier(
+        &state.config.keys.identity_index,
+        &request.issuer,
+        &request.subject,
+    )?;
+    let identity = ExternalIdentity {
+        id: new_external_identity_id(),
+        issuer: request.issuer,
+        subject_verifier: SubjectVerifier(subject_verifier),
+        account_id: session.account_id,
+        created_at: chrono::Utc::now(),
+    };
+    state
+        .registry
+        .store_clone()
+        .link_external_identity(&identity)
+        .await?;
+    Ok(StatusCode::CREATED)
 }
 
 /// DELETE /api/v1/account/identity_links/:id — unlink an External Identity.
 pub async fn unlink_identity(
-    _state: State<Arc<HttpState>>,
-    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
-    identity_id: axum::extract::Path<String>,
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+    axum::extract::Path(identity_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    // ExternalIdentity unlinking is not wired yet; do not
-    // report a successful or misleading not-found mutation.
-    let _ = identity_id;
-    Err(ApiError::Unavailable)
+    state
+        .registry
+        .store_clone()
+        .unlink_external_identity(&session.account_id, &identity_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/v1/account/delete — start deletion flow (sends confirmation).
+/// POST /api/v1/account/delete — start deletion flow and return a short-lived
+/// one-use token. The token is intentionally shown once and never stored.
 pub async fn start_account_deletion(
-    _state: State<Arc<HttpState>>,
-    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
 ) -> Result<Response, ApiError> {
-    // A confirmation token is not durable yet, so do not
-    // advertise a deletion flow that cannot be completed.
-    Err(ApiError::Unavailable)
+    super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
+    let raw_token = generate_secret();
+    let verifier =
+        super::deletion::token_verifier(&state.config.keys.control_plane_session, &raw_token)?;
+    let challenge = DeletionChallengeRecord {
+        id: uuid::Uuid::new_v4().to_string(),
+        verifier,
+        account_id: session.account_id.clone(),
+        session_id: session.id.clone(),
+        expires_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+        consumed_at: None,
+    };
+    state
+        .registry
+        .store_clone()
+        .create_deletion_challenge(&challenge)
+        .await?;
+    let response = serde_json::json!({
+        "confirmation_token": raw_token,
+        "typed_phrase": super::deletion::DELETION_TYPED_PHRASE,
+        "export_available": false,
+        "recovery_available": false,
+        "expires_at": challenge.expires_at,
+    });
+    let body = serde_json::to_vec(&response).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize deletion response: {error}"
+        )))
+    })?;
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
 }
 
-/// POST /api/v1/account/delete/confirm — confirm with typed phrase.
+#[derive(serde::Deserialize)]
+pub struct ConfirmDeletionRequest {
+    pub confirmation_token: String,
+    pub typed_phrase: String,
+}
+
+/// POST /api/v1/account/delete/confirm — atomically consume the confirmation
+/// challenge, revoke credentials/sessions, and fence data-plane access.
 pub async fn confirm_account_deletion(
-    _state: State<Arc<HttpState>>,
-    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+    body: Body,
 ) -> Result<StatusCode, ApiError> {
-    // Deletion flow stub; return stub for now.
-    Err(ApiError::Unavailable)
+    super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
+    let bytes = http_body_util::BodyExt::collect(body)
+        .await
+        .map_err(|error| ApiError::Internal(crate::error::MemoryError::Storage(error.to_string())))?
+        .to_bytes();
+    let request: ConfirmDeletionRequest = serde_json::from_slice(&bytes).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Validation(format!(
+            "confirm deletion body: {error}"
+        )))
+    })?;
+    if !super::deletion::validate_typed_phrase(&request.typed_phrase) {
+        return Err(ApiError::Forbidden);
+    }
+    let verifier = super::deletion::token_verifier(
+        &state.config.keys.control_plane_session,
+        &request.confirmation_token,
+    )?;
+    let store = state.registry.store_clone();
+    super::deletion::execute_deletion(&session, &request.typed_phrase, &verifier, store.as_ref())
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Parse the request body into a `CreateAccountRequest`. The
@@ -303,8 +451,7 @@ pub async fn create_account(
         version: 0,
     };
     let store = state.registry.store_clone();
-    store.write_account(&account).await?;
-    store.write_tenant(&tenant).await?;
+    store.create_account_bundle(&account, &tenant, None).await?;
     enqueue_provisioning(&store, &tenant).await?;
     account_created_response(&account)
 }

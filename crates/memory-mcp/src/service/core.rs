@@ -92,6 +92,8 @@ impl MemoryService {
             query_log_retention_days: self.query_log_retention_days,
             claim_service: self.claim_service.clone(),
             triple_extraction_semaphore: self.triple_extraction_semaphore.clone(),
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: self.outbox_enabled,
         }
     }
 

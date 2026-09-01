@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::error::MemoryError;
 use crate::http::HttpState;
-use crate::http::leases::migration::{NoopMigrations, provision_one};
+use crate::http::leases::migration::{SurrealTenantMigrations, provision_one};
 use crate::http::leases::{ProvisioningLease, migration::ApplyMigrations};
 use crate::http::principal::api_keys::ApiKeyCredential;
 use crate::http::registry::models::*;
@@ -36,13 +36,15 @@ pub async fn apply_test_bootstrap(state: &Arc<HttpState>) -> Result<(), MemoryEr
     else {
         return Ok(());
     };
-    let noop: Arc<dyn ApplyMigrations> = Arc::new(NoopMigrations);
+    let migrations: Arc<dyn ApplyMigrations> = Arc::new(SurrealTenantMigrations::new(
+        state.registry.tenant_engine()?,
+    ));
     for entry in raw.split(',') {
         let (name, key) = entry.split_once('=').ok_or_else(|| {
             MemoryError::ConfigInvalid("bootstrap entry must be <name>=<api_key>".into())
         })?;
         let cred = ApiKeyCredential::parse(key)?;
-        bootstrap_one(state, name, &cred, noop.clone()).await?;
+        bootstrap_one(state, name, &cred, migrations.clone()).await?
     }
     Ok(())
 }

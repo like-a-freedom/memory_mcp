@@ -4,7 +4,7 @@
 **Decision:** [ADR-0052](../../adr/0052-streamable-http-saas-profile.md)
 **Protocol target:** MCP `2026-07-28`
 **SDK baseline:** `rmcp` 3.1.2
-**Implementation status:** Not implemented
+**Implementation status:** Implemented in the `streamable-http-mcp` branch. Transport, durable Registry/runtime, quota admission, HTTP test bootstrap, control-plane deletion flow, subscription outbox, and Dioxus asset packaging are wired and covered by the repository test gates. Production open-signup launch remains gated by §20.5 operational evidence (remote restore, credential rotation, load/cost measurements, and a real Dioxus bundle).
 
 ## 1. Purpose and non-goals
 
@@ -112,6 +112,47 @@ Production startup requires explicit allowed hosts and allowed origins. Wildcard
 origins are rejected. Missing Origin is accepted for non-browser MCP clients.
 Present Origin must be allowlisted. Forwarded host/origin are trusted only under
 explicit trusted-proxy configuration.
+
+### 3.4 Environment contract
+
+The HTTP composition root follows 12-factor configuration and reads deployment
+values only from environment variables. The control Registry and tenant engine
+use separate bindings:
+
+- `SURREALDB_CONTROL_URL`, `SURREALDB_CONTROL_USERNAME`,
+  `SURREALDB_CONTROL_PASSWORD`, `SURREALDB_CONTROL_NAMESPACE`, and
+  `SURREALDB_CONTROL_DB` configure the durable Account/plan/credential Registry;
+- `SURREALDB_TENANT_URL`, `SURREALDB_TENANT_USERNAME`,
+  `SURREALDB_TENANT_PASSWORD`, `SURREALDB_TENANT_NAMESPACE`, and
+  `SURREALDB_TENANT_DB` configure the privileged engine used to create and bind
+  immutable Tenant namespaces;
+- `MEMORY_MCP_HTTP_BIND`, `MEMORY_MCP_HTTP_PUBLIC_BASE_URL`, `ALLOWED_HOSTS`,
+  `ALLOWED_ORIGINS`, `MEMORY_MCP_HTTP_BODY_LIMIT`,
+  `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS`, and
+  `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` configure the HTTP boundary;
+- `MEMORY_MCP_API_KEY_PEPPER` plus the five
+  `MEMORY_MCP_HTTP_*_KEY` variables configure keyed verifiers; raw secrets are
+  never persisted or logged;
+- `MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only` is the safe default policy. For
+  `open`, all seven plan variables must be explicit:
+  `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
+  `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT`,
+  `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
+  `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`,
+  `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
+  `MEMORY_MCP_HTTP_REQUEST_CONCURRENCY`, and
+  `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. These seed durable plan version 1
+  only when it does not already exist;
+- `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is a comma-separated immutable allowlist
+  of `issuer|hex(subject_verifier)` entries;
+- `MEMORY_MCP_CONTROL_PLANE_UI_DIST` is a build-time absolute path to a complete
+  Dioxus 0.7 web bundle. It is embedded deterministically; enabling the UI
+  feature without `index.html` is a build error, not a runtime placeholder.
+
+Remote or embedded `rocksdb://` storage can be selected through the two target
+URLs. Embedded RocksDB is development/demo/single-process only; it is not an HA
+or public-production topology. `mem://` is test-only. There is no runtime
+filesystem fallback for UI assets and no HTTP binary CLI administration path.
 
 ## 4. MCP `2026-07-28` profile
 

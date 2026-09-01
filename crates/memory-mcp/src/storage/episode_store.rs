@@ -47,6 +47,86 @@ impl EpisodeStoreClient {
         self.db.create(record_id, content).await
     }
 
+    /// Create an episode and publish its app invalidation in the same tenant
+    /// transaction. This method is used only by the HTTP runtime; stdio keeps
+    /// the historical direct-create path because its namespace has no outbox
+    /// contract.
+    #[cfg(feature = "streamable-http")]
+    pub(crate) async fn create_with_event(
+        &self,
+        record_id: &str,
+        content: Value,
+        resource_id: &str,
+    ) -> Result<(), MemoryError> {
+        let Some((table, key)) = record_id.split_once(':') else {
+            return Err(MemoryError::Validation(
+                "episode record id must include a table prefix".into(),
+            ));
+        };
+        if table != "episode" || key.is_empty() {
+            return Err(MemoryError::Validation(
+                "episode record id has an invalid table prefix".into(),
+            ));
+        }
+        let object = content.as_object().ok_or_else(|| {
+            MemoryError::Validation("episode content must be a JSON object".into())
+        })?;
+        let required_string = |field: &str| {
+            object
+                .get(field)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| MemoryError::Validation(format!("episode content needs {field}")))
+        };
+        let episode_id = required_string("episode_id")?;
+        let source_type = required_string("source_type")?;
+        let source_id = required_string("source_id")?;
+        let episode_text = required_string("content")?;
+        let t_ref = required_string("t_ref")?;
+        let t_ingested = required_string("t_ingested")?;
+        let policy_tags = object
+            .get("policy_tags")
+            .cloned()
+            .ok_or_else(|| MemoryError::Validation("episode content needs policy_tags".into()))?;
+        let source_lineage = object.get("source_lineage").cloned();
+        let source_lineage_assignment = if source_lineage.is_some() {
+            ", source_lineage = $source_lineage"
+        } else {
+            ""
+        };
+        let mutation = crate::http::subscriptions::outbox::TenantMutation::new(
+            format!(
+                "CREATE type::record('episode', $episode_key) SET \
+                 episode_id = $episode_id, source_type = $source_type, source_id = $source_id, \
+                 content = $episode_text, t_ref = type::datetime($t_ref), \
+                 t_ingested = type::datetime($t_ingested), policy_tags = $policy_tags{source_lineage_assignment}"
+            ),
+            json!({
+                "episode_key": key,
+                "episode_id": episode_id,
+                "source_type": source_type,
+                "source_id": source_id,
+                "episode_text": episode_text,
+                "t_ref": t_ref,
+                "t_ingested": t_ingested,
+                "policy_tags": policy_tags,
+                "source_lineage": source_lineage,
+            }),
+        )?;
+        crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+            &self.db,
+            mutation,
+            crate::http::subscriptions::outbox::TenantChangeEvent {
+                sequence: 0,
+                resource_id: resource_id.to_owned(),
+                revision: 1,
+                change_kind: "episode_created".into(),
+                created_at: chrono::Utc::now(),
+            },
+        )
+        .await
+    }
+
     pub async fn update(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
         self.db.update(record_id, content).await
     }
@@ -209,6 +289,14 @@ mod tests {
             .apply_migrations("org")
             .await
             .expect("apply migrations");
+        #[cfg(feature = "streamable-http")]
+        db_client
+            .execute_migration_script(
+                include_str!("../../migrations/042_tenant_change_event.surql"),
+                "org",
+            )
+            .await
+            .expect("apply HTTP outbox migration");
         db_client
     }
 
@@ -249,6 +337,47 @@ mod tests {
             )
             .await
             .expect("seed fact should succeed");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn create_with_event_commits_episode_and_invalidation_atomically() {
+        let db_client = make_db().await;
+        let store = EpisodeStoreClient::new(db_client.clone(), "org");
+        store
+            .create_with_event(
+                "episode:outbox_test",
+                json!({
+                    "episode_id": "episode:outbox_test",
+                    "source_type": "inline",
+                    "source_id": "outbox_test",
+                    "content": "hello",
+                    "policy_tags": [],
+                    "t_ref": chrono::Utc::now().to_rfc3339(),
+                    "t_ingested": chrono::Utc::now().to_rfc3339(),
+                }),
+                "ui://memory/apps/ingestion_review",
+            )
+            .await
+            .expect("episode and event commit");
+
+        let episode = db_client
+            .select_one("episode:outbox_test", "org")
+            .await
+            .expect("select episode")
+            .expect("episode exists");
+        assert_eq!(episode["content"], "hello");
+        let events = db_client
+            .query(
+                "SELECT * FROM tenant_change_event WHERE resource_id = $resource",
+                Some(json!({"resource": "ui://memory/apps/ingestion_review"})),
+                "org",
+            )
+            .await
+            .expect("select event");
+        let events: Vec<serde_json::Value> = serde_json::from_value(events).expect("parse events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["change_kind"], "episode_created");
     }
 
     #[tokio::test]

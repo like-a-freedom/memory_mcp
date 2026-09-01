@@ -12,7 +12,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-use tokio::sync::broadcast;
+use tokio::sync::{Semaphore, broadcast};
 
 use super::storage::TenantRuntime;
 
@@ -85,17 +85,23 @@ pub struct TenantRuntimeSlot {
     pub phase: RuntimePhase,
     pub pin_count: Arc<AtomicU32>,
     pub active_operations: AtomicU32,
+    pub concurrency: Arc<Semaphore>,
     pub last_used: Instant,
     pub activation: ActivationSlot,
 }
 
 impl TenantRuntimeSlot {
     pub fn new() -> Self {
+        Self::new_with_limit(4)
+    }
+
+    pub fn new_with_limit(limit: u32) -> Self {
         Self {
             runtime: None,
             phase: RuntimePhase::Absent,
             pin_count: Arc::new(AtomicU32::new(0)),
             active_operations: AtomicU32::new(0),
+            concurrency: Arc::new(Semaphore::new(limit.max(1) as usize)),
             last_used: Instant::now(),
             activation: ActivationSlot::new(),
         }

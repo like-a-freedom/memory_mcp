@@ -535,6 +535,60 @@ The generated snippet uses `servers.memory_mcp` with a stdio `command` of
 `cargo install --path crates/memory-mcp --locked`, the installed binary can be
 used directly by the host.
 
+## Streamable HTTP SaaS profile
+
+The optional `memory_mcp_http` binary is a separate multi-user composition root.
+It exposes only modern MCP Streamable HTTP at `POST /mcp`; it has no memory
+operation CLI and never accepts a namespace selector from a request. The request
+path is Bearer API key → Account → ready Tenant → immutable namespace-bound
+runtime. The control Registry uses its own SurrealDB namespace/database, while
+Tenant data is provisioned in server-generated namespaces.
+
+Build and run it with the `streamable-http` feature:
+
+```bash
+cargo build --release --locked --features streamable-http,control-plane
+MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
+ALLOWED_HOSTS=mcp.example.com \
+ALLOWED_ORIGINS=https://mcp.example.com \
+MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
+SURREALDB_CONTROL_URL=wss://surreal.example.com/rpc \
+SURREALDB_CONTROL_USERNAME=... \
+SURREALDB_CONTROL_PASSWORD=... \
+SURREALDB_CONTROL_NAMESPACE=control \
+SURREALDB_CONTROL_DB=registry \
+SURREALDB_TENANT_URL=wss://surreal.example.com/rpc \
+SURREALDB_TENANT_USERNAME=... \
+SURREALDB_TENANT_PASSWORD=... \
+SURREALDB_TENANT_NAMESPACE=tenant \
+SURREALDB_TENANT_DB=tenant \
+MEMORY_MCP_API_KEY_PEPPER=... \
+MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
+MEMORY_MCP_HTTP_SESSION_KEY=... \
+MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
+MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
+MEMORY_MCP_HTTP_CSRF_KEY=... \
+./target/release/memory_mcp_http
+```
+
+The full environment contract, proxy requirements, deletion semantics, and
+production gates are in the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
+[ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
+[operations runbooks](docs/operations/).
+
+For `MEMORY_MCP_HTTP_SIGNUP_MODE=open`, also set all seven durable plan seed
+variables: `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
+`MEMORY_MCP_HTTP_MAX_EPISODE_COUNT`, `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
+`MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`, `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
+`MEMORY_MCP_HTTP_REQUEST_CONCURRENCY`, and
+`MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They are used only to create Registry
+plan version 1 when it is absent; an existing durable plan is not overwritten.
+
+The embedded `rocksdb://` backend is suitable only for development, demos, and
+single-process tests. Public production requires remote SurrealDB, reverse-proxy
+TLS/host/origin enforcement, restricted `/metrics`, and the release evidence in
+§20.5 of the specification.
+
 ## Configuration
 
 Configuration is loaded from environment variables.
@@ -632,9 +686,36 @@ The binary supports a few opt-in Cargo features:
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
 | `mcp-apps` | Enable the optional interactive MCP app-session surface. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps`. |
+| `control-plane-ui` | Compile the optional Dioxus control-plane SPA. It requires a prebuilt web bundle; see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging). |
 | `prometheus` | Compile the optional Prometheus recorder/listener. Set `MEMORY_PROMETHEUS_LISTEN_ADDR` at runtime to expose `/metrics`. |
 
 The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `NER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
+
+### Control-plane UI asset packaging
+
+The `control-plane-ui` feature embeds the separately built Dioxus 0.7 web bundle
+into the `memory_mcp` binary at compile time. The runtime does not read a
+filesystem asset directory, and the build never fetches UI assets from the
+network.
+
+Build the UI with the Dioxus CLI matching the crate's 0.7 dependency, then pass
+an **absolute** bundle directory to the backend build:
+
+```bash
+cd crates/control-plane-ui
+dx bundle --platform web --release --out-dir "$PWD/../../target/control-plane-ui-dist"
+cd ../..
+MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist" \
+  cargo build --release --features control-plane-ui
+```
+
+The bundle must contain a non-empty `index.html`. All regular files are copied
+in deterministic path order into Cargo's `OUT_DIR` and embedded with
+`include_bytes!`; symlinks, non-UTF-8 paths, and invalid bundle entries are
+rejected. If `control-plane-ui` is enabled without the environment variable or
+without a complete bundle, compilation fails with an actionable error instead
+of producing a placeholder page. Builds without that feature do not require UI
+assets.
 
 ### One active namespace
 

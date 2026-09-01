@@ -21,12 +21,20 @@ pub(crate) struct IngestionMetadata {
     pub log_source_id: Option<String>,
 }
 
+#[cfg(feature = "streamable-http")]
+fn is_duplicate_episode_error(error: &MemoryError) -> bool {
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("already exists") || message.contains("duplicate")
+}
+
 /// Handles episode ingestion: file parsing, deduplication, and persistence.
 #[derive(Clone)]
 pub struct IngestionService {
     episode_store: crate::storage::EpisodeStoreClient,
     logger: StdoutLogger,
     rate_limiter: Arc<RateLimiter>,
+    #[cfg(feature = "streamable-http")]
+    outbox_enabled: bool,
 }
 
 impl IngestionService {
@@ -40,7 +48,15 @@ impl IngestionService {
             episode_store: crate::storage::EpisodeStoreClient::new(db_client, active_namespace),
             logger,
             rate_limiter,
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
         }
+    }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn with_outbox(mut self) -> Self {
+        self.outbox_enabled = true;
+        self
     }
 
     pub async fn ingest(
@@ -170,9 +186,23 @@ impl IngestionService {
                 }
                 payload.insert("source_lineage".to_string(), json!(trimmed.to_string()));
             }
-            self.episode_store
-                .create(&episode_id, Value::Object(payload))
-                .await?;
+            let content = Value::Object(payload);
+            #[cfg(feature = "streamable-http")]
+            if self.outbox_enabled {
+                match self
+                    .episode_store
+                    .create_with_event(&episode_id, content, "ui://memory/apps/ingestion_review")
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(error) if is_duplicate_episode_error(&error) => {}
+                    Err(error) => return Err(error),
+                }
+            } else {
+                self.episode_store.create(&episode_id, content).await?;
+            }
+            #[cfg(not(feature = "streamable-http"))]
+            self.episode_store.create(&episode_id, content).await?;
         } else {
             self.logger.log(
                 log_event(

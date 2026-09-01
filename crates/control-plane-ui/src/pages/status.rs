@@ -7,7 +7,7 @@ use crate::api::ApiClient;
 #[component]
 pub fn StatusPage() -> Element {
     let mut account = use_signal(|| None::<crate::api::AccountMeta>);
-    let error = use_signal(|| None::<String>);
+    let mut error = use_signal(|| None::<String>);
 
     use_effect(move || {
         let api = ApiClient::new("/".to_string());

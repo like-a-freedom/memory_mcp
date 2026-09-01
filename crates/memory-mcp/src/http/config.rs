@@ -6,6 +6,7 @@ use std::time::Duration;
 use serde::{Deserialize, Deserializer};
 
 use crate::error::MemoryError;
+use crate::http::registry::models::PlanLimits;
 
 pub const DEFAULT_BIND: &str = "0.0.0.0:8080";
 pub const DEFAULT_BODY_LIMIT_BYTES: usize = 8 * 1024 * 1024; // 8 MiB
@@ -36,9 +37,16 @@ pub struct HttpConfig {
     pub oidc_audience: String,
     pub oidc_redirect_uri: String,
     pub oidc_allowed_alg: String,
+    /// Immutable operator allowlist entries encoded as `issuer|subject_verifier`
+    /// where the verifier is the hex blind index, never the raw OIDC subject.
+    pub operator_identity_allowlist: Vec<String>,
     pub signup_mode: SignupMode,
     pub enable_control_plane: bool,
     pub enable_control_plane_ui: bool,
+    /// Explicit plan values for open signup. The plan is persisted in the
+    /// durable Registry at startup and is never read from request input.
+    #[serde(skip)]
+    pub signup_plan_limits: Option<PlanLimits>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -195,6 +203,40 @@ fn parse_hex_32_env(k: &str) -> Result<[u8; 32], MemoryError> {
         .map_err(|_| MemoryError::ConfigInvalid(k.into()))
 }
 
+fn parse_required_env<T>(key: &str) -> Result<T, MemoryError>
+where
+    T: std::str::FromStr,
+{
+    let raw = require_env(key)?;
+    raw.parse::<T>()
+        .map_err(|_| MemoryError::ConfigInvalid(key.into()))
+}
+
+fn load_signup_plan_limits() -> Result<Option<PlanLimits>, MemoryError> {
+    const KEYS: &[&str] = &[
+        "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES",
+        "MEMORY_MCP_HTTP_MAX_EPISODE_COUNT",
+        "MEMORY_MCP_HTTP_INGEST_PER_MINUTE",
+        "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS",
+        "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS",
+        "MEMORY_MCP_HTTP_REQUEST_CONCURRENCY",
+        "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY",
+    ];
+    let any_set = KEYS.iter().any(|key| optional_env(key).is_some());
+    if !any_set {
+        return Ok(None);
+    }
+    Ok(Some(PlanLimits {
+        max_ingested_bytes: parse_required_env(KEYS[0])?,
+        max_episode_count: parse_required_env(KEYS[1])?,
+        ingest_per_minute: parse_required_env(KEYS[2])?,
+        max_open_app_sessions: parse_required_env(KEYS[3])?,
+        max_active_api_keys: parse_required_env(KEYS[4])?,
+        per_tenant_request_concurrency: parse_required_env(KEYS[5])?,
+        extraction_concurrency: parse_required_env(KEYS[6])?,
+    }))
+}
+
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.
     pub fn from_env() -> Result<Self, MemoryError> {
@@ -236,6 +278,7 @@ impl HttpConfig {
         };
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
         let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
+        let signup_plan_limits = load_signup_plan_limits()?;
         let oidc_issuer = optional_env("MEMORY_MCP_HTTP_OIDC_ISSUER").unwrap_or_default();
         let oidc_client_id = optional_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID").unwrap_or_default();
         let oidc_audience = optional_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE").unwrap_or_default();
@@ -243,6 +286,7 @@ impl HttpConfig {
             optional_env("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI").unwrap_or_default();
         let oidc_allowed_alg = optional_env("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG")
             .unwrap_or_else(|| DEFAULT_OIDC_ALG.into());
+        let operator_identity_allowlist = parse_csv("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES")?;
 
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
@@ -277,9 +321,11 @@ impl HttpConfig {
             oidc_audience,
             oidc_redirect_uri,
             oidc_allowed_alg,
+            operator_identity_allowlist,
             signup_mode,
             enable_control_plane,
             enable_control_plane_ui,
+            signup_plan_limits,
         })
     }
 
@@ -353,6 +399,20 @@ impl HttpConfig {
                 "open signup requires explicit quota values (spec §12)".into(),
             ));
         }
+        if let Some(limits) = &self.signup_plan_limits {
+            if limits.max_ingested_bytes > i64::MAX as u64
+                || limits.max_episode_count > i64::MAX as u64
+            {
+                return Err(MemoryError::ConfigInvalid(
+                    "HTTP quota counters must fit SurrealDB signed integers".into(),
+                ));
+            }
+            if limits.per_tenant_request_concurrency == 0 || limits.extraction_concurrency == 0 {
+                return Err(MemoryError::ConfigInvalid(
+                    "HTTP request and extraction concurrency limits must be positive".into(),
+                ));
+            }
+        }
         if self.enable_control_plane
             && (self.oidc_issuer.is_empty()
                 || self.oidc_client_id.is_empty()
@@ -383,6 +443,13 @@ impl HttpConfig {
                 "control and tenant storage must use different namespace/database bindings".into(),
             ));
         }
+        #[cfg(not(any(test, feature = "test-fixtures")))]
+        if self.control_db.url.starts_with("mem://") || self.tenant_db.url.starts_with("mem://") {
+            return Err(MemoryError::ConfigInvalid(
+                "mem:// is test-only; production HTTP SaaS requires remote SurrealDB or documented embedded RocksDB"
+                    .into(),
+            ));
+        }
         #[cfg(not(feature = "control-plane"))]
         if self.enable_control_plane || self.enable_control_plane_ui {
             return Err(MemoryError::ConfigInvalid(
@@ -408,7 +475,7 @@ impl HttpConfig {
     }
 
     fn open_signup_quotas_set(&self) -> bool {
-        false // Phase 6 will replace
+        self.signup_plan_limits.is_some()
     }
 }
 
@@ -443,9 +510,11 @@ impl HttpConfig {
             oidc_audience: "memory-mcp".into(),
             oidc_redirect_uri: "http://localhost/auth/oidc/callback".into(),
             oidc_allowed_alg: DEFAULT_OIDC_ALG.into(),
+            operator_identity_allowlist: Vec::new(),
             signup_mode: SignupMode::InviteOnly,
             enable_control_plane: false,
             enable_control_plane_ui: false,
+            signup_plan_limits: None,
         }
     }
 }
@@ -491,6 +560,14 @@ mod tests {
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
             "MEMORY_MCP_HTTP_SESSION_KEY",
             "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+            "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES",
+            "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES",
+            "MEMORY_MCP_HTTP_MAX_EPISODE_COUNT",
+            "MEMORY_MCP_HTTP_INGEST_PER_MINUTE",
+            "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS",
+            "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS",
+            "MEMORY_MCP_HTTP_REQUEST_CONCURRENCY",
+            "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY",
         ] {
             // SAFETY: serialized by ENV_LOCK; no other thread reads these vars in tests.
             unsafe {
@@ -577,6 +654,31 @@ mod tests {
             assert_eq!(cfg.bind.port(), 8080);
             assert_eq!(cfg.allowed_hosts, vec!["localhost".to_string()]);
             assert_eq!(cfg.signup_mode, SignupMode::InviteOnly);
+        });
+    }
+
+    #[test]
+    fn open_signup_loads_explicit_plan_limits() {
+        let mut vars = base_required_env();
+        vars[6] = ("MEMORY_MCP_HTTP_SIGNUP_MODE", "open".into());
+        vars.extend([
+            ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
+            ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
+            ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
+            ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
+            ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
+            ("MEMORY_MCP_HTTP_REQUEST_CONCURRENCY", "6".into()),
+            ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
+        ]);
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("config loads");
+            cfg.validate()
+                .expect("open signup with explicit quotas is valid");
+            let limits = cfg.signup_plan_limits.expect("plan limits");
+            assert_eq!(limits.max_ingested_bytes, 1000);
+            assert_eq!(limits.ingest_per_minute, 3);
+            assert_eq!(limits.extraction_concurrency, 4);
         });
     }
 

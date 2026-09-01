@@ -25,11 +25,6 @@ impl Drop for Server {
     }
 }
 
-fn free_port() -> u16 {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind ephemeral");
-    listener.local_addr().expect("local addr").port()
-}
-
 const BOOTSTRAP_KEY_A: &str =
     "mem_sk_ak_aaaa0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
 const BOOTSTRAP_KEY_B: &str =
@@ -78,7 +73,7 @@ fn base_env(port: u16) -> Vec<(String, String)> {
 }
 
 fn start_server() -> Server {
-    let port = free_port();
+    let port = 0;
     let mut env = base_env(port);
     env.push(("RUST_LOG".into(), "info".into()));
 
@@ -93,17 +88,22 @@ fn start_server() -> Server {
 
     let mut server = Server {
         child,
-        base_url: format!("http://127.0.0.1:{port}"),
+        base_url: String::new(),
     };
 
     let stdout = server.child.stdout.take().unwrap();
     let reader = BufReader::new(stdout);
     for line in reader.lines() {
         let line = line.expect("read line");
-        if line.contains("bound=") {
+        if let Some(address) = line.strip_prefix("memory_mcp_http bound=") {
+            server.base_url = format!("http://{address}");
             break;
         }
     }
+    assert!(
+        !server.base_url.is_empty(),
+        "server did not report bound address"
+    );
     server
 }
 

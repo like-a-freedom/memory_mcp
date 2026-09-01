@@ -142,10 +142,17 @@ impl From<AuthError> for MemoryError {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(untagged)]
+pub enum Audience {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct AccessClaims {
     pub iss: String,
     pub sub: String,
-    pub aud: String,
+    pub aud: Audience,
     pub exp: u64,
     pub nonce: Option<String>,
 }
@@ -601,6 +608,8 @@ pub fn unseal_oidc_payload(
             verifier: payload.pkce_verifier,
             challenge: String::new(),
         },
+        // The registry enforces the authoritative expiry at consume time;
+        // this value is only the decrypted projection used by callers.
         expires_at: Utc::now() + chrono::Duration::minutes(10),
     })
 }
@@ -683,7 +692,11 @@ pub async fn callback(
     }
 
     // RFC 9207 issuer check.
-    if params.iss.as_deref() != Some(state.config.oidc_issuer.as_str()) {
+    if params
+        .iss
+        .as_deref()
+        .is_some_and(|issuer| issuer != state.config.oidc_issuer)
+    {
         return Err(super::error::ApiError::Unauthorized);
     }
 
@@ -751,17 +764,43 @@ async fn upsert_account_for_identity(
         crate::http::config::SignupMode::Open => {}
     }
 
-    // Create new account.
+    // Reserve the complete Account → Tenant → ExternalIdentity bundle in one
+    // durable transaction. The namespace is opaque, server-generated, and is
+    // never derived from the external subject.
     let now = chrono::Utc::now();
     let account = crate::http::registry::models::Account {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: crate::http::registry::models::new_account_id(),
         status: crate::http::registry::models::AccountStatus::Active,
-        tenant_id: String::new(),
+        tenant_id: crate::http::registry::models::new_tenant_id(),
         created_at: now,
     };
-
-    store.write_account(&account).await?;
-
+    let tenant = crate::http::registry::models::Tenant {
+        id: account.tenant_id.clone(),
+        status: crate::http::registry::models::TenantStatus::Reserved,
+        namespace_binding: crate::http::registry::models::NamespaceBinding {
+            namespace: crate::http::registry::models::new_namespace_name(),
+            database: "memory".into(),
+        },
+        plan_version: 1,
+        schema_version: 0,
+        retry_stage: None,
+        provisioning_lease: None,
+        created_at: now,
+        version: 0,
+    };
+    let identity = crate::http::registry::models::ExternalIdentity {
+        id: crate::http::registry::models::new_external_identity_id(),
+        issuer: issuer.to_owned(),
+        subject_verifier: sv,
+        account_id: account.id.clone(),
+        created_at: now,
+    };
+    store
+        .create_account_bundle(&account, &tenant, Some(&identity))
+        .await?;
+    store
+        .append_provisioning_event(&tenant.id, "reserved")
+        .await?;
     Ok(account)
 }
 

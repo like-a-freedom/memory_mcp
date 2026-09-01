@@ -98,6 +98,8 @@ pub(crate) mod test_support {
             triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
                 crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
             )),
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
         }
     }
 }

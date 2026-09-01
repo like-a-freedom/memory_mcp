@@ -28,11 +28,6 @@ impl Drop for Server {
     }
 }
 
-fn free_port() -> u16 {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind ephemeral");
-    listener.local_addr().expect("local addr").port()
-}
-
 /// Fixed bootstrap API key for the conformance suite. The
 /// `name=key` form is `<account_name>=<api_key>`; the test
 /// env var (5.8) is `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`.
@@ -82,7 +77,7 @@ fn base_env(port: u16) -> Vec<(String, String)> {
 }
 
 async fn spawn_server(extra_env: &[(&str, &str)]) -> Server {
-    let port = free_port();
+    let port = 0;
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"));
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     for (k, v) in base_env(port) {

@@ -14,6 +14,8 @@ use crate::error::MemoryError;
 pub struct EntityService {
     entity_store: crate::storage::EntityStoreClient,
     db: crate::storage::BoundDbClient,
+    #[cfg(feature = "streamable-http")]
+    outbox_enabled: bool,
 }
 
 impl EntityService {
@@ -28,7 +30,15 @@ impl EntityService {
                 namespace.clone(),
             ),
             db: crate::storage::BoundDbClient::new(db_client, namespace),
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
         }
+    }
+
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn with_outbox(mut self) -> Self {
+        self.outbox_enabled = true;
+        self
     }
 
     // -- Fuzzy resolution support methods --
@@ -71,6 +81,13 @@ impl EntityService {
         alias: &str,
     ) -> Result<(), MemoryError> {
         let normalized_alias = normalize_text(alias);
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            return self
+                .entity_store
+                .add_alias_with_event(entity_id, &normalized_alias)
+                .await;
+        }
         self.entity_store
             .add_alias(entity_id, &normalized_alias)
             .await
@@ -96,6 +113,21 @@ impl EntityService {
             "aliases": aliases,
         });
 
+        #[cfg(feature = "streamable-http")]
+        if self.outbox_enabled {
+            match self
+                .entity_store
+                .create_with_event(&entity_id, payload.clone())
+                .await
+            {
+                Ok(()) => return Ok(entity_id),
+                Err(MemoryError::Storage(message)) if message.contains("already exists") => {
+                    let existing = self.find_entity_id_by_name(&normalized).await?;
+                    return Ok(existing.unwrap_or(entity_id));
+                }
+                Err(error) => return Err(error),
+            }
+        }
         match self.db.create(&entity_id, payload).await {
             Ok(_) => Ok(entity_id),
             Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {

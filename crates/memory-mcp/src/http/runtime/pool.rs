@@ -8,12 +8,9 @@ use tokio::sync::Mutex;
 
 use lru::LruCache;
 
-/// Local warn helper. The workspace does not depend on
-/// `tracing` or `log`; for now the helper is a no-op and
-/// the caller surfaces the error in the response.
-#[allow(dead_code)]
+/// Emit a bounded runtime warning without adding a logging dependency.
 fn tracing_warn(message: &str) {
-    let _ = message;
+    eprintln!("memory_mcp::http::runtime: {message}");
 }
 
 use crate::error::MemoryError;
@@ -207,14 +204,37 @@ impl Pool {
         self.cap
     }
 
+    async fn acquire_tenant_permit(
+        &self,
+        slot: &Arc<Mutex<TenantRuntimeSlot>>,
+    ) -> Result<tokio::sync::OwnedSemaphorePermit, PoolError> {
+        let semaphore = slot.lock().await.concurrency.clone();
+        tokio::time::timeout(self.capacity_wait, semaphore.acquire_owned())
+            .await
+            .map_err(|_| PoolError::CapacityTimeout)?
+            .map_err(|_| PoolError::ShuttingDown)
+    }
+
     /// Acquire a runtime for the given tenant. Single-flights
     /// concurrent activations via the slot's broadcast
-    /// channel. Pins the slot on success.
+    /// channel. Pins the slot and consumes one tenant permit on success.
     pub async fn acquire_or_wait(
         self: &Arc<Self>,
         tenant: &Tenant,
     ) -> Result<super::guard::OperationGuard, PoolError> {
-        let slot = self.slot_for(tenant).await?;
+        self.acquire_or_wait_with_limit(tenant, self.per_tenant_concurrency)
+            .await
+    }
+
+    /// Acquire using the tenant's durable plan concurrency limit. Existing
+    /// callers retain `acquire_or_wait`; HTTP passes the loaded plan here so a
+    /// plan change cannot be replaced by the process default on cold activation.
+    pub async fn acquire_or_wait_with_limit(
+        self: &Arc<Self>,
+        tenant: &Tenant,
+        per_tenant_concurrency: u32,
+    ) -> Result<super::guard::OperationGuard, PoolError> {
+        let slot = self.slot_for(tenant, per_tenant_concurrency).await?;
         let mut guard = slot.lock().await;
 
         // Fast path: already Ready.
@@ -224,7 +244,12 @@ impl Pool {
             guard.last_used = Instant::now();
             let pin = guard.pin_count.clone();
             drop(guard);
-            return Ok(super::guard::OperationGuard::new(runtime, pin));
+            let tenant_permit = self.acquire_tenant_permit(&slot).await?;
+            return Ok(super::guard::OperationGuard::new(
+                runtime,
+                pin,
+                tenant_permit,
+            ));
         }
 
         // Negative cache: short-circuit to ActivationFailed.
@@ -238,14 +263,20 @@ impl Pool {
             drop(guard);
             match rx.recv().await {
                 Ok(runtime) => {
-                    let slot = match self.slot_for(tenant).await {
+                    let slot = match self.slot_for(tenant, per_tenant_concurrency).await {
                         Ok(s) => s,
                         Err(e) => return Err(e),
                     };
                     let mut guard = slot.lock().await;
                     guard.last_used = Instant::now();
                     let pin = guard.pin_count.clone();
-                    return Ok(super::guard::OperationGuard::new(runtime, pin));
+                    drop(guard);
+                    let tenant_permit = self.acquire_tenant_permit(&slot).await?;
+                    return Ok(super::guard::OperationGuard::new(
+                        runtime,
+                        pin,
+                        tenant_permit,
+                    ));
                 }
                 Err(_) => {
                     let mut guard = slot.lock().await;
@@ -268,7 +299,7 @@ impl Pool {
         .await
         .map_err(|_| MemoryError::Unavailable("tenant runtime activation timed out".into()))
         .and_then(|result| result);
-        let slot = match self.slot_for(tenant).await {
+        let slot = match self.slot_for(tenant, per_tenant_concurrency).await {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -283,7 +314,13 @@ impl Pool {
                 }
                 guard.last_used = Instant::now();
                 let pin = guard.pin_count.clone();
-                Ok(super::guard::OperationGuard::new(runtime, pin))
+                drop(guard);
+                let tenant_permit = self.acquire_tenant_permit(&slot).await?;
+                Ok(super::guard::OperationGuard::new(
+                    runtime,
+                    pin,
+                    tenant_permit,
+                ))
             }
             Err(error) => {
                 guard.phase = RuntimePhase::Failed;
@@ -305,6 +342,7 @@ impl Pool {
     async fn slot_for(
         self: &Arc<Self>,
         tenant: &Tenant,
+        per_tenant_concurrency: u32,
     ) -> Result<Arc<Mutex<TenantRuntimeSlot>>, PoolError> {
         let key = tenant.id.clone();
         loop {
@@ -314,7 +352,9 @@ impl Pool {
                     return Ok(slot.clone());
                 }
                 if map.len() < self.cap {
-                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
+                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new_with_limit(
+                        per_tenant_concurrency.max(1),
+                    )));
                     map.put(key.clone(), slot.clone());
                     return Ok(slot);
                 }
@@ -339,7 +379,9 @@ impl Pool {
                 });
                 if let Some(candidate) = candidate {
                     map.pop(&candidate);
-                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
+                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new_with_limit(
+                        per_tenant_concurrency.max(1),
+                    )));
                     map.put(key.clone(), slot.clone());
                     return Ok(slot);
                 }
@@ -422,6 +464,7 @@ mod tests {
     use super::*;
     use crate::http::registry::RegistryHandle;
     use crate::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
+    use crate::http::registry::storage::InMemoryStore;
     use chrono::Utc;
     use surrealdb::Surreal;
     use surrealdb::engine::local::Mem;
@@ -640,13 +683,11 @@ mod tests {
     /// `ActivationFailed` without re-attempting.
     #[tokio::test]
     async fn negative_cache_swallows_repeated_failures() {
-        // Use a registry whose engine init fails so
-        // `build_runtime` fails. The simplest path: use a
-        // pool whose registry was built with a
-        // `RegistryHandle::new()` placeholder; that returns
-        // `Storage("no engine")` error from `tenant_engine()`,
-        // which `build_runtime` propagates as `MemoryError`.
-        let pool = Arc::new(Pool::with_defaults(Arc::new(RegistryHandle::new())));
+        // Use a registry without a privileged engine so
+        // `build_runtime` fails through the explicit missing-engine
+        // error, without constructing a production placeholder.
+        let registry = RegistryHandle::from_store(Arc::new(InMemoryStore::default()));
+        let pool = Arc::new(Pool::with_defaults(Arc::new(registry)));
         let tenant = ready_tenant("ten_neg", "tns_neg");
         let r1 = pool.acquire_or_wait(&tenant).await;
         assert!(matches!(r1, Err(PoolError::ActivationFailed)));

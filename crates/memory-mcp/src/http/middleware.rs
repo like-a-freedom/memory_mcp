@@ -20,6 +20,10 @@ const MODERN_PROTOCOL_VERSION: &str = "2026-07-28";
 pub(crate) struct ValidatedMcpRequest {
     pub(crate) method: String,
     pub(crate) subscription: bool,
+    /// UTF-8 byte length of an inline `ingest` content argument.
+    /// `None` means this request is not an inline ingest or its
+    /// arguments are not structurally valid enough to reserve quota.
+    pub(crate) ingest_source_bytes: Option<u64>,
 }
 
 use super::HttpState;
@@ -102,6 +106,40 @@ fn accepts_media_type(value: &str, expected: &str) -> bool {
 
 fn json_params(body: &Value) -> Option<&serde_json::Map<String, Value>> {
     body.get("params")?.as_object()
+}
+
+fn inline_ingest_source_bytes(body_method: &str, body: &Value) -> Option<u64> {
+    if body_method != "tools/call" {
+        return None;
+    }
+    let params = json_params(body)?;
+    if params.get("name").and_then(Value::as_str) != Some("ingest") {
+        return None;
+    }
+    let arguments = params.get("arguments")?.as_object()?.clone();
+    let parsed: crate::tools::params::IngestParams =
+        serde_json::from_value(Value::Object(arguments)).ok()?;
+    u64::try_from(parsed.content.len()).ok()
+}
+
+fn quota_denied_response(reason: String, retry_after_secs: u32, guidance: String) -> Response {
+    let body = serde_json::json!({
+        "error": {
+            "code": "quota_exceeded",
+            "reason": reason,
+            "guidance": guidance,
+        }
+    });
+    let mut response = (
+        StatusCode::TOO_MANY_REQUESTS,
+        [(header::CONTENT_TYPE, "application/json")],
+        body.to_string(),
+    )
+        .into_response();
+    if let Ok(value) = HeaderValue::from_str(&retry_after_secs.to_string()) {
+        response.headers_mut().insert(header::RETRY_AFTER, value);
+    }
+    response
 }
 
 /// Validate all request data that can affect routing, auth ordering, or
@@ -225,6 +263,7 @@ pub async fn prevalidate_mcp(
     let validated = ValidatedMcpRequest {
         method: body_method.to_string(),
         subscription: body_method == "subscriptions/listen",
+        ingest_source_bytes: inline_ingest_source_bytes(body_method, &value),
     };
     let mut request = axum::http::Request::from_parts(parts, axum::body::Body::from(bytes));
     request.extensions_mut().insert(validated);
@@ -265,6 +304,129 @@ pub async fn authenticate(
         _ => return unauthorized_response(),
     };
     req.extensions_mut().insert(principal);
+    next.run(req).await
+}
+
+/// Authenticate the control-plane Secure cookie and attach the server-side
+/// session. This middleware is mounted only on `/api/v1/account/*` and never
+/// participates in MCP Bearer authentication.
+#[cfg(feature = "control-plane")]
+pub async fn authenticate_control_plane_session(
+    axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
+    mut req: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let cookie = req
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|cookies| {
+            cookies.split(';').find_map(|cookie| {
+                let (name, value) = cookie.trim().split_once('=')?;
+                (name == "__Host-memory_mcp_session").then_some(value.to_owned())
+            })
+        });
+    let Some(cookie) = cookie else {
+        return (StatusCode::UNAUTHORIZED, "control-plane session required").into_response();
+    };
+    let session = match crate::control::session::resolve_session_record(&state, &cookie).await {
+        Ok(session) => session,
+        Err(error) => return error.into_response(),
+    };
+    req.extensions_mut().insert(session);
+    next.run(req).await
+}
+
+/// Authenticate a control-plane session as an operator by matching one of its
+/// durable external identity blind indexes against the immutable deployment
+/// allowlist. Account data cannot grant itself this role.
+#[cfg(feature = "control-plane")]
+pub async fn authenticate_control_plane_operator(
+    axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
+    req: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let Some(session) = req
+        .extensions()
+        .get::<crate::control::session::ControlPlaneSession>()
+        .cloned()
+    else {
+        return (StatusCode::UNAUTHORIZED, "control-plane session required").into_response();
+    };
+    let identities = match state
+        .registry
+        .store_clone()
+        .find_external_identities(&session.account_id)
+        .await
+    {
+        Ok(identities) => identities,
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "operator registry unavailable",
+            )
+                .into_response();
+        }
+    };
+    let is_operator = identities.iter().any(|identity| {
+        let entry = format!(
+            "{}|{}",
+            identity.issuer,
+            hex::encode(identity.subject_verifier.0)
+        );
+        state
+            .config
+            .operator_identity_allowlist
+            .iter()
+            .any(|allowed| allowed == &entry)
+    });
+    if !is_operator {
+        return (StatusCode::FORBIDDEN, "operator access required").into_response();
+    }
+    let mut req = req;
+    req.extensions_mut()
+        .insert(crate::control::operator::OperatorPrincipal {
+            authenticated_at: session.auth_time,
+        });
+    next.run(req).await
+}
+
+/// Require a valid CSRF header for a cookie-authenticated state-changing API
+/// request. The token is bound to the Account and server-side session id.
+#[cfg(feature = "control-plane")]
+pub async fn require_control_plane_csrf(
+    axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
+    req: axum::extract::Request,
+    next: Next,
+) -> Response {
+    if matches!(
+        req.method(),
+        &Method::GET | &Method::HEAD | &Method::OPTIONS
+    ) {
+        return next.run(req).await;
+    }
+    let Some(session) = req
+        .extensions()
+        .get::<crate::control::session::ControlPlaneSession>()
+    else {
+        return (StatusCode::UNAUTHORIZED, "control-plane session required").into_response();
+    };
+    let token = req
+        .headers()
+        .get("x-csrf-token")
+        .and_then(|value| value.to_str().ok());
+    let valid = token.is_some_and(|token| {
+        crate::control::csrf::verify_csrf(
+            &state.config.keys.csrf,
+            &session.account_id,
+            &session.id,
+            token,
+        )
+        .unwrap_or(false)
+    });
+    if !valid {
+        return (StatusCode::FORBIDDEN, "csrf validation failed").into_response();
+    }
     next.run(req).await
 }
 
@@ -313,10 +475,49 @@ pub async fn acquire_runtime(
             return (StatusCode::NOT_FOUND, "tenant not found").into_response();
         }
     };
-    let is_subscription = req
+    let validated = req
         .extensions()
         .get::<super::middleware::ValidatedMcpRequest>()
+        .cloned();
+    let is_subscription = validated
+        .as_ref()
         .is_some_and(|request| request.subscription);
+    let source_bytes = validated.and_then(|request| request.ingest_source_bytes);
+    let store = state.registry.store_clone();
+    let registry_plan = match store.load_plan(tenant.plan_version).await {
+        Ok(plan) => plan,
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "quota registry unavailable",
+            )
+                .into_response();
+        }
+    };
+    let plan = crate::http::registry::plan::Plan::from(&registry_plan);
+    if let Some(source_bytes) = source_bytes {
+        let decision = match store
+            .reserve_ingest_usage(&tenant.id, source_bytes, &plan, chrono::Utc::now())
+            .await
+        {
+            Ok(decision) => decision,
+            Err(_) => {
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "quota registry unavailable",
+                )
+                    .into_response();
+            }
+        };
+        if let crate::http::registry::plan::QuotaDecision::Deny {
+            reason,
+            retry_after_secs,
+            guidance,
+        } = decision
+        {
+            return quota_denied_response(reason, retry_after_secs, guidance);
+        }
+    }
     let permit = match state.admission.try_acquire_for(is_subscription) {
         Ok(p) => p,
         Err(()) => {
@@ -327,7 +528,11 @@ pub async fn acquire_runtime(
                 .into_response();
         }
     };
-    let guard = match state.pool.acquire_or_wait(&tenant).await {
+    let guard = match state
+        .pool
+        .acquire_or_wait_with_limit(&tenant, plan.per_tenant_request_concurrency)
+        .await
+    {
         Ok(g) => g,
         Err(_) => {
             return (
@@ -535,10 +740,9 @@ mod preflight_tests {
     }
 
     async fn echo_body(mut request: Request<Body>) -> Response {
-        let subscription = request
-            .extensions()
-            .get::<ValidatedMcpRequest>()
-            .is_some_and(|validated| validated.subscription);
+        let validated = request.extensions().get::<ValidatedMcpRequest>();
+        let subscription = validated.is_some_and(|validated| validated.subscription);
+        let ingest_source_bytes = validated.and_then(|validated| validated.ingest_source_bytes);
         let body = request
             .body_mut()
             .collect()
@@ -547,7 +751,10 @@ mod preflight_tests {
             .to_bytes();
         (
             StatusCode::OK,
-            format!("{subscription}:{}", String::from_utf8_lossy(&body)),
+            format!(
+                "{subscription}:bytes={ingest_source_bytes:?}:{}",
+                String::from_utf8_lossy(&body)
+            ),
         )
             .into_response()
     }
@@ -608,6 +815,74 @@ mod preflight_tests {
         let body = response_body(response).await;
         assert!(body.starts_with("true:"));
         assert!(body.contains("subscriptions/listen"));
+    }
+
+    #[tokio::test]
+    async fn inline_ingest_uses_utf8_byte_length_for_quota() {
+        let mut request = modern_request(
+            "tools/call",
+            json!({
+                "_meta": metadata(),
+                "name": "ingest",
+                "arguments": {
+                    "source_type": "inline",
+                    "source_id": "bytes-test",
+                    "content": "ёж",
+                    "t_ref": "2026-01-01T00:00:00Z"
+                }
+            }),
+        );
+        request
+            .headers_mut()
+            .insert("Mcp-Name", "ingest".parse().expect("header"));
+        let response = dispatch(request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response_body(response).await.contains("bytes=Some(4)"));
+    }
+
+    #[tokio::test]
+    async fn non_ingest_request_has_no_ingest_quota_size() {
+        let response = dispatch(modern_request("tools/list", json!({"_meta": metadata()}))).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response_body(response).await.contains("bytes=None"));
+    }
+
+    #[tokio::test]
+    async fn structurally_invalid_ingest_arguments_do_not_reserve_quota() {
+        let mut request = modern_request(
+            "tools/call",
+            json!({
+                "_meta": metadata(),
+                "name": "ingest",
+                "arguments": {
+                    "source_type": "inline",
+                    "source_id": "invalid-test",
+                    "content": 42,
+                    "t_ref": "2026-01-01T00:00:00Z"
+                }
+            }),
+        );
+        request
+            .headers_mut()
+            .insert("Mcp-Name", "ingest".parse().expect("header"));
+        let response = dispatch(request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response_body(response).await.contains("bytes=None"));
+    }
+
+    #[tokio::test]
+    async fn quota_denial_returns_retry_after_and_stable_json() {
+        let response = quota_denied_response(
+            "ingested_bytes_exceeded".into(),
+            17,
+            "upgrade the tenant plan".into(),
+        );
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "17");
+        let body = response_body(response).await;
+        assert!(body.contains("quota_exceeded"));
+        assert!(body.contains("ingested_bytes_exceeded"));
+        assert!(body.contains("upgrade the tenant plan"));
     }
 
     #[tokio::test]

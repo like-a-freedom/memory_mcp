@@ -194,6 +194,57 @@ pub trait RegistryStore: Send + Sync + 'static {
         Err(unavailable("transition_account_state"))
     }
 
+    /// Atomically consume a valid deletion challenge, fence the account and
+    /// tenant into their deleting states, revoke all API keys, and append the
+    /// immutable deletion-start audit event. Control-plane sessions are
+    /// deliberately retained; their account-status check denies them.
+    #[cfg(feature = "control-plane")]
+    async fn begin_account_deletion(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let _ = (verifier, account_id, session_id, now);
+        Err(unavailable("begin_account_deletion"))
+    }
+
+    /// Start operator-initiated deletion without a user confirmation token.
+    /// The same control-plane revocation and tombstone invariants apply.
+    #[cfg(feature = "control-plane")]
+    async fn begin_operator_deletion(
+        &self,
+        tenant_id: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let _ = (tenant_id, actor, now);
+        Err(unavailable("begin_operator_deletion"))
+    }
+
+    /// Fenced, idempotent completion of a deletion pass. The account and
+    /// tenant tombstones remain durable; only the tenant-local worker removes
+    /// expired ephemeral rows before this method is called.
+    #[cfg(feature = "control-plane")]
+    async fn finalize_account_deletion(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        completed_at: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let _ = (
+            tenant_id,
+            lease_owner_id,
+            lease_id,
+            fencing_generation,
+            completed_at,
+        );
+        Err(unavailable("finalize_account_deletion"))
+    }
+
     /// CAS-update the tenant's status. The predicate is
     /// `version = $expected_version AND status = $from`. Returns
     /// the new version on success, `MemoryError::Conflict` on
@@ -322,6 +373,13 @@ pub trait RegistryStore: Send + Sync + 'static {
         Err(unavailable("load_plan"))
     }
 
+    /// Create the version-1 signup plan when it is absent. Existing durable
+    /// plan rows are authoritative and must not be overwritten at startup.
+    async fn ensure_plan(&self, plan: &Plan) -> Result<(), MemoryError> {
+        let _ = plan;
+        Err(unavailable("ensure_plan"))
+    }
+
     /// Load the durable usage snapshot for a tenant. Returns
     /// an empty `UsageSnapshot` when no row exists.
     async fn load_usage(
@@ -400,18 +458,6 @@ pub trait RegistryStore: Send + Sync + 'static {
         Err(unavailable("touch_session"))
     }
 
-    /// Delete a session.
-    #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError>;
-
-    /// Delete every session for an account. Returns the
-    /// number of sessions removed.
-    #[cfg(feature = "control-plane")]
-    async fn delete_sessions_for_account(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let _ = account_id;
-        Err(unavailable("delete_sessions_for_account"))
-    }
-
     /// Persist a one-use deletion challenge keyed by a
     /// verifier; the raw token is never stored.
     #[cfg(feature = "control-plane")]
@@ -440,197 +486,14 @@ pub trait RegistryStore: Send + Sync + 'static {
     }
 }
 
-/// Production placeholder. Every method that would require SQL
-/// returns `MemoryError::Unavailable`. The struct exists so the
-/// type bound `Arc<dyn RegistryStore>` is non-empty; `InMemoryStore`
-/// is what every test actually uses.
-pub struct SurrealRegistryStore {
-    _private: (),
-}
-
-impl SurrealRegistryStore {
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
-impl Default for SurrealRegistryStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// Canonical durable implementation. Kept available through this
+/// module path for callers that imported the original storage seam.
+pub use super::surreal_store::SurrealRegistryStore;
 
 fn unavailable(method: &str) -> MemoryError {
     MemoryError::Unavailable(format!(
         "SurrealRegistryStore::{method} is not yet wired; the production store returns Unavailable and the test path uses InMemoryStore through the test-fixtures bootstrap"
     ))
-}
-
-#[async_trait]
-impl RegistryStore for SurrealRegistryStore {
-    async fn ping(&self) -> bool {
-        // The store is reachable as a type; we just don't have
-        // any data behind it. `false` keeps `/health/ready` honest.
-        false
-    }
-    async fn find_account_by_id(&self, _account_id: &str) -> Result<Option<Account>, MemoryError> {
-        Err(unavailable("find_account_by_id"))
-    }
-    async fn find_account_by_identity(
-        &self,
-        _issuer: &str,
-        _subject_verifier: &SubjectVerifier,
-    ) -> Result<Option<Account>, MemoryError> {
-        Err(unavailable("find_account_by_identity"))
-    }
-    async fn find_tenant_by_account(
-        &self,
-        _account_id: &str,
-    ) -> Result<Option<Tenant>, MemoryError> {
-        Err(unavailable("find_tenant_by_account"))
-    }
-    async fn find_tenant_by_id(&self, _tenant_id: &str) -> Result<Option<Tenant>, MemoryError> {
-        Err(unavailable("find_tenant_by_id"))
-    }
-    async fn find_api_key(&self, _key_id: &str) -> Result<Option<ApiKey>, MemoryError> {
-        Err(unavailable("find_api_key"))
-    }
-    async fn write_api_key(&self, _key: &ApiKey) -> Result<(), MemoryError> {
-        Err(unavailable("write_api_key"))
-    }
-    async fn list_api_keys(&self, _account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
-        Err(unavailable("list_api_keys"))
-    }
-    async fn revoke_api_key(&self, _account_id: &str, _key_id: &str) -> Result<(), MemoryError> {
-        Err(unavailable("revoke_api_key"))
-    }
-    async fn touch_api_key(
-        &self,
-        _key_id: &str,
-        _used_at: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("touch_api_key"))
-    }
-    async fn write_account(&self, _account: &Account) -> Result<(), MemoryError> {
-        Err(unavailable("write_account"))
-    }
-    async fn write_tenant(&self, _tenant: &Tenant) -> Result<(), MemoryError> {
-        Err(unavailable("write_tenant"))
-    }
-    async fn update_tenant_state(
-        &self,
-        _tenant_id: &str,
-        _expected_version: u64,
-        _from: TenantStatus,
-        _to: TenantStatus,
-    ) -> Result<u64, MemoryError> {
-        Err(unavailable("update_tenant_state"))
-    }
-    async fn update_tenant_state_fenced(
-        &self,
-        _tenant_id: &str,
-        _expected_version: u64,
-        _from: TenantStatus,
-        _to: TenantStatus,
-        _lease: &LeaseFence<'_>,
-    ) -> Result<u64, MemoryError> {
-        Err(unavailable("update_tenant_state_fenced"))
-    }
-    async fn update_tenant_schema_version_fenced(
-        &self,
-        _tenant_id: &str,
-        _expected_version: u64,
-        _new_schema_version: u32,
-        _lease_owner_id: &str,
-        _lease_id: &str,
-        _fencing_generation: u64,
-    ) -> Result<u64, MemoryError> {
-        Err(unavailable("update_tenant_schema_version_fenced"))
-    }
-    async fn claim_provisioning(
-        &self,
-        _tenant_id: &str,
-        _owner_id: &str,
-        _lease_id: &str,
-        _lease_ttl_secs: i64,
-    ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError> {
-        Err(unavailable("claim_provisioning"))
-    }
-    async fn release_provisioning_lease(
-        &self,
-        _tenant_id: &str,
-        _lease_owner_id: &str,
-        _lease_id: &str,
-        _fencing_generation: u64,
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("release_provisioning_lease"))
-    }
-
-    async fn heartbeat_provisioning(
-        &self,
-        _tenant_id: &str,
-        _owner_id: &str,
-        _lease_id: &str,
-        _fencing_generation: u64,
-        _heartbeat_at: chrono::DateTime<chrono::Utc>,
-        _expires_at: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("heartbeat_provisioning"))
-    }
-
-    async fn list_due_provisioning(
-        &self,
-        _limit: usize,
-        _now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        Err(unavailable("list_due_provisioning"))
-    }
-    async fn append_provisioning_event(
-        &self,
-        _tenant_id: &str,
-        _stage: &str,
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("append_provisioning_event"))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn store_oidc_request(
-        &self,
-        _state_hash: &str,
-        _sealed_payload: &[u8],
-        _aead_nonce: &[u8; 12],
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("store_oidc_request"))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn take_oidc_request(
-        &self,
-        _state_hash: &str,
-    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
-        Err(unavailable("take_oidc_request"))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn store_session(
-        &self,
-        _session: &crate::control::session::ControlPlaneSession,
-    ) -> Result<(), MemoryError> {
-        Err(unavailable("store_session"))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn find_session(
-        &self,
-        _cookie_hash: &str,
-    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
-        Err(unavailable("find_session"))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, _cookie_hash: &str) -> Result<(), MemoryError> {
-        Err(unavailable("delete_session"))
-    }
 }
 
 /// In-memory `RegistryStore` for unit tests. The fields are
@@ -645,6 +508,11 @@ pub struct InMemoryStore {
     api_keys: std::sync::Mutex<Vec<ApiKey>>,
     identities: std::sync::Mutex<Vec<ExternalIdentity>>,
     events: std::sync::Mutex<Vec<(String, String)>>,
+    audit_events: std::sync::Mutex<Vec<(String, String)>>,
+    usage: std::sync::Mutex<
+        std::collections::HashMap<String, crate::http::registry::plan::UsageCounter>,
+    >,
+    plans: std::sync::Mutex<std::collections::HashMap<u32, Plan>>,
     #[cfg(feature = "control-plane")]
     oidc_requests: std::sync::Mutex<std::collections::HashMap<String, SealedOidcPayload>>,
     #[cfg(feature = "control-plane")]
@@ -656,7 +524,7 @@ pub struct InMemoryStore {
 }
 
 /// Sealed OIDC payload: ciphertext + AEAD nonce.
-#[cfg(feature = "control-plane")]
+#[cfg(all(feature = "control-plane", any(test, feature = "test-fixtures")))]
 type SealedOidcPayload = (Vec<u8>, [u8; 12]);
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -668,6 +536,9 @@ impl Default for InMemoryStore {
             api_keys: Mutex::new(Vec::new()),
             identities: Mutex::new(Vec::new()),
             events: Mutex::new(Vec::new()),
+            audit_events: Mutex::new(Vec::new()),
+            usage: Mutex::new(std::collections::HashMap::new()),
+            plans: Mutex::new(std::collections::HashMap::new()),
             #[cfg(feature = "control-plane")]
             oidc_requests: Mutex::new(std::collections::HashMap::new()),
             #[cfg(feature = "control-plane")]
@@ -722,29 +593,50 @@ impl RegistryStore for InMemoryStore {
                 "account.tenant_id must equal tenant.id".into(),
             ));
         }
+        if let Some(identity) = identity
+            && identity.account_id != account.id
         {
-            let mut accounts = self.accounts.lock().expect("poisoned");
-            if accounts.iter().any(|a| a.id == account.id) {
-                return Err(MemoryError::Conflict(format!(
-                    "account {} already exists",
-                    account.id
-                )));
-            }
-            accounts.push(account.clone());
+            return Err(MemoryError::Validation(
+                "identity.account_id must equal account.id".into(),
+            ));
         }
+        let mut accounts = self.accounts.lock().expect("poisoned");
+        let mut tenants = self.tenants.lock().expect("poisoned");
+        let mut identities = self.identities.lock().expect("poisoned");
+        if accounts.iter().any(|a| a.id == account.id) {
+            return Err(MemoryError::Conflict(format!(
+                "account {} already exists",
+                account.id
+            )));
+        }
+        if tenants.iter().any(|t| t.id == tenant.id) {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {} already exists",
+                tenant.id
+            )));
+        }
+        if tenants
+            .iter()
+            .any(|t| t.namespace_binding.namespace == tenant.namespace_binding.namespace)
         {
-            let mut tenants = self.tenants.lock().expect("poisoned");
-            if tenants.iter().any(|t| t.id == tenant.id) {
-                return Err(MemoryError::Conflict(format!(
-                    "tenant {} already exists",
-                    tenant.id
-                )));
-            }
-            tenants.push(tenant.clone());
+            return Err(MemoryError::Conflict(format!(
+                "namespace {} is already bound",
+                tenant.namespace_binding.namespace
+            )));
         }
         if let Some(identity) = identity {
-            self.link_external_identity(identity).await?;
+            if identities.iter().any(|item| item.id == identity.id)
+                || identities.iter().any(|item| {
+                    item.issuer == identity.issuer
+                        && item.subject_verifier.0 == identity.subject_verifier.0
+                })
+            {
+                return Err(MemoryError::Conflict("identity is already linked".into()));
+            }
+            identities.push(identity.clone());
         }
+        accounts.push(account.clone());
+        tenants.push(tenant.clone());
         Ok(())
     }
 
@@ -763,6 +655,18 @@ impl RegistryStore for InMemoryStore {
     }
 
     async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError> {
+        let account_exists = self
+            .accounts
+            .lock()
+            .expect("poisoned")
+            .iter()
+            .any(|account| account.id == identity.account_id);
+        if !account_exists {
+            return Err(MemoryError::NotFound(format!(
+                "account {}",
+                identity.account_id
+            )));
+        }
         let mut identities = self.identities.lock().expect("poisoned");
         if identities.iter().any(|i| i.id == identity.id) {
             return Err(MemoryError::Conflict(format!(
@@ -802,9 +706,14 @@ impl RegistryStore for InMemoryStore {
         max_active: u32,
     ) -> Result<(), MemoryError> {
         let mut keys = self.api_keys.lock().expect("poisoned");
+        let now = chrono::Utc::now();
         let active = keys
             .iter()
-            .filter(|k| k.account_id == key.account_id && matches!(k.status, ApiKeyStatus::Active))
+            .filter(|k| {
+                k.account_id == key.account_id
+                    && matches!(k.status, ApiKeyStatus::Active)
+                    && k.expires_at.is_none_or(|expires_at| expires_at > now)
+            })
             .count() as u32;
         if active >= max_active {
             return Err(MemoryError::Conflict(format!(
@@ -851,9 +760,200 @@ impl RegistryStore for InMemoryStore {
                 a.status, from
             )));
         }
+        if a.status == AccountStatus::Deleting && to != AccountStatus::Deleting {
+            return Err(MemoryError::Conflict(format!(
+                "account {account_id} deletion tombstone is immutable"
+            )));
+        }
         a.status = to;
         Ok(())
     }
+
+    #[cfg(feature = "control-plane")]
+    async fn begin_account_deletion(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let mut challenges = self.deletion_challenges.lock().expect("poisoned");
+        let challenge_index = challenges
+            .iter()
+            .position(|challenge| challenge.verifier == verifier)
+            .ok_or_else(|| MemoryError::Conflict("deletion challenge is invalid".into()))?;
+        let challenge = &challenges[challenge_index];
+        if challenge.account_id != account_id || challenge.session_id != session_id {
+            return Err(MemoryError::Conflict(
+                "deletion challenge tuple mismatch".into(),
+            ));
+        }
+        if challenge.consumed_at.is_some() || challenge.expires_at <= now {
+            return Err(MemoryError::Conflict(
+                "deletion challenge is invalid or expired".into(),
+            ));
+        }
+
+        let mut accounts = self.accounts.lock().expect("poisoned");
+        let account_index = accounts
+            .iter()
+            .position(|account| account.id == account_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
+        if accounts[account_index].status != AccountStatus::Active {
+            return Err(MemoryError::Conflict("account is not active".into()));
+        }
+        let tenant_id = accounts[account_index].tenant_id.clone();
+
+        let mut tenants = self.tenants.lock().expect("poisoned");
+        let tenant_index = tenants
+            .iter()
+            .position(|tenant| tenant.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if tenants[tenant_index].status == TenantStatus::Purged {
+            return Err(MemoryError::Conflict(
+                "tenant deletion tombstone is purged".into(),
+            ));
+        }
+
+        let mut keys = self.api_keys.lock().expect("poisoned");
+        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        let next_tenant_version = tenants[tenant_index]
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
+        accounts[account_index].status = AccountStatus::Deleting;
+        tenants[tenant_index].status = TenantStatus::Deleting;
+        tenants[tenant_index].provisioning_lease = None;
+        tenants[tenant_index].version = next_tenant_version;
+        for key in keys.iter_mut() {
+            if key.account_id == account_id && key.status == ApiKeyStatus::Active {
+                key.status = ApiKeyStatus::Revoked;
+            }
+        }
+        challenges[challenge_index].consumed_at = Some(now);
+        audit_events.push((account_id.to_owned(), "account_deletion_started".to_owned()));
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn begin_operator_deletion(
+        &self,
+        tenant_id: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let mut accounts = self.accounts.lock().expect("poisoned");
+        let account_index = accounts
+            .iter()
+            .position(|account| account.tenant_id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("account for tenant {tenant_id}")))?;
+        let account_id = accounts[account_index].id.clone();
+        if accounts[account_index].status == AccountStatus::Deleting {
+            return Ok(());
+        }
+        if accounts[account_index].status != AccountStatus::Active {
+            return Err(MemoryError::Conflict("account is not active".into()));
+        }
+        let mut tenants = self.tenants.lock().expect("poisoned");
+        let tenant_index = tenants
+            .iter()
+            .position(|tenant| tenant.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if tenants[tenant_index].status == TenantStatus::Purged {
+            return Err(MemoryError::Conflict(
+                "tenant deletion tombstone is purged".into(),
+            ));
+        }
+        let next_version = tenants[tenant_index]
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
+        accounts[account_index].status = AccountStatus::Deleting;
+        tenants[tenant_index].status = TenantStatus::Deleting;
+        tenants[tenant_index].provisioning_lease = None;
+        tenants[tenant_index].version = next_version;
+        for key in self.api_keys.lock().expect("poisoned").iter_mut() {
+            if key.account_id == account_id {
+                key.status = ApiKeyStatus::Revoked;
+            }
+        }
+        self.sessions
+            .lock()
+            .expect("poisoned")
+            .retain(|_, session| session.account_id != account_id);
+        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        if !audit_events
+            .iter()
+            .any(|(id, action)| id == &account_id && action == "account_deletion_started_operator")
+        {
+            let _ = (actor, now);
+            audit_events.push((account_id, "account_deletion_started_operator".to_owned()));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn finalize_account_deletion(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        _completed_at: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let mut tenants = self.tenants.lock().expect("poisoned");
+        let tenant_index = tenants
+            .iter()
+            .position(|tenant| tenant.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if tenants[tenant_index].status == TenantStatus::Purged {
+            return Ok(());
+        }
+        if tenants[tenant_index].status != TenantStatus::Deleting {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} is not deleting"
+            )));
+        }
+        let lease_matches = tenants[tenant_index]
+            .provisioning_lease
+            .as_ref()
+            .is_some_and(|lease| {
+                lease.owner_id == lease_owner_id
+                    && lease.lease_id == lease_id
+                    && lease.fencing_generation == fencing_generation
+                    && lease.expires_at > Utc::now()
+            });
+        if !lease_matches {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} deletion lease is stale"
+            )));
+        }
+        let accounts = self.accounts.lock().expect("poisoned");
+        let account_id = accounts
+            .iter()
+            .find(|account| account.tenant_id == tenant_id)
+            .map(|account| account.id.clone())
+            .ok_or_else(|| MemoryError::NotFound(format!("account for tenant {tenant_id}")))?;
+        let account = accounts
+            .iter()
+            .find(|account| account.id == account_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
+        if account.status != AccountStatus::Deleting {
+            return Err(MemoryError::Conflict(format!(
+                "account {account_id} is not deleting"
+            )));
+        }
+        tenants[tenant_index].status = TenantStatus::Purged;
+        tenants[tenant_index].provisioning_lease = None;
+        tenants[tenant_index].version = tenants[tenant_index]
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
+        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        audit_events.push((account_id, "account_deletion_completed".to_owned()));
+        Ok(())
+    }
+
     async fn find_tenant_by_account(
         &self,
         account_id: &str,
@@ -889,10 +989,14 @@ impl RegistryStore for InMemoryStore {
             .cloned())
     }
     async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError> {
-        self.api_keys
-            .lock()
-            .expect("in-memory store poisoned")
-            .push(key.clone());
+        let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
+        if keys.iter().any(|stored| stored.id == key.id) {
+            return Err(MemoryError::Conflict(format!(
+                "api key {} already exists",
+                key.id
+            )));
+        }
+        keys.push(key.clone());
         Ok(())
     }
     async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
@@ -914,17 +1018,29 @@ impl RegistryStore for InMemoryStore {
     }
     async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError> {
         let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
-        if let Some(k) = keys
+        let k = keys
             .iter_mut()
             .find(|k| k.id == key_id && k.account_id == account_id)
-        {
-            k.status = ApiKeyStatus::Revoked;
+            .ok_or_else(|| MemoryError::NotFound(format!("api key {key_id}")))?;
+        if k.status == ApiKeyStatus::Revoked {
+            return Err(MemoryError::Conflict(format!(
+                "api key {key_id} is already revoked"
+            )));
         }
+        k.status = ApiKeyStatus::Revoked;
+        k.version = k
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("api key {key_id} version overflow")))?;
         Ok(())
     }
     async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError> {
         let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
-        if let Some(k) = keys.iter_mut().find(|k| k.id == key_id) {
+        if let Some(k) = keys.iter_mut().find(|k| {
+            k.id == key_id
+                && k.status == ApiKeyStatus::Active
+                && k.expires_at.is_none_or(|expires_at| expires_at > used_at)
+        }) {
             k.last_used_at = Some(used_at);
         }
         Ok(())
@@ -932,6 +1048,11 @@ impl RegistryStore for InMemoryStore {
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
         let mut accounts = self.accounts.lock().expect("in-memory store poisoned");
         if let Some(slot) = accounts.iter_mut().find(|a| a.id == account.id) {
+            if slot.status == AccountStatus::Deleting && account.status != AccountStatus::Deleting {
+                return Err(MemoryError::Conflict(
+                    "account deletion tombstone is immutable".into(),
+                ));
+            }
             *slot = account.clone();
         } else {
             accounts.push(account.clone());
@@ -941,7 +1062,26 @@ impl RegistryStore for InMemoryStore {
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
         let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
         if let Some(slot) = tenants.iter_mut().find(|t| t.id == tenant.id) {
+            if slot.namespace_binding.namespace != tenant.namespace_binding.namespace
+                || slot.namespace_binding.database != tenant.namespace_binding.database
+            {
+                return Err(MemoryError::Conflict(
+                    "tenant namespace binding is immutable".into(),
+                ));
+            }
+            if slot.status == TenantStatus::Purged && tenant.status != TenantStatus::Purged {
+                return Err(MemoryError::Conflict(
+                    "purged tenant tombstone is immutable".into(),
+                ));
+            }
             *slot = tenant.clone();
+        } else if tenants.iter().any(|existing| {
+            existing.namespace_binding.namespace == tenant.namespace_binding.namespace
+        }) {
+            return Err(MemoryError::Conflict(format!(
+                "namespace {} is already bound",
+                tenant.namespace_binding.namespace
+            )));
         } else {
             tenants.push(tenant.clone());
         }
@@ -966,7 +1106,10 @@ impl RegistryStore for InMemoryStore {
             )));
         }
         t.status = to;
-        t.version += 1;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
         Ok(t.version)
     }
     async fn update_tenant_state_fenced(
@@ -1012,7 +1155,10 @@ impl RegistryStore for InMemoryStore {
             }
         }
         t.status = to;
-        t.version += 1;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
         Ok(t.version)
     }
     async fn update_tenant_schema_version_fenced(
@@ -1059,7 +1205,10 @@ impl RegistryStore for InMemoryStore {
             }
         }
         t.schema_version = new_schema_version;
-        t.version += 1;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
         Ok(t.version)
     }
     async fn claim_provisioning(
@@ -1081,7 +1230,7 @@ impl RegistryStore for InMemoryStore {
             .iter_mut()
             .find(|t| t.id == tenant_id)
             .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-        if matches!(t.status, S::Ready | S::Deleting | S::Purged) {
+        if matches!(t.status, S::Ready | S::Purged) {
             return Ok(None);
         }
         let now = chrono::Utc::now();
@@ -1111,7 +1260,10 @@ impl RegistryStore for InMemoryStore {
             heartbeat_at: now,
         };
         t.provisioning_lease = Some(lease.clone());
-        t.version += 1;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
         Ok(Some(crate::http::leases::ProvisioningLease {
             owner_id: lease.owner_id,
             lease_id: lease.lease_id,
@@ -1139,7 +1291,9 @@ impl RegistryStore for InMemoryStore {
                     && stored.fencing_generation == fencing_generation =>
             {
                 t.provisioning_lease = None;
-                t.version += 1;
+                t.version = t.version.checked_add(1).ok_or_else(|| {
+                    MemoryError::Conflict(format!("tenant {tenant_id} version overflow"))
+                })?;
                 Ok(())
             }
             _ => Err(MemoryError::Conflict(format!(
@@ -1161,6 +1315,7 @@ impl RegistryStore for InMemoryStore {
             .iter_mut()
             .find(|t| t.id == tenant_id)
             .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        let now = chrono::Utc::now();
         let stored_matches = t
             .provisioning_lease
             .as_ref()
@@ -1168,13 +1323,16 @@ impl RegistryStore for InMemoryStore {
                 stored.owner_id == owner_id
                     && stored.lease_id == lease_id
                     && stored.fencing_generation == fencing_generation
+                    && stored.expires_at > now
             })
             .unwrap_or(false);
         if stored_matches {
             let stored = t.provisioning_lease.as_mut().expect("checked above");
             stored.heartbeat_at = heartbeat_at;
             stored.expires_at = expires_at;
-            t.version += 1;
+            t.version = t.version.checked_add(1).ok_or_else(|| {
+                MemoryError::Conflict(format!("tenant {tenant_id} version overflow"))
+            })?;
             Ok(())
         } else {
             Err(MemoryError::Conflict(format!(
@@ -1192,7 +1350,10 @@ impl RegistryStore for InMemoryStore {
         for t in tenants.iter() {
             if !matches!(
                 t.status,
-                TenantStatus::Reserved | TenantStatus::Migrating | TenantStatus::Suspended
+                TenantStatus::Reserved
+                    | TenantStatus::Migrating
+                    | TenantStatus::Suspended
+                    | TenantStatus::Failed
             ) {
                 continue;
             }
@@ -1241,12 +1402,19 @@ impl RegistryStore for InMemoryStore {
     async fn list_deleting_tenants(
         &self,
         limit: usize,
-        _now: chrono::DateTime<chrono::Utc>,
+        now: chrono::DateTime<Utc>,
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
         let tenants = self.tenants.lock().expect("poisoned");
         let mut out = Vec::new();
         for t in tenants.iter() {
-            if matches!(t.status, TenantStatus::Deleting) {
+            if matches!(t.status, TenantStatus::Deleting)
+                && t.provisioning_lease
+                    .as_ref()
+                    .is_none_or(|lease| lease.expires_at <= now)
+            {
                 out.push(t.clone());
             }
             if out.len() >= limit {
@@ -1256,41 +1424,67 @@ impl RegistryStore for InMemoryStore {
         Ok(out)
     }
 
-    async fn load_plan(&self, _version: u32) -> Result<Plan, MemoryError> {
-        Ok(Plan::default())
+    async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError> {
+        Ok(self
+            .plans
+            .lock()
+            .expect("poisoned")
+            .get(&version)
+            .cloned()
+            .unwrap_or_else(|| Plan {
+                version,
+                ..Plan::default()
+            }))
+    }
+
+    async fn ensure_plan(&self, plan: &Plan) -> Result<(), MemoryError> {
+        self.plans
+            .lock()
+            .expect("poisoned")
+            .entry(plan.version)
+            .or_insert_with(|| plan.clone());
+        Ok(())
     }
 
     async fn load_usage(
         &self,
-        _tenant_id: &str,
+        tenant_id: &str,
     ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
-        Ok(crate::http::registry::plan::UsageCounter::default())
+        Ok(self
+            .usage
+            .lock()
+            .expect("poisoned")
+            .get(tenant_id)
+            .cloned()
+            .unwrap_or_default())
     }
 
     async fn reserve_ingest_usage(
         &self,
-        _tenant_id: &str,
-        _source_bytes: u64,
+        tenant_id: &str,
+        source_bytes: u64,
         plan: &crate::http::registry::plan::Plan,
-        _now: chrono::DateTime<chrono::Utc>,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
-        // The in-memory backend delegates the rate-limit math to
-        // the existing `enforce_ingest` helper. The counter is
-        // not persisted across calls; tests that exercise
-        // durable enforcement wire the production store.
-        let mut counter = crate::http::registry::plan::UsageCounter::default();
+        let mut usage = self.usage.lock().expect("poisoned");
+        let counter = usage.entry(tenant_id.to_owned()).or_default();
         Ok(crate::http::registry::plan::enforce_ingest(
             plan,
-            &mut counter,
-            chrono::Utc::now(),
+            counter,
+            source_bytes,
+            now,
         ))
     }
 
     async fn reconcile_usage(
         &self,
-        _tenant_id: &str,
-        _expected: crate::http::registry::plan::UsageCounter,
+        tenant_id: &str,
+        expected: crate::http::registry::plan::UsageCounter,
     ) -> Result<(), MemoryError> {
+        self.usage
+            .lock()
+            .expect("poisoned")
+            .insert(tenant_id.to_owned(), expected);
         Ok(())
     }
     async fn append_provisioning_event(
@@ -1312,7 +1506,13 @@ impl RegistryStore for InMemoryStore {
         sealed_payload: &[u8],
         aead_nonce: &[u8; 12],
     ) -> Result<(), MemoryError> {
-        self.oidc_requests.lock().expect("poisoned").insert(
+        let mut requests = self.oidc_requests.lock().expect("poisoned");
+        if requests.contains_key(state_hash) {
+            return Err(MemoryError::Conflict(
+                "OIDC request state already exists".into(),
+            ));
+        }
+        requests.insert(
             state_hash.to_string(),
             (sealed_payload.to_vec(), *aead_nonce),
         );
@@ -1336,10 +1536,13 @@ impl RegistryStore for InMemoryStore {
         &self,
         session: &crate::control::session::ControlPlaneSession,
     ) -> Result<(), MemoryError> {
-        self.sessions
-            .lock()
-            .expect("poisoned")
-            .insert(session.cookie_hash.clone(), session.clone());
+        let mut sessions = self.sessions.lock().expect("poisoned");
+        if sessions.contains_key(&session.cookie_hash)
+            || sessions.values().any(|stored| stored.id == session.id)
+        {
+            return Err(MemoryError::Conflict("session already exists".into()));
+        }
+        sessions.insert(session.cookie_hash.clone(), session.clone());
         Ok(())
     }
 
@@ -1348,18 +1551,14 @@ impl RegistryStore for InMemoryStore {
         &self,
         cookie_hash: &str,
     ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        let now = chrono::Utc::now();
         Ok(self
             .sessions
             .lock()
-            .expect("poisoned")
+            .expect("in-memory store poisoned")
             .get(cookie_hash)
+            .filter(|session| session.idle_expiry > now && session.absolute_expiry > now)
             .cloned())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
-        self.sessions.lock().expect("poisoned").remove(cookie_hash);
-        Ok(())
     }
 
     #[cfg(feature = "control-plane")]
@@ -1373,16 +1572,13 @@ impl RegistryStore for InMemoryStore {
             .values_mut()
             .find(|s| s.id == session_id)
             .ok_or_else(|| MemoryError::NotFound(format!("session {session_id}")))?;
-        updated.idle_expiry = idle_expiry;
+        if updated.absolute_expiry <= chrono::Utc::now() {
+            return Err(MemoryError::Conflict(format!(
+                "session {session_id} has expired"
+            )));
+        }
+        updated.idle_expiry = idle_expiry.min(updated.absolute_expiry);
         Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn delete_sessions_for_account(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let mut sessions = self.sessions.lock().expect("poisoned");
-        let before = sessions.len();
-        sessions.retain(|_, s| s.account_id != account_id);
-        Ok((before - sessions.len()) as u64)
     }
 
     #[cfg(feature = "control-plane")]
@@ -1391,10 +1587,7 @@ impl RegistryStore for InMemoryStore {
         challenge: &DeletionChallengeRecord,
     ) -> Result<(), MemoryError> {
         let mut challenges = self.deletion_challenges.lock().expect("poisoned");
-        if challenges
-            .iter()
-            .any(|c| c.verifier == challenge.verifier && c.consumed_at.is_none())
-        {
+        if challenges.iter().any(|c| c.verifier == challenge.verifier) {
             return Err(MemoryError::Conflict(
                 "deletion challenge already exists".into(),
             ));
@@ -1442,6 +1635,13 @@ impl InMemoryStore {
             .expect("in-memory store poisoned")
             .clone()
     }
+
+    pub fn audit_events(&self) -> Vec<(String, String)> {
+        self.audit_events
+            .lock()
+            .expect("in-memory store poisoned")
+            .clone()
+    }
 }
 
 #[cfg(test)]
@@ -1453,19 +1653,6 @@ mod tests {
     fn trait_object_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Arc<dyn RegistryStore>>();
-    }
-
-    #[tokio::test]
-    async fn surreal_store_unavailable() {
-        let s = SurrealRegistryStore::new();
-        let r = s.find_account_by_id("acct_x").await;
-        assert!(matches!(r, Err(MemoryError::Unavailable(_))));
-    }
-
-    #[tokio::test]
-    async fn surreal_store_ping_false() {
-        let s = SurrealRegistryStore::new();
-        assert!(!s.ping().await);
     }
 
     #[tokio::test]
@@ -1576,6 +1763,16 @@ mod tests {
     #[tokio::test]
     async fn link_external_identity_rejects_duplicate_tuple() {
         let s = InMemoryStore::default();
+        for (id, tenant_id) in [("acct_a", "ten_a"), ("acct_b", "ten_b")] {
+            s.write_account(&Account {
+                id: id.into(),
+                status: AccountStatus::Active,
+                tenant_id: tenant_id.into(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .unwrap();
+        }
         let sv = SubjectVerifier([0x42u8; 32]);
         let i1 = ExternalIdentity {
             id: "idn_a".into(),
@@ -1594,6 +1791,42 @@ mod tests {
         s.link_external_identity(&i1).await.unwrap();
         let res = s.link_external_identity(&i2).await;
         assert!(matches!(res, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn in_memory_plan_default_preserves_requested_version() {
+        let s = InMemoryStore::default();
+        let plan = s.load_plan(17).await.unwrap();
+        assert_eq!(plan.id, "free");
+        assert_eq!(plan.version, 17);
+    }
+
+    #[tokio::test]
+    async fn api_key_ids_are_not_reusable() {
+        let s = InMemoryStore::default();
+        let key = ApiKey {
+            id: "ak_reusable".into(),
+            account_id: "acct_keys".into(),
+            name: "first".into(),
+            verifier: KeyedVerifier([1; 32]),
+            status: ApiKeyStatus::Active,
+            created_at: chrono::Utc::now(),
+            expires_at: None,
+            last_used_at: None,
+            version: 0,
+        };
+        s.write_api_key(&key).await.unwrap();
+        let duplicate = ApiKey {
+            name: "replacement".into(),
+            verifier: KeyedVerifier([2; 32]),
+            ..key.clone()
+        };
+        let result = s.write_api_key(&duplicate).await;
+        assert!(matches!(result, Err(MemoryError::Conflict(_))));
+        assert_eq!(
+            s.find_api_key(&key.id).await.unwrap().unwrap().name,
+            "first"
+        );
     }
 
     #[tokio::test]
@@ -1774,6 +2007,209 @@ mod tests {
             .consume_deletion_challenge("verifier_z", "acct_other", "ses_d", now)
             .await;
         assert!(matches!(res, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "control-plane")]
+    async fn deletion_start_is_atomic_and_retains_control_records() {
+        let s = InMemoryStore::default();
+        let now = Utc::now();
+        let account = Account {
+            id: "acct_delete".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_delete".into(),
+            created_at: now,
+        };
+        let tenant = Tenant {
+            id: "ten_delete".into(),
+            status: TenantStatus::Ready,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_delete".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 1,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: now,
+            version: 0,
+        };
+        s.write_account(&account).await.unwrap();
+        s.write_tenant(&tenant).await.unwrap();
+        s.write_api_key(&ApiKey {
+            id: "ak_delete".into(),
+            account_id: account.id.clone(),
+            name: "key".into(),
+            verifier: KeyedVerifier([1; 32]),
+            status: ApiKeyStatus::Active,
+            created_at: now,
+            expires_at: None,
+            last_used_at: None,
+            version: 0,
+        })
+        .await
+        .unwrap();
+        s.link_external_identity(&ExternalIdentity {
+            id: "idn_delete".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: SubjectVerifier([2; 32]),
+            account_id: account.id.clone(),
+            created_at: now,
+        })
+        .await
+        .unwrap();
+        s.store_session(&crate::control::session::ControlPlaneSession {
+            id: "ses_delete".into(),
+            cookie_hash: "cookie_delete".into(),
+            account_id: account.id.clone(),
+            auth_time: now,
+            idle_expiry: now + chrono::Duration::minutes(5),
+            absolute_expiry: now + chrono::Duration::hours(1),
+        })
+        .await
+        .unwrap();
+        s.create_deletion_challenge(&DeletionChallengeRecord {
+            id: "del_atomic".into(),
+            verifier: "verifier_atomic".into(),
+            account_id: account.id.clone(),
+            session_id: "ses_delete".into(),
+            expires_at: now + chrono::Duration::minutes(5),
+            consumed_at: None,
+        })
+        .await
+        .unwrap();
+
+        let invalid = s
+            .begin_account_deletion("verifier_atomic", &account.id, "wrong_session", now)
+            .await;
+        assert!(matches!(invalid, Err(MemoryError::Conflict(_))));
+        assert_eq!(
+            s.find_account_by_id(&account.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            AccountStatus::Active
+        );
+        assert_eq!(
+            s.find_tenant_by_id(&tenant.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TenantStatus::Ready
+        );
+        assert_eq!(
+            s.find_api_key("ak_delete").await.unwrap().unwrap().status,
+            ApiKeyStatus::Active
+        );
+
+        s.begin_account_deletion("verifier_atomic", &account.id, "ses_delete", now)
+            .await
+            .unwrap();
+        assert_eq!(
+            s.find_account_by_id(&account.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            AccountStatus::Deleting
+        );
+        assert_eq!(
+            s.find_tenant_by_id(&tenant.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TenantStatus::Deleting
+        );
+        assert_eq!(
+            s.find_api_key("ak_delete").await.unwrap().unwrap().status,
+            ApiKeyStatus::Revoked
+        );
+        assert!(s.find_session("cookie_delete").await.unwrap().is_some());
+        assert_eq!(
+            s.find_external_identities(&account.id).await.unwrap().len(),
+            1
+        );
+        assert_eq!(s.audit_events().len(), 1);
+
+        let replay = s
+            .begin_account_deletion("verifier_atomic", &account.id, "ses_delete", now)
+            .await;
+        assert!(matches!(replay, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "control-plane")]
+    async fn deletion_finalization_is_fenced_and_idempotent() {
+        let s = InMemoryStore::default();
+        let now = Utc::now();
+        s.write_account(&Account {
+            id: "acct_finalize".into(),
+            status: AccountStatus::Deleting,
+            tenant_id: "ten_finalize".into(),
+            created_at: now,
+        })
+        .await
+        .unwrap();
+        s.write_tenant(&Tenant {
+            id: "ten_finalize".into(),
+            status: TenantStatus::Deleting,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_finalize".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 1,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: now,
+            version: 0,
+        })
+        .await
+        .unwrap();
+        let lease = s
+            .claim_provisioning("ten_finalize", "deletion-scheduler", "lease_finalize", 60)
+            .await
+            .unwrap()
+            .unwrap();
+        s.finalize_account_deletion(
+            "ten_finalize",
+            &lease.owner_id,
+            &lease.lease_id,
+            lease.fencing_generation,
+            now,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            s.find_tenant_by_id("ten_finalize")
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TenantStatus::Purged
+        );
+        assert_eq!(
+            s.find_account_by_id("acct_finalize")
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            AccountStatus::Deleting
+        );
+        assert_eq!(s.audit_events().len(), 1);
+        s.finalize_account_deletion(
+            "ten_finalize",
+            &lease.owner_id,
+            &lease.lease_id,
+            lease.fencing_generation,
+            now,
+        )
+        .await
+        .unwrap();
+        assert_eq!(s.audit_events().len(), 1);
     }
 }
 

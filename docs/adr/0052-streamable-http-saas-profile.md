@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted — 2026-08-27. This ADR authorizes architecture and documentation only.
-Implementation requires a separate reviewed plan and explicit approval before
-changing dependencies or `Cargo.toml`.
+Accepted and implemented — 2026-08-27 design, implementation completed in the
+`streamable-http-mcp` branch. The reviewed completion plan and the repository
+quality gates are the implementation record; production open-signup launch still
+requires the operational evidence listed in §20.5 of the specification.
 
 ## Context
 
@@ -62,9 +63,10 @@ The HTTP profile supports only MCP `2026-07-28`:
   ID, or `Last-Event-ID` behavior exists;
 - legacy-only clients receive a stable unsupported-version response.
 
-The intended `rmcp` configuration uses a no-session manager, disables legacy
+The implemented `rmcp` configuration uses a no-session manager, disables legacy
 session mode, requires stateless protocol metadata, and pins supported protocol
-versions. Exact APIs are verified against the pinned SDK during implementation.
+versions. The workspace requests `rmcp` 3.1.2 compatibility and the lockfile
+currently resolves the compatible 3.1.4 release.
 
 ### Identity and tenancy
 

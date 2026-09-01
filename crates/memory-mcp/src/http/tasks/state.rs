@@ -48,6 +48,9 @@ pub struct TenantTaskRecord {
     pub fingerprint: String,
     pub state: TaskState,
     pub version: u64,
+    /// Original bounded tool arguments needed by a worker after a process
+    /// restart. It is tenant-local and never copied into the registry.
+    pub params: serde_json::Value,
     pub cancellation_intent: bool,
     pub lease_owner: Option<String>,
     pub lease_generation: Option<u64>,

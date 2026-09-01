@@ -76,6 +76,9 @@ pub struct MemoryService {
     /// (e.g. when the refresh task must mirror a configured config). Held
     /// only when the backend is Classic GLiNER.
     pub(crate) ner_artifact_refresh_native: Option<crate::config::NativeGlinerConfig>,
+    /// Enables tenant-local transactional outbox hooks for the HTTP runtime.
+    #[cfg(feature = "streamable-http")]
+    pub(crate) outbox_enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -554,7 +557,20 @@ impl MemoryService {
             )),
             ner_artifact_refresh_config: None,
             ner_artifact_refresh_native: None,
+            #[cfg(feature = "streamable-http")]
+            outbox_enabled: false,
         })
+    }
+
+    /// Enable the tenant-local transactional outbox for the HTTP runtime.
+    /// Stdio never calls this method, preserving its direct storage behavior.
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn with_http_outbox(mut self) -> Self {
+        self.ingestion_service = self.ingestion_service.with_outbox();
+        self.entity_service = self.entity_service.with_outbox();
+        self.fact_service = self.fact_service.with_outbox();
+        self.outbox_enabled = true;
+        self
     }
 
     /// Returns a copy of the service with persisted query analytics enabled or disabled.

@@ -1,8 +1,12 @@
 //! Client-side router for the control-plane SPA.
 
 use dioxus::prelude::*;
+use dioxus_router::{Routable, Router as DioxusRouter};
 
-use crate::pages::{delete, keys, login, status};
+use crate::pages::{
+    delete::DeletePage as Delete, keys::KeysPage as Keys, login::LoginPage as Login,
+    status::StatusPage as Status,
+};
 
 #[derive(Routable, Clone, PartialEq)]
 pub enum Route {
@@ -17,13 +21,8 @@ pub enum Route {
 }
 
 #[component]
-pub fn Router() -> Element {
+pub fn AppRouter() -> Element {
     rsx! {
-        match routek {
-            Route::Status {} => rsx! { status::StatusPage {} },
-            Route::Login {} => rsx! { login::LoginPage {} },
-            Route::Keys {} => rsx! { keys::KeysPage {} },
-            Route::Delete {} => rsx! { delete::DeletePage {} },
-        }
+        DioxusRouter::<Route> {}
     }
 }

@@ -20,7 +20,7 @@ use super::super::response::OpenAppResult;
 use super::super::session;
 use super::MemoryMcp;
 #[cfg(feature = "mcp-apps")]
-use crate::service::apps::session::AppSessionState;
+use crate::service::apps::session::{AppSessionState, SessionManager};
 
 pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
@@ -92,6 +92,27 @@ impl MemoryMcp {
 
     #[cfg(feature = "mcp-apps")]
     pub(super) async fn session(&self, session_id: &str) -> Result<AppSessionState, ErrorData> {
+        #[cfg(feature = "streamable-http")]
+        if let Some(store) = self.durable_app_sessions.as_ref() {
+            let tenant_id = self
+                .tenant_id
+                .as_deref()
+                .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
+            let record = store
+                .load(tenant_id, session_id)
+                .await
+                .map_err(crate::mcp::mcp_error)?
+                .ok_or_else(|| Self::invalid_params("unknown or expired app session"))?;
+            let expires_at = Some(record.idle_expiry.min(record.absolute_expiry));
+            if expires_at.is_some_and(|expiry| expiry <= Utc::now()) {
+                return Err(Self::invalid_params("unknown or expired app session"));
+            }
+            return Ok(AppSessionState {
+                app: record.app,
+                expires_at,
+                payload: record.payload,
+            });
+        }
         self.session_manager.purge_expired().await;
         self.session_manager
             .get_valid(session_id)
@@ -106,12 +127,85 @@ impl MemoryMcp {
         ttl_seconds: Option<i64>,
         payload: Value,
     ) -> Result<OpenAppResult, ErrorData> {
+        #[cfg(feature = "streamable-http")]
+        if let Some(store) = self.durable_app_sessions.as_ref() {
+            let tenant_id = self
+                .tenant_id
+                .as_deref()
+                .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
+            let max_open_sessions = self.tenant_plan.as_ref().map_or(
+                crate::http::app_sessions::store::MAX_OPEN_PER_TENANT as u32,
+                |plan| plan.max_open_app_sessions,
+            );
+            let (session_id, _) = store
+                .open_with_limit(tenant_id, app, payload.clone(), max_open_sessions)
+                .await
+                .map_err(crate::mcp::mcp_error)?;
+            return Ok(session::open_app_result(app, session_id, payload));
+        }
         let (session_id, fallback) = self
             .session_manager
             .create(app, ttl_seconds, payload)
             .await
             .map_err(crate::mcp::mcp_error)?;
         Ok(session::open_app_result(app, session_id, fallback))
+    }
+
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    pub(super) async fn execute_durable_app_command(
+        &self,
+        session_id: &str,
+        input: crate::service::AppCommandInput,
+    ) -> Result<crate::mcp::response::AppCommandResult, ErrorData> {
+        let store = self
+            .durable_app_sessions
+            .as_ref()
+            .ok_or_else(|| Self::internal_error("durable app session store is missing"))?;
+        let tenant_id = self
+            .tenant_id
+            .as_deref()
+            .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
+        let record = store
+            .load(tenant_id, session_id)
+            .await
+            .map_err(crate::mcp::mcp_error)?
+            .ok_or_else(|| Self::invalid_params("unknown or expired app session"))?;
+        let manager = SessionManager::new();
+        manager
+            .insert(
+                session_id.to_owned(),
+                AppSessionState {
+                    app: record.app,
+                    expires_at: Some(record.idle_expiry.min(record.absolute_expiry)),
+                    payload: record.payload,
+                },
+            )
+            .await;
+        let expected_version = record.version;
+        let outcome = crate::service::apps::session_lifecycle::execute_app_command(
+            &self.service,
+            &manager,
+            session_id,
+            input,
+        )
+        .await
+        .map_err(crate::mcp::mcp_error)?;
+        if outcome.action == "close_session" {
+            store
+                .close(tenant_id, session_id)
+                .await
+                .map_err(crate::mcp::mcp_error)?;
+        } else {
+            let updated = manager
+                .get(session_id)
+                .await
+                .map_err(crate::mcp::mcp_error)?;
+            store
+                .command(tenant_id, session_id, expected_version, updated.payload)
+                .await
+                .map_err(crate::mcp::mcp_error)?;
+        }
+        Ok(outcome)
     }
 
     #[cfg(feature = "mcp-apps")]

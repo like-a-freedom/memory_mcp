@@ -20,6 +20,7 @@ use std::task::{Context, Poll};
 use http_body::Body;
 use http_body::Frame;
 use http_body::SizeHint;
+use tokio::sync::OwnedSemaphorePermit;
 
 use super::pool::AdmissionPermit;
 use super::storage::TenantRuntime;
@@ -28,12 +29,21 @@ use super::storage::TenantRuntime;
 pub struct OperationGuard {
     runtime: Arc<TenantRuntime>,
     pin_count: Arc<AtomicU32>,
+    _tenant_permit: OwnedSemaphorePermit,
 }
 
 impl OperationGuard {
-    pub fn new(runtime: Arc<TenantRuntime>, pin_count: Arc<AtomicU32>) -> Self {
+    pub fn new(
+        runtime: Arc<TenantRuntime>,
+        pin_count: Arc<AtomicU32>,
+        tenant_permit: OwnedSemaphorePermit,
+    ) -> Self {
         pin_count.fetch_add(1, Ordering::SeqCst);
-        Self { runtime, pin_count }
+        Self {
+            runtime,
+            pin_count,
+            _tenant_permit: tenant_permit,
+        }
     }
 
     pub fn runtime(&self) -> &Arc<TenantRuntime> {

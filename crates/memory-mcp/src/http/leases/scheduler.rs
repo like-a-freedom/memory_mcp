@@ -49,14 +49,18 @@ impl SchedulerHooks {
     }
 
     pub fn with_provisioning_only() -> Result<Self, MemoryError> {
-        Self::new(
-            vec![Arc::new(|registry| {
-                Box::pin(crate::http::leases::migration::run_due_provisioning(
-                    registry,
-                ))
-            })],
-            4,
-        )
+        let mut jobs: Vec<SchedulerJob> = vec![Arc::new(|registry| {
+            Box::pin(crate::http::leases::migration::run_due_provisioning(
+                registry,
+            ))
+        })];
+        #[cfg(feature = "control-plane")]
+        {
+            jobs.push(Arc::new(|registry| {
+                Box::pin(crate::control::deletion::run_deletion_worker(registry))
+            }));
+        }
+        Self::new(jobs, 4)
     }
 
     /// Tasks 7–9 call this before the binary starts serving
@@ -180,6 +184,13 @@ mod tests {
     #[tokio::test]
     async fn empty_scheduler_hooks_are_rejected() {
         assert!(SchedulerHooks::new(Vec::new(), 1).is_err());
+    }
+
+    #[cfg(feature = "control-plane")]
+    #[test]
+    fn provisioning_hooks_include_deletion_worker() {
+        let hooks = SchedulerHooks::with_provisioning_only().expect("provisioning hooks");
+        assert_eq!(hooks.jobs.len(), 2);
     }
 
     #[tokio::test]

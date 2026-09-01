@@ -30,7 +30,7 @@ use crate::http::registry::storage::LeaseFence;
 /// constant via the release process; the runner copies the
 /// value out at compile time so the test path can compare
 /// against it without an env var.
-pub const CURRENT_SCHEMA_VERSION: u32 = 30;
+pub const CURRENT_SCHEMA_VERSION: u32 = 44;
 
 /// Inclusive range of schema versions this replica can
 /// serve. The lower bound is `CURRENT_SCHEMA_VERSION - 1`
@@ -40,11 +40,10 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 30;
 pub const REPLICA_SCHEMA_RANGE: std::ops::RangeInclusive<u32> =
     CURRENT_SCHEMA_VERSION.saturating_sub(1)..=CURRENT_SCHEMA_VERSION;
 
-/// Best-effort warn helper. Mirrors the pool's helper; the
-/// workspace does not yet depend on `tracing` or `log`.
-#[allow(dead_code)]
+/// Emit bounded scheduler warnings without adding a logging dependency to the
+/// HTTP profile.
 fn tracing_warn(message: &str) {
-    let _ = message;
+    eprintln!("memory_mcp::http::leases: {message}");
 }
 
 /// What `provision_one` needs from a privileged SurrealDB
@@ -57,10 +56,11 @@ pub trait ApplyMigrations: Send + Sync + 'static {
     /// Implemented by `ensure_namespace`.
     async fn ensure_namespace(&self, namespace: &str, database: &str) -> Result<(), MemoryError>;
 
-    /// Apply the versioned migrations to the bound client.
-    /// Returns the new `schema_version` (the count of
-    /// versioned scripts applied) on success.
-    async fn apply_migrations(&self, namespace: &str) -> Result<u32, MemoryError>;
+    /// Apply the versioned migrations to the bound client. The database is
+    /// explicit because a tenant binding is an immutable namespace/database
+    /// pair and must never be inferred from mutable connection state.
+    /// Returns the resulting schema version on success.
+    async fn apply_migrations(&self, namespace: &str, database: &str) -> Result<u32, MemoryError>;
 }
 
 /// A no-op `ApplyMigrations` impl useful only for tests that
@@ -74,7 +74,11 @@ impl ApplyMigrations for NoopMigrations {
     async fn ensure_namespace(&self, _namespace: &str, _database: &str) -> Result<(), MemoryError> {
         Ok(())
     }
-    async fn apply_migrations(&self, _namespace: &str) -> Result<u32, MemoryError> {
+    async fn apply_migrations(
+        &self,
+        _namespace: &str,
+        _database: &str,
+    ) -> Result<u32, MemoryError> {
         // The apply_migrations contract is the new
         // schema_version after a successful run, not the
         // number of migrations applied. NoopMigrations is
@@ -82,6 +86,110 @@ impl ApplyMigrations for NoopMigrations {
         // DDL runner computes the target from the
         // migrations directory and the binary's
         // CURRENT_SCHEMA_VERSION.
+        Ok(CURRENT_SCHEMA_VERSION)
+    }
+}
+
+/// Production tenant migration adapter. It owns the privileged engine but
+/// binds a fresh cloned connection to the immutable tenant namespace/database
+/// for each provisioning pass. The existing stdio migration runner supplies
+/// the base memory schema (001/006-039); the HTTP-only catalog adds durable
+/// App Sessions, Tasks, outbox, and task artifacts (040-044).
+pub struct SurrealTenantMigrations {
+    engine: crate::http::registry::PrivilegedEngine,
+}
+
+impl SurrealTenantMigrations {
+    pub fn new(engine: crate::http::registry::PrivilegedEngine) -> Self {
+        Self { engine }
+    }
+
+    async fn ensure_namespace_bound(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<(), MemoryError> {
+        match &self.engine {
+            crate::http::registry::PrivilegedEngine::Remote(db) => {
+                crate::http::registry::storage::ensure_namespace(&**db, namespace, database).await
+            }
+            crate::http::registry::PrivilegedEngine::Local(db)
+            | crate::http::registry::PrivilegedEngine::LocalMem(db) => {
+                crate::http::registry::storage::ensure_namespace(&**db, namespace, database).await
+            }
+        }
+    }
+
+    async fn bound_client(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<crate::storage::client::SurrealDbClient, MemoryError> {
+        match &self.engine {
+            crate::http::registry::PrivilegedEngine::Remote(db) => {
+                let bound = (**db).clone();
+                bound
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|error| {
+                        MemoryError::Storage(format!("tenant bind failed: {error}"))
+                    })?;
+                Ok(
+                    crate::storage::client::SurrealDbClient::from_prebound_remote(
+                        bound, namespace, "info",
+                    ),
+                )
+            }
+            crate::http::registry::PrivilegedEngine::Local(db) => {
+                let bound = (**db).clone();
+                bound
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|error| {
+                        MemoryError::Storage(format!("tenant bind failed: {error}"))
+                    })?;
+                Ok(crate::storage::client::SurrealDbClient::from_prebound(
+                    bound, namespace, "info",
+                ))
+            }
+            crate::http::registry::PrivilegedEngine::LocalMem(db) => {
+                let bound = (**db).clone();
+                bound
+                    .use_ns(namespace)
+                    .use_db(database)
+                    .await
+                    .map_err(|error| {
+                        MemoryError::Storage(format!("tenant bind failed: {error}"))
+                    })?;
+                Ok(crate::storage::client::SurrealDbClient::from_prebound_mem(
+                    bound, namespace, "info",
+                ))
+            }
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ApplyMigrations for SurrealTenantMigrations {
+    async fn ensure_namespace(&self, namespace: &str, database: &str) -> Result<(), MemoryError> {
+        self.ensure_namespace_bound(namespace, database).await
+    }
+
+    async fn apply_migrations(&self, namespace: &str, database: &str) -> Result<u32, MemoryError> {
+        let client = self.bound_client(namespace, database).await?;
+        client.apply_migrations_impl(namespace).await?;
+        const HTTP_MIGRATIONS: &[&str] = &[
+            include_str!("../../../migrations/040_app_sessions.surql"),
+            include_str!("../../../migrations/041_tenant_tasks.surql"),
+            include_str!("../../../migrations/042_tenant_change_event.surql"),
+            include_str!("../../../migrations/043_tenant_task_unique_fingerprint.surql"),
+            include_str!("../../../migrations/044_task_artifacts.surql"),
+        ];
+        for sql in HTTP_MIGRATIONS {
+            client.execute_migration_script(sql, namespace).await?;
+        }
         Ok(CURRENT_SCHEMA_VERSION)
     }
 }
@@ -117,7 +225,8 @@ pub async fn provision_one(
     // compatible replica, or the data plane will surface
     // the Unavailable (→503) until the tenant is migrated
     // forward.
-    if !REPLICA_SCHEMA_RANGE.contains(&tenant.schema_version) {
+    let is_fresh_reserved = tenant.status == TenantStatus::Reserved && tenant.schema_version == 0;
+    if !is_fresh_reserved && !REPLICA_SCHEMA_RANGE.contains(&tenant.schema_version) {
         return Err(MemoryError::Unavailable(format!(
             "tenant {tenant_id} schema_version {} outside replica range {:?}",
             tenant.schema_version, REPLICA_SCHEMA_RANGE
@@ -181,7 +290,9 @@ pub async fn provision_one(
         migrations
             .ensure_namespace(&binding.namespace, &binding.database)
             .await?;
-        let new_version = migrations.apply_migrations(&binding.namespace).await?;
+        let new_version = migrations
+            .apply_migrations(&binding.namespace, &binding.database)
+            .await?;
         Ok(new_version)
     })
     .await;
@@ -267,18 +378,13 @@ pub async fn provision_one(
 pub async fn run_due_provisioning(
     registry: crate::http::registry::RegistryHandle,
 ) -> Result<(), MemoryError> {
+    let store = registry.store_clone();
     #[cfg(any(test, feature = "test-fixtures"))]
-    {
-        let store = registry.store_clone();
-        run_due_provisioning_for(registry, store, 100, chrono::Utc::now()).await
-    }
+    let migrations: Arc<dyn ApplyMigrations> = Arc::new(NoopMigrations);
     #[cfg(not(any(test, feature = "test-fixtures")))]
-    {
-        let _ = registry;
-        Err(MemoryError::Unavailable(
-            "production provisioning migration adapter is not wired; refusing to run NoopMigrations".into(),
-        ))
-    }
+    let migrations: Arc<dyn ApplyMigrations> =
+        Arc::new(SurrealTenantMigrations::new(registry.tenant_engine()?));
+    run_due_provisioning_for(registry, store, migrations, 100, chrono::Utc::now()).await
 }
 
 /// Test-friendly seam: walk up to `limit` due tenants. The
@@ -287,6 +393,7 @@ pub async fn run_due_provisioning(
 pub async fn run_due_provisioning_for(
     registry: crate::http::registry::RegistryHandle,
     store: Arc<dyn crate::http::registry::RegistryStore>,
+    migrations: Arc<dyn ApplyMigrations>,
     limit: usize,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<(), MemoryError> {
@@ -339,15 +446,8 @@ pub async fn run_due_provisioning_for(
         // long-running. The current migration pass is
         // bounded; if it ever exceeds the lease window
         // the next scheduler tick will reclaim.
-        #[cfg(any(test, feature = "test-fixtures"))]
         let migration_result =
-            provision_one(store.clone(), &tenant.id, typed, Arc::new(NoopMigrations)).await;
-        #[cfg(not(any(test, feature = "test-fixtures")))]
-        let migration_result: Result<(), MemoryError> = Err(MemoryError::Unavailable(
-            "production provisioning migration adapter is not wired".into(),
-        ));
-        #[cfg(not(any(test, feature = "test-fixtures")))]
-        let _ = typed;
+            provision_one(store.clone(), &tenant.id, typed, migrations.clone()).await;
         if let Err(error) = migration_result {
             tracing_warn(&format!(
                 "scheduler: provision_one failed for {}: {error}",
@@ -534,7 +634,7 @@ mod tests {
             async fn ensure_namespace(&self, _n: &str, _d: &str) -> Result<(), MemoryError> {
                 Ok(())
             }
-            async fn apply_migrations(&self, _n: &str) -> Result<u32, MemoryError> {
+            async fn apply_migrations(&self, _n: &str, _d: &str) -> Result<u32, MemoryError> {
                 Err(MemoryError::Storage("simulated failure".into()))
             }
         }
@@ -608,9 +708,15 @@ mod tests {
             version: 0,
         };
         seed_reserved(&store, &tenant).await;
-        run_due_provisioning_for(registry.clone(), store.clone(), 1, Utc::now())
-            .await
-            .expect("scheduler tick");
+        run_due_provisioning_for(
+            registry.clone(),
+            store.clone(),
+            Arc::new(NoopMigrations),
+            1,
+            Utc::now(),
+        )
+        .await
+        .expect("scheduler tick");
         let after = store
             .find_tenant_by_id("ten_due")
             .await
@@ -644,6 +750,56 @@ mod tests {
             .expect("read")
             .expect("present");
         assert_eq!(after.status, TenantStatus::Reserved);
+    }
+
+    #[tokio::test]
+    async fn durable_tenant_adapter_provisions_real_surreal_schema() {
+        use crate::http::registry::SurrealRegistryStore;
+        let durable = Arc::new(
+            SurrealRegistryStore::connect_in_memory("control", "registry")
+                .await
+                .expect("registry schema"),
+        );
+        let account = Account {
+            id: "acct_durable_provision".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_durable_provision".into(),
+            created_at: Utc::now(),
+        };
+        let tenant = Tenant {
+            id: account.tenant_id.clone(),
+            status: TenantStatus::Reserved,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_durable_provision".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: Utc::now(),
+            version: 0,
+        };
+        durable
+            .create_account_bundle(&account, &tenant, None)
+            .await
+            .expect("account bundle");
+        let lease = durable
+            .claim_provisioning(&tenant.id, "test", "lease_durable", 60)
+            .await
+            .expect("claim")
+            .expect("lease");
+        let adapter = Arc::new(SurrealTenantMigrations::new(durable.privileged_engine()));
+        provision_one(durable.clone(), &tenant.id, lease, adapter)
+            .await
+            .expect("durable provisioning");
+        let ready = durable
+            .find_tenant_by_id(&tenant.id)
+            .await
+            .expect("read tenant")
+            .expect("tenant exists");
+        assert_eq!(ready.status, TenantStatus::Ready);
+        assert_eq!(ready.schema_version, CURRENT_SCHEMA_VERSION);
     }
 
     #[tokio::test]

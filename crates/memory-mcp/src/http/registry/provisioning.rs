@@ -397,6 +397,10 @@ mod reconcile_tests {
         let reserved = Tenant {
             id: "ten_b".into(),
             status: TenantStatus::Reserved,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_b".into(),
+                database: "memory".into(),
+            },
             ..ready.clone()
         };
         s.write_tenant(&ready).await.unwrap();
