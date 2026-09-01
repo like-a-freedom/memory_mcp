@@ -143,6 +143,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "039_filesystem_ingestion.surql",
             sql: include_str!("../../migrations/039_filesystem_ingestion.surql"),
         },
+        // NOTE: SaaS-specific migrations (040+) are NOT registered here.
+        // They are applied separately by the HTTP profile's provisioning
+        // path (SurrealRegistryStore::connect / connect_in_memory).
+        // The stdio profile never needs these tables.
     ]
 }
 
