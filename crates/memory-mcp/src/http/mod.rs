@@ -8,6 +8,8 @@ pub mod leases;
 pub mod logging;
 pub mod metrics;
 pub mod middleware;
+#[cfg(feature = "control-plane")]
+pub mod oauth;
 pub mod principal;
 pub mod registry;
 pub mod router;
