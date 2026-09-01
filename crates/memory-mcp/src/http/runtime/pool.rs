@@ -16,6 +16,7 @@ fn tracing_warn(message: &str) {
     let _ = message;
 }
 
+use crate::error::MemoryError;
 use crate::http::registry::models::Tenant;
 
 use super::lifecycle::{RuntimePhase, TenantRuntimeSlot};
@@ -174,9 +175,10 @@ impl Pool {
         per_tenant_concurrency: u32,
         registry: Arc<crate::http::registry::RegistryHandle>,
     ) -> Self {
+        let cap = cap.max(1);
         Self {
             map: Mutex::new(LruCache::new(
-                std::num::NonZeroUsize::new(cap.max(1)).unwrap(),
+                std::num::NonZeroUsize::new(cap).unwrap_or(std::num::NonZeroUsize::MIN),
             )),
             registry,
             cap,
@@ -219,8 +221,8 @@ impl Pool {
         if guard.phase == RuntimePhase::Ready
             && let Some(runtime) = guard.runtime.clone()
         {
+            guard.last_used = Instant::now();
             let pin = guard.pin_count.clone();
-            pin.fetch_add(1, Ordering::SeqCst);
             drop(guard);
             return Ok(super::guard::OperationGuard::new(runtime, pin));
         }
@@ -240,9 +242,9 @@ impl Pool {
                         Ok(s) => s,
                         Err(e) => return Err(e),
                     };
-                    let guard = slot.lock().await;
+                    let mut guard = slot.lock().await;
+                    guard.last_used = Instant::now();
                     let pin = guard.pin_count.clone();
-                    pin.fetch_add(1, Ordering::SeqCst);
                     return Ok(super::guard::OperationGuard::new(runtime, pin));
                 }
                 Err(_) => {
@@ -259,7 +261,13 @@ impl Pool {
         let tenant_clone = tenant.clone();
         let tenant_id = tenant.id.clone();
         drop(guard);
-        let activation_result = build_runtime(&registry, &tenant_clone).await;
+        let activation_result = tokio::time::timeout(
+            self.activation_timeout,
+            build_runtime(&registry, &tenant_clone),
+        )
+        .await
+        .map_err(|_| MemoryError::Unavailable("tenant runtime activation timed out".into()))
+        .and_then(|result| result);
         let slot = match self.slot_for(tenant).await {
             Ok(s) => s,
             Err(e) => return Err(e),
@@ -273,8 +281,8 @@ impl Pool {
                 if let Some(sender) = guard.activation.in_flight.take() {
                     let _ = sender.send(runtime.clone());
                 }
+                guard.last_used = Instant::now();
                 let pin = guard.pin_count.clone();
-                pin.fetch_add(1, Ordering::SeqCst);
                 Ok(super::guard::OperationGuard::new(runtime, pin))
             }
             Err(error) => {
@@ -306,6 +314,31 @@ impl Pool {
                     return Ok(slot.clone());
                 }
                 if map.len() < self.cap {
+                    let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
+                    map.put(key.clone(), slot.clone());
+                    return Ok(slot);
+                }
+
+                // Recover capacity synchronously before waiting. Only an
+                // idle, unpinned Ready runtime may be removed; an activation
+                // in flight or a pinned response remains protected.
+                let threshold = Instant::now().checked_sub(self.idle_ttl);
+                let candidate = map.iter().find_map(|(tenant_id, slot)| {
+                    let mut slot_guard = slot.try_lock().ok()?;
+                    if slot_guard.phase == RuntimePhase::Ready
+                        && slot_guard.pin_count.load(Ordering::SeqCst) == 0
+                        && threshold.is_some_and(|limit| slot_guard.last_used <= limit)
+                    {
+                        slot_guard.phase = RuntimePhase::Draining;
+                        slot_guard.runtime = None;
+                        slot_guard.phase = RuntimePhase::Unloaded;
+                        Some(tenant_id.clone())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(candidate) = candidate {
+                    map.pop(&candidate);
                     let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new()));
                     map.put(key.clone(), slot.clone());
                     return Ok(slot);
@@ -418,31 +451,51 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn capacity_one_returns_capacity_timeout() {
-        // Tighten the cap to 1 to force CapacityTimeout without
-        // exercising the activation path under contention.
+    async fn capacity_one_returns_capacity_timeout_when_pinned() {
         let db = Surreal::new::<Mem>(()).await.unwrap();
         db.use_ns("control").use_db("control").await.unwrap();
         let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
-        let _pool = Arc::new(Pool::new(
+        let pool = Arc::new(Pool::new(
             1,
-            DEFAULT_IDLE_TTL,
-            DEFAULT_CAPACITY_WAIT,
+            Duration::ZERO,
+            Duration::from_millis(20),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
             registry,
         ));
-        // The Pool never has a tenant before acquire_or_wait
-        // is called, so the LRU has 0 entries and the first
-        // call inserts; the second call for a different
-        // tenant evicts. We can't easily force CapacityTimeout
-        // from outside without the cap being tighter than
-        // the activation path; the test documents the
-        // exception type but does not assert on its presence.
-        let tenant = ready_tenant("ten_x", "tns_x");
-        let pool = test_pool().await;
-        let r = pool.acquire_or_wait(&tenant).await;
-        assert!(r.is_ok());
+        let guard = pool
+            .acquire_or_wait(&ready_tenant("ten_x", "tns_x"))
+            .await
+            .expect("first runtime acquires");
+        let result = pool.acquire_or_wait(&ready_tenant("ten_y", "tns_y")).await;
+        assert!(matches!(result, Err(PoolError::CapacityTimeout)));
+        drop(guard);
+    }
+
+    #[tokio::test]
+    async fn idle_runtime_is_evicted_to_recover_capacity() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let pool = Arc::new(Pool::new(
+            1,
+            Duration::ZERO,
+            Duration::from_millis(20),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            DEFAULT_PER_TENANT_CONCURRENCY,
+            registry,
+        ));
+        let guard = pool
+            .acquire_or_wait(&ready_tenant("ten_x", "tns_x"))
+            .await
+            .expect("first runtime acquires");
+        drop(guard);
+        let second = pool
+            .acquire_or_wait(&ready_tenant("ten_y", "tns_y"))
+            .await
+            .expect("idle runtime makes capacity available");
+        assert!(pool.contains_ready("ten_y").await);
+        drop(second);
     }
 
     #[tokio::test]
@@ -512,6 +565,8 @@ mod tests {
         let pool = test_pool().await;
         let tenant = ready_tenant("ten_pinned", "tns_pinned");
         let guard = pool.acquire_or_wait(&tenant).await.expect("acquire");
+        let pin_counter = guard.pin_counter();
+        assert_eq!(pin_counter.load(Ordering::SeqCst), 1);
         // mark_draining_if_idle evicts only if pin_count == 0.
         // With the guard held, pin_count is 1, so the call
         // must return None and the slot must remain Ready.
@@ -520,6 +575,7 @@ mod tests {
         assert!(result.is_none(), "pinned runtime must not be evicted");
         assert!(pool.contains_ready("ten_pinned").await);
         drop(guard);
+        assert_eq!(pin_counter.load(Ordering::SeqCst), 0);
     }
 
     /// Pool test 3: the response body holds the pin and
@@ -534,7 +590,7 @@ mod tests {
         // 1 global permit; we hold it via the lease.
         let gate = Arc::new(AdmissionGate::new(1));
         let permit = gate.try_acquire().expect("first permit");
-        let lease = ResponseLease::new(None, permit);
+        let lease = ResponseLease::new(None, Arc::new(permit));
         let inner = axum::body::Body::from("hello");
         let body = LeasedBody::new(inner, lease);
         // Drive the body to completion by collecting it; the

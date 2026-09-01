@@ -1,3 +1,5 @@
+#![cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
+
 //! Black-box protocol conformance for the HTTP SaaS profile.
 //!
 //! Spawns the `memory_mcp_http` binary on an ephemeral port, waits for
@@ -227,8 +229,7 @@ async fn no_mcp_session_id_header_is_set() {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {},
-        "_meta": modern_meta(),
+        "params": {"_meta": modern_meta()},
     });
     let resp = client()
         .post(format!("{}/mcp", server.base_url))
@@ -250,18 +251,12 @@ async fn no_mcp_session_id_header_is_set() {
 
 #[tokio::test]
 async fn server_discover_advertises_only_2026_07_28() {
-    // rmcp 3.1.2 has tightened its server/discover validation
-    // beyond what the plan's spec asks for; the discover round-trip
-    // is exercised in a dedicated unit test in http::transport. Here
-    // we just send a request and assert the connection is open and
-    // the server returns a JSON-RPC response (not a transport error).
     let server = spawn_server(&[]).await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {},
-        "_meta": modern_meta(),
+        "params": {"_meta": modern_meta()},
     });
     let resp = client()
         .post(format!("{}/mcp", server.base_url))
@@ -275,12 +270,49 @@ async fn server_discover_advertises_only_2026_07_28() {
         .send()
         .await
         .expect("send");
-    // The server returns 400 because rmcp 3.1.2's strict
-    // clientCapabilities shape is not satisfied by modern_meta()'s
-    // empty `{}`. The important assertion is that the
-    // PROTOCOL_VERSION constant is 2026-07-28, proven by the
-    // unit test `protocol_version_constant_is_2026_07_28`.
-    assert_eq!(resp.status(), 400);
+    assert_eq!(resp.status(), 200);
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    assert!(
+        content_type.contains("text/event-stream") || content_type.contains("application/json"),
+        "unexpected discovery content type: {content_type}"
+    );
+    let text = resp.text().await.expect("discovery body");
+    assert!(
+        text.contains("2026-07-28"),
+        "discovery omitted protocol version: {text}"
+    );
+}
+
+#[tokio::test]
+async fn removed_ping_method_is_not_available() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ping",
+        "params": {"_meta": modern_meta()},
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "ping")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    let text = resp.text().await.expect("body");
+    assert!(
+        text.contains("-32601") || text.to_ascii_lowercase().contains("method not found"),
+        "ping must not be available in 2026-07-28: {text}"
+    );
 }
 
 #[tokio::test]
@@ -337,7 +369,7 @@ async fn missing_accept_returns_406() {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "ping",
-        "_meta": modern_meta(),
+        "params": {"_meta": modern_meta()},
     });
     let resp = client()
         .post(format!("{}/mcp", server.base_url))
@@ -365,7 +397,7 @@ async fn header_body_mismatch_returns_header_mismatch_error() {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/list",
-        "_meta": modern_meta(),
+        "params": {"_meta": modern_meta()},
     });
     let resp = client()
         .post(format!("{}/mcp", server.base_url))
@@ -388,16 +420,41 @@ async fn header_body_mismatch_returns_header_mismatch_error() {
 }
 
 #[tokio::test]
-async fn tools_call_requires_matching_mcp_name() {
-    // Plan asserts that the Mcp-Method header must equal the body
-    // method for tools/call. rmcp validates this.
+async fn missing_mcp_method_returns_400_before_authentication() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": modern_meta()},
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    assert!(resp.text().await.expect("body").contains("MCP method"));
+}
+
+#[tokio::test]
+async fn missing_mcp_name_returns_400_before_authentication() {
     let server = spawn_server(&[]).await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
-        "params": {"name": "ping"},
-        "_meta": modern_meta(),
+        "params": {
+            "name": "ingest",
+            "arguments": {},
+            "_meta": modern_meta()
+        },
     });
     let resp = client()
         .post(format!("{}/mcp", server.base_url))
@@ -411,8 +468,152 @@ async fn tools_call_requires_matching_mcp_name() {
         .send()
         .await
         .expect("send");
-    // tools/call is now a valid method (we expose it), so the
-    // request is accepted. The spec's test is the rejection case
-    // (mismatched name); the matching case returns 200.
-    assert!(resp.status() == 200 || resp.status() == 400);
+    assert_eq!(resp.status(), 400);
+    assert!(resp.text().await.expect("body").contains("MCP name"));
+}
+
+#[tokio::test]
+async fn mismatched_mcp_name_returns_400() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "ingest",
+            "arguments": {},
+            "_meta": modern_meta()
+        },
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/call")
+        .header("Mcp-Name", "resolve")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    assert!(resp.text().await.expect("body").contains("MCP name"));
+}
+
+#[tokio::test]
+async fn missing_protocol_version_returns_400() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": modern_meta()},
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    assert!(
+        resp.text()
+            .await
+            .expect("body")
+            .contains("protocol version")
+    );
+}
+
+#[tokio::test]
+async fn notification_returns_202_with_empty_body() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "method": "tools/list",
+        "params": {"_meta": modern_meta()},
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/list")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 202);
+    assert!(resp.bytes().await.expect("body").is_empty());
+}
+
+#[tokio::test]
+async fn forged_subscription_header_cannot_bypass_preflight() {
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {"_meta": modern_meta()},
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "subscriptions/listen")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    assert!(resp.text().await.expect("body").contains("HeaderMismatch"));
+}
+
+#[tokio::test]
+async fn tools_call_requires_matching_mcp_name() {
+    // Plan asserts that the Mcp-Method header must equal the body
+    // method for tools/call. rmcp validates this.
+    let server = spawn_server(&[]).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "ingest",
+            "arguments": {
+                "content": "conformance marker",
+                "source_type": "conformance",
+                "source_id": "conformance-tools-call",
+                "t_ref": "2026-08-27T00:00:00Z",
+                "t_ingested": null,
+                "policy_tags": []
+            },
+            "_meta": modern_meta()
+        },
+    });
+    let resp = client()
+        .post(format!("{}/mcp", server.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/call")
+        .header("Mcp-Name", "ingest")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200);
 }

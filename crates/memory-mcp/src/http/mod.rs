@@ -70,7 +70,7 @@ impl HttpState {
         config: HttpConfig,
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = Self::build_registry().await;
+        let registry = Self::build_registry(&config).await?;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -118,7 +118,7 @@ impl HttpState {
     /// Production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = Self::build_registry().await;
+        let registry = Self::build_registry(&config).await?;
         let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
             registry.clone(),
         )));
@@ -168,14 +168,20 @@ impl HttpState {
     /// and api keys, and the runtime pool can build
     /// per-tenant handles. Production builds use the
     /// placeholder.
-    async fn build_registry() -> registry::RegistryHandle {
+    async fn build_registry(
+        config: &HttpConfig,
+    ) -> Result<registry::RegistryHandle, crate::error::MemoryError> {
         #[cfg(any(test, feature = "test-fixtures"))]
         {
-            registry::RegistryHandle::in_memory_with_default_mem_engine().await
+            let _ = config;
+            Ok(registry::RegistryHandle::in_memory_with_default_mem_engine().await)
         }
         #[cfg(not(any(test, feature = "test-fixtures")))]
         {
-            registry::RegistryHandle::new()
+            let _ = config;
+            Err(crate::error::MemoryError::ConfigInvalid(
+                "HTTP SaaS production registry is not wired; refusing to start with an in-memory or placeholder registry".into(),
+            ))
         }
     }
 }

@@ -19,13 +19,17 @@ pub async fn serve(
     println!("memory_mcp_http bound={local_addr}");
     let token = shutdown.token();
     let grace = cfg.shutdown_grace;
-    axum_serve(
+    let serving = axum_serve(
         listener,
         router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
-    .with_graceful_shutdown(async move {
-        token.cancelled().await;
-        tokio::time::sleep(grace).await;
-    })
-    .await
+    .with_graceful_shutdown(async move { token.cancelled().await });
+
+    match tokio::time::timeout(grace, serving).await {
+        Ok(result) => result,
+        Err(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "HTTP graceful shutdown exceeded configured deadline",
+        )),
+    }
 }

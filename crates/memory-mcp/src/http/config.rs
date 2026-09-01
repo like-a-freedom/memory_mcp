@@ -170,6 +170,7 @@ fn parse_csv(k: &str) -> Result<Vec<String>, MemoryError> {
     match std::env::var(k) {
         Ok(v) => Ok(v
             .split(',')
+            .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(str::to_string)
             .collect()),
@@ -298,14 +299,43 @@ impl HttpConfig {
                     .into(),
             ));
         }
+        // A test-fixtures binary must identify itself explicitly.
+        // This prevents an accidentally released build compiled
+        // with the fixture feature from silently selecting the
+        // in-memory registry instead of a durable backend.
+        #[cfg(all(feature = "test-fixtures", not(test)))]
+        if std::env::var("MEMORY_MCP_HTTP_TEST_BOOTSTRAP")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .is_none()
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "test-fixtures HTTP builds require MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
+            ));
+        }
         if self.bind.ip().is_unspecified() && !self.public_base_url.contains("localhost") {
             eprintln!(
                 "memory_mcp::http::config: binding to unspecified address; production must run behind a reverse proxy"
             );
         }
+        if self.body_limit_bytes == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "MEMORY_MCP_HTTP_BODY_LIMIT must be positive".into(),
+            ));
+        }
+        if self.request_deadline.is_zero() || self.shutdown_grace.is_zero() {
+            return Err(MemoryError::ConfigInvalid(
+                "HTTP request deadline and shutdown grace must be positive".into(),
+            ));
+        }
         if self.allowed_hosts.is_empty() {
             return Err(MemoryError::ConfigInvalid(
                 "ALLOWED_HOSTS must be explicit in HTTP SaaS profile".into(),
+            ));
+        }
+        if self.allowed_origins.is_empty() {
+            return Err(MemoryError::ConfigInvalid(
+                "ALLOWED_ORIGINS must be explicit in HTTP SaaS profile".into(),
             ));
         }
         if self.allowed_origins.iter().any(|o| o == "*") {
@@ -321,6 +351,36 @@ impl HttpConfig {
         if self.signup_mode == SignupMode::Open && !self.open_signup_quotas_set() {
             return Err(MemoryError::ConfigInvalid(
                 "open signup requires explicit quota values (spec §12)".into(),
+            ));
+        }
+        if self.enable_control_plane
+            && (self.oidc_issuer.is_empty()
+                || self.oidc_client_id.is_empty()
+                || self.oidc_audience.is_empty()
+                || self.oidc_redirect_uri.is_empty())
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "control plane requires OIDC issuer, client id, audience, and redirect URI".into(),
+            ));
+        }
+        if self.enable_control_plane
+            && !matches!(self.oidc_allowed_alg.as_str(), "RS256" | "ES256" | "EdDSA")
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "OIDC allowed algorithm must be RS256, ES256, or EdDSA".into(),
+            ));
+        }
+        if self.enable_control_plane_ui && !self.enable_control_plane {
+            return Err(MemoryError::ConfigInvalid(
+                "control-plane UI requires control plane to be enabled".into(),
+            ));
+        }
+        if self.control_db.url == self.tenant_db.url
+            && self.control_db.namespace == self.tenant_db.namespace
+            && self.control_db.database == self.tenant_db.database
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "control and tenant storage must use different namespace/database bindings".into(),
             ));
         }
         #[cfg(not(feature = "control-plane"))]
@@ -355,6 +415,10 @@ impl HttpConfig {
 #[cfg(any(test, feature = "test-fixtures"))]
 impl HttpConfig {
     pub fn default_for_test() -> Self {
+        let control_db = SurrealTargetConfig::default_for_test();
+        let mut tenant_db = SurrealTargetConfig::default_for_test();
+        tenant_db.database = "memory_tenant_test".into();
+        tenant_db.namespace = "tenant_test".into();
         Self {
             bind: "127.0.0.1:0".parse().expect("test bind"),
             public_base_url: "http://localhost".into(),
@@ -364,8 +428,8 @@ impl HttpConfig {
             body_limit_bytes: DEFAULT_BODY_LIMIT_BYTES,
             request_deadline: DEFAULT_REQUEST_DEADLINE,
             shutdown_grace: DEFAULT_SHUTDOWN_GRACE,
-            control_db: SurrealTargetConfig::default_for_test(),
-            tenant_db: SurrealTargetConfig::default_for_test(),
+            control_db,
+            tenant_db,
             api_key_pepper: "x".repeat(40),
             keys: HmacKeys {
                 identity_index: [0; 32],
@@ -524,6 +588,90 @@ mod tests {
         with_env(&refs, || {
             let cfg = HttpConfig::from_env().expect("parses");
             assert!(matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(_))));
+        });
+    }
+
+    #[test]
+    fn http_config_rejects_empty_origin_allowlist() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.allowed_origins.clear();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("ALLOWED_ORIGINS")
+        ));
+    }
+
+    #[test]
+    fn http_config_rejects_zero_limits() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.body_limit_bytes = 0;
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("BODY_LIMIT")
+        ));
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.request_deadline = std::time::Duration::ZERO;
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("deadline")
+        ));
+    }
+
+    #[test]
+    fn http_config_rejects_shared_control_and_tenant_binding() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.tenant_db = cfg.control_db.clone();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("different namespace/database")
+        ));
+    }
+
+    #[test]
+    fn control_plane_requires_complete_oidc_config() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.enable_control_plane = true;
+        cfg.oidc_issuer.clear();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("OIDC issuer")
+        ));
+    }
+
+    #[test]
+    fn control_plane_rejects_unknown_oidc_algorithm() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.enable_control_plane = true;
+        cfg.oidc_allowed_alg = "none".into();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("allowed algorithm")
+        ));
+    }
+
+    #[test]
+    fn control_plane_ui_requires_control_plane() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.enable_control_plane_ui = true;
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("UI requires control plane")
+        ));
+    }
+
+    #[test]
+    fn csv_allowlists_trim_entries() {
+        let mut vars = base_required_env();
+        vars[2] = ("ALLOWED_HOSTS", " localhost , 127.0.0.1 ".into());
+        vars[3] = ("ALLOWED_ORIGINS", " http://localhost ".into());
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("parses");
+            assert_eq!(
+                cfg.allowed_hosts,
+                vec!["localhost".to_string(), "127.0.0.1".to_string()]
+            );
+            assert_eq!(cfg.allowed_origins, vec!["http://localhost".to_string()]);
         });
     }
 

@@ -1,3 +1,5 @@
+#![cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
+
 //! Load test scaffolding for the HTTP SaaS profile.
 //!
 //! Tests are marked `#[ignore]` and should be run with `--ignored`

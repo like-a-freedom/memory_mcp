@@ -282,6 +282,8 @@ pub struct OidcClient {
     audience: String,
     redirect_uri: String,
     allowed_algorithm: String,
+    authorization_endpoint: String,
+    token_endpoint: String,
     jwks: JwksCache,
 }
 
@@ -299,6 +301,7 @@ impl OidcClient {
             .build()
             .map_err(|e| MemoryError::ConfigInvalid(e.to_string()))?;
 
+        let issuer = issuer.trim_end_matches('/');
         let discovery_url = format!("{issuer}/.well-known/openid-configuration");
         let discovery: serde_json::Value = client
             .get(&discovery_url)
@@ -311,6 +314,25 @@ impl OidcClient {
             .await
             .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery parse failed: {e}")))?;
 
+        if discovery.get("issuer").and_then(|value| value.as_str()) != Some(issuer) {
+            return Err(MemoryError::ConfigInvalid(
+                "OIDC discovery issuer does not match configured issuer".into(),
+            ));
+        }
+        let authorization_endpoint = discovery
+            .get("authorization_endpoint")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| {
+                MemoryError::ConfigInvalid("OIDC discovery missing authorization_endpoint".into())
+            })?
+            .to_string();
+        let token_endpoint = discovery
+            .get("token_endpoint")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| {
+                MemoryError::ConfigInvalid("OIDC discovery missing token_endpoint".into())
+            })?
+            .to_string();
         let jwks_uri = discovery
             .get("jwks_uri")
             .and_then(|v| v.as_str())
@@ -334,24 +356,33 @@ impl OidcClient {
             audience: audience.to_string(),
             redirect_uri: redirect_uri.to_string(),
             allowed_algorithm: allowed_algorithm.to_string(),
+            authorization_endpoint,
+            token_endpoint,
             jwks,
         })
     }
 
     /// Build the authorization URL with PKCE and nonce.
-    pub fn authorize_url(&self, state: &OidcState, pkce: &PkceCode, nonce: &OidcNonce) -> String {
+    pub fn authorize_url(
+        &self,
+        state: &OidcState,
+        pkce: &PkceCode,
+        nonce: &OidcNonce,
+    ) -> Result<String, MemoryError> {
         use oauth2::basic::BasicClient;
         use oauth2::{
             AuthUrl, ClientId, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
         };
 
+        let auth_url = AuthUrl::new(self.authorization_endpoint.clone()).map_err(|error| {
+            MemoryError::ConfigInvalid(format!("invalid OIDC authorization URL: {error}"))
+        })?;
+        let redirect_url = RedirectUrl::new(self.redirect_uri.clone()).map_err(|error| {
+            MemoryError::ConfigInvalid(format!("invalid OIDC redirect URL: {error}"))
+        })?;
         let client = BasicClient::new(ClientId::new(self.client_id.clone()))
-            .set_auth_uri(
-                AuthUrl::new(format!("{}/authorize", self.issuer)).expect("valid auth URL"),
-            )
-            .set_redirect_uri(
-                RedirectUrl::new(self.redirect_uri.clone()).expect("valid redirect URL"),
-            );
+            .set_auth_uri(auth_url)
+            .set_redirect_uri(redirect_url);
 
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(
             pkce.verifier.clone(),
@@ -365,7 +396,7 @@ impl OidcClient {
 
         url.query_pairs_mut().append_pair("nonce", nonce.as_str());
 
-        url.to_string()
+        Ok(url.to_string())
     }
 
     /// Exchange an authorization code for tokens using raw reqwest.
@@ -379,17 +410,32 @@ impl OidcClient {
             .build()
             .map_err(|e| AuthError::Provider(e.to_string()))?;
 
-        let params = serde_json::json!({
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": self.redirect_uri,
-            "client_id": self.client_id,
-            "code_verifier": pkce.verifier,
-        });
+        let params = [
+            ("grant_type", "authorization_code".to_string()),
+            ("code", code),
+            ("redirect_uri", self.redirect_uri.clone()),
+            ("client_id", self.client_id.clone()),
+            ("code_verifier", pkce.verifier),
+        ];
 
+        let form_body = params
+            .iter()
+            .map(|(key, value)| {
+                format!(
+                    "{}={}",
+                    form_urlencode_component(key),
+                    form_urlencode_component(value),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("&");
         let resp = client
-            .post(format!("{}/oauth/token", self.issuer))
-            .json(&params)
+            .post(&self.token_endpoint)
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(form_body)
             .send()
             .await
             .map_err(|e| AuthError::Provider(e.to_string()))?
@@ -431,12 +477,13 @@ impl OidcClient {
 
         let key: DecodingKey = self.jwks.key_for(&kid).await?;
 
-        let mut validation = Validation::new(match alg {
+        let validation_algorithm = match alg {
             "RS256" => Algorithm::RS256,
             "ES256" => Algorithm::ES256,
             "EdDSA" => Algorithm::EdDSA,
-            _ => unreachable!(),
-        });
+            _ => return Err(AuthError::DisallowedAlgorithm),
+        };
+        let mut validation = Validation::new(validation_algorithm);
         validation.set_audience(&[&self.audience]);
         validation.set_issuer(&[&self.issuer]);
         validation.validate_exp = true;
@@ -446,6 +493,25 @@ impl OidcClient {
 
         Ok(token_data.claims)
     }
+}
+
+fn form_urlencode_component(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                encoded.push(byte as char);
+            }
+            b' ' => encoded.push('+'),
+            other => {
+                encoded.push('%');
+                encoded.push(HEX[(other >> 4) as usize] as char);
+                encoded.push(HEX[(other & 0x0F) as usize] as char);
+            }
+        }
+    }
+    encoded
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +637,7 @@ pub async fn authorize(
         .oidc_client
         .as_ref()
         .ok_or(super::error::ApiError::Unavailable)?;
-    let url = oidc.authorize_url(&state_token, &pkce, &nonce);
+    let url = oidc.authorize_url(&state_token, &pkce, &nonce)?;
     Ok(axum::response::Redirect::to(&url))
 }
 
@@ -607,6 +673,9 @@ pub async fn callback(
     }
 
     let stored = unseal_oidc_payload(&state.config.keys.oidc_state, &sealed, &aead_nonce)?;
+    if stored.state.as_str() != params.state {
+        return Err(super::error::ApiError::Unauthorized);
+    }
 
     // Reject expired requests (TTL 10 minutes).
     if stored.expires_at < Utc::now() {
@@ -614,11 +683,7 @@ pub async fn callback(
     }
 
     // RFC 9207 issuer check.
-    if params
-        .iss
-        .as_deref()
-        .is_some_and(|issuer| issuer != state.config.oidc_issuer)
-    {
+    if params.iss.as_deref() != Some(state.config.oidc_issuer.as_str()) {
         return Err(super::error::ApiError::Unauthorized);
     }
 
@@ -703,6 +768,11 @@ async fn upsert_account_for_identity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn form_urlencode_component_escapes_reserved_bytes() {
+        assert_eq!(form_urlencode_component("a b+c/&"), "a+b%2Bc%2F%26");
+    }
 
     #[test]
     fn identity_subject_verifier_is_deterministic() {

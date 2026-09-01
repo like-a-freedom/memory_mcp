@@ -296,12 +296,9 @@ impl SurrealDbClient {
     /// configuration marker, not a `Connection` impl; the kv
     /// engine is in-memory under the hood. Used by test
     /// fixtures and bootstrap.
-    pub fn from_prebound_mem(_db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
-        // The Mem engine configuration is dropped here; tests
-        // that need the live engine (e.g. provisioning) keep
-        // a separate `Arc<Surreal<Db>>` outside this client.
+    pub fn from_prebound_mem(db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
         Self {
-            engine: DbEngine::Mem(Arc::new(Surreal::init())),
+            engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,

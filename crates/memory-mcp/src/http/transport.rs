@@ -1,31 +1,19 @@
 //! HTTP SaaS transport.
 //!
-//! # rmcp 3.1.2 API surface (verified 2026-08-28)
+//! # rmcp API surface (verified 2026-08-28)
 //!
-//! The following types and methods are confirmed against the installed
-//! `rmcp 3.1.2` source. Line numbers are stable while `Cargo.lock`
-//! resolves the `rmcp` dep to `3.1.2` (currently pinned via the
+//! The following types and methods are confirmed against the version resolved
+//! by `Cargo.lock` (currently `rmcp 3.1.4`; the workspace requirement starts
+//! at `3.1.2`). Line numbers are intentionally not treated as an API contract.
 //! workspace entry in `Cargo.toml`).
 //!
-//! - `rmcp::transport::streamable_http_server::StreamableHttpServerConfig`
-//!   (`src/transport/streamable_http_server/tower.rs:60`).
-//! - `rmcp::transport::streamable_http_server::StreamableHttpService<S, M>`
-//!   (`src/transport/streamable_http_server/tower.rs:999`).
-//! - `rmcp::transport::streamable_http_server::session::never::NeverSessionManager`
-//!   (`src/transport/streamable_http_server/session/never.rs:19`).
+//! - `rmcp::transport::streamable_http_server::StreamableHttpServerConfig`.
+//! - `rmcp::transport::streamable_http_server::StreamableHttpService<S, M>`.
+//! - `rmcp::transport::streamable_http_server::session::never::NeverSessionManager`.
 //!
-//! `StreamableHttpServerConfig` builder methods
-//! (`src/transport/streamable_http_server/tower.rs`):
-//!
-//! - `with_allowed_hosts(impl IntoIterator<Item = String>)`            line 182
-//! - `with_allowed_origins(impl IntoIterator<Item = String>)`          line 194
-//! - `with_sse_keep_alive(Option<Duration>)`                           line 206
-//! - `with_sse_retry(Option<Duration>)`                                line 211
-//! - `with_legacy_session_mode(bool)`                                  line 216
-//! - `with_json_response(bool)`                                        line 221
-//! - `with_cancellation_token(CancellationToken)`                      line 226
-//! - `with_max_request_body_bytes(usize)`                              line 232
-//! - `with_stateless_protocol_metadata_required(bool)`                line 241
+//! `StreamableHttpServerConfig` exposes the builder methods used below for
+//! host/origin policy, SSE framing, stateless metadata, cancellation, and
+//! bounded request bodies.
 //!
 //! `ServerHandler::supported_protocol_versions` has a default impl that
 //! returns `Cow::Borrowed(ProtocolVersion::KNOWN_VERSIONS)`. The HTTP
@@ -59,7 +47,7 @@ pub use crate::mcp::handlers::PROTOCOL_VERSION_2026_07_28 as PROTOCOL_VERSION;
 
 /// Subscriptions listen methods that produce a long-lived SSE
 /// stream and must not be bounded by the request-deadline body wrap.
-const SUBSCRIPTION_METHODS: &[&str] = &["subscriptions/listen", "subscribe", "stream"];
+const SUBSCRIPTION_METHODS: &[&str] = &["subscriptions/listen"];
 
 /// Single production config builder. Every construction of the rmcp
 /// service goes through this function.
@@ -147,20 +135,11 @@ pub async fn mcp_handler(
     );
     let response = forward(svc, req).await;
     let (parts, body) = response.into_parts();
-    // We move the `OperationGuard` out of the Arc; the
-    // `Arc<OperationGuardRef>` in extensions was the only
-    // owner, so this is safe.
-    let operation = (!is_subscription).then(|| match Arc::try_unwrap(guard_ref.0) {
-        Ok(g) => g,
-        Err(_) => panic!("guard_ref Arc has unexpected clones"),
-    });
-    let lease = super::runtime::guard::ResponseLease::new(
-        operation,
-        match Arc::try_unwrap(permit_ref.0) {
-            Ok(p) => p,
-            Err(_) => panic!("permit_ref Arc has unexpected clones"),
-        },
-    );
+    // Shared ownership is intentional: tower/axum layers may clone
+    // request extensions. The resources are released when the final
+    // owner drops, without relying on a panic-prone uniqueness invariant.
+    let operation = (!is_subscription).then_some(guard_ref.0);
+    let lease = super::runtime::guard::ResponseLease::new(operation, permit_ref.0);
     let timeout = (!is_subscription).then_some(state.config.request_deadline);
     let body = super::validation::DeadlineBody::new(body, timeout);
     axum::response::Response::from_parts(
@@ -170,12 +149,11 @@ pub async fn mcp_handler(
 }
 
 fn is_subscription_request(req: &Request) -> bool {
-    let method = req
-        .headers()
-        .get("mcp-method")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    SUBSCRIPTION_METHODS.contains(&method)
+    req.extensions()
+        .get::<super::middleware::ValidatedMcpRequest>()
+        .is_some_and(|request| {
+            request.subscription && SUBSCRIPTION_METHODS.contains(&request.method.as_str())
+        })
 }
 
 /// Forward path shared by `mcp_handler` and the future pool-aware
@@ -214,17 +192,35 @@ mod tests {
     }
 
     #[test]
-    fn subscription_request_detection() {
-        let req = axum::http::Request::builder()
+    fn subscription_request_detection_uses_validated_body_metadata() {
+        let mut req = axum::http::Request::builder()
             .header("mcp-method", "subscriptions/listen")
             .body(Body::empty())
             .unwrap();
+        req.extensions_mut()
+            .insert(super::super::middleware::ValidatedMcpRequest {
+                method: "subscriptions/listen".to_owned(),
+                subscription: true,
+            });
         assert!(is_subscription_request(&req));
-        let req = axum::http::Request::builder()
+
+        let forged = axum::http::Request::builder()
+            .header("mcp-method", "subscriptions/listen")
+            .body(Body::empty())
+            .unwrap();
+        assert!(!is_subscription_request(&forged));
+
+        let mut ordinary = axum::http::Request::builder()
             .header("mcp-method", "tools/call")
             .body(Body::empty())
             .unwrap();
-        assert!(!is_subscription_request(&req));
+        ordinary
+            .extensions_mut()
+            .insert(super::super::middleware::ValidatedMcpRequest {
+                method: "tools/call".to_owned(),
+                subscription: false,
+            });
+        assert!(!is_subscription_request(&ordinary));
     }
 
     #[test]

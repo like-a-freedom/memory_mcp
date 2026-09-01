@@ -15,6 +15,8 @@ use rmcp::task_manager::{TaskExit, TaskManager, TaskOptions};
 use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router};
 #[cfg(feature = "mcp-apps")]
 use serde_json::json;
+#[cfg(feature = "streamable-http")]
+use sha2::{Digest, Sha256};
 
 #[cfg(feature = "mcp-apps")]
 use crate::logging::LogLevel;
@@ -258,6 +260,15 @@ impl MemoryMcp {
     }
 }
 
+#[cfg(feature = "streamable-http")]
+fn durable_task_fingerprint(tool_name: &str, params: &serde_json::Value) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(tool_name.as_bytes());
+    hasher.update([0]);
+    hasher.update(serde_json::to_vec(params).unwrap_or_default());
+    format!("{tool_name}:{}", hex::encode(hasher.finalize()))
+}
+
 async fn extract_response(
     service: Arc<MemoryService>,
     params: ExtractParams,
@@ -317,11 +328,15 @@ impl ServerHandler for MemoryMcp {
             // CreateTaskResult. The worker picks up the task asynchronously.
             #[cfg(feature = "streamable-http")]
             if let Some(task_store) = self.durable_tasks.as_ref() {
-                let task_id = task_store
-                    .enqueue(
-                        &request.name,
-                        serde_json::to_value(&params).unwrap_or_default(),
+                let task_params = serde_json::to_value(&params).map_err(|error| {
+                    ErrorData::internal_error(
+                        format!("failed to serialize extract task parameters: {error}"),
+                        None,
                     )
+                })?;
+                let fingerprint = durable_task_fingerprint(&request.name, &task_params);
+                let task_id = task_store
+                    .enqueue(&fingerprint, task_params)
                     .await
                     .map_err(|error| {
                         ErrorData::internal_error(
@@ -914,6 +929,15 @@ mod tests {
     #[test]
     fn protocol_version_2026_07_28_is_canonical() {
         assert_eq!(PROTOCOL_VERSION_2026_07_28, ProtocolVersion::V_2026_07_28);
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn durable_task_fingerprint_includes_parameters() {
+        let first = durable_task_fingerprint("extract", &json!({"episode_id": "ep_a"}));
+        let second = durable_task_fingerprint("extract", &json!({"episode_id": "ep_b"}));
+        assert_ne!(first, second);
+        assert!(first.starts_with("extract:"));
     }
 
     #[test]

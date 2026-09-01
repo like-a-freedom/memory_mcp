@@ -338,9 +338,26 @@ mod tests {
             .expect("claim")
             .expect("tenant due");
         assert_eq!(lease_a.fencing_generation, 1);
-        // 2. Worker B (a different replica) steals the lease:
-        // claim_provisioning should return a NEW generation
-        // (the implementation already increments on takeover).
+        assert!(matches!(
+            store
+                .claim_provisioning("ten_a", "replica_b", "lease_b", 60)
+                .await,
+            Err(MemoryError::Conflict(_))
+        ));
+        // 2. The lease expires according to datastore time.
+        // Only then may worker B take it over with a higher
+        // fencing generation.
+        store
+            .heartbeat_provisioning(
+                "ten_a",
+                &lease_a.owner_id,
+                &lease_a.lease_id,
+                lease_a.fencing_generation,
+                now - chrono::Duration::seconds(2),
+                now - chrono::Duration::seconds(1),
+            )
+            .await
+            .expect("expire lease");
         let lease_b = store
             .claim_provisioning("ten_a", "replica_b", "lease_b", 60)
             .await

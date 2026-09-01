@@ -47,18 +47,15 @@ pub struct TenantLogContext {
 /// values.
 pub async fn request_log(req: Request, next: Next) -> Response {
     let started = Instant::now();
-    let ctx = req.extensions().get::<TenantLogContext>().cloned();
-    let request_id = ctx.as_ref().map(|c| c.request_id.as_str()).unwrap_or("");
-    let credential_kind = ctx
-        .as_ref()
-        .map(|c| c.credential_kind.as_str())
-        .unwrap_or("");
-    let tenant_fingerprint = ctx
-        .as_ref()
-        .map(|c| c.tenant_fingerprint.as_str())
-        .unwrap_or("");
     let method_category = categorize(req.method().as_str());
     let response = next.run(req).await;
+    // Inner middleware attaches the context to the response after it
+    // has resolved authentication and the tenant. Read it here rather
+    // than from the request, which is observed before inner layers run.
+    let ctx = response.extensions().get::<TenantLogContext>();
+    let request_id = ctx.map(|c| c.request_id.as_str()).unwrap_or("");
+    let credential_kind = ctx.map(|c| c.credential_kind.as_str()).unwrap_or("");
+    let tenant_fingerprint = ctx.map(|c| c.tenant_fingerprint.as_str()).unwrap_or("");
     let outcome = outcome_label(response.status().as_u16());
     let event = RequestLog {
         event: "http_request",
