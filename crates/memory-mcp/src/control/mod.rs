@@ -9,4 +9,6 @@
 
 pub mod account_api;
 pub mod error;
+#[cfg(feature = "control-plane")]
+pub mod oidc;
 pub mod operator;
