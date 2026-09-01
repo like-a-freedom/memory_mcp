@@ -12,3 +12,5 @@ pub mod error;
 #[cfg(feature = "control-plane")]
 pub mod oidc;
 pub mod operator;
+#[cfg(feature = "control-plane")]
+pub mod session;

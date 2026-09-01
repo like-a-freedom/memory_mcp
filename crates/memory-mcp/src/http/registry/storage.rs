@@ -211,6 +211,43 @@ pub trait RegistryStore: Send + Sync + 'static {
         tenant_id: &str,
         stage: &str,
     ) -> Result<(), MemoryError>;
+
+    // -- Control-plane OIDC / session methods (Task 10.1) --
+
+    /// Store OIDC flow material keyed by HMAC(state).
+    #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        state_hash: &str,
+        sealed_payload: &[u8],
+        aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError>;
+
+    /// Atomically consume an OIDC request by state hash.
+    /// Returns `None` if the state was already consumed or expired.
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError>;
+
+    /// Store a control-plane session.
+    #[cfg(feature = "control-plane")]
+    async fn store_session(
+        &self,
+        session: &crate::control::session::ControlPlaneSession,
+    ) -> Result<(), MemoryError>;
+
+    /// Find a session by keyed cookie hash.
+    #[cfg(feature = "control-plane")]
+    async fn find_session(
+        &self,
+        cookie_hash: &str,
+    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError>;
+
+    /// Delete a session.
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError>;
 }
 
 /// Phase 4 production placeholder. Every method that would
@@ -366,6 +403,45 @@ impl RegistryStore for SurrealRegistryStore {
     ) -> Result<(), MemoryError> {
         Err(unavailable("append_provisioning_event"))
     }
+
+    #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        _state_hash: &str,
+        _sealed_payload: &[u8],
+        _aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError> {
+        Err(unavailable("store_oidc_request"))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        _state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        Err(unavailable("take_oidc_request"))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn store_session(
+        &self,
+        _session: &crate::control::session::ControlPlaneSession,
+    ) -> Result<(), MemoryError> {
+        Err(unavailable("store_session"))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn find_session(
+        &self,
+        _cookie_hash: &str,
+    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        Err(unavailable("find_session"))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, _cookie_hash: &str) -> Result<(), MemoryError> {
+        Err(unavailable("delete_session"))
+    }
 }
 
 /// In-memory `RegistryStore` for unit tests. The fields are
@@ -379,7 +455,17 @@ pub struct InMemoryStore {
     tenants: std::sync::Mutex<Vec<Tenant>>,
     api_keys: std::sync::Mutex<Vec<ApiKey>>,
     events: std::sync::Mutex<Vec<(String, String)>>,
+    #[cfg(feature = "control-plane")]
+    oidc_requests: std::sync::Mutex<std::collections::HashMap<String, SealedOidcPayload>>,
+    #[cfg(feature = "control-plane")]
+    sessions: std::sync::Mutex<
+        std::collections::HashMap<String, crate::control::session::ControlPlaneSession>,
+    >,
 }
+
+/// Sealed OIDC payload: ciphertext + AEAD nonce.
+#[cfg(feature = "control-plane")]
+type SealedOidcPayload = (Vec<u8>, [u8; 12]);
 
 #[cfg(any(test, feature = "test-fixtures"))]
 impl Default for InMemoryStore {
@@ -389,6 +475,10 @@ impl Default for InMemoryStore {
             tenants: Mutex::new(Vec::new()),
             api_keys: Mutex::new(Vec::new()),
             events: Mutex::new(Vec::new()),
+            #[cfg(feature = "control-plane")]
+            oidc_requests: Mutex::new(std::collections::HashMap::new()),
+            #[cfg(feature = "control-plane")]
+            sessions: Mutex::new(std::collections::HashMap::new()),
         }
     }
 }
@@ -774,6 +864,63 @@ impl RegistryStore for InMemoryStore {
             .lock()
             .expect("in-memory store poisoned")
             .push((tenant_id.to_string(), stage.to_string()));
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        state_hash: &str,
+        sealed_payload: &[u8],
+        aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError> {
+        self.oidc_requests.lock().expect("poisoned").insert(
+            state_hash.to_string(),
+            (sealed_payload.to_vec(), *aead_nonce),
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        Ok(self
+            .oidc_requests
+            .lock()
+            .expect("poisoned")
+            .remove(state_hash))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn store_session(
+        &self,
+        session: &crate::control::session::ControlPlaneSession,
+    ) -> Result<(), MemoryError> {
+        self.sessions
+            .lock()
+            .expect("poisoned")
+            .insert(session.cookie_hash.clone(), session.clone());
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn find_session(
+        &self,
+        cookie_hash: &str,
+    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        Ok(self
+            .sessions
+            .lock()
+            .expect("poisoned")
+            .get(cookie_hash)
+            .cloned())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
+        self.sessions.lock().expect("poisoned").remove(cookie_hash);
         Ok(())
     }
 }
