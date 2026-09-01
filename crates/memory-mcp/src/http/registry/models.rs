@@ -124,6 +124,16 @@ pub struct Plan {
     pub limits: PlanLimits,
 }
 
+impl Default for Plan {
+    fn default() -> Self {
+        Self {
+            id: "free".to_string(),
+            version: 1,
+            limits: PlanLimits::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlanLimits {
     pub max_ingested_bytes: u64,
@@ -158,6 +168,19 @@ pub struct SubjectVerifier(pub [u8; 32]);
 pub struct IdentityRef {
     pub issuer: String,
     pub subject_verifier: SubjectVerifier,
+}
+
+/// One-use deletion challenge keyed by an HMAC verifier.
+/// The raw token is never persisted; the verifier is the
+/// only durable link.
+#[derive(Debug, Clone)]
+pub struct DeletionChallengeRecord {
+    pub id: String,
+    pub verifier: String,
+    pub account_id: String,
+    pub session_id: String,
+    pub expires_at: DateTime<Utc>,
+    pub consumed_at: Option<DateTime<Utc>>,
 }
 
 impl KeyedVerifier {
