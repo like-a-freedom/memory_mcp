@@ -1,4 +1,4 @@
-//! OIDC Authorization Code + PKCE (Task 10.1, spec §5.3).
+//! OIDC Authorization Code + PKCE.
 //!
 //! Provides the OIDC types (`OidcState`, `OidcNonce`, `PkceCode`),
 //! the `JwksCache` for key validation, and the `OidcClient` that
@@ -540,7 +540,7 @@ pub fn unseal_oidc_payload(
 }
 
 // ---------------------------------------------------------------------------
-// HTTP handlers (Task 10.1 Steps 3-4)
+// HTTP handlers
 // ---------------------------------------------------------------------------
 
 /// GET /api/v1/auth/authorize — initiate OIDC login.

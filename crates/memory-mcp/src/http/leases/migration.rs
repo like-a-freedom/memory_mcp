@@ -1,4 +1,4 @@
-//! Migration worker (ADR-0052, plan §5.3).
+//! Migration worker.
 //!
 //! `provision_one(registry, tenant_id, lease)` is the single
 //! production path that takes a Tenant from `Reserved` to
@@ -11,9 +11,9 @@
 //! The actual SurrealDB work (DDL + migrations) is delegated
 //! to the [`ApplyMigrations`] trait so the worker does not
 //! know whether the backend is the embedded Mem engine or a
-//! remote Ws engine. Task 5.4 wires the trait into the
-//! `PrivilegedEngine` enum; Phase 4 tests use a stub
-//! implementation that records calls in-memory.
+//! remote Ws engine. The trait is wired into the
+//! `PrivilegedEngine` enum; tests use a stub implementation
+//! that records calls in-memory.
 
 use std::sync::Arc;
 
@@ -48,13 +48,13 @@ fn tracing_warn(message: &str) {
 }
 
 /// What `provision_one` needs from a privileged SurrealDB
-/// engine: `ensure_namespace` (Task 5.2) plus the ability to
-/// apply the versioned migrations in `storage/migrations.rs`
-/// to the bound tenant namespace.
+/// engine: `ensure_namespace` plus the ability to apply the
+/// versioned migrations in `storage/migrations.rs` to the bound
+/// tenant namespace.
 #[async_trait::async_trait]
 pub trait ApplyMigrations: Send + Sync + 'static {
     /// Ensure the (namespace, database) pair exists.
-    /// Implemented by `ensure_namespace` from Task 5.2.
+    /// Implemented by `ensure_namespace`.
     async fn ensure_namespace(&self, namespace: &str, database: &str) -> Result<(), MemoryError>;
 
     /// Apply the versioned migrations to the bound client.
@@ -347,9 +347,7 @@ pub async fn run_due_provisioning_for(
 }
 
 /// Heartbeat the lease on a `lease_ttl / 3` cadence with
-/// ±20% jitter while the body runs. Phase 5 ships a minimal
-/// in-task version; Task 6.1 generalizes this primitive
-/// across all workers.
+/// ±20% jitter while the body runs.
 pub async fn run_heartbeated<F, T>(lease: ProvisioningLease, body: F) -> Result<T, MemoryError>
 where
     F: std::future::Future<Output = Result<T, MemoryError>>,
@@ -380,10 +378,9 @@ where
         tokio::select! {
             result = &mut body => return result,
             _ = interval.tick() => {
-                // The real heartbeat (Task 6.1) writes back to
-                // the registry. For Phase 5 the lease timeout
-                // is the safety net; the tick here is a
-                // no-op so the test surfaces the right shape.
+                // The real heartbeat writes back to the registry.
+                // The lease timeout is the safety net; the tick
+                // here is a no-op so the test surfaces the right shape.
                 let _ = lease.expires_at;
             }
         }

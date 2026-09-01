@@ -1,8 +1,8 @@
-//! Bearer-token authenticator (ADR-0052, plan §4.4).
+//! Bearer-token authenticator.
 //!
 //! The cache and rate limiter live alongside the authenticator in
 //! this module so a single file owns the request-path auth
-//! behavior. The OIDC branch lands in Task 4.6.
+//! behavior.
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -25,8 +25,7 @@ pub enum AuthDecision {
 }
 
 /// Fixed-window per-`key_id` rate limiter, bounded to `capacity`
-/// tracked keys (spec §12). Evicted keys simply start a fresh
-/// window.
+/// tracked keys. Evicted keys simply start a fresh window.
 pub struct RateLimiter {
     window: Duration,
     max_per_window: u32,

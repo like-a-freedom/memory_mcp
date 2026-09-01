@@ -1,4 +1,4 @@
-//! Fenced Task worker (spec §10.2).
+//! Fenced Task worker.
 //!
 //! `DurableTaskStore` implements the `TaskStore` seam
 //! over the tenant namespace's `tenant_task` table. The
@@ -284,9 +284,8 @@ impl TaskStore for DurableTaskStore {
     async fn reconcile_artifacts(&self) -> Result<u64, MemoryError> {
         // The reconciler derives the terminal outcome from
         // durable artifacts + fingerprint. The concrete
-        // artifact scan is the extraction pipeline's job
-        // (Task 8.5 wires extract into the Task path). For
-        // now the seam returns 0 and the scheduler skips
+        // artifact scan is the extraction pipeline's job.
+        // For now the seam returns 0 and the scheduler skips
         // the pass.
         Ok(0)
     }
@@ -572,7 +571,7 @@ mod tests {
         // advanced (crash between the two transactions).
         // The reconciler derives Completed from the
         // fingerprint + artifact presence. The concrete
-        // artifact scan is wired in Task 8.5; this test
+        // artifact scan is wired in; this test
         // pins the seam's contract (idempotent, bounded).
         let count = store.reconcile_artifacts().await.expect("reconcile");
         assert_eq!(count, 0, "reconciler seam is idempotent and bounded");

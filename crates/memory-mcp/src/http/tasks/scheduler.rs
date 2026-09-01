@@ -1,4 +1,4 @@
-//! Task retention and retry/reconcile scheduler (plan §8.6).
+//! Task retention and retry/reconcile scheduler.
 //!
 //! The job walks a bounded batch of tenants per cycle,
 //! claims each tenant's maintenance lease before opening

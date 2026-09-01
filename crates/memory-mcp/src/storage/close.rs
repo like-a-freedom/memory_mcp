@@ -1,4 +1,4 @@
-//! One owner for the bi-temporal close protocol (ADR-0039).
+//! One owner for the bi-temporal close protocol.
 //!
 //! Bi-temporal close — setting the valid-time end (`t_invalid`) together with
 //! the transaction-time end (`t_invalid_ingested`) — is the single operation
@@ -342,7 +342,7 @@ mod tests {
             stored
                 .get("t_invalid_ingested")
                 .is_some_and(|v| !v.is_null()),
-            "t_invalid_ingested must be closed whenever t_invalid is (ADR-0039): {stored}"
+            "t_invalid_ingested must be closed whenever t_invalid is: {stored}"
         );
         assert_eq!(
             stored.get("invalidation_reason").and_then(|v| v.as_str()),

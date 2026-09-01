@@ -1,4 +1,4 @@
-//! Durable Tenant Task records (spec §10).
+//! Durable Tenant Task records.
 //!
 //! The `tenant_task` table holds extraction tasks with
 //! optimistic versioning and a fenced lease. The state

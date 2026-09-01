@@ -59,7 +59,7 @@ mod apps;
 /// }
 /// ```
 /// The single protocol version advertised and accepted by the HTTP
-/// profile (ADR-0052). Stdio (ADR-0038) never references this.
+/// profile. Stdio never references this.
 /// Lives in this module (not http::transport) so non-HTTP feature
 /// sets compile without depending on the http module.
 pub const PROTOCOL_VERSION_2026_07_28: rmcp::model::ProtocolVersion =
@@ -100,10 +100,9 @@ pub struct MemoryMcp {
     subscription_authenticator: Option<std::sync::Arc<crate::http::principal::auth::Authenticator>>,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
-    /// When true, advertise and negotiate only MCP 2026-07-28 (HTTP SaaS
-    /// profile, ADR-0052). Stdio constructors leave this false,
-    /// preserving the frozen stdio behavior (ADR-0038) regardless of
-    /// feature flags.
+    /// When true, advertise and negotiate only MCP 2026-07-28. Stdio
+    /// constructors leave this false, preserving the frozen stdio
+    /// behavior regardless of feature flags.
     modern_protocol_only: bool,
 }
 

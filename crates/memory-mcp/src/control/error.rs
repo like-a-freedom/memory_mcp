@@ -1,7 +1,7 @@
-//! Control-plane API error (ADR-0052, plan §4.7).
+//! Control-plane API error.
 //!
-//! Phase 10 extends the variants; the HTTP mapping stays in this
-//! one place. The Internal(MemoryError) variant's body is generic
+//! The HTTP mapping stays in this one place. The Internal(MemoryError)
+//! variant's body is generic
 //! to avoid leaking storage/error shape; the original is logged
 //! server-side by the surrounding middleware.
 

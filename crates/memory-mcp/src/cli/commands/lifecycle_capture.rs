@@ -1,6 +1,6 @@
 //! Internal lifecycle-capture CLI command — hidden, consumed by hook scripts.
 //!
-//! Not a public tool (ADR-0016 AD-2). Constructs a `NormalizedHostEvent` +
+//! Not a public tool. Constructs a `NormalizedHostEvent` +
 //! `InvocationContext` from JSON arguments and delegates to
 //! `MemoryService::capture_lifecycle_event`.
 

@@ -1,4 +1,4 @@
-//! Runtime pool (ADR-0052). Phase 3 stub gate; real pool in Task 5.5.
+//! Runtime pool with a stub gate; real pool implementation pending.
 
 pub mod activation;
 pub mod bootstrap;

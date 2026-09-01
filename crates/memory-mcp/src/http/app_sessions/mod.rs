@@ -1,4 +1,4 @@
-//! Durable HTTP App Sessions (plan §7).
+//! Durable HTTP App Sessions.
 //!
 //! App Sessions are short-lived interactive state opened
 //! by an MCP client during a session. The HTTP SaaS
@@ -20,9 +20,9 @@ mod tests {
     use std::path::PathBuf;
 
     /// The `040_app_sessions.surql` migration is loaded
-    /// by the registry migration runner (Task 5.x). The
+    /// by the registry migration runner. The
     /// loader's test asserts the file's existence; this
-    /// test pins the schema for Phase 7 by reading the
+    /// test pins the schema by reading the
     /// file and asserting the table is defined.
     #[test]
     fn app_session_table_is_present_in_migration() {

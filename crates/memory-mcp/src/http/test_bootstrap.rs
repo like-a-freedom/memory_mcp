@@ -1,9 +1,9 @@
-//! Test-only bootstrap (ADR-0052, plan §5.8). NEVER
+//! Test-only bootstrap. NEVER
 //! compiled without the `test-fixtures` feature.
 //!
 //! Black-box conformance suites need a way to provision
-//! ready tenants without running the full async scheduler
-//! (which lands in Task 6.2). The bootstrap env var
+//! ready tenants without running the full async scheduler.
+//! The bootstrap env var
 //! `MEMORY_MCP_HTTP_TEST_BOOTSTRAP` carries a comma-separated
 //! list of `<name>=<api_key>` pairs. Each entry is parsed
 //! through `ApiKeyCredential::parse`, and a deterministic

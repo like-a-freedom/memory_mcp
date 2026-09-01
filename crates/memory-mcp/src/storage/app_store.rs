@@ -98,7 +98,7 @@ impl AppStoreClient {
     ///
     /// This is the only sanctioned hard delete in the codebase: community
     /// records are derived artifacts rebuilt from active edges, so removing
-    /// them does not break the bi-temporal audit trail (ADR-0044 spirit).
+    /// them does not break the bi-temporal audit trail.
     /// The id must be a `community:` record; anything else is rejected.
     pub async fn delete_community(&self, community_id: &str) -> Result<Value, MemoryError> {
         if !community_id.starts_with("community:") {
@@ -217,8 +217,7 @@ impl AppStoreClient {
     }
 
     /// Whether any fact linked to `episode_id` was accessed at or after
-    /// `hot_cutoff` (ADR-0044: the archival hotness check lives in the
-    /// owning store).
+    /// `hot_cutoff`.
     pub async fn has_recent_fact_access(
         &self,
         episode_id: &str,

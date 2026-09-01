@@ -104,8 +104,7 @@ pub type ExtractFn = dyn Fn(String) -> ExtractFuture + Send + Sync;
 /// client or other transport is bundled. It is intentionally absent from
 /// [`NerExtractorKind`] / the backend registry: there is no
 /// `ENTITY_EXTRACTOR=llm` config flag and no `NerExtractorKind::Llm` variant.
-/// Programmatic users (e.g. the eval harness) construct it directly. See
-/// ADR-0029 (`docs/adr/0029-registry-of-pluggable-ner-backends.md`).
+/// Programmatic users (e.g. the eval harness) construct it directly.
 ///
 /// Errors from the injected function are propagated to the caller; there is
 /// no silent fallback to an empty candidate list.

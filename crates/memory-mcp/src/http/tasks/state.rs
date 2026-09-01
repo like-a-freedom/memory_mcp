@@ -1,4 +1,4 @@
-//! Tenant Task state machine + version (spec §10.2).
+//! Tenant Task state machine + version.
 //!
 //! `TaskState` is the closed set of states a durable Task
 //! can be in. `is_terminal` distinguishes terminal states
@@ -29,7 +29,7 @@ pub enum TaskState {
 
 /// True if the state is a terminal outcome. The reconciler
 /// derives the terminal outcome from durable artifacts;
-/// this is the spec §10.2 atomicity boundary.
+/// this is the atomicity boundary.
 pub fn is_terminal(s: TaskState) -> bool {
     matches!(
         s,
@@ -74,7 +74,7 @@ pub struct TaskHandle {
     pub lease_expiry: DateTime<Utc>,
 }
 
-/// Durable Tenant Task seam (spec §10). Implemented by
+/// Durable Tenant Task seam. Implemented by
 /// the fenced worker store over the tenant namespace's
 /// `tenant_task` table.
 #[async_trait::async_trait]
@@ -93,7 +93,7 @@ pub trait TaskStore: Send + Sync + 'static {
     /// result, error). A missing record is `Ok(None)`.
     async fn load(&self, task_id: &str) -> Result<Option<TenantTaskRecord>, MemoryError>;
 
-    /// Set cancellation intent; never deletes (spec §10.2).
+    /// Set cancellation intent; never deletes.
     async fn set_cancellation_intent(&self, task_id: &str) -> Result<(), MemoryError>;
 
     /// Claim a queued task or a running task whose lease
@@ -134,7 +134,7 @@ pub trait TaskStore: Send + Sync + 'static {
     async fn requeue_expired_running(&self) -> Result<u64, MemoryError>;
 
     /// Reconcile the terminal outcome from durable
-    /// artifacts + fingerprint (spec §10.2). Returns the
+    /// artifacts + fingerprint. Returns the
     /// number of tasks reconciled.
     async fn reconcile_artifacts(&self) -> Result<u64, MemoryError>;
 

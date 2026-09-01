@@ -1,4 +1,4 @@
-//! Black-box protocol conformance for the HTTP SaaS profile (spec §20.1).
+//! Black-box protocol conformance for the HTTP SaaS profile.
 //!
 //! Spawns the `memory_mcp_http` binary on an ephemeral port, waits for
 //! the `memory_mcp_http bound=<addr>` line, then drives a series of

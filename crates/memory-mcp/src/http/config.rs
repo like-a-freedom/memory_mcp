@@ -65,7 +65,7 @@ pub enum SignupMode {
 }
 
 /// Project-private CIDR parser. Avoids the `cidr` crate dep for a single
-/// use site (Task 3.1 plan: "Add `cidr` tiny parser (no extra dep)").
+/// use site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrustedCidr {
     V4(std::net::Ipv4Addr, u8),

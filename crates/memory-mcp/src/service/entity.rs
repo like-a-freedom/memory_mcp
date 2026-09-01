@@ -9,7 +9,7 @@ use crate::error::MemoryError;
 /// Resolves and persists entities.
 ///
 /// Entity-table SQL lives in [`crate::storage::EntityStoreClient`]
-/// (ADR-0044); this service expresses intent, not queries.
+/// this service expresses intent, not queries.
 #[derive(Clone)]
 pub struct EntityService {
     entity_store: crate::storage::EntityStoreClient,

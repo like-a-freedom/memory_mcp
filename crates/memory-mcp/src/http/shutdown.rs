@@ -1,4 +1,4 @@
-//! Coordinated shutdown state for the HTTP profile (spec §17).
+//! Coordinated shutdown state for the HTTP profile.
 //!
 //! Each `HttpState` owns its own `ShutdownState` so test/application
 //! instances do not share a cancelled token.

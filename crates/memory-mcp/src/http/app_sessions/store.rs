@@ -1,4 +1,4 @@
-//! Durable app session store (plan §7.2).
+//! Durable app session store.
 //!
 //! The store wraps a `BoundDbClient` bound to a specific
 //! tenant namespace. Every call carries the tenant
@@ -23,7 +23,7 @@ use serde_json::Value;
 use crate::error::MemoryError;
 use crate::storage::client::BoundDbClient;
 
-/// Idle window. The cleanup pass (Task 7.2) physically
+/// Idle window. The cleanup pass physically
 /// deletes rows whose `idle_expiry` is in the past.
 pub const IDLE_EXPIRY_SECS: i64 = 30 * 60;
 /// Hard ceiling on session lifetime. A session whose
@@ -33,7 +33,7 @@ pub const IDLE_EXPIRY_SECS: i64 = 30 * 60;
 pub const ABSOLUTE_EXPIRY_SECS: i64 = 24 * 60 * 60;
 /// Maximum open app sessions per tenant. Enforced in
 /// `open` before insert; matches
-/// `Plan::max_open_app_sessions` (Task 6.4).
+/// `Plan::max_open_app_sessions`.
 pub const MAX_OPEN_PER_TENANT: i64 = 32;
 
 pub struct AppSessionStore {

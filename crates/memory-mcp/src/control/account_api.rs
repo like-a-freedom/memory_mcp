@@ -1,9 +1,7 @@
-//! Control-plane Account/Tenant endpoints (ADR-0052, plan §4.7).
+//! Control-plane Account/Tenant endpoints.
 //!
-//! Phase 4 stub: create-account writes a reserved Tenant + the
-//! matching Account, then enqueues a provisioning event. The
-//! actual provisioning state machine lands in Task 5.1; the
-//! scheduler lands in Task 6.2.
+//! Stub: create-account writes a reserved Tenant + the
+//! matching Account, then enqueues a provisioning event.
 
 use std::sync::Arc;
 
@@ -52,7 +50,7 @@ fn json_response<T: serde::Serialize>(status: StatusCode, data: &T) -> Response 
 }
 
 // ---------------------------------------------------------------------------
-// Account management endpoints (Task 10.5)
+// Account management endpoints
 // ---------------------------------------------------------------------------
 
 /// GET /api/v1/account — read account metadata + tenant status.
@@ -230,7 +228,7 @@ pub async fn start_account_deletion(
     _state: State<Arc<HttpState>>,
     _session: axum::extract::Extension<super::session::ControlPlaneSession>,
 ) -> Result<Response, ApiError> {
-    // Deletion flow is Task 10.7; return stub for now.
+    // Deletion flow stub; return stub for now.
     Ok(json_response(
         StatusCode::OK,
         &serde_json::json!({
@@ -245,7 +243,7 @@ pub async fn confirm_account_deletion(
     _state: State<Arc<HttpState>>,
     _session: axum::extract::Extension<super::session::ControlPlaneSession>,
 ) -> Result<StatusCode, ApiError> {
-    // Deletion flow is Task 10.7; return stub for now.
+    // Deletion flow stub; return stub for now.
     Err(ApiError::Unavailable)
 }
 

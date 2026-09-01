@@ -1,4 +1,4 @@
-//! Tenant Runtime contents (ADR-0052, plan §5.4).
+//! Tenant Runtime contents.
 //!
 //! The runtime is the per-Tenant bundle: a tenant-bound
 //! SurrealDB client, a `MemoryService` (and the modern
@@ -16,10 +16,9 @@ use crate::mcp::handlers::MemoryMcp;
 use crate::storage::client::BoundDbClient;
 use crate::storage::client::SurrealDbClient;
 
-/// Per-tenant runtime bundle. Lives in the LRU pool (Task
-/// 5.5); the `mcp_service` is the per-request dispatch
-/// target once the HTTP pipeline has resolved and acquired
-/// the runtime.
+/// Per-tenant runtime bundle. Lives in the LRU pool; the
+/// `mcp_service` is the per-request dispatch target once the
+/// HTTP pipeline has resolved and acquired the runtime.
 pub struct TenantRuntime {
     pub tenant_id: String,
     pub namespace: String,
@@ -40,8 +39,7 @@ pub struct TenantRuntime {
 
 impl TenantRuntime {
     /// Construct a runtime from a pre-bound `SurrealDbClient`
-    /// and a `Tenant` row. Used by both `build_runtime` (Task
-    /// 5.4) and tests.
+    /// and a `Tenant` row. Used by both `build_runtime` and tests.
     pub fn from_bound_client(
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
@@ -53,7 +51,7 @@ impl TenantRuntime {
             tenant_db.clone(),
             namespace.clone(),
             "info".into(),
-            100, // rate_limit_rps; plan-driven value arrives with quotas (Task 6.4)
+            100, // rate_limit_rps; configurable via quotas
             100, // rate_limit_burst
         )?;
         let mut mcp_service = MemoryMcp::new_modern(service);

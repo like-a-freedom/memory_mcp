@@ -1,4 +1,4 @@
-//! Outbox polling/reconciliation scheduler job (spec §11).
+//! Outbox polling/reconciliation scheduler job.
 //!
 //! The primary cross-replica wake mechanism is SurrealDB's
 //! LIVE SELECT on `tenant_change_event`. This scheduler

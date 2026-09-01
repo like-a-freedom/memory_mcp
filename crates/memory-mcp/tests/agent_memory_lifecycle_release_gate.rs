@@ -1,8 +1,7 @@
 //! Agent-memory lifecycle integration release gate.
 //!
 //! This test file is the single canonical home for the agent-memory lifecycle
-//! release gate described in
-//! `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`.
+//! release gate.
 //!
 //! It is intentionally split into two layers:
 //!
@@ -61,7 +60,7 @@ const FORBIDDEN_MCP_TOOLS: &[&str] = &[
 ///
 /// `init` is the one output-only onboarding exception authorized by ADR-0030.
 /// The `lifecycle-*` entries are internal hidden subcommands consumed by hook
-/// scripts (ADR-0016 AD-4/AD-5); `lifecycle` is the explicit operator-facing
+/// scripts; `lifecycle` is the explicit operator-facing
 /// maintenance command authorized by ADR-0047.
 const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "serve",
@@ -361,8 +360,7 @@ fn run_agent_memory_lifecycle_baseline() {
 ///
 /// Fails on any surface expansion, trust elevation, external self-promotion,
 /// contradiction-triggered mutation, missing raw evidence, hidden dead letter,
-/// or persisted unlinked exposure trace. This is the cumulative gate from
-/// Tasks 1–9.
+/// or persisted unlinked exposure trace. This is the cumulative gate.
 #[test]
 fn core_agent_memory_release_gate() {
     // 1. Public surface remains exactly eight MCP tools.

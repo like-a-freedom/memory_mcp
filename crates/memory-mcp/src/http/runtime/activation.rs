@@ -1,4 +1,4 @@
-//! Single-flight activation helper (ADR-0052, plan §5.5).
+//! Single-flight activation helper.
 //!
 //! `activate_once` is the canonical helper used by `Pool`
 //! when a slot's broadcast channel is empty. It runs the
@@ -8,7 +8,7 @@
 //!
 //! The actual implementation lives in `pool::Pool::acquire_or_wait`
 //! because it owns the slot map. This module is reserved
-//! for the future Task 6.x scheduler hook.
+//! for the future scheduler hook.
 
 #[allow(dead_code)]
 pub fn placeholder() {}

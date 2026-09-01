@@ -1,4 +1,4 @@
-//! HTTP SaaS transport (ADR-0052).
+//! HTTP SaaS transport.
 //!
 //! # rmcp 3.1.2 API surface (verified 2026-08-28)
 //!
@@ -90,7 +90,7 @@ where
     StreamableHttpService::new(factory, Arc::new(NeverSessionManager::default()), config)
 }
 
-/// Phase 5 production handler. The runtime guard and admission
+/// Production handler. The runtime guard and admission
 /// permit were inserted by `acquire_runtime`; this handler
 /// extracts them and moves the guard into a `ResponseLease`
 /// wrapped around the body so the pin and permit are not

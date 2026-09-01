@@ -7,9 +7,9 @@ use crate::profile::ProfileManifest;
 
 /// Merges per-shard artifacts into one truthful Evaluation Artifact.
 ///
-/// Summary math runs through the same `SuiteReducer` seam a direct run uses
-/// (ADR-0025), and gates, budget status, and verdict are re-derived from the
-/// merged outcome set instead of being copied from one shard.
+/// Summary math runs through the same `SuiteReducer` seam a direct run uses,
+/// and gates, budget status, and verdict are re-derived from the merged
+/// outcome set instead of being copied from one shard.
 pub fn merge_shards(
     shards: &[RunArtifact],
     manifest: &ProfileManifest,

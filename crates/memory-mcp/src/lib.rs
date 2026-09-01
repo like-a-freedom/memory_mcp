@@ -43,8 +43,8 @@ pub mod runner;
 
 /// # SaaS tenant invariant
 ///
-/// Memory MCP has one namespace per process in the stdio profile (ADR-0038)
-/// and a bounded pool of namespaces in the HTTP SaaS profile (ADR-0052).
+/// Memory MCP has one namespace per process in the stdio profile
+/// and a bounded pool of namespaces in the HTTP SaaS profile.
 /// Namespace MUST never be selected through MCP arguments, URL paths, OAuth
 /// claims, or API-key contents. In every profile the Tenant is derived from
 /// an `AuthenticatedPrincipal` resolved by authentication, never by request.

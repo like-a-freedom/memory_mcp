@@ -4,7 +4,7 @@
 //! `LifecycleCapture::execute()` and `LifecycleRecall::execute()` through
 //! `MemoryService::capture_lifecycle_event()` and
 //! `MemoryService::recall_lifecycle_event()`. They close the evidence gate
-//! required by ADR-0016 AD-4/AD-5/AD-6 (Tasks 4, 6, and 9).
+//! required by ADR-0016 AD-4/AD-5/AD-6.
 //!
 //! Unlike the unit tests in `src/service/agent_memory/{capture,recall}.rs`,
 //! these tests construct a real in-memory `MemoryService` with migrations

@@ -1,4 +1,4 @@
-//! Narrow entity store: owns the `entity` table's SQL (ADR-0044).
+//! Narrow entity store: owns the `entity` table's SQL.
 //!
 //! Alias resolution reads and the alias-append write live here so the
 //! service layer expresses intent instead of supplying SQL.

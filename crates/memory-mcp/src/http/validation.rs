@@ -1,5 +1,4 @@
-//! Response body deadline (ADR-0052 §"Disconnect cancels request-owned
-//! work"). The Streamable HTTP service also receives a cancellation
+//! Response body deadline. The Streamable HTTP service also receives a cancellation
 //! token, so a timeout stops request-owned work; already durable
 //! commits remain durable.
 

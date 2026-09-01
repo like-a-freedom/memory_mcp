@@ -1,4 +1,4 @@
-//! Shared sync helpers (ADR-0052, plan §4.4).
+//! Shared sync helpers.
 //!
 //! The cache and rate-limiter use `std::sync::Mutex`; both
 //! want the same poisoned-guard recovery. Keep it in one

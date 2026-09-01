@@ -1,5 +1,5 @@
 //! Transactional outbox: atomically apply a mutation and
-//! emit a `TenantChangeEvent` (spec §11).
+//! emit a `TenantChangeEvent`.
 //!
 //! Every canonical write path (ingest, resolve, invalidate,
 //! durable task state changes, durable app session commands)

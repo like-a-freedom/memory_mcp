@@ -185,7 +185,6 @@ pub struct InitArgs {
 /// Internal lifecycle-capture args — consumed by hook scripts, not a public tool.
 ///
 /// Hidden from `--help` via `#[command(hide = true)]` on the subcommand variant.
-/// See ADR-0016 AD-4 and `docs/agent_integration/CONTRACT.md`.
 #[derive(Debug, Args)]
 pub struct LifecycleCaptureArgs {
     /// JSON-encoded scope-free `NormalizedHostEvent` (event kind, task fingerprint, policy tags, and bounded content).
@@ -199,7 +198,6 @@ pub struct LifecycleCaptureArgs {
 /// Internal lifecycle-recall args — consumed by hook scripts, not a public tool.
 ///
 /// Hidden from `--help` via `#[command(hide = true)]` on the subcommand variant.
-/// See ADR-0016 AD-5 and `docs/agent_integration/CONTRACT.md`.
 #[derive(Debug, Args)]
 pub struct LifecycleRecallArgs {
     /// JSON-encoded scope-free `NormalizedHostEvent` (event kind, task fingerprint, policy tags, and bounded content).

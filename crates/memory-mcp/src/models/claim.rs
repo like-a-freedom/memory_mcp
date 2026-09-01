@@ -562,7 +562,7 @@ pub struct ClaimDraft {
     pub validity_source: ClaimValiditySource,
     pub source_lineage: Option<String>,
     /// Byte offset range `(start, end)` in the original source content.
-    /// Provenance metadata only — excluded from claim identity (ADR-0013).
+    /// Provenance metadata only — excluded from claim identity.
     #[serde(default)]
     pub source_span: Option<(usize, usize)>,
 }
@@ -628,7 +628,7 @@ pub struct Claim {
     pub source_lineage: Option<String>,
     /// Byte offset range `(start, end)` in the original source content from
     /// which the claim was extracted. Provenance metadata only — excluded
-    /// from claim identity (ADR-0013) and from the canonical payload hash.
+    /// from claim identity and from the canonical payload hash.
     #[serde(default)]
     pub source_span: Option<(usize, usize)>,
     pub derivation: ClaimDerivation,

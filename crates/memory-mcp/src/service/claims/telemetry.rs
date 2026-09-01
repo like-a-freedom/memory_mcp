@@ -1,6 +1,6 @@
 //! Claim reconciliation telemetry — bounded metrics and redacted trace events.
 //!
-//! Five Prometheus metric families with bounded enum labels (ADR-0005).
+//! Five Prometheus metric families with bounded enum labels.
 //! Raw namespace, project, subject, comparison-key, fact, claim, relation,
 //! and job identifiers never become metric labels. Trace events carry the
 //! full structurally-redacted key; metrics aggregate only by schema,
@@ -195,7 +195,7 @@ pub(crate) fn record_backfill_fact(outcome: &str, reason_code: &str) {
 
 // ─── Forbidden-label guard ────────────────────────────────────────────────────
 
-// Label keys banned from Prometheus metrics by ADR-0005. The unit test
+// Label keys banned from Prometheus metrics. The unit test
 // `forbidden_label_keys_are_complete` asserts no metric emitted by this
 // module ever uses one of them; the constant itself is test-only state.
 #[cfg(test)]
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn forbidden_label_keys_are_complete() {
-        // ADR-0005 forbids every unbounded identifier from becoming a label.
+        // Every unbounded identifier is forbidden from becoming a label.
         for key in FORBIDDEN_LABEL_KEYS {
             assert!(!key.is_empty());
         }

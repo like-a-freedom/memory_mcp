@@ -1,4 +1,4 @@
-//! HTTP composition-root helpers (ADR-0052).
+//! HTTP composition-root helpers.
 //!
 //! Pure startup functions, no CLI parsing. The binary's `main` only
 //! reads env, dispatches to these helpers, and serves.

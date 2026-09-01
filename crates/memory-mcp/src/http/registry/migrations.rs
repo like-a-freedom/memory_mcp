@@ -1,7 +1,7 @@
-//! Control-namespace migrations (ADR-0052, plan §4.1 Step 4).
+//! Control-namespace migrations.
 //!
-//! Phase 4 ships the migration SQL file. The runtime
-//! `apply_registry_migrations` wrapper is the seam the Task 5.x
+//! Ships the migration SQL file. The runtime
+//! `apply_registry_migrations` wrapper is the seam the
 //! `SurrealRegistryStore` calls during connect; until then the
 //! tests for it live in `migrations::tests` and exercise an
 //! in-memory migration recorder.
@@ -12,8 +12,8 @@ use crate::error::MemoryError;
 use crate::http::registry::storage::RegistryStore;
 use crate::http::registry::storage::SurrealRegistryStore;
 
-/// Path to the registry migration directory. Phase 4 ships the
-/// single file `001_registry.surql`; Task 5.x adds the runtime
+/// Path to the registry migration directory. Ships the single
+/// file `001_registry.surql`; a later milestone adds the runtime
 /// loader. Tests assert the file's existence.
 pub const REGISTRY_MIGRATION_DIR: &str = "crates/memory-mcp/migrations";
 
@@ -42,9 +42,8 @@ pub async fn apply_registry_migrations(
     Ok(migrations)
 }
 
-/// Migration ids the registry needs in Phase 4. The actual SQL
-/// is in the migration directory referenced by
-/// `REGISTRY_MIGRATION_DIR`.
+/// Migration ids the registry needs. The actual SQL is in the
+/// migration directory referenced by `REGISTRY_MIGRATION_DIR`.
 fn list_migrations() -> Vec<String> {
     vec!["001_registry".to_string()]
 }
@@ -57,8 +56,7 @@ mod tests {
 
     #[test]
     fn migration_dir_is_defined() {
-        // The directory the plan calls for is the same directory
-        // where the Phase 4 SQL file lives.
+        // The directory where the SQL file lives.
         assert!(REGISTRY_MIGRATION_DIR.ends_with("migrations"));
     }
 

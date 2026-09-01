@@ -1,9 +1,9 @@
 //! Concrete store for the episode domain: episode reads/writes plus the
 //! community/entity lookups community helpers use.
 //!
-//! Replaces direct `DbClient` consumption in `service/episode/` per
+//! Replaces direct `DbClient` consumption in `service/episode/`.
 //! The store owns its queries; SQL for episode-domain reads lives here
-//! (ADR-0027) rather than on the universal `DbClient`.
+//! rather than on the universal `DbClient`.
 
 use std::sync::Arc;
 
@@ -51,7 +51,7 @@ impl EpisodeStoreClient {
         self.db.update(record_id, content).await
     }
 
-    /// Persists an entity extraction projection row (ADR-0044: the CREATE
+    /// Persists an entity extraction projection row (the CREATE
     /// statement lives in the owning store, not in the service layer).
     ///
     /// `record_body` is the two-part `episode-key:projection-suffix` body;
@@ -73,7 +73,6 @@ impl EpisodeStoreClient {
         Ok(())
     }
 
-    /// Persists an entity extraction projection row (ADR-0044: the CREATE
     /// Finds episodes by the stable source identity used by both legacy and
     /// scope-free episode IDs. The caller decides how many matches are safe.
     pub async fn select_by_source_identity(

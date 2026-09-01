@@ -1,4 +1,4 @@
-//! Prometheus scrape surface for the HTTP profile (ADR-0048).
+//! Prometheus scrape surface for the HTTP profile.
 //!
 //! The HTTP profile serves metrics on its own axum `/metrics` route.
 //! The recorder is installed exactly once at startup; the stdio

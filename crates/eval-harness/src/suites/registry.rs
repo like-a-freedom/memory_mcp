@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(summaries[0].total, 0);
     }
 
-    /// The merged-artifact guarantee (ADR-0025) holds only while `reducer_for`
+    /// The merged-artifact guarantee holds only while `reducer_for`
     /// constructs reducers identical to the suites'. Compare both paths on the
     /// same outcome set for every suite that builds without external state, so
     /// a drifted cutoff/prefix/spec becomes a test failure, not a silent

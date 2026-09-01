@@ -1,9 +1,8 @@
-//! HTTP middleware (ADR-0052 §"Two deployment profiles").
+//! HTTP middleware.
 //!
 //! Each middleware is `axum::middleware::from_fn`-compatible. Layer
 //! ordering matters: layers added LATER wrap layers added EARLIER on
-//! the request path. The plan's Task 3.5–3.7 stack is documented
-//! in `http::router::build_router`.
+//! the request path.
 
 use axum::http::{Method, StatusCode};
 use axum::middleware::Next;
@@ -13,7 +12,7 @@ use std::sync::Arc;
 use super::HttpState;
 use super::principal::auth::AuthDecision;
 
-/// Reject every non-POST method on `/mcp` (spec §4). Runs before
+/// Reject every non-POST method on `/mcp`. Runs before
 /// routing; all other paths pass through untouched. Defense in depth
 /// on top of axum's own method matcher.
 pub async fn reject_non_post_mcp(
@@ -43,7 +42,7 @@ fn unauthorized_response() -> Response {
     response
 }
 
-/// Bearer-token authenticator (ADR-0052, plan §4.6). Wired only
+/// Bearer-token authenticator. Wired only
 /// on `/mcp`. Returns 401 (with `WWW-Authenticate: Bearer
 /// realm="memory-mcp"`) without distinguishing missing,
 /// unknown, expired, revoked, or malformed keys. The raw
@@ -72,7 +71,7 @@ pub async fn authenticate(
     next.run(req).await
 }
 
-/// Tenant runtime acquisition (ADR-0052, plan §5.6). Runs
+/// Tenant runtime acquisition. Runs
 /// after `authenticate` so the principal is available. Resolves
 /// the Tenant via `account_resolver`, acquires a global
 /// admission permit (or a separate subscription permit for
