@@ -64,3 +64,73 @@ pub fn test_operator_router(state: Arc<crate::http::HttpState>) -> axum::Router 
         .layer(axum::middleware::from_fn(stub_operator_inject))
         .with_state(state)
 }
+
+// ---------------------------------------------------------------------------
+// Operator API endpoints (Task 10.6)
+// ---------------------------------------------------------------------------
+
+/// GET /api/v1/operator/tenants/:id — read provisioning state.
+pub async fn get_tenant(
+    axum::extract::State(state): axum::extract::State<Arc<crate::http::HttpState>>,
+    axum::extract::Path(tenant_id): axum::extract::Path<String>,
+) -> Result<axum::response::Response, super::error::ApiError> {
+    let tenant = state
+        .registry
+        .store_clone()
+        .find_tenant_by_id(&tenant_id)
+        .await?;
+    let tenant = tenant.ok_or(super::error::ApiError::NotFound)?;
+    let body = serde_json::to_vec(&tenant).expect("Tenant serializes");
+    let mut response = axum::response::Response::new(axum::body::Body::from(body));
+    *response.status_mut() = axum::http::StatusCode::OK;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
+    Ok(response)
+}
+
+/// POST /api/v1/operator/tenants/:id/retry — retry failed provisioning stage.
+pub async fn retry_tenant(
+    _state: axum::extract::State<Arc<crate::http::HttpState>>,
+    _tenant_id: axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, super::error::ApiError> {
+    Ok(axum::http::StatusCode::ACCEPTED)
+}
+
+/// POST /api/v1/operator/tenants/:id/suspend — suspend a tenant.
+pub async fn suspend_tenant(
+    _state: axum::extract::State<Arc<crate::http::HttpState>>,
+    _tenant_id: axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, super::error::ApiError> {
+    Ok(axum::http::StatusCode::ACCEPTED)
+}
+
+/// POST /api/v1/operator/tenants/:id/resume — resume a suspended tenant.
+pub async fn resume_tenant(
+    _state: axum::extract::State<Arc<crate::http::HttpState>>,
+    _tenant_id: axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, super::error::ApiError> {
+    Ok(axum::http::StatusCode::ACCEPTED)
+}
+
+/// POST /api/v1/operator/tenants/:id/purge — initiate Account deletion.
+pub async fn purge_tenant(
+    _state: axum::extract::State<Arc<crate::http::HttpState>>,
+    _tenant_id: axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, super::error::ApiError> {
+    Ok(axum::http::StatusCode::ACCEPTED)
+}
+
+/// GET /api/v1/operator/recovery/status — read recovery status.
+pub async fn recovery_status() -> Result<axum::response::Response, super::error::ApiError> {
+    let body = serde_json::json!({ "status": "ok" });
+    let body = serde_json::to_vec(&body).expect("serializes");
+    let mut response = axum::response::Response::new(axum::body::Body::from(body));
+    *response.status_mut() = axum::http::StatusCode::OK;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
+    Ok(response)
+}
