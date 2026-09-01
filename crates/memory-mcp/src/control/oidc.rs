@@ -32,6 +32,12 @@ impl OidcState {
     }
 }
 
+impl Default for OidcState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// OIDC nonce — validated against the ID token's `nonce` claim.
 #[derive(Debug, Clone)]
 pub struct OidcNonce(String);
@@ -45,6 +51,12 @@ impl OidcNonce {
     }
 }
 
+impl Default for OidcNonce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// PKCE code verifier + S256 challenge.
 #[derive(Debug, Clone)]
 pub struct PkceCode {
@@ -54,7 +66,6 @@ pub struct PkceCode {
 
 impl PkceCode {
     pub fn new() -> Self {
-        use rand::Fill;
         let mut bytes = [0_u8; 32];
         rand::fill(&mut bytes);
         let verifier = URL_SAFE_NO_PAD.encode(bytes);
@@ -63,6 +74,12 @@ impl PkceCode {
             verifier,
             challenge,
         }
+    }
+}
+
+impl Default for PkceCode {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -169,10 +186,8 @@ impl JwksCache {
             .map_err(|_| AuthError::Jwks("JWKS cache lock poisoned".into()))?
             .fetched_at
             .is_some_and(|at| at.elapsed() < self.ttl);
-        if fresh {
-            if let Some(key) = self.find_key(kid)? {
-                return Ok(key);
-            }
+        if fresh && let Some(key) = self.find_key(kid)? {
+            return Ok(key);
         }
         let _refresh = self.refresh_lock.lock().await;
         let fresh = self
@@ -181,10 +196,8 @@ impl JwksCache {
             .map_err(|_| AuthError::Jwks("JWKS cache lock poisoned".into()))?
             .fetched_at
             .is_some_and(|at| at.elapsed() < self.ttl);
-        if fresh {
-            if let Some(key) = self.find_key(kid)? {
-                return Ok(key);
-            }
+        if fresh && let Some(key) = self.find_key(kid)? {
+            return Ok(key);
         }
         self.refresh().await?;
         self.find_key(kid)?
@@ -478,7 +491,6 @@ pub fn seal_oidc_payload(
 
     let cipher = ChaCha20Poly1305::new(key.into());
     let mut nonce_bytes = [0u8; 12];
-    use rand::Fill;
     rand::fill(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
