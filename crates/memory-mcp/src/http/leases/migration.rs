@@ -63,10 +63,12 @@ pub trait ApplyMigrations: Send + Sync + 'static {
     async fn apply_migrations(&self, namespace: &str) -> Result<u32, MemoryError>;
 }
 
-/// A no-op `ApplyMigrations` impl useful for tests that only
-/// exercise the state machine (no actual DDL).
+/// A no-op `ApplyMigrations` impl useful only for tests that
+/// exercise the state machine without actual DDL.
+#[cfg(any(test, feature = "test-fixtures"))]
 pub struct NoopMigrations;
 
+#[cfg(any(test, feature = "test-fixtures"))]
 #[async_trait::async_trait]
 impl ApplyMigrations for NoopMigrations {
     async fn ensure_namespace(&self, _namespace: &str, _database: &str) -> Result<(), MemoryError> {
@@ -175,7 +177,7 @@ pub async fn provision_one(
     let binding = tenant.namespace_binding.clone();
     let _fence = LeaseFence::from_lease(&lease);
 
-    let migration_result = run_heartbeated(lease.clone(), async {
+    let migration_result = run_heartbeated(store.clone(), tenant_id, lease.clone(), async {
         migrations
             .ensure_namespace(&binding.namespace, &binding.database)
             .await?;
@@ -265,8 +267,18 @@ pub async fn provision_one(
 pub async fn run_due_provisioning(
     registry: crate::http::registry::RegistryHandle,
 ) -> Result<(), MemoryError> {
-    let store = registry.store_clone();
-    run_due_provisioning_for(registry, store, 100, chrono::Utc::now()).await
+    #[cfg(any(test, feature = "test-fixtures"))]
+    {
+        let store = registry.store_clone();
+        run_due_provisioning_for(registry, store, 100, chrono::Utc::now()).await
+    }
+    #[cfg(not(any(test, feature = "test-fixtures")))]
+    {
+        let _ = registry;
+        Err(MemoryError::Unavailable(
+            "production provisioning migration adapter is not wired; refusing to run NoopMigrations".into(),
+        ))
+    }
 }
 
 /// Test-friendly seam: walk up to `limit` due tenants. The
@@ -327,9 +339,16 @@ pub async fn run_due_provisioning_for(
         // long-running. The current migration pass is
         // bounded; if it ever exceeds the lease window
         // the next scheduler tick will reclaim.
-        if let Err(error) =
-            provision_one(store.clone(), &tenant.id, typed, Arc::new(NoopMigrations)).await
-        {
+        #[cfg(any(test, feature = "test-fixtures"))]
+        let migration_result =
+            provision_one(store.clone(), &tenant.id, typed, Arc::new(NoopMigrations)).await;
+        #[cfg(not(any(test, feature = "test-fixtures")))]
+        let migration_result: Result<(), MemoryError> = Err(MemoryError::Unavailable(
+            "production provisioning migration adapter is not wired".into(),
+        ));
+        #[cfg(not(any(test, feature = "test-fixtures")))]
+        let _ = typed;
+        if let Err(error) = migration_result {
             tracing_warn(&format!(
                 "scheduler: provision_one failed for {}: {error}",
                 tenant.id
@@ -348,14 +367,20 @@ pub async fn run_due_provisioning_for(
 
 /// Heartbeat the lease on a `lease_ttl / 3` cadence with
 /// ±20% jitter while the body runs.
-pub async fn run_heartbeated<F, T>(lease: ProvisioningLease, body: F) -> Result<T, MemoryError>
+pub async fn run_heartbeated<F, T>(
+    store: Arc<dyn RegistryStore>,
+    tenant_id: &str,
+    lease: ProvisioningLease,
+    body: F,
+) -> Result<T, MemoryError>
 where
-    F: std::future::Future<Output = Result<T, MemoryError>>,
+    F: std::future::Future<Output = Result<T, MemoryError>> + Send,
+    T: Send + 'static,
 {
     let ttl_secs = (lease.expires_at - lease.heartbeat_at).num_seconds().max(1);
     let base_interval = std::time::Duration::from_secs((ttl_secs / 3).max(1) as u64);
-    // Apply ±20% jitter from the process clock; we don't
-    // pull in a RNG dep for this single jitter.
+    // Apply ±20% jitter from the process clock without adding
+    // another random-number dependency to this path.
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos() as u64)
@@ -370,21 +395,45 @@ where
     let interval_duration = base_interval + std::time::Duration::from_millis(offset);
     let mut interval = tokio::time::interval(interval_duration);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    // Skip the immediate first tick.
+    // Do not heartbeat synchronously before work starts: the lease
+    // was just claimed and the first regular tick is bounded by the
+    // lease interval. Subsequent ticks extend it or cancel the work.
     interval.tick().await;
 
-    tokio::pin!(body);
-    loop {
-        tokio::select! {
-            result = &mut body => return result,
-            _ = interval.tick() => {
-                // The real heartbeat writes back to the registry.
-                // The lease timeout is the safety net; the tick
-                // here is a no-op so the test surfaces the right shape.
-                let _ = lease.expires_at;
+    let heartbeat_cancel = tokio_util::sync::CancellationToken::new();
+    let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
+    let heartbeat_store = store;
+    let heartbeat_tenant = tenant_id.to_owned();
+    let heartbeat_lease = lease;
+    let heartbeat_cancel_task = heartbeat_cancel.clone();
+    let heartbeat = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = heartbeat_cancel_task.cancelled() => break,
+                _ = interval.tick() => {
+                    let now = chrono::Utc::now();
+                    let expiry = now + chrono::Duration::seconds(ttl_secs);
+                    if heartbeat_lease
+                        .heartbeat(heartbeat_store.as_ref(), &heartbeat_tenant, now, expiry)
+                        .await
+                        .is_err()
+                    {
+                        let _ = lost_tx.send(());
+                        break;
+                    }
+                }
             }
         }
-    }
+    });
+
+    tokio::pin!(body);
+    let result = tokio::select! {
+        result = &mut body => result,
+        _ = &mut lost_rx => Err(MemoryError::Conflict("provisioning lease lost".into())),
+    };
+    heartbeat_cancel.cancel();
+    let _ = heartbeat.await;
+    result
 }
 
 #[cfg(test)]

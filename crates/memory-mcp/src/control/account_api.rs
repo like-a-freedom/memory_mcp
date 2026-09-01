@@ -26,27 +26,35 @@ pub struct CreateAccountRequest {
 /// body. Manual because the workspace does not enable axum's
 /// `json` feature; serde_json::to_vec keeps the JSON contract
 /// under our control.
-fn account_created_response(account: &Account) -> Response {
-    let body = serde_json::to_vec(account).expect("Account serializes");
+fn account_created_response(account: &Account) -> Result<Response, ApiError> {
+    let body = serde_json::to_vec(account).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize account response: {error}"
+        )))
+    })?;
     let mut response = Response::new(Body::from(body));
     *response.status_mut() = StatusCode::CREATED;
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
-    response
+    Ok(response)
 }
 
-/// Build a JSON response from serializable data.
-fn json_response<T: serde::Serialize>(status: StatusCode, data: &T) -> Response {
-    let body = serde_json::to_vec(data).expect("serializes");
+// Build a JSON response from serializable data.
+fn json_response<T: serde::Serialize>(status: StatusCode, data: &T) -> Result<Response, ApiError> {
+    let body = serde_json::to_vec(data).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize JSON response: {error}"
+        )))
+    })?;
     let mut response = Response::new(Body::from(body));
     *response.status_mut() = status;
     response.headers_mut().insert(
         axum::http::header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
-    response
+    Ok(response)
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +76,7 @@ pub async fn get_account(
         "account": account,
         "tenant_status": tenant.map(|t| t.status),
     });
-    Ok(json_response(StatusCode::OK, &resp))
+    json_response(StatusCode::OK, &resp)
 }
 
 /// Request body for creating an API key.
@@ -161,7 +169,11 @@ pub async fn create_api_key(
         HeaderValue::from_static("no-store"),
     )];
 
-    let body = serde_json::to_vec(&resp).expect("CreateApiKeyResponse serializes");
+    let body = serde_json::to_vec(&resp).map_err(|error| {
+        ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize API key response: {error}"
+        )))
+    })?;
     let mut response = Response::new(Body::from(body));
     *response.status_mut() = StatusCode::CREATED;
     response.headers_mut().insert(
@@ -184,7 +196,7 @@ pub async fn list_api_keys(
         .store_clone()
         .list_api_keys(&session.account_id)
         .await?;
-    Ok(json_response(StatusCode::OK, &keys))
+    json_response(StatusCode::OK, &keys)
 }
 
 /// DELETE /api/v1/account/api_keys/:id — revoke an API key.
@@ -208,8 +220,9 @@ pub async fn list_identity_links(
     _state: State<Arc<HttpState>>,
     _session: axum::extract::Extension<super::session::ControlPlaneSession>,
 ) -> Result<Response, ApiError> {
-    // ExternalIdentity linking is deferred; return empty list.
-    Ok(json_response(StatusCode::OK, &serde_json::json!([])))
+    // ExternalIdentity linking is not wired yet; fail closed
+    // instead of presenting an empty list as authoritative.
+    Err(ApiError::Unavailable)
 }
 
 /// DELETE /api/v1/account/identity_links/:id — unlink an External Identity.
@@ -218,9 +231,10 @@ pub async fn unlink_identity(
     _session: axum::extract::Extension<super::session::ControlPlaneSession>,
     identity_id: axum::extract::Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    // ExternalIdentity unlinking is deferred; return 404.
+    // ExternalIdentity unlinking is not wired yet; do not
+    // report a successful or misleading not-found mutation.
     let _ = identity_id;
-    Err(ApiError::NotFound)
+    Err(ApiError::Unavailable)
 }
 
 /// POST /api/v1/account/delete — start deletion flow (sends confirmation).
@@ -228,14 +242,9 @@ pub async fn start_account_deletion(
     _state: State<Arc<HttpState>>,
     _session: axum::extract::Extension<super::session::ControlPlaneSession>,
 ) -> Result<Response, ApiError> {
-    // Deletion flow stub; return stub for now.
-    Ok(json_response(
-        StatusCode::OK,
-        &serde_json::json!({
-            "message": "deletion confirmation required",
-            "typed_phrase": "DELETE my account"
-        }),
-    ))
+    // A confirmation token is not durable yet, so do not
+    // advertise a deletion flow that cannot be completed.
+    Err(ApiError::Unavailable)
 }
 
 /// POST /api/v1/account/delete/confirm — confirm with typed phrase.
@@ -297,7 +306,7 @@ pub async fn create_account(
     store.write_account(&account).await?;
     store.write_tenant(&tenant).await?;
     enqueue_provisioning(&store, &tenant).await?;
-    Ok(account_created_response(&account))
+    account_created_response(&account)
 }
 
 #[cfg(test)]

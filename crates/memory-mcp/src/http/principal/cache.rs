@@ -37,9 +37,8 @@ pub struct PrincipalCache {
 
 impl PrincipalCache {
     pub fn new(capacity: usize) -> Self {
-        debug_assert!(capacity > 0, "AuthCache capacity must be non-zero");
-        let cap = std::num::NonZeroUsize::new(capacity)
-            .unwrap_or_else(|| unreachable!("capacity is a non-zero constant"));
+        let cap =
+            std::num::NonZeroUsize::new(capacity.max(1)).unwrap_or(std::num::NonZeroUsize::MIN);
         Self {
             positive: Mutex::new(LruCache::new(cap)),
             negative: Mutex::new(LruCache::new(cap)),

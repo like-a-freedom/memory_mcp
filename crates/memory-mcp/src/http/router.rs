@@ -20,6 +20,10 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             super::middleware::authenticate,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::middleware::prevalidate_mcp,
         ));
     let router = Router::new()
         .route("/health/live", get(super::health::live))

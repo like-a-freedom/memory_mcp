@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use crate::error::MemoryError;
 use crate::storage::client::BoundDbClient;
 
-use super::state::{TaskHandle, TaskState, TaskStore, TenantTaskRecord};
+use super::state::{TaskHandle, TaskState, TaskStore, TenantTaskRecord, is_terminal};
 
 /// Retention window for a finished task.
 pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
@@ -69,38 +69,15 @@ impl TaskStore for DurableTaskStore {
         let id = uuid::Uuid::new_v4().to_string();
         // Dedup: if a non-failed task with this fingerprint
         // exists, return its id. The UNIQUE index on
-        // (tenant_id, fingerprint) prevents concurrent
-        // duplicates at the DB level.
-        let existing = self
-            .db
-            .query(
-                "SELECT id FROM tenant_task \
-                 WHERE tenant_id = $tenant_id AND fingerprint = $fingerprint \
-                 AND state != 'failed' \
-                 LIMIT 1;",
-                Some(json!({
-                    "tenant_id": self.tenant_id.as_str(),
-                    "fingerprint": fingerprint,
-                })),
-            )
-            .await?;
-        let rows: Vec<Value> = serde_json::from_value(existing)
-            .map_err(|e| MemoryError::Storage(format!("task enqueue dedupe: {e}")))?;
-        if let Some(existing_id) = rows.first().and_then(|first| record_id_str(&first["id"])) {
+        // (tenant_id, fingerprint) is the concurrent-write
+        // backstop; a unique conflict is re-read below.
+        if let Some(existing_id) = self.find_existing_id(fingerprint).await? {
             return Ok(existing_id);
         }
-        self.db
+        let create_result = self
+            .db
             .query(
-                "CREATE type::record('tenant_task', $id) SET \
-                 tenant_id = $tenant_id, \
-                 fingerprint = $fingerprint, \
-                 state = 'queued', \
-                 version = 1, \
-                 cancellation_intent = false, \
-                 params = $params, \
-                 created_at = type::datetime($now), \
-                 updated_at = type::datetime($now), \
-                 retention_expiry = type::datetime($retention);",
+                "CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, fingerprint = $fingerprint, state = 'queued', version = 1, cancellation_intent = false, params = $params, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($retention);",
                 Some(json!({
                     "id": id,
                     "tenant_id": self.tenant_id.as_str(),
@@ -110,8 +87,14 @@ impl TaskStore for DurableTaskStore {
                     "retention": Self::to_datetime(retention),
                 })),
             )
-            .await?;
-        Ok(id)
+            .await;
+        match create_result {
+            Ok(_) => Ok(id),
+            Err(error) if is_unique_conflict(&error) => {
+                self.find_existing_id(fingerprint).await?.ok_or(error)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     async fn load(&self, task_id: &str) -> Result<Option<TenantTaskRecord>, MemoryError> {
@@ -136,18 +119,20 @@ impl TaskStore for DurableTaskStore {
     async fn set_cancellation_intent(&self, task_id: &str) -> Result<(), MemoryError> {
         // Cooperative intent, never deletes. A Queued task
         // becomes Cancelled; a Running task becomes
-        // CancelRequested (the worker observes the intent
-        // before committing facts and aborts). Terminal
-        // states are untouched.
+        // CancelRequested. Terminal tasks are immutable and
+        // repeated cancellation is an idempotent no-op.
+        let existing = self.load(task_id).await?;
+        let Some(existing) = existing else {
+            return Err(MemoryError::NotFound(format!("task {task_id} not found")));
+        };
+        if is_terminal(existing.state) {
+            return Ok(());
+        }
         let now = Utc::now();
         let result = self
             .db
             .query(
-                "UPDATE tenant_task SET \
-                 cancellation_intent = true, \
-                 state = IF state = 'queued' THEN 'cancelled' ELSE IF state = 'running' THEN 'cancel_requested' ELSE state END, \
-                 updated_at = type::datetime($now) \
-                 WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id;",
+                "UPDATE tenant_task SET cancellation_intent = true, version = version + 1, state = IF state = 'queued' THEN 'cancelled' ELSE IF state = 'running' THEN 'cancel_requested' ELSE state END, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'];",
                 Some(json!({
                     "id": task_id,
                     "tenant_id": self.tenant_id.as_str(),
@@ -158,7 +143,18 @@ impl TaskStore for DurableTaskStore {
         let rows: Vec<Value> = serde_json::from_value(result)
             .map_err(|e| MemoryError::Storage(format!("cancel intent result: {e}")))?;
         if rows.is_empty() {
-            return Err(MemoryError::NotFound(format!("task {task_id} not found")));
+            // A concurrent worker may have reached a terminal
+            // state between the load and the CAS-like update.
+            if self
+                .load(task_id)
+                .await?
+                .is_some_and(|record| is_terminal(record.state))
+            {
+                return Ok(());
+            }
+            return Err(MemoryError::Conflict(format!(
+                "task {task_id} cancellation raced with another state transition"
+            )));
         }
         Ok(())
     }
@@ -171,16 +167,18 @@ impl TaskStore for DurableTaskStore {
         let result = self
             .db
             .query(
-                "UPDATE tenant_task SET \
+                "UPDATE (SELECT id FROM tenant_task \
+                 WHERE tenant_id = $tenant_id \
+                   AND (state = 'queued' \
+                        OR state = 'cancel_requested' \
+                        OR (state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)))) \
+                 LIMIT 1) SET \
                  lease_owner = $owner, \
                  lease_generation = IF lease_generation IS NONE THEN 1 ELSE lease_generation + 1 END, \
                  lease_expiry = type::datetime($lease_expiry), \
                  state = 'running', \
                  updated_at = type::datetime($now) \
-                 WHERE tenant_id = $tenant_id \
-                   AND (state = 'queued' \
-                        OR (state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)))) \
-                 RETURN id, lease_owner, lease_generation, lease_expiry;",
+                 RETURN AFTER;",
                 Some(json!({
                     "owner": replica_id,
                     "lease_expiry": Self::to_datetime(now + chrono::Duration::seconds(60)),
@@ -218,7 +216,7 @@ impl TaskStore for DurableTaskStore {
     ) -> Result<(), MemoryError> {
         self.fenced_update(
             handle,
-            "UPDATE tenant_task SET progress = $progress, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND lease_generation = $gen",
+            "UPDATE tenant_task SET progress = $progress, version = version + 1, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
             Some(json!({
                 "progress": progress,
                 "now": Self::to_datetime(Utc::now()),
@@ -240,7 +238,7 @@ impl TaskStore for DurableTaskStore {
         };
         self.fenced_update(
             handle,
-            "UPDATE tenant_task SET state = $state, result = $result, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND lease_generation = $gen",
+            "UPDATE tenant_task SET state = $state, result = $result, version = version + 1, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
             Some(json!({
                 "state": final_state,
                 "result": result,
@@ -253,7 +251,7 @@ impl TaskStore for DurableTaskStore {
     async fn fail_fenced(&self, handle: &TaskHandle, error: Value) -> Result<(), MemoryError> {
         self.fenced_update(
             handle,
-            "UPDATE tenant_task SET state = 'failed', error = $error, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND lease_generation = $gen",
+            "UPDATE tenant_task SET state = 'failed', error = $error, version = version + 1, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
             Some(json!({
                 "error": error,
                 "now": Self::to_datetime(Utc::now()),
@@ -267,9 +265,7 @@ impl TaskStore for DurableTaskStore {
         let result = self
             .db
             .query(
-                "UPDATE tenant_task SET state = 'queued', lease_owner = NONE, lease_generation = NONE, lease_expiry = NONE, updated_at = type::datetime($now) \
-                 WHERE tenant_id = $tenant_id AND state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)) \
-                 RETURN id;",
+                "UPDATE tenant_task SET state = 'queued', lease_owner = NONE, lease_expiry = NONE, updated_at = type::datetime($now) WHERE tenant_id = $tenant_id AND state = 'running' AND (lease_expiry IS NONE OR type::datetime(lease_expiry) <= type::datetime($now)) RETURN id;",
                 Some(json!({
                     "tenant_id": self.tenant_id.as_str(),
                     "now": Self::to_datetime(now),
@@ -309,6 +305,22 @@ impl TaskStore for DurableTaskStore {
 }
 
 impl DurableTaskStore {
+    async fn find_existing_id(&self, fingerprint: &str) -> Result<Option<String>, MemoryError> {
+        let existing = self
+            .db
+            .query(
+                "SELECT id FROM tenant_task WHERE tenant_id = $tenant_id AND fingerprint = $fingerprint AND state != 'failed' LIMIT 1;",
+                Some(json!({
+                    "tenant_id": self.tenant_id.as_str(),
+                    "fingerprint": fingerprint,
+                })),
+            )
+            .await?;
+        let rows: Vec<Value> = serde_json::from_value(existing)
+            .map_err(|e| MemoryError::Storage(format!("task enqueue dedupe: {e}")))?;
+        Ok(rows.first().and_then(|first| record_id_str(&first["id"])))
+    }
+
     /// Shared fenced-update helper. Every write to a Task
     /// record must verify `lease_generation = $gen`; a
     /// stale worker (lost the fence) returns Conflict and
@@ -321,6 +333,8 @@ impl DurableTaskStore {
     ) -> Result<(), MemoryError> {
         let mut vars = json!({
             "id": handle.task_id,
+            "tenant_id": handle.tenant_id,
+            "owner": handle.lease_owner,
             "gen": handle.lease_generation,
         });
         if let Some(Value::Object(map)) = extra_vars {
@@ -339,9 +353,21 @@ impl DurableTaskStore {
     }
 }
 
+fn is_unique_conflict(error: &MemoryError) -> bool {
+    match error {
+        MemoryError::Storage(message) => {
+            let message = message.to_ascii_lowercase();
+            message.contains("unique")
+                || message.contains("already exists")
+                || message.contains("duplicate")
+        }
+        _ => false,
+    }
+}
+
 /// Project a `tenant_task` row to `TenantTaskRecord`. The
-/// row fields are coerced defensively; a malformed row is
-/// a storage error, not a panic.
+/// row fields are coerced defensively; a malformed row is a
+/// storage error, not a panic.
 fn project(row: &Value) -> Result<TenantTaskRecord, MemoryError> {
     let get = |k: &str| -> Result<Value, MemoryError> {
         row.get(k)
@@ -493,6 +519,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn claim_updates_only_one_due_task_per_call() {
+        let store = fresh_store().await;
+        let first_id = store
+            .enqueue("fp_many_1", json!({}))
+            .await
+            .expect("enqueue");
+        let second_id = store
+            .enqueue("fp_many_2", json!({}))
+            .await
+            .expect("enqueue");
+
+        let first = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("first claim")
+            .expect("first task due");
+        let second = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("second claim")
+            .expect("second task due");
+        assert_ne!(first.task_id, second.task_id);
+        assert!(
+            [first_id, second_id]
+                .iter()
+                .all(|id| id == &first.task_id || id == &second.task_id)
+        );
+        assert!(
+            store
+                .claim_next_due("replica_a")
+                .await
+                .expect("empty claim")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn requeue_preserves_fence_monotonicity() {
+        let store = fresh_store().await;
+        let id = store
+            .enqueue("fp_requeue", json!({}))
+            .await
+            .expect("enqueue");
+        let first = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("first claim")
+            .expect("task due");
+        assert_eq!(first.lease_generation, 1);
+
+        let now = Utc::now();
+        store
+            .db
+            .query(
+                "UPDATE tenant_task SET lease_expiry = type::datetime($past) WHERE id = type::record('tenant_task', $id);",
+                Some(json!({
+                    "past": DurableTaskStore::to_datetime(now - chrono::Duration::seconds(1)),
+                    "id": id,
+                })),
+            )
+            .await
+            .expect("expire lease");
+        assert_eq!(store.requeue_expired_running().await.expect("requeue"), 1);
+
+        let second = store
+            .claim_next_due("replica_b")
+            .await
+            .expect("second claim")
+            .expect("requeued task due");
+        assert_eq!(second.lease_generation, 2);
+        assert!(matches!(
+            store
+                .complete_fenced(&first, json!({"stale": true}), false)
+                .await,
+            Err(MemoryError::Conflict(_))
+        ));
+    }
+
+    #[tokio::test]
     async fn stale_fenced_worker_cannot_transition_terminal_state() {
         let store = fresh_store().await;
         let id = store.enqueue("fp_2", json!({})).await.expect("enqueue");
@@ -579,6 +684,33 @@ mod tests {
         // The record is untouched by the empty reconciler.
         assert_eq!(record.state, TaskState::Running);
         let _ = handle;
+    }
+
+    #[tokio::test]
+    async fn cancelling_terminal_task_is_idempotent_and_immutable() {
+        let store = fresh_store().await;
+        let id = store
+            .enqueue("fp_terminal_cancel", json!({}))
+            .await
+            .expect("enqueue");
+        let handle = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("claim")
+            .expect("task due");
+        store
+            .complete_fenced(&handle, json!({"ok": true}), false)
+            .await
+            .expect("complete");
+        let before = store.load(&id).await.expect("load").expect("present");
+        store
+            .set_cancellation_intent(&id)
+            .await
+            .expect("terminal cancellation is a no-op");
+        let after = store.load(&id).await.expect("load").expect("present");
+        assert_eq!(after.state, TaskState::Completed);
+        assert!(!after.cancellation_intent);
+        assert_eq!(after.version, before.version);
     }
 
     #[tokio::test]

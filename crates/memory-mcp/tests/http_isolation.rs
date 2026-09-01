@@ -1,3 +1,5 @@
+#![cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
+
 //! Tenant isolation tests.
 //!
 //! Verifies that two Tenants under high concurrency share no state:
@@ -10,7 +12,6 @@
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use std::time::Duration;
 
 struct Server {
     child: Child,
@@ -35,6 +36,7 @@ const BOOTSTRAP_KEY_B: &str =
     "mem_sk_ak_bbbb0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
 
 fn base_env(port: u16) -> Vec<(String, String)> {
+    let zeros = "0".repeat(64);
     vec![
         ("MEMORY_MCP_HTTP_BIND".into(), format!("127.0.0.1:{port}")),
         (
@@ -44,9 +46,30 @@ fn base_env(port: u16) -> Vec<(String, String)> {
         ("ALLOWED_HOSTS".into(), "localhost,127.0.0.1".into()),
         ("ALLOWED_ORIGINS".into(), "http://localhost".into()),
         ("MEMORY_MCP_API_KEY_PEPPER".into(), "x".repeat(40)),
-        ("MEMORY_MCP_SURREALDB_URL".into(), "mem://".into()),
-        ("MEMORY_MCP_SURREALDB_NS".into(), "isolation_test".into()),
-        ("MEMORY_MCP_SURREALDB_DB".into(), "main".into()),
+        ("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY".into(), zeros.clone()),
+        ("MEMORY_MCP_HTTP_SIGNUP_MODE".into(), "invite_only".into()),
+        ("MEMORY_MCP_HTTP_CSRF_KEY".into(), zeros.clone()),
+        ("MEMORY_MCP_HTTP_OIDC_STATE_KEY".into(), zeros.clone()),
+        ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY".into(), zeros.clone()),
+        ("MEMORY_MCP_HTTP_SESSION_KEY".into(), zeros),
+        ("SURREALDB_CONTROL_URL".into(), "mem://".into()),
+        ("SURREALDB_CONTROL_USERNAME".into(), "root".into()),
+        ("SURREALDB_CONTROL_PASSWORD".into(), "root".into()),
+        ("SURREALDB_CONTROL_DB".into(), "control".into()),
+        ("SURREALDB_CONTROL_NAMESPACE".into(), "control".into()),
+        ("SURREALDB_TENANT_URL".into(), "mem://".into()),
+        ("SURREALDB_TENANT_USERNAME".into(), "root".into()),
+        ("SURREALDB_TENANT_PASSWORD".into(), "root".into()),
+        ("SURREALDB_TENANT_DB".into(), "tenant".into()),
+        ("SURREALDB_TENANT_NAMESPACE".into(), "tenant".into()),
+        (
+            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE".into(),
+            "false".into(),
+        ),
+        (
+            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI".into(),
+            "false".into(),
+        ),
         (
             "MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
             format!("tenant_a={BOOTSTRAP_KEY_A},tenant_b={BOOTSTRAP_KEY_B}"),
@@ -64,7 +87,7 @@ fn start_server() -> Server {
     let child = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"))
         .envs(env_refs.iter().copied())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .expect("spawn server");
 
@@ -91,6 +114,17 @@ async fn mcp_call(
     method: &str,
     params: serde_json::Value,
 ) -> serde_json::Value {
+    let mut params = params;
+    params.as_object_mut().expect("params object").insert(
+        "_meta".into(),
+        serde_json::json!({
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {
+                "tasks": {},
+                "subscriptions": {}
+            }
+        }),
+    );
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -102,7 +136,17 @@ async fn mcp_call(
         .post(format!("{base_url}/mcp"))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
+        .header("host", "localhost")
         .header("authorization", format!("Bearer {api_key}"))
+        .header("mcp-protocol-version", "2026-07-28")
+        .header("mcp-method", method)
+        .header(
+            "mcp-name",
+            params
+                .get("name")
+                .and_then(|value| value.as_str())
+                .unwrap_or(""),
+        )
         .body(serde_json::to_string(&body).unwrap())
         .send()
         .await
@@ -117,21 +161,24 @@ async fn mcp_call(
             if let Some(data) = line.strip_prefix("data: ")
                 && let Ok(val) = serde_json::from_str::<serde_json::Value>(data)
             {
-                return val;
+                return serde_json::json!({
+                    "http_status": status.as_u16(),
+                    "payload": val
+                });
             }
         }
     }
-    serde_json::from_str(&text)
-        .unwrap_or(serde_json::json!({"status": status.as_u16(), "raw": text}))
+    let payload = serde_json::from_str(&text).unwrap_or(serde_json::json!({"raw": text}));
+    serde_json::json!({
+        "http_status": status.as_u16(),
+        "payload": payload
+    })
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn two_tenants_share_no_state_under_high_concurrency() {
     let server = start_server();
     let client = reqwest::Client::new();
-
-    // Wait for server to be ready
-    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Ingest unique memories for each tenant
     let mut handles = Vec::new();
@@ -149,7 +196,14 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
                 "tools/call",
                 serde_json::json!({
                     "name": "ingest",
-                    "arguments": {"text": content, "source": "isolation_test"}
+                    "arguments": {
+                        "content": content,
+                        "source_type": "isolation_test",
+                        "source_id": format!("tenant_a_{i}"),
+                        "t_ref": "2026-08-27T00:00:00Z",
+                        "t_ingested": null,
+                        "policy_tags": []
+                    }
                 }),
             )
             .await
@@ -169,15 +223,27 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
                 "tools/call",
                 serde_json::json!({
                     "name": "ingest",
-                    "arguments": {"text": content, "source": "isolation_test"}
+                    "arguments": {
+                        "content": content,
+                        "source_type": "isolation_test",
+                        "source_id": format!("tenant_b_{i}"),
+                        "t_ref": "2026-08-27T00:00:00Z",
+                        "t_ingested": null,
+                        "policy_tags": []
+                    }
                 }),
             )
             .await
         }));
     }
 
-    for h in handles {
-        h.await.unwrap();
+    for handle in handles {
+        let response = handle.await.expect("ingest task joins");
+        assert_eq!(response["http_status"], 200, "ingest failed: {response}");
+        assert!(
+            response["payload"].get("error").is_none(),
+            "ingest failed: {response}"
+        );
     }
 
     // Query tenant A - should only find tenant A memories
@@ -187,8 +253,17 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
         BOOTSTRAP_KEY_A,
         "tools/call",
         serde_json::json!({
-            "name": "search",
-            "arguments": {"query": "tenant_b_memory"}
+            "name": "assemble_context",
+            "arguments": {
+                "query": "tenant_b_memory",
+                "fact_types": [],
+                "as_of": "2026-08-28T00:00:00Z",
+                "budget": 20,
+                "compact": true,
+                "view_mode": null,
+                "window_start": null,
+                "window_end": null
+            }
         }),
     )
     .await;
@@ -200,14 +275,128 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
         BOOTSTRAP_KEY_B,
         "tools/call",
         serde_json::json!({
-            "name": "search",
-            "arguments": {"query": "tenant_a_memory"}
+            "name": "assemble_context",
+            "arguments": {
+                "query": "tenant_a_memory",
+                "fact_types": [],
+                "as_of": "2026-08-28T00:00:00Z",
+                "budget": 20,
+                "compact": true,
+                "view_mode": null,
+                "window_start": null,
+                "window_end": null
+            }
         }),
     )
     .await;
 
-    // Both queries should return empty results (cross-tenant isolation)
-    // The exact response format depends on the tool implementation
-    println!("Tenant A query for B memories: {result_a}");
-    println!("Tenant B query for A memories: {result_b}");
+    assert_eq!(
+        result_a["http_status"], 200,
+        "tenant A query failed: {result_a}"
+    );
+    assert_eq!(
+        result_b["http_status"], 200,
+        "tenant B query failed: {result_b}"
+    );
+    assert!(
+        result_a["payload"].get("error").is_none(),
+        "tenant A query failed: {result_a}"
+    );
+    assert!(
+        result_b["payload"].get("error").is_none(),
+        "tenant B query failed: {result_b}"
+    );
+    assert!(
+        !result_a.to_string().contains("tenant_b_memory"),
+        "tenant A observed tenant B data: {result_a}"
+    );
+    assert!(
+        !result_b.to_string().contains("tenant_a_memory"),
+        "tenant B observed tenant A data: {result_b}"
+    );
+
+    // Positive control: the owner must be able to explain a concrete
+    // episode it just ingested. An empty response is not sufficient
+    // evidence of isolation because the retrieval path may be broken.
+    let owner_ingest = mcp_call(
+        &client,
+        &server.base_url,
+        BOOTSTRAP_KEY_A,
+        "tools/call",
+        serde_json::json!({
+            "name": "ingest",
+            "arguments": {
+                "content": "tenant_a_positive_control_marker",
+                "source_type": "isolation_test",
+                "source_id": "tenant_a_positive_control",
+                "t_ref": "2026-08-27T00:00:00Z",
+                "t_ingested": null,
+                "policy_tags": []
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        owner_ingest["http_status"], 200,
+        "owner ingest failed: {owner_ingest}"
+    );
+    let episode_id = owner_ingest["payload"]["result"]["structuredContent"]["result"]
+        .as_str()
+        .unwrap_or_else(|| panic!("owner ingest must return an episode id: {owner_ingest}"));
+
+    let owner_explanation = mcp_call(
+        &client,
+        &server.base_url,
+        BOOTSTRAP_KEY_A,
+        "tools/call",
+        serde_json::json!({
+            "name": "explain",
+            "arguments": {
+                "context_items": format!("[\"{episode_id}\"]"),
+                "compact": false
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        owner_explanation["http_status"], 200,
+        "owner explain failed: {owner_explanation}"
+    );
+    assert!(
+        owner_explanation["payload"]["result"]["structuredContent"]["result"]
+            .as_array()
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item["content"]
+                        .as_str()
+                        .is_some_and(|content| content.contains("tenant_a_positive_control_marker"))
+                })
+            }),
+        "owner must retrieve its own episode content: {owner_explanation}"
+    );
+
+    let foreign_explanation = mcp_call(
+        &client,
+        &server.base_url,
+        BOOTSTRAP_KEY_B,
+        "tools/call",
+        serde_json::json!({
+            "name": "explain",
+            "arguments": {
+                "context_items": format!("[\"{episode_id}\"]"),
+                "compact": false
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        foreign_explanation["http_status"], 200,
+        "foreign explain failed: {foreign_explanation}"
+    );
+    assert!(
+        !foreign_explanation
+            .to_string()
+            .contains("tenant_a_positive_control_marker"),
+        "foreign tenant retrieved owner episode content: {foreign_explanation}"
+    );
 }

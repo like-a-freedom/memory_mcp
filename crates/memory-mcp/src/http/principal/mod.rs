@@ -47,4 +47,12 @@ impl AuthenticatedPrincipal {
             Self::Oidc { account, .. } => account,
         }
     }
+
+    pub fn credential_kind(&self) -> &'static str {
+        match self {
+            Self::ApiKey { .. } => "api_key",
+            #[cfg(feature = "control-plane")]
+            Self::Oidc { .. } => "oidc",
+        }
+    }
 }

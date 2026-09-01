@@ -22,8 +22,13 @@ pub struct OperatorPrincipal {
 }
 
 impl OperatorPrincipal {
-    /// Stub: always recent.
+    /// Require a recent operator authentication event for
+    /// destructive control-plane actions.
     pub fn require_recent_auth(&self) -> Result<(), ApiError> {
+        let age = chrono::Utc::now() - self.authenticated_at;
+        if age < chrono::Duration::zero() || age > chrono::Duration::seconds(600) {
+            return Err(ApiError::ReauthRequired);
+        }
         Ok(())
     }
 }
@@ -78,7 +83,11 @@ pub async fn get_tenant(
         .find_tenant_by_id(&tenant_id)
         .await?;
     let tenant = tenant.ok_or(super::error::ApiError::NotFound)?;
-    let body = serde_json::to_vec(&tenant).expect("Tenant serializes");
+    let body = serde_json::to_vec(&tenant).map_err(|error| {
+        super::error::ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize tenant response: {error}"
+        )))
+    })?;
     let mut response = axum::response::Response::new(axum::body::Body::from(body));
     *response.status_mut() = axum::http::StatusCode::OK;
     response.headers_mut().insert(
@@ -93,7 +102,7 @@ pub async fn retry_tenant(
     _state: axum::extract::State<Arc<crate::http::HttpState>>,
     _tenant_id: axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
-    Ok(axum::http::StatusCode::ACCEPTED)
+    Err(super::error::ApiError::Unavailable)
 }
 
 /// POST /api/v1/operator/tenants/:id/suspend — suspend a tenant.
@@ -101,7 +110,7 @@ pub async fn suspend_tenant(
     _state: axum::extract::State<Arc<crate::http::HttpState>>,
     _tenant_id: axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
-    Ok(axum::http::StatusCode::ACCEPTED)
+    Err(super::error::ApiError::Unavailable)
 }
 
 /// POST /api/v1/operator/tenants/:id/resume — resume a suspended tenant.
@@ -109,7 +118,7 @@ pub async fn resume_tenant(
     _state: axum::extract::State<Arc<crate::http::HttpState>>,
     _tenant_id: axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
-    Ok(axum::http::StatusCode::ACCEPTED)
+    Err(super::error::ApiError::Unavailable)
 }
 
 /// POST /api/v1/operator/tenants/:id/purge — initiate Account deletion.
@@ -117,13 +126,17 @@ pub async fn purge_tenant(
     _state: axum::extract::State<Arc<crate::http::HttpState>>,
     _tenant_id: axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
-    Ok(axum::http::StatusCode::ACCEPTED)
+    Err(super::error::ApiError::Unavailable)
 }
 
 /// GET /api/v1/operator/recovery/status — read recovery status.
 pub async fn recovery_status() -> Result<axum::response::Response, super::error::ApiError> {
     let body = serde_json::json!({ "status": "ok" });
-    let body = serde_json::to_vec(&body).expect("serializes");
+    let body = serde_json::to_vec(&body).map_err(|error| {
+        super::error::ApiError::Internal(crate::error::MemoryError::Transient(format!(
+            "serialize recovery response: {error}"
+        )))
+    })?;
     let mut response = axum::response::Response::new(axum::body::Body::from(body));
     *response.status_mut() = axum::http::StatusCode::OK;
     response.headers_mut().insert(
@@ -131,4 +144,28 @@ pub async fn recovery_status() -> Result<axum::response::Response, super::error:
         axum::http::HeaderValue::from_static("application/json"),
     );
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recent_operator_auth_is_accepted() {
+        let principal = OperatorPrincipal {
+            authenticated_at: chrono::Utc::now(),
+        };
+        assert!(principal.require_recent_auth().is_ok());
+    }
+
+    #[test]
+    fn stale_operator_auth_is_rejected() {
+        let principal = OperatorPrincipal {
+            authenticated_at: chrono::Utc::now() - chrono::Duration::minutes(11),
+        };
+        assert!(matches!(
+            principal.require_recent_auth(),
+            Err(ApiError::ReauthRequired)
+        ));
+    }
 }

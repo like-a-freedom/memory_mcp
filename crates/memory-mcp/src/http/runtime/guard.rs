@@ -39,6 +39,11 @@ impl OperationGuard {
     pub fn runtime(&self) -> &Arc<TenantRuntime> {
         &self.runtime
     }
+
+    #[cfg(test)]
+    pub fn pin_counter(&self) -> Arc<AtomicU32> {
+        self.pin_count.clone()
+    }
 }
 
 impl Drop for OperationGuard {
@@ -51,8 +56,8 @@ impl Drop for OperationGuard {
 /// duration of the response. Lives inside `LeasedBody` so the
 /// resources are not released until the body stream ends.
 pub struct ResponseLease {
-    _operation: Option<OperationGuard>,
-    _admission: AdmissionPermit,
+    _operation: Option<Arc<OperationGuard>>,
+    _admission: Arc<AdmissionPermit>,
 }
 
 /// `Arc` clone handle for the admission permit so it can be
@@ -68,7 +73,7 @@ impl std::ops::Deref for AdmissionPermitRef {
 }
 
 impl ResponseLease {
-    pub fn new(operation: Option<OperationGuard>, admission: AdmissionPermit) -> Self {
+    pub fn new(operation: Option<Arc<OperationGuard>>, admission: Arc<AdmissionPermit>) -> Self {
         Self {
             _operation: operation,
             _admission: admission,

@@ -647,7 +647,8 @@ impl RegistryStore for InMemoryStore {
             Some(stored)
                 if stored.owner_id == lease.owner_id
                     && stored.lease_id == lease.lease_id
-                    && stored.fencing_generation == lease.fencing_generation => {}
+                    && stored.fencing_generation == lease.fencing_generation
+                    && stored.expires_at > chrono::Utc::now() => {}
             Some(stored) => {
                 return Err(MemoryError::Conflict(format!(
                     "tenant {tenant_id} fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
@@ -693,7 +694,8 @@ impl RegistryStore for InMemoryStore {
             Some(stored)
                 if stored.owner_id == lease_owner_id
                     && stored.lease_id == lease_id
-                    && stored.fencing_generation == fencing_generation => {}
+                    && stored.fencing_generation == fencing_generation
+                    && stored.expires_at > chrono::Utc::now() => {}
             Some(stored) => {
                 return Err(MemoryError::Conflict(format!(
                     "tenant {tenant_id} schema-version fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
@@ -724,6 +726,11 @@ impl RegistryStore for InMemoryStore {
     ) -> Result<Option<crate::http::leases::ProvisioningLease>, MemoryError> {
         use crate::http::registry::models::ProvisioningLeaseState;
         use crate::http::registry::models::TenantStatus as S;
+        if lease_ttl_secs <= 0 {
+            return Err(MemoryError::Validation(
+                "provisioning lease TTL must be positive".into(),
+            ));
+        }
         let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
         let t = tenants
             .iter_mut()
@@ -734,16 +741,22 @@ impl RegistryStore for InMemoryStore {
         }
         let now = chrono::Utc::now();
         let new_generation = match &t.provisioning_lease {
-            // An active lease held by someone else gets
-            // stolen: the new claim increments the
-            // generation so the previous holder's commits
-            // become stale.
-            Some(existing) if existing.expires_at > now => existing.fencing_generation + 1,
-            // No lease or an expired lease: a fresh claim
-            // starts at generation 1 (gen=0 means "no
-            // claim has ever happened" and is the implicit
-            // starting fence for all tenants).
-            _ => 1u64,
+            // An active lease cannot be stolen before expiry.
+            // Takeover is safe only after the datastore-time
+            // lease expires, at which point the generation is
+            // advanced so the prior holder becomes stale.
+            Some(existing) if existing.expires_at > now => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} provisioning lease is still active"
+                )));
+            }
+            Some(existing) => existing.fencing_generation.checked_add(1).ok_or_else(|| {
+                MemoryError::Conflict(format!(
+                    "tenant {tenant_id} provisioning fence generation overflow"
+                ))
+            })?,
+            // No lease: generation 1 is the initial fence.
+            None => 1u64,
         };
         let lease = ProvisioningLeaseState {
             owner_id: owner_id.to_string(),
