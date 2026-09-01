@@ -39,6 +39,216 @@ fn account_created_response(account: &Account) -> Response {
     response
 }
 
+/// Build a JSON response from serializable data.
+fn json_response<T: serde::Serialize>(status: StatusCode, data: &T) -> Response {
+    let body = serde_json::to_vec(data).expect("serializes");
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response
+}
+
+// ---------------------------------------------------------------------------
+// Account management endpoints (Task 10.5)
+// ---------------------------------------------------------------------------
+
+/// GET /api/v1/account — read account metadata + tenant status.
+pub async fn get_account(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+) -> Result<Response, ApiError> {
+    let store = state.registry.store_clone();
+    let account = store.find_account_by_id(&session.account_id).await?;
+    let account = account.ok_or(ApiError::NotFound)?;
+    let tenant = store.find_tenant_by_account(&account.id).await?;
+    let resp = serde_json::json!({
+        "account": account,
+        "tenant_status": tenant.map(|t| t.status),
+    });
+    Ok(json_response(StatusCode::OK, &resp))
+}
+
+/// Request body for creating an API key.
+#[derive(serde::Deserialize)]
+pub struct CreateApiKeyRequest {
+    pub name: String,
+    /// Optional expiry in days from now.
+    pub expires_in_days: Option<u32>,
+}
+
+/// Response body for creating an API key (secret shown once).
+#[derive(serde::Serialize)]
+pub struct CreateApiKeyResponse {
+    pub id: String,
+    pub secret: String,
+    pub name: String,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Generate a random API key secret.
+fn generate_secret() -> String {
+    let mut bytes = [0u8; 32];
+    rand::fill(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// POST /api/v1/account/api_keys — create a new API key.
+pub async fn create_api_key(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+    body: axum::body::Body,
+) -> Result<
+    (
+        StatusCode,
+        [(axum::http::header::HeaderName, HeaderValue); 1],
+        Response,
+    ),
+    ApiError,
+> {
+    use http_body_util::BodyExt;
+
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|e| ApiError::Internal(crate::error::MemoryError::Storage(e.to_string())))?
+        .to_bytes();
+    let req: CreateApiKeyRequest = if bytes.is_empty() {
+        CreateApiKeyRequest {
+            name: "default".to_string(),
+            expires_in_days: None,
+        }
+    } else {
+        serde_json::from_slice(&bytes).map_err(|e| {
+            ApiError::Internal(crate::error::MemoryError::Validation(format!(
+                "create-api-key: {e}"
+            )))
+        })?
+    };
+
+    let secret = generate_secret();
+    let expires_at = req
+        .expires_in_days
+        .map(|d| chrono::Utc::now() + chrono::Duration::days(d as i64));
+
+    let key = ApiKey {
+        id: new_api_key_id(),
+        account_id: session.account_id.clone(),
+        name: req.name.clone(),
+        verifier: KeyedVerifier::compute(state.config.api_key_pepper.as_bytes(), secret.as_bytes()),
+        status: ApiKeyStatus::Active,
+        created_at: chrono::Utc::now(),
+        expires_at,
+        last_used_at: None,
+        version: 0,
+    };
+
+    state.registry.store_clone().write_api_key(&key).await?;
+
+    let resp = CreateApiKeyResponse {
+        id: key.id.clone(),
+        secret,
+        name: req.name,
+        expires_at,
+    };
+
+    let headers = [(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    )];
+
+    let body = serde_json::to_vec(&resp).expect("CreateApiKeyResponse serializes");
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = StatusCode::CREATED;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+
+    Ok((StatusCode::CREATED, headers, response))
+}
+
+/// GET /api/v1/account/api_keys — list API keys (without secrets).
+pub async fn list_api_keys(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+) -> Result<Response, ApiError> {
+    let keys = state
+        .registry
+        .store_clone()
+        .list_api_keys(&session.account_id)
+        .await?;
+    Ok(json_response(StatusCode::OK, &keys))
+}
+
+/// DELETE /api/v1/account/api_keys/:id — revoke an API key.
+pub async fn revoke_api_key(
+    State(state): State<Arc<HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+    axum::extract::Path(key_id): axum::extract::Path<String>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .registry
+        .store_clone()
+        .revoke_api_key(&session.account_id, &key_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/v1/account/identity_links — list linked External Identities.
+pub async fn list_identity_links(
+    _state: State<Arc<HttpState>>,
+    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+) -> Result<Response, ApiError> {
+    // ExternalIdentity linking is deferred; return empty list.
+    Ok(json_response(StatusCode::OK, &serde_json::json!([])))
+}
+
+/// DELETE /api/v1/account/identity_links/:id — unlink an External Identity.
+pub async fn unlink_identity(
+    _state: State<Arc<HttpState>>,
+    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+    identity_id: axum::extract::Path<String>,
+) -> Result<StatusCode, ApiError> {
+    // ExternalIdentity unlinking is deferred; return 404.
+    let _ = identity_id;
+    Err(ApiError::NotFound)
+}
+
+/// POST /api/v1/account/delete — start deletion flow (sends confirmation).
+pub async fn start_account_deletion(
+    _state: State<Arc<HttpState>>,
+    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+) -> Result<Response, ApiError> {
+    // Deletion flow is Task 10.7; return stub for now.
+    Ok(json_response(
+        StatusCode::OK,
+        &serde_json::json!({
+            "message": "deletion confirmation required",
+            "typed_phrase": "DELETE my account"
+        }),
+    ))
+}
+
+/// POST /api/v1/account/delete/confirm — confirm with typed phrase.
+pub async fn confirm_account_deletion(
+    _state: State<Arc<HttpState>>,
+    _session: axum::extract::Extension<super::session::ControlPlaneSession>,
+) -> Result<StatusCode, ApiError> {
+    // Deletion flow is Task 10.7; return stub for now.
+    Err(ApiError::Unavailable)
+}
+
 /// Parse the request body into a `CreateAccountRequest`. The
 /// body is optional: an empty body is treated as "no fields set".
 async fn read_create_account(body: Body) -> Result<CreateAccountRequest, ApiError> {
