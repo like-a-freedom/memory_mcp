@@ -553,15 +553,11 @@ Build and run it with the `streamable-http` feature:
 
 ```bash
 cargo build --release --locked --features streamable-http,control-plane
-# HTTP boundary
-MEMORY_MCP_HTTP_BIND=0.0.0.0:8080 \
+# HTTP boundary (BIND defaults to 0.0.0.0:8080)
 MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
 ALLOWED_HOSTS=mcp.example.com \
 ALLOWED_ORIGINS=https://mcp.example.com \
 MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS=10.0.0.0/8,172.16.0.0/12 \
-MEMORY_MCP_HTTP_BODY_LIMIT=4194304 \
-MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS=120 \
-MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS=30 \
 # SurrealDB control (Registry) and tenant engine bindings
 SURREALDB_CONTROL_URL=wss://surreal.example.com/rpc \
 SURREALDB_CONTROL_USERNAME=... \
@@ -591,6 +587,21 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
 
+`MEMORY_MCP_HTTP_BIND` defaults to `0.0.0.0:8080`, `MEMORY_MCP_HTTP_BODY_LIMIT`
+to `8 MiB`, `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` to `120`, and
+`MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` to `30`. The remaining runtime tuning
+variables (`MEMORY_MCP_HTTP_POOL_CAP`, `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
+`MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
+`MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
+`MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`, `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
+`MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM`,
+`MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY`,
+`MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
+`MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
+`MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
+`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES`) have validated safe defaults; they only
+need to be set when the workload differs from the documented assumptions.
+
 The full environment contract, proxy requirements, deletion semantics, and
 production gates are in the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
 [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
@@ -603,25 +614,11 @@ variables: `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
 `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, and
 `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They are used only to create Registry
 plan version 1 when it is absent; an existing durable plan is not overwritten.
-Runtime tuning is also environment-driven: `MEMORY_MCP_HTTP_POOL_CAP`,
-`MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
-`MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
-`MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
-`MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`,
-`MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
-`MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM`,
-`MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY`,
-`MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
-`MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
-`MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
-`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` have validated safe defaults.
 
 Operator access uses `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`, a comma-separated
 immutable allowlist of `issuer|hex(subject_verifier)` entries. Account APIs
 cannot grant operator status.
 
-Set `MEMORY_MCP_HTTP_REPLICA_ID` to a stable deployment identity when running
-multiple replicas; worker leases otherwise use a process-lifetime PID fallback.
 The Dioxus SPA is built and embedded by enabling the `control-plane-ui` feature
 and pointing `MEMORY_MCP_CONTROL_PLANE_UI_DIST` at the absolute bundle output
 (see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)).
