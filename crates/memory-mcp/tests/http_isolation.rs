@@ -10,181 +10,37 @@
 //! Run: cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures \
 //!      --test http_isolation -- --test-threads=1
 
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
+mod common;
 
-struct Server {
-    child: Child,
-    base_url: String,
-}
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
+use common::http_server::{HttpServerConfig, HttpServerFixture, TestTenant, mcp_call};
 
 const BOOTSTRAP_KEY_A: &str =
     "mem_sk_ak_aaaa0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
 const BOOTSTRAP_KEY_B: &str =
     "mem_sk_ak_bbbb0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
 
-fn base_env(port: u16) -> Vec<(String, String)> {
-    let zeros = "0".repeat(64);
+fn isolation_tenants() -> Vec<TestTenant> {
     vec![
-        ("MEMORY_MCP_HTTP_BIND".into(), format!("127.0.0.1:{port}")),
-        (
-            "MEMORY_MCP_HTTP_PUBLIC_BASE_URL".into(),
-            format!("http://localhost:{port}"),
-        ),
-        ("ALLOWED_HOSTS".into(), "localhost,127.0.0.1".into()),
-        ("ALLOWED_ORIGINS".into(), "http://localhost".into()),
-        ("MEMORY_MCP_API_KEY_PEPPER".into(), "x".repeat(40)),
-        ("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SIGNUP_MODE".into(), "invite_only".into()),
-        ("MEMORY_MCP_HTTP_CSRF_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_STATE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SESSION_KEY".into(), zeros),
-        ("SURREALDB_CONTROL_URL".into(), "mem://".into()),
-        ("SURREALDB_CONTROL_USERNAME".into(), "root".into()),
-        ("SURREALDB_CONTROL_PASSWORD".into(), "root".into()),
-        ("SURREALDB_CONTROL_DB".into(), "control".into()),
-        ("SURREALDB_CONTROL_NAMESPACE".into(), "control".into()),
-        ("SURREALDB_TENANT_URL".into(), "mem://".into()),
-        ("SURREALDB_TENANT_USERNAME".into(), "root".into()),
-        ("SURREALDB_TENANT_PASSWORD".into(), "root".into()),
-        ("SURREALDB_TENANT_DB".into(), "tenant".into()),
-        ("SURREALDB_TENANT_NAMESPACE".into(), "tenant".into()),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE".into(),
-            "false".into(),
-        ),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI".into(),
-            "false".into(),
-        ),
-        (
-            "MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
-            format!("tenant_a={BOOTSTRAP_KEY_A},tenant_b={BOOTSTRAP_KEY_B}"),
-        ),
+        TestTenant::new("tenant_a", BOOTSTRAP_KEY_A),
+        TestTenant::new("tenant_b", BOOTSTRAP_KEY_B),
     ]
-}
-
-fn start_server() -> Server {
-    let port = 0;
-    let mut env = base_env(port);
-    env.push(("RUST_LOG".into(), "info".into()));
-
-    let env_refs: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-
-    let child = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"))
-        .envs(env_refs.iter().copied())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("spawn server");
-
-    let mut server = Server {
-        child,
-        base_url: String::new(),
-    };
-
-    let stdout = server.child.stdout.take().unwrap();
-    let reader = BufReader::new(stdout);
-    for line in reader.lines() {
-        let line = line.expect("read line");
-        if let Some(address) = line.strip_prefix("memory_mcp_http bound=") {
-            server.base_url = format!("http://{address}");
-            break;
-        }
-    }
-    assert!(
-        !server.base_url.is_empty(),
-        "server did not report bound address"
-    );
-    server
-}
-
-async fn mcp_call(
-    client: &reqwest::Client,
-    base_url: &str,
-    api_key: &str,
-    method: &str,
-    params: serde_json::Value,
-) -> serde_json::Value {
-    let mut params = params;
-    params.as_object_mut().expect("params object").insert(
-        "_meta".into(),
-        serde_json::json!({
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-            "io.modelcontextprotocol/clientCapabilities": {
-                "tasks": {},
-                "subscriptions": {}
-            }
-        }),
-    );
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
-    });
-
-    let resp = client
-        .post(format!("{base_url}/mcp"))
-        .header("content-type", "application/json")
-        .header("accept", "application/json, text/event-stream")
-        .header("host", "localhost")
-        .header("authorization", format!("Bearer {api_key}"))
-        .header("mcp-protocol-version", "2026-07-28")
-        .header("mcp-method", method)
-        .header(
-            "mcp-name",
-            params
-                .get("name")
-                .and_then(|value| value.as_str())
-                .unwrap_or(""),
-        )
-        .body(serde_json::to_string(&body).unwrap())
-        .send()
-        .await
-        .expect("send request");
-
-    let status = resp.status();
-    let text = resp.text().await.unwrap();
-
-    // Parse SSE or JSON response
-    if text.starts_with("event:") || text.starts_with("data:") {
-        for line in text.lines() {
-            if let Some(data) = line.strip_prefix("data: ")
-                && let Ok(val) = serde_json::from_str::<serde_json::Value>(data)
-            {
-                return serde_json::json!({
-                    "http_status": status.as_u16(),
-                    "payload": val
-                });
-            }
-        }
-    }
-    let payload = serde_json::from_str(&text).unwrap_or(serde_json::json!({"raw": text}));
-    serde_json::json!({
-        "http_status": status.as_u16(),
-        "payload": payload
-    })
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn two_tenants_share_no_state_under_high_concurrency() {
-    let server = start_server();
-    let client = reqwest::Client::new();
+    let fixture = HttpServerFixture::spawn(HttpServerConfig {
+        tenants: isolation_tenants(),
+        extra_env: Vec::new(),
+        storage_url: "mem://".into(),
+    })
+    .await;
+    let client = fixture.client().clone();
 
     // Ingest unique memories for each tenant
     let mut handles = Vec::new();
 
     for i in 0..5 {
-        let base = server.base_url.clone();
+        let base = fixture.base_url.clone();
         let key = BOOTSTRAP_KEY_A.to_string();
         let content = format!("tenant_a_memory_{i}");
         let c = client.clone();
@@ -211,7 +67,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
     }
 
     for i in 0..5 {
-        let base = server.base_url.clone();
+        let base = fixture.base_url.clone();
         let key = BOOTSTRAP_KEY_B.to_string();
         let content = format!("tenant_b_memory_{i}");
         let c = client.clone();
@@ -249,7 +105,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
     // Query tenant A - should only find tenant A memories
     let result_a = mcp_call(
         &client,
-        &server.base_url,
+        &fixture.base_url,
         BOOTSTRAP_KEY_A,
         "tools/call",
         serde_json::json!({
@@ -271,7 +127,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
     // Query tenant B - should only find tenant B memories
     let result_b = mcp_call(
         &client,
-        &server.base_url,
+        &fixture.base_url,
         BOOTSTRAP_KEY_B,
         "tools/call",
         serde_json::json!({
@@ -320,7 +176,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
     // evidence of isolation because the retrieval path may be broken.
     let owner_ingest = mcp_call(
         &client,
-        &server.base_url,
+        &fixture.base_url,
         BOOTSTRAP_KEY_A,
         "tools/call",
         serde_json::json!({
@@ -346,7 +202,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
 
     let owner_explanation = mcp_call(
         &client,
-        &server.base_url,
+        &fixture.base_url,
         BOOTSTRAP_KEY_A,
         "tools/call",
         serde_json::json!({
@@ -377,7 +233,7 @@ async fn two_tenants_share_no_state_under_high_concurrency() {
 
     let foreign_explanation = mcp_call(
         &client,
-        &server.base_url,
+        &fixture.base_url,
         BOOTSTRAP_KEY_B,
         "tools/call",
         serde_json::json!({

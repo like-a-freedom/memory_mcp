@@ -10,23 +10,11 @@
 //! Run: cargo test -p memory_mcp --features streamable-http,test-fixtures \
 //!      --test http_proto_conformance -- --nocapture
 
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
-use std::time::Duration;
-
 use serde_json::json;
 
-struct Server {
-    child: Child,
-    base_url: String,
-}
+mod common;
 
-impl Drop for Server {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
+use common::http_server::{HttpServerConfig, HttpServerFixture, TestTenant};
 
 /// Fixed bootstrap API key for the conformance suite. The
 /// `name=key` form is `<account_name>=<api_key>`; the test
@@ -34,112 +22,18 @@ impl Drop for Server {
 const BOOTSTRAP_KEY: &str =
     "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_conformancesuite0123456789abcdef";
 
-fn base_env(port: u16) -> Vec<(String, String)> {
-    let zeros = "0".repeat(64);
-    vec![
-        ("MEMORY_MCP_HTTP_BIND".into(), format!("127.0.0.1:{port}")),
-        (
-            "MEMORY_MCP_HTTP_PUBLIC_BASE_URL".into(),
-            "http://localhost".into(),
-        ),
-        ("ALLOWED_HOSTS".into(), "localhost,127.0.0.1".into()),
-        ("ALLOWED_ORIGINS".into(), "http://localhost".into()),
-        ("MEMORY_MCP_API_KEY_PEPPER".into(), "x".repeat(40)),
-        ("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SIGNUP_MODE".into(), "invite_only".into()),
-        ("MEMORY_MCP_HTTP_CSRF_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_STATE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SESSION_KEY".into(), zeros),
-        ("SURREALDB_CONTROL_URL".into(), "mem://".into()),
-        ("SURREALDB_CONTROL_USERNAME".into(), "root".into()),
-        ("SURREALDB_CONTROL_PASSWORD".into(), "root".into()),
-        ("SURREALDB_CONTROL_DB".into(), "control".into()),
-        ("SURREALDB_CONTROL_NAMESPACE".into(), "control".into()),
-        ("SURREALDB_TENANT_URL".into(), "mem://".into()),
-        ("SURREALDB_TENANT_USERNAME".into(), "root".into()),
-        ("SURREALDB_TENANT_PASSWORD".into(), "root".into()),
-        ("SURREALDB_TENANT_DB".into(), "tenant".into()),
-        ("SURREALDB_TENANT_NAMESPACE".into(), "tenant".into()),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE".into(),
-            "false".into(),
-        ),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI".into(),
-            "false".into(),
-        ),
-        (
-            "MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
-            format!("conformance={BOOTSTRAP_KEY}"),
-        ),
-    ]
-}
-
-async fn spawn_server(extra_env: &[(&str, &str)]) -> Server {
-    let port = 0;
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"));
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    for (k, v) in base_env(port) {
-        cmd.env(k, v);
-    }
-    for (k, v) in extra_env {
-        cmd.env(*k, *v);
-    }
-    let mut child = cmd.spawn().expect("spawn memory_mcp_http");
-    let stdout = child.stdout.take().expect("stdout piped");
-    let stderr = child.stderr.take().expect("stderr piped");
-    let bound_line = tokio::task::spawn_blocking(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            let line = line.expect("read stdout");
-            if line.starts_with("memory_mcp_http bound=") {
-                return line;
-            }
-        }
-        panic!("server exited before printing bound line");
-    });
-    let drain = tokio::task::spawn_blocking(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            let line = line.expect("read stderr");
-            eprintln!("server stderr: {line}");
-        }
-    });
-    let bound_line = bound_line.await.expect("join bound");
-    drop(drain);
-    let addr = bound_line
-        .trim_start_matches("memory_mcp_http bound=")
-        .to_string();
-    Server {
-        child,
-        base_url: format!("http://{addr}"),
-    }
-}
-
-fn client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .expect("client")
-}
-
-fn modern_meta() -> serde_json::Value {
-    json!({
-        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-        "io.modelcontextprotocol/clientInfo": {
-            "name": "memory-mcp-conformance",
-            "version": "0.0.0",
-        },
-        "io.modelcontextprotocol/clientCapabilities": {},
-    })
+fn conformance_tenant() -> TestTenant {
+    TestTenant::new("conformance", BOOTSTRAP_KEY)
 }
 
 #[tokio::test]
 async fn get_on_mcp_returns_405() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .get(format!("{}/mcp", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .get(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .send()
         .await
@@ -149,9 +43,12 @@ async fn get_on_mcp_returns_405() {
 
 #[tokio::test]
 async fn delete_on_mcp_returns_405() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .delete(format!("{}/mcp", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .delete(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .send()
         .await
@@ -161,9 +58,12 @@ async fn delete_on_mcp_returns_405() {
 
 #[tokio::test]
 async fn disallowed_host_returns_403() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "evil.example")
         .header("content-type", "application/json")
         .body("{}")
@@ -175,9 +75,12 @@ async fn disallowed_host_returns_403() {
 
 #[tokio::test]
 async fn disallowed_origin_returns_403() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("origin", "https://evil.example")
         .header("content-type", "application/json")
@@ -190,9 +93,12 @@ async fn disallowed_origin_returns_403() {
 
 #[tokio::test]
 async fn health_live_returns_ok() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .get(format!("{}/health/live", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .get(format!("{}/health/live", fixture.base_url))
         .header("host", "localhost")
         .send()
         .await
@@ -203,9 +109,12 @@ async fn health_live_returns_ok() {
 
 #[tokio::test]
 async fn health_ready_returns_json() {
-    let server = spawn_server(&[]).await;
-    let resp = client()
-        .get(format!("{}/health/ready", server.base_url))
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let resp = fixture
+        .client()
+        .get(format!("{}/health/ready", fixture.base_url))
         .header("host", "localhost")
         .send()
         .await
@@ -219,15 +128,18 @@ async fn health_ready_returns_json() {
 async fn no_mcp_session_id_header_is_set() {
     // 2026-07-28 stateless profile must never set Mcp-Session-Id
     // because it removes protocol sessions entirely.
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -246,15 +158,18 @@ async fn no_mcp_session_id_header_is_set() {
 
 #[tokio::test]
 async fn server_discover_advertises_only_2026_07_28() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -284,15 +199,18 @@ async fn server_discover_advertises_only_2026_07_28() {
 
 #[tokio::test]
 async fn removed_ping_method_is_not_available() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 2,
         "method": "ping",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -317,10 +235,13 @@ async fn unsupported_legacy_version_returns_400() {
     // stateless_protocol_metadata_required = true: legacy
     // requests carry no per-request _meta protocol version, and
     // rmcp rejects them.
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "ping" });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -337,10 +258,16 @@ async fn unsupported_legacy_version_returns_400() {
 #[tokio::test]
 async fn body_over_limit_returns_413() {
     // Shrink the limit so the test does not push 8 MiB.
-    let server = spawn_server(&[("MEMORY_MCP_HTTP_BODY_LIMIT", "1024")]).await;
+    let fixture = HttpServerFixture::spawn(
+        HttpServerConfig::default()
+            .with_tenant(conformance_tenant())
+            .with_env("MEMORY_MCP_HTTP_BODY_LIMIT", "1024"),
+    )
+    .await;
     let big = "a".repeat(2048);
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -359,15 +286,18 @@ async fn missing_accept_returns_406() {
     // text/event-stream on stateless POSTs. reqwest forces Accept:
     // */* unless overridden, so we set it explicitly to a value
     // that does NOT include both media types.
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "ping",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("MCP-Protocol-Version", "2026-07-28")
@@ -387,15 +317,18 @@ async fn header_body_mismatch_returns_header_mismatch_error() {
     // whose JSON-RPC method is something else (e.g. tools/list) is
     // rejected as a header-mismatch error. rmcp returns 400 with
     // a jsonrpc error body in that case.
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/list",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -416,15 +349,18 @@ async fn header_body_mismatch_returns_header_mismatch_error() {
 
 #[tokio::test]
 async fn missing_mcp_method_returns_400_before_authentication() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -440,7 +376,9 @@ async fn missing_mcp_method_returns_400_before_authentication() {
 
 #[tokio::test]
 async fn missing_mcp_name_returns_400_before_authentication() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -448,11 +386,12 @@ async fn missing_mcp_name_returns_400_before_authentication() {
         "params": {
             "name": "ingest",
             "arguments": {},
-            "_meta": modern_meta()
+            "_meta": common::http_server::modern_meta()
         },
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -469,7 +408,9 @@ async fn missing_mcp_name_returns_400_before_authentication() {
 
 #[tokio::test]
 async fn mismatched_mcp_name_returns_400() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -477,11 +418,12 @@ async fn mismatched_mcp_name_returns_400() {
         "params": {
             "name": "ingest",
             "arguments": {},
-            "_meta": modern_meta()
+            "_meta": common::http_server::modern_meta()
         },
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -499,15 +441,18 @@ async fn mismatched_mcp_name_returns_400() {
 
 #[tokio::test]
 async fn missing_protocol_version_returns_400() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "server/discover",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -528,14 +473,17 @@ async fn missing_protocol_version_returns_400() {
 
 #[tokio::test]
 async fn notification_returns_202_with_empty_body() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "method": "tools/list",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -552,15 +500,18 @@ async fn notification_returns_202_with_empty_body() {
 
 #[tokio::test]
 async fn forged_subscription_header_cannot_bypass_preflight() {
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/list",
-        "params": {"_meta": modern_meta()},
+        "params": {"_meta": common::http_server::modern_meta()},
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -579,7 +530,9 @@ async fn forged_subscription_header_cannot_bypass_preflight() {
 async fn tools_call_requires_matching_mcp_name() {
     // Plan asserts that the Mcp-Method header must equal the body
     // method for tools/call. rmcp validates this.
-    let server = spawn_server(&[]).await;
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -594,11 +547,12 @@ async fn tools_call_requires_matching_mcp_name() {
                 "t_ingested": null,
                 "policy_tags": []
             },
-            "_meta": modern_meta()
+            "_meta": common::http_server::modern_meta()
         },
     });
-    let resp = client()
-        .post(format!("{}/mcp", server.base_url))
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
         .header("host", "localhost")
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")

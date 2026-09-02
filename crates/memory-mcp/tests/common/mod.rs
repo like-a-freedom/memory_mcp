@@ -9,6 +9,8 @@ use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
 
+pub mod http_server;
+
 static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// The single namespace used by ordinary in-memory test fixtures.
