@@ -91,6 +91,12 @@ jobs:
         # `--all-features` try to compile Metal on Ubuntu.
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps --locked -- -D warnings
 
+      - name: Check additive HTTP feature composition
+        run: >-
+          cargo check -p memory_mcp --all-targets --no-default-features
+          --features streamable-http,prometheus,control-plane,test-fixtures
+          --locked
+
   clippy_macos:
     name: Rust clippy (macOS features)
     runs-on: macos-latest

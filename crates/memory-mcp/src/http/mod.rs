@@ -25,6 +25,9 @@ pub mod validation;
 #[cfg(feature = "test-fixtures")]
 pub mod test_bootstrap;
 
+#[cfg(any(test, feature = "test-fixtures"))]
+pub mod test_state;
+
 use std::sync::Arc;
 
 use config::HttpConfig;
@@ -61,6 +64,15 @@ pub struct HttpState {
 #[cfg(feature = "prometheus")]
 pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
 
+/// The metrics parameter accepted by `HttpState::assemble`. Builds
+/// without the `prometheus` feature carry a zero-sized placeholder so
+/// both feature arms share one assembly body without `cfg` attributes
+/// on individual parameters or call arguments.
+#[cfg(feature = "prometheus")]
+type AssembleMetrics = Option<MetricsHandle>;
+#[cfg(not(feature = "prometheus"))]
+type AssembleMetrics = Option<()>;
+
 impl HttpState {
     /// Production constructor: registry + auth + resolver
     /// + runtime pool. The two arms differ only in the metrics
@@ -71,64 +83,24 @@ impl HttpState {
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = Self::build_registry(&config).await?;
-        let signup_plan = registry::models::Plan {
-            id: "free".into(),
-            version: 1,
-            limits: config.signup_plan_limits.clone().unwrap_or_default(),
-        };
-        registry.ensure_plan(&signup_plan).await?;
-        let pool = Arc::new(runtime::pool::Pool::from_http_config(
-            &config,
-            Arc::new(registry.clone()),
-        ));
-        let store = registry.store_clone();
-        let authenticator = Arc::new(principal::auth::Authenticator::new(
-            store.clone(),
-            Arc::new(principal::cache::PrincipalCache::new(1024)),
-            config.api_key_pepper.as_bytes().to_vec(),
-            Arc::new(principal::auth::RateLimiter::new(
-                4096,
-                std::time::Duration::from_secs(1),
-                20,
-            )),
-        ));
-        let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
-        #[cfg(feature = "control-plane")]
-        let oidc_client = if config.enable_control_plane {
-            Some(Arc::new(
-                crate::control::oidc::OidcClient::new(
-                    &config.oidc_issuer,
-                    &config.oidc_client_id,
-                    &config.oidc_audience,
-                    &config.oidc_redirect_uri,
-                    &config.oidc_allowed_alg,
-                )
-                .await?,
-            ))
-        } else {
-            None
-        };
-        Ok(Arc::new(Self {
-            config: config.clone(),
-            pool,
-            shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::new_with_limits(
-                config.global_request_limit,
-                config.subscription_limit,
-            )),
-            registry,
-            authenticator,
-            account_resolver,
-            #[cfg(feature = "control-plane")]
-            oidc_client,
-            metrics_handle,
-        }))
+        Self::assemble(config, registry, metrics_handle).await
     }
 
     /// Production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
         let registry = Self::build_registry(&config).await?;
+        Self::assemble(config, registry, None).await
+    }
+
+    /// The single state-assembly path shared by every constructor and
+    /// by the feature-gated test builder. Storage selection stays in
+    /// `build_registry`; this function only wires the state itself.
+    pub(crate) async fn assemble(
+        config: HttpConfig,
+        registry: registry::RegistryHandle,
+        _metrics_handle: AssembleMetrics,
+    ) -> Result<Arc<Self>, crate::error::MemoryError> {
         let signup_plan = registry::models::Plan {
             id: "free".into(),
             version: 1,
@@ -166,6 +138,8 @@ impl HttpState {
         } else {
             None
         };
+        #[cfg(feature = "prometheus")]
+        let metrics_handle = _metrics_handle;
         Ok(Arc::new(Self {
             config: config.clone(),
             pool,
@@ -179,6 +153,8 @@ impl HttpState {
             account_resolver,
             #[cfg(feature = "control-plane")]
             oidc_client,
+            #[cfg(feature = "prometheus")]
+            metrics_handle,
         }))
     }
 
@@ -233,17 +209,10 @@ impl HttpState {
     }
 
     pub async fn default_for_test() -> Arc<Self> {
-        let config = HttpConfig::default_for_test();
-        #[cfg(feature = "prometheus")]
-        {
-            Self::new(config, Self::test_metrics_handle())
-                .await
-                .expect("HTTP state for test builds")
-        }
-        #[cfg(not(feature = "prometheus"))]
-        {
-            let _ = Self::test_metrics_handle();
-            Self::new(config).await.expect("HTTP state for test builds")
-        }
+        test_state::HttpStateTestBuilder::new()
+            .await
+            .build()
+            .await
+            .expect("HTTP state for test builds")
     }
 }

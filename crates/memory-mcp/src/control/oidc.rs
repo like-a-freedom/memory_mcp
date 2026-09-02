@@ -860,30 +860,12 @@ mod tests {
 
         let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
         let registry = RegistryHandle::in_memory().with_inner_store(store.clone());
-        let state = Arc::new(crate::http::HttpState {
-            config: crate::http::config::HttpConfig::default_for_test(),
-            pool: Arc::new(crate::http::runtime::pool::Pool::with_defaults(Arc::new(
-                registry.clone(),
-            ))),
-            shutdown: crate::http::shutdown::ShutdownState::new(),
-            admission: Arc::new(crate::http::runtime::pool::AdmissionGate::open()),
-            registry,
-            authenticator: Arc::new(crate::http::principal::auth::Authenticator::new(
-                store.clone(),
-                Arc::new(crate::http::principal::cache::PrincipalCache::new(4)),
-                b"pepper".to_vec(),
-                Arc::new(crate::http::principal::auth::RateLimiter::new(
-                    4,
-                    std::time::Duration::from_secs(60),
-                    100,
-                )),
-            )),
-            account_resolver: Arc::new(crate::http::registry::account::AccountResolver::new(
-                store.clone(),
-            )),
-            #[cfg(feature = "control-plane")]
-            oidc_client: None,
-        });
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_registry(registry)
+            .build()
+            .await
+            .expect("test HTTP state");
         let now = chrono::Utc::now();
         store
             .store_session(&ControlPlaneSession {
