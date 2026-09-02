@@ -542,12 +542,12 @@ used directly by the host.
 
 ## Streamable HTTP SaaS profile
 
-The optional `memory_mcp_http` binary is a separate multi-user composition root.
-It exposes only modern MCP Streamable HTTP at `POST /mcp`; it has no memory
-operation CLI and never accepts a namespace selector from a request. The request
-path is Bearer API key → Account → ready Tenant → immutable namespace-bound
-runtime. The control Registry uses its own SurrealDB namespace/database, while
-Tenant data is provisioned in server-generated namespaces.
+`memory_mcp_http` is a separate, multi-user composition root. It serves only
+modern MCP Streamable HTTP at `POST /mcp`, has no memory-operation CLI, and
+never accepts a namespace selector from a request. Each request resolves
+`Bearer API key → Account → ready Tenant → immutable namespace-bound runtime`.
+The control Registry lives in its own SurrealDB namespace and database; tenant
+data lives in server-generated namespaces.
 
 Build and run it with the `streamable-http` feature:
 
@@ -587,10 +587,13 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
 
-`MEMORY_MCP_HTTP_BIND` defaults to `0.0.0.0:8080`, `MEMORY_MCP_HTTP_BODY_LIMIT`
-to `8 MiB`, `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` to `120`, and
-`MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` to `30`. The remaining runtime tuning
-variables (`MEMORY_MCP_HTTP_POOL_CAP`, `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
+Default values: `MEMORY_MCP_HTTP_BIND=0.0.0.0:8080`,
+`MEMORY_MCP_HTTP_BODY_LIMIT=8 MiB`,
+`MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS=120`,
+`MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS=30`. The remaining runtime tuning
+variables also have defaults and only need to be set when the workload differs
+from the documented assumptions: `MEMORY_MCP_HTTP_POOL_CAP`,
+`MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
 `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
 `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
 `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`, `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
@@ -599,36 +602,36 @@ variables (`MEMORY_MCP_HTTP_POOL_CAP`, `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
 `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
 `MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
 `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
-`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES`) have validated safe defaults; they only
-need to be set when the workload differs from the documented assumptions.
+`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES`.
 
 The full environment contract, proxy requirements, deletion semantics, and
-production gates are in the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
+release gates live in the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
 [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
 [operations runbooks](docs/operations/).
 
-For `MEMORY_MCP_HTTP_SIGNUP_MODE=open`, also set all seven durable plan seed
+For `MEMORY_MCP_HTTP_SIGNUP_MODE=open`, set all seven durable plan seed
 variables: `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
 `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT`, `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
 `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`, `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
 `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, and
-`MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They are used only to create Registry
-plan version 1 when it is absent; an existing durable plan is not overwritten.
+`MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They seed Registry plan version 1
+only when it does not already exist; an existing durable plan is never
+overwritten.
 
-Operator access uses `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`, a comma-separated
-immutable allowlist of `issuer|hex(subject_verifier)` entries. Account APIs
-cannot grant operator status.
+Operator access uses `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`, an immutable
+allowlist of `issuer|hex(subject_verifier)` entries. Account APIs cannot grant
+operator status.
 
 The Dioxus SPA is built and embedded by enabling the `control-plane-ui` feature
 and pointing `MEMORY_MCP_CONTROL_PLANE_UI_DIST` at the absolute bundle output
 (see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)).
-Enabling `control-plane-ui` without a complete bundle (containing a non-empty
+Enabling `control-plane-ui` without a complete bundle (a non-empty
 `index.html`) is a build error, not a runtime placeholder.
 
-The embedded `rocksdb://` backend is suitable only for development, demos, and
-single-process tests. `mem://` is test-only. Public production requires remote
-SurrealDB, reverse-proxy TLS/host/origin enforcement, restricted `/metrics`, and
-the release evidence in §20.5 of the specification.
+`rocksdb://` works for development, demos, and single-process tests only.
+`mem://` is test-only. Public production requires remote SurrealDB, a reverse
+proxy that enforces TLS, host, and origin, restricted `/metrics`, and the
+release evidence in §20.5 of the specification.
 
 ## Configuration
 
