@@ -542,23 +542,31 @@ used directly by the host.
 
 ## Streamable HTTP SaaS profile
 
-`memory_mcp_http` is a separate, multi-user composition root. It serves only
-modern MCP Streamable HTTP at `POST /mcp`, has no memory-operation CLI, and
-never accepts a namespace selector from a request. Each request resolves
-`Bearer API key → Account → ready Tenant → immutable namespace-bound runtime`.
-The control Registry lives in its own SurrealDB namespace and database; tenant
-data lives in server-generated namespaces.
+`memory_mcp_http` is the multi-user, remote deployment of Memory MCP. Each
+authenticated request maps to one Account and one Tenant, then runs against
+that Tenant's dedicated storage. Account, tenant, and namespace identities
+stay independent; the namespace that holds a Tenant's data is server-generated
+and never selectable from a request.
 
-Build and run it with the `streamable-http` feature:
+This section is the operator's quick reference. Full environment contract,
+request validation, and release gates live in the
+[Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
+[ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
+[operations runbooks](docs/operations/).
+
+### Build and run
+
+Build with the `streamable-http` feature. Add `control-plane` for OIDC and
+account management, and `control-plane-ui` to embed the Dioxus SPA.
 
 ```bash
 cargo build --release --locked --features streamable-http,control-plane
-# HTTP boundary (BIND defaults to 0.0.0.0:8080)
+# HTTP boundary
 MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
 ALLOWED_HOSTS=mcp.example.com \
 ALLOWED_ORIGINS=https://mcp.example.com \
 MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS=10.0.0.0/8,172.16.0.0/12 \
-# SurrealDB control (Registry) and tenant engine bindings
+# SurrealDB control (Account/plan/credential Registry) and tenant engine
 SURREALDB_CONTROL_URL=wss://surreal.example.com/rpc \
 SURREALDB_CONTROL_USERNAME=... \
 SURREALDB_CONTROL_PASSWORD=... \
@@ -569,7 +577,7 @@ SURREALDB_TENANT_USERNAME=... \
 SURREALDB_TENANT_PASSWORD=... \
 SURREALDB_TENANT_NAMESPACE=tenant \
 SURREALDB_TENANT_DB=tenant \
-# Keyed verifiers (32-byte hex each; raw secrets are never persisted or logged)
+# Keyed verifiers (32-byte hex; raw secrets are never persisted or logged)
 MEMORY_MCP_API_KEY_PEPPER=... \
 MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
 MEMORY_MCP_HTTP_SESSION_KEY=... \
@@ -582,56 +590,132 @@ MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
 MEMORY_MCP_HTTP_OIDC_CLIENT_ID=memory_mcp \
 MEMORY_MCP_HTTP_OIDC_AUDIENCE=https://mcp.example.com \
 MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://mcp.example.com/auth/oidc/callback \
-# Stable replica identity for multi-replica deployments
+# Stable replica identity (required for multi-replica deployments)
 MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
 
-Default values: `MEMORY_MCP_HTTP_BIND=0.0.0.0:8080`,
-`MEMORY_MCP_HTTP_BODY_LIMIT=8 MiB`,
-`MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS=120`,
-`MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS=30`. The remaining runtime tuning
-variables also have defaults and only need to be set when the workload differs
-from the documented assumptions: `MEMORY_MCP_HTTP_POOL_CAP`,
-`MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
-`MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
-`MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
-`MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`, `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
-`MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM`,
-`MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY`,
-`MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
-`MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
-`MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
-`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES`.
+### Routes
 
-The full environment contract, proxy requirements, deletion semantics, and
-release gates live in the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md),
-[ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
-[operations runbooks](docs/operations/).
+| Route | Auth | Use |
+|---|---|---|
+| `POST /mcp` | Bearer API key | Modern MCP Streamable HTTP (`2026-07-28`). Only `POST` is accepted; `GET`/`DELETE` return `405`. |
+| `/api/v1/account/*` | Browser session + CSRF | Self-service: API keys, profile, account deletion |
+| `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
+| `/auth/oidc/*` | OIDC flow | Login, callback, logout (only when the control plane is enabled) |
+| `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
+| `/metrics` | Public (no app auth) | Prometheus scrape. Restrict at the reverse proxy or network layer. |
+| `/` and SPA fallback | Public | Dioxus control-plane UI (only with the `control-plane-ui` feature) |
 
-For `MEMORY_MCP_HTTP_SIGNUP_MODE=open`, set all seven durable plan seed
-variables: `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
-`MEMORY_MCP_HTTP_MAX_EPISODE_COUNT`, `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
-`MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`, `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
-`MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, and
-`MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They seed Registry plan version 1
-only when it does not already exist; an existing durable plan is never
-overwritten.
+### Authentication
 
-Operator access uses `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`, an immutable
-allowlist of `issuer|hex(subject_verifier)` entries. Account APIs cannot grant
-operator status.
+MCP requests authenticate with a Bearer API key issued per Account. The
+server-generated key has the shape `mem_sk_<key_id>_<256-bit-secret>`; the
+secret is shown once and never recoverable. Each Account can hold up to ten
+active keys. Revocation is durable immediately and externally effective
+within the documented bound. Account APIs cannot grant operator status.
 
-The Dioxus SPA is built and embedded by enabling the `control-plane-ui` feature
-and pointing `MEMORY_MCP_CONTROL_PLANE_UI_DIST` at the absolute bundle output
-(see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)).
-Enabling `control-plane-ui` without a complete bundle (a non-empty
-`index.html`) is a build error, not a runtime placeholder.
+Browser control-plane endpoints authenticate with a secure server-side
+session cookie (HttpOnly, SameSite). The session has both an idle and an
+absolute expiry and rotates after login. Destructive actions require recent
+authentication, typically within ten minutes.
 
-`rocksdb://` works for development, demos, and single-process tests only.
-`mem://` is test-only. Public production requires remote SurrealDB, a reverse
-proxy that enforces TLS, host, and origin, restricted `/metrics`, and the
-release evidence in §20.5 of the specification.
+OIDC is the operator path. When the control plane is enabled, the binary
+requires `MEMORY_MCP_HTTP_OIDC_*` configuration. Enabling the control plane
+without it is a startup error. OIDC login uses Authorization Code with PKCE,
+exact issuer/audience validation, encrypted state and nonce, and an algorithm
+allowlist. The browser session and MCP API keys are independent: a browser
+session never authenticates `POST /mcp`, and an API key never authenticates the
+control plane.
+
+Operator access is granted only through `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`,
+an immutable allowlist of `issuer|hex(subject_verifier)` entries. Operators
+audit, retry, suspend, resume, purge, and inspect recovery status; nothing
+else.
+
+### Reverse proxy
+
+The backend listens on `0.0.0.0:8080` by default. Production terminates TLS at
+a reverse proxy. The proxy must:
+
+- Disable response buffering for `POST /mcp` and set the proxy's read timeout
+  above the ordinary request deadline
+- Apply a separate, longer idle policy to long-lived `subscriptions/listen`
+  streams; the ordinary deadline does not apply to them
+- Enforce host and origin from the configured allowlists
+- Restrict `/metrics` to your metrics network
+- Not rewrite MCP mirrored headers
+
+Wildcard origins are rejected at startup. Missing `Origin` is accepted only
+for non-browser MCP clients.
+
+### Capacity and quotas
+
+The HTTP profile enforces admission limits at the edge (per-tenant and
+global), separate subscription and ordinary-request budgets, and a tunable
+runtime pool. Quota overage returns HTTP `429` with a `Retry-After` header
+and a `guidance` field. Public launch requires remote SurrealDB and explicit
+quota values for `signup_mode=open`:
+
+```text
+MEMORY_MCP_HTTP_MAX_INGESTED_BYTES
+MEMORY_MCP_HTTP_MAX_EPISODE_COUNT
+MEMORY_MCP_HTTP_INGEST_PER_MINUTE
+MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS
+MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS
+MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY
+MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY
+```
+
+These seed Registry plan version 1 only when no plan exists. An existing
+durable plan is never overwritten.
+
+### Long-lived streams
+
+Two features run long-lived response streams:
+
+- `subscriptions/listen`: filtered, ordered change events for Apps and
+  resources. The server reauthorizes at least every 30 seconds, bounded to
+  60 seconds. Revocation terminates the stream within that bound.
+- `extract` with the `io.modelcontextprotocol/tasks` extension: `extract` is
+  the only tool that may return a Task. Clients that do not advertise the
+  extension receive a bounded synchronous result, or a preflight rejection
+  when the work exceeds the configured size limit.
+
+App Sessions, durable Tasks, and the change-event outbox have separate,
+configurable retention and queue limits. The full list of `MEMORY_MCP_HTTP_*`
+tuning variables lives in the specification.
+
+### Account deletion
+
+The user-driven deletion flow is irreversible. After recent OIDC
+re-authentication, the user confirms with a typed phrase and a one-use token.
+The server revokes live API keys and browser sessions, transitions the
+Account and Tenant to terminal deletion states, and preserves a durable
+tombstone so the namespace binding is never reused. Memory records are
+invalidated; only ephemeral Task and App Session rows are physically removed
+after their normal retention/TTL window. There is no cancellation window.
+
+### Multi-replica deployments
+
+Set `MEMORY_MCP_HTTP_REPLICA_ID` to a stable deployment identity. Without it,
+the process falls back to a PID-based identity, which is safe only for a
+single process. Workers across replicas coordinate durable work through
+fenced leases; a stable replica ID makes lease ownership observable.
+
+### Storage backends
+
+`mem://` is test-only. `rocksdb://` works for development, demos, and
+single-process tests. Public production requires remote SurrealDB. The
+embedded profile emits a startup warning and is not HA, not rolling, and
+not horizontally scalable.
+
+### Before opening ingress
+
+Confirm the reverse proxy enforces TLS, host, and origin. Confirm
+`/metrics` is restricted. Run the conformance suite. Complete the
+[operations runbooks](docs/operations/) (restore drill, credential rotation)
+and the §20.5 release evidence for open signup.
 
 ## Configuration
 
