@@ -1,6 +1,6 @@
 # Memory MCP
 
-[![Rust](https://img.shields.io/badge/Rust-1.88%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-1.97%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](https://doc.rust-lang.org/edition-guide/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -20,6 +20,7 @@ It is designed for workflows where agents need more than short-lived chat contex
   - [Read path: context assembly](#read-path-context-assembly)
   - [Bi-temporal data model](#bi-temporal-data-model)
 - [Quick start](#quick-start)
+- [Streamable HTTP SaaS profile](#streamable-http-saas-profile)
 - [Configuration](#configuration)
 - [MCP tools](#mcp-tools)
 - [Development](#development)
@@ -234,19 +235,23 @@ erDiagram
 
 | Module | Purpose |
 | --- | --- |
-| `mcp` | MCP handlers, params, parsers, and tool-facing types |
+| `mcp` | MCP handlers, params, parsers, and tool-facing types (stdio profile) |
 | `service` | Core business logic for ingest, extract, retrieval, graph operations, and validation |
-| `storage` | Database integration and persistence helpers |
+| `storage` | Database integration and persistence helpers (one Active Namespace) |
 | `models` | Shared domain models and request/response types |
 | `config` | Environment-driven configuration loading |
 | `logging` | Logging setup and log-level utilities |
 | `observability` | Optional Prometheus installation and bounded runtime metrics |
+| `tools` | Protocol-agnostic tool implementations shared by MCP and CLI |
+| `cli` | CLI subcommand adapters and lifecycle hooks |
+| `http` | Streamable HTTP composition root (SaaS profile, feature-gated) |
+| `control` | OIDC, browser sessions, account/operator API, CSRF, and deletion flow (feature-gated) |
 
 ## Quick start
 
 ### Requirements
 
-- Rust 1.88+ only when compiling from source
+- Rust 1.97.1+ only when compiling from source (matches workspace `rust-version`)
 - No external SurrealDB service is required for the default embedded mode
 
 ### First run with a release binary
@@ -548,10 +553,16 @@ Build and run it with the `streamable-http` feature:
 
 ```bash
 cargo build --release --locked --features streamable-http,control-plane
+# HTTP boundary
+MEMORY_MCP_HTTP_BIND=0.0.0.0:8080 \
 MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
 ALLOWED_HOSTS=mcp.example.com \
 ALLOWED_ORIGINS=https://mcp.example.com \
-MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
+MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS=10.0.0.0/8,172.16.0.0/12 \
+MEMORY_MCP_HTTP_BODY_LIMIT=4194304 \
+MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS=120 \
+MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS=30 \
+# SurrealDB control (Registry) and tenant engine bindings
 SURREALDB_CONTROL_URL=wss://surreal.example.com/rpc \
 SURREALDB_CONTROL_USERNAME=... \
 SURREALDB_CONTROL_PASSWORD=... \
@@ -562,12 +573,21 @@ SURREALDB_TENANT_USERNAME=... \
 SURREALDB_TENANT_PASSWORD=... \
 SURREALDB_TENANT_NAMESPACE=tenant \
 SURREALDB_TENANT_DB=tenant \
+# Keyed verifiers (32-byte hex each; raw secrets are never persisted or logged)
 MEMORY_MCP_API_KEY_PEPPER=... \
 MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
 MEMORY_MCP_HTTP_SESSION_KEY=... \
 MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
 MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
 MEMORY_MCP_HTTP_CSRF_KEY=... \
+# Signup policy and OIDC
+MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
+MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
+MEMORY_MCP_HTTP_OIDC_CLIENT_ID=memory_mcp \
+MEMORY_MCP_HTTP_OIDC_AUDIENCE=https://mcp.example.com \
+MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://mcp.example.com/auth/oidc/callback \
+# Stable replica identity for multi-replica deployments
+MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
 
@@ -596,13 +616,22 @@ Runtime tuning is also environment-driven: `MEMORY_MCP_HTTP_POOL_CAP`,
 `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
 `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` have validated safe defaults.
 
+Operator access uses `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`, a comma-separated
+immutable allowlist of `issuer|hex(subject_verifier)` entries. Account APIs
+cannot grant operator status.
+
 Set `MEMORY_MCP_HTTP_REPLICA_ID` to a stable deployment identity when running
 multiple replicas; worker leases otherwise use a process-lifetime PID fallback.
+The Dioxus SPA is built and embedded by enabling the `control-plane-ui` feature
+and pointing `MEMORY_MCP_CONTROL_PLANE_UI_DIST` at the absolute bundle output
+(see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)).
+Enabling `control-plane-ui` without a complete bundle (containing a non-empty
+`index.html`) is a build error, not a runtime placeholder.
 
 The embedded `rocksdb://` backend is suitable only for development, demos, and
-single-process tests. Public production requires remote SurrealDB, reverse-proxy
-TLS/host/origin enforcement, restricted `/metrics`, and the release evidence in
-§20.5 of the specification.
+single-process tests. `mem://` is test-only. Public production requires remote
+SurrealDB, reverse-proxy TLS/host/origin enforcement, restricted `/metrics`, and
+the release evidence in §20.5 of the specification.
 
 ## Configuration
 
@@ -1088,7 +1117,7 @@ As of 2026-03-27, `memory_mcp` implements adaptive memory alignment with SOTA re
 
 - **LongMemEval-style acceptance tests**: Coverage for multi-session reasoning, temporal reasoning, knowledge update, abstention, and direct fact lookup.
 
-See `docs/superpowers/specs/2026-03-27-sota-memory-alignment-design.md` for target-state design and `docs/MEMORY_SYSTEM_SPEC.md` for current runtime contract.
+See the [Architecture Decision Records](docs/adr/) (ADR-0008 source continuity, ADR-0022 compact responses, ADR-0040 narrow retrieval, ADR-0049 claim evidence fidelity) and the [compatibility contract](docs/compatibility/one-active-namespace-identities.md) for the current runtime contract.
 
 ## Development
 
@@ -1156,7 +1185,10 @@ GLINER_DEVICE=auto cargo run --release --features metal -- serve
 
 ### Binary entry points
 
-- `crates/memory-mcp/src/main.rs` — main MCP server binary
+- `crates/memory-mcp/src/main.rs` — main MCP server binary (`memory_mcp`); stdio profile, CLI, and lifecycle hooks
+- `crates/memory-mcp/src/bin/memory_mcp_http.rs` — Streamable HTTP SaaS binary (`memory_mcp_http`); built when the `streamable-http` feature is enabled
+- `crates/eval-harness/src/main.rs` — evaluation harness binary (`memory-eval`); never linked into the production binary
+- `crates/control-plane-ui/src/main.rs` — Dioxus web SPA build target (`control-plane-ui`); built with the Dioxus CLI and embedded by the backend when the `control-plane-ui` feature is enabled
 
 MCP input/output schemas are exposed by the server itself through the protocol's
 tool metadata and remain regression-covered by the schema tests under
@@ -1194,10 +1226,12 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 ├── Cargo.toml              # workspace root
 ├── Makefile                # thin eval profile adapters
 ├── crates/
-│   ├── memory-mcp/         # production package
+│   ├── memory-mcp/         # production package (std and HTTP binaries)
 │   │   ├── migrations/
-│   │   ├── src/            # library, thin binary, MCP and domain services
+│   │   ├── src/            # library, two binary entry points, MCP/HTTP, control plane, and domain services
 │   │   └── tests/          # production integration and release-gate tests
+│   ├── control-plane-ui/   # Dioxus 0.7 web SPA (control-plane-ui feature)
+│   │   └── src/            # router, API client, login/keys/delete/status pages
 │   └── eval-harness/       # private evaluation package
 │       ├── benches/        # Criterion benchmark families
 │       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
@@ -1209,6 +1243,8 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │   ├── profiles/           # pr.json, release.json, nightly.json, ner_quality.json
 │   ├── results/            # recorded comparison results (e.g. NER)
 │   └── schema/             # eval-artifact-v1.json
+├── hooks/                  # lifecycle capture scripts (stop, precompact, profile)
+├── scripts/                # time-to-value harness, parity checks
 └── docs/
 ```
 
@@ -1240,14 +1276,16 @@ and the supporting ADRs under `docs/adr/`.
 
 ## Documentation
 
-- [`docs/MEMORY_SYSTEM_SPEC.md`](docs/MEMORY_SYSTEM_SPEC.md) — full system specification
+- [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) — Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
-- [`docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md`](docs/SIMPLIFIED_SEARCH_REDESIGN_SPEC.md) — target-state spec for the upcoming breaking search simplification
-- [`docs/ENTITY_RESOLUTION_GUIDE.md`](docs/ENTITY_RESOLUTION_GUIDE.md) — normalization, classification, and alias-resolution reference
-- [`docs/GRAPH_RELATION_COMPATIBILITY.md`](docs/GRAPH_RELATION_COMPATIBILITY.md) — relation-table strategy and migration path
-- [`docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md`](docs/INTENT_DRIVEN_MCP_DESIGN_GUIDE.md) — curated references for intent- and skills-driven MCP design
-- [`docs/security-hardening-roadmap.md`](docs/security-hardening-roadmap.md) — current query-surface inventory, deployment assumptions, and remaining hardening work
+- [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md) — compact tool responses design
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (52 ADRs, including ADR-0038 one Active Namespace and ADR-0052 Streamable HTTP SaaS profile)
+- [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md) — scope/namespace compatibility contract
+- [`docs/operations/`](docs/operations/) — operator runbooks (protocol conformance, credential rotation, known limitations, SurrealDB restore drill)
+- [`docs/performance/`](docs/performance/) — memory profile and NER performance measurements
+- [`docs/evals/`](docs/evals/) — evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
 - [`docs/BACKLOG.md`](docs/BACKLOG.md) — open engineering backlog
+- [`hooks/README.md`](hooks/README.md) — lifecycle hooks contract and editor-by-editor configuration
 
 ## Contributing
 
@@ -1412,6 +1450,6 @@ external content is treated as data rather than privileged instruction.
 
 See:
 - [ADR 0016](docs/adr/0016-agent-memory-lifecycle-integration.md)
-- [Integration Contract](docs/agent_integration/CONTRACT.md)
+- [Hook scripts contract](hooks/README.md) — transport, environment variables, editor-by-editor configuration, and hidden lifecycle CLI subcommands
 - [Evaluation Results](docs/evals/AGENT_MEMORY_LIFECYCLE.md)
 - [Procedural Memory](docs/evals/PROCEDURAL_MEMORY.md)
