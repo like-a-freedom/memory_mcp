@@ -171,6 +171,19 @@ fn is_conflict_error(error: &MemoryError) -> bool {
     })
 }
 
+/// Engine-level MVCC write conflicts are transient: the datastore
+/// explicitly marks the transaction retryable. Hot usage rows see
+/// them under concurrent ingest, so quota admission retries them
+/// with a short backoff instead of surfacing a 5xx.
+fn is_write_conflict(error: &MemoryError) -> bool {
+    let message = match error {
+        MemoryError::Storage(message) | MemoryError::Conflict(message) => message.as_str(),
+        _ => return false,
+    };
+    let lower = message.to_ascii_lowercase();
+    lower.contains("write conflict") || lower.contains("retry the transaction")
+}
+
 #[cfg(feature = "control-plane")]
 fn classify_deletion_error(error: MemoryError) -> MemoryError {
     match error {
@@ -193,6 +206,31 @@ fn migration_checksum(sql: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(sql.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+/// SurrealQL `SET` assignment plus query variables for writing a
+/// tenant's `provisioning_lease`. Nested datetimes inside a FLEXIBLE
+/// object are not coerced from bound strings by the schema, so every
+/// datetime uses an explicit `type::datetime` cast, matching every
+/// other datetime write in this store.
+fn lease_write_assignment(lease: Option<&ProvisioningLeaseState>) -> (String, Value) {
+    match lease {
+        None => ("provisioning_lease = NONE".to_owned(), json!({})),
+        Some(lease) => (
+            "provisioning_lease = { owner_id: $lease_owner_id, lease_id: $lease_id, \
+             fencing_generation: $lease_fencing_generation, \
+             expires_at: type::datetime($lease_expires_at), \
+             heartbeat_at: type::datetime($lease_heartbeat_at) }"
+                .to_owned(),
+            json!({
+                "lease_owner_id": lease.owner_id,
+                "lease_id": lease.lease_id,
+                "lease_fencing_generation": lease.fencing_generation,
+                "lease_expires_at": lease.expires_at.to_rfc3339(),
+                "lease_heartbeat_at": lease.heartbeat_at.to_rfc3339(),
+            }),
+        ),
+    }
 }
 
 fn migration_ledger_id(file_name: &str) -> String {
@@ -619,7 +657,7 @@ impl SurrealRegistryStore {
             .map_err(|err| map_storage_error("bootstrap registry migration ledger", err))?;
 
         let mut verified = Vec::new();
-        for name in super::migrations::REGISTRY_MIGRATIONS {
+        'catalog: for name in super::migrations::REGISTRY_MIGRATIONS {
             let file_name = format!("{name}.surql");
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("migrations")
@@ -655,7 +693,11 @@ impl SurrealRegistryStore {
                     match row.get("status").and_then(Value::as_str) {
                         Some("completed") => {
                             verified.push(file_name.clone());
-                            break;
+                            // Already applied by an earlier connect: skip both the
+                            // DDL and the fenced completion update. This replica
+                            // does not own the row, so re-running the completion
+                            // would always fail its owner fence.
+                            continue 'catalog;
                         }
                         Some("failed") | Some("applying") => {
                             if migration_lease_active(&row)? {
@@ -1036,15 +1078,12 @@ impl RegistryStore for SurrealRegistryStore {
             .map_err(|error| MemoryError::Storage(format!("encode tenant status: {error}")))?;
         let account_status = serde_json::to_value(account.status)
             .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
+        let (lease_assignment, lease_vars) =
+            lease_write_assignment(tenant.provisioning_lease.as_ref());
         let retry_stage_assignment = if tenant.retry_stage.is_some() {
             "retry_stage = $retry_stage"
         } else {
             "retry_stage = NONE"
-        };
-        let lease_assignment = if tenant.provisioning_lease.is_some() {
-            "provisioning_lease = $lease"
-        } else {
-            "provisioning_lease = NONE"
         };
         let mut script = format!(
             "BEGIN TRANSACTION; LET $existing_namespace = SELECT VALUE id FROM tenant WHERE namespace_binding.namespace = $namespace LIMIT 1; IF array::len($existing_namespace) > 0 {{ THROW 'namespace binding already exists'; }}; CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at); CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;",
@@ -1064,11 +1103,13 @@ impl RegistryStore for SurrealRegistryStore {
             "plan_version": tenant.plan_version,
             "schema_version": tenant.schema_version,
             "retry_stage": tenant.retry_stage,
-            "lease": tenant.provisioning_lease,
             "account_created_at": account.created_at.to_rfc3339(),
             "tenant_created_at": tenant.created_at.to_rfc3339(),
             "version": tenant.version,
         });
+        if let (Some(vars), Some(lease_vars)) = (vars.as_object_mut(), lease_vars.as_object()) {
+            vars.extend(lease_vars.clone());
+        }
         if let Some(identity) = identity {
             let Some(object) = vars.as_object_mut() else {
                 return Err(MemoryError::Storage(
@@ -1507,18 +1548,14 @@ impl RegistryStore for SurrealRegistryStore {
         } else {
             "retry_stage = NONE"
         };
-        let lease_assignment = if tenant.provisioning_lease.is_some() {
-            "provisioning_lease = $lease"
-        } else {
-            "provisioning_lease = NONE"
-        };
+        let (lease_assignment, lease_vars) =
+            lease_write_assignment(tenant.provisioning_lease.as_ref());
         let sql = format!(
             "UPSERT type::record($table, $id) SET id = $id, status = IF status = 'purged' AND $status != 'purged' THEN status ELSE $status END, namespace_binding = IF namespace_binding IS NONE THEN $binding ELSE namespace_binding END, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($created_at), version = $version"
         );
         self.handle()
-            .query_json(
-                &sql,
-                Some(json!({
+            .query_json(&sql, {
+                let mut vars = json!({
                     "table": "tenant",
                     "id": tenant.id,
                     "status": status,
@@ -1526,11 +1563,16 @@ impl RegistryStore for SurrealRegistryStore {
                     "plan_version": tenant.plan_version,
                     "schema_version": tenant.schema_version,
                     "retry_stage": tenant.retry_stage,
-                    "lease": tenant.provisioning_lease,
                     "created_at": tenant.created_at.to_rfc3339(),
                     "version": tenant.version,
-                })),
-            )
+                });
+                if let (Some(vars), Some(lease_vars)) =
+                    (vars.as_object_mut(), lease_vars.as_object())
+                {
+                    vars.extend(lease_vars.clone());
+                }
+                Some(vars)
+            })
             .await
             .map_err(|err| map_storage_error("write_tenant", err))?;
         Ok(())
@@ -1998,18 +2040,26 @@ impl RegistryStore for SurrealRegistryStore {
         plan: &crate::http::registry::plan::Plan,
         now: DateTime<Utc>,
     ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
-        for _attempt in 0..3 {
+        // One hot usage row per Tenant; allow enough attempts that
+        // a burst of concurrent ingests each lands one clean write.
+        for _attempt in 0..8 {
             // Create the usage row once. The conditional UPDATE below is the
             // admission operation; it increments counters only when every
             // quota predicate still holds at the datastore write point.
-            self.handle()
-                .query_json(
-                    "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = IF ingest_window_start IS NONE THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_current_minute IS NONE THEN 0 ELSE ingest_current_minute END, ingested_bytes = IF ingested_bytes IS NONE THEN 0 ELSE ingested_bytes END, episode_count = IF episode_count IS NONE THEN 0 ELSE episode_count END, updated_at = time::now()",
+            let init = self.handle().query_json(
+                    "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = IF ingest_window_start IS NONE THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_current_minute IS NONE THEN 0 ELSE ingest_current_minute END, ingested_bytes = IF ingested_bytes IS NONE THEN 0 ELSE ingested_bytes END, episode_count = IF episode_count IS NONE THEN 0 ELSE episode_count END, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
                     Some(json!({"table": "usage", "tenant_id": tenant_id, "now": now.to_rfc3339()})),
                 )
                 .await
-                .map_err(|error| map_storage_error("initialize ingest usage", error))?;
-            let rows = self
+                .map_err(|error| map_storage_error("initialize ingest usage", error));
+            if let Err(error) = init {
+                if is_write_conflict(&error) {
+                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                    continue;
+                }
+                return Err(error);
+            }
+            let reserve = self
                 .handle()
                 .query_json(
                     "UPDATE type::record($table, $tenant_id) SET ingest_window_start = IF ingest_window_start <= type::datetime($cutoff) THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_window_start <= type::datetime($cutoff) THEN 1 ELSE ingest_current_minute + 1 END, ingested_bytes = ingested_bytes + $bytes, episode_count = episode_count + 1, updated_at = time::now() WHERE tenant_id = $tenant_id AND ingested_bytes + $bytes <= $max_bytes AND episode_count < $max_episodes AND (ingest_current_minute < $per_minute OR ingest_window_start <= type::datetime($cutoff)) RETURN AFTER",
@@ -2025,7 +2075,17 @@ impl RegistryStore for SurrealRegistryStore {
                     })),
                 )
                 .await
-                .map_err(|error| map_storage_error("reserve ingest usage", error))?;
+                .map_err(|error| map_storage_error("reserve ingest usage", error));
+            let rows = match reserve {
+                Ok(rows) => rows,
+                Err(error) => {
+                    if is_write_conflict(&error) {
+                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
             if !rows.is_empty() {
                 return Ok(crate::http::registry::plan::QuotaDecision::Allow);
             }
@@ -2049,7 +2109,7 @@ impl RegistryStore for SurrealRegistryStore {
     ) -> Result<(), MemoryError> {
         self.handle()
             .query_json(
-                "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = type::datetime($window), ingest_current_minute = $count, ingested_bytes = $bytes, episode_count = $episodes, updated_at = time::now()",
+                "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = type::datetime($window), ingest_current_minute = $count, ingested_bytes = $bytes, episode_count = $episodes, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
                 Some(json!({"table": "usage", "tenant_id": tenant_id, "window": expected.window_start.to_rfc3339(), "count": expected.ingest_current_minute, "bytes": expected.ingested_bytes, "episodes": expected.episode_count})),
             )
             .await

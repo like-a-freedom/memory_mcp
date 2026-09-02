@@ -2,6 +2,7 @@
 //! `#[cfg(feature = "streamable-http")] pub mod http;`
 
 pub mod app_sessions;
+pub mod composition;
 pub mod config;
 pub mod health;
 pub mod leases;
@@ -74,23 +75,23 @@ type AssembleMetrics = Option<MetricsHandle>;
 type AssembleMetrics = Option<()>;
 
 impl HttpState {
-    /// Production constructor: registry + auth + resolver
-    /// + runtime pool. The two arms differ only in the metrics
-    /// handle type.
+    /// Production constructor. The two arms differ only in the metrics
+    /// handle type. Storage selection happens inside
+    /// `HttpProductionComposition::connect`.
     #[cfg(feature = "prometheus")]
     pub async fn new(
         config: HttpConfig,
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = Self::build_registry(&config).await?;
-        Self::assemble(config, registry, metrics_handle).await
+        let composition = composition::HttpProductionComposition::connect(&config).await?;
+        Self::assemble(config, composition.registry, metrics_handle).await
     }
 
     /// Production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let registry = Self::build_registry(&config).await?;
-        Self::assemble(config, registry, None).await
+        let composition = composition::HttpProductionComposition::connect(&config).await?;
+        Self::assemble(config, composition.registry, None).await
     }
 
     /// The single state-assembly path shared by every constructor and
@@ -156,39 +157,6 @@ impl HttpState {
             #[cfg(feature = "prometheus")]
             metrics_handle,
         }))
-    }
-
-    /// Build the registry handle. Test-fixture builds deliberately use an
-    /// in-memory backend; every production build connects the control registry
-    /// and tenant privileged engine from their independent environment targets.
-    async fn build_registry(
-        config: &HttpConfig,
-    ) -> Result<registry::RegistryHandle, crate::error::MemoryError> {
-        #[cfg(any(test, feature = "test-fixtures"))]
-        {
-            let _ = config;
-            Ok(registry::RegistryHandle::in_memory_with_default_mem_engine().await)
-        }
-        #[cfg(not(any(test, feature = "test-fixtures")))]
-        {
-            let store = registry::SurrealRegistryStore::connect(&config.control_db).await?;
-            // Embedded RocksDB permits one process handle per path. Reuse the
-            // control connection when both targets intentionally point at the
-            // same endpoint; remote deployments may still use independent
-            // connections when the targets differ.
-            let engine = if config.control_db.url == config.tenant_db.url
-                && config.control_db.username == config.tenant_db.username
-                && config.control_db.password == config.tenant_db.password
-            {
-                store.privileged_engine()
-            } else {
-                registry::SurrealRegistryStore::connect_engine(&config.tenant_db).await?
-            };
-            Ok(registry::RegistryHandle::from_durable(
-                std::sync::Arc::new(store),
-                engine,
-            ))
-        }
     }
 }
 

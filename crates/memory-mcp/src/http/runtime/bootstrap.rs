@@ -8,36 +8,52 @@ use std::process::ExitCode;
 use crate::logging::StdoutLogger;
 
 use super::super::HttpState;
+use super::super::composition::HttpProductionComposition;
 use super::super::config::HttpConfig;
+use super::super::leases::migration::ApplyMigrations;
 
-/// Build `HttpState` from the config, optionally installing a
-/// Prometheus recorder. Maps every error to a `startup_error()`
-/// log line + `ExitCode::from(2)`.
-pub async fn build_state(
-    cfg: &HttpConfig,
-) -> Result<std::sync::Arc<HttpState>, (ExitCode, String)> {
+/// The startup-composed HTTP runtime. The binary keeps
+/// `tenant_migrations` alive for the scheduler hooks; it never
+/// re-selects either adapter after this point (ADR-0053).
+pub struct HttpRuntime {
+    pub state: std::sync::Arc<HttpState>,
+    pub tenant_migrations: std::sync::Arc<dyn ApplyMigrations>,
+}
+
+/// Compose the production adapters, build `HttpState`, and optionally
+/// install a Prometheus recorder. Maps every error to a
+/// `startup_error()` log line + `ExitCode::from(2)`.
+pub async fn build_state(cfg: &HttpConfig) -> Result<HttpRuntime, (ExitCode, String)> {
     #[cfg(feature = "prometheus")]
-    {
-        let handle = match crate::http::metrics::install_recorder() {
-            Ok(h) => Some(h),
-            Err(err) => return Err((ExitCode::from(2), format!("metrics init error: {err}"))),
-        };
-        match HttpState::new(cfg.clone(), handle).await {
-            Ok(s) => Ok(s),
-            Err(err) => Err((
+    let metrics_handle = match crate::http::metrics::install_recorder() {
+        Ok(h) => Some(h),
+        Err(err) => return Err((ExitCode::from(2), format!("metrics init error: {err}"))),
+    };
+    #[cfg(not(feature = "prometheus"))]
+    let metrics_handle = None;
+
+    let composition = match HttpProductionComposition::connect(cfg).await {
+        Ok(c) => c,
+        Err(err) => {
+            return Err((
                 ExitCode::from(2),
                 format!("tenant runtime init error: {err}"),
-            )),
+            ));
         }
-    }
-    #[cfg(not(feature = "prometheus"))]
-    match HttpState::new(cfg.clone()).await {
-        Ok(s) => Ok(s),
-        Err(err) => Err((
-            ExitCode::from(2),
-            format!("tenant runtime init error: {err}"),
-        )),
-    }
+    };
+    let state = match HttpState::assemble(cfg.clone(), composition.registry, metrics_handle).await {
+        Ok(s) => s,
+        Err(err) => {
+            return Err((
+                ExitCode::from(2),
+                format!("tenant runtime init error: {err}"),
+            ));
+        }
+    };
+    Ok(HttpRuntime {
+        state,
+        tenant_migrations: composition.tenant_migrations,
+    })
 }
 
 /// Validate that the stdio profile's `MEMORY_PROMETHEUS_LISTEN_ADDR`

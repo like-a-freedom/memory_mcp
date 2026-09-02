@@ -58,12 +58,19 @@ impl SchedulerHooks {
         })
     }
 
-    pub fn with_provisioning_only() -> Result<Self, MemoryError> {
-        let mut jobs: Vec<SchedulerJob> = vec![Arc::new(|registry| {
+    /// The only production provisioning-hook construction path. The
+    /// migration adapter comes from the startup composition
+    /// (ADR-0053); the scheduler never selects one itself.
+    pub fn with_provisioning_only(
+        migrations: Arc<dyn crate::http::leases::migration::ApplyMigrations>,
+    ) -> Result<Self, MemoryError> {
+        let provisioning: SchedulerJob = Arc::new(move |registry| {
+            let migrations = Arc::clone(&migrations);
             Box::pin(crate::http::leases::migration::run_due_provisioning(
-                registry,
+                registry, migrations,
             ))
-        })];
+        });
+        let mut jobs: Vec<SchedulerJob> = vec![provisioning];
         #[cfg(feature = "control-plane")]
         {
             jobs.push(Arc::new(|registry| {
@@ -212,7 +219,10 @@ mod tests {
     #[cfg(feature = "control-plane")]
     #[test]
     fn provisioning_hooks_include_deletion_worker() {
-        let hooks = SchedulerHooks::with_provisioning_only().expect("provisioning hooks");
+        let hooks = SchedulerHooks::with_provisioning_only(Arc::new(
+            crate::http::leases::migration::NoopMigrations,
+        ))
+        .expect("provisioning hooks");
         assert_eq!(hooks.jobs.len(), 2);
     }
 

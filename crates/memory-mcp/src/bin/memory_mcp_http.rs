@@ -28,13 +28,14 @@ async fn main() -> ExitCode {
         eprintln!("{msg}");
         return ExitCode::from(2);
     }
-    let state = match bootstrap::build_state(&cfg).await {
-        Ok(s) => s,
+    let runtime = match bootstrap::build_state(&cfg).await {
+        Ok(r) => r,
         Err((code, msg)) => {
             eprintln!("{msg}");
             return code;
         }
     };
+    let state = runtime.state;
 
     #[cfg(feature = "test-fixtures")]
     if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_bootstrap(&state).await {
@@ -45,28 +46,30 @@ async fn main() -> ExitCode {
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
     let scheduler_hooks =
-        match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only().map(
-            |hooks| {
-                hooks
-                    .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
-                    .with_additional_job(
-                        memory_mcp::http::tasks::scheduler::scheduler_job_with_options(
-                            memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg),
-                        ),
-                    )
-                    .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
-                    .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
-                    .with_additional_job(memory_mcp::http::runtime::pool::Pool::eviction_scheduler_job(
-                        state.pool.clone(),
-                    ))
-                    .with_additional_job(
-                        memory_mcp::http::registry::provisioning::reconciliation_scheduler_job(),
-                    )
-            },
+        match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only(
+            runtime.tenant_migrations.clone(),
         )
-        .and_then(|hooks| {
-            hooks.with_maintenance_parallelism(cfg.maintenance_parallelism)
-        }) {
+        .map(|hooks| {
+            hooks
+                .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
+                .with_additional_job(
+                    memory_mcp::http::tasks::scheduler::scheduler_job_with_options(
+                        memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg),
+                    ),
+                )
+                .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
+                .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
+                .with_additional_job(
+                    memory_mcp::http::runtime::pool::Pool::eviction_scheduler_job(
+                        state.pool.clone(),
+                    ),
+                )
+                .with_additional_job(
+                    memory_mcp::http::registry::provisioning::reconciliation_scheduler_job(),
+                )
+        })
+        .and_then(|hooks| hooks.with_maintenance_parallelism(cfg.maintenance_parallelism))
+        {
             Ok(hooks) => hooks,
             Err(err) => {
                 eprintln!("scheduler config error: {err}");
