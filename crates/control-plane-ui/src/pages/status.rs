@@ -40,6 +40,13 @@ pub fn StatusPage() -> Element {
                 a { href: "/delete", "Delete Account" }
                 button {
                     onclick: move |_| {
+                        // Drop the cached account so the SPA stops
+                        // displaying the previous identity before
+                        // the navigation completes. The server-side
+                        // `/auth/oidc/logout` clears the cookie and
+                        // invalidates the session; the SPA re-bootstraps
+                        // `/api/v1/me` on the next route load.
+                        account.set(None);
                         spawn(async move {
                             let api = ApiClient::new("/".to_string());
                             let _ = api.logout().await;

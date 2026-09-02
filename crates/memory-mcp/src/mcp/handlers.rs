@@ -117,7 +117,7 @@ pub struct MemoryMcp {
     #[cfg(feature = "streamable-http")]
     subscription_queue_capacity: usize,
     #[cfg(feature = "streamable-http")]
-    subscription_auth_recheck_secs: u64,
+    subscription_auth_recheck: Duration,
     /// Maximum inline extraction size when the client did not advertise Tasks.
     #[cfg(feature = "streamable-http")]
     task_sync_max_bytes: usize,
@@ -160,8 +160,7 @@ impl MemoryMcp {
             #[cfg(feature = "streamable-http")]
             subscription_queue_capacity: crate::http::config::DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
             #[cfg(feature = "streamable-http")]
-            subscription_auth_recheck_secs: crate::http::config::DEFAULT_SUBSCRIPTION_AUTH_RECHECK
-                .as_secs(),
+            subscription_auth_recheck: crate::http::config::DEFAULT_SUBSCRIPTION_AUTH_RECHECK,
             #[cfg(feature = "streamable-http")]
             task_sync_max_bytes: crate::http::config::DEFAULT_TASK_SYNC_MAX_BYTES,
             tasks: TaskManager::new(),
@@ -262,7 +261,10 @@ impl MemoryMcp {
         auth_recheck: Duration,
     ) -> Self {
         self.subscription_queue_capacity = queue_capacity.max(1);
-        self.subscription_auth_recheck_secs = auth_recheck.as_secs().max(1);
+        // Preserve the caller-provided `Duration` so sub-second values
+        // configured by tests or future callers aren't silently truncated
+        // to whole seconds at the comparison sites in `listen`.
+        self.subscription_auth_recheck = auth_recheck.max(Duration::from_secs(1));
         self
     }
 
@@ -272,6 +274,31 @@ impl MemoryMcp {
     pub fn with_task_sync_max_bytes(mut self, max_bytes: usize) -> Self {
         self.task_sync_max_bytes = max_bytes.max(1);
         self
+    }
+
+    /// Reject inline `extract` payloads whose `content` (or `text`) is
+    /// larger than `task_sync_max_bytes` bytes. Extracted as a free
+    /// function so it can be unit-tested without standing up a full
+    /// `ServerHandler` request context.
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn check_inline_extract_size(
+        arguments: Option<&serde_json::Map<String, serde_json::Value>>,
+        max_bytes: usize,
+    ) -> Result<(), ErrorData> {
+        let inline_bytes = arguments
+            .and_then(|map| {
+                map.get("content")
+                    .or_else(|| map.get("text"))
+                    .and_then(|value| value.as_str())
+            })
+            .map(str::len);
+        if inline_bytes.is_some_and(|bytes| bytes > max_bytes) {
+            return Err(ErrorData::invalid_params(
+                "inline extract exceeds the synchronous limit; advertise MCP Tasks",
+                None,
+            ));
+        }
+        Ok(())
     }
 
     /// Returns a reference to the underlying `MemoryService`.
@@ -407,22 +434,7 @@ impl ServerHandler for MemoryMcp {
 
         #[cfg(feature = "streamable-http")]
         if request.name == "extract" && !client_supports_tasks {
-            let inline_bytes = request
-                .arguments
-                .as_ref()
-                .and_then(|arguments| {
-                    arguments
-                        .get("content")
-                        .or_else(|| arguments.get("text"))
-                        .and_then(|value| value.as_str())
-                })
-                .map(str::len);
-            if inline_bytes.is_some_and(|bytes| bytes > self.task_sync_max_bytes) {
-                return Err(ErrorData::invalid_params(
-                    "inline extract exceeds the synchronous limit; advertise MCP Tasks",
-                    None,
-                ));
-            }
+            Self::check_inline_extract_size(request.arguments.as_ref(), self.task_sync_max_bytes)?;
         }
 
         if request.name == "extract" && client_supports_tasks {
@@ -700,9 +712,7 @@ impl ServerHandler for MemoryMcp {
                 tokio::select! {
                     _ = context.cancelled() => return Ok(()),
                     _ = poll_tick.tick() => {
-                        if last_auth_check.elapsed()
-                            >= Duration::from_secs(self.subscription_auth_recheck_secs)
-                        {
+                        if last_auth_check.elapsed() >= self.subscription_auth_recheck {
                             ensure_subscription_authorization(&authenticator, &principal).await?;
                             last_auth_check = Instant::now();
                         }
@@ -726,9 +736,7 @@ impl ServerHandler for MemoryMcp {
                             })?;
                         }
                         while let Some(event) = queue.pop_front() {
-                            if last_auth_check.elapsed()
-                                >= Duration::from_secs(self.subscription_auth_recheck_secs)
-                            {
+                            if last_auth_check.elapsed() >= self.subscription_auth_recheck {
                                 ensure_subscription_authorization(&authenticator, &principal).await?;
                                 last_auth_check = Instant::now();
                             }
@@ -2020,5 +2028,54 @@ mod tests {
         let hash1 = content_hash("same content");
         let hash2 = content_hash("same content");
         assert_eq!(hash1, hash2);
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn inline_extract_rejects_payload_over_sync_limit() {
+        // Content larger than `max_bytes` must surface as invalid_params.
+        let mut arguments = serde_json::Map::new();
+        arguments.insert("content".into(), serde_json::Value::String("x".repeat(128)));
+        let err = MemoryMcp::check_inline_extract_size(Some(&arguments), 64)
+            .expect_err("oversize inline extract must be rejected");
+        assert!(
+            err.message
+                .contains("inline extract exceeds the synchronous limit"),
+            "unexpected error message: {}",
+            err.message
+        );
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn inline_extract_accepts_payload_within_sync_limit() {
+        let mut arguments = serde_json::Map::new();
+        arguments.insert("content".into(), serde_json::Value::String("ok".into()));
+        MemoryMcp::check_inline_extract_size(Some(&arguments), 64)
+            .expect("payload within the limit must pass");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn inline_extract_accepts_text_alias_within_sync_limit() {
+        // `text` is the documented fallback alias for inline payloads.
+        let mut arguments = serde_json::Map::new();
+        arguments.insert("text".into(), serde_json::Value::String("hello".into()));
+        MemoryMcp::check_inline_extract_size(Some(&arguments), 64)
+            .expect("text alias within the limit must pass");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn inline_extract_skips_non_string_arguments() {
+        // A non-string `content` falls through to the regular
+        // extract path; the helper reports zero bytes measured.
+        let mut arguments = serde_json::Map::new();
+        arguments.insert(
+            "content".into(),
+            serde_json::Value::Number(serde_json::Number::from(42)),
+        );
+        MemoryMcp::check_inline_extract_size(Some(&arguments), 1)
+            .expect("non-string content is not measured by the helper");
     }
 }

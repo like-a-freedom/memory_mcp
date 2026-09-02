@@ -124,6 +124,37 @@ pub fn reconciliation_scheduler_job() -> crate::http::leases::scheduler::Schedul
     Arc::new(|registry| Box::pin(reconcile_namespaces(registry)))
 }
 
+/// Classify a set of registered tenants against the namespaces
+/// the privileged engine actually reports. Extracted from
+/// `reconcile_namespaces` so the diff can be tested without the
+/// 60-second scheduler throttle.
+#[cfg(feature = "streamable-http")]
+fn classify_namespace_diff<'a>(
+    tenants: &'a [crate::http::registry::models::Tenant],
+    actual_namespaces: &'a HashSet<String>,
+) -> NamespaceDiff<'a> {
+    let registered_namespaces: HashSet<&'a str> = tenants
+        .iter()
+        .map(|tenant| tenant.namespace_binding.namespace.as_str())
+        .collect();
+    let missing: Vec<&'a crate::http::registry::models::Tenant> = tenants
+        .iter()
+        .filter(|tenant| !actual_namespaces.contains(&tenant.namespace_binding.namespace))
+        .collect();
+    let orphan: Vec<&'a str> = actual_namespaces
+        .iter()
+        .map(String::as_str)
+        .filter(|namespace| !registered_namespaces.contains(*namespace))
+        .collect();
+    NamespaceDiff { missing, orphan }
+}
+
+#[cfg(feature = "streamable-http")]
+struct NamespaceDiff<'a> {
+    missing: Vec<&'a crate::http::registry::models::Tenant>,
+    orphan: Vec<&'a str>,
+}
+
 #[cfg(feature = "streamable-http")]
 async fn reconcile_namespaces(
     registry: crate::http::registry::RegistryHandle,
@@ -145,29 +176,24 @@ async fn reconcile_namespaces(
         return Ok(());
     };
     let actual = engine.list_namespaces().await?;
-    let registered_namespaces: HashSet<String> = registered
-        .iter()
-        .map(|tenant| tenant.namespace_binding.namespace.clone())
-        .collect();
     let actual_namespaces: HashSet<String> = actual
         .into_iter()
         .filter(|namespace| namespace.starts_with("tns_"))
         .collect();
-    for tenant in registered {
-        if !actual_namespaces.contains(&tenant.namespace_binding.namespace) {
-            metrics::counter!(
-                "memory_http_registry_reconciliation_total",
-                "kind" => "missing_namespace"
-            )
-            .increment(1);
-            eprintln!(
-                "memory_mcp::http::registry: missing namespace binding tenant_fingerprint={} namespace_fingerprint={}",
-                identifier_fingerprint(&tenant.id),
-                identifier_fingerprint(&tenant.namespace_binding.namespace)
-            );
-        }
+    let diff = classify_namespace_diff(&registered, &actual_namespaces);
+    for tenant in diff.missing {
+        metrics::counter!(
+            "memory_http_registry_reconciliation_total",
+            "kind" => "missing_namespace"
+        )
+        .increment(1);
+        eprintln!(
+            "memory_mcp::http::registry: missing namespace binding tenant_fingerprint={} namespace_fingerprint={}",
+            identifier_fingerprint(&tenant.id),
+            identifier_fingerprint(&tenant.namespace_binding.namespace)
+        );
     }
-    for namespace in actual_namespaces.difference(&registered_namespaces) {
+    for namespace in diff.orphan {
         metrics::counter!(
             "memory_http_registry_reconciliation_total",
             "kind" => "orphan_namespace"
@@ -533,5 +559,53 @@ mod reconcile_tests {
             matches!(res, Err(MemoryError::Conflict(_))),
             "stale generation must be rejected"
         );
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn classify_namespace_diff_surfaces_missing_and_orphan() {
+        // Two tenants are registered. Only one of them
+        // is present in the privileged engine's namespace
+        // list, and the engine also reports an extra
+        // namespace that no tenant points at.
+        let tenants = vec![reserved_tenant("alive"), reserved_tenant("vanished")];
+        let mut actual = std::collections::HashSet::new();
+        actual.insert("tns_alive".into());
+        actual.insert("tns_unbound".into());
+        let diff = classify_namespace_diff(&tenants, &actual);
+        let missing_ids: Vec<&str> = diff.missing.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(missing_ids, vec!["vanished"]);
+        assert_eq!(diff.orphan, vec!["tns_unbound"]);
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn classify_namespace_diff_is_empty_when_engines_match() {
+        let tenants = vec![reserved_tenant("a"), reserved_tenant("b")];
+        let mut actual = std::collections::HashSet::new();
+        actual.insert("tns_a".into());
+        actual.insert("tns_b".into());
+        let diff = classify_namespace_diff(&tenants, &actual);
+        assert!(diff.missing.is_empty());
+        assert!(diff.orphan.is_empty());
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn classify_namespace_diff_reports_non_tenant_namespaces_as_orphan() {
+        // `classify_namespace_diff` is a pure diff over the
+        // `actual_namespaces` set the caller hands it. The
+        // `tns_*` filter is applied by the caller before
+        // the diff runs, so any non-tenant namespace that
+        // slips through will surface here as an orphan.
+        // This test pins the diff contract; the caller
+        // owns the prefix filter.
+        let tenants = vec![reserved_tenant("a")];
+        let mut actual = std::collections::HashSet::new();
+        actual.insert("tns_a".into());
+        actual.insert("system".into());
+        let diff = classify_namespace_diff(&tenants, &actual);
+        assert!(diff.missing.is_empty());
+        assert_eq!(diff.orphan, vec!["system"]);
     }
 }

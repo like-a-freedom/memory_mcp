@@ -61,3 +61,4 @@
 - HTTP conformance — 20/20 passed
 - HTTP isolation — passed under concurrent two-tenant load
 - UI packaging — positive/negative build contract validated with a temporary bundle; actual `dx` bundle remains an operator prerequisite
+- Post-review hardening — added unit tests for `Pool::evict_idle`, `MemoryMcp::check_inline_extract_size`, `cancel_before_commit_fenced` (success + stale-lease paths), OIDC logout session revocation + cookie header, and replaced subscription recheck `u64 as_secs` truncation with a stored `Duration`; runtime eviction and namespace reconciliation remain tracked-but-not-load-tested pending dedicated CI capacity
