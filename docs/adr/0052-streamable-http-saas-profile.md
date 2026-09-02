@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted and implemented — 2026-08-27 design, implementation completed in the
-`streamable-http-mcp` branch. The reviewed completion plan and the repository
-quality gates are the implementation record; production open-signup launch still
-requires the operational evidence listed in §20.5 of the specification.
+Accepted; core implementation complete, release verification incomplete —
+2026-08-27 design. The Streamable HTTP profile is not production-ready. Public
+open signup remains blocked until the executable and operational evidence in the
+completion plan and `docs/operations/HTTP_RELEASE_GATE.md` has passed.
 
 ## Context
 
